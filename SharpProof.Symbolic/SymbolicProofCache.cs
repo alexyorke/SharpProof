@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicProofCacheStore
-{
+internal static class SymbolicProofCacheStore {
     private const int PerServiceEntryLimit = 2048;
     private const int ProcessFallbackEntryLimit = 4096;
     private static readonly ConditionalWeakTable<SmtAnalysisService, SymbolicProofCache> ServiceCaches = new();
@@ -15,14 +14,12 @@ internal static class SymbolicProofCacheStore
             : FallbackCache;
 }
 
-internal sealed class SymbolicProofCache
-{
+internal sealed class SymbolicProofCache {
     private const string EncodedStatePrefix = "encoded-state:";
     private const string ResultPrefix = "proof-result:";
     private readonly BoundedConcurrentCache<string, object> _values;
 
-    internal SymbolicProofCache(int capacity)
-    {
+    internal SymbolicProofCache(int capacity) {
         _values = new BoundedConcurrentCache<string, object>(capacity, StringComparer.Ordinal);
     }
 
@@ -31,11 +28,9 @@ internal sealed class SymbolicProofCache
     internal long MissCount => _values.MissCount;
     internal long EvictionCount => _values.EvictionCount;
 
-    internal bool TryGetResult(string key, out SymbolicProofInfo result)
-    {
+    internal bool TryGetResult(string key, out SymbolicProofInfo result) {
         if (_values.TryGetValue(ResultPrefix + key, out var value) &&
-            value is SymbolicProofInfo cached)
-        {
+            value is SymbolicProofInfo cached) {
             result = cached;
             return true;
         }
@@ -44,16 +39,13 @@ internal sealed class SymbolicProofCache
         return false;
     }
 
-    internal void TryAddResult(string key, SymbolicProofInfo result)
-    {
+    internal void TryAddResult(string key, SymbolicProofInfo result) {
         _values.TryAdd(ResultPrefix + key, result);
     }
 
-    internal bool TryGetEncodedState(string key, out SymbolicEncodedState entry)
-    {
+    internal bool TryGetEncodedState(string key, out SymbolicEncodedState entry) {
         if (_values.TryGetValue(EncodedStatePrefix + key, out var value) &&
-            value is SymbolicEncodedState cached)
-        {
+            value is SymbolicEncodedState cached) {
             entry = cached;
             return true;
         }
@@ -62,8 +54,7 @@ internal sealed class SymbolicProofCache
         return false;
     }
 
-    internal void TryAddEncodedState(string key, SymbolicEncodedState entry)
-    {
+    internal void TryAddEncodedState(string key, SymbolicEncodedState entry) {
         _values.TryAdd(EncodedStatePrefix + key, entry);
     }
 }

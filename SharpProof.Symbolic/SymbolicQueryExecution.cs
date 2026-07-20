@@ -1,11 +1,9 @@
 namespace SharpProof.Symbolic;
 
-internal sealed partial class SymbolicQueryExecutor
-{
+internal sealed partial class SymbolicQueryExecutor {
     private SymbolicQueryResult QuerySource(
         SymbolicQueryContext request,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (!SupportsSourceTarget(request.Target.Kind) &&
             request.Source.Kind is SymbolicSourceInputKind.File or SymbolicSourceInputKind.Text)
             throw new NotSupportedException(request.Source.Kind == SymbolicSourceInputKind.File
@@ -35,10 +33,8 @@ internal sealed partial class SymbolicQueryExecutor
         Compilation compilation,
         SharpProofTarget target,
         SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
-        return target.Kind switch
-        {
+        CancellationToken cancellationToken) {
+        return target.Kind switch {
             SharpProofTargetKind.Point => SymbolicQueryResult.From(_rangeQueryExecutor.QueryLinePoint(
                 syntaxTree, compilation, target.Line!.Value, target.Column ?? 1, options, cancellationToken)),
             SharpProofTargetKind.Position => SymbolicQueryResult.From(QueryPosition(
@@ -61,8 +57,7 @@ internal sealed partial class SymbolicQueryExecutor
         Compilation compilation,
         int position,
         SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var query = _programPointExecutor.AnalyzeAtPosition(
             syntaxTree,
             compilation,
@@ -88,8 +83,7 @@ internal sealed partial class SymbolicQueryExecutor
         SemanticModel semanticModel,
         SharpProofTarget target,
         SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (target.Kind != SharpProofTargetKind.Node)
             throw new NotSupportedException("Node sources require a node target.");
 
@@ -118,8 +112,7 @@ internal sealed partial class SymbolicQueryExecutor
         SymbolicProgramPointAnalysis analysis,
         IEnumerable<string> conditionTexts,
         SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (conditionTexts == null) return Array.Empty<SymbolicConditionProofResult>();
 
         return conditionTexts
@@ -134,8 +127,7 @@ internal sealed partial class SymbolicQueryExecutor
     private SymbolicConditionProofResult ProveSource(
         SymbolicQueryContext request,
         string conditionText,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (request.Target.Kind != SharpProofTargetKind.Point)
             throw new ArgumentException("Condition proof requests require a point target.", "context");
 
@@ -163,8 +155,7 @@ internal sealed partial class SymbolicQueryExecutor
         SymbolicQueryContext request,
         SmtAnalysisService smtAnalysis,
         SymbolicRuntimeHazardQueryOptions hazardOptions,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (!SupportsRuntimeHazardTarget(request.Target.Kind) &&
             request.Source.Kind != SymbolicSourceInputKind.Node)
             throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");

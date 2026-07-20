@@ -1,6 +1,5 @@
 namespace SharpProof.Attributes;
 
 [AttributeUsage(AttributeTargets.All, Inherited = false)]
-public sealed class ZeroAllocationsAttribute : Attribute
-{
+public sealed class ZeroAllocationsAttribute : Attribute {
 }

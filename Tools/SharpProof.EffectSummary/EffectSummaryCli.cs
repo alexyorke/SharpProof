@@ -39,8 +39,7 @@ internal static class EffectSummaryCli {
                                         $"Unable to resolve artifact spec directory for '{artifactSpecPath}'.");
         var document = ArtifactSpecDocument.Load(artifactSpecPath);
         var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
-        var inputs = new HashSet<string>(pathComparer)
-        {
+        var inputs = new HashSet<string>(pathComparer) {
             artifactSpecPath,
             Path.GetFullPath(typeof(EffectSummaryCli).Assembly.Location)
         };

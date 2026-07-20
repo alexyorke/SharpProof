@@ -1,19 +1,16 @@
 namespace SharpProof.Analyzer;
 
-internal sealed record AnalyzerQueryOutcome<T>(T? Value, SharpProofError? Error) where T : class
-{
+internal sealed record AnalyzerQueryOutcome<T>(T? Value, SharpProofError? Error) where T : class {
     internal bool IsSuccess => Error == null;
 }
 
-internal sealed class MethodBodyAnalysisState
-{
+internal sealed class MethodBodyAnalysisState {
     private readonly ConcurrentDictionary<string, Lazy<object>> _symbolicQueryResults =
         new(StringComparer.Ordinal);
     private readonly SymbolicConditionProofEngine _conditionProofEngine =
         new(new SymbolicInvariantService());
 
-    internal MethodBodyAnalysisState(MethodAnalysisSnapshot snapshot)
-    {
+    internal MethodBodyAnalysisState(MethodAnalysisSnapshot snapshot) {
         Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
     }
 
@@ -22,8 +19,7 @@ internal sealed class MethodBodyAnalysisState
     internal SymbolicQueryExecutor QueryExecutor { get; } = new();
 
     internal AnalyzerQueryOutcome<SymbolicCapabilityResult> GetCapabilityOutcome(
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return GetOrCreateSymbolicQueryResult(
             "capability",
             () => AnalyzerSymbolicQueryBoundary.TryExecute(() => QueryExecutor.QueryCapabilities(
@@ -32,8 +28,7 @@ internal sealed class MethodBodyAnalysisState
     }
 
     internal AnalyzerQueryOutcome<SymbolicComplexityResult> GetComplexityOutcome(
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return GetOrCreateSymbolicQueryResult(
             "complexity",
             () => AnalyzerSymbolicQueryBoundary.TryExecute(() => QueryExecutor.QueryComplexity(
@@ -46,8 +41,7 @@ internal sealed class MethodBodyAnalysisState
         string condition,
         SmtAnalysisService smtAnalysis,
         bool includeCurrentStatementCompletionFacts,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return ProveAtNode(node, condition, cancellationToken, () => _conditionProofEngine.ProveAtSyntaxNode(
             Snapshot.SemanticModel,
             node,
@@ -64,8 +58,7 @@ internal sealed class MethodBodyAnalysisState
         SymbolicState initialState,
         SmtAnalysisService smtAnalysis,
         bool includeCurrentStatementCompletionFacts,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return ProveAtNode(node, condition, cancellationToken, () => _conditionProofEngine.ProveAtSyntaxNode(
             Snapshot.SemanticModel,
             node,
@@ -81,8 +74,7 @@ internal sealed class MethodBodyAnalysisState
         SyntaxNode node,
         string condition,
         CancellationToken cancellationToken,
-        Func<SymbolicConditionProofResult> prove)
-    {
+        Func<SymbolicConditionProofResult> prove) {
         ValidateNode(node);
         return AnalyzerSymbolicQueryBoundary.ResolveProof(
             AnalyzerSymbolicQueryBoundary.TryExecute(prove),
@@ -90,8 +82,7 @@ internal sealed class MethodBodyAnalysisState
             cancellationToken);
     }
 
-    private void ValidateNode(SyntaxNode node)
-    {
+    private void ValidateNode(SyntaxNode node) {
         if (node == null) throw new ArgumentNullException(nameof(node));
         if (node.SyntaxTree != Snapshot.Declaration.SyntaxTree)
             throw new ArgumentException(
@@ -102,8 +93,7 @@ internal sealed class MethodBodyAnalysisState
     internal T GetOrCreateSymbolicQueryResult<T>(
         string queryKey,
         Func<T> query)
-        where T : class
-    {
+        where T : class {
         if (string.IsNullOrWhiteSpace(queryKey))
             throw new ArgumentException("A symbolic query key is required.", nameof(queryKey));
 
@@ -114,12 +104,10 @@ internal sealed class MethodBodyAnalysisState
             _ => new Lazy<object>(
                 () => query(),
                 LazyThreadSafetyMode.ExecutionAndPublication));
-        try
-        {
+        try {
             return (T)lazy.Value;
         }
-        catch
-        {
+        catch {
             if (_symbolicQueryResults.TryGetValue(queryKey, out var current) &&
                 ReferenceEquals(current, lazy))
                 _symbolicQueryResults.TryRemove(queryKey, out _);
@@ -130,16 +118,12 @@ internal sealed class MethodBodyAnalysisState
 
 }
 
-internal static class AnalyzerSymbolicQueryBoundary
-{
-    internal static AnalyzerQueryOutcome<T> TryExecute<T>(Func<T> operation) where T : class
-    {
-        try
-        {
+internal static class AnalyzerSymbolicQueryBoundary {
+    internal static AnalyzerQueryOutcome<T> TryExecute<T>(Func<T> operation) where T : class {
+        try {
             return new AnalyzerQueryOutcome<T>(operation(), null);
         }
-        catch (Exception exception) when (!SymbolicErrorClassifier.IsFatal(exception))
-        {
+        catch (Exception exception) when (!SymbolicErrorClassifier.IsFatal(exception)) {
             return new AnalyzerQueryOutcome<T>(null, SymbolicErrorClassifier.FromException(exception));
         }
     }
@@ -147,8 +131,7 @@ internal static class AnalyzerSymbolicQueryBoundary
     internal static SymbolicConditionProofResult ResolveProof(
         AnalyzerQueryOutcome<SymbolicConditionProofResult> outcome,
         string condition,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (outcome.IsSuccess && outcome.Value != null) return outcome.Value;
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -165,16 +148,14 @@ internal static class AnalyzerSymbolicQueryBoundary
     }
 }
 
-internal sealed class MethodBodyAnalysisContext
-{
+internal sealed class MethodBodyAnalysisContext {
     private readonly Action<Diagnostic> _reportDiagnostic;
 
     internal MethodBodyAnalysisContext(
         MethodBodyAnalysisState state,
         AnalyzerTreeConfiguration configuration,
         CancellationToken cancellationToken,
-        Action<Diagnostic> reportDiagnostic)
-    {
+        Action<Diagnostic> reportDiagnostic) {
         State = state ?? throw new ArgumentNullException(nameof(state));
         Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         CancellationToken = cancellationToken;
@@ -195,8 +176,7 @@ internal sealed class MethodBodyAnalysisContext
 
     internal CancellationToken CancellationToken { get; }
 
-    internal void ReportDiagnostic(Diagnostic diagnostic)
-    {
+    internal void ReportDiagnostic(Diagnostic diagnostic) {
         _reportDiagnostic(diagnostic);
     }
 }

@@ -8,8 +8,7 @@ internal sealed class SymbolicSourceCompilationProfile(
     DocumentationMode documentationMode = DocumentationMode.Parse,
     Platform platform = Platform.AnyCpu,
     OptimizationLevel optimizationLevel = OptimizationLevel.Debug,
-    string? assemblyName = null)
-{
+    string? assemblyName = null) {
     public static readonly SymbolicSourceCompilationProfile Default = new();
 
     public LanguageVersion LanguageVersion { get; } = ValidateDefinedEnum(languageVersion, nameof(languageVersion));
@@ -31,14 +30,12 @@ internal sealed class SymbolicSourceCompilationProfile(
 
     public string? AssemblyName { get; } = NormalizeAssemblyName(assemblyName);
 
-    private static ImmutableArray<string> NormalizePreprocessorSymbols(IEnumerable<string>? symbols)
-    {
+    private static ImmutableArray<string> NormalizePreprocessorSymbols(IEnumerable<string>? symbols) {
         if (symbols == null) return ImmutableArray<string>.Empty;
 
         var builder = ImmutableArray.CreateBuilder<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var symbol in symbols)
-        {
+        foreach (var symbol in symbols) {
             if (string.IsNullOrWhiteSpace(symbol))
                 throw new ArgumentException("Preprocessor symbols cannot contain empty entries.", nameof(symbols));
 
@@ -54,8 +51,7 @@ internal sealed class SymbolicSourceCompilationProfile(
         return builder.ToImmutable();
     }
 
-    private static string? NormalizeAssemblyName(string? assemblyName)
-    {
+    private static string? NormalizeAssemblyName(string? assemblyName) {
         if (assemblyName == null) return null;
 
         if (string.IsNullOrWhiteSpace(assemblyName))
@@ -65,8 +61,7 @@ internal sealed class SymbolicSourceCompilationProfile(
     }
 
     private static TEnum ValidateDefinedEnum<TEnum>(TEnum value, string parameterName)
-        where TEnum : struct
-    {
+        where TEnum : struct {
         if (!Enum.IsDefined(typeof(TEnum), value))
             throw new ArgumentOutOfRangeException(parameterName, value, "Value is not defined.");
         return value;

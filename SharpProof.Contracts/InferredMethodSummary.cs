@@ -2,23 +2,20 @@ using SharpProof.Identity;
 
 namespace SharpProof.Inference;
 
-internal enum InferredPurity
-{
+internal enum InferredPurity {
     Unknown,
     Pure,
     Impure
 }
 
-internal enum InferredSummarySource
-{
+internal enum InferredSummarySource {
     SymbolicBody,
     EffectSummary,
     MetadataContract,
     ManualOverride
 }
 
-internal enum InferredFreshness
-{
+internal enum InferredFreshness {
     Unknown,
     None,
     FreshOwnedArray,
@@ -27,16 +24,14 @@ internal enum InferredFreshness
     FreshByRefLikeView
 }
 
-internal enum InferredEffectVisibility
-{
+internal enum InferredEffectVisibility {
     Unknown,
     None,
     InternalOnly,
     CallerVisible
 }
 
-internal enum InferredSummaryUnknownReason
-{
+internal enum InferredSummaryUnknownReason {
     None,
     MissingBody,
     MissingSummary,
@@ -49,8 +44,7 @@ internal enum InferredSummaryUnknownReason
 }
 
 [Flags]
-internal enum InferredMethodEffects : long
-{
+internal enum InferredMethodEffects : long {
     None = 0,
     AllocatesObject = 1L << 0,
     AllocatesArray = 1L << 1,
@@ -77,16 +71,14 @@ internal sealed record MethodSummaryCacheKey(
     string MethodBodySha256,
     string ConfigurationHash,
     string TargetFramework,
-    int SchemaVersion)
-{
+    int SchemaVersion) {
     internal static MethodSummaryCacheKey Create(
         StructuralMethodIdentity method,
         string? assemblyIdentity,
         string? methodBodySha256,
         string? configurationHash,
         string? targetFramework,
-        int schemaVersion)
-    {
+        int schemaVersion) {
         if (method == null) throw new ArgumentNullException(nameof(method));
         if (schemaVersion <= 0) throw new ArgumentOutOfRangeException(nameof(schemaVersion));
 
@@ -102,8 +94,7 @@ internal sealed record MethodSummaryCacheKey(
     private static string Normalize(string? value) => value?.Trim() ?? string.Empty;
 }
 
-internal sealed class InferredMethodSummary
-{
+internal sealed class InferredMethodSummary {
     internal const int SchemaVersion = 1;
 
     internal InferredMethodSummary(
@@ -115,8 +106,7 @@ internal sealed class InferredMethodSummary
         InferredEffectVisibility effectVisibility,
         IEnumerable<string>? thrownExceptionTypes = null,
         IEnumerable<string>? blockingCallChain = null,
-        InferredSummaryUnknownReason unknownReason = InferredSummaryUnknownReason.None)
-    {
+        InferredSummaryUnknownReason unknownReason = InferredSummaryUnknownReason.None) {
         Identity = identity ?? throw new ArgumentNullException(nameof(identity));
         if (purity == InferredPurity.Unknown && unknownReason == InferredSummaryUnknownReason.None)
             throw new ArgumentException("Unknown purity requires an explicit reason.", nameof(unknownReason));
@@ -159,14 +149,12 @@ internal sealed class InferredMethodSummary
         string? effectVisibility,
         IEnumerable<string>? thrownExceptionTypes,
         IEnumerable<string>? blockingCallChain,
-        IEnumerable<string>? categories)
-    {
+        IEnumerable<string>? categories) {
         if (effects == null) throw new ArgumentNullException(nameof(effects));
 
         var effectValues = effects.ToImmutableArray();
         var categoryValues = categories?.ToImmutableArray() ?? ImmutableArray<string>.Empty;
-        var purity = classification switch
-        {
+        var purity = classification switch {
             "pure" => InferredPurity.Pure,
             "impure" => InferredPurity.Impure,
             _ => InferredPurity.Unknown
@@ -185,12 +173,10 @@ internal sealed class InferredMethodSummary
                 : InferredSummaryUnknownReason.None);
     }
 
-    private static InferredMethodEffects GetEffects(ImmutableArray<string> effects)
-    {
+    private static InferredMethodEffects GetEffects(ImmutableArray<string> effects) {
         var result = InferredMethodEffects.None;
         foreach (var effect in effects)
-            result |= effect switch
-            {
+            result |= effect switch {
                 "allocates_object" => InferredMethodEffects.AllocatesObject,
                 "allocates_array" => InferredMethodEffects.AllocatesArray,
                 "allocates_box" => InferredMethodEffects.Boxes,
@@ -215,10 +201,8 @@ internal sealed class InferredMethodSummary
         return result;
     }
 
-    private static InferredFreshness GetFreshness(string? freshness)
-    {
-        return freshness switch
-        {
+    private static InferredFreshness GetFreshness(string? freshness) {
+        return freshness switch {
             "none" => InferredFreshness.None,
             "fresh_owned_array_write" or "direct_fresh_array_allocation" =>
                 InferredFreshness.FreshOwnedArray,
@@ -227,10 +211,8 @@ internal sealed class InferredMethodSummary
         };
     }
 
-    private static InferredEffectVisibility GetEffectVisibility(string? visibility)
-    {
-        return visibility switch
-        {
+    private static InferredEffectVisibility GetEffectVisibility(string? visibility) {
+        return visibility switch {
             "none" => InferredEffectVisibility.None,
             "internal_only" => InferredEffectVisibility.InternalOnly,
             "caller_visible" => InferredEffectVisibility.CallerVisible,
@@ -240,8 +222,7 @@ internal sealed class InferredMethodSummary
 
     private static InferredSummaryUnknownReason GetUnknownReason(
         ImmutableArray<string> effects,
-        ImmutableArray<string> categories)
-    {
+        ImmutableArray<string> categories) {
         if (categories.Contains("recursive_cycle", StringComparer.Ordinal))
             return InferredSummaryUnknownReason.RecursiveCycle;
         if (categories.Contains("dynamic_dispatch", StringComparer.Ordinal) ||
@@ -257,8 +238,7 @@ internal sealed class InferredMethodSummary
         return InferredSummaryUnknownReason.MissingSummary;
     }
 
-    private static ImmutableArray<string> Normalize(IEnumerable<string>? values)
-    {
+    private static ImmutableArray<string> Normalize(IEnumerable<string>? values) {
         return values == null
             ? ImmutableArray<string>.Empty
             : values.Where(static value => !string.IsNullOrWhiteSpace(value))

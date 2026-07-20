@@ -2,8 +2,7 @@ namespace SharpProof;
 
     [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(SharpProofCodeFixProvider))]
     [Shared]
-    public sealed partial class SharpProofCodeFixProvider : CodeFixProvider
-    {
+    public sealed partial class SharpProofCodeFixProvider : CodeFixProvider {
         private static readonly ImmutableArray<string> AllFixableDiagnosticIds = new[]
             { 2, 3, 5, 7, 8, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 4, 6, 29, 34, 35, 36, 37, 38, 39, 46, 45 }
             .Select(static number => $"SP{number:0000}")
@@ -13,8 +12,7 @@ namespace SharpProof;
 
         public override FixAllProvider? GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
-        public override async Task RegisterCodeFixesAsync(CodeFixContext context)
-        {
+        public override async Task RegisterCodeFixesAsync(CodeFixContext context) {
             var diagnostic = context.Diagnostics[0];
             var document = context.Document;
             var root = await document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
@@ -23,15 +21,13 @@ namespace SharpProof;
             var configuration = AnalyzerConfiguration.FromOptions(document.Project.AnalyzerOptions);
             var attributePolicy = SharpProofAttributeIdentityPolicy.Create(configuration.AttributeStubNamespaces);
 
-            if (TryGetSimpleRemoval(diagnostic.Id, out var removal))
-            {
+            if (TryGetSimpleRemoval(diagnostic.Id, out var removal)) {
                 RegisterSimpleRemovalCodeFix(context, document, root, diagnostic, attributePolicy, removal);
                 return;
             }
 
             if (!int.TryParse(diagnostic.Id.Substring(2), out var diagnosticNumber)) return;
-            switch (diagnosticNumber)
-            {
+            switch (diagnosticNumber) {
                 case 4:
                     RegisterAddPurityCodeFix(context, document, root, diagnostic, attributePolicy);
                     break;
@@ -50,10 +46,8 @@ namespace SharpProof;
             }
         }
 
-        private static bool TryGetSimpleRemoval(string diagnosticId, out SimpleRemovalRegistration registration)
-        {
-            registration = diagnosticId switch
-            {
+        private static bool TryGetSimpleRemoval(string diagnosticId, out SimpleRemovalRegistration registration) {
+            registration = diagnosticId switch {
                 "SP0002" => new(diagnosticId, "Remove [EnforcePure] and [Pure] attributes", SimpleRemovalOperation.DeclarationAndAccessors, "RemoveAttributesMatchingAsyncSP0002", "EnforcePureAttribute", "PureAttribute"),
                 "SP0003" => new(diagnosticId, "Remove misplaced purity attribute", SimpleRemovalOperation.MisplacedAttribute, "RemoveMisplacedAttributeAsync"),
                 "SP0005" => new(diagnosticId, "Remove conflicting purity boundary attributes", SimpleRemovalOperation.DeclarationAndAccessors, "RemoveAttributesMatchingAsyncSP0005", "PureAttribute", "PureExternalAttribute", "ImpureAttribute"),
@@ -75,8 +69,7 @@ namespace SharpProof;
             return registration != null;
         }
 
-        private enum SimpleRemovalOperation
-        {
+        private enum SimpleRemovalOperation {
             MisplacedAttribute,
             DeclarationAndAccessors,
             DiagnosticContract
@@ -91,8 +84,7 @@ namespace SharpProof;
 
         private void RegisterAddPurityCodeFix(
             CodeFixContext context, Document document, SyntaxNode root, Diagnostic diagnostic,
-            SharpProofAttributeIdentityPolicy attributePolicy)
-        {
+            SharpProofAttributeIdentityPolicy attributePolicy) {
             if (!TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declaration) ||
                 declaration is PropertyDeclarationSyntax or IndexerDeclarationSyntax)
                 return;
@@ -105,8 +97,7 @@ namespace SharpProof;
 
         private void RegisterSynchronizationCodeFix(
             CodeFixContext context, Document document, SyntaxNode root, Diagnostic diagnostic,
-            SharpProofAttributeIdentityPolicy attributePolicy)
-        {
+            SharpProofAttributeIdentityPolicy attributePolicy) {
             if (!TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declaration))
                 return;
 
@@ -122,8 +113,7 @@ namespace SharpProof;
         }
 
         private static void RegisterMisplacedRequiresCodeFix(
-            CodeFixContext context, Document document, SyntaxNode root, Diagnostic diagnostic)
-        {
+            CodeFixContext context, Document document, SyntaxNode root, Diagnostic diagnostic) {
             if (!TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var attribute)) return;
 
             if (CanMoveAttributeToGetter(attribute))
@@ -137,8 +127,7 @@ namespace SharpProof;
         }
 
         private static void RegisterNullForgivingCodeFix(
-            CodeFixContext context, Document document, SyntaxNode root, Diagnostic diagnostic)
-        {
+            CodeFixContext context, Document document, SyntaxNode root, Diagnostic diagnostic) {
             if (!TryFindNullForgivingExpression(root, diagnostic.Location.SourceSpan, out var suppression)) return;
 
             Register(context, diagnostic, "Remove unnecessary null-forgiving operator",
@@ -158,12 +147,10 @@ namespace SharpProof;
         internal static bool TryFindNullForgivingExpression(
             SyntaxNode root,
             TextSpan span,
-            out PostfixUnaryExpressionSyntax suppression)
-        {
+            out PostfixUnaryExpressionSyntax suppression) {
             for (var node = root.FindToken(span.Start).Parent; node != null; node = node.Parent)
                 if (node is PostfixUnaryExpressionSyntax postfix &&
-                    postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression))
-                {
+                    postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression)) {
                     suppression = postfix;
                     return true;
                 }
@@ -172,8 +159,7 @@ namespace SharpProof;
             return false;
         }
 
-        internal static ExpressionSyntax RemoveNullForgivingOperator(PostfixUnaryExpressionSyntax suppression)
-        {
+        internal static ExpressionSyntax RemoveNullForgivingOperator(PostfixUnaryExpressionSyntax suppression) {
             var operand = suppression.Operand;
             return operand.WithTrailingTrivia(
                 operand.GetTrailingTrivia().AddRange(suppression.GetTrailingTrivia()));

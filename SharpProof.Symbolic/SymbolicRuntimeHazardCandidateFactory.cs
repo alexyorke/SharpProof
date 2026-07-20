@@ -3,8 +3,7 @@ using static SharpProof.Symbolic.SymbolicRuntimeHazardSyntaxFacts;
 
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicRuntimeHazardCandidateFactory
-{
+internal static class SymbolicRuntimeHazardCandidateFactory {
     private static readonly TryLowerOperationHazard[] OperationHazardLowerers =
     [
         SymbolicOperationLowerer.TryLowerDivideByZeroHazard,
@@ -33,20 +32,17 @@ internal static class SymbolicRuntimeHazardCandidateFactory
         SyntaxNode root,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        bool includeNestedCallables)
-    {
+        bool includeNestedCallables) {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var node in root.DescendantNodesAndSelf(
                      descendIntoTrivia: false,
                      descendIntoChildren: candidate =>
                          includeNestedCallables ||
                          ReferenceEquals(candidate, root) ||
-                         !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-        {
+                         !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))) {
             cancellationToken.ThrowIfCancellationRequested();
 
-            foreach (var candidate in EnumerateCandidatesForNode(node, semanticModel, cancellationToken))
-            {
+            foreach (var candidate in EnumerateCandidatesForNode(node, semanticModel, cancellationToken)) {
                 var key = candidate.Kind + ":" + candidate.Site.SpanStart + ":" + candidate.Site.Span.End;
                 if (seen.Add(key)) yield return candidate;
             }
@@ -56,8 +52,7 @@ internal static class SymbolicRuntimeHazardCandidateFactory
     private static IEnumerable<RuntimeHazardCandidate> EnumerateCandidatesForNode(
         SyntaxNode node,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var operation = semanticModel.GetOperation(node, cancellationToken);
         if (operation != null)

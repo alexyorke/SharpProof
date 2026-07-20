@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal enum SymbolicCapabilityUnknownReason
-{
+internal enum SymbolicCapabilityUnknownReason {
     None,
     UnsupportedTarget,
     NoContainingMethodLikeBody,
@@ -27,8 +26,7 @@ internal sealed record SymbolicCapabilitySite(
     int SourceSpanStart,
     int SourceSpanLength,
     int SourceLine,
-    int SourceColumn)
-{
+    int SourceColumn) {
     public SymbolicUnknownReasonInfo UnknownReasonInfo { get; } =
         SymbolicUnknownReasonTaxonomy.ForCapability(UnknownReason);
 }
@@ -58,8 +56,7 @@ internal sealed record SymbolicCapabilityResult(
         StartLine,
         StartColumn,
         EndLine,
-        EndColumn)
-{
+        EndColumn) {
     public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; } =
         UnknownReasons
         .Select(SymbolicUnknownReasonTaxonomy.ForCapability)

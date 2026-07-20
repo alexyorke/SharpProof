@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowEngine
-{
+internal static partial class ExceptionFlowEngine {
     private readonly record struct ProvenRuntimeHazardSite(
         SymbolicRuntimeHazard Hazard,
         SyntaxNode Site,
@@ -52,8 +51,7 @@ internal static partial class ExceptionFlowEngine
     private static ProvenRuntimeHazardSite? TryProjectHazard(
         SyntaxNode methodNode,
         SymbolicRuntimeHazard hazard,
-        int inputOrder)
-    {
+        int inputOrder) {
         if (hazard.Status != SymbolicRuntimeHazardStatus.Proven) return null;
         var site = ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard);
         var projection = MapHazard(hazard, site);
@@ -69,8 +67,7 @@ internal static partial class ExceptionFlowEngine
                 projection.BeforeCallees);
     }
 
-    private static HazardProjection? MapHazard(SymbolicRuntimeHazard hazard, SyntaxNode site) => hazard.Kind switch
-    {
+    private static HazardProjection? MapHazard(SymbolicRuntimeHazard hazard, SyntaxNode site) => hazard.Kind switch {
         SymbolicRuntimeHazardKind.DirectThrow or SymbolicRuntimeHazardKind.Rethrow =>
             new(ExceptionSources.Throw, 0, BeforeCallees: true),
         SymbolicRuntimeHazardKind.DivideByZero =>

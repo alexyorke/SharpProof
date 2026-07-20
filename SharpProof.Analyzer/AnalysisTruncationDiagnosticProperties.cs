@@ -1,11 +1,9 @@
 namespace SharpProof.Analyzer;
 
-internal static class AnalysisTruncationDiagnosticProperties
-{
+internal static class AnalysisTruncationDiagnosticProperties {
     internal static ImmutableDictionary<string, string?> Add(
         ImmutableDictionary<string, string?> properties,
-        SymbolicAnalysisTruncationInfo truncation)
-    {
+        SymbolicAnalysisTruncationInfo truncation) {
         if (properties == null) throw new ArgumentNullException(nameof(properties));
 
         if (truncation == null) throw new ArgumentNullException(nameof(truncation));
@@ -25,8 +23,7 @@ internal static class AnalysisTruncationDiagnosticProperties
                 string.Join(";", orderedEvents.Select(FormatEvent)));
     }
 
-    private static string FormatEvent(SymbolicAnalysisTruncationEvent item)
-    {
+    private static string FormatEvent(SymbolicAnalysisTruncationEvent item) {
         return string.Join(
             "|",
             item.Code,

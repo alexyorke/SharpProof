@@ -1,15 +1,12 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal sealed partial class SmtConcreteFactIndex
-{
-        private bool TryAddStringValueFact(SmtFormula formula, out bool hasContradiction)
-        {
+internal sealed partial class SmtConcreteFactIndex {
+        private bool TryAddStringValueFact(SmtFormula formula, out bool hasContradiction) {
             hasContradiction = false;
             if (!TryGetStringComparison(formula, out var term, out var op, out var value)) return false;
 
             term = NormalizeAliases(term);
-            if (op == SmtBinaryOperator.NotEqual)
-            {
+            if (op == SmtBinaryOperator.NotEqual) {
                 if (_exactStrings.TryGetValue(term, out var exactValue) &&
                     string.Equals(exactValue, value, StringComparison.Ordinal))
                     hasContradiction = true;
@@ -34,14 +31,12 @@ internal sealed partial class SmtConcreteFactIndex
             return true;
         }
 
-        private bool TryAddReferenceNullFact(SmtFormula formula, out bool hasContradiction)
-        {
+        private bool TryAddReferenceNullFact(SmtFormula formula, out bool hasContradiction) {
             hasContradiction = false;
             if (!TryGetReferenceNullComparison(formula, out var term, out var isNull)) return false;
 
             term = NormalizeAliases(term);
-            if (term is SmtNullConstant)
-            {
+            if (term is SmtNullConstant) {
                 hasContradiction = !isNull;
                 return hasContradiction;
             }
@@ -53,8 +48,7 @@ internal sealed partial class SmtConcreteFactIndex
                 _referenceNullStates[term] = isNull;
 
             if (term is SmtConditionalFormula { Kind: SmtValueKind.Reference } conditional &&
-                TryEvaluateBoolean(conditional.Condition, out var conditionValue))
-            {
+                TryEvaluateBoolean(conditional.Condition, out var conditionValue)) {
                 var selectedBranch = conditionValue ? conditional.WhenTrue : conditional.WhenFalse;
                 var selectedBranchFact = new SmtBinaryFormula(
                     isNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
@@ -70,8 +64,7 @@ internal sealed partial class SmtConcreteFactIndex
         private static bool TryGetReferenceNullComparison(
             SmtFormula formula,
             out SmtFormula term,
-            out bool isNull)
-        {
+            out bool isNull) {
             term = null!;
             isNull = false;
 
@@ -85,15 +78,13 @@ internal sealed partial class SmtConcreteFactIndex
             if (op is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual)) return false;
 
             var comparisonIsNull = op == SmtBinaryOperator.Equal;
-            if (binary.Left is SmtNullConstant && binary.Right.Kind == SmtValueKind.Reference)
-            {
+            if (binary.Left is SmtNullConstant && binary.Right.Kind == SmtValueKind.Reference) {
                 term = binary.Right;
                 isNull = comparisonIsNull;
                 return true;
             }
 
-            if (binary.Right is SmtNullConstant && binary.Left.Kind == SmtValueKind.Reference)
-            {
+            if (binary.Right is SmtNullConstant && binary.Left.Kind == SmtValueKind.Reference) {
                 term = binary.Left;
                 isNull = comparisonIsNull;
                 return true;
@@ -102,8 +93,7 @@ internal sealed partial class SmtConcreteFactIndex
             return false;
         }
 
-        private bool TryEvaluateReferenceComparison(SmtBinaryFormula binary, out bool value)
-        {
+        private bool TryEvaluateReferenceComparison(SmtBinaryFormula binary, out bool value) {
             value = false;
             if (binary.Operator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual) ||
                 binary.Left.Kind != SmtValueKind.Reference ||
@@ -112,8 +102,7 @@ internal sealed partial class SmtConcreteFactIndex
 
             var left = NormalizeAliases(binary.Left);
             var right = NormalizeAliases(binary.Right);
-            if (left.Equals(right))
-            {
+            if (left.Equals(right)) {
                 value = binary.Operator == SmtBinaryOperator.Equal;
                 return true;
             }
@@ -131,11 +120,9 @@ internal sealed partial class SmtConcreteFactIndex
             return true;
         }
 
-        internal bool TryGetKnownReferenceNullState(SmtFormula formula, out bool isNull)
-        {
+        internal bool TryGetKnownReferenceNullState(SmtFormula formula, out bool isNull) {
             formula = NormalizeAliases(formula);
-            if (formula is SmtNullConstant)
-            {
+            if (formula is SmtNullConstant) {
                 isNull = true;
                 return true;
             }
@@ -155,8 +142,7 @@ internal sealed partial class SmtConcreteFactIndex
         private void AddStringLengthFact(
             SmtFormula stringFormula,
             int length,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             stringFormula = NormalizeAliases(stringFormula);
             var lengthFormula = new SmtStringLengthTerm(stringFormula);
             var interval = _integerIntervals.TryGetValue(lengthFormula, out var existing)
@@ -167,17 +153,14 @@ internal sealed partial class SmtConcreteFactIndex
             _integerIntervals[lengthFormula] = interval;
         }
 
-        internal bool TryGetKnownString(SmtFormula formula, out string value)
-        {
+        internal bool TryGetKnownString(SmtFormula formula, out string value) {
             formula = NormalizeAliases(formula);
-            if (_exactStrings.TryGetValue(formula, out var exactValue))
-            {
+            if (_exactStrings.TryGetValue(formula, out var exactValue)) {
                 value = exactValue;
                 return true;
             }
 
-            switch (formula)
-            {
+            switch (formula) {
                 case SmtStringConstant stringConstant:
                     value = stringConstant.Value;
                     return true;
@@ -196,11 +179,9 @@ internal sealed partial class SmtConcreteFactIndex
             }
         }
 
-        private bool TryGetKnownStringLength(SmtFormula formula, out long length)
-        {
+        private bool TryGetKnownStringLength(SmtFormula formula, out long length) {
             formula = NormalizeAliases(formula);
-            if (TryGetKnownString(formula, out var stringValue))
-            {
+            if (TryGetKnownString(formula, out var stringValue)) {
                 length = stringValue.Length;
                 return true;
             }
@@ -208,28 +189,23 @@ internal sealed partial class SmtConcreteFactIndex
             var lengthFormula = new SmtStringLengthTerm(formula);
             if (_integerIntervals.TryGetValue(lengthFormula, out var interval) &&
                 interval.ExactValue is { } exactLength &&
-                exactLength >= 0)
-            {
+                exactLength >= 0) {
                 length = exactLength;
                 return true;
             }
 
-            switch (formula)
-            {
+            switch (formula) {
                 case SmtStringConcatTerm concat
                     when TryGetKnownStringLength(concat.Left, out var leftLength) &&
                          TryGetKnownStringLength(concat.Right, out var rightLength):
-                    try
-                    {
-                        checked
-                        {
+                    try {
+                        checked {
                             length = leftLength + rightLength;
                         }
 
                         return true;
                     }
-                    catch (OverflowException)
-                    {
+                    catch (OverflowException) {
                         break;
                     }
 
@@ -257,8 +233,7 @@ internal sealed partial class SmtConcreteFactIndex
             SmtFormula formula,
             out SmtFormula term,
             out SmtBinaryOperator op,
-            out string value)
-        {
+            out string value) {
             term = null!;
             op = default;
             value = string.Empty;
@@ -272,8 +247,7 @@ internal sealed partial class SmtConcreteFactIndex
             if (effectiveOperator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual)) return false;
 
             if (binary.Left.Kind == SmtValueKind.String &&
-                binary.Right is SmtStringConstant rightConstant)
-            {
+                binary.Right is SmtStringConstant rightConstant) {
                 term = binary.Left;
                 op = effectiveOperator;
                 value = rightConstant.Value;
@@ -281,8 +255,7 @@ internal sealed partial class SmtConcreteFactIndex
             }
 
             if (binary.Left is SmtStringConstant leftConstant &&
-                binary.Right.Kind == SmtValueKind.String)
-            {
+                binary.Right.Kind == SmtValueKind.String) {
                 term = binary.Right;
                 op = effectiveOperator;
                 value = leftConstant.Value;

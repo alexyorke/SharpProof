@@ -1,36 +1,29 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal static class SmtFormulaTraversal
-{
-    internal static IEnumerable<SmtFormula> EnumerateConjuncts(SmtFormula formula)
-    {
-        if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } conjunction)
-        {
+internal static class SmtFormulaTraversal {
+    internal static IEnumerable<SmtFormula> EnumerateConjuncts(SmtFormula formula) {
+        if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } conjunction) {
             foreach (var item in EnumerateConjuncts(conjunction.Left)) yield return item;
             foreach (var item in EnumerateConjuncts(conjunction.Right)) yield return item;
         }
-        else
-        {
+        else {
             yield return formula;
         }
     }
 
-    internal static IEnumerable<SmtFormula> Enumerate(SmtFormula root)
-    {
+    internal static IEnumerable<SmtFormula> Enumerate(SmtFormula root) {
         if (root == null) throw new ArgumentNullException(nameof(root));
 
         var stack = new Stack<SmtFormula>();
         stack.Push(root);
-        while (stack.Count > 0)
-        {
+        while (stack.Count > 0) {
             var current = stack.Pop();
             yield return current;
             PushChildrenInReverse(current, stack);
         }
     }
 
-    internal static bool Contains(SmtFormula root, Func<SmtFormula, bool> predicate)
-    {
+    internal static bool Contains(SmtFormula root, Func<SmtFormula, bool> predicate) {
         if (predicate == null) throw new ArgumentNullException(nameof(predicate));
 
         return Enumerate(root).Any(predicate);
@@ -38,8 +31,7 @@ internal static class SmtFormulaTraversal
 
     internal static SmtFormula MapChildren(
         SmtFormula formula,
-        Func<SmtFormula, SmtFormula> map)
-    {
+        Func<SmtFormula, SmtFormula> map) {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
         if (map == null) throw new ArgumentNullException(nameof(map));
 
@@ -57,8 +49,7 @@ internal static class SmtFormulaTraversal
     internal static SmtFormula RewriteBottomUp(
         SmtFormula root,
         Func<SmtFormula, SmtFormula> rewrite,
-        out bool changed)
-    {
+        out bool changed) {
         if (root == null) throw new ArgumentNullException(nameof(root));
         if (rewrite == null) throw new ArgumentNullException(nameof(rewrite));
 
@@ -67,11 +58,9 @@ internal static class SmtFormulaTraversal
         var results = new Stack<SmtFormula>();
         frames.Push(new TraversalFrame(root, false));
 
-        while (frames.Count > 0)
-        {
+        while (frames.Count > 0) {
             var frame = frames.Pop();
-            if (!frame.Visited)
-            {
+            if (!frame.Visited) {
                 frames.Push(new TraversalFrame(frame.Formula, true));
                 PushChildrenInReverse(frame.Formula, frames);
                 continue;
@@ -90,14 +79,12 @@ internal static class SmtFormulaTraversal
         return results.Pop();
     }
 
-    internal static bool IsWithinDepth(SmtFormula root, int maxDepth)
-    {
+    internal static bool IsWithinDepth(SmtFormula root, int maxDepth) {
         if (root == null) throw new ArgumentNullException(nameof(root));
 
         var stack = new Stack<(SmtFormula Formula, int Depth)>();
         stack.Push((root, 1));
-        while (stack.Count > 0)
-        {
+        while (stack.Count > 0) {
             var (formula, depth) = stack.Pop();
             if (depth > maxDepth) return false;
 
@@ -109,18 +96,15 @@ internal static class SmtFormulaTraversal
         return true;
     }
 
-    internal static bool AreStructurallyEqual(SmtFormula left, SmtFormula right)
-    {
+    internal static bool AreStructurallyEqual(SmtFormula left, SmtFormula right) {
         var pairs = new Stack<FormulaPair>();
         pairs.Push(new FormulaPair(left, right));
-        while (pairs.Count > 0)
-        {
+        while (pairs.Count > 0) {
             var pair = pairs.Pop();
             if (ReferenceEquals(pair.Left, pair.Right)) continue;
             if (pair.Left.GetType() != pair.Right.GetType() || pair.Left.Kind != pair.Right.Kind) return false;
 
-            switch (pair.Left)
-            {
+            switch (pair.Left) {
                 case SmtBooleanConstant leftValue when pair.Right is SmtBooleanConstant rightValue:
                     if (leftValue.Value != rightValue.Value) return false;
                     break;
@@ -205,23 +189,19 @@ internal static class SmtFormulaTraversal
     private static int GetChildCount(SmtFormula formula) =>
         GetChildren(formula).Count;
 
-    private static void PushChildrenInReverse(SmtFormula formula, Stack<SmtFormula> stack)
-    {
+    private static void PushChildrenInReverse(SmtFormula formula, Stack<SmtFormula> stack) {
         var children = GetChildren(formula);
         for (var index = children.Count - 1; index >= 0; index--) stack.Push(children[index]);
     }
 
-    private static void PushChildrenInReverse(SmtFormula formula, Stack<TraversalFrame> stack)
-    {
+    private static void PushChildrenInReverse(SmtFormula formula, Stack<TraversalFrame> stack) {
         var children = GetChildren(formula);
         for (var index = children.Count - 1; index >= 0; index--)
             stack.Push(new TraversalFrame(children[index], false));
     }
 
-    private static FormulaChildren GetChildren(SmtFormula formula)
-    {
-        return formula switch
-        {
+    private static FormulaChildren GetChildren(SmtFormula formula) {
+        return formula switch {
             SmtUnaryFormula unary => new FormulaChildren(unary.Operand),
             SmtBinaryFormula binary => new FormulaChildren(binary.Left, binary.Right),
             SmtIntegerUnaryTerm unary => new FormulaChildren(unary.Operand),
@@ -240,12 +220,10 @@ internal static class SmtFormulaTraversal
         };
     }
 
-    private static SmtFormula Rebuild(SmtFormula formula, IReadOnlyList<SmtFormula> children)
-    {
+    private static SmtFormula Rebuild(SmtFormula formula, IReadOnlyList<SmtFormula> children) {
         bool Same(int index, SmtFormula child) => ReferenceEquals(children[index], child);
 
-        return formula switch
-        {
+        return formula switch {
             SmtUnaryFormula value => Same(0, value.Operand)
                 ? formula
                 : new SmtUnaryFormula(value.Operator, children[0]),
@@ -297,12 +275,10 @@ internal static class SmtFormulaTraversal
     private readonly record struct FormulaChildren(
         SmtFormula? First,
         SmtFormula? Second = null,
-        SmtFormula? Third = null)
-    {
+        SmtFormula? Third = null) {
         internal int Count => Third != null ? 3 : Second != null ? 2 : First != null ? 1 : 0;
 
-        internal SmtFormula this[int index] => index switch
-        {
+        internal SmtFormula this[int index] => index switch {
             0 when First != null => First,
             1 when Second != null => Second,
             2 when Third != null => Third,

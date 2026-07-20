@@ -1,7 +1,6 @@
 namespace SharpProof.ProofCore.Purity;
 
-internal enum PurityHazardKind
-{
+internal enum PurityHazardKind {
     BranchReachability,
     ImpureCallReachability,
     StaticCacheRead,
@@ -12,8 +11,7 @@ internal enum PurityHazardKind
     DivideByZero
 }
 
-internal enum PurityEffectVisibility
-{
+internal enum PurityEffectVisibility {
     CallerVisible,
     InternalOnly
 }

@@ -1,12 +1,10 @@
 namespace SharpProof.Analyzer;
 
-internal static class MethodCapabilityAnalyzer
-{
+internal static class MethodCapabilityAnalyzer {
     internal static void AnalyzeSymbolForCapabilities(
         MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
 
         var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
@@ -19,8 +17,7 @@ internal static class MethodCapabilityAnalyzer
                 out var invalidContract))
             return;
 
-        if (invalidContract != null)
-        {
+        if (invalidContract != null) {
             var diagnostic = InvalidContractArgumentDiagnostics.Create(
                 "[AllowedCapabilities]",
                 invalidContract.Argument,
@@ -36,8 +33,7 @@ internal static class MethodCapabilityAnalyzer
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
 
         var outcome = context.State.GetCapabilityOutcome(context.CancellationToken);
-        if (!outcome.IsSuccess)
-        {
+        if (!outcome.IsSuccess) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var queryFailure = CreateQueryFailureDiagnostic(
                 methodSymbol,
@@ -49,10 +45,8 @@ internal static class MethodCapabilityAnalyzer
 
         var result = outcome.Value!;
 
-        foreach (var site in result.Sites)
-        {
-            if (site.IsUnknown)
-            {
+        foreach (var site in result.Sites) {
+            if (site.IsUnknown) {
                 var unknownSiteDiagnostic = CreateUnknownDiagnostic(methodSymbol, site, context.Node.SyntaxTree);
                 report(unknownSiteDiagnostic);
 
@@ -68,8 +62,7 @@ internal static class MethodCapabilityAnalyzer
             report(diagnostic);
         }
 
-        if (result.Sites.Count == 0 && result.UnknownReasons.Count > 0)
-        {
+        if (result.Sites.Count == 0 && result.UnknownReasons.Count > 0) {
             var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
             var reason = result.UnknownReasons[0].ToString();
             var unknownReasonInfo = result.UnknownReasonDetails.FirstOrDefault() ??
@@ -83,8 +76,7 @@ internal static class MethodCapabilityAnalyzer
     private static Diagnostic CreateQueryFailureDiagnostic(
         IMethodSymbol methodSymbol,
         SharpProofError error,
-        SyntaxTree syntaxTree)
-    {
+        SyntaxTree syntaxTree) {
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, CancellationToken.None);
         var unknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForCapabilityFailure(
             error.Code + ": " + error.Message);
@@ -94,8 +86,7 @@ internal static class MethodCapabilityAnalyzer
 
     private static Diagnostic CreateMethodBodyUnknownDiagnostic(
         IMethodSymbol methodSymbol, SyntaxTree syntaxTree, Location location, string reason,
-        SymbolicUnknownReasonInfo unknownReasonInfo, string operationKind, string evidenceKey)
-    {
+        SymbolicUnknownReasonInfo unknownReasonInfo, string operationKind, string evidenceKey) {
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add(DiagnosticPropertyNames.CapabilityUnknownReasonProperty, reason);
         properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
@@ -122,8 +113,7 @@ internal static class MethodCapabilityAnalyzer
         IMethodSymbol methodSymbol,
         SymbolicCapabilitySite site,
         int disallowedCapabilities,
-        SyntaxTree syntaxTree)
-    {
+        SyntaxTree syntaxTree) {
         var formattedCapabilities = SymbolicCapabilityFacts.FormatMask(disallowedCapabilities);
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add("sharpproof.capability.flags", formattedCapabilities);
@@ -147,8 +137,7 @@ internal static class MethodCapabilityAnalyzer
     private static Diagnostic CreateUnknownDiagnostic(
         IMethodSymbol methodSymbol,
         SymbolicCapabilitySite site,
-        SyntaxTree syntaxTree)
-    {
+        SyntaxTree syntaxTree) {
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add(DiagnosticPropertyNames.CapabilityUnknownReasonProperty, site.UnknownReason.ToString());
         properties = UnknownReasonDiagnosticProperties.Add(properties, site.UnknownReasonInfo);
@@ -177,8 +166,7 @@ internal static class MethodCapabilityAnalyzer
         string evidenceOutcome,
         string analysisOutcome,
         string? unknownReason,
-        out Location location)
-    {
+        out Location location) {
         properties = properties.Add(
             "sharpproof.capability.operation_kind",
             site.OperationKind);
@@ -206,8 +194,7 @@ internal static class MethodCapabilityAnalyzer
 
     private static string CreateCapabilityEvidenceKey(
         SymbolicCapabilitySite site,
-        string outcome)
-    {
+        string outcome) {
         return DiagnosticEvidenceKey.ForSpanLength(
             site.OperationKind,
             site.SourceSpanStart,
@@ -221,8 +208,7 @@ internal static class MethodCapabilityAnalyzer
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken,
         out int capabilities,
-        out InvalidContractArgument? invalidContract)
-    {
+        out InvalidContractArgument? invalidContract) {
         capabilities = SymbolicCapabilityFacts.NoneMask;
         invalidContract = null;
         var found = false;
@@ -230,13 +216,11 @@ internal static class MethodCapabilityAnalyzer
         foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
         foreach (var attribute in attributePolicy.GetAcceptedAttributes(
                      source,
-                     "AllowedCapabilitiesAttribute"))
-        {
+                     "AllowedCapabilitiesAttribute")) {
             cancellationToken.ThrowIfCancellationRequested();
             var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
             var argumentText = AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken);
-            if (!TryGetCapabilityArgumentValue(attribute, out var rawValue))
-            {
+            if (!TryGetCapabilityArgumentValue(attribute, out var rawValue)) {
                 invalidContract = new InvalidContractArgument(
                     argumentText,
                     "expected a SharpProofCapability enum value",
@@ -246,8 +230,7 @@ internal static class MethodCapabilityAnalyzer
 
             if (rawValue < 0 ||
                 rawValue > int.MaxValue ||
-                ((int)rawValue & ~SymbolicCapabilityFacts.AllKnownMask) != 0)
-            {
+                ((int)rawValue & ~SymbolicCapabilityFacts.AllKnownMask) != 0) {
                 invalidContract = new InvalidContractArgument(
                     rawValue.ToString(CultureInfo.InvariantCulture),
                     "unknown SharpProofCapability bits are set",
@@ -263,13 +246,11 @@ internal static class MethodCapabilityAnalyzer
         return found;
     }
 
-    private static bool TryGetCapabilityArgumentValue(AttributeData attribute, out long value)
-    {
+    private static bool TryGetCapabilityArgumentValue(AttributeData attribute, out long value) {
         value = 0;
         if (attribute.ConstructorArguments.Length != 1) return false;
 
-        switch (attribute.ConstructorArguments[0].Value)
-        {
+        switch (attribute.ConstructorArguments[0].Value) {
             case int intValue:
                 value = intValue;
                 return true;

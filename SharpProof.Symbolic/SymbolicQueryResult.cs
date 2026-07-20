@@ -9,8 +9,7 @@ internal sealed class SymbolicQueryResult(
     SymbolicQueryMetrics metrics,
     IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
     SymbolicSmtDiagnostics smtDiagnostics,
-    IReadOnlyList<SymbolicQueryLineGroup>? lineGroups = null)
-{
+    IReadOnlyList<SymbolicQueryLineGroup>? lineGroups = null) {
     public SymbolicQueryScope Scope { get; } = scope ?? throw new ArgumentNullException(nameof(scope));
 
     public string ScopeKind => Scope.Kind.ToString().ToLowerInvariant();
@@ -118,20 +117,17 @@ internal sealed class SymbolicQueryResult(
         .Select(group => FromLine(FilePath, group.Line, group.ProgramPoints, SmtDiagnostics))
         .ToArray();
 
-    internal int LinesWithProgramPoints => Scope.Kind switch
-    {
+    internal int LinesWithProgramPoints => Scope.Kind switch {
         SymbolicQueryScopeKind.File => LineGroups.Count,
         SymbolicQueryScopeKind.Span => ProgramPoints.Select(static point => point.Line).Distinct().Count(),
         _ => ProgramPointCount == 0 ? 0 : 1
     };
 
-    internal SymbolicQueryResult Filter(Func<SymbolicProgramPointResult, bool> matches)
-    {
+    internal SymbolicQueryResult Filter(Func<SymbolicProgramPointResult, bool> matches) {
         if (matches == null) throw new ArgumentNullException(nameof(matches));
 
         var points = ProgramPoints.Where(matches).ToArray();
-        return Scope.Kind switch
-        {
+        return Scope.Kind switch {
             SymbolicQueryScopeKind.File => FromFile(
                 FilePath,
                 LineCount ?? 0,
@@ -171,8 +167,7 @@ internal sealed class SymbolicQueryResult(
         string filePath,
         int lineCount,
         IReadOnlyList<SymbolicQueryLineGroup> lines,
-        SymbolicSmtDiagnostics? smtDiagnostics = null)
-    {
+        SymbolicSmtDiagnostics? smtDiagnostics = null) {
         if (lineCount < 0) throw new ArgumentOutOfRangeException(nameof(lineCount));
         if (lines == null) throw new ArgumentNullException(nameof(lines));
         return FromAggregate(
@@ -189,8 +184,7 @@ internal sealed class SymbolicQueryResult(
         string filePath,
         int line,
         IReadOnlyList<SymbolicProgramPointResult> programPoints,
-        SymbolicSmtDiagnostics? smtDiagnostics = null)
-    {
+        SymbolicSmtDiagnostics? smtDiagnostics = null) {
         return FromAggregate(
             new SymbolicQueryScope(SymbolicQueryScopeKind.Line, filePath, line),
             programPoints,
@@ -206,8 +200,7 @@ internal sealed class SymbolicQueryResult(
         int endLine,
         int endColumn,
         IReadOnlyList<SymbolicProgramPointResult> programPoints,
-        SymbolicSmtDiagnostics? smtDiagnostics = null)
-    {
+        SymbolicSmtDiagnostics? smtDiagnostics = null) {
         if (spanStart < 0) throw new ArgumentOutOfRangeException(nameof(spanStart));
         if (spanEnd < spanStart) throw new ArgumentOutOfRangeException(nameof(spanEnd));
         return FromAggregate(
@@ -224,8 +217,7 @@ internal sealed class SymbolicQueryResult(
             smtDiagnostics);
     }
 
-    internal static SymbolicQueryResult From(SymbolicProgramPointResult point)
-    {
+    internal static SymbolicQueryResult From(SymbolicProgramPointResult point) {
         if (point == null) throw new ArgumentNullException(nameof(point));
 
         return new SymbolicQueryResult(
@@ -248,8 +240,7 @@ internal sealed class SymbolicQueryResult(
         SymbolicQueryScope scope,
         IReadOnlyList<SymbolicProgramPointResult> programPoints,
         SymbolicSmtDiagnostics? smtDiagnostics,
-        IReadOnlyList<SymbolicQueryLineGroup>? lineGroups = null)
-    {
+        IReadOnlyList<SymbolicQueryLineGroup>? lineGroups = null) {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
         var factSummary = SymbolicInvariantFactSummary.Merge(
             programPoints.Select(static point => point.Facts));

@@ -1,17 +1,14 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicFactFactory
-{
-    internal static bool MatchesVariableOrMemberName(string candidate, string variableName)
-    {
+internal static class SymbolicFactFactory {
+    internal static bool MatchesVariableOrMemberName(string candidate, string variableName) {
         return string.Equals(candidate, variableName, StringComparison.Ordinal) ||
                candidate.StartsWith(variableName + ".", StringComparison.Ordinal) ||
                candidate.StartsWith(variableName + "[", StringComparison.Ordinal);
     }
 
 
-    internal static string GetSmtVariableName(ISymbol symbol)
-    {
+    internal static string GetSmtVariableName(ISymbol symbol) {
         var sourceLocation = symbol.Locations.FirstOrDefault(static location => location.IsInSource);
         if (sourceLocation != null)
             return symbol.Name + "#" +
@@ -21,8 +18,7 @@ internal static class SymbolicFactFactory
             ? string.Empty
             : DocumentationCommentId.CreateDeclarationId(symbol.ContainingSymbol.OriginalDefinition) ??
               symbol.ContainingSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var ordinal = symbol switch
-        {
+        var ordinal = symbol switch {
             IParameterSymbol parameter => parameter.Ordinal.ToString(CultureInfo.InvariantCulture),
             ITypeParameterSymbol typeParameter => typeParameter.Ordinal.ToString(CultureInfo.InvariantCulture),
             _ => string.Empty
@@ -30,10 +26,8 @@ internal static class SymbolicFactFactory
         return symbol.Name + "#metadata:" + containingIdentity + ":" + symbol.Kind + ":" + ordinal;
     }
 
-    internal static bool TryCreateReferenceBuiltInLengthFormula(SmtFormula receiverFormula, out SmtFormula formula)
-    {
-        if (receiverFormula.Kind != SmtValueKind.Reference)
-        {
+    internal static bool TryCreateReferenceBuiltInLengthFormula(SmtFormula receiverFormula, out SmtFormula formula) {
+        if (receiverFormula.Kind != SmtValueKind.Reference) {
             formula = null!;
             return false;
         }
@@ -45,11 +39,9 @@ internal static class SymbolicFactFactory
     internal static bool TryCreateReferenceArrayDimensionLengthFormula(
         SmtFormula receiverFormula,
         int dimension,
-        out SmtFormula formula)
-    {
+        out SmtFormula formula) {
         if (receiverFormula.Kind != SmtValueKind.Reference ||
-            dimension < 0)
-        {
+            dimension < 0) {
             formula = null!;
             return false;
         }
@@ -61,10 +53,8 @@ internal static class SymbolicFactFactory
         return true;
     }
 
-    internal static bool TryCreateReferenceStringContentFormula(SmtFormula receiverFormula, out SmtFormula formula)
-    {
-        if (receiverFormula.Kind != SmtValueKind.Reference)
-        {
+    internal static bool TryCreateReferenceStringContentFormula(SmtFormula receiverFormula, out SmtFormula formula) {
+        if (receiverFormula.Kind != SmtValueKind.Reference) {
             formula = null!;
             return false;
         }
@@ -73,10 +63,8 @@ internal static class SymbolicFactFactory
         return true;
     }
 
-    internal static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
-    {
-        return symbol switch
-        {
+    internal static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol) {
+        return symbol switch {
             ILocalSymbol localSymbol => localSymbol.Type,
             IParameterSymbol parameterSymbol => parameterSymbol.Type,
             _ => null
@@ -87,11 +75,9 @@ internal static class SymbolicFactFactory
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ISymbol symbol)
-    {
+        out ISymbol symbol) {
         var candidate = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol?.OriginalDefinition;
-        if (candidate is ILocalSymbol or IParameterSymbol)
-        {
+        if (candidate is ILocalSymbol or IParameterSymbol) {
             symbol = candidate;
             return true;
         }
@@ -104,22 +90,18 @@ internal static class SymbolicFactFactory
         ITypeSymbol type,
         Func<ITypeSymbol, bool> isIntegralType,
         Func<ITypeSymbol, bool> isReferenceLikeType,
-        out SmtValueKind kind)
-    {
-        if (type.SpecialType == SpecialType.System_Boolean)
-        {
+        out SmtValueKind kind) {
+        if (type.SpecialType == SpecialType.System_Boolean) {
             kind = SmtValueKind.Bool;
             return true;
         }
 
-        if (isIntegralType(type))
-        {
+        if (isIntegralType(type)) {
             kind = SmtValueKind.Int;
             return true;
         }
 
-        if (isReferenceLikeType(type))
-        {
+        if (isReferenceLikeType(type)) {
             kind = SmtValueKind.Reference;
             return true;
         }
@@ -128,8 +110,7 @@ internal static class SymbolicFactFactory
         return false;
     }
 
-    internal static bool IsSupportedSmtIntegralOrEnumType(ITypeSymbol? typeSymbol)
-    {
+    internal static bool IsSupportedSmtIntegralOrEnumType(ITypeSymbol? typeSymbol) {
         if (typeSymbol == null) return false;
 
         if (SymbolicTypeFacts.IsBuiltInIntegralType(typeSymbol))
@@ -139,8 +120,7 @@ internal static class SymbolicFactFactory
                IsSupportedSmtIntegralOrEnumType(underlyingType);
     }
 
-    internal static string GetReferenceFormulaName(SmtFormula receiverFormula)
-    {
+    internal static string GetReferenceFormulaName(SmtFormula receiverFormula) {
         return receiverFormula is SmtVariable variable
             ? variable.Name
             : receiverFormula.ToString() ?? string.Empty;

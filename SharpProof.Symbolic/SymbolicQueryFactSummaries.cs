@@ -2,10 +2,8 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicCompactProjection
-{
-    public static SymbolicBoundedProjection<T> Project<T>(IReadOnlyList<T> values, int maxCount)
-    {
+internal static class SymbolicCompactProjection {
+    public static SymbolicBoundedProjection<T> Project<T>(IReadOnlyList<T> values, int maxCount) {
         if (values == null) throw new ArgumentNullException(nameof(values));
 
         ValidateMaxCount(maxCount);
@@ -15,8 +13,7 @@ internal static class SymbolicCompactProjection
         return new SymbolicBoundedProjection<T>(items, values.Count);
     }
 
-    public static IReadOnlyList<T> Take<T>(IEnumerable<T> values, int maxCount)
-    {
+    public static IReadOnlyList<T> Take<T>(IEnumerable<T> values, int maxCount) {
         if (values == null) throw new ArgumentNullException(nameof(values));
 
         if (maxCount == 0) return Array.Empty<T>();
@@ -26,15 +23,13 @@ internal static class SymbolicCompactProjection
         return values.Take(maxCount).ToArray();
     }
 
-    private static void ValidateMaxCount(int maxCount)
-    {
+    private static void ValidateMaxCount(int maxCount) {
         if (maxCount < 0)
             throw new ArgumentOutOfRangeException(nameof(maxCount), "Compact output limits cannot be negative.");
     }
 }
 
-internal readonly struct SymbolicBoundedProjection<T>(IReadOnlyList<T> items, int totalCount)
-{
+internal readonly struct SymbolicBoundedProjection<T>(IReadOnlyList<T> items, int totalCount) {
     public IReadOnlyList<T> Items { get; } = items ?? throw new ArgumentNullException(nameof(items));
     public int TotalCount { get; } = totalCount >= items.Count
         ? totalCount
@@ -51,8 +46,7 @@ internal sealed record SymbolicConservativeUnknownDiagnostic(
     [property: JsonPropertyOrder(2)] string Reason,
     [property: JsonPropertyOrder(3)] IReadOnlyList<string> MaybeFacts,
     [property: JsonPropertyOrder(5)] int CandidateProgramPointCount,
-    [property: JsonPropertyOrder(6)] int UnreachableProgramPointCount)
-{
+    [property: JsonPropertyOrder(6)] int UnreachableProgramPointCount) {
     [JsonPropertyOrder(4)]
     public int MaybeFactCount => MaybeFacts.Count;
 
@@ -69,13 +63,11 @@ internal sealed record SymbolicMergedPathFacts(
     [property: JsonPropertyOrder(6)] string MergedInvariantText,
     [property: JsonPropertyOrder(7)] int CandidateProgramPointCount,
     [property: JsonPropertyOrder(8)] int UnreachableProgramPointCount,
-    [property: JsonPropertyOrder(9)] bool IsUnreachable)
-{
+    [property: JsonPropertyOrder(9)] bool IsUnreachable) {
     [JsonPropertyOrder(4)]
     public int ConservativeUnknownCount => ConservativeUnknowns.Count;
     public static SymbolicMergedPathFacts FromProgramPoints(
-        IEnumerable<SymbolicProgramPointResult> programPoints)
-    {
+        IEnumerable<SymbolicProgramPointResult> programPoints) {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
 
         var points = programPoints.ToArray();
@@ -110,11 +102,9 @@ internal sealed record SymbolicMergedPathFacts(
         var seenConditionTexts = new HashSet<string>(StringComparer.Ordinal);
         var orderedConditions = new List<SymbolicInvariantCondition>();
         var conditionSets = new List<HashSet<string>>();
-        foreach (var point in candidatePoints)
-        {
+        foreach (var point in candidatePoints) {
             var conditionSet = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var condition in point.Invariant.Conditions)
-            {
+            foreach (var condition in point.Invariant.Conditions) {
                 if (string.IsNullOrWhiteSpace(condition.Text)) continue;
 
                 if (conditionSet.Add(condition.Text) &&
@@ -164,12 +154,10 @@ internal sealed record SymbolicMergedPathFacts(
     private static IReadOnlyList<SymbolicConservativeUnknownDiagnostic> CreateConservativeUnknownDiagnostics(
         IReadOnlyList<SymbolicInvariantCondition> maybeConditions,
         int candidateProgramPointCount,
-        int unreachableProgramPointCount)
-    {
+        int unreachableProgramPointCount) {
         var seenTargets = new HashSet<string>(StringComparer.Ordinal);
         var diagnostics = new List<SymbolicConservativeUnknownDiagnostic>();
-        foreach (var condition in maybeConditions)
-        {
+        foreach (var condition in maybeConditions) {
             var target = string.IsNullOrWhiteSpace(condition.Target)
                 ? "path"
                 : condition.Target;
@@ -208,10 +196,8 @@ internal readonly record struct SymbolicQueryMetrics(
     int ProofUnknownCount,
     int ProofProvenTrueCount,
     int ProofProvenFalseCount,
-    int ProofUnreachableCount)
-{
-    internal static SymbolicQueryMetrics FromProgramPoints(IEnumerable<SymbolicProgramPointResult> programPoints)
-    {
+    int ProofUnreachableCount) {
+    internal static SymbolicQueryMetrics FromProgramPoints(IEnumerable<SymbolicProgramPointResult> programPoints) {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
 
         var points = programPoints.ToArray();
@@ -275,11 +261,9 @@ internal sealed record SymbolicConditionProofSummary(
     bool HasMixedReachableOutcomes,
     IReadOnlyList<SymbolicConditionProofReason> Reasons);
 
-internal static class SymbolicConditionProofProjection
-{
+internal static class SymbolicConditionProofProjection {
     internal static IReadOnlyList<SymbolicConditionProofSummary> FromProgramPoints(
-        IEnumerable<SymbolicProgramPointResult> programPoints)
-    {
+        IEnumerable<SymbolicProgramPointResult> programPoints) {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
 
         return programPoints
@@ -292,8 +276,7 @@ internal static class SymbolicConditionProofProjection
 
     private static SymbolicConditionProofSummary Create(
         string condition,
-        IEnumerable<SymbolicConditionProofResult> proofs)
-    {
+        IEnumerable<SymbolicConditionProofResult> proofs) {
         var proofArray = proofs.ToArray();
         var unknownCount = proofArray.Count(static proof => proof.TruthValue == SymbolicTruthValue.Unknown);
         var provenTrueCount = proofArray.Count(static proof => proof.TruthValue == SymbolicTruthValue.ProvenTrue);
@@ -371,8 +354,7 @@ internal static class SymbolicConditionProofProjection
                         ? SymbolicConditionProofSummaryStatus.AlwaysFalse
                         : SymbolicConditionProofSummaryStatus.Mixed;
 
-    internal static string CreateSummary(SymbolicConditionProofSummaryStatus status) => status switch
-    {
+    internal static string CreateSummary(SymbolicConditionProofSummaryStatus status) => status switch {
         SymbolicConditionProofSummaryStatus.None => "No implication proof results were requested for this condition.",
         SymbolicConditionProofSummaryStatus.UnreachableOnly =>
             "Every candidate program point for this condition was unreachable.",
@@ -387,8 +369,7 @@ internal static class SymbolicConditionProofProjection
 
 }
 
-internal enum SymbolicConditionProofSummaryStatus
-{
+internal enum SymbolicConditionProofSummaryStatus {
     None,
     UnreachableOnly,
     AlwaysTrue,

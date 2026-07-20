@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal sealed partial class SymbolicQueryExecutor
-{
+internal sealed partial class SymbolicQueryExecutor {
     private readonly SymbolicCapabilityService _capabilityService;
     private readonly SymbolicConditionProofEngine _conditionProofEngine;
     private readonly SymbolicInvariantService _invariantService;
@@ -9,8 +8,7 @@ internal sealed partial class SymbolicQueryExecutor
     private readonly SymbolicSourceProgramPointExecutor _programPointExecutor;
     private readonly SymbolicSourceRangeQueryExecutor _rangeQueryExecutor;
 
-    internal SymbolicQueryExecutor()
-    {
+    internal SymbolicQueryExecutor() {
         _invariantService = new SymbolicInvariantService();
         _conditionProofEngine = new SymbolicConditionProofEngine(_invariantService);
         _programPointExecutor = new SymbolicSourceProgramPointExecutor(
@@ -23,16 +21,14 @@ internal sealed partial class SymbolicQueryExecutor
 
     public SymbolicQueryResult Query(
         SymbolicQueryContext context,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default) {
         return ExecuteWithLimits(context, cancellationToken, QuerySource);
     }
 
     public SymbolicConditionProofResult Prove(
         SymbolicQueryContext context,
         string conditionText,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default) {
         if (context == null) throw new ArgumentNullException(nameof(context));
         if (string.IsNullOrWhiteSpace(conditionText))
             throw new ArgumentException("Condition text is required.", nameof(conditionText));
@@ -44,11 +40,9 @@ internal sealed partial class SymbolicQueryExecutor
     public SymbolicRuntimeHazardQueryResult QueryRuntimeHazards(
         SymbolicQueryContext context,
         SymbolicRuntimeHazardQueryOptions? hazardOptions = null,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default) {
         hazardOptions ??= SymbolicRuntimeHazardQueryOptions.Default;
-        return ExecuteWithLimits(context, cancellationToken, (request, token) =>
-        {
+        return ExecuteWithLimits(context, cancellationToken, (request, token) => {
             var smtAnalysis = RequireSmt(request, "Runtime hazard queries require SMT analysis.");
             return QueryRuntimeHazardsSource(request, smtAnalysis, hazardOptions, token);
         });
@@ -56,8 +50,7 @@ internal sealed partial class SymbolicQueryExecutor
 
     public SymbolicComplexityResult QueryComplexity(
         SymbolicQueryContext context,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default) {
         return ExecuteWithLimits(context, cancellationToken, (request, token) =>
             SymbolicMethodLikeQueryDispatcher.Execute(
                 request,
@@ -73,8 +66,7 @@ internal sealed partial class SymbolicQueryExecutor
     private static SymbolicComplexityResult ExecuteComplexityAnalysis(
         ResolvedMethodLikeTarget target,
         Compilation compilation,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (target.BodyNode == null)
             throw new ArgumentException("The requested method-like declaration does not have a body.");
         if (target.MethodSymbol == null)
@@ -86,8 +78,7 @@ internal sealed partial class SymbolicQueryExecutor
 
     public SymbolicCapabilityResult QueryCapabilities(
         SymbolicQueryContext context,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default) {
         return ExecuteWithLimits(context, cancellationToken, (request, token) =>
             _capabilityService.Query(request, token));
     }
@@ -95,8 +86,7 @@ internal sealed partial class SymbolicQueryExecutor
     private static TResult ExecuteWithLimits<TResult>(
         SymbolicQueryContext context,
         CancellationToken cancellationToken,
-        Func<SymbolicQueryContext, CancellationToken, TResult> operation)
-    {
+        Func<SymbolicQueryContext, CancellationToken, TResult> operation) {
         if (context == null) throw new ArgumentNullException(nameof(context));
         using var limitScope = SymbolicAnalysisLimitContext.Push(context.Options.AnalysisLimits);
         return operation(context, cancellationToken);

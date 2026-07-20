@@ -9,18 +9,14 @@ internal sealed class SymbolicMutationInventory(
     SyntaxNode root,
     SemanticModel semanticModel,
     CancellationToken cancellationToken,
-    ImmutableArray<SymbolicMutationInventoryEntry> entries)
-{
+    ImmutableArray<SymbolicMutationInventoryEntry> entries) {
     internal static SymbolicMutationInventory Create(
-        SyntaxNode root, SemanticModel semanticModel, CancellationToken cancellationToken)
-    {
+        SyntaxNode root, SemanticModel semanticModel, CancellationToken cancellationToken) {
         var entries = ImmutableArray.CreateBuilder<SymbolicMutationInventoryEntry>();
-        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(root))
-        {
+        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(root)) {
             if (SymbolMutationFacts.TryGetMutationTarget(node, out var target))
                 entries.Add(new(node, target, null));
-            switch (node)
-            {
+            switch (node) {
                 case InvocationExpressionSyntax invocation:
                     if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
                         entries.Add(new(node, null, memberAccess.Expression));
@@ -59,14 +55,11 @@ internal sealed class SymbolicMutationInventory(
             !ReferenceEquals(entry.Source, root) && entry.Source.SpanStart > after &&
             entry.Source.SpanStart < before && References(target, symbol));
 
-    internal SymbolicNestedMutationInvalidationPlan ToInvalidationPlan()
-    {
+    internal SymbolicNestedMutationInvalidationPlan ToInvalidationPlan() {
         var steps = ImmutableArray.CreateBuilder<SymbolicMutationInvalidationStep>();
         var unsupported = false;
-        foreach (var entry in entries)
-        {
-            if (entry.Target is { } target)
-            {
+        foreach (var entry in entries) {
+            if (entry.Target is { } target) {
                 var targets = LowerTargetInvalidations(target, semanticModel, cancellationToken);
                 if (targets.IsDefaultOrEmpty) unsupported = true;
                 else steps.Add(new(targets, target.Span, "operation-transfer.mutation-invalidation"));
@@ -84,10 +77,8 @@ internal sealed class SymbolicMutationInventory(
     }
 
     internal bool TryCollectLocalOrParameterInvalidations(
-        ISet<string> keys, ImmutableArray<SymbolicInvalidationTarget>.Builder targets)
-    {
-        foreach (var entry in entries)
-        {
+        ISet<string> keys, ImmutableArray<SymbolicInvalidationTarget>.Builder targets) {
+        foreach (var entry in entries) {
             if (entry.Target == null) continue;
             if (!SymbolMutationFacts.TryGetLocalOrParameterSymbol(
                     entry.Target, semanticModel, cancellationToken, out var symbol))
@@ -99,8 +90,7 @@ internal sealed class SymbolicMutationInventory(
     }
 
     internal static ImmutableArray<SymbolicInvalidationTarget> LowerTargetInvalidations(
-        ExpressionSyntax target, SemanticModel semanticModel, CancellationToken cancellationToken)
-    {
+        ExpressionSyntax target, SemanticModel semanticModel, CancellationToken cancellationToken) {
         var invalidations = ImmutableArray.CreateBuilder<SymbolicInvalidationTarget>();
         var symbol = GetMutatedSymbol(target, semanticModel, cancellationToken);
         if (symbol is ILocalSymbol or IParameterSymbol)
@@ -111,8 +101,7 @@ internal sealed class SymbolicMutationInventory(
                 SymbolicStateValueFacts.ImplicitThisVariableName + "." + symbol.Name,
                 SymbolicInvalidationMatchKind.VariableOrMember));
 
-        var receiver = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(target) switch
-        {
+        var receiver = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(target) switch {
             ElementAccessExpressionSyntax element => element.Expression,
             MemberAccessExpressionSyntax member => member.Expression,
             _ => null
@@ -125,8 +114,7 @@ internal sealed class SymbolicMutationInventory(
         return invalidations.ToImmutable();
     }
 
-    private bool ExactTargetMatchesAny(ExpressionSyntax target, IReadOnlyCollection<ISymbol> symbols)
-    {
+    private bool ExactTargetMatchesAny(ExpressionSyntax target, IReadOnlyCollection<ISymbol> symbols) {
         target = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(target);
         if (target is TupleExpressionSyntax tuple)
             return tuple.Arguments.Any(argument => symbols.Any(symbol => References(argument.Expression, symbol)));
@@ -139,12 +127,10 @@ internal sealed class SymbolicMutationInventory(
         SymbolMutationFacts.ExpressionReferencesSymbol(node, symbol, semanticModel, cancellationToken);
 
     internal static ISymbol? GetMutatedSymbol(
-        ExpressionSyntax target, SemanticModel semanticModel, CancellationToken cancellationToken)
-    {
+        ExpressionSyntax target, SemanticModel semanticModel, CancellationToken cancellationToken) {
         var symbol = semanticModel.GetSymbolInfo(target, cancellationToken).Symbol;
         if (symbol != null) return SymbolicStateInvalidator.NormalizeMutatedSymbol(symbol);
-        return semanticModel.GetOperation(target, cancellationToken) switch
-        {
+        return semanticModel.GetOperation(target, cancellationToken) switch {
             IFieldReferenceOperation field => field.Field,
             IPropertyReferenceOperation property => property.Property,
             _ => null

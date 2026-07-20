@@ -1,13 +1,11 @@
 namespace SharpProof.Analyzer;
 
-internal static class MethodEnsuresAnalyzer
-{
+internal static class MethodEnsuresAnalyzer {
     internal static void AnalyzeSymbolForEnsures(
         MethodBodyAnalysisContext context,
         CompilationPurityService purityService,
         DiagnosticBaseline baseline,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
 
         var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
@@ -24,10 +22,8 @@ internal static class MethodEnsuresAnalyzer
             baseline);
         if (contracts.Length == 0) return;
 
-        if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context))
-        {
-            foreach (var contract in contracts)
-            {
+        if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) {
+            foreach (var contract in contracts) {
                 var diagnostic = CreateUnsupportedDiagnostic(
                     methodSymbol,
                     contract.Condition,
@@ -40,10 +36,8 @@ internal static class MethodEnsuresAnalyzer
             return;
         }
 
-        if (!SupportsEnsuresPostconditions(context.Node, out var unsupportedReason))
-        {
-            foreach (var contract in contracts)
-            {
+        if (!SupportsEnsuresPostconditions(context.Node, out var unsupportedReason)) {
+            foreach (var contract in contracts) {
                 var diagnostic = CreateUnsupportedDiagnostic(
                     methodSymbol,
                     contract.Condition,
@@ -62,13 +56,11 @@ internal static class MethodEnsuresAnalyzer
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var contract in contracts)
-        {
+        foreach (var contract in contracts) {
             if (!ContractConditionHelpers.TryParse(
                     contract.Condition,
                     out var conditionStatement,
-                    out var conditionExpression))
-            {
+                    out var conditionExpression)) {
                 var diagnostic = CreateUnsupportedDiagnostic(
                     methodSymbol,
                     contract.Condition,
@@ -84,8 +76,7 @@ internal static class MethodEnsuresAnalyzer
                     context.SemanticModel,
                     completionSites[0].QueryNode.SpanStart,
                     conditionStatement,
-                    out var speculativeModel))
-            {
+                    out var speculativeModel)) {
                 var diagnostic = CreateUnsupportedDiagnostic(
                     methodSymbol,
                     contract.Condition,
@@ -98,8 +89,7 @@ internal static class MethodEnsuresAnalyzer
             }
 
             if (!completionSites.All(static site => site.ResultExpression != null) &&
-                RequiresContractHelpers.ContainsResultReference(conditionExpression))
-            {
+                RequiresContractHelpers.ContainsResultReference(conditionExpression)) {
                 var diagnostic = CreateUnsupportedDiagnostic(
                     methodSymbol,
                     contract.Condition,
@@ -112,8 +102,7 @@ internal static class MethodEnsuresAnalyzer
             }
 
             if (ReferencesUserLocalOrUnsupportedParameter(conditionExpression, speculativeModel, methodSymbol,
-                    context.CancellationToken))
-            {
+                    context.CancellationToken)) {
                 var diagnostic = CreateUnsupportedDiagnostic(
                     methodSymbol,
                     contract.Condition,
@@ -125,10 +114,8 @@ internal static class MethodEnsuresAnalyzer
                 continue;
             }
 
-            foreach (var completionSite in completionSites)
-            {
-                if (!purityService.SmtAnalysis.Options.IsEnabled)
-                {
+            foreach (var completionSite in completionSites) {
+                if (!purityService.SmtAnalysis.Options.IsEnabled) {
                     var diagnostic = CreateUnsupportedDiagnostic(
                         methodSymbol,
                         contract.Condition,
@@ -145,8 +132,7 @@ internal static class MethodEnsuresAnalyzer
                         completionSite,
                         NullableFlowFacts.GetMethodReturnState(methodSymbol),
                         out var rewrittenCondition,
-                        out _))
-                {
+                        out _)) {
                     var diagnostic = CreateUnsupportedDiagnostic(
                         methodSymbol,
                         contract.Condition,
@@ -179,8 +165,7 @@ internal static class MethodEnsuresAnalyzer
                     proof.Reason);
                 if (!seen.Add(key)) continue;
 
-                if (proof.TruthValue == SymbolicTruthValue.ProvenFalse)
-                {
+                if (proof.TruthValue == SymbolicTruthValue.ProvenFalse) {
                     var diagnostic = CreateNotProvenDiagnostic(
                         methodSymbol,
                         contract.Condition,
@@ -207,8 +192,7 @@ internal static class MethodEnsuresAnalyzer
     private static ImmutableArray<EnsuresContract> CollectContracts(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return ContractConditionHelpers.Collect(
             methodSymbol,
             attributePolicy,
@@ -224,8 +208,7 @@ internal static class MethodEnsuresAnalyzer
     private static ImmutableArray<RequiresContract> CollectRequiresAssumptions(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return RequiresContractHelpers.ValidContracts(methodSymbol, attributePolicy, cancellationToken)
             .Where(contract =>
                 ContractConditionHelpers.TryParse(contract.Condition, out _, out var conditionExpression) &&
@@ -237,13 +220,10 @@ internal static class MethodEnsuresAnalyzer
         ImmutableArray<EnsuresContract> contracts,
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
-        DiagnosticBaseline baseline)
-    {
+        DiagnosticBaseline baseline) {
         var validContracts = ImmutableArray.CreateBuilder<EnsuresContract>(contracts.Length);
-        foreach (var contract in contracts)
-        {
-            if (contract.InvalidReason == null)
-            {
+        foreach (var contract in contracts) {
+            if (contract.InvalidReason == null) {
                 validContracts.Add(contract);
                 continue;
             }
@@ -266,14 +246,12 @@ internal static class MethodEnsuresAnalyzer
 
     private static bool SupportsEnsuresPostconditions(
         SyntaxNode methodNode,
-        out string reason)
-    {
+        out string reason) {
         if (methodNode is AccessorDeclarationSyntax accessor &&
             (accessor.IsKind(SyntaxKind.SetAccessorDeclaration) ||
              accessor.IsKind(SyntaxKind.InitAccessorDeclaration) ||
              accessor.IsKind(SyntaxKind.AddAccessorDeclaration) ||
-             accessor.IsKind(SyntaxKind.RemoveAccessorDeclaration)))
-        {
+             accessor.IsKind(SyntaxKind.RemoveAccessorDeclaration))) {
             reason = "non-returning accessors are not supported by [Ensures]";
             return false;
         }
@@ -286,10 +264,8 @@ internal static class MethodEnsuresAnalyzer
         ExpressionSyntax conditionExpression,
         SemanticModel speculativeModel,
         IMethodSymbol methodSymbol,
-        CancellationToken cancellationToken)
-    {
-        foreach (var identifier in conditionExpression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
-        {
+        CancellationToken cancellationToken) {
+        foreach (var identifier in conditionExpression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()) {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal)) continue;
 
@@ -306,8 +282,7 @@ internal static class MethodEnsuresAnalyzer
 
     private static bool IsSupportedEnsuresParameter(
         IParameterSymbol parameter,
-        IMethodSymbol methodSymbol)
-    {
+        IMethodSymbol methodSymbol) {
         return SymbolEq.AreEqual(
             parameter.ContainingSymbol?.OriginalDefinition,
             methodSymbol.OriginalDefinition);
@@ -318,14 +293,12 @@ internal static class MethodEnsuresAnalyzer
         MethodNormalCompletion completionSite,
         NullableFlowFactState resultState,
         out string rewrittenCondition,
-        out ExpressionSyntax rewrittenExpression)
-    {
+        out ExpressionSyntax rewrittenExpression) {
         rewrittenCondition = conditionText;
         rewrittenExpression = null!;
         if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
 
-        if (completionSite.ResultExpression == null)
-        {
+        if (completionSite.ResultExpression == null) {
             rewrittenExpression = conditionExpression;
             return true;
         }
@@ -348,14 +321,12 @@ internal static class MethodEnsuresAnalyzer
         CancellationToken cancellationToken,
         out SymbolicCondition symbolicCondition,
         out SymbolicState initialState,
-        out string? failureReason)
-    {
+        out string? failureReason) {
         symbolicCondition = null!;
         initialState = new SymbolicState();
         failureReason = null;
 
-        if (!ContractConditionHelpers.TryParse(proofCondition, out var proofStatement, out var proofExpression))
-        {
+        if (!ContractConditionHelpers.TryParse(proofCondition, out var proofStatement, out var proofExpression)) {
             failureReason = "condition parse failure";
             return false;
         }
@@ -366,8 +337,7 @@ internal static class MethodEnsuresAnalyzer
                 semanticModel,
                 speculativePosition,
                 proofStatement,
-                out var speculativeModel))
-        {
+                out var speculativeModel)) {
             failureReason = "condition binding failure";
             return false;
         }
@@ -379,8 +349,7 @@ internal static class MethodEnsuresAnalyzer
             invocationTermLowerer: snapshots.TryLowerInvocationTerm,
             invocationTermTypeResolver: snapshots.ResolveInvocationTermType);
         var lowering = SymbolicSemanticPipeline.LowerCondition(proofExpression, loweringContext);
-        if (lowering is not { IsExact: true, Value: { } loweredCondition })
-        {
+        if (lowering is not { IsExact: true, Value: { } loweredCondition }) {
             failureReason = snapshots.FailureReason ??
                             "old(...) expression is not supported by the current bounded proof engine";
             return false;
@@ -388,8 +357,7 @@ internal static class MethodEnsuresAnalyzer
 
         symbolicCondition = loweredCondition;
 
-        if (!snapshots.HasSnapshots)
-        {
+        if (!snapshots.HasSnapshots) {
             failureReason = "old(...) expression is not supported by the current bounded proof engine";
             return false;
         }
@@ -398,16 +366,14 @@ internal static class MethodEnsuresAnalyzer
         return true;
     }
 
-    private static bool ContainsOldValueInvocation(ExpressionSyntax expression)
-    {
+    private static bool ContainsOldValueInvocation(ExpressionSyntax expression) {
         return expression
             .DescendantNodesAndSelf()
             .OfType<InvocationExpressionSyntax>()
             .Any(IsOldValueInvocation);
     }
 
-    private static bool IsOldValueInvocation(InvocationExpressionSyntax invocation)
-    {
+    private static bool IsOldValueInvocation(InvocationExpressionSyntax invocation) {
         return invocation.Expression is IdentifierNameSyntax identifier &&
                string.Equals(identifier.Identifier.ValueText, "old", StringComparison.Ordinal);
     }
@@ -417,8 +383,7 @@ internal static class MethodEnsuresAnalyzer
         string condition,
         MethodNormalCompletion completionSite,
         Location? contractLocation,
-        SymbolicConditionProofResult proof)
-    {
+        SymbolicConditionProofResult proof) {
         var unknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForEnsures(
             proof.Reason,
             proof.Proof.UnknownReason);
@@ -460,8 +425,7 @@ internal static class MethodEnsuresAnalyzer
         Location? location,
         string reason,
         IEnumerable<Location>? additionalLocations,
-        SymbolicAnalysisTruncationInfo? analysisTruncation = null)
-    {
+        SymbolicAnalysisTruncationInfo? analysisTruncation = null) {
         var properties = ContractDiagnosticSupport.CreateProofProperties(
             ContractDiagnosticSupport.EvidenceFamily.Ensures,
             methodSymbol,
@@ -486,17 +450,14 @@ internal static class MethodEnsuresAnalyzer
             reason);
     }
 
-    private sealed class ResultPlaceholderRewriter : CSharpSyntaxRewriter
-    {
+    private sealed class ResultPlaceholderRewriter : CSharpSyntaxRewriter {
         private readonly ExpressionSyntax _replacement;
 
-        public ResultPlaceholderRewriter(ExpressionSyntax replacement)
-        {
+        public ResultPlaceholderRewriter(ExpressionSyntax replacement) {
             _replacement = SyntaxFactory.ParenthesizedExpression(replacement);
         }
 
-        public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
-        {
+        public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node) {
             if (!string.Equals(node.Identifier.ValueText, "result", StringComparison.Ordinal))
                 return base.VisitIdentifierName(node);
 
@@ -507,10 +468,8 @@ internal static class MethodEnsuresAnalyzer
         }
     }
 
-    private sealed class NullableResultContractRewriter : CSharpSyntaxRewriter
-    {
-        public override SyntaxNode? VisitBinaryExpression(BinaryExpressionSyntax node)
-        {
+    private sealed class NullableResultContractRewriter : CSharpSyntaxRewriter {
+        public override SyntaxNode? VisitBinaryExpression(BinaryExpressionSyntax node) {
             if ((node.IsKind(SyntaxKind.EqualsExpression) ||
                  node.IsKind(SyntaxKind.NotEqualsExpression)) &&
                 ((IsResult(node.Left) && IsNull(node.Right)) ||
@@ -524,8 +483,7 @@ internal static class MethodEnsuresAnalyzer
             return base.VisitBinaryExpression(node);
         }
 
-        public override SyntaxNode? VisitIsPatternExpression(IsPatternExpressionSyntax node)
-        {
+        public override SyntaxNode? VisitIsPatternExpression(IsPatternExpressionSyntax node) {
             if (!IsResult(node.Expression) ||
                 !CSharpSyntaxFacts.TryGetNullPatternPolarity(node.Pattern, out var matchesNonNull))
                 return base.VisitIsPatternExpression(node);
@@ -535,8 +493,7 @@ internal static class MethodEnsuresAnalyzer
                 .WithTriviaFrom(node);
         }
 
-        private static bool IsResult(ExpressionSyntax expression)
-        {
+        private static bool IsResult(ExpressionSyntax expression) {
             return expression is IdentifierNameSyntax identifier &&
                    string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal);
         }
@@ -546,8 +503,7 @@ internal static class MethodEnsuresAnalyzer
 
     }
 
-    private sealed class OldValueSnapshotBuilder
-    {
+    private sealed class OldValueSnapshotBuilder {
         private readonly CancellationToken _cancellationToken;
         private readonly IMethodSymbol _methodSymbol;
         private readonly SemanticModel _semanticModel;
@@ -558,8 +514,7 @@ internal static class MethodEnsuresAnalyzer
         public OldValueSnapshotBuilder(
             SemanticModel semanticModel,
             IMethodSymbol methodSymbol,
-            CancellationToken cancellationToken)
-        {
+            CancellationToken cancellationToken) {
             _semanticModel = semanticModel;
             _methodSymbol = methodSymbol;
             _cancellationToken = cancellationToken;
@@ -572,27 +527,23 @@ internal static class MethodEnsuresAnalyzer
         public bool TryLowerInvocationTerm(
             InvocationExpressionSyntax invocation,
             SymbolicLoweringContext context,
-            out SymbolicTerm term)
-        {
+            out SymbolicTerm term) {
             _ = context;
             term = null!;
             if (!IsOldValueInvocation(invocation)) return false;
 
-            if (invocation.ArgumentList.Arguments.Count != 1)
-            {
+            if (invocation.ArgumentList.Arguments.Count != 1) {
                 FailureReason = "old(...) requires exactly one argument";
                 return false;
             }
 
             var argument = invocation.ArgumentList.Arguments[0].Expression;
-            if (ContainsOldValueInvocation(argument))
-            {
+            if (ContainsOldValueInvocation(argument)) {
                 FailureReason = "nested old(...) expressions are not supported";
                 return false;
             }
 
-            if (RequiresContractHelpers.ContainsResultReference(argument))
-            {
+            if (RequiresContractHelpers.ContainsResultReference(argument)) {
                 FailureReason = "result is not available inside old(...)";
                 return false;
             }
@@ -601,8 +552,7 @@ internal static class MethodEnsuresAnalyzer
                     argument,
                     _semanticModel,
                     _methodSymbol,
-                    _cancellationToken))
-            {
+                    _cancellationToken)) {
                 FailureReason = "local variables are not supported inside old(...)";
                 return false;
             }
@@ -612,8 +562,7 @@ internal static class MethodEnsuresAnalyzer
 
             var entryContext = new SymbolicLoweringContext(_semanticModel, _cancellationToken);
             var lowering = SymbolicSemanticPipeline.LowerTerm(argument, entryContext);
-            if (lowering is not { IsExact: true, Value: { } entryTerm })
-            {
+            if (lowering is not { IsExact: true, Value: { } entryTerm }) {
                 FailureReason = "old(...) expression is not supported by the current bounded proof engine";
                 return false;
             }
@@ -630,8 +579,7 @@ internal static class MethodEnsuresAnalyzer
             return true;
         }
 
-        public ITypeSymbol? ResolveInvocationTermType(InvocationExpressionSyntax invocation)
-        {
+        public ITypeSymbol? ResolveInvocationTermType(InvocationExpressionSyntax invocation) {
             if (!IsOldValueInvocation(invocation) || invocation.ArgumentList.Arguments.Count != 1)
                 return null;
 

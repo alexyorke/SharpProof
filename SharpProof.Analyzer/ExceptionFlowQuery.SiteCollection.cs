@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowEngine
-{
+internal static partial class ExceptionFlowEngine {
     private static IEnumerable<ExceptionFlowSite> CollectUncaughtExceptionSiteEntries(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
@@ -11,8 +10,7 @@ internal static partial class ExceptionFlowEngine
         HashSet<IMethodSymbol> visitedMethods,
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        ImmutableArray<SymbolicRuntimeHazard> runtimeHazards)
-    {
+        ImmutableArray<SymbolicRuntimeHazard> runtimeHazards) {
         var assessment = new ExceptionSiteAssessment(
             methodNode, semanticModel, cancellationToken, smtAnalysis, attributePolicy);
         var provenRuntimeHazardSites = ProjectProvenRuntimeHazardSites(methodNode, runtimeHazards);
@@ -25,8 +23,7 @@ internal static partial class ExceptionFlowEngine
             yield return entry;
 
         foreach (var calleeCallSite in ExceptionFlowAnalyzer.GetCalleeCallSites(methodNode, semanticModel,
-                     cancellationToken))
-        {
+                     cancellationToken)) {
             if (assessment.Assess(
                     calleeCallSite.CallSite,
                     calleeCallSite.UsingDisposeGuard,
@@ -35,8 +32,7 @@ internal static partial class ExceptionFlowEngine
                 continue;
 
             var calleeDisplay = calleeCallSite.Method.OriginalDefinition.ToDisplayString();
-            if (calleeCallSite.IsDynamicDispatch)
-            {
+            if (calleeCallSite.IsDynamicDispatch) {
                 if (assessment.Assess(
                         calleeCallSite.CallSite,
                         calleeCallSite.UsingDisposeGuard,
@@ -60,8 +56,7 @@ internal static partial class ExceptionFlowEngine
                          exceptionSummaryCatalog,
                          visitedMethods,
                          smtAnalysis,
-                         attributePolicy))
-            {
+                         attributePolicy)) {
                 if (assessment.Assess(
                         calleeCallSite.CallSite,
                         calleeCallSite.UsingDisposeGuard,
@@ -85,10 +80,8 @@ internal static partial class ExceptionFlowEngine
         IEnumerable<ProvenRuntimeHazardSite> sites,
         ExceptionSiteAssessment assessment,
         SemanticModel semanticModel,
-        IMethodSymbol methodSymbol)
-    {
-        foreach (var site in sites)
-        {
+        IMethodSymbol methodSymbol) {
+        foreach (var site in sites) {
             if (assessment.Assess(
                     site.Site,
                     null,

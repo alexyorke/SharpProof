@@ -2,13 +2,11 @@ using static SharpProof.Analyzer.AnalyzerDiagnosticReporter;
 
 namespace SharpProof.Analyzer;
 
-internal static class MethodRequiresAnalyzer
-{
+internal static class MethodRequiresAnalyzer {
     internal static void AnalyzeSymbolForRequires(
         MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
 
         if (PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return;
@@ -17,10 +15,8 @@ internal static class MethodRequiresAnalyzer
             RequiresContractHelpers.CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);
         if (contracts.Length == 0) return;
 
-        foreach (var contract in contracts)
-        {
-            if (contract.InvalidReason != null)
-            {
+        foreach (var contract in contracts) {
+            if (contract.InvalidReason != null) {
                 var invalidDiagnostic = InvalidContractArgumentDiagnostics.Create(
                     RequiresContractHelpers.AttributeDisplayName,
                     contract.Argument,
@@ -32,8 +28,7 @@ internal static class MethodRequiresAnalyzer
                 continue;
             }
 
-            if (!ContractConditionHelpers.TryParse(contract.Condition, out _, out var conditionExpression))
-            {
+            if (!ContractConditionHelpers.TryParse(contract.Condition, out _, out var conditionExpression)) {
                 ReportIfNotSuppressed(
                     context,
                     baseline,
@@ -63,10 +58,8 @@ internal static class MethodRequiresAnalyzer
         OperationAnalysisContext context,
         CompilationPurityService purityService,
         DiagnosticBaseline baseline,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
-        foreach (var callSite in CreateCallSites(context.Operation))
-        {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
+        foreach (var callSite in CreateCallSites(context.Operation)) {
             var contracts = RequiresContractHelpers.ValidContracts(
                 callSite.Method,
                 attributePolicy,
@@ -83,15 +76,13 @@ internal static class MethodRequiresAnalyzer
             var column = lineSpan.StartLinePosition.Character + 1;
             var seen = ImmutableHashSet.CreateBuilder<string>();
 
-            foreach (var contract in contracts)
-            {
+            foreach (var contract in contracts) {
                 if (!RequiresContractHelpers.TryRewriteForArguments(
                         contract.Condition,
                         contract.SourceMethod,
                         callSite.Method,
                         callSite.Arguments,
-                        out var rewrittenCondition))
-                {
+                        out var rewrittenCondition)) {
                     ReportIfNotSuppressed(
                         context,
                         baseline,
@@ -104,8 +95,7 @@ internal static class MethodRequiresAnalyzer
                     continue;
                 }
 
-                if (!purityService.SmtAnalysis.Options.IsEnabled)
-                {
+                if (!purityService.SmtAnalysis.Options.IsEnabled) {
                     ReportIfNotSuppressed(
                         context,
                         baseline,
@@ -138,8 +128,7 @@ internal static class MethodRequiresAnalyzer
                           ":" + proof.TruthValue + ":" + proof.Reason;
                 if (!seen.Add(key)) continue;
 
-                if (proof.TruthValue == SymbolicTruthValue.ProvenFalse)
-                {
+                if (proof.TruthValue == SymbolicTruthValue.ProvenFalse) {
                     ReportIfNotSuppressed(
                         context,
                         baseline,
@@ -162,11 +151,9 @@ internal static class MethodRequiresAnalyzer
         }
     }
 
-    private static ImmutableArray<RequiresCallSite> CreateCallSites(IOperation operation)
-    {
+    private static ImmutableArray<RequiresCallSite> CreateCallSites(IOperation operation) {
         var builder = ImmutableArray.CreateBuilder<RequiresCallSite>();
-        switch (operation)
-        {
+        switch (operation) {
             case IInvocationOperation invocation:
                 builder.Add(new RequiresCallSite(
                     invocation.TargetMethod,
@@ -246,8 +233,7 @@ internal static class MethodRequiresAnalyzer
         return builder.ToImmutable();
     }
 
-    private static ExpressionSyntax? CreateCompoundSetterValue(ICompoundAssignmentOperation operation)
-    {
+    private static ExpressionSyntax? CreateCompoundSetterValue(ICompoundAssignmentOperation operation) {
         if (operation.Syntax is not AssignmentExpressionSyntax assignment ||
             operation.Target.Syntax is not ExpressionSyntax target ||
             operation.Value.Syntax is not ExpressionSyntax value ||
@@ -260,8 +246,7 @@ internal static class MethodRequiresAnalyzer
             SyntaxFactory.ParenthesizedExpression((ExpressionSyntax)value.WithoutTrivia()));
     }
 
-    private static ExpressionSyntax? CreateIncrementSetterValue(IIncrementOrDecrementOperation operation)
-    {
+    private static ExpressionSyntax? CreateIncrementSetterValue(IIncrementOrDecrementOperation operation) {
         if (operation.Target.Syntax is not ExpressionSyntax target ||
             operation.Syntax is not ExpressionSyntax updateExpression ||
             !CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(updateExpression, out _, out var delta))
@@ -273,10 +258,8 @@ internal static class MethodRequiresAnalyzer
             SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(1)));
     }
 
-    private static bool IsMutationTarget(IPropertyReferenceOperation propertyReference)
-    {
-        return propertyReference.Parent switch
-        {
+    private static bool IsMutationTarget(IPropertyReferenceOperation propertyReference) {
+        return propertyReference.Parent switch {
             IAssignmentOperation assignment => ReferenceEquals(assignment.Target, propertyReference),
             IIncrementOrDecrementOperation incrementOrDecrement =>
                 ReferenceEquals(incrementOrDecrement.Target, propertyReference),
@@ -289,13 +272,11 @@ internal static class MethodRequiresAnalyzer
         IPropertyReferenceOperation propertyReference,
         IMethodSymbol? accessor,
         ExpressionSyntax? setterValue,
-        SyntaxNode? syntax = null)
-    {
+        SyntaxNode? syntax = null) {
         if (accessor == null) return;
 
         var arguments = ImmutableDictionary.CreateBuilder<string, ExpressionSyntax>(StringComparer.Ordinal);
-        foreach (var argument in propertyReference.Arguments)
-        {
+        foreach (var argument in propertyReference.Arguments) {
             var ordinal = argument.Parameter?.Ordinal ?? -1;
             if (ordinal < 0 || ordinal >= accessor.Parameters.Length ||
                 argument.Value.Syntax is not ExpressionSyntax expression)
@@ -304,8 +285,7 @@ internal static class MethodRequiresAnalyzer
             arguments[accessor.Parameters[ordinal].Name] = (ExpressionSyntax)expression.WithoutTrivia();
         }
 
-        if (setterValue != null && accessor.MethodKind is MethodKind.PropertySet or MethodKind.EventAdd or MethodKind.EventRemove)
-        {
+        if (setterValue != null && accessor.MethodKind is MethodKind.PropertySet or MethodKind.EventAdd or MethodKind.EventRemove) {
             var valueParameter = accessor.Parameters.LastOrDefault();
             if (valueParameter != null)
                 arguments[valueParameter.Name] = (ExpressionSyntax)setterValue.WithoutTrivia();
@@ -318,8 +298,7 @@ internal static class MethodRequiresAnalyzer
         ImmutableArray<RequiresCallSite>.Builder builder,
         IMethodSymbol? operatorMethod,
         SyntaxNode syntax,
-        params IOperation[] operands)
-    {
+        params IOperation[] operands) {
         if (operatorMethod == null) return;
 
         var arguments = ImmutableDictionary.CreateBuilder<string, ExpressionSyntax>(StringComparer.Ordinal);
@@ -332,11 +311,9 @@ internal static class MethodRequiresAnalyzer
 
     private static ImmutableDictionary<string, ExpressionSyntax> CreateArgumentMap(
         IMethodSymbol method,
-        ImmutableArray<IArgumentOperation> arguments)
-    {
+        ImmutableArray<IArgumentOperation> arguments) {
         var result = ImmutableDictionary.CreateBuilder<string, ExpressionSyntax>(StringComparer.Ordinal);
-        foreach (var argument in arguments)
-        {
+        foreach (var argument in arguments) {
             var ordinal = argument.Parameter?.Ordinal ?? -1;
             if (ordinal < 0 || ordinal >= method.Parameters.Length ||
                 argument.Value.Syntax is not ExpressionSyntax expression)
@@ -353,8 +330,7 @@ internal static class MethodRequiresAnalyzer
         string condition,
         Location location,
         Location? contractLocation,
-        SymbolicConditionProofResult proof)
-    {
+        SymbolicConditionProofResult proof) {
         var callee = methodSymbol.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         var properties = ContractDiagnosticSupport.CreateProofProperties(
             ContractDiagnosticSupport.EvidenceFamily.Requires,
@@ -384,8 +360,7 @@ internal static class MethodRequiresAnalyzer
         Location? location,
         string reason,
         IEnumerable<Location>? additionalLocations,
-        SymbolicAnalysisTruncationInfo? analysisTruncation = null)
-    {
+        SymbolicAnalysisTruncationInfo? analysisTruncation = null) {
         var callee = methodSymbol.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         var properties = ContractDiagnosticSupport.CreateProofProperties(
             ContractDiagnosticSupport.EvidenceFamily.Requires,

@@ -1,14 +1,11 @@
 namespace SharpProof.Analyzer;
 
-internal static class NullableContractAnalyzer
-{
-    internal static void Analyze(MethodBodyAnalysisContext context, AnalyzerSession session)
-    {
+internal static class NullableContractAnalyzer {
+    internal static void Analyze(MethodBodyAnalysisContext context, AnalyzerSession session) {
         if (context.Snapshot.RootOperation == null) return;
 
         var completions = MethodCompletionAnalysis.Collect(context, distinctByQueryPosition: true);
-        if (completions.Length != 0)
-        {
+        if (completions.Length != 0) {
             VerifyReturnContracts(context, session, completions);
             VerifyParameterContracts(context, session, completions);
             VerifyMemberContracts(context, session, completions);
@@ -20,8 +17,7 @@ internal static class NullableContractAnalyzer
     private static void VerifyReturnContracts(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        ImmutableArray<MethodNormalCompletion> completions)
-    {
+        ImmutableArray<MethodNormalCompletion> completions) {
         var method = context.MethodSymbol;
         if (method.ReturnsVoid || method.ReturnType.SpecialType == SpecialType.System_Void) return;
 
@@ -32,8 +28,7 @@ internal static class NullableContractAnalyzer
         if (!requiresNonNull && !hasConditionalContract) return;
         var conditionalContract = "[NotNullIfNotNull(\"" + inputName + "\")]";
 
-        foreach (var completion in completions)
-        {
+        foreach (var completion in completions) {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (completion.ResultExpression == null) continue;
 
@@ -52,8 +47,7 @@ internal static class NullableContractAnalyzer
 
             if (hasConditionalContract &&
                 method.Parameters.FirstOrDefault(parameter => parameter.Name == inputName) is
-                    { RefKind: not RefKind.Out })
-            {
+                    { RefKind: not RefKind.Out }) {
                 var escapedInput = EscapeIdentifier(inputName);
                 Verify(
                     context,
@@ -73,10 +67,8 @@ internal static class NullableContractAnalyzer
     private static void VerifyParameterContracts(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        ImmutableArray<MethodNormalCompletion> completions)
-    {
-        foreach (var parameter in context.MethodSymbol.Parameters)
-        {
+        ImmutableArray<MethodNormalCompletion> completions) {
+        foreach (var parameter in context.MethodSymbol.Parameters) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var target = EscapeIdentifier(parameter.Name);
 
@@ -94,8 +86,7 @@ internal static class NullableContractAnalyzer
                         parameter.Name,
                         "[NotNull]");
 
-            if (NullableFlowFacts.TryGetNotNullWhenValue(parameter, out var notNullWhen))
-            {
+            if (NullableFlowFacts.TryGetNotNullWhenValue(parameter, out var notNullWhen)) {
                 var contract = FormatBooleanAttribute("NotNullWhen", notNullWhen);
                 foreach (var completion in completions)
                     if (completion.ResultExpression != null)
@@ -113,8 +104,7 @@ internal static class NullableContractAnalyzer
             }
 
             if (NullableFlowFacts.TryGetMaybeNullWhenValue(parameter, out var maybeNullWhen) &&
-                parameter.NullableAnnotation == NullableAnnotation.NotAnnotated)
-            {
+                parameter.NullableAnnotation == NullableAnnotation.NotAnnotated) {
                 var contract = FormatBooleanAttribute("MaybeNullWhen", maybeNullWhen);
                 foreach (var completion in completions)
                     if (completion.ResultExpression != null)
@@ -136,8 +126,7 @@ internal static class NullableContractAnalyzer
     private static void VerifyMemberContracts(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        ImmutableArray<MethodNormalCompletion> completions)
-    {
+        ImmutableArray<MethodNormalCompletion> completions) {
         var method = context.MethodSymbol;
         if (method.IsStatic || method.ContainingType == null) return;
 
@@ -154,8 +143,7 @@ internal static class NullableContractAnalyzer
         AnalyzerSession session,
         ImmutableArray<MethodNormalCompletion> completions,
         string targetName,
-        bool? expectedResult)
-    {
+        bool? expectedResult) {
         if (!NullableFlowFacts.TryResolveInstanceMemberTarget(
                 context.MethodSymbol.ContainingType,
                 targetName,
@@ -165,8 +153,7 @@ internal static class NullableContractAnalyzer
         // User-defined getters are not necessarily stable or repeatable. Auto-properties
         // have field-like storage and can use the same assignment proof as fields.
         if (member is IPropertySymbol property &&
-            !IsAutoProperty(property, context.CancellationToken))
-        {
+            !IsAutoProperty(property, context.CancellationToken)) {
             foreach (var completion in completions)
                 ReportInconclusive(
                     context,
@@ -186,8 +173,7 @@ internal static class NullableContractAnalyzer
             ? "[MemberNotNullWhen(" + FormatBoolean(expectedResult.Value) + ", \"" +
               targetName + "\")]"
             : "[MemberNotNull(\"" + targetName + "\")]";
-        foreach (var completion in completions)
-        {
+        foreach (var completion in completions) {
             if (expectedResult.HasValue && completion.ResultExpression == null) continue;
             var condition = expectedResult.HasValue
                 ? ConditionalImplication(completion.ResultExpression!, expectedResult.Value, target)
@@ -209,13 +195,10 @@ internal static class NullableContractAnalyzer
         }
     }
 
-    private static bool IsAutoProperty(IPropertySymbol property, CancellationToken cancellationToken)
-    {
-        foreach (var syntaxReference in property.DeclaringSyntaxReferences)
-        {
+    private static bool IsAutoProperty(IPropertySymbol property, CancellationToken cancellationToken) {
+        foreach (var syntaxReference in property.DeclaringSyntaxReferences) {
             cancellationToken.ThrowIfCancellationRequested();
-            if (syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax
-                {
+            if (syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax {
                     ExpressionBody: null,
                     AccessorList.Accessors: var accessors
                 })
@@ -229,8 +212,7 @@ internal static class NullableContractAnalyzer
         return false;
     }
 
-    private static void AuditNullForgivingOperators(MethodBodyAnalysisContext context, AnalyzerSession session)
-    {
+    private static void AuditNullForgivingOperators(MethodBodyAnalysisContext context, AnalyzerSession session) {
         var suppressions = context.Node.DescendantNodes(
                 node => node == context.Node || node is not LocalFunctionStatementSyntax)
             .OfType<PostfixUnaryExpressionSyntax>()
@@ -242,13 +224,11 @@ internal static class NullableContractAnalyzer
                 postfix.OperatorToken.Span.Length))
             .Select(static group => group.First());
 
-        foreach (var suppression in suppressions)
-        {
+        foreach (var suppression in suppressions) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var operand = suppression.Operand;
             var condition = Parenthesize(operand) + " != null";
-            if (IsStaticallyNonNullInput(operand, context))
-            {
+            if (IsStaticallyNonNullInput(operand, context)) {
                 ReportSuppression(
                     context,
                     session,
@@ -270,19 +250,16 @@ internal static class NullableContractAnalyzer
                 session.PurityService.SmtAnalysis,
                 false,
                 context.CancellationToken);
-            if (memberFactInvalidated && proof.TruthValue == SymbolicTruthValue.ProvenTrue)
-            {
+            if (memberFactInvalidated && proof.TruthValue == SymbolicTruthValue.ProvenTrue) {
                 ReportInconclusive(context, session, suppression.GetLocation(), "null-forgiving", condition, proof);
                 continue;
             }
 
             if (proof.TruthValue == SymbolicTruthValue.Unreachable) continue;
 
-            if (proof.TruthValue is not (SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.ProvenFalse))
-            {
+            if (proof.TruthValue is not (SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.ProvenFalse)) {
                 if (proof.CounterexampleWitness.Status == SymbolicWitnessStatus.Exact &&
-                    CanUseSuppressionCounterexample(operand, context))
-                {
+                    CanUseSuppressionCounterexample(operand, context)) {
                     ReportSuppression(
                         context,
                         session,
@@ -299,8 +276,7 @@ internal static class NullableContractAnalyzer
                     suppression.SpanStart,
                     context.SemanticModel,
                     context.CancellationToken);
-                if (roslynStateBeforeSuppression == NullableFlowFactState.NotNull)
-                {
+                if (roslynStateBeforeSuppression == NullableFlowFactState.NotNull) {
                     ReportSuppression(
                         context,
                         session,
@@ -312,8 +288,7 @@ internal static class NullableContractAnalyzer
                 }
 
                 if (roslynStateBeforeSuppression == NullableFlowFactState.MaybeNull &&
-                    CanUseSuppressionCounterexample(operand, context))
-                {
+                    CanUseSuppressionCounterexample(operand, context)) {
                     ReportSuppression(
                         context,
                         session,
@@ -342,8 +317,7 @@ internal static class NullableContractAnalyzer
         string condition,
         DiagnosticDescriptor descriptor,
         string reason,
-        SymbolicConditionProofResult? proof = null)
-    {
+        SymbolicConditionProofResult? proof = null) {
         var properties = proof == null
             ? CreateProperties(
                 context,
@@ -377,8 +351,7 @@ internal static class NullableContractAnalyzer
         DiagnosticDescriptor violationDescriptor,
         string kind,
         string contract,
-        params object[] messageArguments)
-    {
+        params object[] messageArguments) {
         Verify(
             context,
             session,
@@ -402,8 +375,7 @@ internal static class NullableContractAnalyzer
         string contract,
         object[] messageArguments,
         bool unknownIsViolation,
-        bool counterexampleIsViolation)
-    {
+        bool counterexampleIsViolation) {
         var proof = MethodCompletionAnalysis.Prove(
             context,
             session.PurityService.SmtAnalysis,
@@ -414,8 +386,7 @@ internal static class NullableContractAnalyzer
         if (proof.TruthValue == SymbolicTruthValue.ProvenFalse ||
             counterexampleIsViolation &&
             proof.CounterexampleWitness.Status == SymbolicWitnessStatus.Exact ||
-            unknownIsViolation)
-        {
+            unknownIsViolation) {
             var properties = CreateProperties(
                 context,
                 completion.Location,
@@ -431,15 +402,12 @@ internal static class NullableContractAnalyzer
         ReportInconclusive(context, session, completion.Location, kind, contract, proof);
     }
 
-    private static bool HasVisibleAssignmentToMember(MethodBodyAnalysisContext context, ISymbol member)
-    {
-        foreach (var operation in context.Snapshot.VisibleOperations)
-        {
+    private static bool HasVisibleAssignmentToMember(MethodBodyAnalysisContext context, ISymbol member) {
+        foreach (var operation in context.Snapshot.VisibleOperations) {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (operation is not ISimpleAssignmentOperation assignment) continue;
 
-            ISymbol? target = assignment.Target switch
-            {
+            ISymbol? target = assignment.Target switch {
                 IFieldReferenceOperation field => field.Field.OriginalDefinition,
                 IPropertyReferenceOperation property => property.Property.OriginalDefinition,
                 _ => null
@@ -453,8 +421,7 @@ internal static class NullableContractAnalyzer
 
     private static bool IsStaticallyNonNullInput(
         ExpressionSyntax expression,
-        MethodBodyAnalysisContext context)
-    {
+        MethodBodyAnalysisContext context) {
         return context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol is
                    IParameterSymbol { NullableAnnotation: NullableAnnotation.NotAnnotated } &&
                NullableFlowFacts.GetExpressionState(
@@ -465,13 +432,11 @@ internal static class NullableContractAnalyzer
 
     private static bool CanUseSuppressionCounterexample(
         ExpressionSyntax expression,
-        MethodBodyAnalysisContext context)
-    {
+        MethodBodyAnalysisContext context) {
         if (expression is BinaryExpressionSyntax binary && binary.IsKind(SyntaxKind.AsExpression)) return true;
 
         var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
-        return symbol switch
-        {
+        return symbol switch {
             IParameterSymbol parameter => parameter.NullableAnnotation == NullableAnnotation.Annotated,
             ILocalSymbol local => local.NullableAnnotation == NullableAnnotation.Annotated,
             IFieldSymbol field => field.NullableAnnotation == NullableAnnotation.Annotated,
@@ -484,16 +449,14 @@ internal static class NullableContractAnalyzer
         PostfixUnaryExpressionSyntax suppression,
         ExpressionSyntax operand,
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         if (context.SemanticModel.GetSymbolInfo(operand, context.CancellationToken).Symbol is not
             (IFieldSymbol or IPropertySymbol))
             return false;
 
         foreach (var invocation in context.Snapshot.VisibleOperations
                      .OfType<IInvocationOperation>()
-                     .Where(invocation => invocation.Syntax.SpanStart < suppression.SpanStart))
-        {
+                     .Where(invocation => invocation.Syntax.SpanStart < suppression.SpanStart)) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var policy = PurityPolicyResolver.ResolveInvocation(
                 invocation.TargetMethod,
@@ -512,8 +475,7 @@ internal static class NullableContractAnalyzer
         Location location,
         string kind,
         string contract,
-        SymbolicConditionProofResult proof)
-    {
+        SymbolicConditionProofResult proof) {
         if (!ShouldReportInconclusive(context)) return;
 
         var properties = CreateProperties(context, location, kind, proof.Condition, contract, proof);
@@ -536,8 +498,7 @@ internal static class NullableContractAnalyzer
         string kind,
         string condition,
         string target,
-        SymbolicConditionProofResult proof)
-    {
+        SymbolicConditionProofResult proof) {
         return CreateProperties(
             context,
             location,
@@ -557,8 +518,7 @@ internal static class NullableContractAnalyzer
         string target,
         string proofStatus,
         string proofReason,
-        string? unknownReason)
-    {
+        string? unknownReason) {
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add("sharpproof.nullable.contract_kind", kind)
             .Add("sharpproof.nullable.condition", condition)

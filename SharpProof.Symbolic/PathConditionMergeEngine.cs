@@ -17,14 +17,12 @@ internal readonly record struct PathConditionMergeLimits(
     int MaxFactChoiceCombinationsPerTarget,
     int MaxGuardFactsPerTargetPerState);
 
-internal static class PathConditionMergeEngine
-{
+internal static class PathConditionMergeEngine {
     internal static ImmutableArray<TCondition> MergeAcrossAll<TCondition>(
         IReadOnlyList<IReadOnlyList<TCondition>> conditionSets,
         PathConditionMergeStrategy<TCondition> strategy,
         PathConditionMergeLimits limits)
-        where TCondition : class
-    {
+        where TCondition : class {
         if (conditionSets.Count == 0) return ImmutableArray<TCondition>.Empty;
 
         var common = GetCommonConditions(conditionSets, strategy.GetKey);
@@ -43,14 +41,11 @@ internal static class PathConditionMergeEngine
         var builder = common.ToBuilder();
         var emittedKeys = commonKeys;
         var emittedCount = 0;
-        foreach (var target in targets.OrderBy(static key => key, StringComparer.Ordinal))
-        {
+        foreach (var target in targets.OrderBy(static key => key, StringComparer.Ordinal)) {
             var combinationCount = 0;
-            foreach (var choices in EnumerateChoices(states, target, limits))
-            {
+            foreach (var choices in EnumerateChoices(states, target, limits)) {
                 combinationCount++;
-                if (combinationCount > limits.MaxFactChoiceCombinationsPerTarget)
-                {
+                if (combinationCount > limits.MaxFactChoiceCombinationsPerTarget) {
                     RecordLimit(
                         SymbolicAnalysisLimitKind.FactChoiceCombinationsPerTarget,
                         limits.MaxFactChoiceCombinationsPerTarget,
@@ -65,8 +60,7 @@ internal static class PathConditionMergeEngine
                     continue;
 
                 var branches = new TCondition[states.Length];
-                for (var index = 0; index < states.Length; index++)
-                {
+                for (var index = 0; index < states.Length; index++) {
                     var guard = states[index].CreateGuard(target);
                     branches[index] = guard == null
                         ? choices[index].Condition
@@ -75,8 +69,7 @@ internal static class PathConditionMergeEngine
 
                 var merged = strategy.Disjoin(branches);
                 if (!emittedKeys.Add(strategy.GetKey(merged))) continue;
-                if (emittedCount >= limits.MaxMergedConditions)
-                {
+                if (emittedCount >= limits.MaxMergedConditions) {
                     RecordLimit(
                         SymbolicAnalysisLimitKind.MergedPathConditions,
                         limits.MaxMergedConditions,
@@ -95,16 +88,14 @@ internal static class PathConditionMergeEngine
 
     private static ImmutableArray<TCondition> GetCommonConditions<TCondition>(
         IReadOnlyList<IReadOnlyList<TCondition>> conditionSets,
-        Func<TCondition, string> getKey)
-    {
+        Func<TCondition, string> getKey) {
         var commonKeys = new HashSet<string>(conditionSets[0].Select(getKey), StringComparer.Ordinal);
         for (var index = 1; index < conditionSets.Count; index++)
             commonKeys.IntersectWith(conditionSets[index].Select(getKey));
 
         var builder = ImmutableArray.CreateBuilder<TCondition>();
         var emitted = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var condition in conditionSets[0])
-        {
+        foreach (var condition in conditionSets[0]) {
             var key = getKey(condition);
             if (commonKeys.Contains(key) && emitted.Add(key)) builder.Add(condition);
         }
@@ -116,8 +107,7 @@ internal static class PathConditionMergeEngine
         IReadOnlyList<StatePathFacts<TCondition>> states,
         string target,
         PathConditionMergeLimits limits)
-        where TCondition : class
-    {
+        where TCondition : class {
         var selected = new PathFact<TCondition>[states.Count];
         return EnumerateChoices(states, target, 0, selected, limits);
     }
@@ -128,17 +118,14 @@ internal static class PathConditionMergeEngine
         int stateIndex,
         PathFact<TCondition>[] selected,
         PathConditionMergeLimits limits)
-        where TCondition : class
-    {
-        if (stateIndex == states.Count)
-        {
+        where TCondition : class {
+        if (stateIndex == states.Count) {
             yield return selected.ToArray();
             yield break;
         }
 
         foreach (var fact in states[stateIndex].FactsByTarget[target]
-                     .Take(limits.MaxFactsPerTargetPerState))
-        {
+                     .Take(limits.MaxFactsPerTargetPerState)) {
             selected[stateIndex] = fact;
             foreach (var choices in EnumerateChoices(states, target, stateIndex + 1, selected, limits))
                 yield return choices;
@@ -149,14 +136,12 @@ internal static class PathConditionMergeEngine
         SymbolicAnalysisLimitKind kind,
         int limit,
         int observed,
-        string provenance)
-    {
+        string provenance) {
         SymbolicAnalysisLimitContext.Record(kind, limit, observed, null, provenance);
     }
 
     private sealed class StatePathFacts<TCondition>
-        where TCondition : class
-    {
+        where TCondition : class {
         private readonly ImmutableArray<TCondition> branches;
         private readonly ImmutableArray<PathFact<TCondition>> facts;
         private readonly PathConditionMergeStrategy<TCondition> strategy;
@@ -166,26 +151,22 @@ internal static class PathConditionMergeEngine
             IEnumerable<TCondition> conditions,
             ISet<string> commonKeys,
             PathConditionMergeStrategy<TCondition> strategy,
-            PathConditionMergeLimits limits)
-        {
+            PathConditionMergeLimits limits) {
             this.strategy = strategy;
             this.limits = limits;
             var factsByTarget = new Dictionary<string, List<PathFact<TCondition>>>(StringComparer.Ordinal);
             var localBranches = ImmutableArray.CreateBuilder<TCondition>();
             var localFacts = ImmutableArray.CreateBuilder<PathFact<TCondition>>();
-            foreach (var condition in conditions)
-            {
+            foreach (var condition in conditions) {
                 var conditionKey = strategy.GetKey(condition);
                 if (commonKeys.Contains(conditionKey)) continue;
-                if (!strategy.TryGetTarget(condition, out var targetKey))
-                {
+                if (!strategy.TryGetTarget(condition, out var targetKey)) {
                     localBranches.Add(condition);
                     continue;
                 }
 
                 var fact = new PathFact<TCondition>(condition, conditionKey, targetKey);
-                if (!factsByTarget.TryGetValue(targetKey, out var targetFacts))
-                {
+                if (!factsByTarget.TryGetValue(targetKey, out var targetFacts)) {
                     targetFacts = new List<PathFact<TCondition>>();
                     factsByTarget.Add(targetKey, targetFacts);
                 }
@@ -211,15 +192,12 @@ internal static class PathConditionMergeEngine
 
         internal IReadOnlyDictionary<string, PathFact<TCondition>[]> FactsByTarget { get; }
 
-        internal TCondition? CreateGuard(string targetKey)
-        {
+        internal TCondition? CreateGuard(string targetKey) {
             var conditions = new List<TCondition>(branches);
             var guardFactCount = 0;
-            foreach (var fact in facts)
-            {
+            foreach (var fact in facts) {
                 if (string.Equals(fact.TargetKey, targetKey, StringComparison.Ordinal)) continue;
-                if (guardFactCount >= limits.MaxGuardFactsPerTargetPerState)
-                {
+                if (guardFactCount >= limits.MaxGuardFactsPerTargetPerState) {
                     RecordLimit(
                         SymbolicAnalysisLimitKind.GuardFactsPerTargetPerState,
                         limits.MaxGuardFactsPerTargetPerState,

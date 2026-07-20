@@ -1,9 +1,7 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicRuntimeExceptionFacts
-{
-    internal static bool IsKnownEvidenceCategory(string category)
-    {
+internal static class SymbolicRuntimeExceptionFacts {
+    internal static bool IsKnownEvidenceCategory(string category) {
         return string.Equals(category, ExceptionCategories.DirectThrow, StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.Rethrow, StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.SourceCallee, StringComparison.Ordinal) ||
@@ -51,10 +49,8 @@ internal static class SymbolicRuntimeExceptionFacts
                string.Equals(category, ExceptionCategories.DefiniteSwitchExpressionNoMatch, StringComparison.Ordinal);
     }
 
-    internal static bool TryGetThrowExpression(SyntaxNode throwNode, out ExpressionSyntax expression)
-    {
-        switch (throwNode)
-        {
+    internal static bool TryGetThrowExpression(SyntaxNode throwNode, out ExpressionSyntax expression) {
+        switch (throwNode) {
             case ThrowStatementSyntax { Expression: { } statementExpression }:
                 expression = statementExpression;
                 return true;
@@ -71,8 +67,7 @@ internal static class SymbolicRuntimeExceptionFacts
         SyntaxNode throwNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        bool stopAtUntypedCatch)
-    {
+        bool stopAtUntypedCatch) {
         if (!TryGetThrowExpression(throwNode, out var exceptionExpression))
             return GetRethrownExceptionType(throwNode, semanticModel, cancellationToken, stopAtUntypedCatch);
 
@@ -84,14 +79,11 @@ internal static class SymbolicRuntimeExceptionFacts
         SyntaxNode throwNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        bool stopAtUntypedCatch)
-    {
-        foreach (var catchClause in throwNode.Ancestors().OfType<CatchClauseSyntax>())
-        {
+        bool stopAtUntypedCatch) {
+        foreach (var catchClause in throwNode.Ancestors().OfType<CatchClauseSyntax>()) {
             if (!catchClause.Block.Span.Contains(throwNode.SpanStart)) continue;
 
-            if (catchClause.Declaration == null)
-            {
+            if (catchClause.Declaration == null) {
                 if (stopAtUntypedCatch) return null;
 
                 continue;
@@ -103,8 +95,7 @@ internal static class SymbolicRuntimeExceptionFacts
         return null;
     }
 
-    internal static class ExceptionTypes
-    {
+    internal static class ExceptionTypes {
         internal const string Unknown = "unknown";
         internal const string Exception = "System.Exception";
         internal const string NullReferenceException = "System.NullReferenceException";
@@ -120,8 +111,7 @@ internal static class SymbolicRuntimeExceptionFacts
         internal const string SwitchExpressionException = "System.Runtime.CompilerServices.SwitchExpressionException";
     }
 
-    internal static class ExceptionCategories
-    {
+    internal static class ExceptionCategories {
         internal const string DirectThrow = "direct_throw";
         internal const string Rethrow = "rethrow";
         internal const string SourceCallee = "source_callee";
@@ -166,8 +156,7 @@ internal static class SymbolicRuntimeExceptionFacts
         internal const string DefiniteSwitchExpressionNoMatch = "definite_switch_expression_no_match";
     }
 
-    internal static class ExceptionSources
-    {
+    internal static class ExceptionSources {
         internal const string Throw = "throw";
         internal const string BinaryOperator = "binary_operator";
         internal const string CheckedOperator = "checked_operator";

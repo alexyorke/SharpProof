@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static class RequiresContractHelpers
-{
+internal static class RequiresContractHelpers {
     internal const string AttributeTypeName = "RequiresAttribute";
     internal const string AttributeDisplayName = "[Requires]";
 
@@ -11,8 +10,7 @@ internal static class RequiresContractHelpers
     internal static ImmutableArray<RequiresContract> CollectContracts(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return ContractConditionHelpers.Collect(
             methodSymbol,
             attributePolicy,
@@ -29,15 +27,13 @@ internal static class RequiresContractHelpers
     internal static ImmutableArray<RequiresContract> ValidContracts(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return CollectContracts(methodSymbol, attributePolicy, cancellationToken)
             .Where(static contract => contract.InvalidReason == null)
             .ToImmutableArray();
     }
 
-    internal static bool ContainsResultReference(ExpressionSyntax conditionExpression)
-    {
+    internal static bool ContainsResultReference(ExpressionSyntax conditionExpression) {
         return conditionExpression
             .DescendantNodesAndSelf()
             .OfType<IdentifierNameSyntax>()
@@ -53,11 +49,9 @@ internal static class RequiresContractHelpers
         out ExpressionSyntax conditionExpression,
         out SemanticModel conditionSemanticModel,
         out SymbolicCondition condition,
-        out string failureReason)
-    {
+        out string failureReason) {
         condition = null!;
-        if (!ContractConditionHelpers.TryParse(conditionText, out var conditionStatement, out conditionExpression))
-        {
+        if (!ContractConditionHelpers.TryParse(conditionText, out var conditionStatement, out conditionExpression)) {
             conditionSemanticModel = semanticModel;
             failureReason = "condition parse failure";
             return false;
@@ -67,8 +61,7 @@ internal static class RequiresContractHelpers
                 semanticModel,
                 position,
                 conditionStatement,
-                out conditionSemanticModel))
-        {
+                out conditionSemanticModel)) {
             failureReason = "condition binding failure";
             return false;
         }
@@ -76,8 +69,7 @@ internal static class RequiresContractHelpers
         var lowering = SymbolicSemanticPipeline.LowerCondition(
             conditionExpression,
             new SymbolicLoweringContext(conditionSemanticModel, cancellationToken));
-        if (lowering is not { IsExact: true, Value: { } loweredCondition })
-        {
+        if (lowering is not { IsExact: true, Value: { } loweredCondition }) {
             failureReason = "condition is not supported by the current bounded proof engine";
             return false;
         }
@@ -87,10 +79,8 @@ internal static class RequiresContractHelpers
         return true;
     }
 
-    internal static int GetMethodEntrySpeculativePosition(SyntaxNode methodNode)
-    {
-        return methodNode switch
-        {
+    internal static int GetMethodEntrySpeculativePosition(SyntaxNode methodNode) {
+        return methodNode switch {
             MethodDeclarationSyntax { Body: { } body } => body.OpenBraceToken.Span.End,
             MethodDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression.SpanStart,
             ConstructorDeclarationSyntax { Body: { } body } => body.OpenBraceToken.Span.End,
@@ -110,8 +100,7 @@ internal static class RequiresContractHelpers
 
     internal static string CombineAsImplication(
         ImmutableArray<RequiresContract> requiresContracts,
-        string consequent)
-    {
+        string consequent) {
         if (requiresContracts.IsDefaultOrEmpty) return consequent;
 
         var validConditions = requiresContracts
@@ -130,8 +119,7 @@ internal static class RequiresContractHelpers
         IMethodSymbol contractMethod,
         IMethodSymbol invokedMethod,
         IReadOnlyDictionary<string, ExpressionSyntax> arguments,
-        out string rewrittenCondition)
-    {
+        out string rewrittenCondition) {
         rewrittenCondition = conditionText;
         if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
 
@@ -145,8 +133,7 @@ internal static class RequiresContractHelpers
     internal static bool TryRewriteForArguments(
         string conditionText,
         IReadOnlyDictionary<string, ExpressionSyntax> arguments,
-        out string rewrittenCondition)
-    {
+        out string rewrittenCondition) {
         rewrittenCondition = conditionText;
         if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
 
@@ -160,8 +147,7 @@ internal static class RequiresContractHelpers
 
     private static IReadOnlyDictionary<string, TypeSyntax> CreateTypeParameterReplacements(
         IMethodSymbol contractMethod,
-        IMethodSymbol invokedMethod)
-    {
+        IMethodSymbol invokedMethod) {
         var replacements = new Dictionary<string, TypeSyntax>(StringComparer.Ordinal);
         AddTypeParameterReplacements(
             contractMethod.TypeParameters,
@@ -180,17 +166,14 @@ internal static class RequiresContractHelpers
     private static void AddTypeParameterReplacements(
         ImmutableArray<ITypeParameterSymbol> parameters,
         ImmutableArray<ITypeSymbol> arguments,
-        IDictionary<string, TypeSyntax> replacements)
-    {
-        for (var index = 0; index < parameters.Length && index < arguments.Length; index++)
-        {
+        IDictionary<string, TypeSyntax> replacements) {
+        for (var index = 0; index < parameters.Length && index < arguments.Length; index++) {
             var display = arguments[index].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             replacements[parameters[index].Name] = SyntaxFactory.ParseTypeName(display);
         }
     }
 
-    internal static string CreateEvidenceKey(string prefix, string condition, Location? location, string reason)
-    {
+    internal static string CreateEvidenceKey(string prefix, string condition, Location? location, string reason) {
         return prefix +
                ":" +
                condition +
@@ -200,21 +183,18 @@ internal static class RequiresContractHelpers
                reason;
     }
 
-    private sealed class ParameterPlaceholderRewriter : CSharpSyntaxRewriter
-    {
+    private sealed class ParameterPlaceholderRewriter : CSharpSyntaxRewriter {
         private readonly IReadOnlyDictionary<string, ExpressionSyntax> _replacements;
         private readonly IReadOnlyDictionary<string, TypeSyntax> _typeReplacements;
 
         public ParameterPlaceholderRewriter(
             IReadOnlyDictionary<string, ExpressionSyntax> replacements,
-            IReadOnlyDictionary<string, TypeSyntax> typeReplacements)
-        {
+            IReadOnlyDictionary<string, TypeSyntax> typeReplacements) {
             _replacements = replacements;
             _typeReplacements = typeReplacements;
         }
 
-        public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
-        {
+        public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node) {
             if (CSharpSyntaxFacts.IsMemberOrQualifiedNameRightSide(node))
                 return base.VisitIdentifierName(node);
 
@@ -230,11 +210,9 @@ internal static class RequiresContractHelpers
             return SyntaxFactory.ParenthesizedExpression(replacement).WithTriviaFrom(node);
         }
 
-        private static bool IsShadowedByNestedCallableParameter(IdentifierNameSyntax node, string name)
-        {
+        private static bool IsShadowedByNestedCallableParameter(IdentifierNameSyntax node, string name) {
             foreach (var ancestor in node.Ancestors())
-                switch (ancestor)
-                {
+                switch (ancestor) {
                     case SimpleLambdaExpressionSyntax simpleLambda:
                         return simpleLambda.Parameter.Identifier.ValueText == name;
                     case ParenthesizedLambdaExpressionSyntax parenthesizedLambda:

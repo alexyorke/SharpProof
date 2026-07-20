@@ -10,8 +10,7 @@ internal sealed record ComplexityArtifacts(
     SymbolicCostExpression Cost,
     IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,
     IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons,
-    IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries)
-{
+    IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries) {
     public static readonly ComplexityArtifacts Constant = new(
         SymbolicCostExpression.Constant(),
         Array.Empty<SymbolicComplexityDriverInfo>(),
@@ -22,8 +21,7 @@ internal sealed record ComplexityArtifacts(
         SymbolicCostExpression cost,
         IEnumerable<SymbolicComplexityDriverInfo>? drivers = null,
         IEnumerable<SymbolicComplexityUnknownReason>? unknownReasons = null,
-        IEnumerable<SymbolicComplexityCalleeInfo>? calleeSummaries = null)
-    {
+        IEnumerable<SymbolicComplexityCalleeInfo>? calleeSummaries = null) {
         return new ComplexityArtifacts(
             cost,
             drivers?.ToArray() ?? Array.Empty<SymbolicComplexityDriverInfo>(),
@@ -36,8 +34,7 @@ internal sealed record ComplexityArtifacts(
         SyntaxNode syntax,
         SyntaxTree syntaxTree,
         CancellationToken cancellationToken,
-        params ComplexityArtifacts[] parts)
-    {
+        params ComplexityArtifacts[] parts) {
         return Unknown(reason, syntax, syntaxTree, cancellationToken, parts.AsEnumerable());
     }
 
@@ -47,14 +44,12 @@ internal sealed record ComplexityArtifacts(
         SyntaxTree syntaxTree,
         CancellationToken cancellationToken,
         IEnumerable<ComplexityArtifacts>? parts = null,
-        IEnumerable<SymbolicComplexityCalleeInfo>? calleeSummaries = null)
-    {
+        IEnumerable<SymbolicComplexityCalleeInfo>? calleeSummaries = null) {
         var drivers = new List<SymbolicComplexityDriverInfo>();
         var reasons = new List<SymbolicComplexityUnknownReason> { reason };
         var callees = new List<SymbolicComplexityCalleeInfo>();
         if (parts != null)
-            foreach (var part in parts)
-            {
+            foreach (var part in parts) {
                 drivers.AddRange(part.Drivers);
                 reasons.AddRange(part.UnknownReasons);
                 callees.AddRange(part.CalleeSummaries);
@@ -66,8 +61,7 @@ internal sealed record ComplexityArtifacts(
         return FromCost(SymbolicCostExpression.Unknown(reason), drivers, reasons, callees);
     }
 
-    public ComplexityArtifacts WithDriver(SymbolicComplexityDriverInfo driver)
-    {
+    public ComplexityArtifacts WithDriver(SymbolicComplexityDriverInfo driver) {
         var drivers = Drivers.ToList();
         drivers.Add(driver);
         return new ComplexityArtifacts(Cost, drivers, UnknownReasons, CalleeSummaries);
@@ -77,8 +71,7 @@ internal sealed record ComplexityArtifacts(
         SymbolicComplexityUnknownReason reason,
         SyntaxNode syntax,
         SyntaxTree syntaxTree,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
             syntaxTree,
             syntax.SpanStart,
@@ -101,15 +94,13 @@ internal sealed record SubstitutionResult(
 
 internal readonly record struct LoopBoundInfo(SymbolicCostExpression Cost, string Description);
 
-internal enum StepDirection
-{
+internal enum StepDirection {
     None,
     Up,
     Down
 }
 
-internal enum CostProjection
-{
+internal enum CostProjection {
     Value,
     LengthOrCount
 }

@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal sealed class AnalyzerSession : IDisposable
-{
+internal sealed class AnalyzerSession : IDisposable {
     private readonly ConcurrentDictionary<IMethodSymbol, Lazy<MethodBodyAnalysisState>> _methodBodyAnalyses =
         new(SymbolEq.Default);
 
@@ -14,8 +13,7 @@ internal sealed class AnalyzerSession : IDisposable
         Compilation compilation,
         AnalyzerOptions options,
         CancellationToken cancellationToken,
-        AnalyzerFeatures requestedFeatures)
-    {
+        AnalyzerFeatures requestedFeatures) {
         Features = AnalyzerFeatureDependencies.Expand(requestedFeatures);
         Configuration = AnalyzerConfiguration.FromOptions(options);
         AttributePolicy = SharpProofAttributeIdentityPolicy.Create(Configuration.AttributeStubNamespaces);
@@ -61,16 +59,14 @@ internal sealed class AnalyzerSession : IDisposable
 
     internal int MethodBodyAnalysisCount => _methodBodyAnalyses.Count;
 
-    internal void RecordTrustedBoundaryFinding(TrustedBoundaryReviewFinding finding)
-    {
+    internal void RecordTrustedBoundaryFinding(TrustedBoundaryReviewFinding finding) {
         _trustedBoundaryFindings.AddOrUpdate(
             finding.Key,
             finding,
             (_, existing) => CompareFindingLocation(finding, existing) < 0 ? finding : existing);
     }
 
-    internal ImmutableArray<TrustedBoundaryReviewFinding> GetTrustedBoundaryFindings()
-    {
+    internal ImmutableArray<TrustedBoundaryReviewFinding> GetTrustedBoundaryFindings() {
         return _trustedBoundaryFindings.Values
             .OrderBy(static finding => finding.Location.SourceTree?.FilePath ?? string.Empty, StringComparer.Ordinal)
             .ThenBy(static finding => finding.Location.SourceSpan.Start)
@@ -85,8 +81,7 @@ internal sealed class AnalyzerSession : IDisposable
         SyntaxNode declaration,
         SemanticModel semanticModel,
         ImmutableArray<IOperation> operationBlocks,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var lazy = _methodBodyAnalyses.GetOrAdd(
             methodSymbol,
             _ => new Lazy<MethodBodyAnalysisState>(
@@ -98,12 +93,10 @@ internal sealed class AnalyzerSession : IDisposable
                         operationBlocks,
                         cancellationToken)),
                 LazyThreadSafetyMode.ExecutionAndPublication));
-        try
-        {
+        try {
             return lazy.Value;
         }
-        catch
-        {
+        catch {
             if (_methodBodyAnalyses.TryGetValue(methodSymbol, out var current) &&
                 ReferenceEquals(current, lazy))
                 _methodBodyAnalyses.TryRemove(methodSymbol, out _);
@@ -112,8 +105,7 @@ internal sealed class AnalyzerSession : IDisposable
         }
     }
 
-    public void Dispose()
-    {
+    public void Dispose() {
         if (_purityService.IsValueCreated) _purityService.Value.Dispose();
         _methodBodyAnalyses.Clear();
         _trustedBoundaryFindings.Clear();
@@ -121,8 +113,7 @@ internal sealed class AnalyzerSession : IDisposable
 
     private static int CompareFindingLocation(
         TrustedBoundaryReviewFinding left,
-        TrustedBoundaryReviewFinding right)
-    {
+        TrustedBoundaryReviewFinding right) {
         var pathComparison = string.CompareOrdinal(
             left.Location.SourceTree?.FilePath ?? string.Empty,
             right.Location.SourceTree?.FilePath ?? string.Empty);

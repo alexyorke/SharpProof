@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowEngine
-{
+internal static partial class ExceptionFlowEngine {
     private static IEnumerable<ExceptionFlowSite> CollectSourceCalleeExceptionSites(
         ExceptionFlowAnalyzer.MethodCallCandidate call,
         Compilation compilation,
@@ -9,14 +8,12 @@ internal static partial class ExceptionFlowEngine
         EffectSummaryCatalog exceptionSummaryCatalog,
         HashSet<IMethodSymbol> visitedMethods,
         SmtAnalysisService smtAnalysis,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
         var invokedMethod = call.Method;
         var originalDefinition = invokedMethod.OriginalDefinition;
         if (!visitedMethods.Add(originalDefinition)) return Enumerable.Empty<ExceptionFlowSite>();
 
-        try
-        {
+        try {
             var syntaxReference = invokedMethod.DeclaringSyntaxReferences.FirstOrDefault()
                                   ?? originalDefinition.DeclaringSyntaxReferences.FirstOrDefault();
             if (syntaxReference == null) return Enumerable.Empty<ExceptionFlowSite>();
@@ -41,8 +38,7 @@ internal static partial class ExceptionFlowEngine
                     .Select(static site => site.Category + ":" + site.Source)
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(static source => source, StringComparer.Ordinal)
-                    .Select(source =>
-                {
+                    .Select(source => {
                     var chainedSource = invokedMethodDisplay + " -> " + source;
                     return new ExceptionFlowSite(
                         call.CallSite,
@@ -60,8 +56,7 @@ internal static partial class ExceptionFlowEngine
                 }))
                 .ToArray();
         }
-        finally
-        {
+        finally {
             visitedMethods.Remove(originalDefinition);
         }
     }
@@ -73,8 +68,7 @@ internal static partial class ExceptionFlowEngine
         EffectSummaryCatalog exceptionSummaryCatalog,
         HashSet<IMethodSymbol> visitedMethods,
         SmtAnalysisService smtAnalysis,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
         var invokedMethod = call.Method;
         foreach (var exception in CollectSourceCalleeExceptionSites(call, compilation, cancellationToken,
                      exceptionSummaryCatalog, visitedMethods, smtAnalysis, attributePolicy)) yield return exception;
@@ -83,13 +77,11 @@ internal static partial class ExceptionFlowEngine
             yield break;
 
         var fallbackSource = invokedMethod.OriginalDefinition.ToDisplayString();
-        foreach (var summaryException in summaryExceptions)
-        {
+        foreach (var summaryException in summaryExceptions) {
             var sources = summaryException.Sources.IsDefaultOrEmpty
                 ? ImmutableArray.Create(fallbackSource)
                 : summaryException.Sources;
-            foreach (var source in sources)
-            {
+            foreach (var source in sources) {
                 var matchingEdges = summaryException.Edges.IsDefaultOrEmpty
                     ? ImmutableArray<ExceptionFlowEdge>.Empty
                     : summaryException.Edges
@@ -117,8 +109,7 @@ internal static partial class ExceptionFlowEngine
         }
     }
 
-    private static ImmutableArray<string> CreatePrefixedCalleeChain(string invokedMethodDisplay, string qualifiedSource)
-    {
+    private static ImmutableArray<string> CreatePrefixedCalleeChain(string invokedMethodDisplay, string qualifiedSource) {
         var (_, source) = SplitQualifiedSource(qualifiedSource);
         var nestedChain = ParseCalleeChainFromSource(source);
         var invokedChain = ParseCalleeChainFromSource(invokedMethodDisplay);
@@ -133,8 +124,7 @@ internal static partial class ExceptionFlowEngine
         return invokedChain.Concat(nestedChain.Skip(skip)).ToImmutableArray();
     }
 
-    private static string GetExceptionSourceMethodDisplay(IMethodSymbol methodSymbol)
-    {
+    private static string GetExceptionSourceMethodDisplay(IMethodSymbol methodSymbol) {
         if (methodSymbol.MethodKind != MethodKind.LocalFunction &&
             methodSymbol.MethodKind != MethodKind.AnonymousFunction)
             return methodSymbol.ToDisplayString();
@@ -148,8 +138,7 @@ internal static partial class ExceptionFlowEngine
         return containingDisplay + " -> " + nestedDisplay;
     }
 
-    private static string CreateNestedCallableDisplay(IMethodSymbol methodSymbol)
-    {
+    private static string CreateNestedCallableDisplay(IMethodSymbol methodSymbol) {
         var containingType = methodSymbol.ContainingType?.ToDisplayString();
         var methodName = methodSymbol.MethodKind == MethodKind.Constructor
             ? ".ctor"
@@ -165,8 +154,7 @@ internal static partial class ExceptionFlowEngine
         return containingType + "." + methodName + "(" + parameterList + ")";
     }
 
-    private static (string? Category, string Source) SplitQualifiedSource(string qualifiedSource)
-    {
+    private static (string? Category, string Source) SplitQualifiedSource(string qualifiedSource) {
         if (string.IsNullOrWhiteSpace(qualifiedSource)) return (null, string.Empty);
 
         var separatorIndex = qualifiedSource.IndexOf(':');
@@ -197,8 +185,7 @@ internal static partial class ExceptionFlowEngine
         string exceptionType,
         string category,
         string sourcePath,
-        ImmutableArray<string> calleeChain)
-    {
+        ImmutableArray<string> calleeChain) {
         if (calleeChain.IsDefaultOrEmpty || string.IsNullOrWhiteSpace(sourcePath)) return [];
         return Enumerable.Range(1, Math.Max(1, calleeChain.Length - 1))
             .Select(depth => new ExceptionFlowEdge(

@@ -1,11 +1,9 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicStateValueFacts
-{
+internal static class SymbolicStateValueFacts {
     internal const string ImplicitThisVariableName = "this";
 
-    internal static SymbolicState RemoveReferences(SymbolicState state, ISymbol symbol)
-    {
+    internal static SymbolicState RemoveReferences(SymbolicState state, ISymbol symbol) {
         var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
         return RemoveReferences(state, symbolName);
     }
@@ -16,8 +14,7 @@ internal static class SymbolicStateValueFacts
     internal static bool TryGetCurrentValue(
         SymbolicState state,
         ISymbol symbol,
-        out SymbolicTerm valueTerm)
-    {
+        out SymbolicTerm valueTerm) {
         valueTerm = null!;
         var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
         for (var index = state.PathConditions.Length - 1; index >= 0; index--)
@@ -37,8 +34,7 @@ internal static class SymbolicStateValueFacts
     internal static bool IsKnownNullReference(SymbolicState state, ISymbol symbol) =>
         TryGetKnownReferenceNullState(state, symbol, out var isNull) && isNull;
 
-    internal static bool IsKnownNullReference(SymbolicState state, SymbolicTerm reference)
-    {
+    internal static bool IsKnownNullReference(SymbolicState state, SymbolicTerm reference) {
         return reference is SymbolicVariableTerm { ValueKind: SmtValueKind.Reference } variable &&
                TryGetKnownBooleanState(state, variable.Name, TryGetReferenceNullFactState, out var isNull) &&
                isNull;
@@ -53,24 +49,21 @@ internal static class SymbolicStateValueFacts
     private static bool TryGetKnownReferenceNullState(
         SymbolicState state,
         ISymbol symbol,
-        out bool isNull)
-    {
+        out bool isNull) {
         return TryGetKnownBooleanState(state, symbol, TryGetReferenceNullFactState, out isNull);
     }
 
     private static bool TryGetReferenceNullFactState(
         SymbolicFact fact,
         string symbolName,
-        out bool isNull)
-    {
+        out bool isNull) {
         isNull = false;
         if (fact.Atom is not SymbolicRelationAtom relation) return false;
 
         if (relation.Left is SymbolicVariableTerm { ValueKind: SmtValueKind.Reference } leftVariable &&
             string.Equals(leftVariable.Name, symbolName, StringComparison.Ordinal) &&
             relation.Right is SymbolicNullTerm &&
-            relation.Operator is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual)
-        {
+            relation.Operator is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual) {
             isNull = (relation.Operator == SymbolicRelationOperator.Equal) == fact.Polarity;
             return true;
         }
@@ -78,8 +71,7 @@ internal static class SymbolicStateValueFacts
         if (relation.Right is SymbolicVariableTerm { ValueKind: SmtValueKind.Reference } rightVariable &&
             string.Equals(rightVariable.Name, symbolName, StringComparison.Ordinal) &&
             relation.Left is SymbolicNullTerm &&
-            relation.Operator is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual)
-        {
+            relation.Operator is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual) {
             isNull = (relation.Operator == SymbolicRelationOperator.Equal) == fact.Polarity;
             return true;
         }
@@ -90,8 +82,7 @@ internal static class SymbolicStateValueFacts
     private static bool TryGetKnownNullableHasValueState(
         SymbolicState state,
         ISymbol symbol,
-        out bool hasValue)
-    {
+        out bool hasValue) {
         return TryGetKnownBooleanState(state, symbol, TryGetNullableHasValueFactState, out hasValue);
     }
 
@@ -99,8 +90,7 @@ internal static class SymbolicStateValueFacts
         SymbolicState state,
         ISymbol symbol,
         TryGetBooleanFactState tryGetFactState,
-        out bool value)
-    {
+        out bool value) {
         var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
         return TryGetKnownBooleanState(state, symbolName, tryGetFactState, out value);
     }
@@ -109,8 +99,7 @@ internal static class SymbolicStateValueFacts
         SymbolicState state,
         string symbolName,
         TryGetBooleanFactState tryGetFactState,
-        out bool value)
-    {
+        out bool value) {
         value = false;
         for (var index = state.PathConditions.Length - 1; index >= 0; index--)
             if (TryGetKnownBooleanState(state.PathConditions[index], symbolName, tryGetFactState, out value))
@@ -127,10 +116,8 @@ internal static class SymbolicStateValueFacts
         SymbolicCondition condition,
         string symbolName,
         TryGetBooleanFactState tryGetFactState,
-        out bool value)
-    {
-        switch (condition)
-        {
+        out bool value) {
+        switch (condition) {
             case SymbolicFactCondition factCondition:
                 return tryGetFactState(factCondition.Fact, symbolName, out value);
             case SymbolicNotCondition notCondition
@@ -177,25 +164,21 @@ internal static class SymbolicStateValueFacts
     private static bool TryGetNullableHasValueFactState(
         SymbolicFact fact,
         string symbolName,
-        out bool hasValue)
-    {
+        out bool hasValue) {
         hasValue = false;
-        switch (fact.Atom)
-        {
+        switch (fact.Atom) {
             case SymbolicTruthAtom { Condition: SymbolicNullableHasValueTerm nullableHasValue }
                 when string.Equals(nullableHasValue.NullableName, symbolName, StringComparison.Ordinal):
                 hasValue = fact.Polarity;
                 return true;
-            case SymbolicRelationAtom
-            {
+            case SymbolicRelationAtom {
                 Operator: SymbolicRelationOperator.Equal,
                 Left: SymbolicNullableHasValueTerm leftNullableHasValue,
                 Right: SymbolicBooleanConstantTerm rightBoolean
             } when string.Equals(leftNullableHasValue.NullableName, symbolName, StringComparison.Ordinal):
                 hasValue = rightBoolean.Value == fact.Polarity;
                 return true;
-            case SymbolicRelationAtom
-            {
+            case SymbolicRelationAtom {
                 Operator: SymbolicRelationOperator.Equal,
                 Left: SymbolicBooleanConstantTerm leftBoolean,
                 Right: SymbolicNullableHasValueTerm rightNullableHasValue
@@ -210,8 +193,7 @@ internal static class SymbolicStateValueFacts
     private static bool TryGetEqualityValue(
         SymbolicCondition condition,
         string symbolName,
-        out SymbolicTerm valueTerm)
-    {
+        out SymbolicTerm valueTerm) {
         valueTerm = null!;
         return condition is SymbolicFactCondition factCondition &&
                TryGetEqualityValue(factCondition.Fact, symbolName, out valueTerm);
@@ -220,12 +202,10 @@ internal static class SymbolicStateValueFacts
     private static bool TryGetEqualityValue(
         SymbolicFact fact,
         string symbolName,
-        out SymbolicTerm valueTerm)
-    {
+        out SymbolicTerm valueTerm) {
         valueTerm = null!;
         if (!fact.Polarity ||
-            fact.Atom is not SymbolicRelationAtom
-            {
+            fact.Atom is not SymbolicRelationAtom {
                 Operator: SymbolicRelationOperator.Equal,
                 Left: var left,
                 Right: var right
@@ -234,16 +214,14 @@ internal static class SymbolicStateValueFacts
 
         if (left is SymbolicVariableTerm { ValueKind: SmtValueKind.Int } leftVariable &&
             string.Equals(leftVariable.Name, symbolName, StringComparison.Ordinal) &&
-            right.Kind == SmtValueKind.Int)
-        {
+            right.Kind == SmtValueKind.Int) {
             valueTerm = right;
             return true;
         }
 
         if (right is SymbolicVariableTerm { ValueKind: SmtValueKind.Int } rightVariable &&
             string.Equals(rightVariable.Name, symbolName, StringComparison.Ordinal) &&
-            left.Kind == SmtValueKind.Int)
-        {
+            left.Kind == SmtValueKind.Int) {
             valueTerm = left;
             return true;
         }

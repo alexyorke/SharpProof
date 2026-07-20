@@ -1,14 +1,12 @@
 namespace SharpProof.Analyzer;
 
-internal sealed class EffectSummaryCompatibilityReporter
-{
+internal sealed class EffectSummaryCompatibilityReporter {
     private readonly ConcurrentDictionary<AnalyzerAdditionalFileIssue, byte> _issues = new();
 
     internal void Report(
         string path,
         string symbol,
-        EffectSummaryCompatibility compatibility)
-    {
+        EffectSummaryCompatibility compatibility) {
         if (compatibility.IsCompatible || string.IsNullOrWhiteSpace(compatibility.ReasonCode)) return;
 
         var displayPath = string.IsNullOrWhiteSpace(path) ? "<unknown>" : path;
@@ -25,8 +23,7 @@ internal sealed class EffectSummaryCompatibilityReporter
         string reasonCode = "invalid_additional_file") =>
         _issues.TryAdd(new AnalyzerAdditionalFileIssue(path ?? string.Empty, reason, reasonCode), 0);
 
-    internal ImmutableArray<AnalyzerAdditionalFileIssue> GetIssues()
-    {
+    internal ImmutableArray<AnalyzerAdditionalFileIssue> GetIssues() {
         return _issues.Keys
             .OrderBy(issue => issue.Path, StringComparer.OrdinalIgnoreCase)
             .ThenBy(issue => issue.ReasonCode, StringComparer.Ordinal)
@@ -35,20 +32,16 @@ internal sealed class EffectSummaryCompatibilityReporter
     }
 }
 
-internal static class AnalyzerAdditionalFileText
-{
+internal static class AnalyzerAdditionalFileText {
     internal static bool TryRead(
         AdditionalText additionalFile,
         CancellationToken cancellationToken,
         EffectSummaryCompatibilityReporter reporter,
-        out string text)
-    {
-        try
-        {
+        out string text) {
+        try {
             text = additionalFile.GetText(cancellationToken)?.ToString() ?? string.Empty;
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
+        catch (Exception exception) when (exception is not OperationCanceledException) {
             text = string.Empty;
             reporter.Report(additionalFile.Path, "file contents could not be read");
             return false;
@@ -69,8 +62,7 @@ internal readonly record struct AnalyzerAdditionalFileIssue(
 internal readonly record struct EffectSummaryCompatibility(
     bool IsCompatible,
     string ReasonCode,
-    string Reason)
-{
+    string Reason) {
     internal static EffectSummaryCompatibility Compatible { get; } = new(true, string.Empty, string.Empty);
 
     internal static EffectSummaryCompatibility Incompatible(string reasonCode, string reason) =>

@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class CommonBugAnalyzer
-{
+internal static partial class CommonBugAnalyzer {
     private static readonly ImmutableHashSet<string> MutatingCollectionMethods =
         ImmutableHashSet.Create(
             StringComparer.Ordinal,
@@ -50,16 +49,13 @@ internal static partial class CommonBugAnalyzer
 
     private static void AnalyzeCollectionAndConcurrencyCorrectness(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         AnalyzeCollectionMutationDuringEnumeration(context, session);
         AnalyzeCapturedForLoopVariables(context, session);
 
-        foreach (var operation in context.Snapshot.VisibleOperations)
-        {
+        foreach (var operation in context.Snapshot.VisibleOperations) {
             context.CancellationToken.ThrowIfCancellationRequested();
-            switch (operation)
-            {
+            switch (operation) {
                 case IObjectCreationOperation creation when IsHttpClient(creation.Type):
                     if (FindContainingLoop(creation) is { } clientLoop)
                         Report(
@@ -92,17 +88,14 @@ internal static partial class CommonBugAnalyzer
 
     private static void AnalyzeCollectionMutationDuringEnumeration(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
-        foreach (var loop in context.Snapshot.VisibleOperations.OfType<IForEachLoopOperation>())
-        {
+        AnalyzerSession session) {
+        foreach (var loop in context.Snapshot.VisibleOperations.OfType<IForEachLoopOperation>()) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var collection = Unwrap(loop.Collection);
             var collectionSymbol = GetReferencedSymbol(collection);
             if (collectionSymbol == null || !IsKnownOrdinaryMutableCollection(collection?.Type)) continue;
 
-            foreach (var operation in loop.Body.DescendantsAndSelf())
-            {
+            foreach (var operation in loop.Body.DescendantsAndSelf()) {
                 if (IsInsideNestedCallable(operation, loop.Body)) continue;
                 if (!TryGetCollectionMutation(operation, out var receiver, out var mutationName) ||
                     !SymbolEq.AreEqual(collectionSymbol, GetReferencedSymbol(receiver)))
@@ -123,12 +116,10 @@ internal static partial class CommonBugAnalyzer
     private static bool TryGetCollectionMutation(
         IOperation operation,
         out IOperation? receiver,
-        out string mutationName)
-    {
+        out string mutationName) {
         receiver = null;
         mutationName = string.Empty;
-        switch (operation)
-        {
+        switch (operation) {
             case IInvocationOperation invocation
                 when MutatingCollectionMethods.Contains(invocation.TargetMethod.Name):
                 receiver = invocation.Instance;
@@ -147,11 +138,9 @@ internal static partial class CommonBugAnalyzer
         return false;
     }
 
-    private static IOperation? GetIndexedReceiver(IOperation operation)
-    {
+    private static IOperation? GetIndexedReceiver(IOperation operation) {
         operation = Unwrap(operation)!;
-        return operation switch
-        {
+        return operation switch {
             IPropertyReferenceOperation { Property.IsIndexer: true } property => property.Instance,
             _ => null
         };
@@ -159,12 +148,10 @@ internal static partial class CommonBugAnalyzer
 
     private static void AnalyzeCapturedForLoopVariables(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         foreach (var forStatement in context.Node.DescendantNodes()
                      .OfType<ForStatementSyntax>()
-                     .Where(statement => !IsInsideNestedSyntaxCallable(statement, context.Node)))
-        {
+                     .Where(statement => !IsInsideNestedSyntaxCallable(statement, context.Node))) {
             var variables = forStatement.Declaration?.Variables
                 .Select(variable => context.SemanticModel.GetDeclaredSymbol(variable, context.CancellationToken))
                 .OfType<ILocalSymbol>()
@@ -172,12 +159,10 @@ internal static partial class CommonBugAnalyzer
             if (variables is not { Length: > 0 }) continue;
 
             foreach (var lambda in forStatement.Statement.DescendantNodesAndSelf()
-                         .OfType<AnonymousFunctionExpressionSyntax>())
-            {
+                         .OfType<AnonymousFunctionExpressionSyntax>()) {
                 if (!CanEscapeIteration(lambda, context)) continue;
 
-                foreach (var identifier in lambda.DescendantNodes().OfType<IdentifierNameSyntax>())
-                {
+                foreach (var identifier in lambda.DescendantNodes().OfType<IdentifierNameSyntax>()) {
                     var referenced = context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol;
                     var captured = variables.FirstOrDefault(variable =>
                         SymbolEq.AreEqual(variable, referenced));
@@ -198,8 +183,7 @@ internal static partial class CommonBugAnalyzer
 
     private static bool CanEscapeIteration(
         AnonymousFunctionExpressionSyntax lambda,
-        MethodBodyAnalysisContext context)
-    {
+        MethodBodyAnalysisContext context) {
         SyntaxNode current = lambda;
         while (current.Parent is ParenthesizedExpressionSyntax or CastExpressionSyntax)
             current = current.Parent;
@@ -210,8 +194,7 @@ internal static partial class CommonBugAnalyzer
             context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken).Symbol is IMethodSymbol method)
             return EscapingClosureMethods.Contains(method.Name);
 
-        if (current.Parent is AssignmentExpressionSyntax assignment)
-        {
+        if (current.Parent is AssignmentExpressionSyntax assignment) {
             var target = context.SemanticModel.GetSymbolInfo(assignment.Left, context.CancellationToken).Symbol;
             return target is IFieldSymbol or IPropertySymbol;
         }
@@ -221,17 +204,14 @@ internal static partial class CommonBugAnalyzer
 
     private static void AnalyzeParallelCallbacks(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         var root = context.Snapshot.RootOperation;
         if (root == null) return;
 
-        foreach (var lambda in root.DescendantsAndSelf().OfType<IAnonymousFunctionOperation>())
-        {
+        foreach (var lambda in root.DescendantsAndSelf().OfType<IAnonymousFunctionOperation>()) {
             if (!TryGetParallelScheduler(lambda, out var scheduler)) continue;
 
-            foreach (var mutation in lambda.Body.DescendantsAndSelf())
-            {
+            foreach (var mutation in lambda.Body.DescendantsAndSelf()) {
                 if (!TryGetMutationTarget(mutation, out var target) ||
                     IsProtectedByLock(mutation, lambda) ||
                     !TryGetSharedStateName(target, lambda, out var stateName))
@@ -251,34 +231,28 @@ internal static partial class CommonBugAnalyzer
 
     private static bool TryGetParallelScheduler(
         IAnonymousFunctionOperation lambda,
-        out string scheduler)
-    {
+        out string scheduler) {
         scheduler = string.Empty;
         for (IOperation? current = lambda.Parent; current != null; current = current.Parent)
-            switch (current)
-            {
-                case IInvocationOperation invocation:
-                {
+            switch (current) {
+                case IInvocationOperation invocation: {
                     var typeName = invocation.TargetMethod.ContainingType.ToDisplayString();
                     if ((typeName == "System.Threading.Tasks.Task" && invocation.TargetMethod.Name == "Run") ||
                         (typeName == "System.Threading.Tasks.TaskFactory" && invocation.TargetMethod.Name == "StartNew") ||
                         (typeName == "System.Threading.Tasks.Parallel" &&
                          invocation.TargetMethod.Name is "For" or "ForEach" or "Invoke") ||
                         (typeName == "System.Threading.ThreadPool" &&
-                         invocation.TargetMethod.Name is "QueueUserWorkItem" or "UnsafeQueueUserWorkItem"))
-                    {
+                         invocation.TargetMethod.Name is "QueueUserWorkItem" or "UnsafeQueueUserWorkItem")) {
                         scheduler = typeName + "." + invocation.TargetMethod.Name;
                         return true;
                     }
 
                     return false;
                 }
-                case IObjectCreationOperation creation:
-                {
+                case IObjectCreationOperation creation: {
                     var typeName = creation.Type?.ToDisplayString();
                     if (typeName is "System.Threading.Thread" or "System.Threading.Timer" or
-                        "System.Timers.Timer")
-                    {
+                        "System.Timers.Timer") {
                         scheduler = typeName;
                         return true;
                     }
@@ -292,10 +266,8 @@ internal static partial class CommonBugAnalyzer
         return false;
     }
 
-    private static bool TryGetMutationTarget(IOperation operation, out IOperation target)
-    {
-        switch (operation)
-        {
+    private static bool TryGetMutationTarget(IOperation operation, out IOperation target) {
+        switch (operation) {
             case ISimpleAssignmentOperation assignment:
                 target = assignment.Target;
                 return true;
@@ -319,22 +291,18 @@ internal static partial class CommonBugAnalyzer
     private static bool TryGetSharedStateName(
         IOperation target,
         IAnonymousFunctionOperation lambda,
-        out string stateName)
-    {
+        out string stateName) {
         target = Unwrap(target)!;
-        switch (target)
-        {
+        switch (target) {
             case IFieldReferenceOperation field:
                 stateName = field.Field.Name;
                 return true;
             case IPropertyReferenceOperation property:
                 stateName = property.Property.Name;
                 return true;
-            case ILocalReferenceOperation local:
-            {
+            case ILocalReferenceOperation local: {
                 var declaration = local.Local.Locations.FirstOrDefault(static location => location.IsInSource);
-                if (declaration != null && !lambda.Syntax.Span.Contains(declaration.SourceSpan))
-                {
+                if (declaration != null && !lambda.Syntax.Span.Contains(declaration.SourceSpan)) {
                     stateName = local.Local.Name;
                     return true;
                 }
@@ -347,8 +315,7 @@ internal static partial class CommonBugAnalyzer
         return false;
     }
 
-    private static bool IsProtectedByLock(IOperation operation, IAnonymousFunctionOperation lambda)
-    {
+    private static bool IsProtectedByLock(IOperation operation, IAnonymousFunctionOperation lambda) {
         for (var current = operation.Parent; current != null && current != lambda; current = current.Parent)
             if (current is ILockOperation)
                 return true;
@@ -359,8 +326,7 @@ internal static partial class CommonBugAnalyzer
     private static void AnalyzeConcurrentCollectionEnumeration(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        IInvocationOperation invocation)
-    {
+        IInvocationOperation invocation) {
         if (!string.Equals(invocation.TargetMethod.ContainingType.ToDisplayString(), "System.Linq.Enumerable",
                 StringComparison.Ordinal))
             return;
@@ -379,12 +345,10 @@ internal static partial class CommonBugAnalyzer
             source!.Syntax.ToString());
     }
 
-    private static bool IsKnownOrdinaryMutableCollection(ITypeSymbol? type)
-    {
+    private static bool IsKnownOrdinaryMutableCollection(ITypeSymbol? type) {
         if (type is not INamedTypeSymbol namedType) return false;
         var namespaceName = namedType.ContainingNamespace?.ToDisplayString();
-        return namespaceName switch
-        {
+        return namespaceName switch {
             "System.Collections.Generic" => namedType.Name is
                 "Dictionary" or "HashSet" or "LinkedList" or "List" or "Queue" or
                 "SortedDictionary" or "SortedList" or "SortedSet" or "Stack",
@@ -394,8 +358,7 @@ internal static partial class CommonBugAnalyzer
         };
     }
 
-    private static bool IsConcurrentCollectionType(ITypeSymbol? type)
-    {
+    private static bool IsConcurrentCollectionType(ITypeSymbol? type) {
         return type is INamedTypeSymbol namedType &&
                string.Equals(
                    namedType.ContainingNamespace?.ToDisplayString(),
@@ -403,8 +366,7 @@ internal static partial class CommonBugAnalyzer
                    StringComparison.Ordinal);
     }
 
-    private static bool IsHttpClient(ITypeSymbol? type)
-    {
+    private static bool IsHttpClient(ITypeSymbol? type) {
         return type is INamedTypeSymbol namedType &&
                string.Equals(namedType.Name, "HttpClient", StringComparison.Ordinal) &&
                string.Equals(
@@ -413,8 +375,7 @@ internal static partial class CommonBugAnalyzer
                    StringComparison.Ordinal);
     }
 
-    private static bool IsBoxingConversion(IConversionOperation conversion)
-    {
+    private static bool IsBoxingConversion(IConversionOperation conversion) {
         var sourceType = conversion.Operand.Type;
         var targetType = conversion.Type;
         return sourceType?.IsValueType == true &&
@@ -422,10 +383,8 @@ internal static partial class CommonBugAnalyzer
                (targetType.SpecialType == SpecialType.System_Object || targetType.TypeKind == TypeKind.Interface);
     }
 
-    private static ILoopOperation? FindContainingLoop(IOperation operation)
-    {
-        for (var current = operation.Parent; current != null; current = current.Parent)
-        {
+    private static ILoopOperation? FindContainingLoop(IOperation operation) {
+        for (var current = operation.Parent; current != null; current = current.Parent) {
             if (current is IAnonymousFunctionOperation or ILocalFunctionOperation) return null;
             if (current is ILoopOperation loop) return loop;
         }
@@ -433,11 +392,9 @@ internal static partial class CommonBugAnalyzer
         return null;
     }
 
-    private static ISymbol? GetReferencedSymbol(IOperation? operation)
-    {
+    private static ISymbol? GetReferencedSymbol(IOperation? operation) {
         operation = Unwrap(operation);
-        return operation switch
-        {
+        return operation switch {
             ILocalReferenceOperation local => local.Local,
             IParameterReferenceOperation parameter => parameter.Parameter,
             IFieldReferenceOperation field => field.Field,
@@ -446,8 +403,7 @@ internal static partial class CommonBugAnalyzer
         };
     }
 
-    private static bool IsInsideNestedCallable(IOperation operation, IOperation root)
-    {
+    private static bool IsInsideNestedCallable(IOperation operation, IOperation root) {
         for (var current = operation.Parent; current != null && current != root; current = current.Parent)
             if (current is IAnonymousFunctionOperation or ILocalFunctionOperation)
                 return true;
@@ -455,8 +411,7 @@ internal static partial class CommonBugAnalyzer
         return false;
     }
 
-    private static bool IsInsideNestedSyntaxCallable(SyntaxNode node, SyntaxNode root)
-    {
+    private static bool IsInsideNestedSyntaxCallable(SyntaxNode node, SyntaxNode root) {
         for (var current = node.Parent; current != null && current != root; current = current.Parent)
             if (current is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax)
                 return true;

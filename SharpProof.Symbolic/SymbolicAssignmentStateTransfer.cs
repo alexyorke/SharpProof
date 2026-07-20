@@ -7,22 +7,19 @@ internal readonly record struct SymbolicThrowGuardedValue(
     bool GuardBranchWhenTrue,
     bool RequiresNonNullValue);
 
-internal static class SymbolicAssignmentStateTransfer
-{
+internal static class SymbolicAssignmentStateTransfer {
     internal static bool TryCreateSelfReferentialAssignedValueStateTerm(
         SymbolicTerm previousValueTerm,
         ISymbol assignedSymbol,
         ExpressionSyntax valueExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out SymbolicTerm updatedValueTerm)
-    {
+        out SymbolicTerm updatedValueTerm) {
         updatedValueTerm = null!;
         valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression);
         if (previousValueTerm.Kind != SmtValueKind.Int) return false;
 
-        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default)
-        {
+        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default) {
             [assignedSymbol.OriginalDefinition] = previousValueTerm
         };
         var lowering = SymbolicSemanticPipeline.LowerTerm(
@@ -38,8 +35,7 @@ internal static class SymbolicAssignmentStateTransfer
         return true;
     }
 
-    internal static SymbolicThrowGuardedValue GetThrowGuardedValue(ExpressionSyntax valueExpression)
-    {
+    internal static SymbolicThrowGuardedValue GetThrowGuardedValue(ExpressionSyntax valueExpression) {
         var originalValueExpression = valueExpression;
         valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(originalValueExpression);
         if (valueExpression is BinaryExpressionSyntax coalesceExpression &&
@@ -52,8 +48,7 @@ internal static class SymbolicAssignmentStateTransfer
                 true,
                 true);
 
-        if (valueExpression is ConditionalExpressionSyntax conditionalExpression)
-        {
+        if (valueExpression is ConditionalExpressionSyntax conditionalExpression) {
             if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(conditionalExpression.WhenFalse) is ThrowExpressionSyntax)
                 return new SymbolicThrowGuardedValue(
                     true,
@@ -78,8 +73,7 @@ internal static class SymbolicAssignmentStateTransfer
         SyntaxNode root,
         IReadOnlyCollection<ISymbol> symbols,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         foreach (var symbol in symbols)
             if (SymbolMutationFacts.ExpressionReferencesSymbol(root, symbol, semanticModel, cancellationToken))
                 return true;

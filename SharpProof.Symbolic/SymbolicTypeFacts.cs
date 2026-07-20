@@ -1,9 +1,7 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicTypeFacts
-{
-    internal static bool IsBuiltInIntegralType(ITypeSymbol? typeSymbol)
-    {
+internal static class SymbolicTypeFacts {
+    internal static bool IsBuiltInIntegralType(ITypeSymbol? typeSymbol) {
         return typeSymbol?.SpecialType is
             SpecialType.System_Char or
             SpecialType.System_SByte or
@@ -19,8 +17,7 @@ internal static class SymbolicTypeFacts
     internal static bool IsBuiltInIntegralOrEnumType(ITypeSymbol? typeSymbol) =>
         IsBuiltInIntegralType(typeSymbol) || typeSymbol?.TypeKind == TypeKind.Enum;
 
-    public static string? GetFullMetadataName(INamedTypeSymbol? type)
-    {
+    public static string? GetFullMetadataName(INamedTypeSymbol? type) {
         if (type == null) return null;
 
         var namespaceName = type.ContainingNamespace?.IsGlobalNamespace == false
@@ -31,8 +28,7 @@ internal static class SymbolicTypeFacts
             : namespaceName + "." + type.MetadataName;
     }
 
-    public static bool IsReferenceType(ITypeSymbol? typeSymbol)
-    {
+    public static bool IsReferenceType(ITypeSymbol? typeSymbol) {
         if (typeSymbol == null) return false;
 
         if (typeSymbol is ITypeParameterSymbol typeParameter)
@@ -43,34 +39,28 @@ internal static class SymbolicTypeFacts
         return typeSymbol.IsReferenceType;
     }
 
-    public static bool IsReferenceLikeType(ITypeSymbol? typeSymbol)
-    {
+    public static bool IsReferenceLikeType(ITypeSymbol? typeSymbol) {
         return typeSymbol?.TypeKind == TypeKind.Dynamic ||
                IsReferenceType(typeSymbol);
     }
 
-    public static bool IsSymbolicReferenceLikeType(ITypeSymbol? typeSymbol)
-    {
+    public static bool IsSymbolicReferenceLikeType(ITypeSymbol? typeSymbol) {
         return typeSymbol != null &&
                (IsReferenceLikeType(typeSymbol) ||
                 IsBuiltInSpanOrMemoryType(typeSymbol) ||
                 IsSupportedTupleCarrierType(typeSymbol));
     }
 
-    public static bool IsNullableType(ITypeSymbol? typeSymbol)
-    {
-        return typeSymbol is INamedTypeSymbol
-        {
+    public static bool IsNullableType(ITypeSymbol? typeSymbol) {
+        return typeSymbol is INamedTypeSymbol {
             OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
         };
     }
 
-    public static bool TryGetNullableUnderlyingType(ITypeSymbol? typeSymbol, out ITypeSymbol underlyingType)
-    {
+    public static bool TryGetNullableUnderlyingType(ITypeSymbol? typeSymbol, out ITypeSymbol underlyingType) {
         if (typeSymbol is INamedTypeSymbol namedType &&
             namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T &&
-            namedType.TypeArguments.Length == 1)
-        {
+            namedType.TypeArguments.Length == 1) {
             underlyingType = namedType.TypeArguments[0];
             return true;
         }
@@ -83,71 +73,59 @@ internal static class SymbolicTypeFacts
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        Func<ExpressionSyntax, ExpressionSyntax> unwrapExpression)
-    {
+        Func<ExpressionSyntax, ExpressionSyntax> unwrapExpression) {
         expression = unwrapExpression(expression);
         var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
         return typeInfo.Type?.TypeKind == TypeKind.Dynamic ||
                typeInfo.ConvertedType?.TypeKind == TypeKind.Dynamic;
     }
 
-    public static bool IsSystemRangeType(ITypeSymbol? typeSymbol)
-    {
-        return typeSymbol is INamedTypeSymbol
-        {
+    public static bool IsSystemRangeType(ITypeSymbol? typeSymbol) {
+        return typeSymbol is INamedTypeSymbol {
             Name: "Range",
             ContainingNamespace: { } containingNamespace
         } &&
                containingNamespace.ToDisplayString() == "System";
     }
 
-    public static bool IsSystemIndexType(ITypeSymbol? typeSymbol)
-    {
-        return typeSymbol is INamedTypeSymbol
-        {
+    public static bool IsSystemIndexType(ITypeSymbol? typeSymbol) {
+        return typeSymbol is INamedTypeSymbol {
             Name: "Index",
             ContainingNamespace: { } containingNamespace
         } &&
                containingNamespace.ToDisplayString() == "System";
     }
 
-    public static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol)
-    {
+    public static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol) {
         return typeSymbol is INamedTypeSymbol namedType &&
                namedType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
     }
 
-    public static bool IsCharArrayType(ITypeSymbol? typeSymbol)
-    {
-        return typeSymbol is IArrayTypeSymbol
-        {
+    public static bool IsCharArrayType(ITypeSymbol? typeSymbol) {
+        return typeSymbol is IArrayTypeSymbol {
             Rank: 1,
             ElementType.SpecialType: SpecialType.System_Char
         };
     }
 
-    public static bool IsReadOnlySpanOfCharType(ITypeSymbol? typeSymbol)
-    {
+    public static bool IsReadOnlySpanOfCharType(ITypeSymbol? typeSymbol) {
         return typeSymbol is INamedTypeSymbol namedType &&
                namedType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
                namedType.TypeArguments.Length == 1 &&
                namedType.TypeArguments[0].SpecialType == SpecialType.System_Char;
     }
 
-    public static bool IsStringOrReadOnlySpanOfCharType(ITypeSymbol? typeSymbol)
-    {
+    public static bool IsStringOrReadOnlySpanOfCharType(ITypeSymbol? typeSymbol) {
         return typeSymbol?.SpecialType == SpecialType.System_String ||
                IsReadOnlySpanOfCharType(typeSymbol);
     }
 
-    public static bool IsBuiltInMemoryType(ITypeSymbol? typeSymbol)
-    {
+    public static bool IsBuiltInMemoryType(ITypeSymbol? typeSymbol) {
         return typeSymbol is INamedTypeSymbol namedType &&
                namedType.OriginalDefinition.ToDisplayString() is "System.Memory<T>" or "System.ReadOnlyMemory<T>";
     }
 
-    public static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
-    {
+    public static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol) {
         return IsBuiltInSpanType(typeSymbol) ||
                IsBuiltInMemoryType(typeSymbol);
     }
@@ -155,22 +133,18 @@ internal static class SymbolicTypeFacts
     public static bool IsNullableValueAccess(
         MemberAccessExpressionSyntax memberAccess,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return memberAccess.Name.Identifier.ValueText == "Value" &&
-               semanticModel.GetSymbolInfo(memberAccess, cancellationToken).Symbol is IPropertySymbol
-               {
+               semanticModel.GetSymbolInfo(memberAccess, cancellationToken).Symbol is IPropertySymbol {
                    Name: "Value",
                    ContainingType.OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
                };
     }
 
-    public static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol)
-    {
+    public static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol) {
         if (typeSymbol == null) return false;
 
-        switch (typeSymbol.SpecialType)
-        {
+        switch (typeSymbol.SpecialType) {
             case SpecialType.System_Byte:
             case SpecialType.System_SByte:
             case SpecialType.System_Int16:
@@ -186,8 +160,7 @@ internal static class SymbolicTypeFacts
         }
     }
 
-    private static bool IsBigIntegerType(ITypeSymbol typeSymbol)
-    {
+    private static bool IsBigIntegerType(ITypeSymbol typeSymbol) {
         return typeSymbol is INamedTypeSymbol namedType &&
                namedType.ToDisplayString() == "System.Numerics.BigInteger";
     }
@@ -195,12 +168,10 @@ internal static class SymbolicTypeFacts
     public static bool TryGetCheckedIntegralRange(
         ITypeSymbol? typeSymbol,
         out long minValue,
-        out long maxValue)
-    {
+        out long maxValue) {
         if (typeSymbol?.SpecialType is not (SpecialType.System_Int32 or
             SpecialType.System_UInt32 or
-            SpecialType.System_Int64))
-        {
+            SpecialType.System_Int64)) {
             minValue = default;
             maxValue = default;
             return false;
@@ -212,18 +183,15 @@ internal static class SymbolicTypeFacts
     public static bool TryGetBoundedIntegralRange(
         ITypeSymbol? typeSymbol,
         out long minValue,
-        out long maxValue)
-    {
+        out long maxValue) {
         return TryGetCheckedNumericConversionRange(typeSymbol, out minValue, out maxValue);
     }
 
     public static bool TryGetCheckedNumericConversionRange(
         ITypeSymbol? typeSymbol,
         out long minValue,
-        out long maxValue)
-    {
-        switch (typeSymbol?.SpecialType)
-        {
+        out long maxValue) {
+        switch (typeSymbol?.SpecialType) {
             case SpecialType.System_Char:
                 minValue = char.MinValue;
                 maxValue = char.MaxValue;
@@ -265,14 +233,12 @@ internal static class SymbolicTypeFacts
 
     private static bool IsKnownReferenceTypeParameter(
         ITypeParameterSymbol typeParameter,
-        HashSet<ITypeParameterSymbol> visited)
-    {
+        HashSet<ITypeParameterSymbol> visited) {
         if (!visited.Add(typeParameter)) return false;
 
         if (typeParameter.HasReferenceTypeConstraint) return true;
 
-        foreach (var constraint in typeParameter.ConstraintTypes)
-        {
+        foreach (var constraint in typeParameter.ConstraintTypes) {
             if (constraint.IsReferenceType) return true;
 
             if (constraint is ITypeParameterSymbol nestedTypeParameter &&
@@ -283,8 +249,7 @@ internal static class SymbolicTypeFacts
         return false;
     }
 
-    public static bool HasInstanceInt32Member(ITypeSymbol? typeSymbol, string memberName)
-    {
+    public static bool HasInstanceInt32Member(ITypeSymbol? typeSymbol, string memberName) {
         if (typeSymbol == null) return false;
 
         for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
@@ -301,11 +266,9 @@ internal static class SymbolicTypeFacts
     public static bool IsKnownNonNegativeCollectionCountProperty(
         IPropertySymbol propertySymbol,
         ITypeSymbol? receiverType,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         if (receiverType == null ||
-            propertySymbol is not
-            {
+            propertySymbol is not {
                 Name: "Count",
                 IsStatic: false,
                 Parameters.Length: 0,
@@ -314,10 +277,8 @@ internal static class SymbolicTypeFacts
             return false;
 
         foreach (var interfaceType in EnumerateKnownNonNegativeCountInterfaces(receiverType, compilation))
-            foreach (var interfaceCount in interfaceType.GetMembers("Count").OfType<IPropertySymbol>())
-            {
-                if (interfaceCount is not
-                    {
+            foreach (var interfaceCount in interfaceType.GetMembers("Count").OfType<IPropertySymbol>()) {
+                if (interfaceCount is not {
                         IsStatic: false,
                         Parameters.Length: 0,
                         Type.SpecialType: SpecialType.System_Int32
@@ -338,8 +299,7 @@ internal static class SymbolicTypeFacts
 
     private static IEnumerable<INamedTypeSymbol> EnumerateKnownNonNegativeCountInterfaces(
         ITypeSymbol receiverType,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         if (receiverType is INamedTypeSymbol namedReceiver &&
             IsKnownNonNegativeCountInterface(namedReceiver, compilation))
             yield return namedReceiver;
@@ -349,8 +309,7 @@ internal static class SymbolicTypeFacts
                 yield return interfaceType;
     }
 
-    private static bool IsKnownNonNegativeCountInterface(INamedTypeSymbol typeSymbol, Compilation compilation)
-    {
+    private static bool IsKnownNonNegativeCountInterface(INamedTypeSymbol typeSymbol, Compilation compilation) {
         return IsSameOriginalType(typeSymbol, compilation.GetTypeByMetadataName("System.Collections.ICollection")) ||
                IsSameOriginalType(
                    typeSymbol,
@@ -360,20 +319,16 @@ internal static class SymbolicTypeFacts
                    compilation.GetTypeByMetadataName("System.Collections.Generic.IReadOnlyCollection`1"));
     }
 
-    private static bool IsSameOriginalType(INamedTypeSymbol candidate, INamedTypeSymbol? target)
-    {
+    private static bool IsSameOriginalType(INamedTypeSymbol candidate, INamedTypeSymbol? target) {
         return target != null &&
                SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, target);
     }
 
-    public static bool HasDeclaredInstanceInt32Member(ITypeSymbol typeSymbol, string memberName)
-    {
-        foreach (var member in typeSymbol.GetMembers(memberName))
-        {
+    public static bool HasDeclaredInstanceInt32Member(ITypeSymbol typeSymbol, string memberName) {
+        foreach (var member in typeSymbol.GetMembers(memberName)) {
             if (member.IsStatic) continue;
 
-            switch (member)
-            {
+            switch (member) {
                 case IPropertySymbol { Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 }:
                 case IFieldSymbol { Type.SpecialType: SpecialType.System_Int32 }:
                     return true;
@@ -383,8 +338,7 @@ internal static class SymbolicTypeFacts
         return false;
     }
 
-    public static bool HasInt32Indexer(ITypeSymbol? typeSymbol)
-    {
+    public static bool HasInt32Indexer(ITypeSymbol? typeSymbol) {
         if (typeSymbol == null) return false;
 
         for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
@@ -398,8 +352,7 @@ internal static class SymbolicTypeFacts
         return false;
     }
 
-    public static bool HasDeclaredInt32Indexer(ITypeSymbol typeSymbol)
-    {
+    public static bool HasDeclaredInt32Indexer(ITypeSymbol typeSymbol) {
         foreach (var property in typeSymbol.GetMembers().OfType<IPropertySymbol>())
             if (property is { IsIndexer: true, IsStatic: false, Parameters.Length: 1 } &&
                 property.Parameters[0].Type.SpecialType == SpecialType.System_Int32)
@@ -411,13 +364,11 @@ internal static class SymbolicTypeFacts
     public static bool TryGetTuplePositionalField(
         ITypeSymbol? receiverType,
         int position,
-        out IFieldSymbol fieldSymbol)
-    {
+        out IFieldSymbol fieldSymbol) {
         fieldSymbol = null!;
         if (receiverType is not INamedTypeSymbol namedType) return false;
 
-        if (namedType.IsTupleType)
-        {
+        if (namedType.IsTupleType) {
             if (position < 0 || position >= namedType.TupleElements.Length) return false;
 
             fieldSymbol = namedType.TupleElements[position];
@@ -432,8 +383,7 @@ internal static class SymbolicTypeFacts
         return fieldSymbol != null;
     }
 
-    public static bool IsSupportedTupleCarrierType(ITypeSymbol type)
-    {
+    public static bool IsSupportedTupleCarrierType(ITypeSymbol type) {
         if (type is not INamedTypeSymbol namedType) return false;
 
         if (namedType.IsTupleType && namedType.TupleElements.Length > 0) return true;
@@ -444,8 +394,7 @@ internal static class SymbolicTypeFacts
             .Any(static field => !field.IsStatic && IsTupleElementStorageName(field.Name));
     }
 
-    public static bool IsTupleElementStorageName(string name)
-    {
+    public static bool IsTupleElementStorageName(string name) {
         return name.Length > 4 &&
                name.StartsWith("Item", StringComparison.Ordinal) &&
                name.Skip(4).All(char.IsDigit);

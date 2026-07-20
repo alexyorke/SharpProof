@@ -7,8 +7,7 @@ namespace SharpProof.ProofCore.Smt;
 ///     load, where a wall-clock timeout flips results nondeterministically under
 ///     contention.
 /// </summary>
-internal static class SmtResourceBudget
-{
+internal static class SmtResourceBudget {
     /// <summary>
     ///     Calibrated against Z3 4.12.2, which consumes roughly 3,200-4,500 rlimit
     ///     units per millisecond on a modern desktop core for the integer/string
@@ -28,8 +27,7 @@ internal static class SmtResourceBudget
     public static uint GetRlimit(TimeSpan budget) =>
         (uint)GetSaturatedRlimit(budget, uint.MaxValue, 1);
 
-    public static TimeSpan GetWallClockSafetyNet(TimeSpan budget)
-    {
+    public static TimeSpan GetWallClockSafetyNet(TimeSpan budget) {
         if (budget <= TimeSpan.Zero) return TimeSpan.Zero;
 
         if (budget.Ticks > TimeSpan.MaxValue.Ticks / WallClockSafetyFactor) return TimeSpan.MaxValue;
@@ -40,8 +38,7 @@ internal static class SmtResourceBudget
     public static long GetMethodRlimitBudget(TimeSpan methodBudget) =>
         GetSaturatedRlimit(methodBudget, long.MaxValue, 0);
 
-    private static long GetSaturatedRlimit(TimeSpan budget, long maximum, long minimum)
-    {
+    private static long GetSaturatedRlimit(TimeSpan budget, long maximum, long minimum) {
         var rlimit = budget.TotalMilliseconds * RlimitPerMillisecond;
         if (rlimit >= maximum) return maximum;
 

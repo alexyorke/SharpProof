@@ -7,8 +7,7 @@ internal readonly record struct StructuralParameterIdentity(
     string Type,
     string RefKind);
 
-internal static class StructuralRefKinds
-{
+internal static class StructuralRefKinds {
     internal const string None = "none";
     internal const string Ref = "ref";
     internal const string Out = "out";
@@ -17,8 +16,7 @@ internal static class StructuralRefKinds
 
 }
 
-internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIdentity>
-{
+internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIdentity> {
     internal const int ContractVersion = 1;
     internal const string KeyPrefix = "spm1";
 
@@ -29,8 +27,7 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
         int genericArity,
         IEnumerable<StructuralParameterIdentity> parameters,
         string returnType,
-        string returnRefKind)
-    {
+        string returnRefKind) {
         if (string.IsNullOrWhiteSpace(containingMetadataType))
             throw new ArgumentException("Containing metadata type is required.", nameof(containingMetadataType));
         if (string.IsNullOrWhiteSpace(methodKind))
@@ -61,8 +58,7 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
         string returnType,
         string returnRefKind)
         : this(containingMetadataType, methodKind, name, genericArity,
-            (IEnumerable<StructuralParameterIdentity>)parameters, returnType, returnRefKind)
-    {
+            (IEnumerable<StructuralParameterIdentity>)parameters, returnType, returnRefKind) {
     }
 
     public string ContainingMetadataType { get; }
@@ -73,8 +69,7 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
     public string ReturnType { get; }
     public string ReturnRefKind { get; }
 
-    internal StructuralMethodIdentity WithContainingMetadataType(string containingMetadataType)
-    {
+    internal StructuralMethodIdentity WithContainingMetadataType(string containingMetadataType) {
         return new StructuralMethodIdentity(
             containingMetadataType,
             MethodKind,
@@ -85,10 +80,8 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
             ReturnRefKind);
     }
 
-    internal string ToCanonicalKey()
-    {
-        var values = new List<string>
-        {
+    internal string ToCanonicalKey() {
+        var values = new List<string> {
             KeyPrefix,
             Encode(ContainingMetadataType),
             Encode(MethodKind),
@@ -96,8 +89,7 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
             GenericArity.ToString(System.Globalization.CultureInfo.InvariantCulture),
             Parameters.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)
         };
-        foreach (var parameter in Parameters)
-        {
+        foreach (var parameter in Parameters) {
             values.Add(Encode(parameter.RefKind));
             values.Add(Encode(parameter.Type));
         }
@@ -107,8 +99,7 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
         return string.Join("|", values);
     }
 
-    internal static bool TryParseCanonicalKey(string? key, out StructuralMethodIdentity identity)
-    {
+    internal static bool TryParseCanonicalKey(string? key, out StructuralMethodIdentity identity) {
         identity = null!;
         if (string.IsNullOrWhiteSpace(key)) return false;
 
@@ -128,8 +119,7 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
 
         var parameters = ImmutableArray.CreateBuilder<StructuralParameterIdentity>(parameterCount);
         var partIndex = 6;
-        for (var index = 0; index < parameterCount; index++)
-        {
+        for (var index = 0; index < parameterCount; index++) {
             if (!TryDecode(parts[partIndex++], out var refKind) ||
                 !TryDecode(parts[partIndex++], out var type))
                 return false;
@@ -140,8 +130,7 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
             !TryDecode(parts[partIndex], out var returnType))
             return false;
 
-        try
-        {
+        try {
             identity = new StructuralMethodIdentity(
                 containingType,
                 methodKind,
@@ -152,14 +141,12 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
                 returnRefKind);
             return true;
         }
-        catch (ArgumentException)
-        {
+        catch (ArgumentException) {
             return false;
         }
     }
 
-    public bool Equals(StructuralMethodIdentity? other)
-    {
+    public bool Equals(StructuralMethodIdentity? other) {
         if (ReferenceEquals(this, other)) return true;
         if (other is null ||
             GenericArity != other.GenericArity ||
@@ -181,10 +168,8 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
     public override bool Equals(object? obj) =>
         obj is StructuralMethodIdentity other && Equals(other);
 
-    public override int GetHashCode()
-    {
-        unchecked
-        {
+    public override int GetHashCode() {
+        unchecked {
             var hash = 17;
             hash = hash * 31 + StringComparer.Ordinal.GetHashCode(ContainingMetadataType);
             hash = hash * 31 + StringComparer.Ordinal.GetHashCode(MethodKind);
@@ -200,15 +185,12 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
     private static string Encode(string value) =>
         Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
 
-    private static bool TryDecode(string value, out string decoded)
-    {
-        try
-        {
+    private static bool TryDecode(string value, out string decoded) {
+        try {
             decoded = Encoding.UTF8.GetString(Convert.FromBase64String(value));
             return true;
         }
-        catch (FormatException)
-        {
+        catch (FormatException) {
             decoded = string.Empty;
             return false;
         }

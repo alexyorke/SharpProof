@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPointExecutor programPointExecutor)
-{
+internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPointExecutor programPointExecutor) {
     private readonly SymbolicSourceProgramPointExecutor _programPointExecutor =
         programPointExecutor ?? throw new ArgumentNullException(nameof(programPointExecutor));
 
@@ -10,8 +9,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
         Compilation compilation,
         int line,
         SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         Validate(syntaxTree, compilation);
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var nodes = SymbolicSourceTargetSelector.FindOnLine(
@@ -41,8 +39,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
         int line,
         int column,
         SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         Validate(syntaxTree, compilation);
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var position = SymbolicSourceLocation.GetPosition(syntaxTree, line, column, cancellationToken);
@@ -73,8 +70,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
         int spanStart,
         int spanEnd,
         SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         Validate(syntaxTree, compilation);
         var sourceSpan = SymbolicSourceLocation.GetSourceSpan(syntaxTree, spanStart, spanEnd, cancellationToken);
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
@@ -114,8 +110,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
         int endLine,
         int endColumn,
         SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
         var spanStart = SymbolicSourceLocation.GetPosition(syntaxTree, startLine, startColumn, cancellationToken);
         var spanEnd = SymbolicSourceLocation.GetPosition(syntaxTree, endLine, endColumn, cancellationToken);
@@ -132,13 +127,11 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
         SyntaxTree syntaxTree,
         Compilation compilation,
         SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         Validate(syntaxTree, compilation);
         var lineCount = syntaxTree.GetText(cancellationToken).Lines.Count;
         var lineResults = new List<SymbolicQueryLineGroup>();
-        for (var line = 1; line <= lineCount; line++)
-        {
+        for (var line = 1; line <= lineCount; line++) {
             var lineResult = QueryLine(
                 syntaxTree,
                 compilation,
@@ -156,8 +149,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
             SymbolicSmtDiagnostics.FromService(options.SmtAnalysis));
     }
 
-    private static void Validate(SyntaxTree syntaxTree, Compilation compilation)
-    {
+    private static void Validate(SyntaxTree syntaxTree, Compilation compilation) {
         if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
         if (compilation == null) throw new ArgumentNullException(nameof(compilation));
     }

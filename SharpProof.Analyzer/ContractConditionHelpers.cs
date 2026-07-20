@@ -1,19 +1,16 @@
 namespace SharpProof.Analyzer;
 
-internal static class ContractConditionHelpers
-{
+internal static class ContractConditionHelpers {
     internal static ImmutableArray<TContract> Collect<TContract>(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
         string attributeTypeName,
         Func<ContractAttributeCondition, TContract> createContract,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var builder = ImmutableArray.CreateBuilder<TContract>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
-        foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, attributeTypeName))
-        {
+        foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, attributeTypeName)) {
             cancellationToken.ThrowIfCancellationRequested();
             var condition = attribute.ConstructorArguments.Length == 1
                 ? attribute.ConstructorArguments[0].Value as string
@@ -36,11 +33,9 @@ internal static class ContractConditionHelpers
     internal static bool TryParse(
         string conditionText,
         out IfStatementSyntax conditionStatement,
-        out ExpressionSyntax conditionExpression)
-    {
+        out ExpressionSyntax conditionExpression) {
         var statement = SyntaxFactory.ParseStatement("if (" + conditionText + ") { }");
-        if (statement.ContainsDiagnostics || statement is not IfStatementSyntax ifStatement)
-        {
+        if (statement.ContainsDiagnostics || statement is not IfStatementSyntax ifStatement) {
             conditionStatement = null!;
             conditionExpression = null!;
             return false;
@@ -55,11 +50,9 @@ internal static class ContractConditionHelpers
         SemanticModel semanticModel,
         int position,
         IfStatementSyntax conditionStatement,
-        out SemanticModel speculativeModel)
-    {
+        out SemanticModel speculativeModel) {
         if (semanticModel.TryGetSpeculativeSemanticModel(position, conditionStatement, out var model) &&
-            model != null)
-        {
+            model != null) {
             speculativeModel = model;
             return true;
         }
@@ -68,8 +61,7 @@ internal static class ContractConditionHelpers
         return false;
     }
 
-    private static string? GetInvalidReason(AttributeData attribute, string? condition)
-    {
+    private static string? GetInvalidReason(AttributeData attribute, string? condition) {
         if (attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0].Value is not string)
             return "expected a string condition";

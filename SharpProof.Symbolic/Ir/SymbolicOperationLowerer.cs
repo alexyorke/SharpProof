@@ -419,8 +419,7 @@ internal static partial class SymbolicOperationLowerer {
         out SymbolicHazardOperation hazard) {
         if (operation is not IInvocationOperation invocationOperation ||
             operation.Syntax is not InvocationExpressionSyntax invocation ||
-            invocationOperation.TargetMethod is not
-            {
+            invocationOperation.TargetMethod is not {
                 IsStatic: false,
                 Parameters.Length: 0,
                 Name: "Dequeue" or "Peek" or "Pop"
@@ -1193,8 +1192,7 @@ internal static partial class SymbolicOperationLowerer {
         if (operation.Syntax is not CastExpressionSyntax cast ||
             operation.Operand.Syntax is not ExpressionSyntax operand ||
             !operation.IsChecked ||
-            operation.Conversion is not
-            {
+            operation.Conversion is not {
                 Exists: true,
                 IsIdentity: false,
                 IsImplicit: false,

@@ -2,8 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicInvariantService
-{
+internal sealed class SymbolicInvariantService {
     internal SymbolicProgramPointQueryContext Analyze(
         SemanticModel semanticModel,
         int position,
@@ -32,8 +31,7 @@ internal sealed class SymbolicInvariantService
         SmtAnalysisService? smtAnalysis = null,
         CancellationToken cancellationToken = default,
         bool includeCurrentStatementCompletionFacts = false,
-        SymbolicState? initialState = null)
-    {
+        SymbolicState? initialState = null) {
         var point = CollectProgramPoint(
             site,
             semanticModel,
@@ -53,8 +51,7 @@ internal sealed class SymbolicInvariantService
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
         SmtAnalysisService? smtAnalysis = null,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default) {
         using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
         var pathState = SymbolicReachabilityService.CollectForInitialEntryState(
             forStatement,
@@ -71,8 +68,7 @@ internal sealed class SymbolicInvariantService
             limitScope.Snapshot());
     }
 
-    private static IReadOnlyList<SmtFormula> EncodePathState(SymbolicState pathState)
-    {
+    private static IReadOnlyList<SmtFormula> EncodePathState(SymbolicState pathState) {
         pathState = SymbolicProofStateFacts.NormalizeState(pathState);
         return SymbolicProofEncoder.EncodeState(pathState) is { Success: true } encoded
             ? encoded.PathConditions
@@ -84,8 +80,7 @@ internal sealed class SymbolicInvariantService
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         bool includeCurrentStatementCompletionFacts,
-        SymbolicState? initialState)
-    {
+        SymbolicState? initialState) {
         using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
         var pathState = SymbolicReachabilityService.CollectPathStateAt(
             site,
@@ -106,8 +101,7 @@ internal sealed class SymbolicInvariantService
         SymbolicState pathState,
         SmtAnalysisService? smtAnalysis,
         SyntaxNode sourceNode,
-        SymbolicAnalysisTruncationInfo truncation)
-    {
+        SymbolicAnalysisTruncationInfo truncation) {
         formulas = FlattenProjectedConjunctions(formulas);
         if (formulas.Count == 0 &&
             pathState.IsContradictory)
@@ -129,8 +123,7 @@ internal sealed class SymbolicInvariantService
                 truncation,
                 stateProof.RawResult);
 
-        if (formulas.Count == 0)
-        {
+        if (formulas.Count == 0) {
             if (stateProof != null)
                 return new SymbolicProgramPointAnalysis(
                     spanStart,
@@ -166,15 +159,12 @@ internal sealed class SymbolicInvariantService
             stateProof?.RawResult);
     }
 
-    private static IReadOnlyList<SmtFormula> FlattenProjectedConjunctions(IEnumerable<SmtFormula> formulas)
-    {
+    private static IReadOnlyList<SmtFormula> FlattenProjectedConjunctions(IEnumerable<SmtFormula> formulas) {
         var projected = new List<SmtFormula>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        void Add(SmtFormula formula)
-        {
-            if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } conjunction)
-            {
+        void Add(SmtFormula formula) {
+            if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } conjunction) {
                 Add(conjunction.Left);
                 Add(conjunction.Right);
                 return;
@@ -193,10 +183,8 @@ internal sealed class SymbolicInvariantService
     private static bool HasPathStateFacts(SymbolicState pathState) =>
         pathState.Facts.Length != 0 || pathState.PathConditions.Length != 0;
 
-    private static SymbolicReachability MapReachability(SymbolicProofStatus status)
-    {
-        return status switch
-        {
+    private static SymbolicReachability MapReachability(SymbolicProofStatus status) {
+        return status switch {
             SymbolicProofStatus.Reachable => SymbolicReachability.Reachable,
             SymbolicProofStatus.Unreachable => SymbolicReachability.Unreachable,
             SymbolicProofStatus.Unknown => SymbolicReachability.Unknown,
@@ -211,18 +199,15 @@ internal sealed class SymbolicInvariantService
         SymbolicAnalysisTruncationInfo Truncation);
 }
 
-internal sealed record SymbolicInvariantFactSummary(IReadOnlyList<string> Facts)
-{
+internal sealed record SymbolicInvariantFactSummary(IReadOnlyList<string> Facts) {
     public string MergedInvariantText { get; } = FormatMergedInvariantFacts(Facts);
 
-    internal static SymbolicInvariantFactSummary Merge(IEnumerable<IEnumerable<string>> factSets)
-    {
+    internal static SymbolicInvariantFactSummary Merge(IEnumerable<IEnumerable<string>> factSets) {
         if (factSets == null) throw new ArgumentNullException(nameof(factSets));
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var facts = new List<string>();
-        foreach (var factSet in factSets)
-        {
+        foreach (var factSet in factSets) {
             if (factSet == null) continue;
 
             foreach (var fact in factSet)
@@ -233,11 +218,9 @@ internal sealed record SymbolicInvariantFactSummary(IReadOnlyList<string> Facts)
         return new SymbolicInvariantFactSummary(facts);
     }
 
-    internal static string FormatMergedInvariantFacts(IReadOnlyList<string> facts)
-    {
+    internal static string FormatMergedInvariantFacts(IReadOnlyList<string> facts) {
         if (facts == null) throw new ArgumentNullException(nameof(facts));
-        return facts.Count switch
-        {
+        return facts.Count switch {
             0 => "true",
             1 => facts[0],
             _ => string.Join(" && ", facts.Select(static fact => "(" + fact + ")"))
@@ -254,8 +237,7 @@ internal sealed record SymbolicProgramPointAnalysis(
     SymbolicSmtDiagnostics SmtDiagnostics,
     [property: JsonIgnore] SyntaxNode SourceNode,
     [property: JsonIgnore] SymbolicAnalysisTruncationInfo AnalysisTruncation,
-    [property: JsonIgnore] PurityProofResult? ReachabilityProof = null)
-{
+    [property: JsonIgnore] PurityProofResult? ReachabilityProof = null) {
     internal SymbolicProgramPointAnalysis(
         int spanStart,
         IReadOnlyList<SmtFormula> pathConditions,
@@ -265,8 +247,7 @@ internal sealed record SymbolicProgramPointAnalysis(
         SymbolicSmtDiagnostics smtDiagnostics,
         SyntaxNode sourceNode)
         : this(spanStart, pathConditions, pathState, reachability, reachabilityReason, smtDiagnostics, sourceNode,
-            SymbolicAnalysisTruncationInfo.None)
-    {
+            SymbolicAnalysisTruncationInfo.None) {
     }
 
     public IReadOnlyList<string> Facts { get; } = PathConditions.Select(SymbolicFormulaDisplay.Format).ToArray();
@@ -288,8 +269,7 @@ internal sealed record SymbolicSmtDiagnostics(
     int ExecutedQueryCount,
     int CacheEntryCount,
     SmtAnalysisHealth Health,
-    SmtSolverLifecycleOptions Lifecycle)
-{
+    SmtSolverLifecycleOptions Lifecycle) {
     public static readonly SymbolicSmtDiagnostics NotConfigured = new(
         false,
         SmtAnalysisMode.Off,
@@ -312,8 +292,7 @@ internal sealed record SymbolicSmtDiagnostics(
 
     internal SymbolicSmtDiagnostics Snapshot => this;
 
-    public static SymbolicSmtDiagnostics FromService(SmtAnalysisService? smtAnalysis)
-    {
+    public static SymbolicSmtDiagnostics FromService(SmtAnalysisService? smtAnalysis) {
         if (smtAnalysis == null) return NotConfigured;
 
         return new SymbolicSmtDiagnostics(
@@ -330,8 +309,7 @@ internal sealed record SymbolicSmtDiagnostics(
             smtAnalysis.Options.Lifecycle);
     }
 
-    internal static int ToBoundedMilliseconds(TimeSpan value)
-    {
+    internal static int ToBoundedMilliseconds(TimeSpan value) {
         var totalMilliseconds = value.TotalMilliseconds;
         if (totalMilliseconds >= int.MaxValue) return int.MaxValue;
 
@@ -342,8 +320,7 @@ internal sealed record SymbolicSmtDiagnostics(
 
 }
 
-internal enum SymbolicReachability
-{
+internal enum SymbolicReachability {
     NotChecked,
     Unknown,
     Reachable,

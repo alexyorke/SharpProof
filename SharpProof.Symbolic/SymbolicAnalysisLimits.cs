@@ -2,8 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Symbolic;
 
-internal enum SymbolicAnalysisLimitKind
-{
+internal enum SymbolicAnalysisLimitKind {
     IfElseFactMerge,
     SwitchFactMerge,
     TryFactMerge,
@@ -22,19 +21,16 @@ internal sealed record SymbolicAnalysisTruncationEvent(
     [property: JsonPropertyOrder(2)] int Limit,
     [property: JsonPropertyOrder(3)] int Observed,
     [property: JsonPropertyOrder(4)] string Provenance,
-    [property: JsonPropertyOrder(5)] int? SourceSpanStart)
-{
+    [property: JsonPropertyOrder(5)] int? SourceSpanStart) {
     [JsonPropertyOrder(1)]
     public string Code { get; } = GetCode(Kind);
 
     private static string GetCode(SymbolicAnalysisLimitKind value) => "analysis_limit." +
         (Enum.IsDefined(typeof(SymbolicAnalysisLimitKind), value) ? ToSnakeCase(value.ToString()) : "unknown");
 
-    private static string ToSnakeCase(string value)
-    {
+    private static string ToSnakeCase(string value) {
         var result = new System.Text.StringBuilder(value.Length + 8);
-        for (var index = 0; index < value.Length; index++)
-        {
+        for (var index = 0; index < value.Length; index++) {
             var character = value[index];
             if (index != 0 && char.IsUpper(character)) result.Append('_');
             result.Append(char.ToLowerInvariant(character));
@@ -44,21 +40,18 @@ internal sealed record SymbolicAnalysisTruncationEvent(
 }
 
 internal sealed record SymbolicAnalysisTruncationInfo(
-    [property: JsonPropertyOrder(1)] IReadOnlyList<SymbolicAnalysisTruncationEvent> Events)
-{
+    [property: JsonPropertyOrder(1)] IReadOnlyList<SymbolicAnalysisTruncationEvent> Events) {
     public static readonly SymbolicAnalysisTruncationInfo None = new(Array.Empty<SymbolicAnalysisTruncationEvent>());
 
     [JsonPropertyOrder(0)]
     public bool IsTruncated => Events.Count != 0;
 
     internal static SymbolicAnalysisTruncationInfo Combine(
-        IEnumerable<SymbolicAnalysisTruncationInfo> truncations)
-    {
+        IEnumerable<SymbolicAnalysisTruncationInfo> truncations) {
         if (truncations == null) throw new ArgumentNullException(nameof(truncations));
 
         var events = new SymbolicAnalysisTruncationEventAccumulator();
-        foreach (var truncation in truncations)
-        {
+        foreach (var truncation in truncations) {
             if (truncation == null) continue;
 
             foreach (var item in truncation.Events) events.Add(item);
@@ -68,8 +61,7 @@ internal sealed record SymbolicAnalysisTruncationInfo(
     }
 }
 
-internal static class SymbolicAnalysisLimitContext
-{
+internal static class SymbolicAnalysisLimitContext {
     private static readonly AsyncLocal<Scope?> CurrentScope = new();
 
     internal static SharpProofAnalysisBudget Limits => CurrentScope.Value?.Limits ?? SharpProofAnalysisBudget.Default;
@@ -83,8 +75,7 @@ internal static class SymbolicAnalysisLimitContext
     private static Scope Push(
         SharpProofAnalysisBudget? limits,
         SyntaxNode? sourceNode,
-        bool propagateEvents)
-    {
+        bool propagateEvents) {
         var parent = CurrentScope.Value;
         var scope = new Scope(
             parent,
@@ -100,16 +91,14 @@ internal static class SymbolicAnalysisLimitContext
         int limit,
         int observed,
         SyntaxNode? sourceNode,
-        string provenance)
-    {
+        string provenance) {
         CurrentScope.Value?.Record(kind, limit, observed, sourceNode, provenance);
     }
 
     internal static bool CanAddMergedSwitchFact(
         int addedCount,
         SyntaxNode sourceNode,
-        string provenance)
-    {
+        string provenance) {
         var limit = Limits.MaxMergedSwitchFacts;
         if (addedCount < limit) return true;
 
@@ -126,8 +115,7 @@ internal static class SymbolicAnalysisLimitContext
         Scope? parent,
         SharpProofAnalysisBudget limits,
         int? defaultSourceSpanStart,
-        bool propagateEvents) : IDisposable
-    {
+        bool propagateEvents) : IDisposable {
         private readonly SymbolicAnalysisTruncationEventAccumulator _events = new();
         private readonly Scope? _parent = parent;
         private readonly bool _propagateEvents = propagateEvents;
@@ -145,8 +133,7 @@ internal static class SymbolicAnalysisLimitContext
             int limit,
             int observed,
             SyntaxNode? sourceNode,
-            string provenance)
-        {
+            string provenance) {
             Record(kind, limit, observed, sourceNode?.SpanStart ?? DefaultSourceSpanStart, provenance);
         }
 
@@ -155,8 +142,7 @@ internal static class SymbolicAnalysisLimitContext
             int limit,
             int observed,
             int? sourceSpanStart,
-            string provenance)
-        {
+            string provenance) {
             _events.Add(new SymbolicAnalysisTruncationEvent(
                 kind,
                 limit,
@@ -165,8 +151,7 @@ internal static class SymbolicAnalysisLimitContext
                 sourceSpanStart));
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             if (_disposed) return;
 
             _disposed = true;

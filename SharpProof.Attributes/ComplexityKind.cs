@@ -11,8 +11,7 @@ namespace SharpProof.Attributes;
 ///     independent size parameters and are only comparable to themselves and to <c>Constant</c>.
 ///     Unknown and recursive-unknown are reported states, not declarable bounds.
 /// </remarks>
-public enum ComplexityKind
-{
+public enum ComplexityKind {
     /// <summary><c>O(1)</c>.</summary>
     Constant = 0,
 

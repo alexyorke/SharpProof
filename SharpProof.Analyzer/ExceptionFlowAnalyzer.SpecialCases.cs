@@ -1,15 +1,12 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowAnalyzer
-{
+internal static partial class ExceptionFlowAnalyzer {
     private static IEnumerable<MethodCallCandidate> GetLocalDelegateTargetInvocationNodes(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var knownTargets = new Dictionary<ISymbol, ImmutableHashSet<IMethodSymbol>>(SymbolEq.Default);
-        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(methodNode))
-        {
+        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(methodNode)) {
             UpdateKnownDelegateTargets(node, semanticModel, cancellationToken, knownTargets);
             if (node is not InvocationExpressionSyntax invocation) continue;
 
@@ -30,10 +27,8 @@ internal static partial class ExceptionFlowAnalyzer
         SyntaxNode node,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets)
-    {
-        if (TryGetDeconstructionAssignment(node, semanticModel, cancellationToken, out var deconstruction))
-        {
+        IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets) {
+        if (TryGetDeconstructionAssignment(node, semanticModel, cancellationToken, out var deconstruction)) {
             UpdateDeconstructionDelegateTargets(
                 deconstruction.Target,
                 deconstruction.Value,
@@ -41,10 +36,8 @@ internal static partial class ExceptionFlowAnalyzer
             return;
         }
 
-        if (node is LocalDeclarationStatementSyntax localDeclaration)
-        {
-            foreach (var variable in localDeclaration.Declaration.Variables)
-            {
+        if (node is LocalDeclarationStatementSyntax localDeclaration) {
+            foreach (var variable in localDeclaration.Declaration.Variables) {
                 if (semanticModel.GetDeclaredSymbol(variable, cancellationToken) is not ILocalSymbol localSymbol)
                     continue;
 
@@ -58,8 +51,7 @@ internal static partial class ExceptionFlowAnalyzer
             }
         }
         else if (node is AssignmentExpressionSyntax assignment &&
-                 TryGetInvokedLocalSymbol(assignment.Left, semanticModel, cancellationToken, out var localSymbol))
-        {
+                 TryGetInvokedLocalSymbol(assignment.Left, semanticModel, cancellationToken, out var localSymbol)) {
             if (assignment.Right is ExpressionSyntax rightExpression &&
                 semanticModel.GetSymbolInfo(rightExpression, cancellationToken).Symbol is IMethodSymbol targetMethod)
                 SetKnownDelegateTarget(knownTargets, localSymbol!, targetMethod, assignment);
@@ -72,14 +64,12 @@ internal static partial class ExceptionFlowAnalyzer
         SyntaxNode node,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out IDeconstructionAssignmentOperation deconstruction)
-    {
+        out IDeconstructionAssignmentOperation deconstruction) {
         deconstruction = null!;
         if (node is not AssignmentExpressionSyntax and not LocalDeclarationStatementSyntax) return false;
 
         var operation = semanticModel.GetOperation(node, cancellationToken);
-        if (operation is IDeconstructionAssignmentOperation direct)
-        {
+        if (operation is IDeconstructionAssignmentOperation direct) {
             deconstruction = direct;
             return true;
         }
@@ -88,11 +78,9 @@ internal static partial class ExceptionFlowAnalyzer
 
         var pending = new Stack<IOperation>();
         pending.Push(operation);
-        while (pending.Count > 0)
-        {
+        while (pending.Count > 0) {
             var candidate = pending.Pop();
-            if (candidate is IDeconstructionAssignmentOperation nested)
-            {
+            if (candidate is IDeconstructionAssignmentOperation nested) {
                 deconstruction = nested;
                 return true;
             }
@@ -106,15 +94,12 @@ internal static partial class ExceptionFlowAnalyzer
     private static void UpdateDeconstructionDelegateTargets(
         IOperation target,
         IOperation value,
-        IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets)
-    {
+        IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets) {
         target = UnwrapDelegateAssignmentOperation(target);
         value = UnwrapDelegateAssignmentOperation(value);
 
-        if (target is ITupleOperation targetTuple)
-        {
-            if (value is ITupleOperation valueTuple && valueTuple.Elements.Length == targetTuple.Elements.Length)
-            {
+        if (target is ITupleOperation targetTuple) {
+            if (value is ITupleOperation valueTuple && valueTuple.Elements.Length == targetTuple.Elements.Length) {
                 for (var index = 0; index < targetTuple.Elements.Length; index++)
                     UpdateDeconstructionDelegateTargets(
                         targetTuple.Elements[index],
@@ -138,11 +123,9 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static void InvalidateDelegateTargets(
         IOperation target,
-        IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets)
-    {
+        IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets) {
         target = UnwrapDelegateAssignmentOperation(target);
-        if (target is ITupleOperation tuple)
-        {
+        if (target is ITupleOperation tuple) {
             foreach (var element in tuple.Elements) InvalidateDelegateTargets(element, knownTargets);
             return;
         }
@@ -150,11 +133,9 @@ internal static partial class ExceptionFlowAnalyzer
         if (TryGetDelegateAssignmentSymbol(target, out var symbol)) knownTargets.Remove(symbol);
     }
 
-    private static bool TryGetDelegateAssignmentSymbol(IOperation operation, out ISymbol symbol)
-    {
+    private static bool TryGetDelegateAssignmentSymbol(IOperation operation, out ISymbol symbol) {
         operation = UnwrapDelegateAssignmentOperation(operation);
-        switch (operation)
-        {
+        switch (operation) {
             case ILocalReferenceOperation local:
                 symbol = local.Local.OriginalDefinition;
                 return true;
@@ -172,11 +153,9 @@ internal static partial class ExceptionFlowAnalyzer
     private static bool TryResolveDelegateAssignmentValue(
         IOperation operation,
         IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets,
-        out ImmutableHashSet<IMethodSymbol> methods)
-    {
+        out ImmutableHashSet<IMethodSymbol> methods) {
         operation = UnwrapDelegateAssignmentOperation(operation);
-        switch (operation)
-        {
+        switch (operation) {
             case IMethodReferenceOperation methodReference:
                 methods = ImmutableHashSet.Create<IMethodSymbol>(
                     SymbolEq.Default,
@@ -196,11 +175,9 @@ internal static partial class ExceptionFlowAnalyzer
         }
     }
 
-    private static IOperation UnwrapDelegateAssignmentOperation(IOperation operation)
-    {
+    private static IOperation UnwrapDelegateAssignmentOperation(IOperation operation) {
         while (true)
-            switch (operation)
-            {
+            switch (operation) {
                 case IConversionOperation conversion:
                     operation = conversion.Operand;
                     continue;
@@ -219,8 +196,7 @@ internal static partial class ExceptionFlowAnalyzer
         InvocationExpressionSyntax invocation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        IReadOnlyDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets)
-    {
+        IReadOnlyDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets) {
         if (!TryGetInvokedLocalSymbol(invocation.Expression, semanticModel, cancellationToken, out var localSymbol))
             return Enumerable.Empty<IMethodSymbol>();
 
@@ -233,8 +209,7 @@ internal static partial class ExceptionFlowAnalyzer
         IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets,
         ISymbol symbol,
         IMethodSymbol target,
-        SyntaxNode assignment)
-    {
+        SyntaxNode assignment) {
         var isConditional = assignment.Ancestors().Any(static ancestor =>
             ancestor is IfStatementSyntax or SwitchStatementSyntax or SwitchExpressionSyntax or
                 ConditionalExpressionSyntax or WhileStatementSyntax or DoStatementSyntax or
@@ -249,8 +224,7 @@ internal static partial class ExceptionFlowAnalyzer
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ISymbol? localSymbol)
-    {
+        out ISymbol? localSymbol) {
         localSymbol = null;
         var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
         if (symbol is not ILocalSymbol and not IParameterSymbol) return false;
@@ -259,12 +233,10 @@ internal static partial class ExceptionFlowAnalyzer
         return true;
     }
 
-    private static IMethodSymbol? FindObjectCreationConstructor(IOperation root)
-    {
+    private static IMethodSymbol? FindObjectCreationConstructor(IOperation root) {
         var pending = new Stack<IOperation>();
         pending.Push(root);
-        while (pending.Count != 0)
-        {
+        while (pending.Count != 0) {
             var operation = pending.Pop();
             if (operation is IObjectCreationOperation objectCreation)
                 return objectCreation.Constructor;

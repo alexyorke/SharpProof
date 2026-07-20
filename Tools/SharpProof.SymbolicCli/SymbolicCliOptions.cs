@@ -791,8 +791,7 @@ internal sealed class SymbolicCliOptions {
             allowedMetrics = new[] { "capability-sites", "capability-unknowns" };
         else allowedMetrics = Complexity
             ? (new[] { "complexity-drivers", "complexity-unknowns" })
-            : (new[]
-            {
+            : (new[] {
                 "program-points",
                 "conservative-unknowns",
                 "proof-unknowns",

@@ -1,25 +1,21 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal enum SmtValueKind
-{
+internal enum SmtValueKind {
     Bool,
     Int,
     Reference,
     String
 }
 
-internal enum SmtUnaryOperator
-{
+internal enum SmtUnaryOperator {
     Not
 }
 
-internal enum SmtIntegerUnaryOperator
-{
+internal enum SmtIntegerUnaryOperator {
     Negate
 }
 
-internal enum SmtBinaryOperator
-{
+internal enum SmtBinaryOperator {
     And,
     Or,
     Equal,
@@ -30,8 +26,7 @@ internal enum SmtBinaryOperator
     GreaterThanOrEqual
 }
 
-internal enum SmtIntegerBinaryOperator
-{
+internal enum SmtIntegerBinaryOperator {
     Add,
     Subtract,
     Multiply,

@@ -1,13 +1,11 @@
 namespace SharpProof.Analyzer;
 
-internal static class MethodPurityAnalyzer
-{
+internal static class MethodPurityAnalyzer {
     internal static void AnalyzeSymbolForPurity(
         MethodBodyAnalysisContext context,
         CompilationPurityService purityService,
         DiagnosticBaseline baseline,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
 
         var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
@@ -59,11 +57,9 @@ internal static class MethodPurityAnalyzer
                 hasDirectImpureAttribute) ||
             hasDirectImpureAttribute && hasInheritedPurityEnforcement ||
             hasInheritedImpureAttribute &&
-            (hasEnforcePureAttribute || hasPureAttribute || hasDirectPureExternalAttribute))
-        {
+            (hasEnforcePureAttribute || hasPureAttribute || hasDirectPureExternalAttribute)) {
             var conflictingDiagnosticLocation = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
-            if (conflictingDiagnosticLocation != null)
-            {
+            if (conflictingDiagnosticLocation != null) {
                 var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                     ImmutableDictionary<string, string?>.Empty,
                     methodSymbol,
@@ -92,11 +88,9 @@ internal static class MethodPurityAnalyzer
             attributePolicy.HasAttribute(methodSymbol, "AllowSynchronizationAttribute");
 
         // Report if [AllowSynchronization] is present without [EnforcePure]/[Pure]
-        if (hasAllowSynchronization && !hasPurityEnforcementAttribute)
-        {
+        if (hasAllowSynchronization && !hasPurityEnforcementAttribute) {
             var allowSyncLocation = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
-            if (allowSyncLocation != null)
-            {
+            if (allowSyncLocation != null) {
                 var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                     ImmutableDictionary<string, string?>.Empty,
                     methodSymbol,
@@ -118,14 +112,11 @@ internal static class MethodPurityAnalyzer
         }
 
         // Report redundant [AllowSynchronization] if present but no synchronization constructs exist in the body
-        if (hasAllowSynchronization && hasPurityEnforcementAttribute)
-        {
+        if (hasAllowSynchronization && hasPurityEnforcementAttribute) {
             var containsLock = context.Node.DescendantNodes().OfType<LockStatementSyntax>().Any();
-            if (!containsLock)
-            {
+            if (!containsLock) {
                 var redundantLoc = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
-                if (redundantLoc != null)
-                {
+                if (redundantLoc != null) {
                     var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                         ImmutableDictionary<string, string?>.Empty,
                         methodSymbol,
@@ -160,8 +151,7 @@ internal static class MethodPurityAnalyzer
         var enforceOrPureAttributeSymbol =
             GetEffectivePurityAttributeSymbol(enforcePureAttributeSymbol, pureAttributeSymbol);
         PurityAnalysisEngine.PurityAnalysisResult purityResult;
-        try
-        {
+        try {
             purityResult = purityService.GetPurity(
                 methodSymbol,
                 context.SemanticModel,
@@ -169,8 +159,7 @@ internal static class MethodPurityAnalyzer
                 allowSynchronizationAttributeSymbol,
                 context.CancellationToken);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException && !SymbolicErrorClassifier.IsFatal(ex))
-        {
+        catch (Exception ex) when (ex is not OperationCanceledException && !SymbolicErrorClassifier.IsFatal(ex)) {
             var error = SymbolicErrorClassifier.FromException(ex);
             purityResult = PurityAnalysisEngine.PurityAnalysisResult.ImpureUnknownLocation.WithEvidence(
                 PurityAnalysisEngine.PurityEvidence.Create(
@@ -184,12 +173,10 @@ internal static class MethodPurityAnalyzer
         var effectiveEmitExplanations = context.Configuration.EmitExplanations;
         var effectiveReportBclFallbackGuesses = context.Configuration.ReportBclFallbackGuesses;
 
-        if (!isPure && hasPurityEnforcementAttribute)
-        {
+        if (!isPure && hasPurityEnforcementAttribute) {
             var diagnosticLocation = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
 
-            if (diagnosticLocation != null)
-            {
+            if (diagnosticLocation != null) {
                 var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                     AnalysisTruncationDiagnosticProperties.Add(
                         purityResult.Evidence.ToDiagnosticProperties(),
@@ -211,8 +198,7 @@ internal static class MethodPurityAnalyzer
                 if (baseline.IsSuppressed(diagnostic)) return;
 
                 context.ReportDiagnostic(diagnostic);
-                if (effectiveEmitExplanations)
-                {
+                if (effectiveEmitExplanations) {
                     var explanation = Diagnostic.Create(
                         AnalyzerDiagnosticCatalog.Get("PurityExplanationRule"),
                         diagnosticLocation,
@@ -222,8 +208,7 @@ internal static class MethodPurityAnalyzer
                 }
 
                 if ((effectiveEmitExplanations || effectiveReportBclFallbackGuesses) &&
-                    !string.IsNullOrEmpty(purityResult.Evidence.BclFallbackGuess))
-                {
+                    !string.IsNullOrEmpty(purityResult.Evidence.BclFallbackGuess)) {
                     var fallbackDiagnostic = Diagnostic.Create(
                         AnalyzerDiagnosticCatalog.Get("BclFallbackGuessRule"),
                         diagnosticLocation,
@@ -236,8 +221,7 @@ internal static class MethodPurityAnalyzer
         }
 
         else if (effectiveMissingPuritySuggestions.IsEnabled && isPure && !hasPurityEnforcementAttribute &&
-                 !hasAllowSynchronization && !hasImpureAttribute)
-        {
+                 !hasAllowSynchronization && !hasImpureAttribute) {
             if (context.Node is LocalFunctionStatementSyntax or PropertyDeclarationSyntax
                 or IndexerDeclarationSyntax) return;
 
@@ -249,12 +233,10 @@ internal static class MethodPurityAnalyzer
                 if (setterNode.Body == null && setterNode.ExpressionBody == null)
                     isCompilerGeneratedSetter = true;
 
-            if (!isCompilerGeneratedSetter)
-            {
+            if (!isCompilerGeneratedSetter) {
                 var diagnosticLocation = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
 
-                if (diagnosticLocation != null)
-                {
+                if (diagnosticLocation != null) {
                     var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                         ImmutableDictionary<string, string?>.Empty,
                         methodSymbol,
@@ -279,8 +261,7 @@ internal static class MethodPurityAnalyzer
     private static bool ShouldReportMissingEnforcePure(
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
-        MissingPuritySuggestionOptions options)
-    {
+        MissingPuritySuggestionOptions options) {
         if (!ShouldSuggestMissingEnforcePure(methodSymbol)) return false;
 
         if (!MatchesSuggestionScope(methodSymbol, options.Scope)) return false;
@@ -298,8 +279,7 @@ internal static class MethodPurityAnalyzer
         return true;
     }
 
-    private static string CreatePurityEvidenceKey(PurityAnalysisEngine.PurityEvidence evidence)
-    {
+    private static string CreatePurityEvidenceKey(PurityAnalysisEngine.PurityEvidence evidence) {
         return evidence.Category +
                "|" +
                evidence.RuleName +
@@ -317,8 +297,7 @@ internal static class MethodPurityAnalyzer
                evidence.BclFallbackReason;
     }
 
-    private static string? GetPurityUnknownReason(PurityAnalysisEngine.PurityEvidence evidence)
-    {
+    private static string? GetPurityUnknownReason(PurityAnalysisEngine.PurityEvidence evidence) {
         if (evidence.UnknownReasonInfo.IsUnknown) return evidence.UnknownReasonInfo.Code;
 
         return string.IsNullOrWhiteSpace(evidence.Category) ? null : evidence.Category;
@@ -328,8 +307,7 @@ internal static class MethodPurityAnalyzer
         bool hasEnforcePureAttribute,
         bool hasPureAttribute,
         bool hasPureExternalAttribute,
-        bool hasImpureAttribute)
-    {
+        bool hasImpureAttribute) {
         if (hasImpureAttribute && (hasEnforcePureAttribute || hasPureAttribute || hasPureExternalAttribute))
             return true;
 
@@ -338,10 +316,8 @@ internal static class MethodPurityAnalyzer
         return hasEnforcePureAttribute && hasPureAttribute;
     }
 
-    private static bool MatchesSuggestionScope(IMethodSymbol methodSymbol, MissingPuritySuggestionScope scope)
-    {
-        switch (scope)
-        {
+    private static bool MatchesSuggestionScope(IMethodSymbol methodSymbol, MissingPuritySuggestionScope scope) {
+        switch (scope) {
             case MissingPuritySuggestionScope.All:
                 return true;
             case MissingPuritySuggestionScope.Public:
@@ -357,11 +333,9 @@ internal static class MethodPurityAnalyzer
         }
     }
 
-    private static bool IsGeneratedCode(SyntaxNode node)
-    {
+    private static bool IsGeneratedCode(SyntaxNode node) {
         var filePath = node.SyntaxTree.FilePath;
-        if (!string.IsNullOrWhiteSpace(filePath))
-        {
+        if (!string.IsNullOrWhiteSpace(filePath)) {
             var fileName = Path.GetFileName(filePath);
             if (fileName.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase) ||
                 fileName.EndsWith(".generated.cs", StringComparison.OrdinalIgnoreCase) ||
@@ -378,10 +352,8 @@ internal static class MethodPurityAnalyzer
         return root.GetLeadingTrivia().ToString().IndexOf("<auto-generated", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
-    private static bool IsTestCode(IMethodSymbol methodSymbol, string filePath)
-    {
-        if (!string.IsNullOrWhiteSpace(filePath))
-        {
+    private static bool IsTestCode(IMethodSymbol methodSymbol, string filePath) {
+        if (!string.IsNullOrWhiteSpace(filePath)) {
             var normalized = filePath.Replace('/', Path.DirectorySeparatorChar);
             var fileName = Path.GetFileNameWithoutExtension(filePath) ?? string.Empty;
             if (normalized.StartsWith("test" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
@@ -396,8 +368,7 @@ internal static class MethodPurityAnalyzer
         }
 
         var containingTypeName = methodSymbol.ContainingType?.Name;
-        if (!string.IsNullOrWhiteSpace(containingTypeName))
-        {
+        if (!string.IsNullOrWhiteSpace(containingTypeName)) {
             var typeName = containingTypeName!;
             if (typeName.EndsWith("Test", StringComparison.OrdinalIgnoreCase) ||
                 typeName.EndsWith("Tests", StringComparison.OrdinalIgnoreCase))
@@ -408,8 +379,7 @@ internal static class MethodPurityAnalyzer
         return IsTestLikeName(namespaceName);
     }
 
-    private static bool IsTestLikeName(string? value)
-    {
+    private static bool IsTestLikeName(string? value) {
         if (string.IsNullOrWhiteSpace(value)) return false;
 
         var name = value!;
@@ -421,11 +391,9 @@ internal static class MethodPurityAnalyzer
                name.IndexOf(".Tests.", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
-    private static bool MatchesNamespaceFilter(IMethodSymbol methodSymbol, ImmutableHashSet<string> namespaceFilters)
-    {
+    private static bool MatchesNamespaceFilter(IMethodSymbol methodSymbol, ImmutableHashSet<string> namespaceFilters) {
         var namespaceName = methodSymbol.ContainingNamespace?.ToDisplayString() ?? string.Empty;
-        foreach (var filter in namespaceFilters)
-        {
+        foreach (var filter in namespaceFilters) {
             if (filter.Length == 0) continue;
 
             if (namespaceName.Equals(filter, StringComparison.Ordinal) ||
@@ -436,10 +404,8 @@ internal static class MethodPurityAnalyzer
         return false;
     }
 
-    private static int GetMethodComplexity(SyntaxNode node)
-    {
-        var body = node switch
-        {
+    private static int GetMethodComplexity(SyntaxNode node) {
+        var body = node switch {
             MethodDeclarationSyntax m => (SyntaxNode?)m.Body ?? m.ExpressionBody?.Expression,
             ConstructorDeclarationSyntax c => (SyntaxNode?)c.Body ?? c.ExpressionBody?.Expression,
             OperatorDeclarationSyntax o => (SyntaxNode?)o.Body ?? o.ExpressionBody?.Expression,
@@ -464,8 +430,7 @@ internal static class MethodPurityAnalyzer
         return complexity;
     }
 
-    private static bool ShouldSuggestMissingEnforcePure(IMethodSymbol methodSymbol)
-    {
+    private static bool ShouldSuggestMissingEnforcePure(IMethodSymbol methodSymbol) {
         if (methodSymbol.MethodKind == MethodKind.Conversion) return false;
 
         if (methodSymbol.MethodKind == MethodKind.Constructor &&
@@ -482,8 +447,7 @@ internal static class MethodPurityAnalyzer
         return true;
     }
 
-    private static bool ImplementsInstanceInterfaceMember(IMethodSymbol methodSymbol)
-    {
+    private static bool ImplementsInstanceInterfaceMember(IMethodSymbol methodSymbol) {
         if (methodSymbol.IsStatic || methodSymbol.ContainingType == null) return false;
 
         if (methodSymbol.ExplicitInterfaceImplementations.Length > 0) return true;
@@ -492,8 +456,7 @@ internal static class MethodPurityAnalyzer
     }
 
     private static bool HasPurityEnforcement(IMethodSymbol methodSymbol, INamedTypeSymbol? enforcePureAttributeSymbol,
-        INamedTypeSymbol? pureAttributeSymbol)
-    {
+        INamedTypeSymbol? pureAttributeSymbol) {
         return HasPurityEnforcement(methodSymbol, enforcePureAttributeSymbol, pureAttributeSymbol,
             new HashSet<IMethodSymbol>(SymbolEq.Default));
     }
@@ -501,10 +464,8 @@ internal static class MethodPurityAnalyzer
     private static bool HasInheritedPurityEnforcement(
         IMethodSymbol methodSymbol,
         INamedTypeSymbol? enforcePureAttributeSymbol,
-        INamedTypeSymbol? pureAttributeSymbol)
-    {
-        var visited = new HashSet<IMethodSymbol>(SymbolEq.Default)
-        {
+        INamedTypeSymbol? pureAttributeSymbol) {
+        var visited = new HashSet<IMethodSymbol>(SymbolEq.Default) {
             methodSymbol.OriginalDefinition
         };
 
@@ -533,13 +494,11 @@ internal static class MethodPurityAnalyzer
         IMethodSymbol methodSymbol,
         INamedTypeSymbol? enforcePureAttributeSymbol,
         INamedTypeSymbol? pureAttributeSymbol,
-        HashSet<IMethodSymbol> visitedMethods)
-    {
+        HashSet<IMethodSymbol> visitedMethods) {
         methodSymbol = methodSymbol.OriginalDefinition;
         if (!visitedMethods.Add(methodSymbol)) return false;
 
-        foreach (var attributeData in methodSymbol.GetAttributes())
-        {
+        foreach (var attributeData in methodSymbol.GetAttributes()) {
             var attributeClass = attributeData.AttributeClass?.OriginalDefinition;
             if (enforcePureAttributeSymbol != null &&
                 SymbolEq.AreEqual(attributeClass, enforcePureAttributeSymbol)) return true;
@@ -563,8 +522,7 @@ internal static class MethodPurityAnalyzer
         return false;
     }
 
-    private static IEnumerable<IMethodSymbol> EnumerateImplementedInterfaceMethods(IMethodSymbol methodSymbol)
-    {
+    private static IEnumerable<IMethodSymbol> EnumerateImplementedInterfaceMethods(IMethodSymbol methodSymbol) {
         var containingType = methodSymbol.ContainingType;
         if (containingType == null) yield break;
 
@@ -578,12 +536,10 @@ internal static class MethodPurityAnalyzer
                     yield return interfaceMember;
     }
 
-    private static bool HasAttributeByName(IMethodSymbol methodSymbol, string attributeTypeName)
-    {
+    private static bool HasAttributeByName(IMethodSymbol methodSymbol, string attributeTypeName) {
         foreach (var attributeData in SymbolAttributeTraversal.GetAttributes(
                      methodSymbol,
-                     AssociatedAttributePolicy.AnyAssociatedSymbol))
-        {
+                     AssociatedAttributePolicy.AnyAssociatedSymbol)) {
             var attributeClass = attributeData.AttributeClass;
             if (attributeClass != null &&
                 string.Equals(attributeClass.Name, attributeTypeName, StringComparison.Ordinal)) return true;
@@ -593,8 +549,7 @@ internal static class MethodPurityAnalyzer
     }
 
     private static INamedTypeSymbol GetEffectivePurityAttributeSymbol(INamedTypeSymbol? enforcePureAttributeSymbol,
-        INamedTypeSymbol? pureAttributeSymbol)
-    {
+        INamedTypeSymbol? pureAttributeSymbol) {
         return enforcePureAttributeSymbol ?? pureAttributeSymbol!;
     }
 

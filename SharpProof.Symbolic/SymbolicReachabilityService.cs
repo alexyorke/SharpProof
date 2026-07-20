@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicReachabilityService
-{
+internal static class SymbolicReachabilityService {
     private const int StructuralPathStateCacheEntryLimit = 512;
 
     private static readonly ConditionalWeakTable<SemanticModel,
@@ -13,8 +12,7 @@ internal static class SymbolicReachabilityService
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SymbolicState? initialState = null,
-        bool includeCurrentStatementCompletionFacts = false)
-    {
+        bool includeCurrentStatementCompletionFacts = false) {
         cancellationToken.ThrowIfCancellationRequested();
         if (initialState != null ||
             !SymbolicCfgProgramPointStateCollector.UsesDefaultAnalysisLimits(SymbolicAnalysisLimitContext.Limits))
@@ -31,8 +29,7 @@ internal static class SymbolicReachabilityService
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(site);
         var cache = methodCaches.GetValue(executionRoot, static _ =>
             new BoundedConcurrentCache<PathStateCacheKey, SymbolicState>(StructuralPathStateCacheEntryLimit));
-        if (!cache.TryGetValue(key, out var state))
-        {
+        if (!cache.TryGetValue(key, out var state)) {
             state = BuildStructuralPathStateSnapshot(
                 site,
                 semanticModel,
@@ -49,8 +46,7 @@ internal static class SymbolicReachabilityService
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis)
-    {
+        SmtAnalysisService? smtAnalysis) {
         if (forStatement.Condition == null) return false;
 
         var initialEntryState = CollectForInitialEntryState(
@@ -70,8 +66,7 @@ internal static class SymbolicReachabilityService
     internal static SymbolicState CollectForInitialEntryState(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var cfgState = SymbolicCfgProgramPointStateCollector.CollectForInitialEntryState(
             forStatement,
             semanticModel,
@@ -89,8 +84,7 @@ internal static class SymbolicReachabilityService
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SymbolicState? initialState,
-        bool includeCurrentStatementCompletionFacts)
-    {
+        bool includeCurrentStatementCompletionFacts) {
         var cfgState = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
             semanticModel,

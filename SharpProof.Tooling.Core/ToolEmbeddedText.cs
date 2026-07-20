@@ -3,10 +3,8 @@ using System.Text;
 
 namespace SharpProof.Tools.Shared;
 
-public static class ToolEmbeddedText
-{
-    public static string Load(Assembly assembly, string resourceName)
-    {
+public static class ToolEmbeddedText {
+    public static string Load(Assembly assembly, string resourceName) {
         if (assembly == null) throw new ArgumentNullException(nameof(assembly));
         if (string.IsNullOrWhiteSpace(resourceName)) throw new ArgumentException(
             "An embedded resource name is required.", nameof(resourceName));

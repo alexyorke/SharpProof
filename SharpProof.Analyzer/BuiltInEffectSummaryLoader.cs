@@ -1,11 +1,9 @@
 namespace SharpProof.Analyzer;
 
-internal static class BuiltInEffectSummaryLoader
-{
+internal static class BuiltInEffectSummaryLoader {
     internal const string SummaryFileName = "SharpProof.EffectSummary.json";
 
-    internal static void LoadBuiltInSummaryJsonDocuments(Action<string> addJson)
-    {
+    internal static void LoadBuiltInSummaryJsonDocuments(Action<string> addJson) {
         LoadEmbeddedSummaryJsonDocuments(addJson);
     }
 
@@ -13,21 +11,17 @@ internal static class BuiltInEffectSummaryLoader
         AnalyzerOptions options,
         CancellationToken cancellationToken,
         Action<string, string> addJson,
-        EffectSummaryCompatibilityReporter? reporter = null)
-    {
-        foreach (var additionalFile in options.AdditionalFiles)
-        {
+        EffectSummaryCompatibilityReporter? reporter = null) {
+        foreach (var additionalFile in options.AdditionalFiles) {
             var path = additionalFile.Path ?? string.Empty;
             if (!IsSummaryFile(path)) continue;
 
             string? text;
-            if (reporter != null)
-            {
+            if (reporter != null) {
                 if (!AnalyzerAdditionalFileText.TryRead(additionalFile, cancellationToken, reporter, out text))
                     continue;
             }
-            else
-            {
+            else {
                 text = additionalFile.GetText(cancellationToken)?.ToString();
                 if (string.IsNullOrWhiteSpace(text)) continue;
             }
@@ -36,8 +30,7 @@ internal static class BuiltInEffectSummaryLoader
         }
     }
 
-    internal static bool HasAdditionalSummaryJsonDocuments(AnalyzerOptions options)
-    {
+    internal static bool HasAdditionalSummaryJsonDocuments(AnalyzerOptions options) {
         foreach (var additionalFile in options.AdditionalFiles)
             if (IsSummaryFile(additionalFile.Path))
                 return true;
@@ -45,18 +38,15 @@ internal static class BuiltInEffectSummaryLoader
         return false;
     }
 
-    internal static bool IsSummaryFile(string path)
-    {
+    internal static bool IsSummaryFile(string path) {
         var fileName = Path.GetFileName(path);
         return string.Equals(fileName, SummaryFileName, StringComparison.OrdinalIgnoreCase) ||
                fileName.EndsWith("." + SummaryFileName, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static void LoadEmbeddedSummaryJsonDocuments(Action<string> addJson)
-    {
+    private static void LoadEmbeddedSummaryJsonDocuments(Action<string> addJson) {
         var assembly = typeof(BuiltInEffectSummaryLoader).Assembly;
-        foreach (var resourceName in assembly.GetManifestResourceNames())
-        {
+        foreach (var resourceName in assembly.GetManifestResourceNames()) {
             if (!IsSummaryResource(resourceName)) continue;
 
             using var stream = assembly.GetManifestResourceStream(resourceName);
@@ -67,8 +57,7 @@ internal static class BuiltInEffectSummaryLoader
         }
     }
 
-    private static bool IsSummaryResource(string resourceName)
-    {
+    private static bool IsSummaryResource(string resourceName) {
         return resourceName.EndsWith("." + SummaryFileName, StringComparison.OrdinalIgnoreCase) ||
                string.Equals(resourceName, SummaryFileName, StringComparison.OrdinalIgnoreCase);
     }

@@ -1,11 +1,9 @@
 namespace SharpProof.Analyzer;
 
-internal static class AnalyzerFeaturePipeline
-{
+internal static class AnalyzerFeaturePipeline {
     internal static void AnalyzeOperationBlock(
         OperationBlockAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         if (!TryCreateOperationBlockContext(context, session, out var methodContext)) return;
 
         AnalyzeCallable(methodContext, session);
@@ -13,8 +11,7 @@ internal static class AnalyzerFeaturePipeline
 
     internal static void AnalyzeSyntaxFallback(
         SyntaxNodeAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         if (!RequiresSyntaxFallback(context.Node) ||
             !TryCreateSyntaxContext(context, session, out var methodContext))
             return;
@@ -22,15 +19,13 @@ internal static class AnalyzerFeaturePipeline
         AnalyzeCallable(methodContext, session);
     }
 
-    internal static bool RequiresSyntaxFallback(SyntaxNode node)
-    {
+    internal static bool RequiresSyntaxFallback(SyntaxNode node) {
         if (node is PropertyDeclarationSyntax { ExpressionBody: not null } or
             IndexerDeclarationSyntax { ExpressionBody: not null } or
             LocalFunctionStatementSyntax)
             return true;
 
-        return node switch
-        {
+        return node switch {
             MethodDeclarationSyntax method => method.Body == null && method.ExpressionBody == null,
             ConstructorDeclarationSyntax constructor =>
                 constructor.Body == null && constructor.ExpressionBody == null,
@@ -45,12 +40,10 @@ internal static class AnalyzerFeaturePipeline
 
     private static void AnalyzeCallable(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         using (EffectSummaryCatalog.UseCurrent(session.EffectSummaryCatalog))
         using (ImpurityCatalog.UseConfiguredOverrides(session.Configuration))
-        using (SymbolicAnalysisLimitContext.Push(session.Configuration.AnalysisLimits, context.Node))
-        {
+        using (SymbolicAnalysisLimitContext.Push(session.Configuration.AnalysisLimits, context.Node)) {
             var features = session.Features;
             TrustedBoundaryReviewAnalyzer.Analyze(context, session);
 
@@ -114,8 +107,7 @@ internal static class AnalyzerFeaturePipeline
     private static bool TryCreateOperationBlockContext(
         OperationBlockAnalysisContext context,
         AnalyzerSession session,
-        out MethodBodyAnalysisContext methodContext)
-    {
+        out MethodBodyAnalysisContext methodContext) {
         methodContext = null!;
         if (context.OwningSymbol is not IMethodSymbol methodSymbol || PurityAnalysisEngine.IsMetadataSymbol(methodSymbol))
             return false;
@@ -145,8 +137,7 @@ internal static class AnalyzerFeaturePipeline
     private static bool TryCreateSyntaxContext(
         SyntaxNodeAnalysisContext context,
         AnalyzerSession session,
-        out MethodBodyAnalysisContext methodContext)
-    {
+        out MethodBodyAnalysisContext methodContext) {
         methodContext = null!;
         var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken);
         var methodSymbol = declaredSymbol as IMethodSymbol;
@@ -179,8 +170,7 @@ internal static class AnalyzerFeaturePipeline
     private static SyntaxNode? FindDeclaration(
         IMethodSymbol methodSymbol,
         ImmutableArray<IOperation> operationBlocks,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var operationSyntax = operationBlocks.IsDefaultOrEmpty
             ? null
             : operationBlocks
@@ -198,10 +188,8 @@ internal static class AnalyzerFeaturePipeline
         return declaration == null ? null : NormalizeDeclaration(declaration);
     }
 
-    private static SyntaxNode NormalizeDeclaration(SyntaxNode declaration)
-    {
-        return declaration switch
-        {
+    private static SyntaxNode NormalizeDeclaration(SyntaxNode declaration) {
+        return declaration switch {
             AccessorDeclarationSyntax => declaration,
             PropertyDeclarationSyntax => declaration,
             IndexerDeclarationSyntax => declaration,

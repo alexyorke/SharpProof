@@ -1,15 +1,13 @@
 namespace SharpProof.Analyzer;
 
-internal static class InvalidContractArgumentDiagnostics
-{
+internal static class InvalidContractArgumentDiagnostics {
     internal static Diagnostic Create(
         string attributeName,
         string argument,
         string reason,
         Location location,
         ISymbol? baselineSymbol = null,
-        SyntaxTree? syntaxTree = null)
-    {
+        SyntaxTree? syntaxTree = null) {
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add("sharpproof.contract.attribute", attributeName)
             .Add("sharpproof.contract.argument", argument)
@@ -32,8 +30,7 @@ internal static class InvalidContractArgumentDiagnostics
             location,
             null,
             properties,
-            new object[]
-            {
+            new object[] {
                 attributeName,
                 argument,
                 reason

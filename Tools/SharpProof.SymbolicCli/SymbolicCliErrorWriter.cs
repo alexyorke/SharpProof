@@ -28,8 +28,7 @@ internal static class SymbolicCliErrorWriter {
         Exception? innerException = null) {
         var details = string.IsNullOrWhiteSpace(detailName)
             ? null
-            : new[]
-            {
+            : new[] {
                 new KeyValuePair<string, string>(detailName!, detailValue ?? string.Empty)
             };
         var error = new SharpProofError(

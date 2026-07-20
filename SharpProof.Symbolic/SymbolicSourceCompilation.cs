@@ -1,12 +1,10 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicSourceCompilation
-{
+internal static class SymbolicSourceCompilation {
     private static readonly ConcurrentDictionary<string, ImmutableArray<MetadataReference>>
         TrustedPlatformReferenceCache = new(StringComparer.Ordinal);
 
-    public static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-    {
+    public static ImmutableArray<MetadataReference> GetTrustedPlatformReferences() {
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
         var cacheKey = trustedPlatformAssemblies ?? string.Empty;
         return TrustedPlatformReferenceCache.GetOrAdd(
@@ -26,8 +24,7 @@ internal static class SymbolicSourceCompilation
         SymbolicSourceCompilationKind kind,
         IEnumerable<MetadataReference>? references,
         CancellationToken cancellationToken,
-        SymbolicSourceCompilationProfile? profile = null)
-    {
+        SymbolicSourceCompilationProfile? profile = null) {
         var assemblyName = "SharpProof.Symbolic." + kind;
         return Create(sourceText, filePath, assemblyName + ".cs", assemblyName, references, cancellationToken, profile);
     }
@@ -39,8 +36,7 @@ internal static class SymbolicSourceCompilation
         string assemblyName,
         IEnumerable<MetadataReference>? references,
         CancellationToken cancellationToken,
-        SymbolicSourceCompilationProfile? profile = null)
-    {
+        SymbolicSourceCompilationProfile? profile = null) {
         if (sourceText == null) throw new ArgumentNullException(nameof(sourceText));
 
         if (string.IsNullOrWhiteSpace(filePath)) filePath = defaultFilePath;
@@ -74,8 +70,7 @@ internal static class SymbolicSourceCompilation
     }
 }
 
-internal enum SymbolicSourceCompilationKind
-{
+internal enum SymbolicSourceCompilationKind {
     Query,
     RuntimeHazards,
     Complexity,

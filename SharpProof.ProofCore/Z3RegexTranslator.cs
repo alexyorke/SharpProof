@@ -1,7 +1,6 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal sealed class Z3RegexTranslator
-{
+internal sealed class Z3RegexTranslator {
     private const int MaxBoundedRepeat = 64;
 
     // Keep large Unicode category unions conservative; Z3 range-heavy regexes can get expensive
@@ -18,8 +17,7 @@ internal sealed class Z3RegexTranslator
     private int _position;
     private bool _singleline;
 
-    private Z3RegexTranslator(Context context, string pattern, RegexOptions options)
-    {
+    private Z3RegexTranslator(Context context, string pattern, RegexOptions options) {
         _context = context;
         _expressions = new Z3RegexExpressionFactory(context);
         _pattern = pattern;
@@ -30,8 +28,7 @@ internal sealed class Z3RegexTranslator
     }
 
 
-    internal static Z3RegexTranslationResult Translate(Context context, string pattern, RegexOptions options)
-    {
+    internal static Z3RegexTranslationResult Translate(Context context, string pattern, RegexOptions options) {
         var fallback = Z3RegexTranslationValidator.Validate(pattern, options);
         if (fallback != RegexTranslationFallback.None)
             return Z3RegexTranslationResult.Failed(fallback);
@@ -57,24 +54,20 @@ internal sealed class Z3RegexTranslator
         return Z3RegexTranslationResult.Succeeded(regex, translator._isExact);
     }
 
-    private bool TryParseExpression(out ReExpr regex)
-    {
+    private bool TryParseExpression(out ReExpr regex) {
         SkipIgnoredPatternTrivia();
         var alternatives = new List<ReExpr>();
-        if (!TryParseConcat(out var first))
-        {
+        if (!TryParseConcat(out var first)) {
             regex = null!;
             return false;
         }
 
         alternatives.Add(first);
         SkipIgnoredPatternTrivia();
-        while (Peek('|'))
-        {
+        while (Peek('|')) {
             _position++;
             SkipIgnoredPatternTrivia();
-            if (!TryParseConcat(out var alternative))
-            {
+            if (!TryParseConcat(out var alternative)) {
                 regex = null!;
                 return false;
             }
@@ -92,22 +85,18 @@ internal sealed class Z3RegexTranslator
     private bool TryParseConcat(out ReExpr regex) =>
         TryParseConcat(out regex, out _);
 
-    private bool TryParseConcat(out ReExpr regex, out bool consumedAny)
-    {
+    private bool TryParseConcat(out ReExpr regex, out bool consumedAny) {
         var parts = new List<ReExpr>();
         consumedAny = false;
-        while (true)
-        {
+        while (true) {
             SkipIgnoredPatternTrivia();
             if (_position >= _pattern.Length ||
                 Peek('|') ||
                 Peek(')'))
                 break;
 
-            if (TryParseLookaheadAssertion(out var lookahead))
-            {
-                if (!TryParseConcat(out var suffix, out var suffixConsumed) || !suffixConsumed)
-                {
+            if (TryParseLookaheadAssertion(out var lookahead)) {
+                if (!TryParseConcat(out var suffix, out var suffixConsumed) || !suffixConsumed) {
                     regex = null!;
                     return false;
                 }
@@ -118,10 +107,8 @@ internal sealed class Z3RegexTranslator
                 return true;
             }
 
-            if (TryParseLookbehindAssertion(out var lookbehind))
-            {
-                if (parts.Count == 0)
-                {
+            if (TryParseLookbehindAssertion(out var lookbehind)) {
+                if (parts.Count == 0) {
                     regex = null!;
                     return false;
                 }
@@ -133,16 +120,14 @@ internal sealed class Z3RegexTranslator
                 continue;
             }
 
-            if (TryParseWordBoundaryAssertion(out var wordBoundary))
-            {
+            if (TryParseWordBoundaryAssertion(out var wordBoundary)) {
                 var prefix = parts.Count == 0
                     ? CreateLiteralRegex(string.Empty)
                     : parts.Count == 1
                         ? parts[0]
                         : _context.MkConcat(parts.ToArray());
                 if (!TryParseConcat(out var suffix, out var suffixConsumed) ||
-                    !TryConstrainSplitWithWordBoundary(prefix, suffix, wordBoundary, out var constrained))
-                {
+                    !TryConstrainSplitWithWordBoundary(prefix, suffix, wordBoundary, out var constrained)) {
                     regex = null!;
                     return false;
                 }
@@ -152,8 +137,7 @@ internal sealed class Z3RegexTranslator
                 return true;
             }
 
-            if (!TryParseRepeat(out var part))
-            {
+            if (!TryParseRepeat(out var part)) {
                 regex = null!;
                 return false;
             }
@@ -162,8 +146,7 @@ internal sealed class Z3RegexTranslator
             consumedAny = true;
         }
 
-        regex = parts.Count switch
-        {
+        regex = parts.Count switch {
             0 => CreateLiteralRegex(string.Empty),
             1 => parts[0],
             _ => _context.MkConcat(parts.ToArray())
@@ -177,8 +160,7 @@ internal sealed class Z3RegexTranslator
     private bool TryParseLookbehindAssertion(out RegexLookaheadAssertion assertion) =>
         TryParseLookaroundAssertion(true, out assertion);
 
-    private bool TryParseLookaroundAssertion(bool lookbehind, out RegexLookaheadAssertion assertion)
-    {
+    private bool TryParseLookaroundAssertion(bool lookbehind, out RegexLookaheadAssertion assertion) {
         assertion = default;
         SkipIgnoredPatternTrivia();
         var savedPosition = _position;
@@ -194,8 +176,7 @@ internal sealed class Z3RegexTranslator
 
         var positive = _pattern[_position + polarityOffset] == '=';
         _position += polarityOffset + 1;
-        if (!TryParseExpression(out var lookaroundRegex) || !Peek(')'))
-        {
+        if (!TryParseExpression(out var lookaroundRegex) || !Peek(')')) {
             _position = savedPosition;
             ApplyOptions(savedOptions);
             _isExact = savedIsExact;
@@ -206,8 +187,7 @@ internal sealed class Z3RegexTranslator
         var lookaroundIsExact = _isExact;
         ApplyOptions(savedOptions);
         _isExact = savedIsExact;
-        if (!positive && !lookaroundIsExact)
-        {
+        if (!positive && !lookaroundIsExact) {
             _position = savedPosition;
             return false;
         }
@@ -216,8 +196,7 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private bool TryParseWordBoundaryAssertion(out bool isBoundary)
-    {
+    private bool TryParseWordBoundaryAssertion(out bool isBoundary) {
         isBoundary = false;
         SkipIgnoredPatternTrivia();
         if (_position + 1 >= _pattern.Length ||
@@ -233,8 +212,7 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private ReExpr ConstrainSuffixWithLookahead(RegexLookaheadAssertion assertion, ReExpr suffix)
-    {
+    private ReExpr ConstrainSuffixWithLookahead(RegexLookaheadAssertion assertion, ReExpr suffix) {
         _isExact &= assertion.IsExact;
         var lookaheadLanguage = _expressions.Concat(assertion.Regex, _expressions.AnyString());
         return assertion.IsPositive
@@ -242,8 +220,7 @@ internal sealed class Z3RegexTranslator
             : _context.MkDiff(suffix, lookaheadLanguage);
     }
 
-    private ReExpr ConstrainPrefixWithLookbehind(RegexLookaheadAssertion assertion, ReExpr prefix)
-    {
+    private ReExpr ConstrainPrefixWithLookbehind(RegexLookaheadAssertion assertion, ReExpr prefix) {
         _isExact &= assertion.IsExact;
         var lookbehindLanguage = _expressions.Concat(_expressions.AnyString(), assertion.Regex);
         return assertion.IsPositive
@@ -255,8 +232,7 @@ internal sealed class Z3RegexTranslator
         ReExpr prefix,
         ReExpr suffix,
         bool isBoundary,
-        out ReExpr regex)
-    {
+        out ReExpr regex) {
         regex = null!;
         if (!TryCreateCharacterRangesRegex(Z3RegexCharacterRanges.Word, out var wordChar)) return false;
 
@@ -280,16 +256,14 @@ internal sealed class Z3RegexTranslator
     private ReExpr ConstrainSuffixStart(ReExpr suffix, ReExpr firstCharacter) =>
         _context.MkIntersect(suffix, _expressions.Concat(firstCharacter, _expressions.AnyString()));
 
-    private bool TryParseRepeat(out ReExpr regex)
-    {
+    private bool TryParseRepeat(out ReExpr regex) {
         SkipIgnoredPatternTrivia();
         if (!TryParseAtom(out regex)) return false;
 
         SkipIgnoredPatternTrivia();
         if (_position >= _pattern.Length) return true;
 
-        switch (_pattern[_position])
-        {
+        switch (_pattern[_position]) {
             case '*':
                 _position++;
                 regex = _context.MkStar(regex);
@@ -312,20 +286,17 @@ internal sealed class Z3RegexTranslator
         }
     }
 
-    private bool TryParseBoundedRepeat(ref ReExpr regex)
-    {
+    private bool TryParseBoundedRepeat(ref ReExpr regex) {
         var savedPosition = _position;
         _position++;
-        if (!TryReadNumber(out var lower))
-        {
+        if (!TryReadNumber(out var lower)) {
             _position = savedPosition;
             return true;
         }
 
         var upper = lower;
         var unbounded = false;
-        if (Peek(','))
-        {
+        if (Peek(',')) {
             _position++;
             if (Peek('}'))
                 unbounded = true;
@@ -346,18 +317,15 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private bool TryParseAtom(out ReExpr regex)
-    {
+    private bool TryParseAtom(out ReExpr regex) {
         regex = null!;
         SkipIgnoredPatternTrivia();
         if (_position >= _pattern.Length) return false;
 
         var current = _pattern[_position++];
-        switch (current)
-        {
+        switch (current) {
             case '(':
-                if (TryParseInlineOptionGroup(out var inlineOptions))
-                {
+                if (TryParseInlineOptionGroup(out var inlineOptions)) {
                     ApplyOptions(inlineOptions);
                     regex = CreateLiteralRegex(string.Empty);
                     return true;
@@ -367,8 +335,7 @@ internal sealed class Z3RegexTranslator
                 if (!TryParseGroupPrefix(out var groupOptions)) return false;
 
                 ApplyOptions(groupOptions);
-                if (!TryParseExpression(out regex) || !Peek(')'))
-                {
+                if (!TryParseExpression(out regex) || !Peek(')')) {
                     ApplyOptions(outerOptions);
                     return false;
                 }
@@ -397,15 +364,13 @@ internal sealed class Z3RegexTranslator
     private RegexOptionScope CaptureOptions() =>
         new RegexOptionScope(_ignorePatternWhitespace, _singleline, _ignoreCase);
 
-    private void ApplyOptions(RegexOptionScope options)
-    {
+    private void ApplyOptions(RegexOptionScope options) {
         _ignorePatternWhitespace = options.IgnorePatternWhitespace;
         _singleline = options.Singleline;
         _ignoreCase = options.IgnoreCase;
     }
 
-    private bool TryParseInlineOptionGroup(out RegexOptionScope groupOptions)
-    {
+    private bool TryParseInlineOptionGroup(out RegexOptionScope groupOptions) {
         groupOptions = CaptureOptions();
         var savedPosition = _position;
         if (!Peek('?')) return false;
@@ -418,20 +383,17 @@ internal sealed class Z3RegexTranslator
         return false;
     }
 
-    private bool TryParseGroupPrefix(out RegexOptionScope groupOptions)
-    {
+    private bool TryParseGroupPrefix(out RegexOptionScope groupOptions) {
         groupOptions = CaptureOptions();
         if (!Peek('?')) return true;
 
         _position++;
-        if (Peek(':'))
-        {
+        if (Peek(':')) {
             _position++;
             return true;
         }
 
-        if (Peek('>'))
-        {
+        if (Peek('>')) {
             _position++;
             // Atomic grouping can only remove matches by preventing backtracking.
             _isExact = false;
@@ -444,8 +406,7 @@ internal sealed class Z3RegexTranslator
         return TryParseNamedCaptureGroupPrefix();
     }
 
-    private bool TryParseOptionGroupPrefix(out RegexOptionScope groupOptions)
-    {
+    private bool TryParseOptionGroupPrefix(out RegexOptionScope groupOptions) {
         var savedPosition = _position;
         if (TryParseRegexOptionsUntil(':', out groupOptions)) return true;
 
@@ -454,8 +415,7 @@ internal sealed class Z3RegexTranslator
         return false;
     }
 
-    private bool TryParseRegexOptionsUntil(char terminator, out RegexOptionScope groupOptions)
-    {
+    private bool TryParseRegexOptionsUntil(char terminator, out RegexOptionScope groupOptions) {
         var position = _position;
         if (!Z3RegexPatternNormalizer.TryReadOptionsUntil(
                 _pattern,
@@ -470,10 +430,8 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private bool TryParseNamedCaptureGroupPrefix()
-    {
-        if (Peek('<'))
-        {
+    private bool TryParseNamedCaptureGroupPrefix() {
+        if (Peek('<')) {
             if (_position + 1 >= _pattern.Length ||
                 _pattern[_position + 1] is '=' or '!')
                 return false;
@@ -482,8 +440,7 @@ internal sealed class Z3RegexTranslator
             return TryReadCaptureName('>');
         }
 
-        if (Peek('\''))
-        {
+        if (Peek('\'')) {
             _position++;
             return TryReadCaptureName('\'');
         }
@@ -491,14 +448,11 @@ internal sealed class Z3RegexTranslator
         return false;
     }
 
-    private bool TryReadCaptureName(char terminator)
-    {
+    private bool TryReadCaptureName(char terminator) {
         var start = _position;
-        while (_position < _pattern.Length)
-        {
+        while (_position < _pattern.Length) {
             var current = _pattern[_position];
-            if (current == terminator)
-            {
+            if (current == terminator) {
                 if (_position == start) return false;
 
                 _position++;
@@ -513,14 +467,12 @@ internal sealed class Z3RegexTranslator
         return false;
     }
 
-    private bool TryParseEscapedAtom(out ReExpr regex)
-    {
+    private bool TryParseEscapedAtom(out ReExpr regex) {
         regex = null!;
         if (_position >= _pattern.Length) return false;
 
         var escaped = _pattern[_position++];
-        if (TryCreateEscapedCharacterClassRegex(escaped, out var escapedClass))
-        {
+        if (TryCreateEscapedCharacterClassRegex(escaped, out var escapedClass)) {
             _isExact &= escapedClass.IsExact;
             regex = escapedClass.Regex;
             return true;
@@ -532,8 +484,7 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private bool TryParseCharClass(out ReExpr regex)
-    {
+    private bool TryParseCharClass(out ReExpr regex) {
         var classStart = _position - 1;
         var savedIsExact = _isExact;
         if (_ignoreCase) return TryParseWholeCharacterClassWithDotNet(out regex);
@@ -545,31 +496,26 @@ internal sealed class Z3RegexTranslator
         return TryParseWholeCharacterClassWithDotNet(out regex);
     }
 
-    private bool TryParseSimpleCharClass(out ReExpr regex)
-    {
+    private bool TryParseSimpleCharClass(out ReExpr regex) {
         regex = null!;
         var negate = false;
-        if (Peek('^'))
-        {
+        if (Peek('^')) {
             negate = true;
             _position++;
         }
 
         var parts = new List<CharacterClassPart>();
-        if (Peek(']'))
-        {
+        if (Peek(']')) {
             parts.Add(CreateClassCharacterPart(']'));
             _position++;
         }
 
-        while (_position < _pattern.Length && !Peek(']'))
-        {
+        while (_position < _pattern.Length && !Peek(']')) {
             if (!TryReadClassPart(out var start)) return false;
 
             if (Peek('-') &&
                 _position + 1 < _pattern.Length &&
-                _pattern[_position + 1] != ']')
-            {
+                _pattern[_position + 1] != ']') {
                 _position++;
                 if (start.ExactCharacter is not { } startCharacter ||
                     !TryReadClassPart(out var end) ||
@@ -583,8 +529,7 @@ internal sealed class Z3RegexTranslator
                     false,
                     new[] { new CharacterRange(startCharacter, endCharacter) }));
             }
-            else
-            {
+            else {
                 parts.Add(start);
             }
         }
@@ -595,8 +540,7 @@ internal sealed class Z3RegexTranslator
         regex = parts.Count == 1
             ? parts[0].Regex
             : _context.MkUnion(parts.Select(static part => part.Regex).ToArray());
-        if (negate)
-        {
+        if (negate) {
             if (parts.Any(static part => part.IsApproximation || part.Ranges == null)) return false;
 
             var complementRanges = Z3RegexCharacterRanges.Complement(Z3RegexCharacterRanges.Merge(parts.SelectMany(static part => part.Ranges!)));
@@ -606,14 +550,12 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private bool TryParseWholeCharacterClassWithDotNet(out ReExpr regex)
-    {
+    private bool TryParseWholeCharacterClassWithDotNet(out ReExpr regex) {
         regex = null!;
         if (!TryReadWholeCharacterClassPattern(out var atomPattern)) return false;
 
         var options = CreateCurrentCharacterClassRegexOptions();
-        if (!TryCreateCharacterRangesRegex(atomPattern, options, out regex))
-        {
+        if (!TryCreateCharacterRangesRegex(atomPattern, options, out regex)) {
             _isExact = false;
             regex = _expressions.AnyCharacter();
         }
@@ -621,8 +563,7 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private RegexOptions CreateCurrentCharacterClassRegexOptions()
-    {
+    private RegexOptions CreateCurrentCharacterClassRegexOptions() {
         var options = RegexOptions.None;
         if (_ignorePatternWhitespace) options |= RegexOptions.IgnorePatternWhitespace;
 
@@ -633,8 +574,7 @@ internal sealed class Z3RegexTranslator
         return options;
     }
 
-    private bool TryReadWholeCharacterClassPattern(out string atomPattern)
-    {
+    private bool TryReadWholeCharacterClassPattern(out string atomPattern) {
         atomPattern = string.Empty;
         var start = _position - 1;
         if (start < 0 || start >= _pattern.Length || _pattern[start] != '[') return false;
@@ -645,23 +585,19 @@ internal sealed class Z3RegexTranslator
         if (index < _pattern.Length && _pattern[index] == ']') index++;
 
         var escaped = false;
-        for (; index < _pattern.Length; index++)
-        {
+        for (; index < _pattern.Length; index++) {
             var current = _pattern[index];
-            if (escaped)
-            {
+            if (escaped) {
                 escaped = false;
                 continue;
             }
 
-            if (current == '\\')
-            {
+            if (current == '\\') {
                 escaped = true;
                 continue;
             }
 
-            if (current == ']')
-            {
+            if (current == ']') {
                 _position = index + 1;
                 atomPattern = _pattern.Substring(start, index - start + 1);
                 return true;
@@ -671,14 +607,12 @@ internal sealed class Z3RegexTranslator
         return false;
     }
 
-    private bool TryReadClassPart(out CharacterClassPart part)
-    {
+    private bool TryReadClassPart(out CharacterClassPart part) {
         part = default;
         if (_position >= _pattern.Length) return false;
 
         var current = _pattern[_position++];
-        if (current != '\\')
-        {
+        if (current != '\\') {
             part = CreateClassCharacterPart(current);
             return true;
         }
@@ -686,8 +620,7 @@ internal sealed class Z3RegexTranslator
         if (_position >= _pattern.Length) return false;
 
         var escaped = _pattern[_position++];
-        if (TryCreateEscapedCharacterClassRegex(escaped, out var escapedClass))
-        {
+        if (TryCreateEscapedCharacterClassRegex(escaped, out var escapedClass)) {
             _isExact &= escapedClass.IsExact;
             part = new CharacterClassPart(
                 escapedClass.Regex,
@@ -703,8 +636,7 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private CharacterClassPart CreateClassCharacterPart(char value)
-    {
+    private CharacterClassPart CreateClassCharacterPart(char value) {
         return new CharacterClassPart(
             CreateLiteralRegex(value.ToString()),
             value,
@@ -712,10 +644,8 @@ internal sealed class Z3RegexTranslator
             new[] { new CharacterRange(value, value) });
     }
 
-    private bool TryReadEscapedLiteralCharacter(char escaped, bool inCharacterClass, out char value)
-    {
-        switch (escaped)
-        {
+    private bool TryReadEscapedLiteralCharacter(char escaped, bool inCharacterClass, out char value) {
+        switch (escaped) {
             case 'x': return TryReadFixedHexChar(2, out value);
             case 'u': return TryReadFixedHexChar(4, out value);
             case 'c': return TryReadControlCharacterEscape(out value);
@@ -727,21 +657,17 @@ internal sealed class Z3RegexTranslator
         }
     }
 
-    private bool TryCreateEscapedCharacterClassRegex(char escaped, out RegexClassTranslation regex)
-    {
+    private bool TryCreateEscapedCharacterClassRegex(char escaped, out RegexClassTranslation regex) {
         regex = default;
-        if (Z3RegexCharacterRanges.TryGetShorthand(escaped, out var shorthandRanges))
-        {
+        if (Z3RegexCharacterRanges.TryGetShorthand(escaped, out var shorthandRanges)) {
             regex = CreateCharacterClassTranslation(shorthandRanges);
             return true;
         }
 
-        if (escaped is 'p' or 'P')
-        {
+        if (escaped is 'p' or 'P') {
             if (!TryReadRegexCategoryName(out var categoryName)) return false;
 
-            if (!Z3RegexCharacterRanges.TryGet(@"\p{" + categoryName + "}", out var categoryRanges))
-            {
+            if (!Z3RegexCharacterRanges.TryGet(@"\p{" + categoryName + "}", out var categoryRanges)) {
                 regex = new RegexClassTranslation(_expressions.AnyCharacter(), false, null);
                 return true;
             }
@@ -754,15 +680,13 @@ internal sealed class Z3RegexTranslator
         return false;
     }
 
-    private RegexClassTranslation CreateCharacterClassTranslation(CharacterRange[] ranges)
-    {
+    private RegexClassTranslation CreateCharacterClassTranslation(CharacterRange[] ranges) {
         return TryCreateCharacterRangesRegex(ranges, out var regex)
             ? new RegexClassTranslation(regex, true, ranges)
             : new RegexClassTranslation(_expressions.AnyCharacter(), false, null);
     }
 
-    private ReExpr CreateCharacterRangesRegex(IReadOnlyList<CharacterRange> ranges)
-    {
+    private ReExpr CreateCharacterRangesRegex(IReadOnlyList<CharacterRange> ranges) {
         if (ranges.Count == 0 || ranges.Count > MaxCharacterClassRangeCount)
             throw new InvalidOperationException("Unsupported character class range count.");
 
@@ -773,45 +697,37 @@ internal sealed class Z3RegexTranslator
         return regexes.Length == 1 ? regexes[0] : _context.MkUnion(regexes);
     }
 
-    private bool TryCreateCharacterRangesRegex(IReadOnlyList<CharacterRange> ranges, out ReExpr regex)
-    {
+    private bool TryCreateCharacterRangesRegex(IReadOnlyList<CharacterRange> ranges, out ReExpr regex) {
         regex = null!;
-        try
-        {
+        try {
             regex = CreateCharacterRangesRegex(ranges);
             return true;
         }
-        catch (InvalidOperationException)
-        {
+        catch (InvalidOperationException) {
             return false;
         }
     }
 
-    private bool TryCreateCharacterRangesRegex(string atomPattern, RegexOptions options, out ReExpr regex)
-    {
+    private bool TryCreateCharacterRangesRegex(string atomPattern, RegexOptions options, out ReExpr regex) {
         regex = null!;
-        try
-        {
+        try {
             if (!Z3RegexCharacterRanges.TryGet(atomPattern, options, out var ranges)) return false;
 
             regex = CreateCharacterRangesRegex(ranges);
             return true;
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or RegexMatchTimeoutException)
-        {
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or RegexMatchTimeoutException) {
             return false;
         }
     }
 
-    private bool TryReadRegexCategoryName(out string categoryName)
-    {
+    private bool TryReadRegexCategoryName(out string categoryName) {
         categoryName = string.Empty;
         if (!Peek('{')) return false;
 
         _position++;
         var start = _position;
-        while (_position < _pattern.Length && !Peek('}'))
-        {
+        while (_position < _pattern.Length && !Peek('}')) {
             var current = _pattern[_position];
             if (!char.IsLetterOrDigit(current) && current != '_') return false;
 
@@ -825,14 +741,12 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private bool TryReadFixedHexChar(int digitCount, out char value)
-    {
+    private bool TryReadFixedHexChar(int digitCount, out char value) {
         value = default;
         if (_position + digitCount > _pattern.Length) return false;
 
         var parsed = 0;
-        for (var index = 0; index < digitCount; index++)
-        {
+        for (var index = 0; index < digitCount; index++) {
             var digit = HexValue(_pattern[_position + index]);
             if (digit < 0) return false;
 
@@ -844,8 +758,7 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private bool TryReadControlCharacterEscape(out char value)
-    {
+    private bool TryReadControlCharacterEscape(out char value) {
         value = default;
         if (_position >= _pattern.Length) return false;
 
@@ -859,13 +772,11 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private char ReadNullPrefixedOctalEscape()
-    {
+    private char ReadNullPrefixedOctalEscape() {
         var value = 0;
         for (var digitCount = 0;
              digitCount < 2 && _position < _pattern.Length && IsOctalDigit(_pattern[_position]);
-             digitCount++)
-        {
+             digitCount++) {
             value = value * 8 + (_pattern[_position] - '0');
             _position++;
         }
@@ -876,8 +787,7 @@ internal sealed class Z3RegexTranslator
     private static bool IsOctalDigit(char value) =>
         value is >= '0' and <= '7';
 
-    private static int HexValue(char value)
-    {
+    private static int HexValue(char value) {
         if (value >= '0' && value <= '9') return value - '0';
 
         if (value >= 'a' && value <= 'f') return value - 'a' + 10;
@@ -887,12 +797,10 @@ internal sealed class Z3RegexTranslator
         return -1;
     }
 
-    private bool TryReadNumber(out uint value)
-    {
+    private bool TryReadNumber(out uint value) {
         value = 0;
         var start = _position;
-        while (_position < _pattern.Length && char.IsDigit(_pattern[_position]))
-        {
+        while (_position < _pattern.Length && char.IsDigit(_pattern[_position])) {
             var digit = (uint)(_pattern[_position] - '0');
             value = checked(value * 10 + digit);
             _position++;
@@ -902,21 +810,17 @@ internal sealed class Z3RegexTranslator
         return _position > start;
     }
 
-    private void ConsumeNonGreedyMarker()
-    {
+    private void ConsumeNonGreedyMarker() {
         SkipIgnoredPatternTrivia();
         if (Peek('?')) _position++;
     }
 
-    private void SkipIgnoredPatternTrivia()
-    {
+    private void SkipIgnoredPatternTrivia() {
         Z3RegexPatternNormalizer.SkipIgnoredTrivia(_pattern, ref _position, _ignorePatternWhitespace);
     }
 
-    private ReExpr CreateLiteralRegex(string value)
-    {
-        if (_ignoreCase && value.Length != 0)
-        {
+    private ReExpr CreateLiteralRegex(string value) {
+        if (_ignoreCase && value.Length != 0) {
             var regexes = new ReExpr[value.Length];
             for (var index = 0; index < value.Length; index++)
                 regexes[index] = CreateIgnoreCaseLiteralCharacterRegex(value[index]);
@@ -927,8 +831,7 @@ internal sealed class Z3RegexTranslator
         return _expressions.Literal(value);
     }
 
-    private ReExpr CreateIgnoreCaseLiteralCharacterRegex(char value)
-    {
+    private ReExpr CreateIgnoreCaseLiteralCharacterRegex(char value) {
         if (TryCreateCharacterRangesRegex(Regex.Escape(value.ToString()),
                 RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, out var regex)) return regex;
 
@@ -945,10 +848,8 @@ internal sealed class Z3RegexTranslator
     private static bool IsEscapedLiteralCharacter(char value) =>
         !char.IsLetterOrDigit(value);
 
-    private static bool TryGetEscapedLiteralCharacter(char escaped, bool inCharacterClass, out char value)
-    {
-        value = escaped switch
-        {
+    private static bool TryGetEscapedLiteralCharacter(char escaped, bool inCharacterClass, out char value) {
+        value = escaped switch {
             'a' => '\a',
             'b' when inCharacterClass => '\b',
             'e' => '\u001b',

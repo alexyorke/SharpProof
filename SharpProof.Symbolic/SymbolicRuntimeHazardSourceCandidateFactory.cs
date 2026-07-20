@@ -1,12 +1,10 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicRuntimeHazardSourceCandidateFactory
-{
+internal static class SymbolicRuntimeHazardSourceCandidateFactory {
     internal static IEnumerable<RuntimeHazardCandidate> CreateThrowCandidates(
         SyntaxNode throwNode,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var exceptionType = SymbolicRuntimeExceptionFacts.GetThrownExceptionType(
             throwNode,
             semanticModel,

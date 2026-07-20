@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicCapabilityFacts
-{
+internal static class SymbolicCapabilityFacts {
     internal const SymbolicCapability AllKnown =
         SymbolicCapability.IO |
         SymbolicCapability.FileRead |
@@ -40,8 +39,7 @@ internal static class SymbolicCapabilityFacts
         .Select(static capability => (int)capability)
         .ToImmutableArray();
 
-    internal static SymbolicCapability Normalize(SymbolicCapability capabilities)
-    {
+    internal static SymbolicCapability Normalize(SymbolicCapability capabilities) {
         if ((capabilities & (SymbolicCapability.FileRead |
                              SymbolicCapability.FileWrite |
                              SymbolicCapability.Network |
@@ -52,8 +50,7 @@ internal static class SymbolicCapabilityFacts
         return capabilities;
     }
 
-    internal static SymbolicCapability ExpandAllowed(SymbolicCapability capabilities)
-    {
+    internal static SymbolicCapability ExpandAllowed(SymbolicCapability capabilities) {
         if ((capabilities & SymbolicCapability.IO) != 0)
             capabilities |= SymbolicCapability.FileRead |
                             SymbolicCapability.FileWrite |
@@ -64,8 +61,7 @@ internal static class SymbolicCapabilityFacts
         return Normalize(capabilities);
     }
 
-    internal static string Format(SymbolicCapability capabilities)
-    {
+    internal static string Format(SymbolicCapability capabilities) {
         capabilities = Normalize(capabilities);
         if (capabilities == SymbolicCapability.None) return "None";
 

@@ -6,8 +6,7 @@ internal sealed record SymbolicProgramPointQueryContext(
     SyntaxNode Node,
     SymbolicProgramPointAnalysis Analysis);
 
-internal static class SymbolicProgramPointProjector
-{
+internal static class SymbolicProgramPointProjector {
     internal static SymbolicProgramPointResult Project(
         SyntaxTree syntaxTree,
         SymbolicProgramPointQueryContext query,
@@ -20,8 +19,7 @@ internal static class SymbolicProgramPointProjector
         int? requestedColumn = null,
         int? requestedPosition = null,
         int? requestedPositionDistance = null,
-        bool? containsRequestedPosition = null)
-    {
+        bool? containsRequestedPosition = null) {
         var nodeSourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(
             syntaxTree,
             query.Node.Span,

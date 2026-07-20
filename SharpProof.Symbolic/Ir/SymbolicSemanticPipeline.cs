@@ -109,8 +109,7 @@ internal static class SymbolicSemanticPipeline {
             valueExpression,
             provenanceRoot + ".runtime-type",
             evidenceKey: provenanceRoot + ".runtime-type"));
-        var conditions = new SymbolicCondition[]
-        {
+        var conditions = new SymbolicCondition[] {
             new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull, sourceNonNull),
             new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull, runtimeTypeTest),
             new SymbolicBinaryCondition(

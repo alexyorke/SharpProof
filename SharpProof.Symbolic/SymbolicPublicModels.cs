@@ -2,15 +2,13 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Symbolic;
 
-internal enum SymbolicProofBackend
-{
+internal enum SymbolicProofBackend {
     None,
     Syntactic,
     Smt
 }
 
-internal enum SymbolicProofStatus
-{
+internal enum SymbolicProofStatus {
     Unknown,
     Reachable,
     Unreachable,
@@ -18,8 +16,7 @@ internal enum SymbolicProofStatus
     ProvenFalse
 }
 
-internal enum SymbolicProofStage
-{
+internal enum SymbolicProofStage {
     None,
     Lowering,
     Normalization,
@@ -29,15 +26,13 @@ internal enum SymbolicProofStage
     ResultMapping
 }
 
-internal enum SymbolicProofSupport
-{
+internal enum SymbolicProofSupport {
     Exact,
     Approximate,
     Unsupported
 }
 
-internal enum SymbolicUnknownReason
-{
+internal enum SymbolicUnknownReason {
     None,
     UnsupportedIrEncoding,
     SmtDisabled,
@@ -73,8 +68,7 @@ internal sealed record SymbolicProofInfo(
     SymbolicProofSupport Support,
     string? Target = null,
     string? ConditionText = null,
-    string? DisplayKind = null)
-{
+    string? DisplayKind = null) {
     public SymbolicProofStatus Status { get; init; } = Status;
     public SymbolicProofBackend Backend { get; init; } = Backend;
     public SymbolicUnknownReason UnknownReason { get; init; } = UnknownReason;
@@ -119,14 +113,12 @@ internal sealed record SymbolicProofInfo(
         SymbolicProofStage.SyntacticClassification,
         SymbolicProofSupport.Exact);
 
-    internal SymbolicProofInfo WithCacheHit(SymbolicBudgetInfo? budget) => this with
-    {
+    internal SymbolicProofInfo WithCacheHit(SymbolicBudgetInfo? budget) => this with {
         CacheHit = true,
         Budget = budget ?? Budget
     };
 
-    internal SymbolicProofInfo WithStatus(SymbolicProofStatus status, string? reason = null) => this with
-    {
+    internal SymbolicProofInfo WithStatus(SymbolicProofStatus status, string? reason = null) => this with {
         Status = status,
         UnknownReason = status == SymbolicProofStatus.Unknown && UnknownReason == SymbolicUnknownReason.None
             ? SymbolicUnknownReason.Unknown
@@ -139,8 +131,7 @@ internal sealed record SymbolicProofInfo(
         SymbolicBudgetInfo? budget) =>
         FromResult(
             result,
-            result.PathCheck.Feasibility switch
-            {
+            result.PathCheck.Feasibility switch {
                 Feasibility.Satisfiable => SymbolicProofStatus.Reachable,
                 Feasibility.Unsatisfiable => SymbolicProofStatus.Unreachable,
                 _ => SymbolicProofStatus.Unknown
@@ -152,8 +143,7 @@ internal sealed record SymbolicProofInfo(
         SymbolicBudgetInfo? budget) =>
         FromResult(
             result,
-            result.Outcome switch
-            {
+            result.Outcome switch {
                 PurityProofOutcome.ProvablyPure => SymbolicProofStatus.ProvenTrue,
                 PurityProofOutcome.ProvablyImpure => SymbolicProofStatus.ProvenFalse,
                 _ => SymbolicProofStatus.Unknown
@@ -188,8 +178,7 @@ internal sealed record SymbolicProofInfo(
     { RawResult = result };
 
     internal static SymbolicProofStatus MapStatus<TStatus>(TStatus value)
-        where TStatus : struct, Enum => (object)value switch
-    {
+        where TStatus : struct, Enum => (object)value switch {
         SymbolicTruthValue.ProvenTrue or SymbolicConditionProofSummaryStatus.AlwaysTrue or
             SymbolicRuntimeHazardStatus.Proven => SymbolicProofStatus.ProvenTrue,
         SymbolicTruthValue.ProvenFalse or SymbolicConditionProofSummaryStatus.AlwaysFalse =>
@@ -208,8 +197,7 @@ internal sealed record SymbolicProofInfo(
         string? target = null,
         string? conditionText = null,
         string? displayKind = null,
-        string? rawUnknownReason = null)
-    {
+        string? rawUnknownReason = null) {
         var backend = isSolverBacked ? SymbolicProofBackend.Smt :
             status == SymbolicProofStatus.Unknown ? SymbolicProofBackend.None : SymbolicProofBackend.Syntactic;
         var unknownReason = status == SymbolicProofStatus.Unknown && rawUnknownReason != null
@@ -222,8 +210,7 @@ internal sealed record SymbolicProofInfo(
             reason,
             cacheHit,
             budget,
-            backend switch
-            {
+            backend switch {
                 SymbolicProofBackend.Syntactic => SymbolicProofStage.SyntacticClassification,
                 SymbolicProofBackend.Smt => SymbolicProofStage.ResultMapping,
                 _ => SymbolicProofStage.None
@@ -242,8 +229,7 @@ internal sealed record SymbolicProofInfo(
         string reason,
         string? target = null,
         string? conditionText = null,
-        string? displayKind = null) => source with
-    {
+        string? displayKind = null) => source with {
         Status = status,
         UnknownReason = status == SymbolicProofStatus.Unknown
             ? source.UnknownReason
@@ -263,10 +249,8 @@ internal sealed record SymbolicFactInfo(
     int SourceSpanStart,
     int SourceSpanLength,
     string? SymbolKey = null,
-    string? EvidenceKey = null)
-{
-    internal static SymbolicFactInfo FromFact(SymbolicFact fact)
-    {
+    string? EvidenceKey = null) {
+    internal static SymbolicFactInfo FromFact(SymbolicFact fact) {
         if (fact == null) throw new ArgumentNullException(nameof(fact));
 
         var atomKind = fact.Atom.GetType().Name;
@@ -281,8 +265,7 @@ internal sealed record SymbolicFactInfo(
             fact.EvidenceKey);
     }
 
-    internal static IReadOnlyList<SymbolicFactInfo> FromState(SymbolicState state)
-    {
+    internal static IReadOnlyList<SymbolicFactInfo> FromState(SymbolicState state) {
         if (state == null) throw new ArgumentNullException(nameof(state));
 
         var facts = new List<SymbolicFactInfo>(state.Facts.Length + state.PathConditions.Length);
@@ -293,14 +276,12 @@ internal sealed record SymbolicFactInfo(
         return facts;
     }
 
-    internal static IReadOnlyList<SymbolicFactInfo> Distinct(IEnumerable<SymbolicFactInfo> facts)
-    {
+    internal static IReadOnlyList<SymbolicFactInfo> Distinct(IEnumerable<SymbolicFactInfo> facts) {
         if (facts == null) throw new ArgumentNullException(nameof(facts));
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var distinct = new List<SymbolicFactInfo>();
-        foreach (var fact in facts)
-        {
+        foreach (var fact in facts) {
             if (fact == null) continue;
 
             var key = string.Join(
@@ -319,10 +300,8 @@ internal sealed record SymbolicFactInfo(
         return distinct;
     }
 
-    private static void AddConditionFacts(ICollection<SymbolicFactInfo> facts, SymbolicCondition condition)
-    {
-        switch (condition)
-        {
+    private static void AddConditionFacts(ICollection<SymbolicFactInfo> facts, SymbolicCondition condition) {
+        switch (condition) {
             case SymbolicFactCondition factCondition:
                 facts.Add(FromFact(factCondition.Fact));
                 break;
@@ -336,8 +315,7 @@ internal sealed record SymbolicFactInfo(
         }
     }
 
-    private static string FormatFactText(SymbolicFact fact)
-    {
+    private static string FormatFactText(SymbolicFact fact) {
         if (fact.Confidence != SymbolicFactConfidence.Exact &&
             fact.Atom is SymbolicExceptionPreconditionAtom precondition)
             return FormatUnsupportedExceptionPrecondition(precondition);
@@ -349,8 +327,7 @@ internal sealed record SymbolicFactInfo(
         return fact.Polarity ? text : "!(" + text + ")";
     }
 
-    private static string FormatUnsupportedExceptionPrecondition(SymbolicExceptionPreconditionAtom precondition)
-    {
+    private static string FormatUnsupportedExceptionPrecondition(SymbolicExceptionPreconditionAtom precondition) {
         if (precondition.Subject != null &&
             SymbolicIrFormulaEncoder.TryEncodeTerm(precondition.Subject, out var subjectFormula))
             return "unknown(" + precondition.Kind + " trigger for " +

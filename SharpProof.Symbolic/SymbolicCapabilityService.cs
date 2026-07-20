@@ -2,8 +2,7 @@ using SharpProofCapability = SharpProof.Attributes.SharpProofCapability;
 
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicCapabilityService
-{
+internal sealed class SymbolicCapabilityService {
     private static readonly SymbolDisplayFormat CapabilitySymbolDisplayFormat = new(
         typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
         genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
@@ -40,12 +39,10 @@ internal sealed class SymbolicCapabilityService
     private static SymbolicCapabilityResult CreateResult(
         ResolvedMethodLikeTarget target,
         CapabilitySummary summary,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var syntaxTree = target.SyntaxTree;
         var sites = summary.Sites
-            .Select(site =>
-            {
+            .Select(site => {
                 var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
                     syntaxTree,
                     site.SpanStart,
@@ -85,8 +82,7 @@ internal sealed class SymbolicCapabilityService
             summary.UnknownReasons.OrderBy(static reason => reason.ToString(), StringComparer.Ordinal).ToArray());
     }
 
-    private sealed class AnalysisSession(Compilation compilation, CancellationToken cancellationToken)
-    {
+    private sealed class AnalysisSession(Compilation compilation, CancellationToken cancellationToken) {
         private readonly HashSet<IMethodSymbol> _activeMethods =
             new(SymbolEqualityComparer.Default);
 
@@ -96,8 +92,7 @@ internal sealed class SymbolicCapabilityService
         private readonly Dictionary<IMethodSymbol, CapabilitySummary> _methodCache =
             new(SymbolEqualityComparer.Default);
 
-        public CapabilitySummary Analyze(SyntaxNode declaration, SemanticModel semanticModel)
-        {
+        public CapabilitySummary Analyze(SyntaxNode declaration, SemanticModel semanticModel) {
             var declaredMethodSymbol = TryGetMethodSymbol(declaration, semanticModel, _cancellationToken);
             if (declaredMethodSymbol != null &&
                 _methodCache.TryGetValue(declaredMethodSymbol, out var cachedSummary))
@@ -107,13 +102,11 @@ internal sealed class SymbolicCapabilityService
                 !_activeMethods.Add(declaredMethodSymbol))
                 return CapabilitySummary.Unknown(SymbolicCapabilityUnknownReason.RecursiveSourceCycle);
 
-            try
-            {
+            try {
                 var rootOperation =
                     MethodBodyOperationResolver.GetMethodBodyRootOperation(declaration, semanticModel,
                         _cancellationToken, true);
-                if (rootOperation == null)
-                {
+                if (rootOperation == null) {
                     var unsupported = CapabilitySummary.Unknown(SymbolicCapabilityUnknownReason.UnsupportedTarget);
                     if (declaredMethodSymbol != null) _methodCache[declaredMethodSymbol] = unsupported;
 
@@ -122,13 +115,11 @@ internal sealed class SymbolicCapabilityService
 
                 var sites = new List<CapabilitySiteData>();
                 var unknownReasons = new HashSet<SymbolicCapabilityUnknownReason>();
-                foreach (var operation in rootOperation.DescendantsAndSelf())
-                {
+                foreach (var operation in rootOperation.DescendantsAndSelf()) {
                     _cancellationToken.ThrowIfCancellationRequested();
                     if (!IsVisibleOperation(operation, declaration)) continue;
 
-                    foreach (var site in AnalyzeOperation(operation))
-                    {
+                    foreach (var site in AnalyzeOperation(operation)) {
                         sites.Add(site);
                         if (site.IsUnknown) unknownReasons.Add(site.UnknownReason);
                     }
@@ -139,30 +130,24 @@ internal sealed class SymbolicCapabilityService
 
                 return summary;
             }
-            catch (OperationCanceledException)
-            {
+            catch (OperationCanceledException) {
                 return CapabilitySummary.Unknown(SymbolicCapabilityUnknownReason.CancellationRequested);
             }
-            finally
-            {
+            finally {
                 if (declaredMethodSymbol != null) _activeMethods.Remove(declaredMethodSymbol);
             }
         }
 
-        private IEnumerable<CapabilitySiteData> AnalyzeOperation(IOperation operation)
-        {
-            return operation switch
-            {
-                ILockOperation => new[]
-                {
+        private IEnumerable<CapabilitySiteData> AnalyzeOperation(IOperation operation) {
+            return operation switch {
+                ILockOperation => new[] {
                     CapabilitySiteData.Proven(
                         SharpProofCapability.Synchronization, operation, "lock", string.Empty)
                 },
                 IDynamicMemberReferenceOperation { Parent: IDynamicInvocationOperation or IDynamicIndexerAccessOperation } =>
                     Array.Empty<CapabilitySiteData>(),
                 IDynamicInvocationOperation or IDynamicIndexerAccessOperation or
-                    IDynamicMemberReferenceOperation or IDynamicObjectCreationOperation => new[]
-                    {
+                    IDynamicMemberReferenceOperation or IDynamicObjectCreationOperation => new[] {
                         CapabilitySiteData.Unknown(
                             operation, "dynamic", SymbolicCapabilityUnknownReason.DynamicDispatch, string.Empty)
                     },
@@ -180,8 +165,7 @@ internal sealed class SymbolicCapabilityService
         }
 
         private IEnumerable<CapabilitySiteData> AnalyzePropertyUsage(
-            IPropertyReferenceOperation propertyReferenceOperation)
-        {
+            IPropertyReferenceOperation propertyReferenceOperation) {
             var accessor = propertyReferenceOperation.Property.GetMethod ??
                            propertyReferenceOperation.Property.SetMethod;
             return AnalyzeSymbolUsage(
@@ -189,10 +173,8 @@ internal sealed class SymbolicCapabilityService
         }
 
         private IEnumerable<CapabilitySiteData> AnalyzeFieldUsage(IFieldSymbol fieldSymbol,
-            IFieldReferenceOperation fieldReferenceOperation)
-        {
-            if (TryClassifySymbolCapabilities(fieldSymbol, out var capabilities))
-            {
+            IFieldReferenceOperation fieldReferenceOperation) {
+            if (TryClassifySymbolCapabilities(fieldSymbol, out var capabilities)) {
                 if (capabilities != SharpProofCapability.None)
                     yield return CapabilitySiteData.Proven(
                         capabilities,
@@ -215,10 +197,8 @@ internal sealed class SymbolicCapabilityService
             IMethodSymbol? methodSymbol,
             IOperation operation,
             string siteKind,
-            ISymbol? displaySymbol)
-        {
-            if (methodSymbol == null)
-            {
+            ISymbol? displaySymbol) {
+            if (methodSymbol == null) {
                 yield return CapabilitySiteData.Unknown(
                     operation,
                     siteKind,
@@ -227,8 +207,7 @@ internal sealed class SymbolicCapabilityService
                 yield break;
             }
 
-            if (SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(methodSymbol, operation))
-            {
+            if (SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(methodSymbol, operation)) {
                 yield return CapabilitySiteData.Unknown(
                     operation,
                     siteKind,
@@ -238,15 +217,13 @@ internal sealed class SymbolicCapabilityService
                 yield break;
             }
 
-            if (TryAnalyzeSourceMethod(methodSymbol, operation, siteKind, out var sourceSites))
-            {
+            if (TryAnalyzeSourceMethod(methodSymbol, operation, siteKind, out var sourceSites)) {
                 foreach (var site in sourceSites) yield return site;
 
                 yield break;
             }
 
-            if (TryClassifySymbolCapabilities(methodSymbol, out var capabilities))
-            {
+            if (TryClassifySymbolCapabilities(methodSymbol, out var capabilities)) {
                 if (capabilities != SharpProofCapability.None)
                     yield return CapabilitySiteData.Proven(
                         capabilities,
@@ -271,14 +248,12 @@ internal sealed class SymbolicCapabilityService
             IMethodSymbol methodSymbol,
             IOperation operation,
             string siteKind,
-            out ImmutableArray<CapabilitySiteData> sites)
-        {
+            out ImmutableArray<CapabilitySiteData> sites) {
             sites = ImmutableArray<CapabilitySiteData>.Empty;
             var sourceMethod = ResolveSourceImplementation(methodSymbol.OriginalDefinition);
             if (!IsSourceMethod(sourceMethod)) return false;
 
-            if (!TryResolveSourceDeclaration(sourceMethod, out var declaration, out var semanticModel))
-            {
+            if (!TryResolveSourceDeclaration(sourceMethod, out var declaration, out var semanticModel)) {
                 sites = ImmutableArray.Create(
                     CapabilitySiteData.Unknown(
                         operation,
@@ -317,8 +292,7 @@ internal sealed class SymbolicCapabilityService
         private bool TryResolveSourceDeclaration(
             IMethodSymbol methodSymbol,
             out SyntaxNode declaration,
-            out SemanticModel semanticModel)
-        {
+            out SemanticModel semanticModel) {
             return SymbolicMethodSourceResolver.TryResolve(
                 _compilation,
                 methodSymbol,
@@ -344,8 +318,7 @@ internal sealed class SymbolicCapabilityService
         private static bool IsSourceMethod(IMethodSymbol methodSymbol) =>
             SymbolicMethodSourceResolver.IsBackedBySource(methodSymbol);
 
-        private static bool TryClassifySymbolCapabilities(ISymbol symbol, out SharpProofCapability capabilities)
-        {
+        private static bool TryClassifySymbolCapabilities(ISymbol symbol, out SharpProofCapability capabilities) {
             capabilities = SharpProofCapability.None;
             var originalSymbol = symbol.OriginalDefinition;
             if (IsNativeInteropSymbol(originalSymbol)) capabilities |= SharpProofCapability.NativeInterop;
@@ -359,8 +332,7 @@ internal sealed class SymbolicCapabilityService
                    IsKnownCapabilityNeutralSymbol(namespaceName, typeName, memberName);
         }
 
-        private static bool ShouldTreatMetadataSymbolAsUnknown(ISymbol symbol)
-        {
+        private static bool ShouldTreatMetadataSymbolAsUnknown(ISymbol symbol) {
             var originalSymbol = symbol.OriginalDefinition;
             if (originalSymbol.Locations.Any(static location => location.IsInSource)) return false;
 
@@ -375,8 +347,7 @@ internal sealed class SymbolicCapabilityService
             string namespaceName,
             string typeName,
             string memberName,
-            ISymbol symbol) => typeName switch
-        {
+            ISymbol symbol) => typeName switch {
             "System.Console" => SharpProofCapability.Console,
             "System.Environment" or "System.AppContext" => IsClockMember(memberName)
                 ? SharpProofCapability.Clock
@@ -413,8 +384,7 @@ internal sealed class SymbolicCapabilityService
         private static SharpProofCapability ClassifyReflectionCapability(
             string typeName,
             string memberName,
-            ISymbol symbol) => (typeName, memberName) switch
-        {
+            ISymbol symbol) => (typeName, memberName) switch {
             ("System.Delegate", "DynamicInvoke") => SharpProofCapability.Reflection,
             ("System.Type", "GetType" or "GetTypeFromHandle") => SharpProofCapability.Reflection,
             _ when typeName == "System.Activator" || symbol.ContainingNamespace?.ToDisplayString()
@@ -442,8 +412,7 @@ internal sealed class SymbolicCapabilityService
                 "System.IO.TextReader" or "System.IO.TextWriter" ||
             typeName.StartsWith("System.IO.Pipes.", StringComparison.Ordinal);
 
-        private static SharpProofCapability ClassifyFileLikeMember(string memberName)
-        {
+        private static SharpProofCapability ClassifyFileLikeMember(string memberName) {
             if (memberName is "Open" or "OpenHandle" or "OpenText")
                 return SharpProofCapability.FileRead | SharpProofCapability.FileWrite;
 
@@ -500,11 +469,9 @@ internal sealed class SymbolicCapabilityService
              typeName.StartsWith("System.Convert", StringComparison.Ordinal)) ||
             typeName == "System.Object" && memberName == "ToString";
 
-        private static bool IsNativeInteropSymbol(ISymbol symbol)
-        {
+        private static bool IsNativeInteropSymbol(ISymbol symbol) {
             if (symbol is IMethodSymbol methodSymbol)
-                foreach (var attribute in methodSymbol.GetAttributes())
-                {
+                foreach (var attribute in methodSymbol.GetAttributes()) {
                     var attributeName = attribute.AttributeClass?.Name;
                     if (string.Equals(attributeName, "DllImportAttribute", StringComparison.Ordinal) ||
                         string.Equals(attributeName, "LibraryImportAttribute", StringComparison.Ordinal))
@@ -519,12 +486,10 @@ internal sealed class SymbolicCapabilityService
     private sealed record CapabilitySummary(
         SharpProofCapability Capabilities,
         ImmutableArray<CapabilitySiteData> Sites,
-        ImmutableArray<SymbolicCapabilityUnknownReason> UnknownReasons)
-    {
+        ImmutableArray<SymbolicCapabilityUnknownReason> UnknownReasons) {
         public static CapabilitySummary FromSites(
             IReadOnlyList<CapabilitySiteData> sites,
-            IReadOnlyCollection<SymbolicCapabilityUnknownReason> unknownReasons)
-        {
+            IReadOnlyCollection<SymbolicCapabilityUnknownReason> unknownReasons) {
             var capabilities = SymbolicCapabilityFacts.Normalize(
                 sites.Where(static site => !site.IsUnknown)
                     .Aggregate(SharpProofCapability.None, static (current, site) => current | site.Capabilities));
@@ -538,8 +503,7 @@ internal sealed class SymbolicCapabilityService
                 unknownReasons.OrderBy(static reason => reason.ToString(), StringComparer.Ordinal).ToImmutableArray());
         }
 
-        public static CapabilitySummary Unknown(SymbolicCapabilityUnknownReason unknownReason)
-        {
+        public static CapabilitySummary Unknown(SymbolicCapabilityUnknownReason unknownReason) {
             return new CapabilitySummary(
                 SharpProofCapability.None,
                 ImmutableArray<CapabilitySiteData>.Empty,
@@ -554,8 +518,7 @@ internal sealed class SymbolicCapabilityService
         string symbolDisplayName,
         bool isTransitive,
         bool isUnknown,
-        SymbolicCapabilityUnknownReason unknownReason)
-    {
+        SymbolicCapabilityUnknownReason unknownReason) {
         public SharpProofCapability Capabilities { get; } = SymbolicCapabilityFacts.Normalize(capabilities);
 
         public string SiteKind { get; } = siteKind;

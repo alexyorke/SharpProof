@@ -1,12 +1,10 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicComplexityResultProjector
-{
+internal static class SymbolicComplexityResultProjector {
     internal static SymbolicComplexityResult Project(
         ResolvedMethodLikeTarget target,
         MethodAnalysisSummary summary,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         var complexity = new SymbolicComplexityInfo(
             summary.Cost.ToBigOText(target.MethodSymbol!),
@@ -36,8 +34,7 @@ internal static class SymbolicComplexityResultProjector
         IEnumerable<SymbolicComplexityDriverInfo> drivers) => drivers.Distinct().ToArray();
 
     private static IReadOnlyList<SymbolicComplexityUnknownReason> DistinctUnknownReasons(
-        IEnumerable<SymbolicComplexityUnknownReason> reasons)
-    {
+        IEnumerable<SymbolicComplexityUnknownReason> reasons) {
         return reasons
             .Where(static reason => reason != SymbolicComplexityUnknownReason.None)
             .Distinct()

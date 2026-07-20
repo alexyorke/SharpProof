@@ -1,7 +1,6 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal sealed partial class SmtConcreteFactIndex
-{
+internal sealed partial class SmtConcreteFactIndex {
         private const int MaxAffineExpansionDepth = 8;
         private const int MaxBooleanEvaluationDepth = 64;
         private const int MaxBooleanFactInferenceDepth = 16;
@@ -24,13 +23,11 @@ internal sealed partial class SmtConcreteFactIndex
         internal Dictionary<SmtFormula, string> StringEqualities => _exactStrings;
         internal Dictionary<SmtFormula, SmtIntegerInterval> IntegerIntervals => _integerIntervals;
 
-        internal SmtConcreteFactIndex()
-        {
+        internal SmtConcreteFactIndex() {
             _workBudget = new SyntacticWorkBudget(MaxSyntacticWorkItems);
         }
 
-        private SmtConcreteFactIndex(SmtConcreteFactIndex source)
-        {
+        private SmtConcreteFactIndex(SmtConcreteFactIndex source) {
             _integerIntervals = new Dictionary<SmtFormula, SmtIntegerInterval>(source._integerIntervals);
             _exactStrings = new Dictionary<SmtFormula, string>(source._exactStrings);
             _excludedStrings = source._excludedStrings.ToDictionary(
@@ -48,22 +45,18 @@ internal sealed partial class SmtConcreteFactIndex
 
         internal static SmtConcreteFactIndex Create(
             IEnumerable<SmtFormula> formulas,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             var facts = new SmtConcreteFactIndex();
             facts.AddAll(formulas, out hasContradiction);
             return facts;
         }
 
-        private void AddAll(IEnumerable<SmtFormula> formulas, out bool hasContradiction)
-        {
+        private void AddAll(IEnumerable<SmtFormula> formulas, out bool hasContradiction) {
             hasContradiction = false;
             var formulaArray = formulas as SmtFormula[] ?? formulas.ToArray();
-            for (var pass = 0; pass < 4; pass++)
-            {
+            for (var pass = 0; pass < 4; pass++) {
                 var addedThisPass = false;
-                foreach (var formula in formulaArray)
-                {
+                foreach (var formula in formulaArray) {
                     if (Add(formula, out var formulaContradiction)) addedThisPass = true;
 
                     hasContradiction |= formulaContradiction;
@@ -73,39 +66,33 @@ internal sealed partial class SmtConcreteFactIndex
             }
         }
 
-        internal bool Add(SmtFormula formula, out bool hasContradiction)
-        {
+        internal bool Add(SmtFormula formula, out bool hasContradiction) {
             hasContradiction = false;
             if (!_workBudget.TryConsume()) return false;
 
             formula = NormalizeAliases(formula);
             var added = false;
-            if (TryAddAliasFact(formula, out var aliasContradiction))
-            {
+            if (TryAddAliasFact(formula, out var aliasContradiction)) {
                 added = true;
                 hasContradiction |= aliasContradiction;
             }
 
-            if (TryAddIntegerIntervalFact(formula, out var integerContradiction))
-            {
+            if (TryAddIntegerIntervalFact(formula, out var integerContradiction)) {
                 added = true;
                 hasContradiction |= integerContradiction;
             }
 
-            if (TryAddBooleanFact(formula, out var booleanContradiction))
-            {
+            if (TryAddBooleanFact(formula, out var booleanContradiction)) {
                 added = true;
                 hasContradiction |= booleanContradiction;
             }
 
-            if (TryAddStringValueFact(formula, out var stringContradiction))
-            {
+            if (TryAddStringValueFact(formula, out var stringContradiction)) {
                 added = true;
                 hasContradiction |= stringContradiction;
             }
 
-            if (TryAddReferenceNullFact(formula, out var referenceContradiction))
-            {
+            if (TryAddReferenceNullFact(formula, out var referenceContradiction)) {
                 added = true;
                 hasContradiction |= referenceContradiction;
             }
@@ -117,13 +104,10 @@ internal sealed partial class SmtConcreteFactIndex
             return added || hasContradiction;
         }
 
-        private bool TryAddAliasFact(SmtFormula formula, out bool hasContradiction)
-        {
+        private bool TryAddAliasFact(SmtFormula formula, out bool hasContradiction) {
             hasContradiction = false;
-            if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
-            {
-                if (TryGetAliasComparison(negated.Operand, out var negatedLeft, out var negatedRight))
-                {
+            if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated) {
+                if (TryGetAliasComparison(negated.Operand, out var negatedLeft, out var negatedRight)) {
                     hasContradiction = FindCanonical(negatedLeft).Equals(FindCanonical(negatedRight));
                     return hasContradiction;
                 }
@@ -132,15 +116,13 @@ internal sealed partial class SmtConcreteFactIndex
             }
 
             var added = false;
-            if (TryAddAffineIntegerEqualityFact(formula, out var affineContradiction))
-            {
+            if (TryAddAffineIntegerEqualityFact(formula, out var affineContradiction)) {
                 added = true;
                 hasContradiction |= affineContradiction;
             }
 
             if (hasContradiction ||
-                formula is SmtBinaryFormula
-                {
+                formula is SmtBinaryFormula {
                     Operator: SmtBinaryOperator.Equal,
                     Left.Kind: SmtValueKind.Int,
                     Right.Kind: SmtValueKind.Int
@@ -154,8 +136,7 @@ internal sealed partial class SmtConcreteFactIndex
             return added || addedAlias;
         }
 
-        private bool TryAddAffineIntegerEqualityFact(SmtFormula formula, out bool hasContradiction)
-        {
+        private bool TryAddAffineIntegerEqualityFact(SmtFormula formula, out bool hasContradiction) {
             hasContradiction = false;
             if (formula is not SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } binary ||
                 binary.Left.Kind != SmtValueKind.Int ||
@@ -168,10 +149,8 @@ internal sealed partial class SmtConcreteFactIndex
                 !TryGetAffineIntegerTerm(rightFormula, 0, out var right))
                 return false;
 
-            if (SmtAffineIntegerTerm.TrySubtract(left, right, out var difference))
-            {
-                if (difference.BaseTerm == null)
-                {
+            if (SmtAffineIntegerTerm.TrySubtract(left, right, out var difference)) {
+                if (difference.BaseTerm == null) {
                     hasContradiction = difference.Offset != 0;
                     return hasContradiction;
                 }
@@ -180,8 +159,7 @@ internal sealed partial class SmtConcreteFactIndex
                         difference,
                         out var solvedTerm,
                         out var solvedConstant,
-                        out hasContradiction))
-                {
+                        out hasContradiction)) {
                     if (hasContradiction) return true;
 
                     return AddIntegerIntervalFact(
@@ -198,8 +176,7 @@ internal sealed partial class SmtConcreteFactIndex
         private bool TryAddUnitAffineAlias(
             SmtAffineIntegerTerm left,
             SmtAffineIntegerTerm right,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
             if (left.BaseTerm == null ||
                 right.BaseTerm == null ||
@@ -215,26 +192,22 @@ internal sealed partial class SmtConcreteFactIndex
             long offset;
             var leftHasInterval = _integerIntervals.ContainsKey(left.BaseTerm);
             var rightHasInterval = _integerIntervals.ContainsKey(right.BaseTerm);
-            if (leftHasInterval && !rightHasInterval)
-            {
+            if (leftHasInterval && !rightHasInterval) {
                 alias = right.BaseTerm;
                 baseTerm = left.BaseTerm;
                 if (!SmtIntegerArithmetic.TrySubtract(left.Offset, right.Offset, out offset)) return false;
             }
-            else if (rightHasInterval && !leftHasInterval)
-            {
+            else if (rightHasInterval && !leftHasInterval) {
                 alias = left.BaseTerm;
                 baseTerm = right.BaseTerm;
                 if (!SmtIntegerArithmetic.TrySubtract(right.Offset, left.Offset, out offset)) return false;
             }
-            else if (string.CompareOrdinal(left.BaseTerm.ToString(), right.BaseTerm.ToString()) <= 0)
-            {
+            else if (string.CompareOrdinal(left.BaseTerm.ToString(), right.BaseTerm.ToString()) <= 0) {
                 alias = right.BaseTerm;
                 baseTerm = left.BaseTerm;
                 if (!SmtIntegerArithmetic.TrySubtract(left.Offset, right.Offset, out offset)) return false;
             }
-            else
-            {
+            else {
                 alias = left.BaseTerm;
                 baseTerm = right.BaseTerm;
                 if (!SmtIntegerArithmetic.TrySubtract(right.Offset, left.Offset, out offset)) return false;
@@ -247,8 +220,7 @@ internal sealed partial class SmtConcreteFactIndex
         private bool AddDirectedAlias(
             SmtFormula alias,
             SmtFormula canonical,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
             alias = NormalizeAliases(alias);
             canonical = NormalizeAliases(canonical);
@@ -265,22 +237,18 @@ internal sealed partial class SmtConcreteFactIndex
             SmtAffineIntegerTerm difference,
             out SmtFormula term,
             out long constant,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             term = null!;
             constant = default;
             hasContradiction = false;
             if (difference.BaseTerm == null ||
-                difference.Scale == 0)
-            {
+                difference.Scale == 0) {
                 hasContradiction = difference.Offset != 0;
                 return hasContradiction;
             }
 
-            try
-            {
-                if (difference.Offset % difference.Scale != 0)
-                {
+            try {
+                if (difference.Offset % difference.Scale != 0) {
                     hasContradiction = true;
                     return true;
                 }
@@ -291,14 +259,12 @@ internal sealed partial class SmtConcreteFactIndex
                 term = difference.BaseTerm;
                 return true;
             }
-            catch (OverflowException)
-            {
+            catch (OverflowException) {
                 return false;
             }
         }
 
-        private static SmtFormula CreateOffsetTerm(SmtFormula baseTerm, long offset)
-        {
+        private static SmtFormula CreateOffsetTerm(SmtFormula baseTerm, long offset) {
             return offset == 0
                 ? baseTerm
                 : new SmtIntegerBinaryTerm(
@@ -307,14 +273,12 @@ internal sealed partial class SmtConcreteFactIndex
                     new SmtIntegerConstant(offset));
         }
 
-        private static SmtFormula CreateAffineTerm(SmtAffineIntegerTerm term)
-        {
+        private static SmtFormula CreateAffineTerm(SmtAffineIntegerTerm term) {
             if (term.BaseTerm == null ||
                 term.Scale == 0)
                 return new SmtIntegerConstant(term.Offset);
 
-            var scaled = term.Scale switch
-            {
+            var scaled = term.Scale switch {
                 1 => term.BaseTerm,
                 -1 => new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, term.BaseTerm),
                 _ => new SmtIntegerBinaryTerm(
@@ -335,8 +299,7 @@ internal sealed partial class SmtConcreteFactIndex
             SmtFormula formula,
             out SmtFormula left,
             out SmtBinaryOperator op,
-            out SmtFormula right)
-        {
+            out SmtFormula right) {
             left = null!;
             op = default;
             right = null!;
@@ -358,8 +321,7 @@ internal sealed partial class SmtConcreteFactIndex
         private static bool TryGetAliasComparison(
             SmtFormula formula,
             out SmtFormula left,
-            out SmtFormula right)
-        {
+            out SmtFormula right) {
             left = null!;
             right = null!;
             if (formula is not SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } binary ||
@@ -375,8 +337,7 @@ internal sealed partial class SmtConcreteFactIndex
             return true;
         }
 
-        private static bool CanAliasTerm(SmtFormula formula)
-        {
+        private static bool CanAliasTerm(SmtFormula formula) {
             return formula is not SmtBooleanConstant and
                 not SmtIntegerConstant and
                 not SmtStringConstant and
@@ -386,8 +347,7 @@ internal sealed partial class SmtConcreteFactIndex
         private bool UnionAliases(
             SmtFormula left,
             SmtFormula right,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             left = FindCanonical(left);
             right = FindCanonical(right);
             hasContradiction = false;
@@ -399,8 +359,7 @@ internal sealed partial class SmtConcreteFactIndex
             return true;
         }
 
-        private bool RegisterAlias(SmtFormula alias, SmtFormula canonical)
-        {
+        private bool RegisterAlias(SmtFormula alias, SmtFormula canonical) {
             _aliases[alias] = (canonical, false);
             MergeIntegerFacts(canonical, alias, out var integerContradiction);
             MergeStringFacts(canonical, alias, out var stringContradiction);
@@ -414,10 +373,8 @@ internal sealed partial class SmtConcreteFactIndex
         private static SmtFormula FindCanonical(
             Dictionary<SmtFormula, (SmtFormula Parent, bool Differs)> equivalences,
             SmtFormula formula,
-            out bool differsFromCanonical)
-        {
-            if (!equivalences.TryGetValue(formula, out var parent))
-            {
+            out bool differsFromCanonical) {
+            if (!equivalences.TryGetValue(formula, out var parent)) {
                 differsFromCanonical = false;
                 return formula;
             }
@@ -436,8 +393,7 @@ internal sealed partial class SmtConcreteFactIndex
         private void MergeIntegerFacts(
             SmtFormula canonical,
             SmtFormula alias,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
             if (!_integerIntervals.TryGetValue(alias, out var aliasInterval)) return;
 
@@ -452,11 +408,9 @@ internal sealed partial class SmtConcreteFactIndex
         private void MergeStringFacts(
             SmtFormula canonical,
             SmtFormula alias,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
-            if (_excludedStrings.TryGetValue(alias, out var aliasExcluded))
-            {
+            if (_excludedStrings.TryGetValue(alias, out var aliasExcluded)) {
                 if (_excludedStrings.TryGetValue(canonical, out var existingExcluded))
                     existingExcluded.UnionWith(aliasExcluded);
                 else
@@ -483,8 +437,7 @@ internal sealed partial class SmtConcreteFactIndex
         private void MergeReferenceFacts(
             SmtFormula canonical,
             SmtFormula alias,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
             if (!_referenceNullStates.TryGetValue(alias, out var aliasIsNull)) return;
 
@@ -496,15 +449,13 @@ internal sealed partial class SmtConcreteFactIndex
             _referenceNullStates.Remove(alias);
         }
 
-        private SmtFormula NormalizeAliases(SmtFormula formula)
-        {
+        private SmtFormula NormalizeAliases(SmtFormula formula) {
             if (!_workBudget.TryConsume()) return formula;
 
             return NormalizeAliases(formula, new HashSet<SmtFormula>());
         }
 
-        private SmtFormula NormalizeAliases(SmtFormula formula, HashSet<SmtFormula> visiting)
-        {
+        private SmtFormula NormalizeAliases(SmtFormula formula, HashSet<SmtFormula> visiting) {
             if (!_workBudget.TryConsume()) return formula;
 
             var directCanonical = FindCanonical(formula);
@@ -517,8 +468,7 @@ internal sealed partial class SmtConcreteFactIndex
             var normalized = SmtFormulaTraversal.MapChildren(
                 formula,
                 child => NormalizeAliases(child, visiting));
-            if (normalized is SmtConditionalFormula conditional)
-            {
+            if (normalized is SmtConditionalFormula conditional) {
                 if (TryEvaluateBoolean(conditional.Condition, out var conditionValue))
                     normalized = conditionValue ? conditional.WhenTrue : conditional.WhenFalse;
                 else if (conditional.WhenTrue.Equals(conditional.WhenFalse))
@@ -533,12 +483,10 @@ internal sealed partial class SmtConcreteFactIndex
                 : normalized;
         }
 
-        private sealed class SyntacticWorkBudget(int remaining)
-        {
+        private sealed class SyntacticWorkBudget(int remaining) {
             private int _remaining = remaining;
 
-            internal bool TryConsume()
-            {
+            internal bool TryConsume() {
                 if (_remaining <= 0) return false;
 
                 _remaining--;
@@ -546,8 +494,7 @@ internal sealed partial class SmtConcreteFactIndex
             }
         }
 
-        private static bool ReferencesFormula(SmtFormula formula, SmtFormula candidate)
-        {
+        private static bool ReferencesFormula(SmtFormula formula, SmtFormula candidate) {
             return !SmtFormulaTraversal.IsWithinDepth(formula, MaxFormulaReferenceDepth + 1) ||
                    SmtFormulaTraversal.Contains(formula, candidate.Equals);
         }

@@ -1,15 +1,12 @@
 namespace SharpProof.Analyzer;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public class SharpProofAnalyzer : DiagnosticAnalyzer
-{
+public class SharpProofAnalyzer : DiagnosticAnalyzer {
     public SharpProofAnalyzer()
-        : this(AnalyzerFeatures.All)
-    {
+        : this(AnalyzerFeatures.All) {
     }
 
-    internal SharpProofAnalyzer(AnalyzerFeatures features)
-    {
+    internal SharpProofAnalyzer(AnalyzerFeatures features) {
         Features = AnalyzerFeatureDependencies.Expand(features);
     }
 
@@ -18,13 +15,11 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         AnalyzerDiagnosticCatalog.SupportedDiagnostics;
 
-    public override void Initialize(AnalysisContext context)
-    {
+    public override void Initialize(AnalysisContext context) {
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
 
-        context.RegisterCompilationStartAction(startContext =>
-        {
+        context.RegisterCompilationStartAction(startContext => {
             SmtNativeLibraryBootstrap.TryLoadFromAnalyzerLocatorPaths(
                 startContext.Options.AdditionalFiles.Select(static file => file.Path));
             var session = new AnalyzerSession(
@@ -33,12 +28,9 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
                 startContext.CancellationToken,
                 Features);
 
-            startContext.RegisterCompilationEndAction(endContext =>
-            {
-                try
-                {
-                    foreach (var invalidConfigurationValue in session.Configuration.InvalidConfigurationValues)
-                    {
+            startContext.RegisterCompilationEndAction(endContext => {
+                try {
+                    foreach (var invalidConfigurationValue in session.Configuration.InvalidConfigurationValues) {
                         var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue);
                         if (!session.Baseline.IsSuppressed(diagnostic)) endContext.ReportDiagnostic(diagnostic);
                     }
@@ -48,14 +40,12 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
 
                     TrustedBoundaryReviewAnalyzer.ReportDiagnostics(endContext, session);
                 }
-                finally
-                {
+                finally {
                     session.Dispose();
                 }
             });
 
-            if ((session.Features & AnalyzerFeatures.Callable) != 0)
-            {
+            if ((session.Features & AnalyzerFeatures.Callable) != 0) {
                 startContext.RegisterOperationBlockAction(
                     c => AnalyzerFeaturePipeline.AnalyzeOperationBlock(c, session));
                 startContext.RegisterSyntaxNodeAction(
@@ -100,8 +90,7 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
                     OperationKind.Unary,
                     OperationKind.Conversion);
 
-            if (session.Features.Includes(AnalyzerFeatures.CommonBugs))
-            {
+            if (session.Features.Includes(AnalyzerFeatures.CommonBugs)) {
                 startContext.RegisterSymbolAction(
                     c => CommonBugAnalyzer.AnalyzeNamedType(c, session),
                     SymbolKind.NamedType);
@@ -118,15 +107,13 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeTreeConfiguration(
         SyntaxTreeAnalysisContext context,
-        DiagnosticBaseline baseline)
-    {
+        DiagnosticBaseline baseline) {
         var options = context.Options.AnalyzerConfigOptionsProvider.GetOptions(context.Tree);
         var invalidConfigurationValues = AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
             options,
             context.Options.AnalyzerConfigOptionsProvider.GlobalOptions);
         var location = Location.Create(context.Tree, new TextSpan(0, 0));
-        foreach (var invalidConfigurationValue in invalidConfigurationValues)
-        {
+        foreach (var invalidConfigurationValue in invalidConfigurationValues) {
             var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue, location, context.Tree);
             AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
         }
@@ -135,8 +122,7 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
     private static Diagnostic CreateInvalidConfigurationDiagnostic(
         InvalidAnalyzerConfigurationValue invalidConfigurationValue,
         Location? location = null,
-        SyntaxTree? syntaxTree = null)
-    {
+        SyntaxTree? syntaxTree = null) {
         var path = syntaxTree?.FilePath ?? "<global>";
         var properties = BaselineDiagnosticProperties.Add(
             ImmutableDictionary<string, string?>.Empty
@@ -161,8 +147,7 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
             location ?? Location.None,
             null,
             properties,
-            new object[]
-            {
+            new object[] {
                 invalidConfigurationValue.Key,
                 invalidConfigurationValue.Value,
                 invalidConfigurationValue.Reason
@@ -170,8 +155,7 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
     }
 
     private static Diagnostic CreateInvalidAdditionalFileDiagnostic(
-        AnalyzerAdditionalFileIssue issue)
-    {
+        AnalyzerAdditionalFileIssue issue) {
         var path = string.IsNullOrWhiteSpace(issue.Path) ? "<unknown>" : issue.Path;
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add("sharpproof.additional_file.path", path)

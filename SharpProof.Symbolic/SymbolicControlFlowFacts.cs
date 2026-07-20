@@ -1,12 +1,10 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicControlFlowFacts
-{
+internal static class SymbolicControlFlowFacts {
     internal static bool StatementDefinitelyExits(
         StatementSyntax statement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         if (statement is ReturnStatementSyntax or
             ThrowStatementSyntax or
@@ -21,13 +19,11 @@ internal static class SymbolicControlFlowFacts
             ExpressionStatementDefinitelyExits(expressionStatement, semanticModel, cancellationToken))
             return true;
 
-        try
-        {
+        try {
             var controlFlow = semanticModel.AnalyzeControlFlow(statement);
             return controlFlow is { Succeeded: true } && !controlFlow.EndPointIsReachable;
         }
-        catch (ArgumentException)
-        {
+        catch (ArgumentException) {
             return false;
         }
     }
@@ -35,16 +31,14 @@ internal static class SymbolicControlFlowFacts
     internal static bool ExpressionStatementDefinitelyExits(
         ExpressionStatementSyntax statement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(statement.Expression);
         return expression is InvocationExpressionSyntax invocation &&
                semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation &&
                NullableFlowFacts.HasDoesNotReturn(invocationOperation.TargetMethod);
     }
 
-    internal static StatementSyntax UnwrapSingleStatementBlock(StatementSyntax statement)
-    {
+    internal static StatementSyntax UnwrapSingleStatementBlock(StatementSyntax statement) {
         while (statement is BlockSyntax { Statements.Count: 1 } block) statement = block.Statements[0];
 
         return statement;

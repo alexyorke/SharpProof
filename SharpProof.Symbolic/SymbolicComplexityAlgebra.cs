@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicComplexityAlgebra
-{
+internal static class SymbolicComplexityAlgebra {
     internal static ComplexityArtifacts CombineSequence(IEnumerable<ComplexityArtifacts> parts) =>
         Combine(parts);
 
@@ -14,8 +13,7 @@ internal static class SymbolicComplexityAlgebra
     internal static ComplexityArtifacts CombineBranch(params ComplexityArtifacts[] parts) =>
         Combine(parts);
 
-    internal static ComplexityArtifacts Multiply(SymbolicCostExpression multiplier, ComplexityArtifacts body)
-    {
+    internal static ComplexityArtifacts Multiply(SymbolicCostExpression multiplier, ComplexityArtifacts body) {
         var cost = SymbolicCostExpression.Multiply(multiplier, body.Cost);
         var reasons = new List<SymbolicComplexityUnknownReason>(body.UnknownReasons);
         if (cost.IsUnknown && cost.UnknownReason != SymbolicComplexityUnknownReason.None)
@@ -28,8 +26,7 @@ internal static class SymbolicComplexityAlgebra
         SymbolicCostExpression cost,
         IEnumerable<SymbolicComplexityDriverInfo> drivers,
         IEnumerable<SymbolicComplexityUnknownReason> reasons,
-        IEnumerable<SymbolicComplexityCalleeInfo> callees)
-    {
+        IEnumerable<SymbolicComplexityCalleeInfo> callees) {
         return new MethodAnalysisSummary(
             cost,
             drivers.ToImmutableArray(),
@@ -42,8 +39,7 @@ internal static class SymbolicComplexityAlgebra
         string description,
         SyntaxNode node,
         SyntaxTree syntaxTree,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
             syntaxTree,
             node.SpanStart,
@@ -61,8 +57,7 @@ internal static class SymbolicComplexityAlgebra
     internal static SymbolicComplexityCalleeInfo CreateCalleeInfo(
         string methodDisplayName,
         SymbolicCostExpression cost,
-        IMethodSymbol contextMethod)
-    {
+        IMethodSymbol contextMethod) {
         return new SymbolicComplexityCalleeInfo(
             methodDisplayName,
             cost.ToBigOText(contextMethod),
@@ -71,14 +66,12 @@ internal static class SymbolicComplexityAlgebra
             cost.UnknownReason);
     }
 
-    private static ComplexityArtifacts Combine(IEnumerable<ComplexityArtifacts> parts)
-    {
+    private static ComplexityArtifacts Combine(IEnumerable<ComplexityArtifacts> parts) {
         var costExpressions = new List<SymbolicCostExpression>();
         var drivers = new List<SymbolicComplexityDriverInfo>();
         var reasons = new List<SymbolicComplexityUnknownReason>();
         var callees = new List<SymbolicComplexityCalleeInfo>();
-        foreach (var part in parts.Where(static part => part != null))
-        {
+        foreach (var part in parts.Where(static part => part != null)) {
             costExpressions.Add(part.Cost);
             drivers.AddRange(part.Drivers);
             reasons.AddRange(part.UnknownReasons);

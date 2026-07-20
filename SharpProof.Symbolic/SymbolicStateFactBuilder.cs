@@ -1,12 +1,9 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicStateFactBuilder
-{
-    internal static bool TryCreateSymbolTerm(ISymbol symbol, out SymbolicTerm term)
-    {
+internal static class SymbolicStateFactBuilder {
+    internal static bool TryCreateSymbolTerm(ISymbol symbol, out SymbolicTerm term) {
         if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not { } type ||
-            !TryGetValueKind(type, out var kind))
-        {
+            !TryGetValueKind(type, out var kind)) {
             term = null!;
             return false;
         }
@@ -15,8 +12,7 @@ internal static class SymbolicStateFactBuilder
         return true;
     }
 
-    internal static bool CanCompareIrTerms(SymbolicTerm left, SymbolicTerm right)
-    {
+    internal static bool CanCompareIrTerms(SymbolicTerm left, SymbolicTerm right) {
         return left.Kind == right.Kind ||
                (left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference) ||
                (right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference);
@@ -27,8 +23,7 @@ internal static class SymbolicStateFactBuilder
         ISymbol symbol,
         SyntaxNode source,
         bool isNull,
-        string provenance)
-    {
+        string provenance) {
         if (!TryCreateSymbolTerm(symbol, out var term) || term.Kind != SmtValueKind.Reference)
             return;
 
@@ -50,13 +45,11 @@ internal static class SymbolicStateFactBuilder
         CancellationToken cancellationToken,
         string provenance,
         out SymbolicCondition condition,
-        Func<ISymbol, int>? getSymbolVersion = null)
-    {
+        Func<ISymbol, int>? getSymbolVersion = null) {
         var lowering = SymbolicSemanticPipeline.LowerReferenceTerm(
             expression,
             new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion));
-        if (lowering is not { IsExact: true, Value: { } reference })
-        {
+        if (lowering is not { IsExact: true, Value: { } reference }) {
             condition = null!;
             return false;
         }
@@ -72,8 +65,7 @@ internal static class SymbolicStateFactBuilder
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         string provenance,
-        Func<ISymbol, int>? getSymbolVersion = null)
-    {
+        Func<ISymbol, int>? getSymbolVersion = null) {
         if (!TryCreateReferenceNullCondition(
             expression,
             isNull,
@@ -88,8 +80,7 @@ internal static class SymbolicStateFactBuilder
             state, condition, true, expression.Span, provenance).State;
     }
 
-    internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)
-    {
+    internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind) {
         return SymbolicFactFactory.TryGetValueKind(
             type,
             SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,

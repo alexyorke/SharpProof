@@ -2,8 +2,7 @@ using static SharpProof.Symbolic.SymbolicStateFactBuilder;
 
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicLoopStateTransfer
-{
+internal static class SymbolicLoopStateTransfer {
     private delegate bool TryLowerLoopInitializerBound(
         ExpressionSyntax expression,
         ISymbol initializedSymbol,
@@ -16,8 +15,7 @@ internal static class SymbolicLoopStateTransfer
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var initializerBounds = EnumerateLoopBoundTerms(
             forStatement,
             semanticModel,
@@ -62,8 +60,7 @@ internal static class SymbolicLoopStateTransfer
         StatementSyntax loopBody,
         string provenancePrefix,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var initializerBounds = EnumerateLoopBoundTerms(
             loopStatement,
             semanticModel,
@@ -111,11 +108,9 @@ internal static class SymbolicLoopStateTransfer
         MonotonicDirection direction,
         string provenance,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var forStatement = loopStatement as ForStatementSyntax;
-        foreach (var initializer in initializers)
-        {
+        foreach (var initializer in initializers) {
             if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
                 symbolTerm.Kind != SmtValueKind.Int ||
                 initializer.Bound.Kind != SmtValueKind.Int)
@@ -186,10 +181,8 @@ internal static class SymbolicLoopStateTransfer
             StatementSyntax loopStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            TryLowerLoopInitializerBound tryLowerBound)
-    {
-        foreach (var initializer in EnumerateLoopInitializers(loopStatement, semanticModel, cancellationToken))
-        {
+            TryLowerLoopInitializerBound tryLowerBound) {
+        foreach (var initializer in EnumerateLoopInitializers(loopStatement, semanticModel, cancellationToken)) {
             if (!tryLowerBound(
                     initializer.Value,
                     initializer.Symbol,
@@ -214,10 +207,8 @@ internal static class SymbolicLoopStateTransfer
         EnumerateLoopInitializers(
             StatementSyntax loopStatement,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-    {
-        if (loopStatement is ForStatementSyntax forStatement)
-        {
+            CancellationToken cancellationToken) {
+        if (loopStatement is ForStatementSyntax forStatement) {
             foreach (var initializer in EnumerateForLoopInitializers(forStatement, semanticModel, cancellationToken))
                 yield return (initializer.Symbol, initializer.Value, null);
             yield break;
@@ -232,8 +223,7 @@ internal static class SymbolicLoopStateTransfer
         EnumerateForLoopInitializers(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (forStatement.Declaration != null)
             foreach (var declarator in forStatement.Declaration.Variables)
                 if (declarator.Initializer != null &&
@@ -254,11 +244,9 @@ internal static class SymbolicLoopStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SymbolicTerm upperBound,
-        out IReadOnlyList<ISymbol> upperBoundSymbols)
-    {
+        out IReadOnlyList<ISymbol> upperBoundSymbols) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        if (expression is not BinaryExpressionSyntax binaryExpression)
-        {
+        if (expression is not BinaryExpressionSyntax binaryExpression) {
             upperBound = null!;
             upperBoundSymbols = Array.Empty<ISymbol>();
             return false;
@@ -276,8 +264,7 @@ internal static class SymbolicLoopStateTransfer
                 out upperBoundSymbols))
             return true;
 
-        if (binaryExpression.IsKind(SyntaxKind.AddExpression))
-        {
+        if (binaryExpression.IsKind(SyntaxKind.AddExpression)) {
             if (SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue) &&
                 rightValue < 0 &&
                 TryLowerInitializerBoundTerm(
@@ -312,8 +299,7 @@ internal static class SymbolicLoopStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SymbolicTerm bound,
-        out IReadOnlyList<ISymbol> boundSymbols)
-    {
+        out IReadOnlyList<ISymbol> boundSymbols) {
         var referencedSymbols = SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
             expression,
             semanticModel,
@@ -323,8 +309,7 @@ internal static class SymbolicLoopStateTransfer
             new SymbolicLoweringContext(semanticModel, cancellationToken));
         if (referencedSymbols.Any(symbol => SymbolEqualityComparer.Default.Equals(symbol, initializedSymbol)) ||
             lowering is not { IsExact: true, Value: { } candidate } ||
-            candidate.Kind != SmtValueKind.Int)
-        {
+            candidate.Kind != SmtValueKind.Int) {
             bound = null!;
             boundSymbols = Array.Empty<ISymbol>();
             return false;
@@ -341,8 +326,7 @@ internal static class SymbolicLoopStateTransfer
         StatementSyntax foreachStatement,
         StatementSyntax foreachBody,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         state = SymbolicSourceCompletionLowerer.ApplyThrowGuard(
             state,
             expressionSyntax,
@@ -376,13 +360,10 @@ internal static class SymbolicLoopStateTransfer
         SyntaxNode candidate,
         int? siteSpanStart,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        switch (candidate)
-        {
+        CancellationToken cancellationToken) {
+        switch (candidate) {
             case WhileStatementSyntax loop when ContainsSite(loop.Statement, siteSpanStart):
-                if (!ReferencesAreAssignedBeforeSite(loop.Condition, loop.Statement, siteSpanStart, semanticModel, cancellationToken))
-                {
+                if (!ReferencesAreAssignedBeforeSite(loop.Condition, loop.Statement, siteSpanStart, semanticModel, cancellationToken)) {
                     SymbolicProgramPointFacts.AddReachabilityCondition(
                         ref state, loop.Condition, true, semanticModel, cancellationToken);
                     ApplyLoopBodyInvariantStateFacts(
@@ -421,8 +402,7 @@ internal static class SymbolicLoopStateTransfer
         StatementSyntax loopStatement,
         SymbolicLoopEdgeKind edgeKind,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var lowering = LowerLoopBodyInvariants(loopStatement, semanticModel, cancellationToken);
         if (lowering is not { IsExact: true, Value: { } plan })
             return;
@@ -456,8 +436,7 @@ internal static class SymbolicLoopStateTransfer
         ExpressionSyntax expressionSyntax,
         StatementSyntax foreachStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var lowering = SymbolicFiniteDomainLowerer.LowerForeachDomain(
             expressionSyntax,
             foreachStatement,
@@ -477,8 +456,7 @@ internal static class SymbolicLoopStateTransfer
         ExpressionSyntax expressionSyntax,
         StatementSyntax foreachStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (AnyConditionSymbolInvalidatedInStatement(expressionSyntax, foreachStatement, semanticModel,
                 cancellationToken)) return;
 
@@ -506,8 +484,7 @@ internal static class SymbolicLoopStateTransfer
         ITypeSymbol? type,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out SymbolicTerm length)
-    {
+        out SymbolicTerm length) {
         length = null!;
         if (!SymbolicProgramPointFacts.IsSupportedForeachLengthReceiver(expressionSyntax) &&
             !SymbolicProgramPointFacts.IsSupportedForeachLengthReceiver(type))
@@ -515,8 +492,7 @@ internal static class SymbolicLoopStateTransfer
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var lengthLowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(expressionSyntax, context);
-        if (lengthLowering is { IsExact: true, Value: { } loweredLength })
-        {
+        if (lengthLowering is { IsExact: true, Value: { } loweredLength }) {
             length = loweredLength;
             return true;
         }
@@ -524,10 +500,8 @@ internal static class SymbolicLoopStateTransfer
         var receiverLowering = SymbolicSemanticPipeline.LowerTerm(expressionSyntax, context);
         if (receiverLowering is not { IsExact: true, Value: { } receiver }) return false;
 
-        if (type?.SpecialType == SpecialType.System_String)
-        {
-            if (receiver.Kind == SmtValueKind.String)
-            {
+        if (type?.SpecialType == SpecialType.System_String) {
+            if (receiver.Kind == SmtValueKind.String) {
                 length = new SymbolicLengthTerm(receiver);
                 return true;
             }
@@ -549,11 +523,9 @@ internal static class SymbolicLoopStateTransfer
     internal static SymbolicState CollectForInitializerState(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var state = new SymbolicState();
-        foreach (var initializer in EnumerateForLoopInitializers(forStatement, semanticModel, cancellationToken))
-        {
+        foreach (var initializer in EnumerateForLoopInitializers(forStatement, semanticModel, cancellationToken)) {
             SymbolicStateInvalidator.InvalidateNestedMutations(
                 ref state,
                 initializer.Value,
@@ -588,8 +560,7 @@ internal static class SymbolicLoopStateTransfer
         ref SymbolicState state,
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var targets = EnumerateForLoopInitializers(forStatement, semanticModel, cancellationToken)
             .Select(static initializer => new SymbolicInvalidationTarget(
                 SymbolicFactFactory.GetSmtVariableName(initializer.Symbol)))
@@ -605,11 +576,9 @@ internal static class SymbolicLoopStateTransfer
     internal static SymbolicLoweringResult<SymbolicLoopInvariantPlan> LowerLoopBodyInvariants(
         StatementSyntax loopStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var conditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
-        switch (loopStatement)
-        {
+        switch (loopStatement) {
             case ForStatementSyntax forStatement:
                 AddForLoopBodyInvariantConditions(
                     conditions,
@@ -646,16 +615,13 @@ internal static class SymbolicLoopStateTransfer
         EnumeratePreLoopInitializerExpressions(
             StatementSyntax loopStatement,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-    {
+            CancellationToken cancellationToken) {
         if (loopStatement.Parent is not BlockSyntax containingBlock) yield break;
 
         var loopIndex = containingBlock.Statements.IndexOf(loopStatement);
-        for (var statementIndex = 0; statementIndex < loopIndex; statementIndex++)
-        {
+        for (var statementIndex = 0; statementIndex < loopIndex; statementIndex++) {
             var statement = containingBlock.Statements[statementIndex];
-            if (statement is LocalDeclarationStatementSyntax { Declaration.Variables.Count: 1 } localDeclaration)
-            {
+            if (statement is LocalDeclarationStatementSyntax { Declaration.Variables.Count: 1 } localDeclaration) {
                 var declarator = localDeclaration.Declaration.Variables[0];
                 if (declarator.Initializer != null &&
                     semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
@@ -677,13 +643,11 @@ internal static class SymbolicLoopStateTransfer
         StatementSyntax loopStatement,
         IReadOnlyList<ISymbol> boundSymbols,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (loopStatement.Parent is not BlockSyntax containingBlock) return true;
 
         var loopIndex = containingBlock.Statements.IndexOf(loopStatement);
-        for (var statementIndex = initializer.StatementIndex + 1; statementIndex < loopIndex; statementIndex++)
-        {
+        for (var statementIndex = initializer.StatementIndex + 1; statementIndex < loopIndex; statementIndex++) {
             var statement = containingBlock.Statements[statementIndex];
             if (SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(statement, initializer.Symbol, semanticModel, cancellationToken) ||
                 boundSymbols.Any(symbol =>
@@ -698,10 +662,8 @@ internal static class SymbolicLoopStateTransfer
         StatementSyntax loopStatement,
         ISymbol symbol,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var headerExpression = loopStatement switch
-        {
+        CancellationToken cancellationToken) {
+        var headerExpression = loopStatement switch {
             WhileStatementSyntax whileStatement => whileStatement.Condition,
             DoStatementSyntax doStatement => doStatement.Condition,
             ForStatementSyntax forStatement => forStatement.Condition,
@@ -718,10 +680,8 @@ internal static class SymbolicLoopStateTransfer
         ISymbol symbol,
         MonotonicDirection direction,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var incrementor in forStatement.Incrementors)
-        {
+        CancellationToken cancellationToken) {
+        foreach (var incrementor in forStatement.Incrementors) {
             if (!SymbolMutationFacts.ExpressionReferencesSymbol(incrementor, symbol, semanticModel, cancellationToken)) continue;
 
             if (!IncrementorPreservesBound(incrementor, symbol, direction, semanticModel, cancellationToken)) return false;
@@ -735,8 +695,7 @@ internal static class SymbolicLoopStateTransfer
         ISymbol symbol,
         MonotonicDirection direction,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var inventory = SymbolicMutationInventory.Create(loopBody, semanticModel, cancellationToken);
         if (inventory.ExposesSymbol(symbol, mutableOnly: false)) return false;
         foreach (var source in inventory.MutationSources(symbol))
@@ -752,8 +711,7 @@ internal static class SymbolicLoopStateTransfer
         ISymbol symbol,
         MonotonicDirection direction,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         if (SymbolMutationFacts.TryGetIncrementedOrDecrementedSymbol(
                 expression,
@@ -793,8 +751,7 @@ internal static class SymbolicLoopStateTransfer
         ISymbol symbol,
         MonotonicDirection direction,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         if (expression is not BinaryExpressionSyntax binaryExpression) return false;
 
@@ -821,8 +778,7 @@ internal static class SymbolicLoopStateTransfer
     private static bool IsCompatibleSubtrahend(long subtrahend, MonotonicDirection direction) =>
         direction == MonotonicDirection.NonDecreasing ? subtrahend <= 0 : subtrahend >= 0;
 
-    private enum MonotonicDirection
-    {
+    private enum MonotonicDirection {
         NonDecreasing,
         NonIncreasing
     }
@@ -831,17 +787,14 @@ internal static class SymbolicLoopStateTransfer
         ExpressionSyntax expression,
         ISymbol symbol,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var expressionSymbol = semanticModel.GetSymbolInfo(CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression), cancellationToken).Symbol;
         return expressionSymbol != null &&
                SymbolEqualityComparer.Default.Equals(expressionSymbol.OriginalDefinition, symbol);
     }
 
-    internal static bool IsLoopBodyBlock(BlockSyntax block)
-    {
-        return block.Parent switch
-        {
+    internal static bool IsLoopBodyBlock(BlockSyntax block) {
+        return block.Parent switch {
             WhileStatementSyntax whileStatement => ReferenceEquals(whileStatement.Statement, block),
             ForStatementSyntax forStatement => ReferenceEquals(forStatement.Statement, block),
             ForEachStatementSyntax forEachStatement => ReferenceEquals(forEachStatement.Statement, block),
@@ -854,8 +807,7 @@ internal static class SymbolicLoopStateTransfer
         ExpressionSyntax condition,
         StatementSyntax statement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var conditionSymbols = GetConditionDependencySymbols(condition, semanticModel, cancellationToken);
         return SymbolicMutationInventory.Create(statement, semanticModel, cancellationToken)
             .MutatesAny(conditionSymbols, exactTargets: true);
@@ -865,8 +817,7 @@ internal static class SymbolicLoopStateTransfer
         ExpressionSyntax condition,
         StatementSyntax statement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var conditionSymbols = GetConditionDependencySymbols(condition, semanticModel, cancellationToken);
         return conditionSymbols.Count != 0 &&
                conditionSymbols.Any(symbol =>
@@ -877,8 +828,7 @@ internal static class SymbolicLoopStateTransfer
         ExpressionSyntax expression,
         StatementSyntax statement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var symbol = semanticModel.GetSymbolInfo(CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression), cancellationToken).Symbol
             ?.OriginalDefinition;
         if (symbol is ILocalSymbol or IParameterSymbol)
@@ -896,8 +846,7 @@ internal static class SymbolicLoopStateTransfer
         ExpressionSyntax expression,
         IReadOnlyCollection<ISymbol> symbols,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return SymbolicMutationInventory.Create(expression, semanticModel, cancellationToken)
             .MutatesAny(symbols);
     }
@@ -906,8 +855,7 @@ internal static class SymbolicLoopStateTransfer
         ForStatementSyntax forStatement,
         ISymbol symbol,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return forStatement.Condition != null &&
                ExpressionMutatesAnySymbol(
                    forStatement.Condition,
@@ -919,8 +867,7 @@ internal static class SymbolicLoopStateTransfer
     internal static bool IsLocalOrParameterReference(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var symbol = semanticModel.GetSymbolInfo(CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression), cancellationToken).Symbol
             ?.OriginalDefinition;
         return symbol is ILocalSymbol or IParameterSymbol;
@@ -931,8 +878,7 @@ internal static class SymbolicLoopStateTransfer
         SyntaxNode branchRoot,
         int useSpanStart,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var dependencySymbols = GetConditionDependencySymbols(condition, semanticModel, cancellationToken);
         return AnySymbolAssignedBeforeUse(
             dependencySymbols,
@@ -947,8 +893,7 @@ internal static class SymbolicLoopStateTransfer
         SwitchSectionSyntax section,
         int useSpanStart,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return AnySymbolAssignedBeforeUse(
             SymbolicBranchCompletionStateTransfer.GetSwitchConditionSymbols(switchStatement, semanticModel, cancellationToken),
             section,
@@ -962,8 +907,7 @@ internal static class SymbolicLoopStateTransfer
         SwitchExpressionArmSyntax arm,
         int useSpanStart,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return AnySymbolAssignedBeforeUse(
             SymbolicBranchCompletionStateTransfer.GetSwitchExpressionConditionSymbols(switchExpression, semanticModel, cancellationToken),
             arm,
@@ -977,8 +921,7 @@ internal static class SymbolicLoopStateTransfer
         SyntaxNode branchRoot,
         int useSpanStart,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (symbols.Count == 0) return false;
         var inventory = SymbolicMutationInventory.Create(branchRoot, semanticModel, cancellationToken);
         return symbols.Any(symbol =>
@@ -991,8 +934,7 @@ internal static class SymbolicLoopStateTransfer
         int beforeSpanStart,
         ISymbol symbol,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return SymbolicMutationInventory.Create(root, semanticModel, cancellationToken)
             .MutatesBetween(afterSpanStart, beforeSpanStart, symbol);
     }
@@ -1000,8 +942,7 @@ internal static class SymbolicLoopStateTransfer
     internal static IReadOnlyList<ISymbol> GetConditionDependencySymbols(
         SyntaxNode root,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var symbols = new List<ISymbol>();
         SymbolicBranchCompletionStateTransfer.AddReferencedSymbols(root, semanticModel, cancellationToken, symbols);
         SymbolicBranchCompletionStateTransfer.AddDeclaredPatternSymbols(root, semanticModel, cancellationToken, symbols);

@@ -1,12 +1,10 @@
 namespace SharpProof.Analyzer;
 
-internal static class MethodExpectedComplexityAnalyzer
-{
+internal static class MethodExpectedComplexityAnalyzer {
     internal static void AnalyzeSymbolForExpectedComplexity(
         MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
 
         var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
@@ -22,8 +20,7 @@ internal static class MethodExpectedComplexityAnalyzer
                 out var invalidContract))
             return;
 
-        if (invalidContract != null)
-        {
+        if (invalidContract != null) {
             var diagnostic = InvalidContractArgumentDiagnostics.Create(
                 "[ExpectedComplexity]",
                 invalidContract.Argument,
@@ -40,8 +37,7 @@ internal static class MethodExpectedComplexityAnalyzer
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
 
         var outcome = context.State.GetComplexityOutcome(context.CancellationToken);
-        if (!outcome.IsSuccess)
-        {
+        if (!outcome.IsSuccess) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var error = outcome.Error!;
             var diagnostic = CreateUnknownDiagnostic(
@@ -60,8 +56,7 @@ internal static class MethodExpectedComplexityAnalyzer
         var result = outcome.Value!;
 
         var classification = Classify(result, declaredComplexity);
-        switch (classification.Kind)
-        {
+        switch (classification.Kind) {
             case ComplexityVerificationKind.Verified:
                 return;
 
@@ -98,8 +93,7 @@ internal static class MethodExpectedComplexityAnalyzer
         CancellationToken cancellationToken,
         out DeclaredComplexity declaredComplexity,
         out Location? attributeLocation,
-        out InvalidContractArgument? invalidContract)
-    {
+        out InvalidContractArgument? invalidContract) {
         declaredComplexity = default;
         attributeLocation = null;
         invalidContract = null;
@@ -107,13 +101,11 @@ internal static class MethodExpectedComplexityAnalyzer
         foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
         foreach (var attribute in attributePolicy.GetAcceptedAttributes(
                      source,
-                     "ExpectedComplexityAttribute"))
-        {
+                     "ExpectedComplexityAttribute")) {
             cancellationToken.ThrowIfCancellationRequested();
             attributeLocation = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
             if (attribute.ConstructorArguments.Length != 1 ||
-                attribute.ConstructorArguments[0].Value is not int intValue)
-            {
+                attribute.ConstructorArguments[0].Value is not int intValue) {
                 declaredComplexity = new DeclaredComplexity(default, "invalid");
                 invalidContract = new InvalidContractArgument(
                     AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken),
@@ -121,8 +113,7 @@ internal static class MethodExpectedComplexityAnalyzer
                 return true;
             }
 
-            if (!Enum.IsDefined(typeof(DeclaredComplexityKind), intValue))
-            {
+            if (!Enum.IsDefined(typeof(DeclaredComplexityKind), intValue)) {
                 declaredComplexity = new DeclaredComplexity(
                     (DeclaredComplexityKind)intValue,
                     intValue.ToString());
@@ -141,10 +132,8 @@ internal static class MethodExpectedComplexityAnalyzer
 
     private static ComplexityVerificationClassification Classify(
         SymbolicComplexityResult result,
-        DeclaredComplexity declaredComplexity)
-    {
-        if (result.Complexity.IsUnknown || result.Complexity.IsRecursiveUnknown)
-        {
+        DeclaredComplexity declaredComplexity) {
+        if (result.Complexity.IsUnknown || result.Complexity.IsRecursiveUnknown) {
             var reason = result.UnknownReasons.Count > 0
                 ? result.UnknownReasons[0].ToString()
                 : "complexity unknown";
@@ -156,8 +145,7 @@ internal static class MethodExpectedComplexityAnalyzer
                 "inferred complexity '" + result.Complexity.Text + "' contains conservative alternatives");
 
         if (ComplexityContractFacts.TryMap(result.Complexity.Kind, out var actualClass))
-            switch (Order(actualClass, MapDeclared(declaredComplexity.Kind)))
-            {
+            switch (Order(actualClass, MapDeclared(declaredComplexity.Kind))) {
                 case ComplexityOrder.Within:
                     return ComplexityVerificationClassification.Verified;
                 case ComplexityOrder.Exceeds:
@@ -174,8 +162,7 @@ internal static class MethodExpectedComplexityAnalyzer
     // Max (O(max(n, m))) involve independent size parameters, so they only compare to themselves
     // and to Constant (the bottom element); every other pairing stays conservatively incomparable
     // (reported as SP0022) rather than being coerced into a chain position it cannot justify.
-    private static ComplexityOrder Order(ComplexityGrowthClass actual, ComplexityGrowthClass declared)
-    {
+    private static ComplexityOrder Order(ComplexityGrowthClass actual, ComplexityGrowthClass declared) {
         if (actual == declared) return ComplexityOrder.Within;
 
         // O(1) is within every bound.
@@ -196,10 +183,8 @@ internal static class MethodExpectedComplexityAnalyzer
         GetDeclaredComplexityDescriptor(kind).GrowthClass;
 
     private static (ComplexityGrowthClass GrowthClass, string Text) GetDeclaredComplexityDescriptor(
-        DeclaredComplexityKind kind)
-    {
-        return kind switch
-        {
+        DeclaredComplexityKind kind) {
+        return kind switch {
             DeclaredComplexityKind.Constant => (ComplexityGrowthClass.Constant, "O(1)"),
             DeclaredComplexityKind.Logarithmic => (ComplexityGrowthClass.Logarithmic, "O(log n)"),
             DeclaredComplexityKind.Linear => (ComplexityGrowthClass.Linear, "O(n)"),
@@ -212,10 +197,8 @@ internal static class MethodExpectedComplexityAnalyzer
         };
     }
 
-    private static bool TryGetChainRank(ComplexityGrowthClass complexityClass, out int rank)
-    {
-        switch (complexityClass)
-        {
+    private static bool TryGetChainRank(ComplexityGrowthClass complexityClass, out int rank) {
+        switch (complexityClass) {
             case ComplexityGrowthClass.Constant:
                 rank = 0;
                 return true;
@@ -243,8 +226,7 @@ internal static class MethodExpectedComplexityAnalyzer
         SymbolicComplexityResult result,
         Location? attributeLocation,
         CancellationToken cancellationToken,
-        SyntaxTree syntaxTree)
-    {
+        SyntaxTree syntaxTree) {
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
         var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             ImmutableDictionary<string, string?>.Empty
@@ -276,8 +258,7 @@ internal static class MethodExpectedComplexityAnalyzer
         string reason,
         CancellationToken cancellationToken,
         SyntaxTree syntaxTree,
-        SymbolicUnknownReasonInfo? unknownReasonInfo)
-    {
+        SymbolicUnknownReasonInfo? unknownReasonInfo) {
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add(DiagnosticPropertyNames.ExpectedComplexityProperty, declaredComplexity.Text)
@@ -308,14 +289,12 @@ internal static class MethodExpectedComplexityAnalyzer
 
     private readonly record struct DeclaredComplexity(
         DeclaredComplexityKind Kind,
-        string? TextOverride = null)
-    {
+        string? TextOverride = null) {
         public string Text => TextOverride ?? GetDeclaredComplexityDescriptor(Kind).Text;
     }
 
     // Mirrors the integer values of SharpProof.Attributes.ComplexityKind.
-    private enum DeclaredComplexityKind
-    {
+    private enum DeclaredComplexityKind {
         Constant = 0,
         Linear = 1,
         Quadratic = 2,
@@ -325,8 +304,7 @@ internal static class MethodExpectedComplexityAnalyzer
         Max = 6
     }
 
-    private enum ComplexityOrder
-    {
+    private enum ComplexityOrder {
         Within,
         Exceeds,
         Incomparable
@@ -334,8 +312,7 @@ internal static class MethodExpectedComplexityAnalyzer
 
     private readonly record struct ComplexityVerificationClassification(
         ComplexityVerificationKind Kind,
-        string Reason)
-    {
+        string Reason) {
         public static readonly ComplexityVerificationClassification Verified =
             new(ComplexityVerificationKind.Verified, string.Empty);
 
@@ -346,8 +323,7 @@ internal static class MethodExpectedComplexityAnalyzer
             new ComplexityVerificationClassification(ComplexityVerificationKind.Unknown, reason);
     }
 
-    private enum ComplexityVerificationKind
-    {
+    private enum ComplexityVerificationKind {
         Verified,
         Exceeded,
         Unknown

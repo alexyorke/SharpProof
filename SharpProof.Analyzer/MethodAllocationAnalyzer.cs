@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static class MethodAllocationAnalyzer
-{
+internal static class MethodAllocationAnalyzer {
     private static readonly SymbolDisplayFormat AllocationSymbolDisplayFormat = new(
         typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
         genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
@@ -10,8 +9,7 @@ internal static class MethodAllocationAnalyzer
     internal static void AnalyzeSymbolForZeroAllocations(
         MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
 
         if (PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return;
@@ -23,8 +21,7 @@ internal static class MethodAllocationAnalyzer
 
         if (context.Snapshot.RootOperation == null) return;
 
-        foreach (var allocationSite in CollectAllocationSites(context.Snapshot.VisibleOperations))
-        {
+        foreach (var allocationSite in CollectAllocationSites(context.Snapshot.VisibleOperations)) {
             var location = allocationSite.Syntax.GetLocation();
             var properties = CreateAllocationProperties(allocationSite, methodSymbol, context.Node.SyntaxTree);
             var diagnostic = Diagnostic.Create(
@@ -32,8 +29,7 @@ internal static class MethodAllocationAnalyzer
                 location,
                 null,
                 properties,
-                new object[]
-                {
+                new object[] {
                     allocationSite.Syntax.ToString(),
                     methodSymbol.Name
                 });
@@ -47,8 +43,7 @@ internal static class MethodAllocationAnalyzer
     private static ImmutableDictionary<string, string?> CreateAllocationProperties(
         AllocationSite allocationSite,
         IMethodSymbol methodSymbol,
-        SyntaxTree syntaxTree)
-    {
+        SyntaxTree syntaxTree) {
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add("sharpproof.allocation.kind", allocationSite.AllocationKind)
             .Add("sharpproof.allocation.operation_kind", allocationSite.Operation.Kind.ToString());
@@ -71,8 +66,7 @@ internal static class MethodAllocationAnalyzer
             allocationSite.AllocationKind);
     }
 
-    private static string CreateAllocationEvidenceKey(AllocationSite allocationSite)
-    {
+    private static string CreateAllocationEvidenceKey(AllocationSite allocationSite) {
         return DiagnosticEvidenceKey.ForSpanEnd(
             allocationSite.AllocationKind,
             allocationSite.Syntax.SpanStart,
@@ -80,12 +74,10 @@ internal static class MethodAllocationAnalyzer
             allocationSite.Symbol?.ToDisplayString(AllocationSymbolDisplayFormat));
     }
 
-    private static IEnumerable<AllocationSite> CollectAllocationSites(IEnumerable<IOperation> operations)
-    {
+    private static IEnumerable<AllocationSite> CollectAllocationSites(IEnumerable<IOperation> operations) {
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var operation in operations)
-        {
+        foreach (var operation in operations) {
             if (!TryCreateAllocationSite(operation, out var allocationSite)) continue;
 
             var key = allocationSite.Syntax.SpanStart +
@@ -97,12 +89,10 @@ internal static class MethodAllocationAnalyzer
         }
     }
 
-    private static bool TryCreateAllocationSite(IOperation operation, out AllocationSite allocationSite)
-    {
+    private static bool TryCreateAllocationSite(IOperation operation, out AllocationSite allocationSite) {
         allocationSite = default;
 
-        switch (operation)
-        {
+        switch (operation) {
             case IObjectCreationOperation objectCreationOperation
                 when IsHeapAllocatedObjectType(objectCreationOperation.Type):
                 allocationSite = new AllocationSite(
@@ -197,8 +187,7 @@ internal static class MethodAllocationAnalyzer
         }
     }
 
-    private static bool IsHeapAllocatedObjectType(ITypeSymbol? type)
-    {
+    private static bool IsHeapAllocatedObjectType(ITypeSymbol? type) {
         if (type == null) return false;
 
         if (type.IsReferenceType) return true;
@@ -206,31 +195,26 @@ internal static class MethodAllocationAnalyzer
         return type is ITypeParameterSymbol typeParameter && !typeParameter.HasValueTypeConstraint;
     }
 
-    private static bool IsImplicitParamsArray(IArrayCreationOperation arrayCreationOperation)
-    {
+    private static bool IsImplicitParamsArray(IArrayCreationOperation arrayCreationOperation) {
         return arrayCreationOperation.IsImplicit &&
-               arrayCreationOperation.Parent is IArgumentOperation
-               {
+               arrayCreationOperation.Parent is IArgumentOperation {
                    ArgumentKind: ArgumentKind.ParamArray
                };
     }
 
-    private static bool IsOutermostNonconstantStringConcatenation(IBinaryOperation operation)
-    {
+    private static bool IsOutermostNonconstantStringConcatenation(IBinaryOperation operation) {
         if (operation.OperatorKind != BinaryOperatorKind.Add ||
             operation.Type?.SpecialType != SpecialType.System_String ||
             operation.ConstantValue.HasValue)
             return false;
 
-        return operation.Parent is not IBinaryOperation
-        {
+        return operation.Parent is not IBinaryOperation {
             OperatorKind: BinaryOperatorKind.Add,
             Type.SpecialType: SpecialType.System_String
         };
     }
 
-    private static bool IsBoxingConversion(IConversionOperation conversionOperation)
-    {
+    private static bool IsBoxingConversion(IConversionOperation conversionOperation) {
         if (conversionOperation.Conversion.MethodSymbol != null) return false;
 
         var sourceType = conversionOperation.Operand?.Type;
@@ -249,8 +233,7 @@ internal static class MethodAllocationAnalyzer
         return targetType is ITypeParameterSymbol typeParameter && typeParameter.HasReferenceTypeConstraint;
     }
 
-    private static bool IsStackOnlyCollectionExpressionTarget(ITypeSymbol? type)
-    {
+    private static bool IsStackOnlyCollectionExpressionTarget(ITypeSymbol? type) {
         if (type is not INamedTypeSymbol namedType) return false;
 
         var originalDefinition = namedType.OriginalDefinition;

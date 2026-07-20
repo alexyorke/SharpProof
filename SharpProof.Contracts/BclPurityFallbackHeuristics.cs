@@ -1,43 +1,36 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static class BclPurityFallbackHeuristics
-{
+internal static class BclPurityFallbackHeuristics {
     public const string CatalogSource = "bcl_heuristic_fallback";
     public const string ProbablyPure = "probably_pure";
     public const string ProbablyImpure = "probably_impure";
     public const string Unknown = "unknown";
 
-    public static bool TryClassify(Shape shape, out Classification classification)
-    {
+    public static bool TryClassify(Shape shape, out Classification classification) {
         classification = default;
         if (!shape.IsFrameworkMetadataSymbol) return false;
 
-        if (shape.HasRefOrOutParameter)
-        {
+        if (shape.HasRefOrOutParameter) {
             classification = ProbablyImpureBecause("ref_or_out_parameter");
             return true;
         }
 
-        if (shape.ReturnsByRef)
-        {
+        if (shape.ReturnsByRef) {
             classification = ProbablyImpureBecause("byref_return");
             return true;
         }
 
-        if (IsAmbientType(shape.TypeName))
-        {
+        if (IsAmbientType(shape.TypeName)) {
             classification = ProbablyImpureBecause("ambient_namespace_or_type");
             return true;
         }
 
-        if (shape.IsProperty)
-        {
+        if (shape.IsProperty) {
             classification = ClassifyProperty(shape);
             return true;
         }
 
-        if (shape.IsField)
-        {
+        if (shape.IsField) {
             classification = ClassifyField(shape);
             return true;
         }
@@ -46,8 +39,7 @@ internal static class BclPurityFallbackHeuristics
         return true;
     }
 
-    public static bool IsFrameworkSystemAssemblyName(string assemblyName)
-    {
+    public static bool IsFrameworkSystemAssemblyName(string assemblyName) {
         return assemblyName.Equals("mscorlib", StringComparison.Ordinal) ||
                assemblyName.Equals("netstandard", StringComparison.Ordinal) ||
                assemblyName.Equals("System", StringComparison.Ordinal) ||
@@ -55,14 +47,12 @@ internal static class BclPurityFallbackHeuristics
                assemblyName.StartsWith("System.", StringComparison.Ordinal);
     }
 
-    public static bool IsSystemNamespace(string namespaceName)
-    {
+    public static bool IsSystemNamespace(string namespaceName) {
         return namespaceName.Equals("System", StringComparison.Ordinal) ||
                namespaceName.StartsWith("System.", StringComparison.Ordinal);
     }
 
-    public static bool IsValueLikeTypeName(string typeName)
-    {
+    public static bool IsValueLikeTypeName(string typeName) {
         if (string.IsNullOrWhiteSpace(typeName)) return false;
 
         var normalized = NormalizeTypeName(typeName);
@@ -77,15 +67,13 @@ internal static class BclPurityFallbackHeuristics
                IsLikelyFrameworkValueTypeName(normalized);
     }
 
-    public static bool IsReadOnlyViewTypeName(string typeName)
-    {
+    public static bool IsReadOnlyViewTypeName(string typeName) {
         var normalized = NormalizeTypeName(typeName);
         return normalized.StartsWith("System.ReadOnlySpan<", StringComparison.Ordinal) ||
                normalized.StartsWith("System.ReadOnlyMemory<", StringComparison.Ordinal);
     }
 
-    public static bool IsKnownValueTypeName(string typeName)
-    {
+    public static bool IsKnownValueTypeName(string typeName) {
         var normalized = NormalizeTypeName(typeName);
         return IsKnownPrimitiveOrValueAlias(normalized) ||
                IsLikelyFrameworkValueTypeName(normalized);
@@ -94,10 +82,8 @@ internal static class BclPurityFallbackHeuristics
     public static string NormalizeTypeName(string typeName) =>
         typeName.Trim().TrimEnd('&');
 
-    public static string GetDisplayReason(string reason)
-    {
-        return reason switch
-        {
+    public static string GetDisplayReason(string reason) {
+        return reason switch {
             "ref_or_out_parameter" => "member has ref or out parameters",
             "byref_return" => "member returns by-reference data",
             "ambient_namespace_or_type" => "member belongs to an ambient framework namespace or type",
@@ -119,8 +105,7 @@ internal static class BclPurityFallbackHeuristics
         };
     }
 
-    private static Classification ClassifyMethod(Shape shape)
-    {
+    private static Classification ClassifyMethod(Shape shape) {
         if (shape.IsConstructor)
             return shape.HasValueTypeContainingType &&
                    shape.HasOnlyValueLikeOrReadOnlyViewParameters
@@ -141,8 +126,7 @@ internal static class BclPurityFallbackHeuristics
         return UnknownBecause("metadata_method_shape_ambiguous");
     }
 
-    private static Classification ClassifyProperty(Shape shape)
-    {
+    private static Classification ClassifyProperty(Shape shape) {
         if (shape.IsSetterOnlyProperty) return ProbablyImpureBecause("metadata_property_setter");
 
         if (!shape.HasValueLikeReturn)
@@ -151,8 +135,7 @@ internal static class BclPurityFallbackHeuristics
         return ProbablyPureBecause("metadata_getter_value_like_return");
     }
 
-    private static Classification ClassifyField(Shape shape)
-    {
+    private static Classification ClassifyField(Shape shape) {
         if (!shape.IsReadOnlyField) return ProbablyImpureBecause("mutable_metadata_field");
 
         if (!shape.HasValueLikeReturn)
@@ -163,8 +146,7 @@ internal static class BclPurityFallbackHeuristics
         return ProbablyPureBecause("readonly_metadata_field_value_like");
     }
 
-    private static bool IsAmbientType(string typeName)
-    {
+    private static bool IsAmbientType(string typeName) {
         return typeName is
             "System.Console" or
             "System.Environment" or
@@ -174,15 +156,13 @@ internal static class BclPurityFallbackHeuristics
             "Microsoft.Win32.Registry";
     }
 
-    private static bool IsKnownImmutableCollectionType(string typeName)
-    {
+    private static bool IsKnownImmutableCollectionType(string typeName) {
         var normalized = NormalizeTypeName(typeName);
         return normalized.StartsWith("System.Collections.Immutable.", StringComparison.Ordinal) &&
                normalized.IndexOf(".Builder", StringComparison.Ordinal) < 0;
     }
 
-    private static bool HasMutatingName(string name)
-    {
+    private static bool HasMutatingName(string name) {
         return StartsWithAny(
                    name,
                    "Add",
@@ -220,8 +200,7 @@ internal static class BclPurityFallbackHeuristics
     private static ImmutableHashSet<string> GetKnownPrimitiveOrValueAliases() =>
         KnownPrimitiveOrValueAliases.Value;
 
-    private static bool IsLikelyFrameworkValueTypeName(string typeName)
-    {
+    private static bool IsLikelyFrameworkValueTypeName(string typeName) {
         return typeName.StartsWith("System.Nullable<", StringComparison.Ordinal) ||
                typeName.Equals("System.DateTime", StringComparison.Ordinal) ||
                typeName.Equals("System.DateTimeOffset", StringComparison.Ordinal) ||
@@ -274,8 +253,7 @@ internal static class BclPurityFallbackHeuristics
         string Reason,
         string Category);
 
-    private static class KnownPrimitiveOrValueAliases
-    {
+    private static class KnownPrimitiveOrValueAliases {
         public static readonly ImmutableHashSet<string> Value = ImmutableHashSet.Create(
             StringComparer.Ordinal,
             "bool",

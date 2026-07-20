@@ -9,14 +9,12 @@ internal sealed record SymbolicNestedMutationInvalidationPlan(
     ImmutableArray<SymbolicMutationInvalidationStep> Steps,
     bool HasUnsupportedMutation);
 
-internal static class SymbolicStateInvalidator
-{
+internal static class SymbolicStateInvalidator {
     internal static void InvalidateNestedAssignmentMutations(
         ref SymbolicState state,
         AssignmentExpressionSyntax assignment,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         InvalidateNestedMutations(ref state, assignment.Left, semanticModel, cancellationToken);
         InvalidateNestedMutations(ref state, assignment.Right, semanticModel, cancellationToken);
     }
@@ -25,8 +23,7 @@ internal static class SymbolicStateInvalidator
         ref SymbolicState state,
         SyntaxNode root,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         state = ApplyNestedMutationInvalidations(
             state,
             LowerNestedMutations(root, semanticModel, cancellationToken));
@@ -40,8 +37,7 @@ internal static class SymbolicStateInvalidator
 
     internal static SymbolicState ApplyNestedMutationInvalidations(
         SymbolicState state,
-        SymbolicNestedMutationInvalidationPlan plan)
-    {
+        SymbolicNestedMutationInvalidationPlan plan) {
         foreach (var step in plan.Steps)
             state = SymbolicOperationTransferKernel.Invalidate(
                 state,
@@ -55,8 +51,7 @@ internal static class SymbolicStateInvalidator
         ref SymbolicState state,
         ExpressionSyntax mutatedExpression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var invalidations = SymbolicMutationInventory.LowerTargetInvalidations(
             mutatedExpression,
             semanticModel,
@@ -69,8 +64,7 @@ internal static class SymbolicStateInvalidator
                 "operation-transfer.mutation-invalidation").State;
     }
 
-    internal static void InvalidateSymbol(ref SymbolicState state, ISymbol symbol, SyntaxNode source)
-    {
+    internal static void InvalidateSymbol(ref SymbolicState state, ISymbol symbol, SyntaxNode source) {
         state = SymbolicOperationTransferKernel.Invalidate(
             state,
             ImmutableArray.Create(new SymbolicInvalidationTarget(
@@ -85,8 +79,7 @@ internal static class SymbolicStateInvalidator
     internal static bool IsCurrentInstanceMemberReference(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         if (expression is IdentifierNameSyntax &&
             SymbolicMutationInventory.GetMutatedSymbol(expression, semanticModel, cancellationToken) is

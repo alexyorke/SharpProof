@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer;
 
-internal static class RoslynStructuralMethodIdentity
-{
-    internal static StructuralMethodIdentity Create(IMethodSymbol method)
-    {
+internal static class RoslynStructuralMethodIdentity {
+    internal static StructuralMethodIdentity Create(IMethodSymbol method) {
         if (method == null) throw new ArgumentNullException(nameof(method));
         method = method.OriginalDefinition;
 
@@ -33,12 +31,10 @@ internal static class RoslynStructuralMethodIdentity
     internal static ImmutableArray<string> GetCanonicalKeys(IMethodSymbol method) =>
         ImmutableArray.Create(GetCanonicalKey(method));
 
-    internal static string GetTypeKey(ITypeSymbol type)
-    {
+    internal static string GetTypeKey(ITypeSymbol type) {
         if (type == null) throw new ArgumentNullException(nameof(type));
 
-        switch (type)
-        {
+        switch (type) {
             case IDynamicTypeSymbol:
                 return "named:System.Object";
             case IArrayTypeSymbol array:
@@ -63,8 +59,7 @@ internal static class RoslynStructuralMethodIdentity
         }
     }
 
-    internal static string GetMetadataTypeName(INamedTypeSymbol type)
-    {
+    internal static string GetMetadataTypeName(INamedTypeSymbol type) {
         if (type == null) throw new ArgumentNullException(nameof(type));
         var definition = type.OriginalDefinition;
         if (definition.ContainingType != null)
@@ -76,8 +71,7 @@ internal static class RoslynStructuralMethodIdentity
             : namespaceName + "." + definition.MetadataName;
     }
 
-    private static string GetNamedTypeKey(INamedTypeSymbol type)
-    {
+    private static string GetNamedTypeKey(INamedTypeSymbol type) {
         var definitionName = GetMetadataTypeName(type.OriginalDefinition);
         var typeArguments = GetFlattenedTypeArguments(type);
         if (typeArguments.IsDefaultOrEmpty) return "named:" + definitionName;
@@ -86,8 +80,7 @@ internal static class RoslynStructuralMethodIdentity
                string.Join(";", typeArguments.Select(GetTypeKey)) + "]";
     }
 
-    private static string GetFunctionPointerKey(IFunctionPointerTypeSymbol functionPointer)
-    {
+    private static string GetFunctionPointerKey(IFunctionPointerTypeSymbol functionPointer) {
         var signature = functionPointer.Signature;
         var parameters = string.Join(
             ";",
@@ -102,8 +95,7 @@ internal static class RoslynStructuralMethodIdentity
                returnRefKind + ":" + GetTypeKey(signature.ReturnType);
     }
 
-    private static ImmutableArray<ITypeSymbol> GetFlattenedTypeArguments(INamedTypeSymbol type)
-    {
+    private static ImmutableArray<ITypeSymbol> GetFlattenedTypeArguments(INamedTypeSymbol type) {
         if (!type.IsGenericType && type.ContainingType == null) return ImmutableArray<ITypeSymbol>.Empty;
 
         var builder = ImmutableArray.CreateBuilder<ITypeSymbol>();
@@ -113,14 +105,12 @@ internal static class RoslynStructuralMethodIdentity
 
     private static void AppendFlattenedTypeArguments(
         INamedTypeSymbol type,
-        ImmutableArray<ITypeSymbol>.Builder builder)
-    {
+        ImmutableArray<ITypeSymbol>.Builder builder) {
         if (type.ContainingType != null) AppendFlattenedTypeArguments(type.ContainingType, builder);
         foreach (var argument in type.TypeArguments) builder.Add(argument);
     }
 
-    private static int GetFlattenedTypeParameterOrdinal(ITypeParameterSymbol parameter)
-    {
+    private static int GetFlattenedTypeParameterOrdinal(ITypeParameterSymbol parameter) {
         if (parameter.ContainingSymbol is not INamedTypeSymbol owner) return parameter.Ordinal;
 
         var offset = 0;
@@ -129,8 +119,7 @@ internal static class RoslynStructuralMethodIdentity
         return offset + parameter.Ordinal;
     }
 
-    private static int GetFlattenedMethodTypeParameterOrdinal(ITypeParameterSymbol parameter)
-    {
+    private static int GetFlattenedMethodTypeParameterOrdinal(ITypeParameterSymbol parameter) {
         var offset = parameter.Ordinal;
         for (var containing = parameter.ContainingSymbol?.ContainingSymbol;
              containing != null;
@@ -141,10 +130,8 @@ internal static class RoslynStructuralMethodIdentity
         return offset;
     }
 
-    private static string GetMethodKind(IMethodSymbol method)
-    {
-        return method.MethodKind switch
-        {
+    private static string GetMethodKind(IMethodSymbol method) {
+        return method.MethodKind switch {
             MethodKind.Constructor => "constructor",
             MethodKind.StaticConstructor => "static-constructor",
             MethodKind.PropertyGet => "property-get",
@@ -160,10 +147,8 @@ internal static class RoslynStructuralMethodIdentity
         };
     }
 
-    private static string GetLogicalName(IMethodSymbol method)
-    {
-        string? name = method.MethodKind switch
-        {
+    private static string GetLogicalName(IMethodSymbol method) {
+        string? name = method.MethodKind switch {
             MethodKind.Constructor => ".ctor",
             MethodKind.StaticConstructor => ".cctor",
             MethodKind.Destructor => "Finalize",
@@ -178,10 +163,8 @@ internal static class RoslynStructuralMethodIdentity
         return method.MethodKind.ToString();
     }
 
-    private static string GetRefKind(RefKind refKind)
-    {
-        return refKind switch
-        {
+    private static string GetRefKind(RefKind refKind) {
+        return refKind switch {
             RefKind.Ref => StructuralRefKinds.Ref,
             RefKind.Out => StructuralRefKinds.Out,
             RefKind.In => StructuralRefKinds.In,
@@ -190,8 +173,7 @@ internal static class RoslynStructuralMethodIdentity
         };
     }
 
-    private static string GetNamespaceName(INamespaceSymbol? namespaceSymbol)
-    {
+    private static string GetNamespaceName(INamespaceSymbol? namespaceSymbol) {
         if (namespaceSymbol == null || namespaceSymbol.IsGlobalNamespace) return string.Empty;
 
         var segments = new Stack<string>();

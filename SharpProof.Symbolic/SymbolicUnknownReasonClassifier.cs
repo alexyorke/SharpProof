@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicUnknownReasonClassifier
-{
+internal static class SymbolicUnknownReasonClassifier {
     private static readonly (SymbolicUnknownReason Reason, string[] Fragments)[] Rules =
     [
         (SymbolicUnknownReason.Timeout, ["timeout", "timed_out"]),
@@ -16,8 +15,7 @@ internal static class SymbolicUnknownReasonClassifier
         (SymbolicUnknownReason.SmtUnavailable, ["transient_failure", "z3", "native", "unavailable", "load"])
     ];
 
-    internal static SymbolicUnknownReason Classify(string reason)
-    {
+    internal static SymbolicUnknownReason Classify(string reason) {
         if (string.IsNullOrWhiteSpace(reason)) return SymbolicUnknownReason.Unknown;
 
         foreach (var rule in Rules)
@@ -28,14 +26,11 @@ internal static class SymbolicUnknownReasonClassifier
     }
 }
 
-internal static class SymbolicReasonDisplay
-{
-    internal static string Format(string? reason)
-    {
+internal static class SymbolicReasonDisplay {
+    internal static string Format(string? reason) {
         if (string.IsNullOrWhiteSpace(reason)) return reason ?? string.Empty;
 
-        return reason switch
-        {
+        return reason switch {
             "smt_disabled" => "SMT disabled",
             "smt_disposed" => "SMT solver disposed",
             "smt_timeout" => "SMT solver timed out",

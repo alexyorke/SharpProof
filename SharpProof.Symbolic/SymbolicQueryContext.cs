@@ -3,8 +3,7 @@ namespace SharpProof.Symbolic;
 internal sealed class SymbolicQueryContext(
     SymbolicSourceInput source,
     SharpProofTarget target,
-    SymbolicQueryOptions? options = null)
-{
+    SymbolicQueryOptions? options = null) {
     public SymbolicSourceInput Source { get; } = source ?? throw new ArgumentNullException(nameof(source));
     public SharpProofTarget Target { get; } = target ?? throw new ArgumentNullException(nameof(target));
     public SymbolicQueryOptions Options { get; } = options ?? SymbolicQueryOptions.Default;
@@ -16,8 +15,7 @@ internal sealed class SymbolicQueryOptions(
     SmtAnalysisService? smtAnalysis = null,
     IEnumerable<string>? impliedConditions = null,
     bool includeExpressionProgramPoints = false,
-    bool includeCurrentStatementCompletionFacts = false)
-{
+    bool includeCurrentStatementCompletionFacts = false) {
     public static readonly SymbolicQueryOptions Default = new(SharpProofAnalysisBudget.Default);
 
     public SymbolicQueryOptions(
@@ -32,8 +30,7 @@ internal sealed class SymbolicQueryOptions(
             smtAnalysis,
             impliedConditions,
             includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts)
-    {
+            includeCurrentStatementCompletionFacts) {
     }
 
     public SharpProofAnalysisBudget AnalysisLimits { get; } =
@@ -54,17 +51,14 @@ internal sealed class SymbolicQueryOptions(
     public bool IncludeCurrentStatementCompletionFacts { get; } = includeCurrentStatementCompletionFacts;
 }
 
-internal static class SymbolicQueryOptionHelpers
-{
+internal static class SymbolicQueryOptionHelpers {
     public static ImmutableArray<MetadataReference> NormalizeReferences(
         IEnumerable<MetadataReference>? references,
-        string parameterName)
-    {
+        string parameterName) {
         if (references == null) return ImmutableArray<MetadataReference>.Empty;
 
         var builder = ImmutableArray.CreateBuilder<MetadataReference>();
-        foreach (var reference in references)
-        {
+        foreach (var reference in references) {
             if (reference == null)
                 throw new ArgumentException("References cannot contain null entries.", parameterName);
 

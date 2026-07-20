@@ -2,15 +2,13 @@ namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicSourceProgramPointExecutor(
     SymbolicInvariantService _invariantService,
-    SymbolicConditionProofEngine _conditionProofEngine)
-{
+    SymbolicConditionProofEngine _conditionProofEngine) {
     internal SymbolicProgramPointQueryContext AnalyzeAtPosition(
         SyntaxTree syntaxTree,
         Compilation compilation,
         int position,
         SymbolicQueryOptions options,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var text = syntaxTree.GetText(cancellationToken);
         if (position < 0 || position > text.Length)
             throw new ArgumentOutOfRangeException(nameof(position), "--position must be within the source text span.");
@@ -32,8 +30,7 @@ internal sealed class SymbolicSourceProgramPointExecutor(
         int? requestedColumn = null,
         int? requestedPosition = null,
         int? requestedPositionDistance = null,
-        bool? containsRequestedPosition = null)
-    {
+        bool? containsRequestedPosition = null) {
         var query = _invariantService.Analyze(
             semanticModel,
             node.SpanStart,
@@ -71,8 +68,7 @@ internal sealed class SymbolicSourceProgramPointExecutor(
         int? requestedColumn = null,
         int? requestedPosition = null,
         int? requestedPositionDistance = null,
-        bool? containsRequestedPosition = null)
-    {
+        bool? containsRequestedPosition = null) {
         var conditionProofs = _conditionProofEngine.ProveAll(
             query.SemanticModel,
             query.Position,

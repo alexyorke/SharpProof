@@ -1,12 +1,10 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class CommonBugAnalyzer
-{
+internal static partial class CommonBugAnalyzer {
     private static void AnalyzeNamedTypeCore(
         SymbolAnalysisContext context,
         AnalyzerSession session,
-        INamedTypeSymbol type)
-    {
+        INamedTypeSymbol type) {
         if (type.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
 
         AnalyzeMutableStruct(context, session, type);
@@ -17,8 +15,7 @@ internal static partial class CommonBugAnalyzer
     private static void AnalyzeMutableStruct(
         SymbolAnalysisContext context,
         AnalyzerSession session,
-        INamedTypeSymbol type)
-    {
+        INamedTypeSymbol type) {
         if (type.TypeKind != TypeKind.Struct || type.IsReadOnly || !HasMutableInstanceState(type)) return;
 
         var location = GetTypeIdentifierLocation(type, context.CancellationToken);
@@ -34,10 +31,8 @@ internal static partial class CommonBugAnalyzer
             type.Name);
     }
 
-    private static bool HasMutableInstanceState(INamedTypeSymbol type)
-    {
-        return type.GetMembers().Any(member => member switch
-        {
+    private static bool HasMutableInstanceState(INamedTypeSymbol type) {
+        return type.GetMembers().Any(member => member switch {
             IFieldSymbol { IsStatic: false, IsConst: false, IsReadOnly: false, IsImplicitlyDeclared: false } => true,
             IPropertySymbol { IsStatic: false, SetMethod: { IsInitOnly: false } } => true,
             _ => false
@@ -47,10 +42,8 @@ internal static partial class CommonBugAnalyzer
     private static void AnalyzeOwnedDisposableFields(
         SymbolAnalysisContext context,
         AnalyzerSession session,
-        INamedTypeSymbol type)
-    {
-        foreach (var field in type.GetMembers().OfType<IFieldSymbol>())
-        {
+        INamedTypeSymbol type) {
+        foreach (var field in type.GetMembers().OfType<IFieldSymbol>()) {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (field.IsStatic || field.IsConst || field.IsImplicitlyDeclared ||
                 field.DeclaringSyntaxReferences.IsDefaultOrEmpty ||
@@ -79,27 +72,22 @@ internal static partial class CommonBugAnalyzer
         IFieldSymbol field,
         INamedTypeSymbol containingType,
         Compilation compilation,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         foreach (var syntaxReference in field.DeclaringSyntaxReferences)
-            if (syntaxReference.GetSyntax(cancellationToken) is VariableDeclaratorSyntax
-                {
+            if (syntaxReference.GetSyntax(cancellationToken) is VariableDeclaratorSyntax {
                     Initializer.Value: { } initializer
-                })
-            {
+                }) {
                 var semanticModel = compilation.GetSemanticModel(initializer.SyntaxTree);
                 if (Unwrap(semanticModel.GetOperation(initializer, cancellationToken)) is IObjectCreationOperation)
                     return true;
             }
 
         foreach (var constructor in containingType.InstanceConstructors)
-            foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
-            {
+            foreach (var syntaxReference in constructor.DeclaringSyntaxReferences) {
                 var declaration = syntaxReference.GetSyntax(cancellationToken);
                 var semanticModel = compilation.GetSemanticModel(declaration.SyntaxTree);
                 foreach (var assignment in declaration.DescendantNodes().OfType<AssignmentExpressionSyntax>())
-                    if (semanticModel.GetOperation(assignment, cancellationToken) is ISimpleAssignmentOperation
-                        {
+                    if (semanticModel.GetOperation(assignment, cancellationToken) is ISimpleAssignmentOperation {
                             Target: IFieldReferenceOperation target,
                             Value: { } value
                         } &&
@@ -111,16 +99,13 @@ internal static partial class CommonBugAnalyzer
         return false;
     }
 
-    private static bool TryGetRequiredDisposalInterface(ITypeSymbol type, out string interfaceName)
-    {
-        if (ImplementsInterface(type, "System.IDisposable"))
-        {
+    private static bool TryGetRequiredDisposalInterface(ITypeSymbol type, out string interfaceName) {
+        if (ImplementsInterface(type, "System.IDisposable")) {
             interfaceName = "System.IDisposable";
             return true;
         }
 
-        if (ImplementsInterface(type, "System.IAsyncDisposable"))
-        {
+        if (ImplementsInterface(type, "System.IAsyncDisposable")) {
             interfaceName = "System.IAsyncDisposable";
             return true;
         }
@@ -129,8 +114,7 @@ internal static partial class CommonBugAnalyzer
         return false;
     }
 
-    private static bool ImplementsInterface(ITypeSymbol type, string metadataName)
-    {
+    private static bool ImplementsInterface(ITypeSymbol type, string metadataName) {
         return type is INamedTypeSymbol namedType && namedType.AllInterfaces.Any(candidate =>
             string.Equals(candidate.ToDisplayString(), metadataName, StringComparison.Ordinal));
     }
@@ -138,14 +122,11 @@ internal static partial class CommonBugAnalyzer
     private static void AnalyzeIneffectiveRequiredAttributes(
         SymbolAnalysisContext context,
         AnalyzerSession session,
-        INamedTypeSymbol type)
-    {
+        INamedTypeSymbol type) {
         var requiredAttributeType = context.Compilation.GetTypeByMetadataName(
             "System.ComponentModel.DataAnnotations.RequiredAttribute");
-        foreach (var member in type.GetMembers())
-        {
-            ITypeSymbol? memberType = member switch
-            {
+        foreach (var member in type.GetMembers()) {
+            ITypeSymbol? memberType = member switch {
                 IFieldSymbol { IsStatic: false } field => field.Type,
                 IPropertySymbol { IsStatic: false, IsIndexer: false } property => property.Type,
                 _ => null
@@ -168,19 +149,16 @@ internal static partial class CommonBugAnalyzer
         }
     }
 
-    private static bool IsNullableValueType(ITypeSymbol type)
-    {
+    private static bool IsNullableValueType(ITypeSymbol type) {
         return type is INamedTypeSymbol namedType &&
                namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T;
     }
 
     private static Location? GetTypeIdentifierLocation(
         INamedTypeSymbol type,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var syntax = type.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
-        return syntax switch
-        {
+        return syntax switch {
             TypeDeclarationSyntax declaration => declaration.Identifier.GetLocation(),
             _ => type.Locations.FirstOrDefault(static location => location.IsInSource)
         };
@@ -188,8 +166,7 @@ internal static partial class CommonBugAnalyzer
 
     private static Location? GetFieldIdentifierLocation(
         IFieldSymbol field,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var syntax = field.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
         return syntax is VariableDeclaratorSyntax variable
             ? variable.Identifier.GetLocation()

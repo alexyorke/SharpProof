@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicKnownGuardFacts
-{
+internal static class SymbolicKnownGuardFacts {
     private const string ArgumentOutOfRangeExceptionType = "System.ArgumentOutOfRangeException";
 
     internal static bool TryCreateArgumentOutOfRangeGuardConditions(
@@ -11,8 +10,7 @@ internal static class SymbolicKnownGuardFacts
         out SymbolicTerm subject,
         out SymbolicCondition triggerCondition,
         out SymbolicCondition normalCompletionCondition,
-        out string guardKey)
-    {
+        out string guardKey) {
         subject = null!;
         triggerCondition = null!;
         normalCompletionCondition = null!;
@@ -35,8 +33,7 @@ internal static class SymbolicKnownGuardFacts
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var subjectLowering = SymbolicSemanticPipeline.LowerTerm(subjectExpression, context);
         if (subjectLowering is not { IsExact: true, Value: { } loweredSubject } ||
-            loweredSubject.Kind != SmtValueKind.Int)
-        {
+            loweredSubject.Kind != SmtValueKind.Int) {
             subject = null!;
             return false;
         }
@@ -44,26 +41,22 @@ internal static class SymbolicKnownGuardFacts
         subject = loweredSubject;
 
         SymbolicTerm comparisonValue;
-        if (requiresComparisonValue)
-        {
-            if (!TryGetArgumentExpression(operation, 1, out var comparisonExpression))
-            {
+        if (requiresComparisonValue) {
+            if (!TryGetArgumentExpression(operation, 1, out var comparisonExpression)) {
                 subject = null!;
                 return false;
             }
 
             var comparisonLowering = SymbolicSemanticPipeline.LowerTerm(comparisonExpression, context);
             if (comparisonLowering is not { IsExact: true, Value: { } loweredComparisonValue } ||
-                loweredComparisonValue.Kind != SmtValueKind.Int)
-            {
+                loweredComparisonValue.Kind != SmtValueKind.Int) {
                 subject = null!;
                 return false;
             }
 
             comparisonValue = loweredComparisonValue;
         }
-        else
-        {
+        else {
             comparisonValue = new SymbolicIntegerConstantTerm(0);
         }
 
@@ -86,13 +79,11 @@ internal static class SymbolicKnownGuardFacts
     private static bool TryGetArgumentExpression(
         IInvocationOperation operation,
         int parameterOrdinal,
-        out ExpressionSyntax expression)
-    {
+        out ExpressionSyntax expression) {
         foreach (var argument in operation.Arguments)
             if (argument.Parameter?.Ordinal == parameterOrdinal &&
                 argument.ArgumentKind == ArgumentKind.Explicit &&
-                argument.Syntax is ArgumentSyntax argumentSyntax)
-            {
+                argument.Syntax is ArgumentSyntax argumentSyntax) {
                 expression = argumentSyntax.Expression;
                 return true;
             }
@@ -106,8 +97,7 @@ internal static class SymbolicKnownGuardFacts
         SymbolicTerm left,
         SymbolicTerm right,
         SyntaxNode sourceNode,
-        string provenance)
-    {
+        string provenance) {
         return new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicRelationAtom(relation, left, right),
             sourceNode,
@@ -120,10 +110,8 @@ internal static class SymbolicKnownGuardFacts
         out SymbolicRelationOperator triggerRelation,
         out SymbolicRelationOperator normalRelation,
         out bool requiresComparisonValue,
-        out string guardKey)
-    {
-        (triggerRelation, normalRelation, requiresComparisonValue, guardKey) = methodName switch
-        {
+        out string guardKey) {
+        (triggerRelation, normalRelation, requiresComparisonValue, guardKey) = methodName switch {
             "ThrowIfNegative" => (SymbolicRelationOperator.LessThan, SymbolicRelationOperator.GreaterThanOrEqual, false,
                 "negative"),
             "ThrowIfZero" => (SymbolicRelationOperator.Equal, SymbolicRelationOperator.NotEqual, false, "zero"),

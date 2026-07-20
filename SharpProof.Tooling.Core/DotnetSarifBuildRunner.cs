@@ -2,14 +2,11 @@ using System.Diagnostics;
 
 namespace SharpProof.Tools.Shared;
 
-internal static class DotnetSarifBuildRunner
-{
+internal static class DotnetSarifBuildRunner {
     private static readonly TimeSpan BuildTimeout = TimeSpan.FromMinutes(5);
 
-    internal static async Task RunAsync(string input, string sarifPath)
-    {
-        var startInfo = new ProcessStartInfo("dotnet")
-        {
+    internal static async Task RunAsync(string input, string sarifPath) {
+        var startInfo = new ProcessStartInfo("dotnet") {
             RedirectStandardError = true,
             RedirectStandardOutput = true,
             UseShellExecute = false
@@ -25,18 +22,14 @@ internal static class DotnetSarifBuildRunner
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
         using var timeout = new CancellationTokenSource(BuildTimeout);
-        try
-        {
+        try {
             await process.WaitForExitAsync(timeout.Token);
         }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
-        {
-            try
-            {
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested) {
+            try {
                 process.Kill(entireProcessTree: true);
             }
-            catch (InvalidOperationException)
-            {
+            catch (InvalidOperationException) {
             }
 
             await Task.WhenAll(outputTask, errorTask);
@@ -56,16 +49,12 @@ internal static class DotnetSarifBuildRunner
                 output + Environment.NewLine + error);
     }
 
-    internal static async Task<MaterializedSarifInputs> MaterializeAsync(IEnumerable<string> inputs)
-    {
+    internal static async Task<MaterializedSarifInputs> MaterializeAsync(IEnumerable<string> inputs) {
         var materialized = new List<MaterializedSarifInput>();
         var temporaryPaths = new List<string>();
-        try
-        {
-            foreach (var input in inputs)
-            {
-                if (!IsBuildInput(input))
-                {
+        try {
+            foreach (var input in inputs) {
+                if (!IsBuildInput(input)) {
                     materialized.Add(new MaterializedSarifInput(input, input));
                     continue;
                 }
@@ -79,38 +68,31 @@ internal static class DotnetSarifBuildRunner
 
             return new MaterializedSarifInputs(materialized, temporaryPaths);
         }
-        catch
-        {
+        catch {
             DeleteAll(temporaryPaths);
             throw;
         }
     }
 
-    private static bool IsBuildInput(string input)
-    {
+    private static bool IsBuildInput(string input) {
         var extension = Path.GetExtension(input);
         return string.Equals(extension, ".sln", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(extension, ".csproj", StringComparison.OrdinalIgnoreCase);
     }
 
-    internal static void DeleteAll(IEnumerable<string> paths)
-    {
-        foreach (var path in paths)
-        {
-            try
-            {
+    internal static void DeleteAll(IEnumerable<string> paths) {
+        foreach (var path in paths) {
+            try {
                 File.Delete(path);
             }
-            catch
-            {
+            catch {
             }
         }
     }
 }
 
 internal sealed class MaterializedSarifInputs(IReadOnlyList<MaterializedSarifInput> inputs,
-    IReadOnlyList<string> temporaryPaths) : IDisposable
-{
+    IReadOnlyList<string> temporaryPaths) : IDisposable {
     internal IReadOnlyList<MaterializedSarifInput> Inputs { get; } = inputs;
 
     public void Dispose() => DotnetSarifBuildRunner.DeleteAll(temporaryPaths);

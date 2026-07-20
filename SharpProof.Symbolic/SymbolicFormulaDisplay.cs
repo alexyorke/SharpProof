@@ -1,17 +1,14 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicFormulaDisplay
-{
-    internal static string Format(SymbolicCondition condition)
-    {
+internal static class SymbolicFormulaDisplay {
+    internal static string Format(SymbolicCondition condition) {
         if (condition == null) throw new ArgumentNullException(nameof(condition));
         return SymbolicIrFormulaEncoder.TryEncode(condition, out var formula)
             ? Format(formula)
             : condition.ToString() ?? string.Empty;
     }
 
-    internal static string GetKind(SmtFormula formula)
-    {
+    internal static string GetKind(SmtFormula formula) {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
 
         var typeName = formula.GetType().Name;
@@ -20,8 +17,7 @@ internal static class SymbolicFormulaDisplay
             : typeName;
     }
 
-    internal static string FormatMergedInvariant(IReadOnlyList<SmtFormula> pathConditions)
-    {
+    internal static string FormatMergedInvariant(IReadOnlyList<SmtFormula> pathConditions) {
         if (pathConditions == null) throw new ArgumentNullException(nameof(pathConditions));
 
         if (pathConditions.Count == 0) return "true";
@@ -31,12 +27,10 @@ internal static class SymbolicFormulaDisplay
         return string.Join(" && ", pathConditions.Select(static condition => "(" + Format(condition) + ")"));
     }
 
-    internal static string Format(SmtFormula formula)
-    {
+    internal static string Format(SmtFormula formula) {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
 
-        switch (formula)
-        {
+        switch (formula) {
             case SmtBooleanConstant boolean:
                 return boolean.Value ? "true" : "false";
             case SmtIntegerConstant integer:
@@ -84,12 +78,10 @@ internal static class SymbolicFormulaDisplay
         }
     }
 
-    internal static string GetMergeTarget(SmtFormula formula)
-    {
+    internal static string GetMergeTarget(SmtFormula formula) {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
 
-        switch (formula)
-        {
+        switch (formula) {
             case SmtUnaryFormula unary:
                 return GetMergeTarget(unary.Operand);
             case SmtBinaryFormula binary when IsComparison(binary.Operator):
@@ -111,10 +103,8 @@ internal static class SymbolicFormulaDisplay
         }
     }
 
-    private static string FormatBinary(SmtBinaryFormula binary)
-    {
-        var op = binary.Operator switch
-        {
+    private static string FormatBinary(SmtBinaryFormula binary) {
+        var op = binary.Operator switch {
             SmtBinaryOperator.And => "&&",
             SmtBinaryOperator.Or => "||",
             SmtBinaryOperator.Equal => "==",
@@ -142,10 +132,8 @@ internal static class SymbolicFormulaDisplay
     private static string FormatIntegerBinary(
         SmtIntegerBinaryOperator binaryOperator,
         SmtFormula left,
-        SmtFormula right)
-    {
-        var op = binaryOperator switch
-        {
+        SmtFormula right) {
+        var op = binaryOperator switch {
             SmtIntegerBinaryOperator.Add => "+",
             SmtIntegerBinaryOperator.Subtract => "-",
             SmtIntegerBinaryOperator.Multiply => "*",
@@ -157,23 +145,20 @@ internal static class SymbolicFormulaDisplay
         return FormatTerm(left) + " " + op + " " + FormatTerm(right);
     }
 
-    private static string FormatConditionTerm(SmtFormula formula)
-    {
+    private static string FormatConditionTerm(SmtFormula formula) {
         return formula is SmtBinaryFormula or SmtConditionalFormula
             ? "(" + Format(formula) + ")"
             : Format(formula);
     }
 
-    private static string FormatTerm(SmtFormula formula)
-    {
+    private static string FormatTerm(SmtFormula formula) {
         return formula is SmtBinaryFormula or SmtIntegerBinaryTerm or SmtOpaqueIntegerBinaryTerm or
             SmtConditionalFormula
             ? "(" + Format(formula) + ")"
             : Format(formula);
     }
 
-    private static string GetComparisonTarget(SmtBinaryFormula binary)
-    {
+    private static string GetComparisonTarget(SmtBinaryFormula binary) {
         var leftTarget = TryGetTermTarget(binary.Left);
         var rightTarget = TryGetTermTarget(binary.Right);
         if (leftTarget != null && IsConstant(binary.Right)) return leftTarget;
@@ -185,10 +170,8 @@ internal static class SymbolicFormulaDisplay
         return Format(binary);
     }
 
-    private static string? TryGetTermTarget(SmtFormula formula)
-    {
-        switch (formula)
-        {
+    private static string? TryGetTermTarget(SmtFormula formula) {
+        switch (formula) {
             case SmtVariable variable:
                 return FormatVariableName(variable.Name);
             case SmtStringLengthTerm length:
@@ -203,8 +186,7 @@ internal static class SymbolicFormulaDisplay
         }
     }
 
-    private static bool IsComparison(SmtBinaryOperator op)
-    {
+    private static bool IsComparison(SmtBinaryOperator op) {
         return op == SmtBinaryOperator.Equal ||
                op == SmtBinaryOperator.NotEqual ||
                op == SmtBinaryOperator.LessThan ||
@@ -216,18 +198,15 @@ internal static class SymbolicFormulaDisplay
     private static bool IsConstant(SmtFormula formula) =>
         formula is SmtBooleanConstant or SmtIntegerConstant or SmtStringConstant or SmtNullConstant;
 
-    private static string FormatVariableName(string name)
-    {
+    private static string FormatVariableName(string name) {
         if (string.IsNullOrWhiteSpace(name)) return name ?? string.Empty;
 
         const string recordPrefix = "SmtVariable {";
-        if (name.StartsWith(recordPrefix, StringComparison.Ordinal))
-        {
+        if (name.StartsWith(recordPrefix, StringComparison.Ordinal)) {
             var nameMarker = "Name = ";
             var nameIndex = name.IndexOf(nameMarker, StringComparison.Ordinal);
             var closeIndex = name.IndexOf(" }", StringComparison.Ordinal);
-            if (nameIndex >= 0 && closeIndex > nameIndex)
-            {
+            if (nameIndex >= 0 && closeIndex > nameIndex) {
                 var innerNameStart = nameIndex + nameMarker.Length;
                 var innerName = name.Substring(innerNameStart, closeIndex - innerNameStart).Trim();
                 var suffix = closeIndex + 2 < name.Length
@@ -239,8 +218,7 @@ internal static class SymbolicFormulaDisplay
 
         name = name.Replace(".String", string.Empty);
         var hashIndex = name.LastIndexOf('#');
-        if (hashIndex > 0 && hashIndex + 1 < name.Length)
-        {
+        if (hashIndex > 0 && hashIndex + 1 < name.Length) {
             var index = hashIndex + 1;
             while (index < name.Length && char.IsDigit(name[index])) index++;
 
@@ -250,8 +228,7 @@ internal static class SymbolicFormulaDisplay
         return name;
     }
 
-    private static string EscapeString(string value)
-    {
+    private static string EscapeString(string value) {
         return (value ?? string.Empty)
             .Replace("\\", "\\\\")
             .Replace("\"", "\\\"")
@@ -261,35 +238,29 @@ internal static class SymbolicFormulaDisplay
     }
 }
 
-internal static class SymbolicProgramPointKinds
-{
+internal static class SymbolicProgramPointKinds {
     public const string Statement = "Statement";
     public const string Expression = "Expression";
     public const string Other = "Other";
 
-    public static string Normalize(string? programPointKind, string? nodeKind = null)
-    {
+    public static string Normalize(string? programPointKind, string? nodeKind = null) {
         if (TryNormalizeKnownKind(programPointKind, out var normalizedKind)) return normalizedKind;
 
         return InferFromNodeKind(nodeKind);
     }
 
-    internal static bool TryNormalizeKnownKind(string? value, out string normalizedKind)
-    {
-        if (string.Equals(value, Statement, StringComparison.OrdinalIgnoreCase))
-        {
+    internal static bool TryNormalizeKnownKind(string? value, out string normalizedKind) {
+        if (string.Equals(value, Statement, StringComparison.OrdinalIgnoreCase)) {
             normalizedKind = Statement;
             return true;
         }
 
-        if (string.Equals(value, Expression, StringComparison.OrdinalIgnoreCase))
-        {
+        if (string.Equals(value, Expression, StringComparison.OrdinalIgnoreCase)) {
             normalizedKind = Expression;
             return true;
         }
 
-        if (string.Equals(value, Other, StringComparison.OrdinalIgnoreCase))
-        {
+        if (string.Equals(value, Other, StringComparison.OrdinalIgnoreCase)) {
             normalizedKind = Other;
             return true;
         }
@@ -298,8 +269,7 @@ internal static class SymbolicProgramPointKinds
         return false;
     }
 
-    private static string InferFromNodeKind(string? nodeKind)
-    {
+    private static string InferFromNodeKind(string? nodeKind) {
         if (string.IsNullOrWhiteSpace(nodeKind)) return Other;
 
         var nonEmptyNodeKind = nodeKind!;

@@ -1,17 +1,14 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicInputDomainSynthesizer
-{
+internal static class SymbolicInputDomainSynthesizer {
     internal static IReadOnlyList<SymbolicInputDomain> Synthesize(
         IReadOnlyList<SmtFormula> formulas,
         IReadOnlyList<SymbolicSatisfyingAssignment> assignments,
-        SymbolicInputRoleMap roles)
-    {
+        SymbolicInputRoleMap roles) {
         var builders = new Dictionary<string, DomainBuilder>(StringComparer.Ordinal);
         foreach (var formula in formulas) Visit(formula, true, builders, roles);
 
-        foreach (var assignment in assignments)
-        {
+        foreach (var assignment in assignments) {
             var target = GetTarget(assignment.SymbolicName, assignment.ValueKind, roles);
             GetOrCreate(builders, target).AddSymbolicName(assignment.SymbolicName);
         }
@@ -23,8 +20,7 @@ internal static class SymbolicInputDomainSynthesizer
     }
 
     internal static SymbolicInputDomainSummary MergeAlternatives(
-        IReadOnlyList<SymbolicInputDomainSummary> summaries)
-    {
+        IReadOnlyList<SymbolicInputDomainSummary> summaries) {
         if (summaries.Count == 0)
             return new SymbolicInputDomainSummary(
                 SymbolicWitnessStatus.None,
@@ -52,8 +48,7 @@ internal static class SymbolicInputDomainSynthesizer
 
     private static SymbolicInputDomain MergeDomainAlternatives(
         IReadOnlyList<SymbolicInputDomain> domains,
-        int totalAlternativeCount)
-    {
+        int totalAlternativeCount) {
         var first = domains[0];
         var coversEveryAlternative = domains.Count == totalAlternativeCount;
         var role = domains.All(domain => domain.Role == first.Role)
@@ -130,8 +125,7 @@ internal static class SymbolicInputDomainSynthesizer
 
     private static SymbolicIntegerRange? MergeRanges(
         IReadOnlyList<SymbolicIntegerRange?> ranges,
-        bool coversEveryAlternative)
-    {
+        bool coversEveryAlternative) {
         if (!coversEveryAlternative || ranges.Any(static range => range == null)) return null;
 
         var concrete = ranges.Cast<SymbolicIntegerRange>().ToArray();
@@ -152,8 +146,7 @@ internal static class SymbolicInputDomainSynthesizer
 
     private static IReadOnlyList<string> IntersectValues(
         IReadOnlyList<IReadOnlyList<string>> alternatives,
-        bool coversEveryAlternative)
-    {
+        bool coversEveryAlternative) {
         if (!coversEveryAlternative || alternatives.Count == 0) return Array.Empty<string>();
 
         var values = new HashSet<string>(alternatives[0], StringComparer.Ordinal);
@@ -166,10 +159,8 @@ internal static class SymbolicInputDomainSynthesizer
         SmtFormula formula,
         bool polarity,
         IDictionary<string, DomainBuilder> builders,
-        SymbolicInputRoleMap roles)
-    {
-        switch (formula)
-        {
+        SymbolicInputRoleMap roles) {
+        switch (formula) {
             case SmtBooleanConstant:
                 return;
             case SmtVariable { Kind: SmtValueKind.Bool } booleanVariable:
@@ -258,8 +249,7 @@ internal static class SymbolicInputDomainSynthesizer
         SmtBinaryFormula binary,
         bool polarity,
         IDictionary<string, DomainBuilder> builders,
-        SymbolicInputRoleMap roles)
-    {
+        SymbolicInputRoleMap roles) {
         var comparison = polarity ? binary.Operator : SmtComparisonOperatorFacts.Negate(binary.Operator);
         if (TryApplyNullness(binary.Left, binary.Right, comparison, builders, roles) ||
             TryApplyNullness(binary.Right, binary.Left, SmtComparisonOperatorFacts.Reverse(comparison), builders, roles))
@@ -291,8 +281,7 @@ internal static class SymbolicInputDomainSynthesizer
         SmtFormula value,
         SmtBinaryOperator comparison,
         IDictionary<string, DomainBuilder> builders,
-        SymbolicInputRoleMap roles)
-    {
+        SymbolicInputRoleMap roles) {
         if (candidate is not SmtVariable { Kind: SmtValueKind.Reference } variable ||
             value is not SmtNullConstant ||
             comparison is not SmtBinaryOperator.Equal and not SmtBinaryOperator.NotEqual)
@@ -319,8 +308,7 @@ internal static class SymbolicInputDomainSynthesizer
         SmtFormula value,
         SmtBinaryOperator comparison,
         IDictionary<string, DomainBuilder> builders,
-        SymbolicInputRoleMap roles)
-    {
+        SymbolicInputRoleMap roles) {
         if (value is not SmtIntegerConstant constant ||
             !TryGetIntegerTarget(candidate, roles, out var target, out var rangeKind, out var symbolicName))
             return false;
@@ -329,8 +317,7 @@ internal static class SymbolicInputDomainSynthesizer
         builder.AddSymbolicName(symbolicName);
         builder.ApplyRange(rangeKind, comparison, constant.Value);
         builder.AddPredicate(
-            rangeKind switch
-            {
+            rangeKind switch {
                 RangeKind.StringLength => SymbolicDomainPredicateKind.StringLength,
                 RangeKind.CollectionLength => SymbolicDomainPredicateKind.CollectionLength,
                 _ => SymbolicDomainPredicateKind.Range
@@ -348,8 +335,7 @@ internal static class SymbolicInputDomainSynthesizer
         SmtFormula value,
         SmtBinaryOperator comparison,
         IDictionary<string, DomainBuilder> builders,
-        SymbolicInputRoleMap roles)
-    {
+        SymbolicInputRoleMap roles) {
         if (!TryGetStringVariable(candidate, out var variable) ||
             value is not SmtStringConstant constant ||
             comparison is not SmtBinaryOperator.Equal and not SmtBinaryOperator.NotEqual)
@@ -375,8 +361,7 @@ internal static class SymbolicInputDomainSynthesizer
         SmtFormula value,
         SmtBinaryOperator comparison,
         IDictionary<string, DomainBuilder> builders,
-        SymbolicInputRoleMap roles)
-    {
+        SymbolicInputRoleMap roles) {
         if (candidate is not SmtVariable { Kind: SmtValueKind.Bool } variable ||
             value is not SmtBooleanConstant constant ||
             comparison is not SmtBinaryOperator.Equal and not SmtBinaryOperator.NotEqual)
@@ -401,8 +386,7 @@ internal static class SymbolicInputDomainSynthesizer
         SmtFormula bound,
         SmtBinaryOperator comparison,
         IDictionary<string, DomainBuilder> builders,
-        SymbolicInputRoleMap roles)
-    {
+        SymbolicInputRoleMap roles) {
         if (candidate is not SmtVariable { Kind: SmtValueKind.Int } index ||
             !TryGetCollectionLengthVariable(bound, out var lengthVariable, out var collectionName) ||
             comparison is not SmtBinaryOperator.LessThan and
@@ -434,10 +418,8 @@ internal static class SymbolicInputDomainSynthesizer
         SymbolicDomainPredicateKind kind,
         bool polarity,
         IDictionary<string, DomainBuilder> builders,
-        SymbolicInputRoleMap roles)
-    {
-        if (!TryGetStringVariable(value, out var variable) || argument is not SmtStringConstant constant)
-        {
+        SymbolicInputRoleMap roles) {
+        if (!TryGetStringVariable(value, out var variable) || argument is not SmtStringConstant constant) {
             MarkUnsupported(value, polarity, builders, roles, "string_predicate_domain_not_synthesized");
             return;
         }
@@ -461,10 +443,8 @@ internal static class SymbolicInputDomainSynthesizer
         SymbolicInputRoleMap roles,
         out Target target,
         out RangeKind rangeKind,
-        out string symbolicName)
-    {
-        switch (formula)
-        {
+        out string symbolicName) {
+        switch (formula) {
             case SmtVariable { Kind: SmtValueKind.Int } variable:
                 symbolicName = variable.Name;
                 target = GetTarget(variable.Name, SymbolicInputValueKind.Integer, roles);
@@ -485,10 +465,8 @@ internal static class SymbolicInputDomainSynthesizer
         }
     }
 
-    private static bool TryGetStringVariable(SmtFormula formula, out SmtVariable variable)
-    {
-        if (formula is SmtVariable { Kind: SmtValueKind.String } stringVariable)
-        {
+    private static bool TryGetStringVariable(SmtFormula formula, out SmtVariable variable) {
+        if (formula is SmtVariable { Kind: SmtValueKind.String } stringVariable) {
             variable = stringVariable;
             return true;
         }
@@ -500,11 +478,9 @@ internal static class SymbolicInputDomainSynthesizer
     private static bool TryGetCollectionLengthVariable(
         SmtFormula formula,
         out SmtVariable variable,
-        out string collectionName)
-    {
+        out string collectionName) {
         if (formula is SmtVariable { Kind: SmtValueKind.Int } lengthVariable &&
-            IsCollectionLengthName(lengthVariable.Name))
-        {
+            IsCollectionLengthName(lengthVariable.Name)) {
             variable = lengthVariable;
             collectionName = RemoveSuffix(lengthVariable.Name, ".Length", ".Count");
             return true;
@@ -519,10 +495,8 @@ internal static class SymbolicInputDomainSynthesizer
         SmtFormula formula,
         bool polarity,
         IDictionary<string, DomainBuilder> builders,
-        SymbolicInputRoleMap roles)
-    {
-        foreach (var variable in CollectVariables(formula))
-        {
+        SymbolicInputRoleMap roles) {
+        foreach (var variable in CollectVariables(formula)) {
             var builder = GetOrCreate(builders,
                 GetTarget(variable.Name, SymbolicInputWitnessFactory.MapValueKind(variable.Kind), roles));
             builder.AddSymbolicName(variable.Name);
@@ -542,10 +516,8 @@ internal static class SymbolicInputDomainSynthesizer
         bool polarity,
         IDictionary<string, DomainBuilder> builders,
         SymbolicInputRoleMap roles,
-        string reason)
-    {
-        foreach (var variable in CollectVariables(formula))
-        {
+        string reason) {
+        foreach (var variable in CollectVariables(formula)) {
             var builder = GetOrCreate(builders,
                 GetTarget(variable.Name, SymbolicInputWitnessFactory.MapValueKind(variable.Kind), roles));
             builder.AddSymbolicName(variable.Name);
@@ -560,8 +532,7 @@ internal static class SymbolicInputDomainSynthesizer
         }
     }
 
-    private static IReadOnlyList<SmtVariable> CollectVariables(SmtFormula formula)
-    {
+    private static IReadOnlyList<SmtVariable> CollectVariables(SmtFormula formula) {
         var variables = new HashSet<SmtVariable>();
         foreach (var candidate in SmtFormulaTraversal.Enumerate(formula))
             if (candidate is SmtVariable variable)
@@ -573,15 +544,13 @@ internal static class SymbolicInputDomainSynthesizer
     private static Target GetTarget(
         string symbolicName,
         SymbolicInputValueKind valueKind,
-        SymbolicInputRoleMap roles)
-    {
+        SymbolicInputRoleMap roles) {
         var baseName = RemoveSuffix(symbolicName, ".String", ".Length", ".Count");
         var identity = roles.Resolve(baseName);
         var isCollection = IsCollectionLengthName(symbolicName);
         var domainKind = isCollection
             ? SymbolicInputDomainKind.Collection
-            : valueKind switch
-            {
+            : valueKind switch {
                 SymbolicInputValueKind.Boolean => SymbolicInputDomainKind.Boolean,
                 SymbolicInputValueKind.Integer => SymbolicInputDomainKind.Integer,
                 SymbolicInputValueKind.Reference => SymbolicInputDomainKind.Reference,
@@ -596,10 +565,8 @@ internal static class SymbolicInputDomainSynthesizer
             domainKind);
     }
 
-    private static DomainBuilder GetOrCreate(IDictionary<string, DomainBuilder> builders, Target target)
-    {
-        if (builders.TryGetValue(target.Key, out var builder))
-        {
+    private static DomainBuilder GetOrCreate(IDictionary<string, DomainBuilder> builders, Target target) {
+        if (builders.TryGetValue(target.Key, out var builder)) {
             builder.MergeTarget(target);
             return builder;
         }
@@ -609,14 +576,12 @@ internal static class SymbolicInputDomainSynthesizer
         return builder;
     }
 
-    private static bool IsCollectionLengthName(string name)
-    {
+    private static bool IsCollectionLengthName(string name) {
         return name.EndsWith(".Length", StringComparison.Ordinal) ||
                name.EndsWith(".Count", StringComparison.Ordinal);
     }
 
-    private static string RemoveSuffix(string value, params string[] suffixes)
-    {
+    private static string RemoveSuffix(string value, params string[] suffixes) {
         foreach (var suffix in suffixes)
             if (value.EndsWith(suffix, StringComparison.Ordinal))
                 return value.Substring(0, value.Length - suffix.Length);
@@ -624,14 +589,12 @@ internal static class SymbolicInputDomainSynthesizer
         return value;
     }
 
-    private static string Format(SmtFormula formula, bool polarity)
-    {
+    private static string Format(SmtFormula formula, bool polarity) {
         var text = SymbolicFormulaDisplay.Format(formula);
         return polarity ? text : "!(" + text + ")";
     }
 
-    private enum RangeKind
-    {
+    private enum RangeKind {
         Integer,
         StringLength,
         CollectionLength
@@ -644,8 +607,7 @@ internal static class SymbolicInputDomainSynthesizer
         SymbolicInputValueKind ValueKind,
         SymbolicInputDomainKind DomainKind);
 
-    private sealed class DomainBuilder
-    {
+    private sealed class DomainBuilder {
         private readonly HashSet<string> _contains = new(StringComparer.Ordinal);
         private readonly HashSet<string> _prefixes = new(StringComparer.Ordinal);
         private readonly HashSet<string> _predicateKeys = new(StringComparer.Ordinal);
@@ -661,8 +623,7 @@ internal static class SymbolicInputDomainSynthesizer
         private string _reason = "domain_synthesized";
         private SymbolicWitnessStatus _status = SymbolicWitnessStatus.Exact;
 
-        internal DomainBuilder(Target target)
-        {
+        internal DomainBuilder(Target target) {
             Name = target.SourceName;
             Role = target.Role;
             ValueKind = target.ValueKind;
@@ -681,8 +642,7 @@ internal static class SymbolicInputDomainSynthesizer
 
         private bool IsIndex { get; set; }
 
-        internal void MergeTarget(Target target)
-        {
+        internal void MergeTarget(Target target) {
             if (Role == SymbolicInputRole.Derived && target.Role != SymbolicInputRole.Derived) Role = target.Role;
 
             if (ValueKind == SymbolicInputValueKind.Reference && target.ValueKind == SymbolicInputValueKind.String)
@@ -694,15 +654,12 @@ internal static class SymbolicInputDomainSynthesizer
             if (string.IsNullOrWhiteSpace(Name)) Name = target.SourceName;
         }
 
-        internal void AddSymbolicName(string name)
-        {
+        internal void AddSymbolicName(string name) {
             _symbolicNames.Add(name);
         }
 
-        internal void ApplyRange(RangeKind kind, SmtBinaryOperator comparison, long value)
-        {
-            var range = kind switch
-            {
+        internal void ApplyRange(RangeKind kind, SmtBinaryOperator comparison, long value) {
+            var range = kind switch {
                 RangeKind.StringLength => _stringLength,
                 RangeKind.CollectionLength => _collectionLength,
                 _ => _integer
@@ -710,26 +667,22 @@ internal static class SymbolicInputDomainSynthesizer
             range.Apply(comparison, value);
         }
 
-        internal void SetNullness(SymbolicNullness nullness)
-        {
+        internal void SetNullness(SymbolicNullness nullness) {
             if (Nullness != SymbolicNullness.Unknown && Nullness != nullness)
                 MarkUnsupported("conflicting_nullness_constraints");
             else
                 Nullness = nullness;
         }
 
-        internal void SetExactString(string value)
-        {
+        internal void SetExactString(string value) {
             if (_exactString != null && !string.Equals(_exactString, value, StringComparison.Ordinal))
                 MarkUnsupported("conflicting_string_content_constraints");
             else
                 _exactString = value;
         }
 
-        internal void AddRequiredStringValue(SymbolicDomainPredicateKind kind, string value)
-        {
-            switch (kind)
-            {
+        internal void AddRequiredStringValue(SymbolicDomainPredicateKind kind, string value) {
+            switch (kind) {
                 case SymbolicDomainPredicateKind.StringPrefix:
                     _prefixes.Add(value);
                     break;
@@ -742,13 +695,11 @@ internal static class SymbolicInputDomainSynthesizer
             }
         }
 
-        internal void AddRegex(string pattern, bool polarity)
-        {
+        internal void AddRegex(string pattern, bool polarity) {
             if (polarity) _regexes.Add(pattern);
         }
 
-        internal void MarkIndex(string relatedCollection)
-        {
+        internal void MarkIndex(string relatedCollection) {
             IsIndex = true;
             DomainKind = SymbolicInputDomainKind.Index;
             _relatedCollection = relatedCollection;
@@ -760,29 +711,25 @@ internal static class SymbolicInputDomainSynthesizer
             string? value,
             bool isNegated,
             SymbolicWitnessStatus status,
-            string reason)
-        {
+            string reason) {
             var key = kind + "|" + isNegated + "|" + text + "|" + value;
             if (!_predicateKeys.Add(key)) return;
 
             _predicates.Add(new SymbolicDomainPredicate(kind, text, value, isNegated, status, reason));
         }
 
-        internal void MarkApproximate(string reason)
-        {
+        internal void MarkApproximate(string reason) {
             if (_status == SymbolicWitnessStatus.Exact) _status = SymbolicWitnessStatus.Approximate;
 
             if (_status != SymbolicWitnessStatus.Unsupported) _reason = reason;
         }
 
-        internal void MarkUnsupported(string reason)
-        {
+        internal void MarkUnsupported(string reason) {
             _status = SymbolicWitnessStatus.Unsupported;
             _reason = reason;
         }
 
-        internal SymbolicInputDomain Build()
-        {
+        internal SymbolicInputDomain Build() {
             return new SymbolicInputDomain(
                 Name,
                 Role,
@@ -806,17 +753,14 @@ internal static class SymbolicInputDomainSynthesizer
         }
     }
 
-    private sealed class RangeBuilder
-    {
+    private sealed class RangeBuilder {
         private long? _maximum;
         private bool _maximumInclusive;
         private long? _minimum;
         private bool _minimumInclusive;
 
-        internal void Apply(SmtBinaryOperator comparison, long value)
-        {
-            switch (comparison)
-            {
+        internal void Apply(SmtBinaryOperator comparison, long value) {
+            switch (comparison) {
                 case SmtBinaryOperator.Equal:
                     ApplyMinimum(value, true);
                     ApplyMaximum(value, true);
@@ -836,28 +780,23 @@ internal static class SymbolicInputDomainSynthesizer
             }
         }
 
-        internal SymbolicIntegerRange? Build()
-        {
+        internal SymbolicIntegerRange? Build() {
             return _minimum.HasValue || _maximum.HasValue
                 ? new SymbolicIntegerRange(_minimum, _minimumInclusive, _maximum, _maximumInclusive)
                 : null;
         }
 
-        private void ApplyMinimum(long value, bool inclusive)
-        {
+        private void ApplyMinimum(long value, bool inclusive) {
             if (!_minimum.HasValue || value > _minimum.Value ||
-                value == _minimum.Value && !inclusive && _minimumInclusive)
-            {
+                value == _minimum.Value && !inclusive && _minimumInclusive) {
                 _minimum = value;
                 _minimumInclusive = inclusive;
             }
         }
 
-        private void ApplyMaximum(long value, bool inclusive)
-        {
+        private void ApplyMaximum(long value, bool inclusive) {
             if (!_maximum.HasValue || value < _maximum.Value ||
-                value == _maximum.Value && !inclusive && _maximumInclusive)
-            {
+                value == _maximum.Value && !inclusive && _maximumInclusive) {
                 _maximum = value;
                 _maximumInclusive = inclusive;
             }

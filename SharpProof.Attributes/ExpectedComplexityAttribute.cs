@@ -1,10 +1,8 @@
 namespace SharpProof.Attributes;
 
 [AttributeUsage(AttributeTargets.All, Inherited = false)]
-public sealed class ExpectedComplexityAttribute : Attribute
-{
-    public ExpectedComplexityAttribute(ComplexityKind maximumComplexity)
-    {
+public sealed class ExpectedComplexityAttribute : Attribute {
+    public ExpectedComplexityAttribute(ComplexityKind maximumComplexity) {
         MaximumComplexity = maximumComplexity;
     }
 

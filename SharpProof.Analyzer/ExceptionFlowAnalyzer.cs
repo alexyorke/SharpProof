@@ -1,14 +1,12 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowAnalyzer
-{
+internal static partial class ExceptionFlowAnalyzer {
     public static void AnalyzeSymbolForExceptions(
         MethodBodyAnalysisContext context,
         EffectSummaryCatalog exceptionSummaryCatalog,
         CompilationPurityService purityService,
         DiagnosticBaseline baseline,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
         var runtimeHazardMode = context.Configuration.RuntimeHazardMode;
         var reportMethodSummaries = context.Configuration.ReportExceptions ||
                                     (runtimeHazardMode & RuntimeHazardMode.Summaries) != 0;
@@ -35,8 +33,7 @@ internal static partial class ExceptionFlowAnalyzer
         if (reportMethodSummaries ||
             reportCheckedExceptionSites ||
             reportUnknownRuntimeHazards ||
-            hasValidExceptionContracts)
-        {
+            hasValidExceptionContracts) {
             if (reportMethodSummaries || reportCheckedExceptionSites || hasValidExceptionContracts)
                 queryResult = context.State.GetOrCreateSymbolicQueryResult(
                     "exception-flow",
@@ -49,8 +46,7 @@ internal static partial class ExceptionFlowAnalyzer
                         purityService.SmtAnalysis,
                         attributePolicy));
 
-            if (reportUnknownRuntimeHazards)
-            {
+            if (reportUnknownRuntimeHazards) {
                 var hazardResult = queryResult ?? context.State.GetOrCreateSymbolicQueryResult(
                     "unknown-runtime-hazards",
                     () => ExceptionFlowEngine.AnalyzeHazards(
@@ -110,10 +106,8 @@ internal static partial class ExceptionFlowAnalyzer
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         ImmutableArray<SymbolicRuntimeHazard> hazards,
-        DiagnosticBaseline baseline)
-    {
-        foreach (var hazard in hazards)
-        {
+        DiagnosticBaseline baseline) {
+        foreach (var hazard in hazards) {
             var site = FindRuntimeHazardSiteNode(context.Node, hazard);
             var location = GetExceptionSiteLocation(site);
             if (location == null) continue;
@@ -161,8 +155,7 @@ internal static partial class ExceptionFlowAnalyzer
 
     internal static SyntaxNode FindRuntimeHazardSiteNode(
         SyntaxNode methodNode,
-        SymbolicRuntimeHazard hazard)
-    {
+        SymbolicRuntimeHazard hazard) {
         return methodNode.DescendantNodesAndSelf()
                    .FirstOrDefault(node =>
                        node.SpanStart == hazard.SpanStart &&
@@ -170,8 +163,7 @@ internal static partial class ExceptionFlowAnalyzer
                ?? methodNode;
     }
 
-    private static string CreateUnknownRuntimeHazardEvidenceKey(SymbolicRuntimeHazard hazard)
-    {
+    private static string CreateUnknownRuntimeHazardEvidenceKey(SymbolicRuntimeHazard hazard) {
         return CreateSourceSpanKey(hazard.SpanStart, hazard.SpanEnd) +
                "|" +
                hazard.Kind +
@@ -189,11 +181,9 @@ internal static partial class ExceptionFlowAnalyzer
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         ImmutableArray<ExceptionFlowEngine.ExceptionFlowSite> siteEntries,
-        DiagnosticBaseline baseline)
-    {
+        DiagnosticBaseline baseline) {
         foreach (var siteGroup in siteEntries.GroupBy(entry => CreateExceptionSiteKey(entry.Site),
-                     StringComparer.Ordinal))
-        {
+                     StringComparer.Ordinal)) {
             var firstEntry = siteGroup.First();
             var siteEvidence = new ExceptionFlowEngine.ExceptionEvidenceProjection(siteGroup);
             var exceptionSymbol = siteGroup.Select(static site => site.ExceptionSymbol)
@@ -233,8 +223,7 @@ internal static partial class ExceptionFlowAnalyzer
     }
 
     private static ImmutableDictionary<string, string?> CreateExceptionProperties(
-        ExceptionFlowEngine.ExceptionEvidenceProjection exceptionEvidence)
-    {
+        ExceptionFlowEngine.ExceptionEvidenceProjection exceptionEvidence) {
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add(DiagnosticPropertyNames.ExceptionTypesProperty, string.Join(";", exceptionEvidence.Types))
             .Add(DiagnosticPropertyNames.ExceptionCategoriesProperty, exceptionEvidence.FormatCategories())
@@ -248,8 +237,7 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static string CreateExceptionEvidenceKey(
         string scope,
-        ExceptionFlowEngine.ExceptionEvidenceProjection exceptionEvidence)
-    {
+        ExceptionFlowEngine.ExceptionEvidenceProjection exceptionEvidence) {
         return scope +
                "|" +
                string.Join(";", exceptionEvidence.Types) +
@@ -265,8 +253,7 @@ internal static partial class ExceptionFlowAnalyzer
         CreateSourceSpanKey(node);
 
     internal static IEnumerable<TNode> GetRelevantDescendants<TNode>(SyntaxNode methodNode)
-        where TNode : SyntaxNode
-    {
+        where TNode : SyntaxNode {
         return CSharpSyntaxFacts
             .DescendantNodesInExecution(methodNode, includeSelf: false)
             .OfType<TNode>();
@@ -275,18 +262,14 @@ internal static partial class ExceptionFlowAnalyzer
     internal static IEnumerable<MethodCallCandidate> GetCalleeCallSites(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var rootOperation =
             MethodBodyOperationResolver.GetMethodBodyRootOperation(methodNode, semanticModel, cancellationToken, false);
-        if (rootOperation != null)
-        {
-            foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation))
-            {
+        if (rootOperation != null) {
+            foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation)) {
                 cancellationToken.ThrowIfCancellationRequested();
-                switch (operation)
-                {
+                switch (operation) {
                     case IInvocationOperation invocation:
                         foreach (var candidate in CreateInvocationCandidates(
                                      invocation, semanticModel, cancellationToken))
@@ -303,8 +286,7 @@ internal static partial class ExceptionFlowAnalyzer
                         break;
                     case IInterpolatedStringHandlerCreationOperation handler:
                         var handlerConstructor = FindObjectCreationConstructor(handler.HandlerCreation);
-                        if (handlerConstructor != null)
-                        {
+                        if (handlerConstructor != null) {
                             var handlerCandidate = new MethodCallCandidate(handler.Syntax, handlerConstructor);
                             if (seen.Add(CreateMethodCallSiteKey(handlerCandidate))) yield return handlerCandidate;
                         }
@@ -318,13 +300,11 @@ internal static partial class ExceptionFlowAnalyzer
             }
         }
 
-        if (methodNode is ConstructorDeclarationSyntax { Initializer: { } initializer })
-        {
+        if (methodNode is ConstructorDeclarationSyntax { Initializer: { } initializer }) {
             var initializedConstructor =
                 (semanticModel.GetOperation(initializer, cancellationToken) as IInvocationOperation)?.TargetMethod ??
                 semanticModel.GetSymbolInfo(initializer, cancellationToken).Symbol as IMethodSymbol;
-            if (initializedConstructor != null)
-            {
+            if (initializedConstructor != null) {
                 var candidate = new MethodCallCandidate(initializer, initializedConstructor);
                 if (seen.Add(CreateMethodCallSiteKey(candidate))) yield return candidate;
             }
@@ -346,8 +326,7 @@ internal static partial class ExceptionFlowAnalyzer
     private static IEnumerable<MethodCallCandidate> CreateInvocationCandidates(
         IInvocationOperation invocation,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var method = ResolveDispatchTarget(
             invocation.TargetMethod,
             invocation.Instance,
@@ -373,10 +352,8 @@ internal static partial class ExceptionFlowAnalyzer
     private static IEnumerable<MethodCallCandidate> CreatePropertyCandidates(
         IPropertyReferenceOperation property,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var setter = property.Syntax.Parent is AssignmentExpressionSyntax
-        {
+        CancellationToken cancellationToken) {
+        var setter = property.Syntax.Parent is AssignmentExpressionSyntax {
             RawKind: (int)SyntaxKind.SimpleAssignmentExpression
         } assignment && ReferenceEquals(assignment.Left, property.Syntax);
         var propertySymbol = property.Property;
@@ -404,8 +381,7 @@ internal static partial class ExceptionFlowAnalyzer
             yield return dynamicDispatchCandidate;
     }
 
-    private static string CreateMethodCallSiteKey(SyntaxNode callSite, IMethodSymbol method)
-    {
+    private static string CreateMethodCallSiteKey(SyntaxNode callSite, IMethodSymbol method) {
         return CreateSourceSpanKey(callSite) +
                "|" +
                method.OriginalDefinition.ToDisplayString();
@@ -418,8 +394,7 @@ internal static partial class ExceptionFlowAnalyzer
         IOperation? receiver,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out MethodCallCandidate candidate)
-    {
+        out MethodCallCandidate candidate) {
         candidate = null!;
         if (method == null ||
             method.OriginalDefinition.DeclaringSyntaxReferences.Length == 0 ||
@@ -435,8 +410,7 @@ internal static partial class ExceptionFlowAnalyzer
         return true;
     }
 
-    private static string CreateMethodCallSiteKey(MethodCallCandidate candidate)
-    {
+    private static string CreateMethodCallSiteKey(MethodCallCandidate candidate) {
         var key = CreateMethodCallSiteKey(candidate.CallSite, candidate.Method);
         if (candidate.IsDynamicDispatch) key += "|dynamic-dispatch";
         if (candidate.UsingDisposeGuard?.ResourceExpression is not { } resourceExpression) return key;
@@ -452,8 +426,7 @@ internal static partial class ExceptionFlowAnalyzer
         SyntaxNode callSite,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        Func<INamedTypeSymbol, IMethodSymbol?> resolveExactTarget)
-    {
+        Func<INamedTypeSymbol, IMethodSymbol?> resolveExactTarget) {
         if (!SymbolicDispatchFacts.IsBaseReference(receiver) &&
             PurityConcreteReceiverResolver.TryResolveExactConcreteType(
                 receiver,
@@ -470,8 +443,7 @@ internal static partial class ExceptionFlowAnalyzer
     private static string CreateSourceSpanKey(SyntaxNode node) =>
         CreateSourceSpanKey(node.SpanStart, node.Span.End);
 
-    private static string CreateSourceSpanKey(int spanStart, int spanEnd)
-    {
+    private static string CreateSourceSpanKey(int spanStart, int spanEnd) {
         return spanStart.ToString(CultureInfo.InvariantCulture) +
                ":" +
                spanEnd.ToString(CultureInfo.InvariantCulture);
@@ -479,11 +451,9 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static bool TryGetOperatorOrConversionMethod(
         IOperation operation,
-        out IMethodSymbol? method)
-    {
+        out IMethodSymbol? method) {
         method = null;
-        switch (operation)
-        {
+        switch (operation) {
             case IBinaryOperation binaryOperation when binaryOperation.OperatorMethod != null:
                 method = binaryOperation.OperatorMethod;
                 return true;
@@ -500,18 +470,15 @@ internal static partial class ExceptionFlowAnalyzer
         }
     }
 
-    private static Location? GetIdentifierLocation(SyntaxNode node)
-    {
-        return node switch
-        {
+    private static Location? GetIdentifierLocation(SyntaxNode node) {
+        return node switch {
             MethodDeclarationSyntax method => method.Identifier.GetLocation(),
             ConstructorDeclarationSyntax constructor => constructor.Identifier.GetLocation(),
             OperatorDeclarationSyntax op => op.OperatorToken.GetLocation(),
             ConversionOperatorDeclarationSyntax conversion => conversion.ImplicitOrExplicitKeyword.GetLocation(),
             LocalFunctionStatementSyntax localFunction => localFunction.Identifier.GetLocation(),
             AccessorDeclarationSyntax accessor =>
-                accessor.Parent?.Parent switch
-                {
+                accessor.Parent?.Parent switch {
                     PropertyDeclarationSyntax property => property.Identifier.GetLocation(),
                     IndexerDeclarationSyntax indexer => indexer.ThisKeyword.GetLocation(),
                     _ => accessor.Keyword.GetLocation()
@@ -520,10 +487,8 @@ internal static partial class ExceptionFlowAnalyzer
         };
     }
 
-    private static Location? GetExceptionSiteLocation(SyntaxNode node)
-    {
-        return node switch
-        {
+    private static Location? GetExceptionSiteLocation(SyntaxNode node) {
+        return node switch {
             InvocationExpressionSyntax invocation => invocation.Expression.GetLocation(),
             ObjectCreationExpressionSyntax creation => creation.GetLocation(),
             ImplicitObjectCreationExpressionSyntax creation => creation.GetLocation(),
@@ -534,8 +499,7 @@ internal static partial class ExceptionFlowAnalyzer
         };
     }
 
-    private static string GetExceptionSiteDisplay(SyntaxNode node, IMethodSymbol method)
-    {
+    private static string GetExceptionSiteDisplay(SyntaxNode node, IMethodSymbol method) {
         var display = node.ToString();
         return string.IsNullOrWhiteSpace(display)
             ? method.OriginalDefinition.ToDisplayString()

@@ -1,26 +1,21 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal sealed partial class SmtConcreteFactIndex
-{
-        internal bool TryGetKnownInteger(SmtFormula formula, out long value)
-        {
+internal sealed partial class SmtConcreteFactIndex {
+        internal bool TryGetKnownInteger(SmtFormula formula, out long value) {
             formula = NormalizeAliases(formula);
             if (_integerIntervals.TryGetValue(formula, out var interval) &&
-                interval.ExactValue.HasValue)
-            {
+                interval.ExactValue.HasValue) {
                 value = interval.ExactValue.Value;
                 return true;
             }
 
             if (TryCreateIntrinsicIntegerInterval(formula, out var intrinsicInterval) &&
-                intrinsicInterval.ExactValue.HasValue)
-            {
+                intrinsicInterval.ExactValue.HasValue) {
                 value = intrinsicInterval.ExactValue.Value;
                 return true;
             }
 
-            switch (formula)
-            {
+            switch (formula) {
                 case SmtIntegerConstant integerConstant:
                     value = integerConstant.Value;
                     return true;
@@ -48,8 +43,7 @@ internal sealed partial class SmtConcreteFactIndex
 
         private bool TryAddIntegerIntervalFact(
             SmtFormula formula,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
             if (!SmtComparisonOperatorFacts.TryGetIntegerComparison(
                     formula,
@@ -73,8 +67,7 @@ internal sealed partial class SmtConcreteFactIndex
                     out var affineTautology))
                 return added;
 
-            if (affineContradiction)
-            {
+            if (affineContradiction) {
                 hasContradiction = true;
                 return true;
             }
@@ -94,8 +87,7 @@ internal sealed partial class SmtConcreteFactIndex
 
         private bool TryAddAffineIntegerComparisonFact(
             SmtFormula formula,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
             if (!TryGetIntegerBinaryComparison(formula, out var left, out var op, out var right)) return false;
 
@@ -141,8 +133,7 @@ internal sealed partial class SmtConcreteFactIndex
             SmtAffineIntegerTerm term,
             SmtBinaryOperator op,
             long constant,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
             if (term.BaseTerm == null ||
                 term.Scale == 0)
@@ -164,8 +155,7 @@ internal sealed partial class SmtConcreteFactIndex
                     out var affineTautology))
                 return false;
 
-            if (affineContradiction)
-            {
+            if (affineContradiction) {
                 hasContradiction = true;
                 return true;
             }
@@ -183,15 +173,13 @@ internal sealed partial class SmtConcreteFactIndex
             long left,
             SmtBinaryOperator op,
             long right,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             if (!TryEvaluateConstantComparison(
                     left,
                     op,
                     right,
                     out var constantContradiction,
-                    out var constantTautology))
-            {
+                    out var constantTautology)) {
                 hasContradiction = false;
                 return false;
             }
@@ -204,8 +192,7 @@ internal sealed partial class SmtConcreteFactIndex
             SmtFormula term,
             SmtBinaryOperator op,
             long constant,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             term = NormalizeAliases(term);
             var interval = TryCreateIntrinsicIntegerInterval(term, out var intrinsicInterval)
                 ? intrinsicInterval
@@ -218,8 +205,7 @@ internal sealed partial class SmtConcreteFactIndex
             return true;
         }
 
-        private bool TryCreateIntrinsicIntegerInterval(SmtFormula term, out SmtIntegerInterval interval)
-        {
+        private bool TryCreateIntrinsicIntegerInterval(SmtFormula term, out SmtIntegerInterval interval) {
             term = NormalizeAliases(term);
             interval = SmtIntegerInterval.Unbounded;
             if (term is not SmtStringLengthTerm stringLength) return false;
@@ -239,8 +225,7 @@ internal sealed partial class SmtConcreteFactIndex
             out SmtBinaryOperator normalizedOp,
             out long normalizedConstant,
             out bool hasContradiction,
-            out bool isTautology)
-        {
+            out bool isTautology) {
             normalizedTerm = term;
             normalizedOp = op;
             normalizedConstant = constant;
@@ -260,8 +245,7 @@ internal sealed partial class SmtConcreteFactIndex
 
             var scale = affine.Scale;
             var adjusted = (BigInteger)constant - affine.Offset;
-            if (scale < 0)
-            {
+            if (scale < 0) {
                 adjusted = BigInteger.Negate(adjusted);
                 op = SmtComparisonOperatorFacts.Reverse(op);
                 var positiveScale = BigInteger.Negate(new BigInteger(scale));
@@ -300,10 +284,8 @@ internal sealed partial class SmtConcreteFactIndex
             SmtBinaryOperator op,
             long right,
             out bool hasContradiction,
-            out bool isTautology)
-        {
-            if (!SmtIntegerComparisonFacts.TryEvaluate(op, left, right, out var value))
-            {
+            out bool isTautology) {
+            if (!SmtIntegerComparisonFacts.TryEvaluate(op, left, right, out var value)) {
                 hasContradiction = false;
                 isTautology = false;
                 return false;
@@ -321,8 +303,7 @@ internal sealed partial class SmtConcreteFactIndex
             out SmtBinaryOperator normalizedOp,
             out long normalizedConstant,
             out bool hasContradiction,
-            out bool isTautology)
-        {
+            out bool isTautology) {
             return TryInvertPositiveScaleComparison(
                 op,
                 new BigInteger(adjustedConstant),
@@ -340,19 +321,16 @@ internal sealed partial class SmtConcreteFactIndex
             out SmtBinaryOperator normalizedOp,
             out long normalizedConstant,
             out bool hasContradiction,
-            out bool isTautology)
-        {
+            out bool isTautology) {
             normalizedOp = op;
             normalizedConstant = 0;
             hasContradiction = false;
             isTautology = false;
             BigInteger value;
 
-            switch (op)
-            {
+            switch (op) {
                 case SmtBinaryOperator.Equal:
-                    if (adjustedConstant % positiveScale != 0)
-                    {
+                    if (adjustedConstant % positiveScale != 0) {
                         hasContradiction = true;
                         return true;
                     }
@@ -360,8 +338,7 @@ internal sealed partial class SmtConcreteFactIndex
                     value = adjustedConstant / positiveScale;
                     break;
                 case SmtBinaryOperator.NotEqual:
-                    if (adjustedConstant % positiveScale != 0)
-                    {
+                    if (adjustedConstant % positiveScale != 0) {
                         isTautology = true;
                         return true;
                     }
@@ -389,8 +366,7 @@ internal sealed partial class SmtConcreteFactIndex
         private bool TryGetAffineIntegerTerm(
             SmtFormula formula,
             int depth,
-            out SmtAffineIntegerTerm affine)
-        {
+            out SmtAffineIntegerTerm affine) {
             return SmtAffineIntegerTerm.TryCreate(
                 formula,
                 MaxAffineExpansionDepth - depth,

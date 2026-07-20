@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static class DiagnosticPropertyNames
-{
+internal static class DiagnosticPropertyNames {
     internal const string BaselineContractProperty = "sharpproof.baseline.contract";
     internal const string BaselineEvidenceKeyProperty = "sharpproof.baseline.evidence_key";
     internal const string BaselineOperationKindProperty = "sharpproof.baseline.operation_kind";

@@ -2,8 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Symbolic;
 
-internal enum SymbolicComplexityKind
-{
+internal enum SymbolicComplexityKind {
     Constant,
     Linear,
     Product,
@@ -13,8 +12,7 @@ internal enum SymbolicComplexityKind
     RecursiveUnknown
 }
 
-internal enum SymbolicComplexityUnknownReason
-{
+internal enum SymbolicComplexityUnknownReason {
     None,
     UnsupportedTarget,
     NoContainingMethodLikeBody,
@@ -49,8 +47,7 @@ internal sealed record SymbolicComplexityCalleeInfo(
     string ComplexityText,
     SymbolicComplexityKind Kind,
     bool IsConservative,
-    SymbolicComplexityUnknownReason UnknownReason)
-{
+    SymbolicComplexityUnknownReason UnknownReason) {
     public SymbolicUnknownReasonInfo UnknownReasonInfo { get; } =
         SymbolicUnknownReasonTaxonomy.ForComplexity(UnknownReason);
 }
@@ -80,8 +77,7 @@ internal sealed record SymbolicComplexityResult(
         StartLine,
         StartColumn,
         EndLine,
-        EndColumn)
-{
+        EndColumn) {
     [JsonPropertyOrder(-2)]
     public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; } =
         UnknownReasons

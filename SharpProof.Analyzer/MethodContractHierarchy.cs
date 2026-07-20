@@ -1,16 +1,13 @@
 namespace SharpProof.Analyzer;
 
-internal static class MethodContractHierarchy
-{
+internal static class MethodContractHierarchy {
     internal static IEnumerable<IMethodSymbol> EnumerateSources(
         IMethodSymbol method,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (method == null) throw new ArgumentNullException(nameof(method));
 
         var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
-        for (var current = method; current != null; current = current.OverriddenMethod)
-        {
+        for (var current = method; current != null; current = current.OverriddenMethod) {
             cancellationToken.ThrowIfCancellationRequested();
             if (seen.Add(current)) yield return current;
         }
@@ -22,14 +19,11 @@ internal static class MethodContractHierarchy
         var containingType = method.ContainingType;
         if (containingType == null) yield break;
 
-        foreach (var interfaceType in containingType.AllInterfaces)
-        {
+        foreach (var interfaceType in containingType.AllInterfaces) {
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (var interfaceMember in interfaceType.GetMembers())
-            {
+            foreach (var interfaceMember in interfaceType.GetMembers()) {
                 cancellationToken.ThrowIfCancellationRequested();
-                switch (interfaceMember)
-                {
+                switch (interfaceMember) {
                     case IMethodSymbol interfaceMethod
                         when Implements(containingType, method, interfaceMethod) && seen.Add(interfaceMethod):
                         yield return interfaceMethod;
@@ -37,8 +31,7 @@ internal static class MethodContractHierarchy
 
                     case IPropertySymbol interfaceProperty
                         when containingType.FindImplementationForInterfaceMember(interfaceProperty) is
-                            IPropertySymbol implementationProperty:
-                    {
+                            IPropertySymbol implementationProperty: {
                         var interfaceAccessor = SelectMatchingAccessor(method, implementationProperty, interfaceProperty);
                         if (interfaceAccessor != null && seen.Add(interfaceAccessor)) yield return interfaceAccessor;
                         break;
@@ -51,8 +44,7 @@ internal static class MethodContractHierarchy
     private static bool Implements(
         INamedTypeSymbol containingType,
         IMethodSymbol method,
-        IMethodSymbol interfaceMethod)
-    {
+        IMethodSymbol interfaceMethod) {
         return containingType.FindImplementationForInterfaceMember(interfaceMethod) is IMethodSymbol implementation &&
                TypeHierarchyEnumeration.IsSameOrOverridesTargetMethod(method, implementation);
     }
@@ -60,8 +52,7 @@ internal static class MethodContractHierarchy
     private static IMethodSymbol? SelectMatchingAccessor(
         IMethodSymbol method,
         IPropertySymbol implementation,
-        IPropertySymbol interfaceProperty)
-    {
+        IPropertySymbol interfaceProperty) {
         if (implementation.GetMethod != null &&
             TypeHierarchyEnumeration.IsSameOrOverridesTargetMethod(method, implementation.GetMethod))
             return interfaceProperty.GetMethod;

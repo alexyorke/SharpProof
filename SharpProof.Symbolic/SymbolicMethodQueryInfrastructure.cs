@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicSourceInputDispatcher
-{
+internal static class SymbolicSourceInputDispatcher {
     internal static TResult Execute<TResult>(
         SymbolicSourceInput source,
         SharpProofTarget target,
@@ -10,14 +9,12 @@ internal static class SymbolicSourceInputDispatcher
         string unsupportedSourceMessage,
         Func<SyntaxTree, Compilation, SharpProofTarget, CancellationToken, TResult> querySyntaxTree,
         Func<SyntaxNode, SemanticModel, SharpProofTarget, CancellationToken, TResult> queryNode,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (source == null) throw new ArgumentNullException(nameof(source));
         if (target == null) throw new ArgumentNullException(nameof(target));
 
         options ??= SymbolicQueryOptions.Default;
-        switch (source.Kind)
-        {
+        switch (source.Kind) {
             case SymbolicSourceInputKind.File:
                 if (string.IsNullOrWhiteSpace(source.FilePath))
                     throw new ArgumentException("File path is required.", nameof(source));
@@ -63,8 +60,7 @@ internal static class SymbolicSourceInputDispatcher
         SymbolicSourceCompilationProfile? compilationProfile,
         SymbolicSourceCompilationKind compilationKind,
         Func<SyntaxTree, Compilation, SharpProofTarget, CancellationToken, TResult> querySyntaxTree,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
             sourceText,
             filePath,
@@ -76,8 +72,7 @@ internal static class SymbolicSourceInputDispatcher
     }
 }
 
-internal static class SymbolicMethodLikeQueryDispatcher
-{
+internal static class SymbolicMethodLikeQueryDispatcher {
     internal static TResult Execute<TResult>(
         SymbolicQueryContext request,
         SymbolicSourceCompilationKind compilationKind,
@@ -86,8 +81,7 @@ internal static class SymbolicMethodLikeQueryDispatcher
         string nodeTargetMessage,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
         Func<ResolvedMethodLikeTarget, Compilation, CancellationToken, TResult> executeAnalysis,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return SymbolicSourceInputDispatcher.Execute(
             request.Source,
             request.Target,
@@ -102,8 +96,7 @@ internal static class SymbolicMethodLikeQueryDispatcher
             SyntaxTree syntaxTree,
             Compilation compilation,
             SharpProofTarget queryTarget,
-            CancellationToken queryCancellationToken)
-        {
+            CancellationToken queryCancellationToken) {
             if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
             if (compilation == null) throw new ArgumentNullException(nameof(compilation));
 
@@ -122,8 +115,7 @@ internal static class SymbolicMethodLikeQueryDispatcher
             SyntaxNode node,
             SemanticModel semanticModel,
             SharpProofTarget queryTarget,
-            CancellationToken queryCancellationToken)
-        {
+            CancellationToken queryCancellationToken) {
             if (node == null) throw new ArgumentNullException(nameof(node));
             if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
             if (queryTarget.Kind != SharpProofTargetKind.Node)
@@ -139,19 +131,16 @@ internal static class SymbolicMethodLikeQueryDispatcher
     }
 }
 
-internal static class SymbolicMethodLikeTargetResolver
-{
+internal static class SymbolicMethodLikeTargetResolver {
     internal static ResolvedMethodLikeTarget Resolve(
         SyntaxTree syntaxTree,
         SemanticModel semanticModel,
         SharpProofTarget target,
         string unsupportedTargetMessage,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var root = syntaxTree.GetRoot(cancellationToken);
-        switch (target.Kind)
-        {
+        switch (target.Kind) {
             case SharpProofTargetKind.Point:
                 var position = SymbolicSourceLocation.GetPosition(
                     syntaxTree,
@@ -190,8 +179,7 @@ internal static class SymbolicMethodLikeTargetResolver
         SyntaxNode node,
         SemanticModel semanticModel,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return isMethodLikeDeclaration(node)
             ? ResolvedMethodLikeTarget.Create(node, semanticModel, cancellationToken)
             : ResolveContaining(node, semanticModel, isMethodLikeDeclaration, cancellationToken);
@@ -203,8 +191,7 @@ internal static class SymbolicMethodLikeTargetResolver
         SemanticModel semanticModel,
         int position,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var text = syntaxTree.GetText(cancellationToken);
         if (position < 0 || position > text.Length)
             throw new ArgumentOutOfRangeException(nameof(position), "--position must be within the source text span.");
@@ -223,8 +210,7 @@ internal static class SymbolicMethodLikeTargetResolver
         SemanticModel semanticModel,
         int line,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var lineSpan = SymbolicSourceLocation.GetLineSpan(syntaxTree, line, cancellationToken);
         var declaration = root
             .DescendantNodes(static candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
@@ -246,10 +232,8 @@ internal static class SymbolicMethodLikeTargetResolver
         SyntaxNode node,
         SemanticModel semanticModel,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
-        CancellationToken cancellationToken)
-    {
-        foreach (var ancestor in node.AncestorsAndSelf())
-        {
+        CancellationToken cancellationToken) {
+        foreach (var ancestor in node.AncestorsAndSelf()) {
             cancellationToken.ThrowIfCancellationRequested();
             if (isMethodLikeDeclaration(ancestor))
                 return ResolvedMethodLikeTarget.Create(ancestor, semanticModel, cancellationToken);
@@ -267,8 +251,7 @@ internal sealed record ResolvedMethodLikeTarget(
     SyntaxNode? BodyNode,
     ISymbol? DeclaredSymbol,
     IMethodSymbol? MethodSymbol,
-    NodeSourceSpan SourceSpan)
-{
+    NodeSourceSpan SourceSpan) {
     internal string MethodName => !string.IsNullOrWhiteSpace(MethodSymbol?.Name)
         ? MethodSymbol!.Name
         : Declaration is AnonymousFunctionExpressionSyntax
@@ -278,8 +261,7 @@ internal sealed record ResolvedMethodLikeTarget(
     internal string MethodDisplayName =>
         MethodSymbol?.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) ?? MethodName;
 
-    internal string DeclarationKind => Declaration switch
-    {
+    internal string DeclarationKind => Declaration switch {
         MethodDeclarationSyntax => "method",
         ConstructorDeclarationSyntax => "constructor",
         DestructorDeclarationSyntax => "destructor",
@@ -310,8 +292,7 @@ internal sealed record ResolvedMethodLikeTarget(
                 cancellationToken));
 }
 
-internal static class SymbolicMethodSourceResolver
-{
+internal static class SymbolicMethodSourceResolver {
     internal static bool IsBackedBySource(IMethodSymbol method) =>
         method.OriginalDefinition.DeclaringSyntaxReferences.Length != 0;
 
@@ -323,35 +304,30 @@ internal static class SymbolicMethodSourceResolver
         CancellationToken cancellationToken,
         out SyntaxNode declaration,
         out SyntaxNode? body,
-        out SemanticModel semanticModel)
-    {
+        out SemanticModel semanticModel) {
         SyntaxNode? fallbackDeclaration = null;
         SemanticModel? fallbackSemanticModel = null;
-        foreach (var syntaxReference in method.OriginalDefinition.DeclaringSyntaxReferences)
-        {
+        foreach (var syntaxReference in method.OriginalDefinition.DeclaringSyntaxReferences) {
             cancellationToken.ThrowIfCancellationRequested();
             var candidate = syntaxReference.GetSyntax(cancellationToken);
             if (!acceptsDeclaration(candidate)) continue;
 
             var candidateBody = GetBodyNode(candidate);
             var candidateSemanticModel = compilation.GetSemanticModel(candidate.SyntaxTree);
-            if (candidateBody != null)
-            {
+            if (candidateBody != null) {
                 declaration = candidate;
                 body = candidateBody;
                 semanticModel = candidateSemanticModel;
                 return true;
             }
 
-            if (allowBodylessFallback)
-            {
+            if (allowBodylessFallback) {
                 fallbackDeclaration ??= candidate;
                 fallbackSemanticModel ??= candidateSemanticModel;
             }
         }
 
-        if (fallbackDeclaration != null && fallbackSemanticModel != null)
-        {
+        if (fallbackDeclaration != null && fallbackSemanticModel != null) {
             declaration = fallbackDeclaration;
             body = null;
             semanticModel = fallbackSemanticModel;
@@ -364,10 +340,8 @@ internal static class SymbolicMethodSourceResolver
         return false;
     }
 
-    internal static SyntaxNode? GetBodyNode(SyntaxNode declaration)
-    {
-        return declaration switch
-        {
+    internal static SyntaxNode? GetBodyNode(SyntaxNode declaration) {
+        return declaration switch {
             BaseMethodDeclarationSyntax method => (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
             AccessorDeclarationSyntax accessor => (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression,
             PropertyDeclarationSyntax property => GetGetterBody(property.ExpressionBody, property.AccessorList),
@@ -381,8 +355,7 @@ internal static class SymbolicMethodSourceResolver
 
     private static SyntaxNode? GetGetterBody(
         ArrowExpressionClauseSyntax? expressionBody,
-        AccessorListSyntax? accessorList)
-    {
+        AccessorListSyntax? accessorList) {
         var getter = accessorList?.Accessors.FirstOrDefault(static accessor => accessor.Keyword.ValueText == "get");
         return expressionBody?.Expression ?? (SyntaxNode?)getter?.Body ?? getter?.ExpressionBody?.Expression;
     }

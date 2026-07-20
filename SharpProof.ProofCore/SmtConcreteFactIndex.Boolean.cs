@@ -1,7 +1,6 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal sealed partial class SmtConcreteFactIndex
-{
+internal sealed partial class SmtConcreteFactIndex {
         internal bool TryEvaluateBoolean(SmtFormula formula, out bool value) =>
             TryEvaluateBoolean(formula, out value, 0);
 
@@ -11,8 +10,7 @@ internal sealed partial class SmtConcreteFactIndex
         private bool TryEvaluateBoolean(
             SmtFormula formula,
             out bool value,
-            int conditionalBranchDepth)
-        {
+            int conditionalBranchDepth) {
             return TryEvaluateBoolean(formula, out value, conditionalBranchDepth, true);
         }
 
@@ -20,45 +18,37 @@ internal sealed partial class SmtConcreteFactIndex
             SmtFormula formula,
             out bool value,
             int conditionalBranchDepth,
-            bool allowDirectFact)
-        {
+            bool allowDirectFact) {
             if (_booleanEvaluationDepth >= MaxBooleanEvaluationDepth ||
-                !_workBudget.TryConsume())
-            {
+                !_workBudget.TryConsume()) {
                 value = false;
                 return false;
             }
 
             _booleanEvaluationDepth++;
-            try
-            {
+            try {
                 formula = NormalizeAliases(formula);
                 var canonical = FindBooleanCanonical(formula, out var isNegatedFromCanonical);
-                if (!canonical.Equals(formula))
-                {
-                    if (allowDirectFact && _exactBooleans.TryGetValue(canonical, out var canonicalExactValue))
-                    {
+                if (!canonical.Equals(formula)) {
+                    if (allowDirectFact && _exactBooleans.TryGetValue(canonical, out var canonicalExactValue)) {
                         value = canonicalExactValue ^ isNegatedFromCanonical;
                         return true;
                     }
 
-                    if (TryEvaluateBoolean(canonical, out var canonicalValue, conditionalBranchDepth))
-                    {
+                    if (TryEvaluateBoolean(canonical, out var canonicalValue, conditionalBranchDepth)) {
                         value = canonicalValue ^ isNegatedFromCanonical;
                         return true;
                     }
                 }
 
-                if (allowDirectFact && _exactBooleans.TryGetValue(formula, out var exactValue))
-                {
+                if (allowDirectFact && _exactBooleans.TryGetValue(formula, out var exactValue)) {
                     value = exactValue;
                     return true;
                 }
 
                 if (TryEvaluateKnownComplement(formula, out value)) return true;
 
-                switch (formula)
-                {
+                switch (formula) {
                     case SmtBooleanConstant booleanConstant:
                         value = booleanConstant.Value;
                         return true;
@@ -66,36 +56,30 @@ internal sealed partial class SmtConcreteFactIndex
                         when TryEvaluateBoolean(negated.Operand, out var operandValue, conditionalBranchDepth):
                         value = !operandValue;
                         return true;
-                    case SmtBinaryFormula { Operator: SmtBinaryOperator.And } binary:
-                        {
+                    case SmtBinaryFormula { Operator: SmtBinaryOperator.And } binary: {
                             var hasLeft = TryEvaluateBoolean(binary.Left, out var left, conditionalBranchDepth);
                             var hasRight = TryEvaluateBoolean(binary.Right, out var right, conditionalBranchDepth);
-                            if ((hasLeft && !left) || (hasRight && !right))
-                            {
+                            if ((hasLeft && !left) || (hasRight && !right)) {
                                 value = false;
                                 return true;
                             }
 
-                            if (hasLeft && hasRight)
-                            {
+                            if (hasLeft && hasRight) {
                                 value = left && right;
                                 return true;
                             }
 
                             break;
                         }
-                    case SmtBinaryFormula { Operator: SmtBinaryOperator.Or } binary:
-                        {
+                    case SmtBinaryFormula { Operator: SmtBinaryOperator.Or } binary: {
                             var hasLeft = TryEvaluateBoolean(binary.Left, out var left, conditionalBranchDepth);
                             var hasRight = TryEvaluateBoolean(binary.Right, out var right, conditionalBranchDepth);
-                            if ((hasLeft && left) || (hasRight && right))
-                            {
+                            if ((hasLeft && left) || (hasRight && right)) {
                                 value = true;
                                 return true;
                             }
 
-                            if (hasLeft && hasRight)
-                            {
+                            if (hasLeft && hasRight) {
                                 value = left || right;
                                 return true;
                             }
@@ -138,17 +122,14 @@ internal sealed partial class SmtConcreteFactIndex
                 value = false;
                 return false;
             }
-            finally
-            {
+            finally {
                 _booleanEvaluationDepth--;
             }
         }
 
-        private bool TryEvaluateKnownComplement(SmtFormula formula, out bool value)
-        {
+        private bool TryEvaluateKnownComplement(SmtFormula formula, out bool value) {
             foreach (var exactBoolean in _exactBooleans)
-                if (SmtComparisonOperatorFacts.AreComplements(formula, exactBoolean.Key))
-                {
+                if (SmtComparisonOperatorFacts.AreComplements(formula, exactBoolean.Key)) {
                     value = !exactBoolean.Value;
                     return true;
                 }
@@ -163,10 +144,8 @@ internal sealed partial class SmtConcreteFactIndex
         private bool TryAddBooleanFact(
             SmtFormula formula,
             bool value,
-            out bool hasContradiction)
-        {
-            if (!_workBudget.TryConsume())
-            {
+            out bool hasContradiction) {
+            if (!_workBudget.TryConsume()) {
                 hasContradiction = false;
                 return false;
             }
@@ -175,12 +154,10 @@ internal sealed partial class SmtConcreteFactIndex
                 return AddExactBooleanWithoutInference(formula, value, out hasContradiction);
 
             _booleanFactInferenceDepth++;
-            try
-            {
+            try {
                 return TryAddBooleanFactCore(formula, value, out hasContradiction);
             }
-            finally
-            {
+            finally {
                 _booleanFactInferenceDepth--;
             }
         }
@@ -188,8 +165,7 @@ internal sealed partial class SmtConcreteFactIndex
         private bool TryAddBooleanFactCore(
             SmtFormula formula,
             bool value,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
             if (formula.Kind != SmtValueKind.Bool ||
                 formula is SmtBooleanConstant)
@@ -198,12 +174,9 @@ internal sealed partial class SmtConcreteFactIndex
             if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
                 return TryAddBooleanFact(negated.Operand, !value, out hasContradiction);
 
-            if (formula is SmtBinaryFormula binary)
-            {
-                if (binary.Operator == SmtBinaryOperator.And)
-                {
-                    if (value)
-                    {
+            if (formula is SmtBinaryFormula binary) {
+                if (binary.Operator == SmtBinaryOperator.And) {
+                    if (value) {
                         var addedLeft = TryAddBooleanFact(binary.Left, true, out var leftContradiction);
                         var addedRight = TryAddBooleanFact(binary.Right, true, out var rightContradiction);
                         hasContradiction = leftContradiction || rightContradiction;
@@ -216,10 +189,8 @@ internal sealed partial class SmtConcreteFactIndex
                     if (TryEvaluateBoolean(binary.Right, out var right) && right)
                         return TryAddBooleanFact(binary.Left, false, out hasContradiction);
                 }
-                else if (binary.Operator == SmtBinaryOperator.Or)
-                {
-                    if (!value)
-                    {
+                else if (binary.Operator == SmtBinaryOperator.Or) {
+                    if (!value) {
                         var addedLeft = TryAddBooleanFact(binary.Left, false, out var leftContradiction);
                         var addedRight = TryAddBooleanFact(binary.Right, false, out var rightContradiction);
                         hasContradiction = leftContradiction || rightContradiction;
@@ -234,20 +205,17 @@ internal sealed partial class SmtConcreteFactIndex
                 }
                 else if (binary.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual &&
                          binary.Left.Kind == SmtValueKind.Bool &&
-                         binary.Right.Kind == SmtValueKind.Bool)
-                {
+                         binary.Right.Kind == SmtValueKind.Bool) {
                     var addedEquivalence = TryAddBooleanEquivalenceFact(
                         binary,
                         value,
                         out var equivalenceContradiction);
-                    if (equivalenceContradiction)
-                    {
+                    if (equivalenceContradiction) {
                         hasContradiction = true;
                         return true;
                     }
 
-                    if (TryEvaluateBoolean(binary.Left, out var left))
-                    {
+                    if (TryEvaluateBoolean(binary.Left, out var left)) {
                         var expectedRight = binary.Operator == SmtBinaryOperator.Equal == value
                             ? left
                             : !left;
@@ -255,8 +223,7 @@ internal sealed partial class SmtConcreteFactIndex
                         return addedEquivalence || addedRight;
                     }
 
-                    if (TryEvaluateBoolean(binary.Right, out var right))
-                    {
+                    if (TryEvaluateBoolean(binary.Right, out var right)) {
                         var expectedLeft = binary.Operator == SmtBinaryOperator.Equal == value
                             ? right
                             : !right;
@@ -267,8 +234,7 @@ internal sealed partial class SmtConcreteFactIndex
             }
 
             if (TryEvaluateBoolean(formula, out var knownValue) &&
-                knownValue != value)
-            {
+                knownValue != value) {
                 hasContradiction = true;
                 return true;
             }
@@ -276,8 +242,7 @@ internal sealed partial class SmtConcreteFactIndex
             var addedComparisonFact = TryAddKnownBooleanComparisonFact(formula, value, out var comparisonContradiction);
             if (!comparisonContradiction &&
                 TryEvaluateBoolean(formula, out knownValue) &&
-                knownValue != value)
-            {
+                knownValue != value) {
                 hasContradiction = true;
                 return true;
             }
@@ -290,28 +255,24 @@ internal sealed partial class SmtConcreteFactIndex
         private bool TryAddKnownBooleanComparisonFact(
             SmtFormula formula,
             bool value,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
             var effectiveFormula = value
                 ? formula
                 : new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
             var added = false;
 
-            if (TryAddIntegerIntervalFact(effectiveFormula, out var integerContradiction))
-            {
+            if (TryAddIntegerIntervalFact(effectiveFormula, out var integerContradiction)) {
                 added = true;
                 hasContradiction |= integerContradiction;
             }
 
-            if (TryAddStringValueFact(effectiveFormula, out var stringContradiction))
-            {
+            if (TryAddStringValueFact(effectiveFormula, out var stringContradiction)) {
                 added = true;
                 hasContradiction |= stringContradiction;
             }
 
-            if (TryAddReferenceNullFact(effectiveFormula, out var referenceContradiction))
-            {
+            if (TryAddReferenceNullFact(effectiveFormula, out var referenceContradiction)) {
                 added = true;
                 hasContradiction |= referenceContradiction;
             }
@@ -322,8 +283,7 @@ internal sealed partial class SmtConcreteFactIndex
         private bool AddExactBoolean(
             SmtFormula formula,
             bool value,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
             formula = NormalizeAliases(formula);
             var canonical = FindBooleanCanonical(formula, out var isNegatedFromCanonical);
@@ -339,11 +299,9 @@ internal sealed partial class SmtConcreteFactIndex
         private bool AddExactBooleanWithoutInference(
             SmtFormula formula,
             bool value,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
-            if (formula is SmtBooleanConstant booleanConstant)
-            {
+            if (formula is SmtBooleanConstant booleanConstant) {
                 hasContradiction = booleanConstant.Value != value;
                 return hasContradiction;
             }
@@ -359,8 +317,7 @@ internal sealed partial class SmtConcreteFactIndex
         private bool TryAddBooleanEquivalenceFact(
             SmtBinaryFormula formula,
             bool value,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
             if (formula.Operator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual) ||
                 formula.Left.Kind != SmtValueKind.Bool ||
@@ -379,12 +336,10 @@ internal sealed partial class SmtConcreteFactIndex
         private bool TryGetBooleanRelationTerm(
             SmtFormula formula,
             out SmtFormula term,
-            out bool isNegated)
-        {
+            out bool isNegated) {
             term = NormalizeAliases(formula);
             isNegated = false;
-            while (term is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
-            {
+            while (term is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated) {
                 isNegated = !isNegated;
                 term = NormalizeAliases(negated.Operand);
             }
@@ -396,25 +351,21 @@ internal sealed partial class SmtConcreteFactIndex
             return false;
         }
 
-        private bool TryGetDirectKnownBooleanValue(SmtFormula formula, out bool value)
-        {
+        private bool TryGetDirectKnownBooleanValue(SmtFormula formula, out bool value) {
             formula = NormalizeAliases(formula);
             var canonical = FindBooleanCanonical(formula, out var isNegatedFromCanonical);
-            if (_exactBooleans.TryGetValue(canonical, out var exactValue))
-            {
+            if (_exactBooleans.TryGetValue(canonical, out var exactValue)) {
                 value = exactValue ^ isNegatedFromCanonical;
                 return true;
             }
 
-            if (formula is SmtBooleanConstant booleanConstant)
-            {
+            if (formula is SmtBooleanConstant booleanConstant) {
                 value = booleanConstant.Value;
                 return true;
             }
 
             if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated &&
-                TryGetDirectKnownBooleanValue(negated.Operand, out var operandValue))
-            {
+                TryGetDirectKnownBooleanValue(negated.Operand, out var operandValue)) {
                 value = !operandValue;
                 return true;
             }
@@ -423,12 +374,10 @@ internal sealed partial class SmtConcreteFactIndex
             return false;
         }
 
-        private static bool CanRelateBooleanTerm(SmtFormula formula)
-        {
+        private static bool CanRelateBooleanTerm(SmtFormula formula) {
             if (formula.Kind != SmtValueKind.Bool) return false;
 
-            return formula switch
-            {
+            return formula switch {
                 SmtVariable => true,
                 SmtStringContainsFormula => true,
                 SmtStringStartsWithFormula => true,
@@ -451,15 +400,13 @@ internal sealed partial class SmtConcreteFactIndex
             SmtFormula left,
             SmtFormula right,
             bool differs,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             var leftRoot = FindBooleanCanonical(left, out var leftNegated);
             var rightRoot = FindBooleanCanonical(right, out var rightNegated);
             var rootDiffers = differs ^ leftNegated ^ rightNegated;
             hasContradiction = false;
 
-            if (leftRoot.Equals(rightRoot))
-            {
+            if (leftRoot.Equals(rightRoot)) {
                 hasContradiction = rootDiffers;
                 return hasContradiction;
             }
@@ -478,8 +425,7 @@ internal sealed partial class SmtConcreteFactIndex
             SmtFormula canonical,
             SmtFormula alias,
             bool aliasDiffersFromCanonical,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             hasContradiction = false;
             if (!_exactBooleans.TryGetValue(alias, out var aliasValue)) return;
 
@@ -495,13 +441,10 @@ internal sealed partial class SmtConcreteFactIndex
         private bool TryEvaluateComparison(
             SmtBinaryFormula binary,
             out bool value,
-            int conditionalBranchDepth)
-        {
+            int conditionalBranchDepth) {
             if (TryGetKnownInteger(binary.Left, out var leftInteger) &&
-                TryGetKnownInteger(binary.Right, out var rightInteger))
-            {
-                value = binary.Operator switch
-                {
+                TryGetKnownInteger(binary.Right, out var rightInteger)) {
+                value = binary.Operator switch {
                     SmtBinaryOperator.Equal => leftInteger == rightInteger,
                     SmtBinaryOperator.NotEqual => leftInteger != rightInteger,
                     SmtBinaryOperator.LessThan => leftInteger < rightInteger,
@@ -519,10 +462,8 @@ internal sealed partial class SmtConcreteFactIndex
             }
 
             if (TryGetKnownString(binary.Left, out var leftString) &&
-                TryGetKnownString(binary.Right, out var rightString))
-            {
-                value = binary.Operator switch
-                {
+                TryGetKnownString(binary.Right, out var rightString)) {
+                value = binary.Operator switch {
                     SmtBinaryOperator.Equal => string.Equals(leftString, rightString, StringComparison.Ordinal),
                     SmtBinaryOperator.NotEqual => !string.Equals(leftString, rightString, StringComparison.Ordinal),
                     _ => false
@@ -531,10 +472,8 @@ internal sealed partial class SmtConcreteFactIndex
             }
 
             if (TryEvaluateBoolean(binary.Left, out var leftBoolean) &&
-                TryEvaluateBoolean(binary.Right, out var rightBoolean))
-            {
-                value = binary.Operator switch
-                {
+                TryEvaluateBoolean(binary.Right, out var rightBoolean)) {
+                value = binary.Operator switch {
                     SmtBinaryOperator.Equal => leftBoolean == rightBoolean,
                     SmtBinaryOperator.NotEqual => leftBoolean != rightBoolean,
                     _ => false
@@ -555,10 +494,8 @@ internal sealed partial class SmtConcreteFactIndex
         private bool TryEvaluateConditionalComparison(
             SmtBinaryFormula binary,
             out bool value,
-            int conditionalBranchDepth)
-        {
-            if (conditionalBranchDepth >= MaxConditionalBranchEvaluationDepth)
-            {
+            int conditionalBranchDepth) {
+            if (conditionalBranchDepth >= MaxConditionalBranchEvaluationDepth) {
                 value = false;
                 return false;
             }
@@ -590,8 +527,7 @@ internal sealed partial class SmtConcreteFactIndex
             SmtFormula whenTrue,
             SmtFormula whenFalse,
             out bool value,
-            int conditionalBranchDepth)
-        {
+            int conditionalBranchDepth) {
             value = false;
             if (conditionalBranchDepth >= MaxConditionalBranchEvaluationDepth ||
                 _conditionalBranchEvaluationDepth >= MaxConditionalBranchEvaluationDepth)
@@ -604,8 +540,7 @@ internal sealed partial class SmtConcreteFactIndex
                     conditionalBranchDepth + 1);
 
             _conditionalBranchEvaluationDepth++;
-            try
-            {
+            try {
                 var trueKnown = TryEvaluateBranchFormula(
                     condition,
                     true,
@@ -621,8 +556,7 @@ internal sealed partial class SmtConcreteFactIndex
                     out var falseReachable,
                     out var falseValue);
 
-                if (!trueReachable && !falseReachable)
-                {
+                if (!trueReachable && !falseReachable) {
                     value = false;
                     return true;
                 }
@@ -632,23 +566,20 @@ internal sealed partial class SmtConcreteFactIndex
                     return false;
 
                 if ((!trueReachable || trueValue) &&
-                    (!falseReachable || falseValue))
-                {
+                    (!falseReachable || falseValue)) {
                     value = true;
                     return true;
                 }
 
                 if ((!trueReachable || !trueValue) &&
-                    (!falseReachable || !falseValue))
-                {
+                    (!falseReachable || !falseValue)) {
                     value = false;
                     return true;
                 }
 
                 return false;
             }
-            finally
-            {
+            finally {
                 _conditionalBranchEvaluationDepth--;
             }
         }
@@ -659,11 +590,9 @@ internal sealed partial class SmtConcreteFactIndex
             SmtFormula formula,
             int conditionalBranchDepth,
             out bool isReachable,
-            out bool value)
-        {
+            out bool value) {
             var branchFacts = ForkWithBooleanAssumption(condition, assumptionValue, out var hasContradiction);
-            if (hasContradiction)
-            {
+            if (hasContradiction) {
                 isReachable = false;
                 value = false;
                 return true;
@@ -676,8 +605,7 @@ internal sealed partial class SmtConcreteFactIndex
         private SmtConcreteFactIndex ForkWithBooleanAssumption(
             SmtFormula formula,
             bool value,
-            out bool hasContradiction)
-        {
+            out bool hasContradiction) {
             var fork = new SmtConcreteFactIndex(this);
             fork.TryAddBooleanFact(formula, value, out hasContradiction);
             if (hasContradiction) return fork;
@@ -687,24 +615,19 @@ internal sealed partial class SmtConcreteFactIndex
             return fork;
         }
 
-        private bool ReplayExactBooleanFacts(out bool hasContradiction)
-        {
+        private bool ReplayExactBooleanFacts(out bool hasContradiction) {
             hasContradiction = false;
             var added = false;
-            for (var pass = 0; pass < 2; pass++)
-            {
+            for (var pass = 0; pass < 2; pass++) {
                 var exactFacts = _exactBooleans.ToArray();
                 var addedThisPass = false;
-                foreach (var exactFact in exactFacts)
-                {
-                    if (TryAddBooleanFact(exactFact.Key, exactFact.Value, out var factContradiction))
-                    {
+                foreach (var exactFact in exactFacts) {
+                    if (TryAddBooleanFact(exactFact.Key, exactFact.Value, out var factContradiction)) {
                         addedThisPass = true;
                         added = true;
                     }
 
-                    if (factContradiction)
-                    {
+                    if (factContradiction) {
                         hasContradiction = true;
                         return true;
                     }
@@ -719,22 +642,19 @@ internal sealed partial class SmtConcreteFactIndex
         private bool TryClassifyBooleanFromFacts(
             SmtFormula formula,
             out bool value,
-            int conditionalBranchDepth)
-        {
+            int conditionalBranchDepth) {
             if (TryEvaluateBoolean(formula, out value, conditionalBranchDepth)) return true;
 
             var falseProbe = new SmtConcreteFactIndex(this);
             falseProbe.Add(new SmtUnaryFormula(SmtUnaryOperator.Not, formula), out var falseContradiction);
-            if (falseContradiction)
-            {
+            if (falseContradiction) {
                 value = true;
                 return true;
             }
 
             var trueProbe = new SmtConcreteFactIndex(this);
             trueProbe.Add(formula, out var trueContradiction);
-            if (trueContradiction)
-            {
+            if (trueContradiction) {
                 value = false;
                 return true;
             }
@@ -743,8 +663,7 @@ internal sealed partial class SmtConcreteFactIndex
             return false;
         }
 
-        private bool TryEvaluateBooleanEquivalenceComparison(SmtBinaryFormula binary, out bool value)
-        {
+        private bool TryEvaluateBooleanEquivalenceComparison(SmtBinaryFormula binary, out bool value) {
             value = false;
             if (binary.Operator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual) ||
                 binary.Left.Kind != SmtValueKind.Bool ||

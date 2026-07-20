@@ -2,15 +2,13 @@ using System.Diagnostics;
 
 namespace SharpProof.ProofCore.Smt;
 
-internal enum Feasibility
-{
+internal enum Feasibility {
     Satisfiable,
     Unsatisfiable,
     Unknown
 }
 
-internal sealed class SmtSolver : IDisposable
-{
+internal sealed class SmtSolver : IDisposable {
     internal const int MaxRegexValidationCacheEntries = SmtRegexValidator.MaxCacheEntries;
     private readonly Z3FormulaEncoder _encoder = new();
     private readonly SmtConcreteFactPreprocessor _preprocessor = new();
@@ -25,16 +23,13 @@ internal sealed class SmtSolver : IDisposable
 
     internal int RegexValidationCacheCount => _preprocessor.RegexValidationCacheCount;
 
-    public void Dispose()
-    {
+    public void Dispose() {
         _encoder.Dispose();
     }
 
-    private Status CheckAndAccountResources(Solver solver)
-    {
+    private Status CheckAndAccountResources(Solver solver) {
         var status = solver.Check();
-        foreach (var entry in solver.Statistics.Entries)
-        {
+        foreach (var entry in solver.Statistics.Entries) {
             if (!string.Equals(entry.Key, "rlimit count", StringComparison.Ordinal) || !entry.IsUInt) continue;
 
             // The statistic is cumulative per Z3 context; account the delta. A
@@ -53,16 +48,14 @@ internal sealed class SmtSolver : IDisposable
 
     public SmtFeasibilityResult CheckSatisfiability(
         IEnumerable<SmtFormula> pathConditions,
-        TimeSpan timeout)
-    {
+        TimeSpan timeout) {
         return CheckSatisfiability(pathConditions, timeout, true);
     }
 
     private SmtFeasibilityResult CheckSatisfiability(
         IEnumerable<SmtFormula> pathConditions,
         TimeSpan timeout,
-        bool adjustApproximation)
-    {
+        bool adjustApproximation) {
         var query = Prepare(pathConditions);
         if (query.Status != SmtConcreteFactPreparationStatus.Ready)
             return query.Status == SmtConcreteFactPreparationStatus.Unsatisfiable
@@ -79,8 +72,7 @@ internal sealed class SmtSolver : IDisposable
                 SmtSatisfyingWitness.Unsupported("solver_timeout"));
 
         if (query.WasChanged && !query.ContainsApproximateRegex)
-            try
-            {
+            try {
                 return CheckSatisfiabilityRawWithWitness(
                     query.OriginalConditions,
                     query.OriginalConditions,
@@ -89,14 +81,12 @@ internal sealed class SmtSolver : IDisposable
                     adjustApproximation,
                     false);
             }
-            catch (Exception ex) when (IsConservativeSolverFailure(ex))
-            {
+            catch (Exception ex) when (IsConservativeSolverFailure(ex)) {
                 // Exact concrete facts may still use operations that the encoder cannot represent.
                 // The preparation pass already validated them, so continue with the reduced query.
             }
 
-        try
-        {
+        try {
             return CheckSatisfiabilityRawWithWitness(
                 query.Conditions,
                 query.OriginalConditions,
@@ -105,8 +95,7 @@ internal sealed class SmtSolver : IDisposable
                 adjustApproximation,
                 query.ContainsApproximateRegex);
         }
-        catch (Exception ex) when (IsConservativeSolverFailure(ex))
-        {
+        catch (Exception ex) when (IsConservativeSolverFailure(ex)) {
             return new SmtFeasibilityResult(
                 Feasibility.Unknown,
                 SmtSatisfyingWitness.Unsupported(GetConservativeSolverFailureReason(ex)));
@@ -116,8 +105,7 @@ internal sealed class SmtSolver : IDisposable
     public SmtPathAndImpurityCheckResult CheckPathAndImpurityWithWitness(
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula impurityCondition,
-        TimeSpan timeout)
-    {
+        TimeSpan timeout) {
         var normalizedPathConditions = pathConditions.ToArray();
         var deadline = Stopwatch.StartNew();
         var path = CheckSatisfiability(normalizedPathConditions, timeout, true);
@@ -145,8 +133,7 @@ internal sealed class SmtSolver : IDisposable
         TimeSpan timeout,
         bool preprocessedModel,
         bool adjustApproximation,
-        bool? containsApproximateRegex = null)
-    {
+        bool? containsApproximateRegex = null) {
         var isApproximate = containsApproximateRegex ?? ContainsApproximateRegex(conditions);
         using var solver = _encoder.CreateSolver(timeout);
         foreach (var formula in conditions) solver.Assert(_encoder.EncodeCondition(formula));
@@ -183,10 +170,8 @@ internal sealed class SmtSolver : IDisposable
             witness);
     }
 
-    private static Feasibility ToFeasibility(Status status)
-    {
-        return status switch
-        {
+    private static Feasibility ToFeasibility(Status status) {
+        return status switch {
             Status.SATISFIABLE => Feasibility.Satisfiable,
             Status.UNSATISFIABLE => Feasibility.Unsatisfiable,
             _ => Feasibility.Unknown
@@ -196,8 +181,7 @@ internal sealed class SmtSolver : IDisposable
     private bool ContainsApproximateRegex(IEnumerable<SmtFormula> formulas) =>
         formulas.Any(_encoder.ContainsApproximateRegex);
 
-    private PreparedSmtQuery Prepare(IEnumerable<SmtFormula> conditions)
-    {
+    private PreparedSmtQuery Prepare(IEnumerable<SmtFormula> conditions) {
         var original = conditions.ToArray();
         var status = _preprocessor.Prepare(original, out var prepared);
         return new PreparedSmtQuery(
@@ -208,15 +192,13 @@ internal sealed class SmtSolver : IDisposable
             ContainsApproximateRegex(original));
     }
 
-    private static Feasibility AdjustForApproximation(Feasibility feasibility, bool containsApproximateRegex)
-    {
+    private static Feasibility AdjustForApproximation(Feasibility feasibility, bool containsApproximateRegex) {
         return feasibility == Feasibility.Satisfiable && containsApproximateRegex
             ? Feasibility.Unknown
             : feasibility;
     }
 
-    private static bool IsConservativeSolverFailure(Exception ex)
-    {
+    private static bool IsConservativeSolverFailure(Exception ex) {
         return ex is InvalidOperationException ||
                ex is Z3Exception ||
                ex is ArgumentException ||
@@ -225,18 +207,15 @@ internal sealed class SmtSolver : IDisposable
                ex is ArithmeticException;
     }
 
-    private static string GetConservativeSolverFailureReason(Exception ex)
-    {
-        return ex switch
-        {
+    private static string GetConservativeSolverFailureReason(Exception ex) {
+        return ex switch {
             Z3Exception => "z3_transient_failure",
             RegexMatchTimeoutException => "solver_timeout",
             _ => "solver_encoding_failure"
         };
     }
 
-    private static IReadOnlyList<SmtVariable> CollectVariables(IEnumerable<SmtFormula> formulas)
-    {
+    private static IReadOnlyList<SmtVariable> CollectVariables(IEnumerable<SmtFormula> formulas) {
         var variables = new HashSet<SmtVariable>();
         foreach (var formula in formulas)
             foreach (var candidate in SmtFormulaTraversal.Enumerate(formula))

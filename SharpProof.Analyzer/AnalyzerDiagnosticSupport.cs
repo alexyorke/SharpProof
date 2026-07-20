@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static class AnalyzerDiagnosticReporter
-{
+internal static class AnalyzerDiagnosticReporter {
     internal static Action<Diagnostic> CreateBaselineReporter(
         MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline) =>
@@ -10,32 +9,27 @@ internal static class AnalyzerDiagnosticReporter
     internal static void ReportIfNotSuppressed(
         MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline,
-        Diagnostic diagnostic)
-    {
+        Diagnostic diagnostic) {
         ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
     }
 
     internal static void ReportIfNotSuppressed(
         Microsoft.CodeAnalysis.Diagnostics.OperationAnalysisContext context,
         DiagnosticBaseline baseline,
-        Diagnostic diagnostic)
-    {
+        Diagnostic diagnostic) {
         ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
     }
 
     internal static void ReportIfNotSuppressed(
         DiagnosticBaseline baseline,
         Diagnostic diagnostic,
-        Action<Diagnostic> reportDiagnostic)
-    {
+        Action<Diagnostic> reportDiagnostic) {
         if (!baseline.IsSuppressed(diagnostic)) reportDiagnostic(diagnostic);
     }
 }
 
-internal static class ContractDiagnosticSupport
-{
-    internal enum EvidenceFamily
-    {
+internal static class ContractDiagnosticSupport {
+    internal enum EvidenceFamily {
         Requires,
         Ensures
     }
@@ -53,10 +47,8 @@ internal static class ContractDiagnosticSupport
         SymbolicAnalysisTruncationInfo analysisTruncation,
         string? diagnosticUnknownReason = null,
         string? callee = null,
-        SymbolicUnknownReasonInfo? structuredUnknownReason = null)
-    {
-        var properties = family switch
-        {
+        SymbolicUnknownReasonInfo? structuredUnknownReason = null) {
+        var properties = family switch {
             EvidenceFamily.Requires => ImmutableDictionary<string, string?>.Empty
                 .Add("sharpproof.requires.condition", condition)
                 .Add("sharpproof.requires.proof_status", proofStatus)
@@ -96,14 +88,12 @@ internal static class ContractDiagnosticSupport
 
     internal static string FormatUnknownReason(
         SymbolicConditionProofResult proof,
-        string contractAttributeName)
-    {
+        string contractAttributeName) {
         if (proof.Proof.UnknownReason != SymbolicUnknownReason.None &&
             proof.Proof.UnknownReason != SymbolicUnknownReason.Unknown)
             return proof.Proof.UnknownReason.ToString();
 
-        return proof.Reason switch
-        {
+        return proof.Reason switch {
             "condition_parse_failure" => "condition parse failure",
             "condition_binding_failure" => "condition binding failure",
             "condition_not_supported" => "condition is not supported by the current bounded proof engine",
@@ -113,8 +103,7 @@ internal static class ContractDiagnosticSupport
         };
     }
 
-    internal static string FormatLocationKey(Location? location)
-    {
+    internal static string FormatLocationKey(Location? location) {
         return location == null
             ? "none"
             : location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture) +
@@ -123,8 +112,7 @@ internal static class ContractDiagnosticSupport
     }
 }
 
-internal static class AnalyzerDiagnosticProperties
-{
+internal static class AnalyzerDiagnosticProperties {
     internal static ImmutableDictionary<string, string?> AddBaselineAndExplain(
         ImmutableDictionary<string, string?> properties,
         ISymbol? symbol,
@@ -136,8 +124,7 @@ internal static class AnalyzerDiagnosticProperties
         string explainContractText,
         string proofStatus,
         string? unknownReason = null,
-        string? impliedConditionText = null)
-    {
+        string? impliedConditionText = null) {
         if (symbol != null && syntaxTree != null)
             properties = BaselineDiagnosticProperties.Add(
                 properties,
@@ -156,14 +143,12 @@ internal static class AnalyzerDiagnosticProperties
     }
 }
 
-internal static class DiagnosticEvidenceKey
-{
+internal static class DiagnosticEvidenceKey {
     internal static string ForSpanLength(
         string kind,
         int spanStart,
         int spanLength,
-        params string?[] segments)
-    {
+        params string?[] segments) {
         return Build(kind, spanStart, spanLength, segments);
     }
 
@@ -171,8 +156,7 @@ internal static class DiagnosticEvidenceKey
         string kind,
         int spanStart,
         int spanEnd,
-        params string?[] segments)
-    {
+        params string?[] segments) {
         return Build(kind, spanStart, spanEnd, segments);
     }
 
@@ -180,8 +164,7 @@ internal static class DiagnosticEvidenceKey
         string kind,
         int spanStart,
         int spanValue,
-        IEnumerable<string?> segments)
-    {
+        IEnumerable<string?> segments) {
         return kind +
                "@" +
                spanStart.ToString(CultureInfo.InvariantCulture) +

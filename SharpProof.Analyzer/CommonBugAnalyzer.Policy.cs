@@ -1,16 +1,13 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class CommonBugAnalyzer
-{
+internal static partial class CommonBugAnalyzer {
     internal static void AnalyzeSyntaxTree(
         SyntaxTreeAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         var root = context.Tree.GetRoot(context.CancellationToken);
         foreach (var directive in root.DescendantTrivia(descendIntoTrivia: true)
                      .Select(static trivia => trivia.GetStructure()))
-            switch (directive)
-            {
+            switch (directive) {
                 case PragmaWarningDirectiveTriviaSyntax pragma
                     when pragma.IsActive &&
                          pragma.DisableOrRestoreKeyword.IsKind(SyntaxKind.DisableKeyword) &&
@@ -37,8 +34,7 @@ internal static partial class CommonBugAnalyzer
 
     internal static void AnalyzeSuppressionAttribute(
         SyntaxNodeAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         if (context.Node is not AttributeSyntax attribute ||
             context.SemanticModel.GetSymbolInfo(attribute, context.CancellationToken).Symbol is not
                 IMethodSymbol constructor ||

@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal enum ComplexityGrowthClass
-{
+internal enum ComplexityGrowthClass {
     Constant,
     Logarithmic,
     Linear,
@@ -11,14 +10,11 @@ internal enum ComplexityGrowthClass
     Max
 }
 
-internal static class ComplexityContractFacts
-{
+internal static class ComplexityContractFacts {
     internal static bool TryMap(
         SymbolicComplexityKind kind,
-        out ComplexityGrowthClass complexityClass)
-    {
-        switch (kind)
-        {
+        out ComplexityGrowthClass complexityClass) {
+        switch (kind) {
             case SymbolicComplexityKind.Constant:
                 complexityClass = ComplexityGrowthClass.Constant;
                 return true;
@@ -40,10 +36,8 @@ internal static class ComplexityContractFacts
         }
     }
 
-    internal static bool TryGetAttributeKindName(SymbolicComplexityKind kind, out string name)
-    {
-        if (TryMap(kind, out var complexityClass))
-        {
+    internal static bool TryGetAttributeKindName(SymbolicComplexityKind kind, out string name) {
+        if (TryMap(kind, out var complexityClass)) {
             name = complexityClass.ToString();
             return true;
         }

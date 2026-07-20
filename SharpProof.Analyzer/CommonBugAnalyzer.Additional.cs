@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class CommonBugAnalyzer
-{
+internal static partial class CommonBugAnalyzer {
     private static readonly ImmutableHashSet<BinaryOperatorKind> SuspiciousIdenticalOperators =
         ImmutableHashSet.Create(
             BinaryOperatorKind.Equals,
@@ -16,8 +15,7 @@ internal static partial class CommonBugAnalyzer
 
     private static void AnalyzeAdditionalCommonBugs(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         AnalyzeIdenticalOperands(context, session);
         AnalyzeContainerOwnedDisposal(context, session);
         AnalyzeUnconsumedDeferredQueries(context, session);
@@ -25,10 +23,8 @@ internal static partial class CommonBugAnalyzer
 
     private static void AnalyzeIdenticalOperands(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
-        foreach (var binary in context.Snapshot.VisibleOperations.OfType<IBinaryOperation>())
-        {
+        AnalyzerSession session) {
+        foreach (var binary in context.Snapshot.VisibleOperations.OfType<IBinaryOperation>()) {
             if (!SuspiciousIdenticalOperators.Contains(binary.OperatorKind) ||
                 binary.OperatorMethod != null ||
                 IsFloatingPoint(binary.LeftOperand.Type) ||
@@ -53,11 +49,9 @@ internal static partial class CommonBugAnalyzer
     private static bool IsFloatingPoint(ITypeSymbol? type) =>
         type?.SpecialType is SpecialType.System_Single or SpecialType.System_Double;
 
-    private static ISymbol? GetStableLocalOrParameter(IOperation operation)
-    {
+    private static ISymbol? GetStableLocalOrParameter(IOperation operation) {
         operation = Unwrap(operation)!;
-        return operation switch
-        {
+        return operation switch {
             ILocalReferenceOperation local => local.Local,
             IParameterReferenceOperation parameter => parameter.Parameter,
             _ => null
@@ -66,11 +60,9 @@ internal static partial class CommonBugAnalyzer
 
     private static void AnalyzeContainerOwnedDisposal(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         foreach (var operation in context.Snapshot.VisibleOperations)
-            switch (operation)
-            {
+            switch (operation) {
                 case IUsingOperation usingOperation:
                     ReportResolvedServiceInUsing(context, session, usingOperation.Resources);
                     break;
@@ -95,8 +87,7 @@ internal static partial class CommonBugAnalyzer
     private static void ReportResolvedServiceInUsing(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        IOperation resources)
-    {
+        IOperation resources) {
         foreach (var resolver in resources.DescendantsAndSelf().OfType<IInvocationOperation>())
             if (IsServiceResolution(resolver))
                 Report(
@@ -108,8 +99,7 @@ internal static partial class CommonBugAnalyzer
                     resolver.TargetMethod.Name);
     }
 
-    private static bool IsServiceResolution(IInvocationOperation invocation)
-    {
+    private static bool IsServiceResolution(IInvocationOperation invocation) {
         if (invocation.TargetMethod.Name is not ("GetService" or "GetRequiredService")) return false;
 
         var containingType = invocation.TargetMethod.ContainingType.ToDisplayString();
@@ -120,8 +110,7 @@ internal static partial class CommonBugAnalyzer
 
     private static void AnalyzeUnconsumedDeferredQueries(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         var operations = context.Snapshot.VisibleOperations;
         foreach (var statement in operations.OfType<IExpressionStatementOperation>())
             if (Unwrap(statement.Operation) is IInvocationOperation invocation && IsDeferredQuery(invocation))
@@ -133,8 +122,7 @@ internal static partial class CommonBugAnalyzer
                     "unconsumed_deferred_query",
                     invocation.TargetMethod.Name);
 
-        foreach (var declarator in operations.OfType<IVariableDeclaratorOperation>())
-        {
+        foreach (var declarator in operations.OfType<IVariableDeclaratorOperation>()) {
             if (declarator.Initializer?.Value is not { } initializer ||
                 Unwrap(initializer) is not IInvocationOperation invocation ||
                 !IsDeferredQuery(invocation))
@@ -154,8 +142,7 @@ internal static partial class CommonBugAnalyzer
         }
     }
 
-    private static bool IsDeferredQuery(IInvocationOperation invocation)
-    {
+    private static bool IsDeferredQuery(IInvocationOperation invocation) {
         return DeferredQueryOperators.Contains(invocation.TargetMethod.Name) &&
                (IsLinqMethod(invocation.TargetMethod, "System.Linq.Enumerable") ||
                 IsLinqMethod(invocation.TargetMethod, "System.Linq.Queryable"));

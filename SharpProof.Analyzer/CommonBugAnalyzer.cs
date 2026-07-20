@@ -1,11 +1,9 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class CommonBugAnalyzer
-{
+internal static partial class CommonBugAnalyzer {
     internal static void AnalyzeCallable(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         AnalyzeAsyncCorrectness(context, session);
         AnalyzeCollectionAndConcurrencyCorrectness(context, session);
         AnalyzeNullLinqSerializationAndDeployment(context, session);
@@ -14,8 +12,7 @@ internal static partial class CommonBugAnalyzer
 
     internal static void AnalyzeNamedType(
         SymbolAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         if (context.Symbol is INamedTypeSymbol type)
             AnalyzeNamedTypeCore(context, session, type);
     }
@@ -26,8 +23,7 @@ internal static partial class CommonBugAnalyzer
         DiagnosticDescriptor descriptor,
         Location location,
         string kind,
-        params object[] messageArguments)
-    {
+        params object[] messageArguments) {
         context.CancellationToken.ThrowIfCancellationRequested();
         ReportCommonBugForSymbol(
             session,
@@ -47,8 +43,7 @@ internal static partial class CommonBugAnalyzer
         ISymbol symbol,
         Location location,
         string kind,
-        params object[] messageArguments)
-    {
+        params object[] messageArguments) {
         context.CancellationToken.ThrowIfCancellationRequested();
         if (location.SourceTree == null) return;
 
@@ -69,8 +64,7 @@ internal static partial class CommonBugAnalyzer
         DiagnosticDescriptor descriptor,
         Location location,
         string kind,
-        params object[] messageArguments)
-    {
+        params object[] messageArguments) {
         context.CancellationToken.ThrowIfCancellationRequested();
         var symbol = context.SemanticModel.GetEnclosingSymbol(location.SourceSpan.Start, context.CancellationToken);
         if (symbol == null || location.SourceTree == null) return;
@@ -92,8 +86,7 @@ internal static partial class CommonBugAnalyzer
         DiagnosticDescriptor descriptor,
         Location location,
         string kind,
-        params object[] messageArguments)
-    {
+        params object[] messageArguments) {
         context.CancellationToken.ThrowIfCancellationRequested();
         var path = context.Tree.FilePath ?? string.Empty;
         var properties = BaselineDiagnosticProperties.Add(
@@ -115,8 +108,7 @@ internal static partial class CommonBugAnalyzer
         ISymbol symbol,
         SyntaxTree syntaxTree,
         object[] messageArguments,
-        Action<Diagnostic> reportDiagnostic)
-    {
+        Action<Diagnostic> reportDiagnostic) {
         var symbolDisplay = symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         var properties = BaselineDiagnosticProperties.Add(
             CreateCommonBugProperties(kind, symbolDisplay),
@@ -129,8 +121,7 @@ internal static partial class CommonBugAnalyzer
         if (!session.Baseline.IsSuppressed(diagnostic)) reportDiagnostic(diagnostic);
     }
 
-    private static ImmutableDictionary<string, string?> CreateCommonBugProperties(string kind, string symbol)
-    {
+    private static ImmutableDictionary<string, string?> CreateCommonBugProperties(string kind, string symbol) {
         return ImmutableDictionary<string, string?>.Empty
             .Add("sharpproof.common_bug.kind", kind)
             .Add("sharpproof.common_bug.symbol", symbol);
@@ -144,8 +135,7 @@ internal static partial class CommonBugAnalyzer
         Location location,
         string kind,
         ImmutableDictionary<string, string?> properties,
-        object[] messageArguments)
-    {
+        object[] messageArguments) {
         properties = ExplainDiagnosticProperties.Add(
             properties,
             location,
@@ -155,8 +145,7 @@ internal static partial class CommonBugAnalyzer
         return Diagnostic.Create(descriptor, location, null, properties, messageArguments);
     }
 
-    private static IOperation? Unwrap(IOperation? operation)
-    {
+    private static IOperation? Unwrap(IOperation? operation) {
         while (operation is IConversionOperation conversion && conversion.OperatorMethod == null)
             operation = conversion.Operand;
 
@@ -166,8 +155,7 @@ internal static partial class CommonBugAnalyzer
         return operation;
     }
 
-    private static bool IsTaskType(ITypeSymbol? type)
-    {
+    private static bool IsTaskType(ITypeSymbol? type) {
         for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType)
             if (string.Equals(current.Name, "Task", StringComparison.Ordinal) &&
                 string.Equals(
@@ -179,8 +167,7 @@ internal static partial class CommonBugAnalyzer
         return false;
     }
 
-    private static bool IsTaskCompletionSourceType(ITypeSymbol? type)
-    {
+    private static bool IsTaskCompletionSourceType(ITypeSymbol? type) {
         return type is INamedTypeSymbol namedType &&
                string.Equals(namedType.Name, "TaskCompletionSource", StringComparison.Ordinal) &&
                string.Equals(
@@ -189,10 +176,8 @@ internal static partial class CommonBugAnalyzer
                    StringComparison.Ordinal);
     }
 
-    private static bool IsOrDerivesFrom(ITypeSymbol? type, string metadataName)
-    {
-        for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType)
-        {
+    private static bool IsOrDerivesFrom(ITypeSymbol? type, string metadataName) {
+        for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType) {
             var namespaceName = current.ContainingNamespace?.ToDisplayString();
             var candidate = string.IsNullOrEmpty(namespaceName)
                 ? current.MetadataName
@@ -203,8 +188,7 @@ internal static partial class CommonBugAnalyzer
         return false;
     }
 
-    private static AttributeData? FindAttribute(ISymbol symbol, INamedTypeSymbol? attributeType)
-    {
+    private static AttributeData? FindAttribute(ISymbol symbol, INamedTypeSymbol? attributeType) {
         if (attributeType == null) return null;
 
         return symbol.GetAttributes().FirstOrDefault(attribute =>

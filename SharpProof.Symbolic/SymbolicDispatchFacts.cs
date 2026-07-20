@@ -1,9 +1,7 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicDispatchFacts
-{
-    public static bool ShouldTreatAsDynamicDispatch(IMethodSymbol methodSymbol, IOperation operation)
-    {
+internal static class SymbolicDispatchFacts {
+    public static bool ShouldTreatAsDynamicDispatch(IMethodSymbol methodSymbol, IOperation operation) {
         var originalMethod = methodSymbol.OriginalDefinition;
         if (originalMethod.IsStatic ||
             originalMethod.MethodKind is MethodKind.Constructor or MethodKind.StaticConstructor ||
@@ -23,10 +21,8 @@ internal static class SymbolicDispatchFacts
         return !HasExactReceiverType(operation);
     }
 
-    public static IOperation? GetReceiverOperation(IOperation operation)
-    {
-        return operation switch
-        {
+    public static IOperation? GetReceiverOperation(IOperation operation) {
+        return operation switch {
             IInvocationOperation invocationOperation => UnwrapImplicitConversion(invocationOperation.Instance),
             IPropertyReferenceOperation propertyReferenceOperation => UnwrapImplicitConversion(
                 propertyReferenceOperation.Instance),
@@ -34,16 +30,14 @@ internal static class SymbolicDispatchFacts
         };
     }
 
-    private static bool HasExactReceiverType(IOperation operation)
-    {
+    private static bool HasExactReceiverType(IOperation operation) {
         var receiver = GetReceiverOperation(operation);
         var receiverType = receiver?.Type as INamedTypeSymbol;
         return receiverType is { TypeKind: TypeKind.Struct } ||
                receiverType is { IsSealed: true };
     }
 
-    private static IOperation? UnwrapImplicitConversion(IOperation? operation)
-    {
+    private static IOperation? UnwrapImplicitConversion(IOperation? operation) {
         var current = operation;
         while (current is IConversionOperation conversionOperation && conversionOperation.IsImplicit)
             current = conversionOperation.Operand;
@@ -51,8 +45,7 @@ internal static class SymbolicDispatchFacts
         return current;
     }
 
-    public static bool IsBaseReference(IOperation? operation)
-    {
+    public static bool IsBaseReference(IOperation? operation) {
         var unwrappedOperation = UnwrapImplicitConversion(operation);
         return unwrappedOperation is IInstanceReferenceOperation instanceReferenceOperation &&
                instanceReferenceOperation.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance &&

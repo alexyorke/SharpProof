@@ -1,7 +1,6 @@
 namespace SharpProof.Schema;
 
-public static class SharpProofEvidenceSchema
-{
+public static class SharpProofEvidenceSchema {
     public const int CurrentVersion = 2;
 
     public const string DiagnosticVersionProperty = "sharpproof.evidence.schema_version";

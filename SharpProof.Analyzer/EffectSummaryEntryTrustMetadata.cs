@@ -8,14 +8,12 @@ internal sealed record EffectSummaryEntryTrustMetadata(
     int BuiltInSourcePriority,
     int AdditionalSourcePriority,
     string? SourcePath,
-    EffectSummaryCompatibilityReporter? CompatibilityReporter)
-{
+    EffectSummaryCompatibilityReporter? CompatibilityReporter) {
     internal bool IsTrustedFor(
         IMethodSymbol methodSymbol,
         ActualAssemblyIdentity? actualAssemblyIdentity,
         ActualMethodIdentity? actualMethodIdentity,
-        string displaySymbol)
-    {
+        string displaySymbol) {
         return methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
                IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity, displaySymbol);
     }
@@ -23,8 +21,7 @@ internal sealed record EffectSummaryEntryTrustMetadata(
     internal bool IsTrustedFor(
         ActualAssemblyIdentity? actualAssemblyIdentity,
         ActualMethodIdentity? actualMethodIdentity,
-        string displaySymbol)
-    {
+        string displaySymbol) {
         return EffectSummaryEntryTrustEvaluator.IsTrusted(
             AssemblyIdentity,
             ArtifactSource,

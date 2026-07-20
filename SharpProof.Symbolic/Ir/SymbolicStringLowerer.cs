@@ -267,8 +267,7 @@ internal static class SymbolicStringLowerer {
                 IInvocationOperation {
                     Instance.Syntax: ExpressionSyntax receiverExpression
                 } operation ||
-            operation.TargetMethod is not
-            {
+            operation.TargetMethod is not {
                 IsStatic: false,
                 Name: "IndexOf" or "LastIndexOf",
                 ReturnType.SpecialType: SpecialType.System_Int32,

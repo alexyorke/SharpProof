@@ -1,13 +1,11 @@
 namespace SharpProof.Analyzer;
 
-internal static class InferredContractSuggestionAnalyzer
-{
+internal static class InferredContractSuggestionAnalyzer {
     private const string AttributeNamespace = "global::SharpProof.Attributes.";
 
     internal static void Analyze(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         var options = context.Configuration.InferredContractSuggestions;
         if (!options.IsEnabled ||
             context.Snapshot.RootOperation == null ||
@@ -27,8 +25,7 @@ internal static class InferredContractSuggestionAnalyzer
     private static void SuggestNullableContracts(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        InferredContractSuggestionOptions options)
-    {
+        InferredContractSuggestionOptions options) {
         const string optionKind = "nullability";
         const InferredContractConfidence confidence = InferredContractConfidence.High;
         if (!options.Includes(optionKind, confidence)) return;
@@ -37,8 +34,7 @@ internal static class InferredContractSuggestionAnalyzer
         if (!method.ReturnsVoid &&
             method.ReturnType.IsReferenceType &&
             method.ReturnNullableAnnotation == NullableAnnotation.Annotated &&
-            NullableFlowFacts.GetMethodReturnState(method) != NullableFlowFactState.NotNull)
-        {
+            NullableFlowFacts.GetMethodReturnState(method) != NullableFlowFactState.NotNull) {
             var returns = GetReturnExpressions(context.Node).ToArray();
             if (returns.Length != 0 &&
                 returns.All(expression => NullableFlowFacts.GetExpressionState(
@@ -77,13 +73,11 @@ internal static class InferredContractSuggestionAnalyzer
     private static bool TryGetNullGuardParameter(
         MethodBodyAnalysisContext context,
         ExpressionSyntax condition,
-        out IParameterSymbol parameter)
-    {
+        out IParameterSymbol parameter) {
         if (TryMatchNullGuard(condition, out var candidate, out var matchesNull) &&
             matchesNull &&
             context.SemanticModel.GetSymbolInfo(candidate, context.CancellationToken).Symbol is
-                IParameterSymbol found)
-        {
+                IParameterSymbol found) {
             parameter = found;
             return true;
         }
@@ -95,8 +89,7 @@ internal static class InferredContractSuggestionAnalyzer
     private static void SuggestZeroAllocations(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        InferredContractSuggestionOptions options)
-    {
+        InferredContractSuggestionOptions options) {
         const string kind = "zero-allocations";
         const InferredContractConfidence confidence = InferredContractConfidence.High;
         if (!options.Includes(kind, confidence) ||
@@ -118,8 +111,7 @@ internal static class InferredContractSuggestionAnalyzer
     private static void SuggestAllowedCapabilities(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        InferredContractSuggestionOptions options)
-    {
+        InferredContractSuggestionOptions options) {
         const string kind = "capabilities";
         const InferredContractConfidence confidence = InferredContractConfidence.High;
         if (!options.Includes(kind, confidence) ||
@@ -127,8 +119,7 @@ internal static class InferredContractSuggestionAnalyzer
             return;
 
         var outcome = context.State.GetCapabilityOutcome(context.CancellationToken);
-        if (!outcome.IsSuccess)
-        {
+        if (!outcome.IsSuccess) {
             context.CancellationToken.ThrowIfCancellationRequested();
             return;
         }
@@ -174,8 +165,7 @@ internal static class InferredContractSuggestionAnalyzer
     private static void SuggestExpectedComplexity(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        InferredContractSuggestionOptions options)
-    {
+        InferredContractSuggestionOptions options) {
         const string kind = "complexity";
         const InferredContractConfidence confidence = InferredContractConfidence.High;
         if (!options.Includes(kind, confidence) ||
@@ -183,8 +173,7 @@ internal static class InferredContractSuggestionAnalyzer
             return;
 
         var outcome = context.State.GetComplexityOutcome(context.CancellationToken);
-        if (!outcome.IsSuccess)
-        {
+        if (!outcome.IsSuccess) {
             context.CancellationToken.ThrowIfCancellationRequested();
             return;
         }
@@ -212,8 +201,7 @@ internal static class InferredContractSuggestionAnalyzer
     private static void SuggestExceptionContract(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        InferredContractSuggestionOptions options)
-    {
+        InferredContractSuggestionOptions options) {
         const string kind = "exceptions";
         if (!options.IsEnabled ||
             !options.Kinds.Contains(kind) ||
@@ -232,8 +220,7 @@ internal static class InferredContractSuggestionAnalyzer
                 session.PurityService.SmtAnalysis,
                 session.AttributePolicy));
 
-        if (result.Evidence.Count == 0)
-        {
+        if (result.Evidence.Count == 0) {
             const InferredContractConfidence confidence = InferredContractConfidence.High;
             if (!options.Includes(kind, confidence) || !IsTriviallyNonThrowingBody(context)) return;
 
@@ -269,8 +256,7 @@ internal static class InferredContractSuggestionAnalyzer
     private static void SuggestEnsures(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        InferredContractSuggestionOptions options)
-    {
+        InferredContractSuggestionOptions options) {
         const string kind = "ensures";
         const InferredContractConfidence confidence = InferredContractConfidence.High;
         var method = context.MethodSymbol;
@@ -286,8 +272,7 @@ internal static class InferredContractSuggestionAnalyzer
         if (returns.Length == 0) return;
 
         string? condition = null;
-        foreach (var returnExpression in returns)
-        {
+        foreach (var returnExpression in returns) {
             if (!TryInferEnsuresCondition(context, returnExpression, out var inferredCondition)) return;
 
             if (condition == null)
@@ -312,8 +297,7 @@ internal static class InferredContractSuggestionAnalyzer
     private static void SuggestRequires(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        InferredContractSuggestionOptions options)
-    {
+        InferredContractSuggestionOptions options) {
         const string kind = "requires";
         const InferredContractConfidence confidence = InferredContractConfidence.High;
         if (!options.Includes(kind, confidence) ||
@@ -353,8 +337,7 @@ internal static class InferredContractSuggestionAnalyzer
         string attributeExpression,
         string displayAttribute,
         string evidence,
-        InferredContractConfidence confidence)
-    {
+        InferredContractConfidence confidence) {
         var location = context.Node is AccessorDeclarationSyntax accessor
             ? accessor.Keyword.GetLocation()
             : AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
@@ -380,8 +363,7 @@ internal static class InferredContractSuggestionAnalyzer
             location,
             null,
             properties,
-            new object[]
-            {
+            new object[] {
                 context.MethodSymbol.Name,
                 descriptor.Id == "SP0046" ? displayAttribute : evidence,
                 displayAttribute,
@@ -390,8 +372,7 @@ internal static class InferredContractSuggestionAnalyzer
         if (!session.Baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
     }
 
-    private static bool IsSupportedDeclaration(SyntaxNode node)
-    {
+    private static bool IsSupportedDeclaration(SyntaxNode node) {
         return node is MethodDeclarationSyntax or
             ConstructorDeclarationSyntax or
             OperatorDeclarationSyntax or
@@ -400,10 +381,8 @@ internal static class InferredContractSuggestionAnalyzer
             LocalFunctionStatementSyntax;
     }
 
-    private static bool MatchesScope(IMethodSymbol methodSymbol, MissingPuritySuggestionScope scope)
-    {
-        return scope switch
-        {
+    private static bool MatchesScope(IMethodSymbol methodSymbol, MissingPuritySuggestionScope scope) {
+        return scope switch {
             MissingPuritySuggestionScope.All => true,
             MissingPuritySuggestionScope.Public =>
                 methodSymbol.DeclaredAccessibility is Accessibility.Public or
@@ -420,13 +399,11 @@ internal static class InferredContractSuggestionAnalyzer
     private static bool TryGetFiniteExceptionTypes(
         ExceptionFlowEngine.ExceptionFlowResult result,
         out string[] exceptionTypes,
-        out string[] displayTypes)
-    {
+        out string[] displayTypes) {
         var symbols = result.Sites
             .Select(static entry => entry.Type as INamedTypeSymbol)
             .ToArray();
-        if (symbols.Length == 0 || symbols.Any(static symbol => symbol == null))
-        {
+        if (symbols.Length == 0 || symbols.Any(static symbol => symbol == null)) {
             exceptionTypes = Array.Empty<string>();
             displayTypes = Array.Empty<string>();
             return false;
@@ -437,8 +414,7 @@ internal static class InferredContractSuggestionAnalyzer
             .Distinct<INamedTypeSymbol>(SymbolEq.Default)
             .OrderBy(static symbol => symbol.ToDisplayString(), StringComparer.Ordinal)
             .ToArray();
-        if (distinctSymbols.Length is < 1 or > 4)
-        {
+        if (distinctSymbols.Length is < 1 or > 4) {
             exceptionTypes = Array.Empty<string>();
             displayTypes = Array.Empty<string>();
             return false;
@@ -453,8 +429,7 @@ internal static class InferredContractSuggestionAnalyzer
         return true;
     }
 
-    private static bool IsTriviallyNonThrowingBody(MethodBodyAnalysisContext context)
-    {
+    private static bool IsTriviallyNonThrowingBody(MethodBodyAnalysisContext context) {
         if (CSharpSyntaxFacts.TryGetExpressionBody(context.Node, out var expressionBody))
             return IsTriviallyNonThrowingExpression(context, expressionBody);
 
@@ -468,13 +443,11 @@ internal static class InferredContractSuggestionAnalyzer
 
     private static bool IsTriviallyNonThrowingExpression(
         MethodBodyAnalysisContext context,
-        ExpressionSyntax expression)
-    {
+        ExpressionSyntax expression) {
         expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         if (expression is LiteralExpressionSyntax or DefaultExpressionSyntax or TypeOfExpressionSyntax) return true;
 
-        if (expression is InvocationExpressionSyntax
-            {
+        if (expression is InvocationExpressionSyntax {
                 Expression: IdentifierNameSyntax { Identifier.ValueText: "nameof" }
             })
             return true;
@@ -483,10 +456,8 @@ internal static class InferredContractSuggestionAnalyzer
                context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol is IParameterSymbol;
     }
 
-    private static IEnumerable<ExpressionSyntax> GetReturnExpressions(SyntaxNode node)
-    {
-        if (CSharpSyntaxFacts.TryGetExpressionBody(node, out var expressionBody))
-        {
+    private static IEnumerable<ExpressionSyntax> GetReturnExpressions(SyntaxNode node) {
+        if (CSharpSyntaxFacts.TryGetExpressionBody(node, out var expressionBody)) {
             yield return expressionBody;
             yield break;
         }
@@ -504,20 +475,17 @@ internal static class InferredContractSuggestionAnalyzer
     private static bool TryInferEnsuresCondition(
         MethodBodyAnalysisContext context,
         ExpressionSyntax expression,
-        out string condition)
-    {
+        out string condition) {
         expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         var constant = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constant.HasValue &&
-            TryFormatContractConstant(constant.Value, context.MethodSymbol.ReturnType, out var literal))
-        {
+            TryFormatContractConstant(constant.Value, context.MethodSymbol.ReturnType, out var literal)) {
             condition = "result == " + literal;
             return true;
         }
 
         if (expression is IdentifierNameSyntax identifier &&
-            context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol is IParameterSymbol)
-        {
+            context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol is IParameterSymbol) {
             condition = "result == " + identifier.Identifier.Text;
             return true;
         }
@@ -529,8 +497,7 @@ internal static class InferredContractSuggestionAnalyzer
                 ImplicitArrayCreationExpressionSyntax or
                 AnonymousObjectCreationExpressionSyntax or
                 InterpolatedStringExpressionSyntax or
-                TypeOfExpressionSyntax)
-        {
+                TypeOfExpressionSyntax) {
             condition = "result != null";
             return true;
         }
@@ -542,22 +509,18 @@ internal static class InferredContractSuggestionAnalyzer
     private static bool TryFormatContractConstant(
         object? value,
         ITypeSymbol returnType,
-        out string literal)
-    {
-        if (value == null)
-        {
+        out string literal) {
+        if (value == null) {
             literal = "null";
             return returnType.IsReferenceType || returnType.NullableAnnotation == NullableAnnotation.Annotated;
         }
 
-        if (returnType.TypeKind == TypeKind.Enum)
-        {
+        if (returnType.TypeKind == TypeKind.Enum) {
             literal = string.Empty;
             return false;
         }
 
-        switch (value)
-        {
+        switch (value) {
             case bool boolean:
                 literal = boolean ? "true" : "false";
                 return true;
@@ -588,13 +551,11 @@ internal static class InferredContractSuggestionAnalyzer
         }
     }
 
-    private static bool TryGetLeadingThrowGuard(SyntaxNode node, out IfStatementSyntax ifStatement)
-    {
+    private static bool TryGetLeadingThrowGuard(SyntaxNode node, out IfStatementSyntax ifStatement) {
         var body = CSharpSyntaxFacts.GetBlockBody(node);
         if (body?.Statements.FirstOrDefault() is IfStatementSyntax candidate &&
             candidate.Else == null &&
-            CSharpSyntaxFacts.IsThrowOnlyStatement(candidate.Statement))
-        {
+            CSharpSyntaxFacts.IsThrowOnlyStatement(candidate.Statement)) {
             ifStatement = candidate;
             return true;
         }
@@ -606,20 +567,17 @@ internal static class InferredContractSuggestionAnalyzer
     private static bool TryNegateParameterGuard(
         MethodBodyAnalysisContext context,
         ExpressionSyntax expression,
-        out string condition)
-    {
+        out string condition) {
         expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         if (TryMatchNullGuard(expression, out var nullTarget, out var matchesNull) &&
-            IsParameterReference(context, nullTarget))
-        {
+            IsParameterReference(context, nullTarget)) {
             condition = nullTarget.WithoutTrivia() + (matchesNull ? " != null" : " == null");
             return true;
         }
 
         if (expression is BinaryExpressionSyntax binary &&
             TryGetNegatedOperator(binary.Kind(), out var negatedOperator) &&
-            HasOneParameterAndOneConstant(context, binary.Left, binary.Right))
-        {
+            HasOneParameterAndOneConstant(context, binary.Left, binary.Right)) {
             condition = binary.Left.WithoutTrivia() + " " + negatedOperator + " " +
                         binary.Right.WithoutTrivia();
             return true;
@@ -627,8 +585,7 @@ internal static class InferredContractSuggestionAnalyzer
 
         if (expression is IsPatternExpressionSyntax isPattern &&
             IsParameterReference(context, isPattern.Expression) &&
-            CSharpSyntaxFacts.TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNonNull))
-        {
+            CSharpSyntaxFacts.TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNonNull)) {
             condition = isPattern.Expression.WithoutTrivia() + (matchesNonNull ? " == null" : " != null");
             return true;
         }
@@ -640,19 +597,16 @@ internal static class InferredContractSuggestionAnalyzer
     private static bool TryMatchNullGuard(
         ExpressionSyntax expression,
         out ExpressionSyntax target,
-        out bool matchesNull)
-    {
+        out bool matchesNull) {
         expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         if (expression is BinaryExpressionSyntax binary &&
             (binary.IsKind(SyntaxKind.EqualsExpression) ||
-             binary.IsKind(SyntaxKind.NotEqualsExpression)))
-        {
+             binary.IsKind(SyntaxKind.NotEqualsExpression))) {
             if (CSharpSyntaxFacts.IsNullLiteral(binary.Left))
                 target = binary.Right;
             else if (CSharpSyntaxFacts.IsNullLiteral(binary.Right))
                 target = binary.Left;
-            else
-            {
+            else {
                 target = null!;
                 matchesNull = false;
                 return false;
@@ -663,8 +617,7 @@ internal static class InferredContractSuggestionAnalyzer
         }
 
         if (expression is IsPatternExpressionSyntax isPattern &&
-            CSharpSyntaxFacts.TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNonNull))
-        {
+            CSharpSyntaxFacts.TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNonNull)) {
             target = isPattern.Expression;
             matchesNull = !matchesNonNull;
             return true;
@@ -678,8 +631,7 @@ internal static class InferredContractSuggestionAnalyzer
     private static bool HasOneParameterAndOneConstant(
         MethodBodyAnalysisContext context,
         ExpressionSyntax left,
-        ExpressionSyntax right)
-    {
+        ExpressionSyntax right) {
         var leftIsParameter = IsParameterReference(context, left);
         var rightIsParameter = IsParameterReference(context, right);
         return leftIsParameter != rightIsParameter &&
@@ -688,17 +640,14 @@ internal static class InferredContractSuggestionAnalyzer
                    : context.SemanticModel.GetConstantValue(left, context.CancellationToken).HasValue);
     }
 
-    private static bool IsParameterReference(MethodBodyAnalysisContext context, ExpressionSyntax expression)
-    {
+    private static bool IsParameterReference(MethodBodyAnalysisContext context, ExpressionSyntax expression) {
         expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         return expression is IdentifierNameSyntax identifier &&
                context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol is IParameterSymbol;
     }
 
-    private static bool TryGetNegatedOperator(SyntaxKind kind, out string negatedOperator)
-    {
-        negatedOperator = kind switch
-        {
+    private static bool TryGetNegatedOperator(SyntaxKind kind, out string negatedOperator) {
+        negatedOperator = kind switch {
             SyntaxKind.EqualsExpression => "!=",
             SyntaxKind.NotEqualsExpression => "==",
             SyntaxKind.LessThanExpression => ">=",
@@ -710,8 +659,7 @@ internal static class InferredContractSuggestionAnalyzer
         return negatedOperator.Length != 0;
     }
 
-    private static string QuoteString(string value)
-    {
+    private static string QuoteString(string value) {
         return SyntaxFactory.LiteralExpression(
                 SyntaxKind.StringLiteralExpression,
                 SyntaxFactory.Literal(value))

@@ -1,8 +1,7 @@
 namespace SharpProof.Analyzer;
 
 [Flags]
-internal enum AnalyzerFeatures
-{
+internal enum AnalyzerFeatures {
     None = 0,
     PurityCore = 1 << 0,
     Purity = 1 << 1,
@@ -22,10 +21,8 @@ internal enum AnalyzerFeatures
     All = PurityCore | Callable | Placement
 }
 
-internal static class AnalyzerFeatureDependencies
-{
-    internal static AnalyzerFeatures Expand(AnalyzerFeatures features)
-    {
+internal static class AnalyzerFeatureDependencies {
+    internal static AnalyzerFeatures Expand(AnalyzerFeatures features) {
         if ((features & (AnalyzerFeatures.Purity |
                          AnalyzerFeatures.Requires |
                          AnalyzerFeatures.Ensures |
@@ -39,8 +36,7 @@ internal static class AnalyzerFeatureDependencies
 
     internal static bool Includes(
         this AnalyzerFeatures features,
-        AnalyzerFeatures feature)
-    {
+        AnalyzerFeatures feature) {
         return (features & feature) == feature;
     }
 }

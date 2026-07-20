@@ -858,8 +858,7 @@ internal sealed class SymbolicState {
         bool isContradictory) {
         if (isContradictory) return "contradictory:true";
 
-        var parts = new List<string>
-        {
+        var parts = new List<string> {
             "contradictory:false"
         };
 

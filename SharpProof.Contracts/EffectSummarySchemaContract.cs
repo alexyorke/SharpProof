@@ -3,8 +3,7 @@ using System.Text.Json;
 
 namespace SharpProof.Schema;
 
-internal static class EffectSummarySchemaContract
-{
+internal static class EffectSummarySchemaContract {
     internal const int CurrentVersion = 5;
 }
 
@@ -64,8 +63,7 @@ internal sealed record EffectSummaryMethodContract(
     ImmutableArray<string> TransitiveThrownExceptionTypes,
     ImmutableArray<EffectSummaryExceptionProvenanceContract> ThrownExceptionProvenance,
     ImmutableArray<EffectSummaryExceptionProvenanceContract> TransitiveThrownExceptionProvenance,
-    ImmutableArray<EffectSummaryExceptionEdgeContract> TransitiveThrownExceptionEdges)
-{
+    ImmutableArray<EffectSummaryExceptionEdgeContract> TransitiveThrownExceptionEdges) {
     internal EffectSummaryPurityContract FlatPurity => new(
         Classification,
         Categories,
@@ -82,25 +80,21 @@ internal sealed record EffectSummaryMethodContract(
         string.Equals(CanonicalKey?.Trim(), Identity.ToCanonicalKey(), StringComparison.Ordinal);
 }
 
-internal static class EffectSummaryContractReader
-{
+internal static class EffectSummaryContractReader {
     internal static bool TryReadMethod(JsonElement element, out EffectSummaryMethodContract contract) =>
         TryRead(element, out contract) && contract.HasConsistentIdentity;
 
     internal static bool TryReadAssembly(JsonElement element, out EffectSummaryAssemblyContract contract) =>
         TryRead(element, out contract);
 
-    private static bool TryRead<T>(JsonElement element, out T contract) where T : class
-    {
+    private static bool TryRead<T>(JsonElement element, out T contract) where T : class {
         contract = null!;
         if (element.ValueKind != JsonValueKind.Object) return false;
-        try
-        {
+        try {
             contract = element.Deserialize<T>()!;
             return contract != null;
         }
-        catch (Exception exception) when (exception is JsonException or ArgumentException or NotSupportedException)
-        {
+        catch (Exception exception) when (exception is JsonException or ArgumentException or NotSupportedException) {
             return false;
         }
     }

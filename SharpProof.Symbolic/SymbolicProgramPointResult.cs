@@ -20,8 +20,7 @@ internal sealed record SymbolicProgramPointMetadata(
     int NodeEndColumn,
     string NodeKind,
     string? MethodName,
-    string ProgramPointKind)
-{
+    string ProgramPointKind) {
     public int NodeSpanLength => Math.Max(0, NodeSpanEnd - NodeSpanStart);
 }
 
@@ -36,8 +35,7 @@ internal sealed class SymbolicProgramPointResult(
     SymbolicInvariantResult? invariant = null,
     IReadOnlyList<SymbolicFactInfo>? symbolicFacts = null,
     SymbolicInputWitness? reachabilityWitness = null,
-    SymbolicAnalysisTruncationInfo? analysisTruncation = null)
-{
+    SymbolicAnalysisTruncationInfo? analysisTruncation = null) {
     [JsonIgnore] internal SymbolicProgramPointMetadata Metadata { get; } = metadata;
 
     public string FilePath => Metadata.FilePath;
@@ -108,8 +106,7 @@ internal sealed class SymbolicProgramPointResult(
     public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; } =
         analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
 
-    private static string FormatMergedInvariantText(IReadOnlyList<string> facts)
-    {
+    private static string FormatMergedInvariantText(IReadOnlyList<string> facts) {
         if (facts.Count == 0) return "true";
 
         if (facts.Count == 1) return facts[0];
@@ -122,8 +119,7 @@ internal sealed class SymbolicProgramPointResult(
 internal sealed record SymbolicInvariantResult(
     [property: JsonPropertyOrder(0)] IReadOnlyList<SymbolicInvariantCondition> Conditions,
     [property: JsonPropertyOrder(4)] string MergedInvariantText,
-    [property: JsonPropertyOrder(5)] SymbolicInvariantMergeKind MergeKind)
-{
+    [property: JsonPropertyOrder(5)] SymbolicInvariantMergeKind MergeKind) {
     [JsonPropertyOrder(1)]
     public int ConditionCount => Conditions.Count;
 
@@ -140,8 +136,7 @@ internal sealed record SymbolicInvariantResult(
     public static SymbolicInvariantResult FromFacts(
         IReadOnlyList<string> facts,
         string? mergedInvariantText = null,
-        SymbolicInvariantMergeKind mergeKind = SymbolicInvariantMergeKind.DistinctFactUnion)
-    {
+        SymbolicInvariantMergeKind mergeKind = SymbolicInvariantMergeKind.DistinctFactUnion) {
         if (facts == null) throw new ArgumentNullException(nameof(facts));
 
         return new SymbolicInvariantResult(
@@ -155,8 +150,7 @@ internal sealed record SymbolicInvariantResult(
     internal static SymbolicInvariantResult FromFormulas(
         IReadOnlyList<SmtFormula> formulas,
         string? mergedInvariantText = null,
-        SymbolicInvariantMergeKind mergeKind = SymbolicInvariantMergeKind.Conjunction)
-    {
+        SymbolicInvariantMergeKind mergeKind = SymbolicInvariantMergeKind.Conjunction) {
         if (formulas == null) throw new ArgumentNullException(nameof(formulas));
 
         return new SymbolicInvariantResult(
@@ -167,8 +161,7 @@ internal sealed record SymbolicInvariantResult(
             mergeKind);
     }
 
-    public static SymbolicInvariantResult FromMergedPathFacts(SymbolicMergedPathFacts facts)
-    {
+    public static SymbolicInvariantResult FromMergedPathFacts(SymbolicMergedPathFacts facts) {
         if (facts == null) throw new ArgumentNullException(nameof(facts));
 
         var conditions = new List<SymbolicInvariantCondition>();
@@ -194,10 +187,8 @@ internal sealed record SymbolicInvariantCondition(
     [property: JsonPropertyOrder(3)] string ValueKind,
     [property: JsonPropertyOrder(4)] bool IsSolverBacked,
     [property: JsonPropertyOrder(5)] string Target,
-    [property: JsonPropertyOrder(6)] bool IsConservativeUnknown)
-{
-    public static SymbolicInvariantCondition FromText(int index, string text)
-    {
+    [property: JsonPropertyOrder(6)] bool IsConservativeUnknown) {
+    public static SymbolicInvariantCondition FromText(int index, string text) {
         var normalizedText = text ?? string.Empty;
         return new SymbolicInvariantCondition(
             index,
@@ -209,8 +200,7 @@ internal sealed record SymbolicInvariantCondition(
             false);
     }
 
-    internal static SymbolicInvariantCondition FromFormula(int index, SmtFormula formula)
-    {
+    internal static SymbolicInvariantCondition FromFormula(int index, SmtFormula formula) {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
 
         return new SymbolicInvariantCondition(
@@ -223,8 +213,7 @@ internal sealed record SymbolicInvariantCondition(
             false);
     }
 
-    public static SymbolicInvariantCondition FromConservativeUnknown(int index, string text)
-    {
+    public static SymbolicInvariantCondition FromConservativeUnknown(int index, string text) {
         var target = ExtractConservativeUnknownTarget(text);
         return new SymbolicInvariantCondition(
             index,
@@ -236,8 +225,7 @@ internal sealed record SymbolicInvariantCondition(
             true);
     }
 
-    private static string ExtractConservativeUnknownTarget(string? text)
-    {
+    private static string ExtractConservativeUnknownTarget(string? text) {
         const string prefix = "unknown(";
         if (text != null &&
             text.StartsWith(prefix, StringComparison.Ordinal) &&
@@ -250,25 +238,21 @@ internal sealed record SymbolicInvariantCondition(
 
 }
 
-internal static class TextFactTargetExtraction
-{
-    internal static string? TryExtract(string? text)
-    {
+internal static class TextFactTargetExtraction {
+    internal static string? TryExtract(string? text) {
         if (string.IsNullOrWhiteSpace(text)) return null;
 
         return ScanIdentifierTarget(Unwrap(text!.Trim()));
     }
 
-    internal static string Extract(string text)
-    {
+    internal static string Extract(string text) {
         if (string.IsNullOrWhiteSpace(text)) return string.Empty;
 
         var value = Unwrap(text.Trim());
         return ScanIdentifierTarget(value) ?? value;
     }
 
-    private static string Unwrap(string value)
-    {
+    private static string Unwrap(string value) {
         while (value.StartsWith("!", StringComparison.Ordinal) ||
                (value.StartsWith("(", StringComparison.Ordinal) && value.EndsWith(")", StringComparison.Ordinal)))
             value = value.StartsWith("!", StringComparison.Ordinal)
@@ -278,10 +262,8 @@ internal static class TextFactTargetExtraction
         return value;
     }
 
-    private static string? ScanIdentifierTarget(string value)
-    {
-        for (var index = 0; index < value.Length; index++)
-        {
+    private static string? ScanIdentifierTarget(string value) {
+        for (var index = 0; index < value.Length; index++) {
             if (!SyntaxFacts.IsIdentifierStartCharacter(value[index]) && value[index] != '@') continue;
 
             var start = index;
@@ -300,8 +282,7 @@ internal static class TextFactTargetExtraction
     }
 }
 
-internal enum SymbolicInvariantMergeKind
-{
+internal enum SymbolicInvariantMergeKind {
     Conjunction,
     DistinctFactUnion,
     ConservativeFactMerge
@@ -320,8 +301,7 @@ internal sealed record SymbolicConditionProofResult(
     [property: JsonIgnore] SymbolicProgramPointMetadata? programPoint = null,
     [property: JsonIgnore] SymbolicInputWitness? witness = null,
     [property: JsonIgnore] SymbolicInputWitness? counterexampleWitness = null,
-    [property: JsonIgnore] SymbolicAnalysisTruncationInfo? analysisTruncation = null)
-{
+    [property: JsonIgnore] SymbolicAnalysisTruncationInfo? analysisTruncation = null) {
     public string Condition { get; init; } = condition ?? string.Empty;
 
     public string Target { get; init; } = ResolveTarget(formula, target);
@@ -410,8 +390,7 @@ internal sealed record SymbolicConditionProofResult(
 
 }
 
-internal enum SymbolicTruthValue
-{
+internal enum SymbolicTruthValue {
     Unknown,
     ProvenTrue,
     ProvenFalse,

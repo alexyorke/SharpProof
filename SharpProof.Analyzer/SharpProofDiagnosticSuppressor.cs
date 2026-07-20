@@ -1,8 +1,7 @@
 namespace SharpProof.Analyzer;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
-{
+public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor {
     private const string ProofDocumentationUrl =
         "https://github.com/alexyorke/SharpProof/blob/main/docs/proven-diagnostic-suppression.md";
 
@@ -86,8 +85,7 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
 
     public override ImmutableArray<SuppressionDescriptor> SupportedSuppressions => SuppressionDescriptors;
 
-    public override void ReportSuppressions(SuppressionAnalysisContext context)
-    {
+    public override void ReportSuppressions(SuppressionAnalysisContext context) {
         if (context.ReportedDiagnostics.IsDefaultOrEmpty) return;
 
         var configuration = AnalyzerConfiguration.FromOptions(context.Options);
@@ -100,15 +98,13 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
         var hazardService = new SymbolicRuntimeHazardQueryService();
         var attributePolicy = SharpProofAttributeIdentityPolicy.Create(configuration.AttributeStubNamespaces);
         var hazardsByRoot = new Dictionary<QueryRootKey, IReadOnlyList<SymbolicRuntimeHazard>>();
-        foreach (var candidate in candidates)
-        {
+        foreach (var candidate in candidates) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var key = new QueryRootKey(
                 candidate.QueryRoot.SyntaxTree,
                 candidate.QueryRoot.SpanStart,
                 candidate.QueryRoot.Span.End);
-            if (!hazardsByRoot.TryGetValue(key, out var hazards))
-            {
+            if (!hazardsByRoot.TryGetValue(key, out var hazards)) {
                 hazards = QueryHazards(
                     candidate.QueryRoot,
                     context.GetSemanticModel(candidate.QueryRoot.SyntaxTree),
@@ -132,20 +128,17 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
 
     private static List<SuppressionCandidate> CollectCandidates(
         SuppressionAnalysisContext context,
-        AnalyzerConfiguration configuration)
-    {
+        AnalyzerConfiguration configuration) {
         var candidates = new List<SuppressionCandidate>();
         var optionsByTree = new Dictionary<SyntaxTree, ProvenDiagnosticSuppressionOptions>();
-        foreach (var diagnostic in context.ReportedDiagnostics)
-        {
+        foreach (var diagnostic in context.ReportedDiagnostics) {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (diagnostic.DefaultSeverity == DiagnosticSeverity.Error ||
                 !SpecsByDiagnosticId.TryGetValue(diagnostic.Id, out var spec) ||
                 diagnostic.Location.SourceTree is not { } syntaxTree)
                 continue;
 
-            if (!optionsByTree.TryGetValue(syntaxTree, out var options))
-            {
+            if (!optionsByTree.TryGetValue(syntaxTree, out var options)) {
                 options = AnalyzerConfiguration.GetTreeConfiguration(
                     context.Options,
                     syntaxTree,
@@ -176,10 +169,8 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
         SmtAnalysisService smtAnalysis,
         SharpProofAnalysisBudget analysisLimits,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
+        CancellationToken cancellationToken) {
+        try {
             using var limitScope = SymbolicAnalysisLimitContext.Push(analysisLimits, queryRoot);
             var options = new SymbolicRuntimeHazardQueryOptions(
                 includeUnprovenCandidates: true,
@@ -207,14 +198,12 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
                         includeNestedCallables: false))
                 .Hazards;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
+        catch (Exception ex) when (ex is not OperationCanceledException) {
             return Array.Empty<SymbolicRuntimeHazard>();
         }
     }
 
-    private static SyntaxNode? FindQueryRoot(SyntaxNode node)
-    {
+    private static SyntaxNode? FindQueryRoot(SyntaxNode node) {
         return CSharpSyntaxFacts.GetContainingExecutionRoot(
             node,
             ExecutionRootPolicy.Callable |
@@ -223,8 +212,7 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
             ExecutionRootPolicy.GlobalStatement);
     }
 
-    private static bool HasExactUnreachableProof(SymbolicRuntimeHazard hazard)
-    {
+    private static bool HasExactUnreachableProof(SymbolicRuntimeHazard hazard) {
         return hazard.Status == SymbolicRuntimeHazardStatus.Unreachable &&
                hazard.Proof.Status == SymbolicProofStatus.Unreachable &&
                hazard.Proof.Backend != SymbolicProofBackend.None &&
@@ -232,8 +220,7 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
                !hazard.AnalysisTruncation.IsTruncated;
     }
 
-    private static bool HazardContainsDiagnostic(SymbolicRuntimeHazard hazard, TextSpan diagnosticSpan)
-    {
+    private static bool HazardContainsDiagnostic(SymbolicRuntimeHazard hazard, TextSpan diagnosticSpan) {
         var hazardSpan = TextSpan.FromBounds(hazard.SpanStart, hazard.SpanEnd);
         return diagnosticSpan.IsEmpty
             ? hazardSpan.Contains(diagnosticSpan.Start)
@@ -244,8 +231,7 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
         string suppressionId,
         string diagnosticId,
         string proofKind,
-        params SymbolicRuntimeHazardKind[] hazardKinds)
-    {
+        params SymbolicRuntimeHazardKind[] hazardKinds) {
         var justification =
             $"SharpProof proved the matching {proofKind} trigger unreachable with exact, non-truncated evidence. " +
             "Inspect the source location with SharpProof.SymbolicCli explain or " +

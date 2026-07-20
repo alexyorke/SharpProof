@@ -134,8 +134,7 @@ internal static class SymbolicMemberLowerer {
         out SymbolicCondition condition) {
         condition = null!;
         if (context.InlineDepth >= SymbolicLoweringContext.MaxSourcePredicateInlineDepth ||
-            propertySymbol is not
-            {
+            propertySymbol is not {
                 IsStatic: false,
                 IsIndexer: false,
                 Type.SpecialType: SpecialType.System_Boolean,

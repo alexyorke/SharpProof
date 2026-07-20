@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class CommonBugAnalyzer
-{
+internal static partial class CommonBugAnalyzer {
     private static readonly ImmutableHashSet<string> MaybeNullResultMethods =
         ImmutableHashSet.Create(
             StringComparer.Ordinal,
@@ -31,13 +30,10 @@ internal static partial class CommonBugAnalyzer
 
     private static void AnalyzeNullLinqSerializationAndDeployment(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
-        foreach (var operation in context.Snapshot.VisibleOperations)
-        {
+        AnalyzerSession session) {
+        foreach (var operation in context.Snapshot.VisibleOperations) {
             context.CancellationToken.ThrowIfCancellationRequested();
-            if (operation is IInvocationOperation invocation)
-            {
+            if (operation is IInvocationOperation invocation) {
                 AnalyzeMaybeNullDereference(context, session, invocation);
                 AnalyzePrematureMaterialization(context, session, invocation);
                 AnalyzeDeferredQueryLambda(context, session, invocation);
@@ -51,8 +47,7 @@ internal static partial class CommonBugAnalyzer
     private static void AnalyzeMaybeNullDereference(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        IInvocationOperation invocation)
-    {
+        IInvocationOperation invocation) {
         if (!MaybeNullResultMethods.Contains(invocation.TargetMethod.Name) ||
             invocation.Type == null ||
             (!invocation.Type.IsReferenceType && !IsNullableValueType(invocation.Type)) ||
@@ -68,14 +63,12 @@ internal static partial class CommonBugAnalyzer
             invocation.TargetMethod.Name);
     }
 
-    private static bool IsImmediatelyDereferenced(IInvocationOperation invocation)
-    {
+    private static bool IsImmediatelyDereferenced(IInvocationOperation invocation) {
         IOperation current = invocation;
         while (current.Parent is IConversionOperation conversion && conversion.Operand == current)
             current = conversion;
 
-        return current.Parent switch
-        {
+        return current.Parent switch {
             IPropertyReferenceOperation property when Unwrap(property.Instance) == current => true,
             IFieldReferenceOperation field when Unwrap(field.Instance) == current => true,
             IInvocationOperation call when Unwrap(call.Instance) == current => true,
@@ -87,8 +80,7 @@ internal static partial class CommonBugAnalyzer
     private static void AnalyzePrematureMaterialization(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        IInvocationOperation invocation)
-    {
+        IInvocationOperation invocation) {
         if (!IsLinqMethod(invocation.TargetMethod, "System.Linq.Enumerable") ||
             !PostMaterializationOperators.Contains(invocation.TargetMethod.Name))
             return;
@@ -112,8 +104,7 @@ internal static partial class CommonBugAnalyzer
     private static void AnalyzeDeferredQueryLambda(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        IInvocationOperation invocation)
-    {
+        IInvocationOperation invocation) {
         var isEnumerable = IsLinqMethod(invocation.TargetMethod, "System.Linq.Enumerable");
         var isQueryable = IsLinqMethod(invocation.TargetMethod, "System.Linq.Queryable");
         if ((!isEnumerable && !isQueryable) || !DeferredQueryOperators.Contains(invocation.TargetMethod.Name))
@@ -121,8 +112,7 @@ internal static partial class CommonBugAnalyzer
 
         foreach (var lambda in invocation.Arguments
                      .SelectMany(static argument => argument.Value.DescendantsAndSelf())
-                     .OfType<IAnonymousFunctionOperation>())
-        {
+                     .OfType<IAnonymousFunctionOperation>()) {
             foreach (var mutation in lambda.Body.DescendantsAndSelf())
                 if (TryGetMutationTarget(mutation, out var target) &&
                     TryGetSharedStateName(target, lambda, out _))
@@ -136,8 +126,7 @@ internal static partial class CommonBugAnalyzer
                         mutation.Syntax.ToString());
 
             if (!isQueryable) continue;
-            foreach (var sourceCall in lambda.Body.DescendantsAndSelf().OfType<IInvocationOperation>())
-            {
+            foreach (var sourceCall in lambda.Body.DescendantsAndSelf().OfType<IInvocationOperation>()) {
                 if (sourceCall.TargetMethod.DeclaringSyntaxReferences.IsDefaultOrEmpty ||
                     sourceCall.TargetMethod.MethodKind == MethodKind.LocalFunction)
                     continue;
@@ -157,8 +146,7 @@ internal static partial class CommonBugAnalyzer
     private static void AnalyzeSerializationInvocation(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        IInvocationOperation invocation)
-    {
+        IInvocationOperation invocation) {
         var serializer = GetSerializerKind(invocation.TargetMethod);
         if (serializer == SerializerKind.None) return;
 
@@ -191,8 +179,7 @@ internal static partial class CommonBugAnalyzer
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
         SerializerKind serializer,
-        ITypeSymbol serializedType)
-    {
+        ITypeSymbol serializedType) {
         var root = GetSerializableSourceType(serializedType);
         if (root == null) return;
 
@@ -200,8 +187,7 @@ internal static partial class CommonBugAnalyzer
             ? "Newtonsoft.Json.JsonIgnoreAttribute"
             : "System.Text.Json.Serialization.JsonIgnoreAttribute";
         var wrongAttributeType = context.SemanticModel.Compilation.GetTypeByMetadataName(wrongAttribute);
-        foreach (var member in root.GetMembers().Where(static member => member is IFieldSymbol or IPropertySymbol))
-        {
+        foreach (var member in root.GetMembers().Where(static member => member is IFieldSymbol or IPropertySymbol)) {
             var attribute = FindAttribute(member, wrongAttributeType);
             var location = attribute?.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken).GetLocation();
             if (location == null) continue;
@@ -218,14 +204,12 @@ internal static partial class CommonBugAnalyzer
         }
     }
 
-    private static bool HasExplicitSerializationPolicy(IInvocationOperation invocation)
-    {
+    private static bool HasExplicitSerializationPolicy(IInvocationOperation invocation) {
         return invocation.Arguments.Any(argument =>
             !argument.IsImplicit && IsSerializationPolicyType(argument.Parameter?.Type));
     }
 
-    private static bool IsSerializationPolicyType(ITypeSymbol? type)
-    {
+    private static bool IsSerializationPolicyType(ITypeSymbol? type) {
         return type is INamedTypeSymbol namedType &&
                (namedType.Name == "JsonSerializerOptions" &&
                 namedType.ContainingNamespace?.ToDisplayString() == "System.Text.Json" ||
@@ -239,8 +223,7 @@ internal static partial class CommonBugAnalyzer
     private static bool ContainsSerializableCycle(
         INamedTypeSymbol root,
         INamedTypeSymbol? jsonIgnoreAttribute,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var path = new HashSet<INamedTypeSymbol>(SymbolEq.Default);
         return Visit(root, root, path, 0);
 
@@ -248,13 +231,11 @@ internal static partial class CommonBugAnalyzer
             INamedTypeSymbol current,
             INamedTypeSymbol target,
             HashSet<INamedTypeSymbol> currentPath,
-            int depth)
-        {
+            int depth) {
             cancellationToken.ThrowIfCancellationRequested();
             if (depth >= 8 || !currentPath.Add(current.OriginalDefinition)) return false;
 
-            foreach (var memberType in GetSerializableMemberTypes(current, jsonIgnoreAttribute))
-            {
+            foreach (var memberType in GetSerializableMemberTypes(current, jsonIgnoreAttribute)) {
                 var next = GetSerializableSourceType(memberType);
                 if (next == null) continue;
                 if (SymbolEq.AreEqual(next.OriginalDefinition, target.OriginalDefinition))
@@ -269,13 +250,10 @@ internal static partial class CommonBugAnalyzer
 
     private static IEnumerable<ITypeSymbol> GetSerializableMemberTypes(
         INamedTypeSymbol type,
-        INamedTypeSymbol? jsonIgnoreAttribute)
-    {
+        INamedTypeSymbol? jsonIgnoreAttribute) {
         foreach (var member in type.GetMembers())
-            switch (member)
-            {
-                case IPropertySymbol
-                    {
+            switch (member) {
+                case IPropertySymbol {
                         IsStatic: false,
                         IsIndexer: false,
                         DeclaredAccessibility: Accessibility.Public,
@@ -283,8 +261,7 @@ internal static partial class CommonBugAnalyzer
                     } property when FindAttribute(property, jsonIgnoreAttribute) == null:
                     yield return UnwrapCollectionType(property.Type);
                     break;
-                case IFieldSymbol
-                    {
+                case IFieldSymbol {
                         IsStatic: false,
                         DeclaredAccessibility: Accessibility.Public
                     } field when FindAttribute(field, jsonIgnoreAttribute) == null:
@@ -293,8 +270,7 @@ internal static partial class CommonBugAnalyzer
             }
     }
 
-    private static ITypeSymbol UnwrapCollectionType(ITypeSymbol type)
-    {
+    private static ITypeSymbol UnwrapCollectionType(ITypeSymbol type) {
         if (type is IArrayTypeSymbol array) return array.ElementType;
         if (type is INamedTypeSymbol { TypeArguments.Length: 1 } namedType &&
             namedType.AllInterfaces.Any(candidate =>
@@ -304,8 +280,7 @@ internal static partial class CommonBugAnalyzer
         return type;
     }
 
-    private static INamedTypeSymbol? GetSerializableSourceType(ITypeSymbol type)
-    {
+    private static INamedTypeSymbol? GetSerializableSourceType(ITypeSymbol type) {
         type = UnwrapCollectionType(type);
         return type is INamedTypeSymbol namedType &&
                namedType.SpecialType != SpecialType.System_String &&
@@ -316,8 +291,7 @@ internal static partial class CommonBugAnalyzer
 
     private static void AnalyzeUncheckedAllocationLengths(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         if (context.SemanticModel.Compilation.Options is CSharpCompilationOptions { CheckOverflow: true }) return;
 
         foreach (var binary in context.Node.DescendantNodes()
@@ -325,11 +299,9 @@ internal static partial class CommonBugAnalyzer
                      .Where(expression => expression.IsKind(SyntaxKind.MultiplyExpression) &&
                                           IsAllocationLengthExpression(expression) &&
                                           !IsInsideNestedSyntaxCallable(expression, context.Node) &&
-                                          !IsInsideCheckedContext(expression)))
-        {
+                                          !IsInsideCheckedContext(expression))) {
             if (context.SemanticModel.GetConstantValue(binary, context.CancellationToken).HasValue ||
-                context.SemanticModel.GetOperation(binary, context.CancellationToken) is not IBinaryOperation
-                {
+                context.SemanticModel.GetOperation(binary, context.CancellationToken) is not IBinaryOperation {
                     Type: { } resultType
                 } ||
                 !IsBoundedIntegralType(resultType))
@@ -345,10 +317,8 @@ internal static partial class CommonBugAnalyzer
         }
     }
 
-    private static bool IsAllocationLengthExpression(BinaryExpressionSyntax expression)
-    {
-        for (SyntaxNode? current = expression; current?.Parent != null; current = current.Parent)
-        {
+    private static bool IsAllocationLengthExpression(BinaryExpressionSyntax expression) {
+        for (SyntaxNode? current = expression; current?.Parent != null; current = current.Parent) {
             if (current.Parent is ArrayRankSpecifierSyntax rank && rank.Sizes.Contains((ExpressionSyntax)current))
                 return rank.Parent?.Parent is ArrayCreationExpressionSyntax or StackAllocArrayCreationExpressionSyntax;
             if (current.Parent is not ParenthesizedExpressionSyntax and not CastExpressionSyntax) return false;
@@ -357,14 +327,12 @@ internal static partial class CommonBugAnalyzer
         return false;
     }
 
-    private static bool IsInsideCheckedContext(SyntaxNode node)
-    {
+    private static bool IsInsideCheckedContext(SyntaxNode node) {
         return node.Ancestors().Any(ancestor => ancestor.IsKind(SyntaxKind.CheckedExpression) ||
                                                 ancestor.IsKind(SyntaxKind.CheckedStatement));
     }
 
-    private static bool IsBoundedIntegralType(ITypeSymbol type)
-    {
+    private static bool IsBoundedIntegralType(ITypeSymbol type) {
         return type.SpecialType is SpecialType.System_SByte or SpecialType.System_Byte or
             SpecialType.System_Int16 or SpecialType.System_UInt16 or
             SpecialType.System_Int32 or SpecialType.System_UInt32 or
@@ -378,8 +346,7 @@ internal static partial class CommonBugAnalyzer
     private static bool IsLinqMethod(IMethodSymbol method, string containingType) =>
         string.Equals(method.ContainingType.ToDisplayString(), containingType, StringComparison.Ordinal);
 
-    private static bool ImplementsIQueryable(ITypeSymbol? type)
-    {
+    private static bool ImplementsIQueryable(ITypeSymbol? type) {
         return type is INamedTypeSymbol namedType &&
                (namedType.ToDisplayString() is "System.Linq.IQueryable" ||
                 namedType.OriginalDefinition.ToDisplayString() == "System.Linq.IQueryable<T>" ||
@@ -388,8 +355,7 @@ internal static partial class CommonBugAnalyzer
                     candidate.OriginalDefinition.ToDisplayString() == "System.Linq.IQueryable<T>"));
     }
 
-    private static SerializerKind GetSerializerKind(IMethodSymbol method)
-    {
+    private static SerializerKind GetSerializerKind(IMethodSymbol method) {
         if (method.Name == "Serialize" && method.ContainingType.ToDisplayString() == "System.Text.Json.JsonSerializer")
             return SerializerKind.SystemTextJson;
         if (method.Name == "SerializeObject" && method.ContainingType.ToDisplayString() == "Newtonsoft.Json.JsonConvert")
@@ -397,8 +363,7 @@ internal static partial class CommonBugAnalyzer
         return SerializerKind.None;
     }
 
-    private enum SerializerKind
-    {
+    private enum SerializerKind {
         None,
         SystemTextJson,
         NewtonsoftJson

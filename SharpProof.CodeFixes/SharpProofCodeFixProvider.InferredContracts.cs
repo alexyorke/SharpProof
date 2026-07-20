@@ -1,13 +1,11 @@
 namespace SharpProof;
 
-    public sealed partial class SharpProofCodeFixProvider
-    {
+    public sealed partial class SharpProofCodeFixProvider {
         internal void RegisterInferredContractCodeFix(
             CodeFixContext context,
             Document document,
             SyntaxNode root,
-            Diagnostic diagnostic)
-        {
+            Diagnostic diagnostic) {
             if (!diagnostic.Properties.TryGetValue(
                     DiagnosticPropertyNames.SuggestedContractAttributeProperty,
                 out var attributeExpression) ||
@@ -55,11 +53,9 @@ namespace SharpProof;
             SyntaxNode declaration,
             string attributeExpression,
             string contractKind,
-            CancellationToken cancellationToken)
-        {
+            CancellationToken cancellationToken) {
             cancellationToken.ThrowIfCancellationRequested();
-            if (contractKind == "nullable-return")
-            {
+            if (contractKind == "nullable-return") {
                 var parsed = SyntaxFactory.ParseCompilationUnit(
                     "class __SharpProofPlaceholder { [return: " + attributeExpression +
                     "] object M() => null; }");
@@ -84,8 +80,7 @@ namespace SharpProof;
             var parameter = declaration.DescendantNodes()
                 .OfType<ParameterSyntax>()
                 .FirstOrDefault(candidate => candidate.Identifier.ValueText == parameterName);
-            if (parameter == null)
-            {
+            if (parameter == null) {
                 if (parameterName != "value" ||
                     declaration is not AccessorDeclarationSyntax accessor ||
                     !accessor.IsKind(SyntaxKind.SetAccessorDeclaration) &&
@@ -126,8 +121,7 @@ namespace SharpProof;
             SyntaxNode root,
             SyntaxNode declaration,
             string attributeExpression,
-            CancellationToken cancellationToken)
-        {
+            CancellationToken cancellationToken) {
             const string attributeNamespace = "global::SharpProof.Attributes.";
             if (string.IsNullOrWhiteSpace(attributeExpression) ||
                 !attributeExpression.StartsWith(attributeNamespace, StringComparison.Ordinal) ||
@@ -165,8 +159,7 @@ namespace SharpProof;
             SyntaxNode root,
             SyntaxNode declaration,
             AttributeListSyntax attributeList,
-            string lineEnding)
-        {
+            string lineEnding) {
             var originalDeclaration = declaration;
             (declaration, attributeList) = FormatInsertedAttribute(declaration, attributeList, lineEnding);
             var updatedDeclaration = WithAttributeLists(
@@ -177,8 +170,7 @@ namespace SharpProof;
 
         private static async Task<string> GetLineEndingAsync(
             Document document,
-            CancellationToken cancellationToken)
-        {
+            CancellationToken cancellationToken) {
             var sourceText = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
             return sourceText.ToString().IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
         }
@@ -186,8 +178,7 @@ namespace SharpProof;
         private static (SyntaxNode Declaration, AttributeListSyntax AttributeList) FormatInsertedAttribute(
             SyntaxNode declaration,
             AttributeListSyntax attributeList,
-            string lineEnding)
-        {
+            string lineEnding) {
             var leadingTrivia = declaration.GetLeadingTrivia();
             var indentation = SyntaxFactory.TriviaList(
                 leadingTrivia
@@ -204,8 +195,7 @@ namespace SharpProof;
 
         private static bool HasUnaliasedSharpProofAttributesUsing(SyntaxNode declaration) =>
             declaration.AncestorsAndSelf()
-                .SelectMany(static ancestor => ancestor switch
-                {
+                .SelectMany(static ancestor => ancestor switch {
                     CompilationUnitSyntax compilationUnit => compilationUnit.Usings,
                     BaseNamespaceDeclarationSyntax namespaceDeclaration => namespaceDeclaration.Usings,
                     _ => default
@@ -218,8 +208,7 @@ namespace SharpProof;
             SemanticModel model,
             int position,
             string shortName,
-            INamedTypeSymbol expectedType)
-        {
+            INamedTypeSymbol expectedType) {
             var candidates = model.LookupNamespacesAndTypes(position, name: shortName)
                 .Concat(model.LookupNamespacesAndTypes(position, name: shortName + "Attribute"))
                 .OfType<INamedTypeSymbol>()
@@ -230,21 +219,18 @@ namespace SharpProof;
 
         private static AttributeListSyntax ShortenSharpProofAttributeNames(
             AttributeListSyntax attributeList,
-            string attributeNamespace)
-        {
+            string attributeNamespace) {
             return (AttributeListSyntax)new SharpProofAttributeNameRewriter(attributeNamespace).Visit(attributeList)!;
         }
 
-        private sealed class SharpProofAttributeNameRewriter(string attributeNamespace) : CSharpSyntaxRewriter
-        {
+        private sealed class SharpProofAttributeNameRewriter(string attributeNamespace) : CSharpSyntaxRewriter {
             public override SyntaxNode? VisitQualifiedName(QualifiedNameSyntax node) =>
                 Shorten(node) ?? base.VisitQualifiedName(node);
 
             public override SyntaxNode? VisitAliasQualifiedName(AliasQualifiedNameSyntax node) =>
                 Shorten(node) ?? base.VisitAliasQualifiedName(node);
 
-            public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
-            {
+            public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node) {
                 var expressionText = node.Expression.ToString();
                 if (expressionText.StartsWith(attributeNamespace, StringComparison.Ordinal))
                     return node.WithExpression(SyntaxFactory.ParseExpression(
@@ -254,8 +240,7 @@ namespace SharpProof;
                 return base.VisitMemberAccessExpression(node);
             }
 
-            private NameSyntax? Shorten(NameSyntax node)
-            {
+            private NameSyntax? Shorten(NameSyntax node) {
                 var text = node.ToString();
                 return text.StartsWith(attributeNamespace, StringComparison.Ordinal)
                     ? SyntaxFactory.ParseName(text.Substring(attributeNamespace.Length)).WithTriviaFrom(node)

@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static class TrustedBoundaryReviewAnalyzer
-{
+internal static class TrustedBoundaryReviewAnalyzer {
     private const int DirectImpureRank = 10;
     private const int DirectPureExternalRank = 11;
     private const int AssemblyImpureRank = 12;
@@ -31,22 +30,18 @@ internal static class TrustedBoundaryReviewAnalyzer
     private const string JetBrainsPureAttributeName = "JetBrains.Annotations.PureAttribute";
     private const string CodeContractsPureAttributeName = "System.Diagnostics.Contracts.PureAttribute";
 
-    internal static void Analyze(MethodBodyAnalysisContext context, AnalyzerSession session)
-    {
+    internal static void Analyze(MethodBodyAnalysisContext context, AnalyzerSession session) {
         var mode = session.Configuration.TrustedBoundaryReviewMode;
         if (mode == TrustedBoundaryReviewMode.Off) return;
 
-        foreach (var operation in context.Snapshot.VisibleOperations)
-        {
+        foreach (var operation in context.Snapshot.VisibleOperations) {
             context.CancellationToken.ThrowIfCancellationRequested();
-            foreach (var symbol in GetReferencedBoundarySymbols(operation))
-            {
+            foreach (var symbol in GetReferencedBoundarySymbols(operation)) {
                 foreach (var finding in Evaluate(
                              symbol,
                              operation.Syntax.GetLocation(),
                              context.SemanticModel.Compilation,
-                             session.Configuration))
-                {
+                             session.Configuration)) {
                     if (mode == TrustedBoundaryReviewMode.Used &&
                         !string.Equals(finding.Disposition, "applied", StringComparison.Ordinal))
                         continue;
@@ -57,10 +52,8 @@ internal static class TrustedBoundaryReviewAnalyzer
         }
     }
 
-    internal static void ReportDiagnostics(CompilationAnalysisContext context, AnalyzerSession session)
-    {
-        foreach (var finding in session.GetTrustedBoundaryFindings())
-        {
+    internal static void ReportDiagnostics(CompilationAnalysisContext context, AnalyzerSession session) {
+        foreach (var finding in session.GetTrustedBoundaryFindings()) {
             var properties = ImmutableDictionary<string, string?>.Empty
                 .Add("sharpproof.trusted_boundary.symbol", finding.SymbolDisplay)
                 .Add("sharpproof.trusted_boundary.source", finding.Source)
@@ -97,8 +90,7 @@ internal static class TrustedBoundaryReviewAnalyzer
         ISymbol referencedSymbol,
         Location location,
         Compilation compilation,
-        AnalyzerConfiguration configuration)
-    {
+        AnalyzerConfiguration configuration) {
         var symbol = referencedSymbol.OriginalDefinition;
         var method = symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod?.OriginalDefinition;
         var symbolDisplay = symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
@@ -243,8 +235,7 @@ internal static class TrustedBoundaryReviewAnalyzer
             .ThenBy(static candidate => candidate.Value, StringComparer.Ordinal)
             .First();
         var findings = ImmutableArray.CreateBuilder<TrustedBoundaryReviewFinding>(reviewCandidates.Length);
-        foreach (var candidate in reviewCandidates)
-        {
+        foreach (var candidate in reviewCandidates) {
             var applied = IsApplied(candidate, winner);
             findings.Add(new TrustedBoundaryReviewFinding(
                 symbol,
@@ -261,17 +252,14 @@ internal static class TrustedBoundaryReviewAnalyzer
         return findings.ToImmutable();
     }
 
-    private static bool IsApplied(TrustCandidate candidate, TrustCandidate winner)
-    {
+    private static bool IsApplied(TrustCandidate candidate, TrustCandidate winner) {
         return string.Equals(candidate.Source, winner.Source, StringComparison.Ordinal) &&
                string.Equals(candidate.Value, winner.Value, StringComparison.Ordinal) &&
                string.Equals(candidate.Classification, winner.Classification, StringComparison.Ordinal);
     }
 
-    private static IEnumerable<ISymbol> GetReferencedBoundarySymbols(IOperation operation)
-    {
-        switch (operation)
-        {
+    private static IEnumerable<ISymbol> GetReferencedBoundarySymbols(IOperation operation) {
+        switch (operation) {
             case IInvocationOperation invocation:
                 yield return invocation.TargetMethod;
                 break;
@@ -316,8 +304,7 @@ internal static class TrustedBoundaryReviewAnalyzer
         ISymbol symbol,
         IMethodSymbol? method,
         AnalyzerConfiguration configuration,
-        out string configuredValue)
-    {
+        out string configuredValue) {
         if (ImpurityCatalog.TryGetConfiguredKnownPureMember(symbol, configuration, out configuredValue)) return true;
         return method != null &&
                !SymbolEq.AreEqual(symbol, method) &&
@@ -328,8 +315,7 @@ internal static class TrustedBoundaryReviewAnalyzer
         ISymbol symbol,
         IMethodSymbol? method,
         AnalyzerConfiguration configuration,
-        out string configuredValue)
-    {
+        out string configuredValue) {
         if (ImpurityCatalog.TryGetConfiguredKnownImpureMember(symbol, configuration, out configuredValue)) return true;
         return method != null &&
                !SymbolEq.AreEqual(symbol, method) &&
@@ -341,8 +327,7 @@ internal static class TrustedBoundaryReviewAnalyzer
         IMethodSymbol? method,
         AnalyzerConfiguration configuration,
         out string source,
-        out string configuredValue)
-    {
+        out string configuredValue) {
         if (ImpurityCatalog.TryGetConfiguredImpureBoundary(
                 symbol,
                 configuration,
@@ -361,8 +346,7 @@ internal static class TrustedBoundaryReviewAnalyzer
     private static bool TryGetBuiltInKnownPureMember(
         ISymbol symbol,
         IMethodSymbol? method,
-        out string catalogValue)
-    {
+        out string catalogValue) {
         if (ImpurityCatalog.TryGetBuiltInKnownPureMember(symbol, out catalogValue)) return true;
         return method != null &&
                !SymbolEq.AreEqual(symbol, method) &&
@@ -372,30 +356,25 @@ internal static class TrustedBoundaryReviewAnalyzer
     private static bool TryGetBuiltInImpureMember(
         ISymbol symbol,
         IMethodSymbol? method,
-        out string catalogValue)
-    {
+        out string catalogValue) {
         var source = ImpurityCatalog.GetKnownImpureMemberSource(symbol);
         if (!string.IsNullOrWhiteSpace(source) &&
-            !string.Equals(source, "config_known_impure", StringComparison.Ordinal))
-        {
+            !string.Equals(source, "config_known_impure", StringComparison.Ordinal)) {
             catalogValue = source!;
             return true;
         }
 
-        if (method != null && !SymbolEq.AreEqual(symbol, method))
-        {
+        if (method != null && !SymbolEq.AreEqual(symbol, method)) {
             source = ImpurityCatalog.GetKnownImpureMemberSource(method);
             if (!string.IsNullOrWhiteSpace(source) &&
-                !string.Equals(source, "config_known_impure", StringComparison.Ordinal))
-            {
+                !string.Equals(source, "config_known_impure", StringComparison.Ordinal)) {
                 catalogValue = source!;
                 return true;
             }
         }
 
         if (ImpurityCatalog.IsInImpureNamespaceOrType(symbol) ||
-            (method != null && ImpurityCatalog.IsInImpureNamespaceOrType(method)))
-        {
+            (method != null && ImpurityCatalog.IsInImpureNamespaceOrType(method))) {
             catalogValue = "known_impure_namespace_or_type";
             return true;
         }
@@ -404,8 +383,7 @@ internal static class TrustedBoundaryReviewAnalyzer
         return false;
     }
 
-    private static IEnumerable<AttributeData> GetDirectAttributes(ISymbol symbol)
-    {
+    private static IEnumerable<AttributeData> GetDirectAttributes(ISymbol symbol) {
         var associatedAttributePolicy = symbol is IMethodSymbol
             ? AssociatedAttributePolicy.AnyAssociatedSymbol
             : AssociatedAttributePolicy.None;
@@ -420,13 +398,11 @@ internal static class TrustedBoundaryReviewAnalyzer
 
     private static AttributeData? FindAttribute(
         IEnumerable<AttributeData> attributes,
-        string metadataName)
-    {
+        string metadataName) {
         return attributes.FirstOrDefault(attribute => IsAttribute(attribute, metadataName));
     }
 
-    private static bool IsAttribute(AttributeData attribute, string metadataName)
-    {
+    private static bool IsAttribute(AttributeData attribute, string metadataName) {
         return string.Equals(attribute.AttributeClass?.ToDisplayString(), metadataName, StringComparison.Ordinal) ||
                string.Equals(
                    attribute.AttributeClass?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
@@ -455,8 +431,7 @@ internal sealed record TrustedBoundaryReviewFinding(
     string OverriddenBy,
     string OverrideValue,
     string Classification,
-    Location Location)
-{
+    Location Location) {
     internal string Key =>
         SymbolDisplay + "\u001f" + Source + "\u001f" + Value + "\u001f" + Disposition + "\u001f" + OverriddenBy;
 }

@@ -2,21 +2,18 @@ using static SharpProof.Symbolic.SymbolicStateFactBuilder;
 
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicProgramPointFacts
-{
+internal static class SymbolicProgramPointFacts {
     internal static SymbolicState CollectPriorAssignmentState(
         SyntaxNode site,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         bool includeCurrentStatementCompletionFacts = false,
-        SymbolicState? initialState = null)
-    {
+        SymbolicState? initialState = null) {
         var state = initialState ?? new SymbolicState();
         SymbolicStatementStateTransfer.AddMethodEntryNullableFlowStateFacts(ref state, site, semanticModel, cancellationToken);
         foreach (var containingBlock in CSharpSyntaxFacts
                      .EnumerateContainingBlocks(site, stopAtExecutionRoot: true)
-                     .Reverse())
-        {
+                     .Reverse()) {
             if (SymbolicLoopStateTransfer.IsLoopBodyBlock(containingBlock.Block))
                 SymbolicStateInvalidator.InvalidateNestedMutations(
                     ref state,
@@ -30,10 +27,8 @@ internal static class SymbolicProgramPointFacts
                 semanticModel,
                 cancellationToken);
 
-            foreach (var statement in containingBlock.Block.Statements)
-            {
-                if (ReferenceEquals(statement, containingBlock.ContainingStatement))
-                {
+            foreach (var statement in containingBlock.Block.Statements) {
+                if (ReferenceEquals(statement, containingBlock.ContainingStatement)) {
                     SymbolicStatementStateTransfer.InvalidateStateForTryRegionEntry(
                         ref state,
                         site,
@@ -61,8 +56,7 @@ internal static class SymbolicProgramPointFacts
             }
         }
 
-        if (site is BlockSyntax siteBlock)
-        {
+        if (site is BlockSyntax siteBlock) {
             SymbolicStatementStateTransfer.ApplyContainingBlockEntryStateFacts(
                 ref state,
                 siteBlock,
@@ -77,8 +71,7 @@ internal static class SymbolicProgramPointFacts
                     cancellationToken).Value!;
         }
         else if (includeCurrentStatementCompletionFacts &&
-                 site is ExpressionSyntax siteExpression)
-        {
+                 site is ExpressionSyntax siteExpression) {
             SymbolicCfgProgramPointStateCollector.TryApplyCurrentExpressionCompletion(
                 ref state,
                 siteExpression,
@@ -92,8 +85,7 @@ internal static class SymbolicProgramPointFacts
     internal static SymbolicState CollectForInitialEntryState(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var state = CollectAncestorReachabilityState(forStatement, semanticModel, cancellationToken);
         state = MergeStates(
             state,
@@ -104,8 +96,7 @@ internal static class SymbolicProgramPointFacts
         return state;
     }
 
-    internal static SymbolicState MergeStates(SymbolicState left, SymbolicState right)
-    {
+    internal static SymbolicState MergeStates(SymbolicState left, SymbolicState right) {
         var symbolVersions = left.SymbolVersions.SetItems(right.SymbolVersions);
         return new SymbolicState(
             left.Facts.Concat(right.Facts),
@@ -117,13 +108,11 @@ internal static class SymbolicProgramPointFacts
     public static SymbolicState CollectAncestorReachabilityState(
         SyntaxNode syntaxNode,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var state = new SymbolicState();
 
         foreach (var ancestor in syntaxNode.Ancestors())
-            if (ancestor is IfStatementSyntax ifStatementSyntax)
-            {
+            if (ancestor is IfStatementSyntax ifStatementSyntax) {
                 if (ifStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
                     !SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
                         ifStatementSyntax.Condition,
@@ -144,8 +133,7 @@ internal static class SymbolicProgramPointFacts
                     AddReachabilityCondition(ref state, ifStatementSyntax.Condition, false, semanticModel,
                         cancellationToken);
             }
-            else if (ancestor is ConditionalExpressionSyntax conditionalExpressionSyntax)
-            {
+            else if (ancestor is ConditionalExpressionSyntax conditionalExpressionSyntax) {
                 if (conditionalExpressionSyntax.WhenTrue.Span.Contains(syntaxNode.Span) &&
                     !SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
                         conditionalExpressionSyntax.Condition,
@@ -166,8 +154,7 @@ internal static class SymbolicProgramPointFacts
                         cancellationToken);
             }
             else if (ancestor is BinaryExpressionSyntax binaryExpressionSyntax &&
-                     binaryExpressionSyntax.Right.Span.Contains(syntaxNode.Span))
-            {
+                     binaryExpressionSyntax.Right.Span.Contains(syntaxNode.Span)) {
                 if (SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
                         binaryExpressionSyntax.Left,
                         binaryExpressionSyntax.Right,
@@ -196,8 +183,7 @@ internal static class SymbolicProgramPointFacts
                          conditionalAccessExpressionSyntax.WhenNotNull,
                          syntaxNode.SpanStart,
                          semanticModel,
-                         cancellationToken))
-            {
+                         cancellationToken)) {
                 AddReferenceNullCondition(ref state, conditionalAccessExpressionSyntax.Expression, false, semanticModel,
                     cancellationToken);
             }
@@ -209,8 +195,7 @@ internal static class SymbolicProgramPointFacts
                          lockStatementSyntax.Statement,
                          syntaxNode.SpanStart,
                          semanticModel,
-                         cancellationToken))
-            {
+                         cancellationToken)) {
                 AddReferenceNullCondition(
                     ref state,
                     lockStatementSyntax.Expression,
@@ -220,8 +205,7 @@ internal static class SymbolicProgramPointFacts
                     "ir.path.lock-entry.not-null");
             }
             else if (ancestor is CatchClauseSyntax catchClauseSyntax &&
-                     catchClauseSyntax.Block.Span.Contains(syntaxNode.Span))
-            {
+                     catchClauseSyntax.Block.Span.Contains(syntaxNode.Span)) {
                 SymbolicStatementStateTransfer.AddCatchBodyEntryStateFacts(
                     ref state,
                     catchClauseSyntax,
@@ -230,10 +214,8 @@ internal static class SymbolicProgramPointFacts
                     cancellationToken);
             }
             else if (ancestor is UsingStatementSyntax usingStatementSyntax &&
-                     usingStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
-            {
-                if (usingStatementSyntax.Declaration != null)
-                {
+                     usingStatementSyntax.Statement.Span.Contains(syntaxNode.Span)) {
+                if (usingStatementSyntax.Declaration != null) {
                     SymbolicStatementStateTransfer.AddUsingStatementDeclarationStateFacts(
                         ref state,
                         usingStatementSyntax,
@@ -246,8 +228,7 @@ internal static class SymbolicProgramPointFacts
                              usingStatementSyntax.Statement,
                              syntaxNode.SpanStart,
                              semanticModel,
-                             cancellationToken))
-                {
+                             cancellationToken)) {
                     SymbolicStatementStateTransfer.AddUsingStatementExpressionStateFacts(
                         ref state,
                         usingStatementSyntax.Expression,
@@ -261,11 +242,9 @@ internal static class SymbolicProgramPointFacts
                          ancestor,
                          syntaxNode.SpanStart,
                          semanticModel,
-                         cancellationToken))
-            {
+                         cancellationToken)) {
             }
-            else if (ancestor is SwitchStatementSyntax switchStatementSyntax)
-            {
+            else if (ancestor is SwitchStatementSyntax switchStatementSyntax) {
                 var matchingSection = switchStatementSyntax.Sections
                     .FirstOrDefault(section => section.Span.Contains(syntaxNode.SpanStart));
                 if (matchingSection != null &&
@@ -274,8 +253,7 @@ internal static class SymbolicProgramPointFacts
                         matchingSection,
                         syntaxNode.SpanStart,
                         semanticModel,
-                        cancellationToken))
-                {
+                        cancellationToken)) {
                     AddSwitchStatementSectionStateFacts(
                         ref state,
                         switchStatementSyntax.Expression,
@@ -284,8 +262,7 @@ internal static class SymbolicProgramPointFacts
                         cancellationToken);
                 }
             }
-            else if (ancestor is SwitchExpressionSyntax switchExpressionSyntax)
-            {
+            else if (ancestor is SwitchExpressionSyntax switchExpressionSyntax) {
                 var matchingArm = switchExpressionSyntax.Arms
                     .FirstOrDefault(arm => arm.Expression.Span.Contains(syntaxNode.SpanStart));
                 if (matchingArm != null &&
@@ -300,8 +277,7 @@ internal static class SymbolicProgramPointFacts
                         matchingArm,
                         semanticModel,
                         cancellationToken,
-                        out var armCondition))
-                {
+                        out var armCondition)) {
                     state = state.AddPathCondition(armCondition);
                     AddPatternBindingStateFacts(
                         ref state,
@@ -325,8 +301,7 @@ internal static class SymbolicProgramPointFacts
         ExpressionSyntax condition,
         bool mustBeTrue,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var transition = SymbolicReachabilityLowerer.Apply(
             state,
             condition,
@@ -342,8 +317,7 @@ internal static class SymbolicProgramPointFacts
         ExpressionSyntax condition,
         bool branchWhenTrue,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (!SymbolicReachabilityLowerer.TryApplyInlineAssignment(
                 state,
                 condition,
@@ -364,18 +338,15 @@ internal static class SymbolicProgramPointFacts
         bool isNull,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        string? provenance = null)
-    {
-        if (NullableFlowFacts.IsDefinitelyNullReferenceValue(expression, semanticModel, cancellationToken))
-        {
+        string? provenance = null) {
+        if (NullableFlowFacts.IsDefinitelyNullReferenceValue(expression, semanticModel, cancellationToken)) {
             if (!isNull)
                 state = SymbolicOperationTransferKernel.Complete(state, expression.Span).State;
 
             return;
         }
 
-        if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(expression, semanticModel, cancellationToken))
-        {
+        if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(expression, semanticModel, cancellationToken)) {
             if (isNull)
                 state = SymbolicOperationTransferKernel.Complete(state, expression.Span).State;
 
@@ -402,8 +373,7 @@ internal static class SymbolicProgramPointFacts
         ref SymbolicState state,
         ExpressionSyntax leftExpression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var originalKey = state.NormalizedProofKey;
         AddReferenceNullCondition(
             ref state,
@@ -436,15 +406,12 @@ internal static class SymbolicProgramPointFacts
     private static bool ConditionalAccessFallbackRequiresNullReceiver(
         ConditionalAccessExpressionSyntax conditionalAccess,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var typeInfo = semanticModel.GetTypeInfo(conditionalAccess.WhenNotNull, cancellationToken);
         var type = typeInfo.ConvertedType ?? typeInfo.Type;
-        if (type == null)
-        {
+        if (type == null) {
             var symbol = semanticModel.GetSymbolInfo(conditionalAccess.WhenNotNull, cancellationToken).Symbol;
-            type = symbol switch
-            {
+            type = symbol switch {
                 IFieldSymbol field => field.Type,
                 IPropertySymbol property => property.Type,
                 IEventSymbol @event => @event.Type,
@@ -462,8 +429,7 @@ internal static class SymbolicProgramPointFacts
         ExpressionSyntax governingExpression,
         SwitchSectionSyntax section,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (SwitchPathConditionBuilder.TryCreateSwitchStatementSectionSymbolicCondition(
                 governingExpression,
                 section,
@@ -494,8 +460,7 @@ internal static class SymbolicProgramPointFacts
         ExpressionSyntax governingExpression,
         PatternSyntax pattern,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var term = SymbolicSemanticPipeline.LowerTerm(governingExpression, context);
         var typeInfo = semanticModel.GetTypeInfo(governingExpression, cancellationToken);
@@ -524,8 +489,7 @@ internal static class SymbolicProgramPointFacts
         ref SymbolicState state,
         ExpressionSyntax? guardCondition,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (guardCondition == null) return;
 
         AddReachabilityCondition(
@@ -541,22 +505,19 @@ internal static class SymbolicProgramPointFacts
         StatementSyntax statement,
         ISymbol symbol,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return SymbolicMutationInventory.Create(statement, semanticModel, cancellationToken)
             .InvalidatesSymbol(symbol, mutableExposures: true);
     }
 
-    internal static bool IsSupportedForeachLengthReceiver(ExpressionSyntax expressionSyntax)
-    {
+    internal static bool IsSupportedForeachLengthReceiver(ExpressionSyntax expressionSyntax) {
         expressionSyntax = UnwrapExpression(expressionSyntax);
         return expressionSyntax is ArrayCreationExpressionSyntax or
             ImplicitArrayCreationExpressionSyntax or
             CollectionExpressionSyntax;
     }
 
-    internal static bool IsSupportedForeachLengthReceiver(ITypeSymbol? type)
-    {
+    internal static bool IsSupportedForeachLengthReceiver(ITypeSymbol? type) {
         return type is IArrayTypeSymbol { Rank: 1 } ||
                type?.SpecialType == SpecialType.System_String;
     }

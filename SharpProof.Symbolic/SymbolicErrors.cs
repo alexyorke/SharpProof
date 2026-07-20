@@ -2,8 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicErrorCodes
-{
+internal static class SymbolicErrorCodes {
     public const string InvalidRequest = "SPQ1000";
     public const string InvalidTarget = "SPQ1001";
     public const string UnsupportedTarget = "SPQ1002";
@@ -18,8 +17,7 @@ internal static class SymbolicErrorCodes
     public const string InternalFailure = "SPQ9000";
 }
 
-internal static class SymbolicErrorExitCodes
-{
+internal static class SymbolicErrorExitCodes {
     public const int GateFailure = 1;
     public const int Usage = 64;
     public const int InvalidData = 65;
@@ -31,8 +29,7 @@ internal static class SymbolicErrorExitCodes
 }
 
 internal sealed record SymbolicErrorEnvelope(
-    [property: JsonPropertyOrder(2)] SharpProofError Error)
-{
+    [property: JsonPropertyOrder(2)] SharpProofError Error) {
     [JsonPropertyOrder(0)]
     public string Kind => "error";
 
@@ -40,27 +37,22 @@ internal sealed record SymbolicErrorEnvelope(
     public int SchemaVersion => 1;
 }
 
-internal sealed class SymbolicQueryException : Exception
-{
+internal sealed class SymbolicQueryException : Exception {
     public SymbolicQueryException(SharpProofError error)
-        : base(error?.Message)
-    {
+        : base(error?.Message) {
         Error = error ?? throw new ArgumentNullException(nameof(error));
     }
 
     public SymbolicQueryException(SharpProofError error, Exception innerException)
-        : base(error?.Message, innerException)
-    {
+        : base(error?.Message, innerException) {
         Error = error ?? throw new ArgumentNullException(nameof(error));
     }
 
     public SharpProofError Error { get; }
 }
 
-internal static class SymbolicErrorClassifier
-{
-    public static SharpProofError FromException(Exception exception)
-    {
+internal static class SymbolicErrorClassifier {
+    public static SharpProofError FromException(Exception exception) {
         if (exception == null) throw new ArgumentNullException(nameof(exception));
 
         var relevant = Unwrap(exception);
@@ -121,19 +113,15 @@ internal static class SymbolicErrorClassifier
             SymbolicErrorExitCodes.InternalFailure, false, relevant);
     }
 
-    public static bool IsFatal(Exception exception)
-    {
+    public static bool IsFatal(Exception exception) {
         if (exception == null) throw new ArgumentNullException(nameof(exception));
 
         return exception is OutOfMemoryException or StackOverflowException or AccessViolationException;
     }
 
-    private static Exception Unwrap(Exception exception)
-    {
-        while (true)
-        {
-            switch (exception)
-            {
+    private static Exception Unwrap(Exception exception) {
+        while (true) {
+            switch (exception) {
                 case AggregateException aggregateException when aggregateException.InnerExceptions.Count == 1:
                     exception = aggregateException.InnerExceptions[0];
                     continue;
@@ -147,8 +135,7 @@ internal static class SymbolicErrorClassifier
         }
     }
 
-    private static ImmutableDictionary<string, string> CreateExceptionDetails(Exception exception)
-    {
+    private static ImmutableDictionary<string, string> CreateExceptionDetails(Exception exception) {
         return ImmutableDictionary<string, string>.Empty
             .Add("exceptionType", exception.GetType().FullName ?? exception.GetType().Name);
     }
@@ -165,23 +152,20 @@ internal static class SymbolicErrorClassifier
 
     private static ImmutableDictionary<string, string> AddPath(
         ImmutableDictionary<string, string> details,
-        string? path)
-    {
+        string? path) {
         if (string.IsNullOrWhiteSpace(path)) return details;
 
         return details.SetItem("path", path!);
     }
 
-    private static bool IsNativeSolverLoadFailure(Exception exception)
-    {
+    private static bool IsNativeSolverLoadFailure(Exception exception) {
         return exception is DllNotFoundException ||
                ((exception is BadImageFormatException or FileLoadException) &&
                (exception.Message.IndexOf("z3", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 exception.Message.IndexOf("solver", StringComparison.OrdinalIgnoreCase) >= 0));
     }
 
-    private static bool IsZ3Exception(Exception exception)
-    {
+    private static bool IsZ3Exception(Exception exception) {
         return IsExceptionType(exception, "Microsoft.Z3.Z3Exception") ||
                string.Equals(exception.GetType().Name, "Z3Exception", StringComparison.Ordinal);
     }

@@ -2,16 +2,14 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Symbolic;
 
-internal enum SymbolicWitnessStatus
-{
+internal enum SymbolicWitnessStatus {
     None,
     Exact,
     Approximate,
     Unsupported
 }
 
-internal enum SymbolicInputRole
-{
+internal enum SymbolicInputRole {
     Unknown,
     Parameter,
     Local,
@@ -20,8 +18,7 @@ internal enum SymbolicInputRole
     Derived
 }
 
-internal enum SymbolicInputValueKind
-{
+internal enum SymbolicInputValueKind {
     Unknown,
     Boolean,
     Integer,
@@ -29,8 +26,7 @@ internal enum SymbolicInputValueKind
     String
 }
 
-internal enum SymbolicInputDomainKind
-{
+internal enum SymbolicInputDomainKind {
     Unknown,
     Boolean,
     Integer,
@@ -40,15 +36,13 @@ internal enum SymbolicInputDomainKind
     Index
 }
 
-internal enum SymbolicNullness
-{
+internal enum SymbolicNullness {
     Unknown,
     Null,
     NotNull
 }
 
-internal enum SymbolicDomainPredicateKind
-{
+internal enum SymbolicDomainPredicateKind {
     Equality,
     Inequality,
     Range,
@@ -70,8 +64,7 @@ internal sealed record SymbolicIntegerRange(
     long? Minimum,
     bool MinimumInclusive,
     long? Maximum,
-    bool MaximumInclusive)
-{
+    bool MaximumInclusive) {
     public bool HasLowerBound => Minimum.HasValue;
 
     public bool HasUpperBound => Maximum.HasValue;
@@ -133,8 +126,7 @@ internal sealed record SymbolicInputDomainSummary(
     [property: JsonPropertyOrder(0)] SymbolicWitnessStatus Status,
     [property: JsonPropertyOrder(1)] string Reason,
     [property: JsonPropertyOrder(2)] IReadOnlyList<SymbolicInputDomain> Domains,
-    [property: JsonPropertyOrder(4)] int AlternativeCount)
-{
+    [property: JsonPropertyOrder(4)] int AlternativeCount) {
     [JsonPropertyOrder(3)] public int DomainCount => Domains.Count;
 
     [JsonPropertyOrder(5)] public bool HasApproximation =>
@@ -152,24 +144,21 @@ internal sealed record SymbolicInputWitness(
     [property: JsonPropertyOrder(0)] SymbolicWitnessStatus Status,
     [property: JsonPropertyOrder(1)] string Reason,
     [property: JsonPropertyOrder(2)] IReadOnlyList<SymbolicSatisfyingAssignment> Assignments,
-    [property: JsonPropertyOrder(4)] SymbolicInputDomainSummary DomainSummary)
-{
+    [property: JsonPropertyOrder(4)] SymbolicInputDomainSummary DomainSummary) {
     [JsonPropertyOrder(3)] public int AssignmentCount => Assignments.Count;
 
     [JsonPropertyOrder(5)] public bool IsAvailable =>
         Status is SymbolicWitnessStatus.Exact or SymbolicWitnessStatus.Approximate;
 }
 
-internal static class SymbolicInputWitnessFactory
-{
+internal static class SymbolicInputWitnessFactory {
     internal static SymbolicInputWitness CreateReachability(
         SmtSatisfyingWitness? witness,
         IEnumerable<SmtFormula> pathConditions,
         SemanticModel? semanticModel,
         int position,
         SymbolicReachability reachability,
-        string reason)
-    {
+        string reason) {
         var conditions = pathConditions?.ToArray() ?? Array.Empty<SmtFormula>();
         if (reachability == SymbolicReachability.Unreachable) return None(reason);
 
@@ -193,8 +182,7 @@ internal static class SymbolicInputWitnessFactory
         SemanticModel? semanticModel,
         int position,
         SymbolicWitnessStatus missingStatus,
-        string missingReason)
-    {
+        string missingReason) {
         var formulaArray = formulas?.ToArray() ?? Array.Empty<SmtFormula>();
         var roles = SymbolicInputRoleMap.Create(semanticModel, position);
         var assignments = witness?.Assignments
@@ -212,8 +200,7 @@ internal static class SymbolicInputWitnessFactory
             new SymbolicInputDomainSummary(domainStatus, domainReason, domains, 1));
     }
 
-    internal static SymbolicInputWitness Unconstrained()
-    {
+    internal static SymbolicInputWitness Unconstrained() {
         return CreateEmpty(
             SymbolicWitnessStatus.Exact,
             "unconstrained_inputs",
@@ -229,8 +216,7 @@ internal static class SymbolicInputWitnessFactory
     private static SymbolicInputWitness CreateEmpty(
         SymbolicWitnessStatus status,
         string reason,
-        int alternativeCount)
-    {
+        int alternativeCount) {
         return new SymbolicInputWitness(
             status,
             reason,
@@ -242,8 +228,7 @@ internal static class SymbolicInputWitnessFactory
                 alternativeCount));
     }
 
-    internal static SymbolicInputDomainSummary MergeAlternatives(IEnumerable<SymbolicInputWitness> witnesses)
-    {
+    internal static SymbolicInputDomainSummary MergeAlternatives(IEnumerable<SymbolicInputWitness> witnesses) {
         var alternatives = witnesses
             .Where(static witness => witness.Status != SymbolicWitnessStatus.None)
             .ToArray();
@@ -254,8 +239,7 @@ internal static class SymbolicInputWitnessFactory
     private static SymbolicSatisfyingAssignment CreateAssignment(
         SmtModelAssignment assignment,
         string reason,
-        SymbolicInputRoleMap roles)
-    {
+        SymbolicInputRoleMap roles) {
         var identity = roles.Resolve(assignment.Name);
         return new SymbolicSatisfyingAssignment(
             assignment.Name,
@@ -271,10 +255,8 @@ internal static class SymbolicInputWitnessFactory
             reason);
     }
 
-    internal static SymbolicWitnessStatus MapStatus(SmtWitnessStatus status)
-    {
-        return status switch
-        {
+    internal static SymbolicWitnessStatus MapStatus(SmtWitnessStatus status) {
+        return status switch {
             SmtWitnessStatus.Exact => SymbolicWitnessStatus.Exact,
             SmtWitnessStatus.Approximate => SymbolicWitnessStatus.Approximate,
             SmtWitnessStatus.Unsupported => SymbolicWitnessStatus.Unsupported,
@@ -282,10 +264,8 @@ internal static class SymbolicInputWitnessFactory
         };
     }
 
-    internal static SymbolicInputValueKind MapValueKind(SmtValueKind kind)
-    {
-        return kind switch
-        {
+    internal static SymbolicInputValueKind MapValueKind(SmtValueKind kind) {
+        return kind switch {
             SmtValueKind.Bool => SymbolicInputValueKind.Boolean,
             SmtValueKind.Int => SymbolicInputValueKind.Integer,
             SmtValueKind.Reference => SymbolicInputValueKind.Reference,
@@ -297,8 +277,7 @@ internal static class SymbolicInputWitnessFactory
     private static SymbolicWitnessStatus ResolveDomainStatus(
         IReadOnlyList<SymbolicInputDomain> domains,
         int formulaCount,
-        SymbolicWitnessStatus witnessStatus)
-    {
+        SymbolicWitnessStatus witnessStatus) {
         if (domains.Any(static domain => domain.Status == SymbolicWitnessStatus.Unsupported))
             return SymbolicWitnessStatus.Unsupported;
 
@@ -316,8 +295,7 @@ internal static class SymbolicInputWitnessFactory
     private static string ResolveDomainReason(
         IReadOnlyList<SymbolicInputDomain> domains,
         int formulaCount,
-        string witnessReason)
-    {
+        string witnessReason) {
         if (domains.Any(static domain => domain.Status == SymbolicWitnessStatus.Unsupported))
             return "one_or_more_domains_unsupported";
 
@@ -330,27 +308,21 @@ internal static class SymbolicInputWitnessFactory
     }
 }
 
-internal sealed class SymbolicInputRoleMap
-{
+internal sealed class SymbolicInputRoleMap {
     private readonly Dictionary<string, (string SourceName, SymbolicInputRole Role)> _identities;
 
-    private SymbolicInputRoleMap(Dictionary<string, (string SourceName, SymbolicInputRole Role)> identities)
-    {
+    private SymbolicInputRoleMap(Dictionary<string, (string SourceName, SymbolicInputRole Role)> identities) {
         _identities = identities;
     }
 
-    internal static SymbolicInputRoleMap Create(SemanticModel? semanticModel, int position)
-    {
+    internal static SymbolicInputRoleMap Create(SemanticModel? semanticModel, int position) {
         var identities = new Dictionary<string, (string SourceName, SymbolicInputRole Role)>(StringComparer.Ordinal);
         identities["this"] = ("this", SymbolicInputRole.Receiver);
         if (semanticModel == null) return new SymbolicInputRoleMap(identities);
 
-        try
-        {
-            foreach (var symbol in semanticModel.LookupSymbols(position))
-            {
-                var role = symbol switch
-                {
+        try {
+            foreach (var symbol in semanticModel.LookupSymbols(position)) {
+                var role = symbol switch {
                     IParameterSymbol => SymbolicInputRole.Parameter,
                     ILocalSymbol => SymbolicInputRole.Local,
                     IFieldSymbol or IPropertySymbol => SymbolicInputRole.ReceiverState,
@@ -364,25 +336,21 @@ internal sealed class SymbolicInputRoleMap
                     identities[SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition)] = (symbol.Name, role);
             }
         }
-        catch (ArgumentOutOfRangeException)
-        {
+        catch (ArgumentOutOfRangeException) {
             // Preserve witness data even when a synthetic query position cannot be looked up.
         }
 
         return new SymbolicInputRoleMap(identities);
     }
 
-    internal (string SourceName, SymbolicInputRole Role) Resolve(string symbolicName)
-    {
-        if (symbolicName.StartsWith("this.", StringComparison.Ordinal))
-        {
+    internal (string SourceName, SymbolicInputRole Role) Resolve(string symbolicName) {
+        if (symbolicName.StartsWith("this.", StringComparison.Ordinal)) {
             var receiverStateName = RemoveNumericLocationSuffix(symbolicName, "this.".Length);
             return (receiverStateName, SymbolicInputRole.ReceiverState);
         }
 
         var root = GetRootName(symbolicName);
-        if (_identities.TryGetValue(root, out var identity))
-        {
+        if (_identities.TryGetValue(root, out var identity)) {
             var suffixStart = GetRootSegmentEnd(symbolicName);
             var suffix = suffixStart < symbolicName.Length
                 ? symbolicName.Substring(suffixStart)
@@ -396,8 +364,7 @@ internal sealed class SymbolicInputRoleMap
         return (GetDisplayName(root), SymbolicInputRole.Derived);
     }
 
-    internal static string GetRootName(string symbolicName)
-    {
+    internal static string GetRootName(string symbolicName) {
         var end = GetRootSegmentEnd(symbolicName);
         var root = symbolicName.Substring(0, end);
         var versionIndex = root.LastIndexOf("@v", StringComparison.Ordinal);
@@ -408,11 +375,9 @@ internal sealed class SymbolicInputRoleMap
         return root;
     }
 
-    private static int GetRootSegmentEnd(string symbolicName)
-    {
+    private static int GetRootSegmentEnd(string symbolicName) {
         var end = symbolicName.Length;
-        foreach (var marker in new[] { ".", "[", "?" })
-        {
+        foreach (var marker in new[] { ".", "[", "?" }) {
             var markerIndex = symbolicName.IndexOf(marker, StringComparison.Ordinal);
             if (markerIndex >= 0 && markerIndex < end) end = markerIndex;
         }
@@ -423,8 +388,7 @@ internal sealed class SymbolicInputRoleMap
     private static string GetDisplayName(string root) =>
         RemoveNumericLocationSuffix(root, 0);
 
-    private static string RemoveNumericLocationSuffix(string value, int minimumPrefixLength)
-    {
+    private static string RemoveNumericLocationSuffix(string value, int minimumPrefixLength) {
         var locationIndex = value.LastIndexOf('#');
         return locationIndex > minimumPrefixLength &&
                value.Substring(locationIndex + 1).All(char.IsDigit)

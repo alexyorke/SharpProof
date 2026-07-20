@@ -1,13 +1,11 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicRuntimeHazardSyntaxFacts
-{
+internal static class SymbolicRuntimeHazardSyntaxFacts {
     internal static bool TryGetArrayElementStoreType(
         ElementAccessExpressionSyntax elementAccess,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out IArrayTypeSymbol arrayType)
-    {
+        out IArrayTypeSymbol arrayType) {
         arrayType = null!;
         var argumentCount = elementAccess.ArgumentList.Arguments.Count;
         if (argumentCount == 0 ||
@@ -24,8 +22,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
         ExpressionSyntax nullableExpression,
         SyntaxNode useNode,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         nullableExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(nullableExpression);
         if (!SymbolMutationFacts.TryGetLocalOrParameterSymbol(
                 nullableExpression,
@@ -52,8 +49,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
     private static bool IsMissingNullableValueExpression(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         if (!SymbolicTypeFacts.IsNullableType(
                 CSharpSyntaxFacts.GetExpressionType(expression, semanticModel, cancellationToken)))
@@ -71,8 +67,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
     internal static bool IsBuiltInSequenceElementAccess(
         ElementAccessExpressionSyntax elementAccess,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var argumentCount = elementAccess.ArgumentList.Arguments.Count;
         if (argumentCount == 0) return false;
 
@@ -90,21 +85,18 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
         CancellationToken cancellationToken,
         out SymbolicRuntimeHazardKind kind,
         out string exceptionType,
-        out string category)
-    {
+        out string category) {
         kind = default;
         exceptionType = string.Empty;
         category = string.Empty;
 
-        if (IsBuiltInSequenceElementAccess(elementAccess, semanticModel, cancellationToken))
-        {
+        if (IsBuiltInSequenceElementAccess(elementAccess, semanticModel, cancellationToken)) {
             var isRange = elementAccess.ArgumentList.Arguments.Count == 1 &&
                           IsBuiltInRangeAccessArgument(
                               elementAccess.ArgumentList.Arguments[0].Expression,
                               semanticModel,
                               cancellationToken);
-            if (isRange)
-            {
+            if (isRange) {
                 kind = SymbolicRuntimeHazardKind.ArgumentOutOfRange;
                 exceptionType = ExceptionTypes.ArgumentOutOfRangeException;
                 category = ExceptionCategories.DefiniteRangeOutOfRange;
@@ -117,8 +109,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
             return true;
         }
 
-        if (IsCountBackedIntIndexerElementAccess(elementAccess, semanticModel, cancellationToken))
-        {
+        if (IsCountBackedIntIndexerElementAccess(elementAccess, semanticModel, cancellationToken)) {
             kind = SymbolicRuntimeHazardKind.ArgumentOutOfRange;
             exceptionType = ExceptionTypes.ArgumentOutOfRangeException;
             category = ExceptionCategories.DefiniteCountIndexOutOfRange;
@@ -134,8 +125,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
         out ExpressionSyntax startExpression,
         out ExpressionSyntax? countExpression,
         out bool oneArgumentUpperBoundIsInclusive,
-        out string category)
-    {
+        out string category) {
         sourceExpression = null!;
         startExpression = null!;
         countExpression = null;
@@ -148,8 +138,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
                 method,
                 out sourceExpression,
                 out startExpression,
-                out countExpression))
-        {
+                out countExpression)) {
             category = method.Name == "AsMemory"
                 ? ExceptionCategories.DefiniteMemoryExtensionsAsMemoryOutOfRange
                 : ExceptionCategories.DefiniteMemoryExtensionsAsSpanOutOfRange;
@@ -162,8 +151,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
                 out var firstArgument))
             return false;
 
-        if (IsStringSlicingInvocation(method, "Substring"))
-        {
+        if (IsStringSlicingInvocation(method, "Substring")) {
             sourceExpression = instanceExpression;
             startExpression = firstArgument;
             oneArgumentUpperBoundIsInclusive = true;
@@ -171,8 +159,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
             return TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression);
         }
 
-        if (IsStringSlicingInvocation(method, "Remove"))
-        {
+        if (IsStringSlicingInvocation(method, "Remove")) {
             sourceExpression = instanceExpression;
             startExpression = firstArgument;
             category = ExceptionCategories.DefiniteStringRemoveOutOfRange;
@@ -182,8 +169,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
             return true;
         }
 
-        if (IsBuiltInSpanOrMemorySliceInvocation(method))
-        {
+        if (IsBuiltInSpanOrMemorySliceInvocation(method)) {
             sourceExpression = instanceExpression;
             startExpression = firstArgument;
             oneArgumentUpperBoundIsInclusive = true;
@@ -199,8 +185,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
         IMethodSymbol method,
         out ExpressionSyntax sourceExpression,
         out ExpressionSyntax startExpression,
-        out ExpressionSyntax? countExpression)
-    {
+        out ExpressionSyntax? countExpression) {
         sourceExpression = null!;
         startExpression = null!;
         countExpression = null;
@@ -223,11 +208,9 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
 
     internal static bool TryGetMemoryExtensionsViewSourceExpression(
         IInvocationOperation invocationOperation,
-        out ExpressionSyntax sourceExpression)
-    {
+        out ExpressionSyntax sourceExpression) {
         if (invocationOperation.Instance?.Syntax is ExpressionSyntax instanceExpression &&
-            IsMemoryExtensionsViewSourceType(invocationOperation.Instance.Type))
-        {
+            IsMemoryExtensionsViewSourceType(invocationOperation.Instance.Type)) {
             sourceExpression = instanceExpression;
             return true;
         }
@@ -236,8 +219,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
             if ((argument.Parameter?.Ordinal == 0 ||
                  IsMemoryExtensionsViewSourceType(argument.Value.Type)) &&
                 argument.Value.Syntax is ExpressionSyntax argumentExpression &&
-                IsMemoryExtensionsViewSourceType(argument.Value.Type))
-            {
+                IsMemoryExtensionsViewSourceType(argument.Value.Type)) {
                 sourceExpression = argumentExpression;
                 return true;
             }
@@ -249,8 +231,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
     internal static bool TryGetOptionalSecondIntArgument(
         IInvocationOperation invocationOperation,
         IMethodSymbol method,
-        out ExpressionSyntax? secondArgument)
-    {
+        out ExpressionSyntax? secondArgument) {
         secondArgument = null;
         if (method.Parameters.Length == 1)
             return invocationOperation.Arguments.Length == 1 &&
@@ -266,8 +247,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
             out secondArgument);
     }
 
-    internal static bool IsStringSlicingInvocation(IMethodSymbol method, string methodName)
-    {
+    internal static bool IsStringSlicingInvocation(IMethodSymbol method, string methodName) {
         return method.Name == methodName &&
                method.ContainingType?.SpecialType == SpecialType.System_String &&
                method.ReturnType.SpecialType == SpecialType.System_String &&
@@ -275,8 +255,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
     }
 
-    internal static bool IsBuiltInSpanOrMemorySliceInvocation(IMethodSymbol method)
-    {
+    internal static bool IsBuiltInSpanOrMemorySliceInvocation(IMethodSymbol method) {
         return method.Name == "Slice" &&
                (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&
                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) &&
@@ -284,8 +263,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(method.ReturnType);
     }
 
-    internal static bool IsMemoryExtensionsViewInvocation(IMethodSymbol method)
-    {
+    internal static bool IsMemoryExtensionsViewInvocation(IMethodSymbol method) {
         return method.Name is "AsSpan" or "AsMemory" &&
                method.ContainingType?.OriginalDefinition.ToDisplayString() == "System.MemoryExtensions" &&
                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(method.ReturnType) &&
@@ -294,14 +272,12 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
                method.Parameters.Any(static parameter => IsMemoryExtensionsViewSourceType(parameter.Type));
     }
 
-    internal static bool IsMemoryExtensionsViewSourceType(ITypeSymbol? typeSymbol)
-    {
+    internal static bool IsMemoryExtensionsViewSourceType(ITypeSymbol? typeSymbol) {
         return typeSymbol?.SpecialType == SpecialType.System_String ||
                typeSymbol is IArrayTypeSymbol;
     }
 
-    internal static bool IsArrayGetValueInvocation(IMethodSymbol method)
-    {
+    internal static bool IsArrayGetValueInvocation(IMethodSymbol method) {
         return method.Name == "GetValue" &&
                !method.IsStatic &&
                method.ContainingType?.SpecialType == SpecialType.System_Array &&
@@ -313,8 +289,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
     internal static bool IsCountBackedIntIndexerElementAccess(
         ElementAccessExpressionSyntax elementAccess,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (elementAccess.ArgumentList.Arguments.Count != 1) return false;
 
         var argumentType = CSharpSyntaxFacts.GetExpressionType(
@@ -333,8 +308,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
     internal static bool IsBuiltInRangeAccessArgument(
         ExpressionSyntax argumentExpression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         argumentExpression = UnwrapExpression(argumentExpression);
         if (argumentExpression is RangeExpressionSyntax) return true;
 
@@ -346,8 +320,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
         CastExpressionSyntax castExpression,
         ITypeSymbol? targetType,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return IsNonNullableValueType(targetType) &&
                TryGetNullableUnderlyingType(
                    SymbolicRuntimeTypeFacts.GetNaturalExpressionType(castExpression.Expression, semanticModel,
@@ -358,8 +331,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
         CastExpressionSyntax castExpression,
         ITypeSymbol? targetType,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var operandType = CSharpSyntaxFacts.GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
         return IsNonNullableValueType(targetType) &&
                IsReferenceType(operandType);
@@ -372,8 +344,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
     internal static bool IsDynamicExpression(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return SymbolicTypeFacts.IsDynamicExpression(
             expression,
             semanticModel,
@@ -381,8 +352,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
             UnwrapDynamicExpression);
     }
 
-    internal static bool IsNonNullableValueType(ITypeSymbol? typeSymbol)
-    {
+    internal static bool IsNonNullableValueType(ITypeSymbol? typeSymbol) {
         return typeSymbol is { IsValueType: true, TypeKind: not TypeKind.TypeParameter } &&
                typeSymbol.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T;
     }
@@ -392,8 +362,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
 
 
     internal static IEnumerable<ExpressionSyntax> GetStackAllocLengthExpressions(
-        StackAllocArrayCreationExpressionSyntax stackAllocCreation)
-    {
+        StackAllocArrayCreationExpressionSyntax stackAllocCreation) {
         if (stackAllocCreation.Type is not ArrayTypeSyntax arrayType) yield break;
 
         foreach (var rankSpecifier in arrayType.RankSpecifiers)

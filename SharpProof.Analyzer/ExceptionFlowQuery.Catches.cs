@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowEngine
-{
-    private enum ExceptionSiteDisposition
-    {
+internal static partial class ExceptionFlowEngine {
+    private enum ExceptionSiteDisposition {
         Escapes,
         Caught,
         Unreachable,
@@ -15,16 +13,14 @@ internal static partial class ExceptionFlowEngine
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
         private readonly Dictionary<SyntaxNode, SymbolicState> _pathStates = new();
 
         internal ExceptionSiteDisposition Assess(
             SyntaxNode site,
             ExceptionFlowAnalyzer.UsingDisposeGuard? usingGuard,
             Func<ITypeSymbol?> resolveType,
-            out ITypeSymbol? exceptionType)
-        {
+            out ITypeSymbol? exceptionType) {
             exceptionType = null;
             var pathState = GetPathState(site);
             var reachabilityState = usingGuard?.ResourceExpression is { } receiver
@@ -46,8 +42,7 @@ internal static partial class ExceptionFlowEngine
                 : ExceptionSiteDisposition.Escapes;
         }
 
-        private SymbolicState GetPathState(SyntaxNode site)
-        {
+        private SymbolicState GetPathState(SyntaxNode site) {
             if (_pathStates.TryGetValue(site, out var state)) return state;
             var initialState = RequiresEntryStateBuilder.CreateForUse(
                 site,
@@ -67,10 +62,8 @@ internal static partial class ExceptionFlowEngine
             new SymbolicProofService(smtAnalysis).ClassifyReachability(state).Status !=
             SymbolicProofStatus.Unreachable;
 
-        private bool IsShadowedByFinally(SyntaxNode site, SymbolicState pathState)
-        {
-            foreach (var tryStatement in site.Ancestors().OfType<TryStatementSyntax>())
-            {
+        private bool IsShadowedByFinally(SyntaxNode site, SymbolicState pathState) {
+            foreach (var tryStatement in site.Ancestors().OfType<TryStatementSyntax>()) {
                 if (tryStatement.Finally?.Block is not { } finallyBlock ||
                     finallyBlock.Span.Contains(site.SpanStart) ||
                     !tryStatement.Block.Span.Contains(site.SpanStart) &&
@@ -97,11 +90,9 @@ internal static partial class ExceptionFlowEngine
             return false;
         }
 
-        private bool IsCaught(SyntaxNode site, ITypeSymbol? exceptionType)
-        {
+        private bool IsCaught(SyntaxNode site, ITypeSymbol? exceptionType) {
             if (site.Ancestors().OfType<CatchFilterClauseSyntax>().Any()) return true;
-            foreach (var tryStatement in site.Ancestors().OfType<TryStatementSyntax>())
-            {
+            foreach (var tryStatement in site.Ancestors().OfType<TryStatementSyntax>()) {
                 if (!tryStatement.Block.Span.Contains(site.SpanStart)) continue;
                 if (tryStatement.Catches.Any(catchClause =>
                         Catches(catchClause, exceptionType, site)))
@@ -111,10 +102,8 @@ internal static partial class ExceptionFlowEngine
             return false;
         }
 
-        private bool Catches(CatchClauseSyntax clause, ITypeSymbol? exceptionType, SyntaxNode site)
-        {
-            if (clause.Declaration != null)
-            {
+        private bool Catches(CatchClauseSyntax clause, ITypeSymbol? exceptionType, SyntaxNode site) {
+            if (clause.Declaration != null) {
                 if (exceptionType == null) return false;
                 var catchType = semanticModel.GetTypeInfo(clause.Declaration.Type, cancellationToken).Type;
                 if (catchType == null || !TypeHierarchyEnumeration.IsSameOrDerivedFrom(exceptionType, catchType))

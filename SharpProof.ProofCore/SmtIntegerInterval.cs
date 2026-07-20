@@ -4,8 +4,7 @@ internal readonly struct SmtIntegerInterval(
     long? lowerBound,
     long? upperBound,
     long[] excludedValues,
-    bool isImpossible) : IEquatable<SmtIntegerInterval>
-{
+    bool isImpossible) : IEquatable<SmtIntegerInterval> {
     internal static SmtIntegerInterval Unbounded { get; } = new(
         null,
         null,
@@ -41,10 +40,8 @@ internal readonly struct SmtIntegerInterval(
         (LowerBound.HasValue && value < LowerBound.Value) ||
         (UpperBound.HasValue && value > UpperBound.Value);
 
-    internal SmtIntegerInterval Apply(SmtBinaryOperator op, long constant)
-    {
-        return op switch
-        {
+    internal SmtIntegerInterval Apply(SmtBinaryOperator op, long constant) {
+        return op switch {
             SmtBinaryOperator.Equal => WithExactValue(constant),
             SmtBinaryOperator.NotEqual => Exclude(constant),
             SmtBinaryOperator.GreaterThan => constant == long.MaxValue
@@ -59,8 +56,7 @@ internal readonly struct SmtIntegerInterval(
         };
     }
 
-    internal SmtIntegerInterval Intersect(SmtIntegerInterval other)
-    {
+    internal SmtIntegerInterval Intersect(SmtIntegerInterval other) {
         var interval = this;
         if (other.IsImpossible) interval = interval.Impossible();
         if (other.LowerBound.HasValue) interval = interval.WithLowerBound(other.LowerBound.Value);
@@ -72,8 +68,7 @@ internal readonly struct SmtIntegerInterval(
         return interval;
     }
 
-    public bool Equals(SmtIntegerInterval other)
-    {
+    public bool Equals(SmtIntegerInterval other) {
         return LowerBound == other.LowerBound &&
                UpperBound == other.UpperBound &&
                IsImpossible == other.IsImpossible &&
@@ -83,10 +78,8 @@ internal readonly struct SmtIntegerInterval(
     public override bool Equals(object? obj) =>
         obj is SmtIntegerInterval other && Equals(other);
 
-    public override int GetHashCode()
-    {
-        unchecked
-        {
+    public override int GetHashCode() {
+        unchecked {
             var hash = LowerBound.GetHashCode();
             hash = (hash * 397) ^ UpperBound.GetHashCode();
             hash = (hash * 397) ^ IsImpossible.GetHashCode();
@@ -95,8 +88,7 @@ internal readonly struct SmtIntegerInterval(
         }
     }
 
-    private SmtIntegerInterval Exclude(long value)
-    {
+    private SmtIntegerInterval Exclude(long value) {
         if (Array.IndexOf(ExcludedValues, value) >= 0) return this;
 
         var excludedValues = new long[ExcludedValues.Length + 1];
@@ -105,8 +97,7 @@ internal readonly struct SmtIntegerInterval(
         return new SmtIntegerInterval(LowerBound, UpperBound, excludedValues, IsImpossible);
     }
 
-    private SmtIntegerInterval WithLowerBound(long lowerBound)
-    {
+    private SmtIntegerInterval WithLowerBound(long lowerBound) {
         return new SmtIntegerInterval(
             LowerBound.HasValue ? Math.Max(LowerBound.Value, lowerBound) : lowerBound,
             UpperBound,
@@ -114,8 +105,7 @@ internal readonly struct SmtIntegerInterval(
             IsImpossible);
     }
 
-    private SmtIntegerInterval WithUpperBound(long upperBound)
-    {
+    private SmtIntegerInterval WithUpperBound(long upperBound) {
         return new SmtIntegerInterval(
             LowerBound,
             UpperBound.HasValue ? Math.Min(UpperBound.Value, upperBound) : upperBound,
@@ -123,8 +113,7 @@ internal readonly struct SmtIntegerInterval(
             IsImpossible);
     }
 
-    private SmtIntegerInterval WithExactValue(long value)
-    {
+    private SmtIntegerInterval WithExactValue(long value) {
         return new SmtIntegerInterval(
             value,
             value,

@@ -1,7 +1,6 @@
 namespace SharpProof.ProofCore.Purity;
 
-internal enum PurityProofOutcome
-{
+internal enum PurityProofOutcome {
     ProvablyPure,
     ProvablyImpure,
     Unknown
@@ -18,18 +17,15 @@ internal sealed record PurityProofResult(
     ProofCheckInfo ImpurityCheck,
     string Reason);
 
-internal interface IPurityProofSearchSession : IDisposable
-{
+internal interface IPurityProofSearchSession : IDisposable {
     long ConsumedResourceCount { get; }
 
     PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout);
 }
 
-internal sealed class PurityProofSearch : IPurityProofSearchSession
-{
+internal sealed class PurityProofSearch : IPurityProofSearchSession {
     private static readonly IReadOnlyDictionary<PurityHazardKind, HazardDescriptor> HazardDescriptors =
-        new Dictionary<PurityHazardKind, HazardDescriptor>
-        {
+        new Dictionary<PurityHazardKind, HazardDescriptor> {
             [PurityHazardKind.BranchReachability] = HazardDescriptor.Triggered(
                 "branch_unreachable",
                 "branch_reachable",
@@ -66,13 +62,11 @@ internal sealed class PurityProofSearch : IPurityProofSearchSession
     /// </summary>
     public long ConsumedResourceCount => _solver.ConsumedResourceCount;
 
-    public void Dispose()
-    {
+    public void Dispose() {
         _solver.Dispose();
     }
 
-    public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
-    {
+    public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout) {
         if (query == null || query.Hazard == null)
             return UnknownWithoutProof("invalid_proof_query");
 
@@ -94,12 +88,10 @@ internal sealed class PurityProofSearch : IPurityProofSearchSession
     private PurityProofResult ClassifyInternalOnlyEffect(
         IEnumerable<SmtFormula> pathConditions,
         TimeSpan timeout,
-        string pureReason)
-    {
+        string pureReason) {
         var normalizedPathConditions = pathConditions.ToArray();
         var path = _solver.CheckSatisfiability(normalizedPathConditions, timeout);
-        return path.Feasibility switch
-        {
+        return path.Feasibility switch {
             Feasibility.Unsatisfiable => new PurityProofResult(
                 PurityProofOutcome.ProvablyPure,
                 Attempted(path),
@@ -123,8 +115,7 @@ internal sealed class PurityProofSearch : IPurityProofSearchSession
         PurityHazardKind kind,
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula? triggerCondition,
-        TimeSpan timeout)
-    {
+        TimeSpan timeout) {
         var descriptor = HazardDescriptors[kind];
         return descriptor.Mode == HazardClassificationMode.InternalEffect
             ? ClassifyInternalOnlyEffect(pathConditions, timeout, descriptor.PureReason)
@@ -135,8 +126,7 @@ internal sealed class PurityProofSearch : IPurityProofSearchSession
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula impurityCondition,
         TimeSpan timeout,
-        HazardDescriptor descriptor)
-    {
+        HazardDescriptor descriptor) {
         var normalizedPathConditions = pathConditions.ToArray();
         var check = _solver.CheckPathAndImpurityWithWitness(
             normalizedPathConditions,
@@ -165,8 +155,7 @@ internal sealed class PurityProofSearch : IPurityProofSearchSession
                 Attempted(check.Impurity),
                 "path_feasibility_unknown");
 
-        return impurityFeasibility switch
-        {
+        return impurityFeasibility switch {
             Feasibility.Satisfiable => new PurityProofResult(
                 PurityProofOutcome.ProvablyImpure,
                 Attempted(check.Path),
@@ -180,8 +169,7 @@ internal sealed class PurityProofSearch : IPurityProofSearchSession
         };
     }
 
-    private static PurityProofResult UnknownWithoutProof(string reason)
-    {
+    private static PurityProofResult UnknownWithoutProof(string reason) {
         return new PurityProofResult(
             PurityProofOutcome.Unknown,
             NotAttempted(),
@@ -195,8 +183,7 @@ internal sealed class PurityProofSearch : IPurityProofSearchSession
     private static ProofCheckInfo NotAttempted() =>
         new ProofCheckInfo(false, Feasibility.Unknown);
 
-    private enum HazardClassificationMode
-    {
+    private enum HazardClassificationMode {
         Triggered,
         InternalEffect
     }
@@ -206,14 +193,12 @@ internal sealed class PurityProofSearch : IPurityProofSearchSession
         string PureReason,
         string ImpureReason,
         string UnknownReason,
-        bool AcceptsInternalOnlyVisibility)
-    {
+        bool AcceptsInternalOnlyVisibility) {
         internal static HazardDescriptor Triggered(
             string pureReason,
             string impureReason,
             string unknownReason,
-            bool acceptsInternalOnlyVisibility = false)
-        {
+            bool acceptsInternalOnlyVisibility = false) {
             return new HazardDescriptor(
                 HazardClassificationMode.Triggered,
                 pureReason,
@@ -222,8 +207,7 @@ internal sealed class PurityProofSearch : IPurityProofSearchSession
                 acceptsInternalOnlyVisibility);
         }
 
-        internal static HazardDescriptor InternalEffect(string pureReason)
-        {
+        internal static HazardDescriptor InternalEffect(string pureReason) {
             return new HazardDescriptor(
                 HazardClassificationMode.InternalEffect,
                 pureReason,

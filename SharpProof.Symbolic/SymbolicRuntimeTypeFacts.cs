@@ -1,15 +1,13 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicRuntimeTypeFacts
-{
+internal static class SymbolicRuntimeTypeFacts {
     internal static bool TryGetExactRuntimeType(
         ExpressionSyntax expression,
         SyntaxNode useNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out ITypeSymbol exactType,
-        int inlineDepth = 0)
-    {
+        int inlineDepth = 0) {
         exactType = null!;
         if (inlineDepth > 8) return false;
 
@@ -29,8 +27,7 @@ internal static class SymbolicRuntimeTypeFacts
                 inlineDepth + 1);
 
         var expressionType = GetNaturalExpressionType(expression, semanticModel, cancellationToken);
-        if (expressionType != null && IsNonNullableValueType(expressionType))
-        {
+        if (expressionType != null && IsNonNullableValueType(expressionType)) {
             exactType = expressionType;
             return true;
         }
@@ -47,8 +44,7 @@ internal static class SymbolicRuntimeTypeFacts
                 out exactType,
                 inlineDepth);
 
-        if (expression is BinaryExpressionSyntax
-            {
+        if (expression is BinaryExpressionSyntax {
                 RawKind: (int)SyntaxKind.CoalesceExpression
             } coalesceExpression)
             return TryGetCommonExactRuntimeType(
@@ -60,15 +56,13 @@ internal static class SymbolicRuntimeTypeFacts
                 out exactType,
                 inlineDepth);
 
-        if (expression is CastExpressionSyntax castExpression)
-        {
+        if (expression is CastExpressionSyntax castExpression) {
             var targetType = CSharpSyntaxFacts.GetExpressionType(castExpression, semanticModel, cancellationToken);
             if (targetType == null ||
                 targetType.TypeKind == TypeKind.Dynamic)
                 return false;
 
-            if (SymbolicTypeFacts.IsReferenceType(targetType))
-            {
+            if (SymbolicTypeFacts.IsReferenceType(targetType)) {
                 var operandType = CSharpSyntaxFacts.GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
                 if (IsNonNullableValueType(operandType) &&
                     TryGetExactRuntimeType(
@@ -77,8 +71,7 @@ internal static class SymbolicRuntimeTypeFacts
                         semanticModel,
                         cancellationToken,
                         out var boxedValueType,
-                        inlineDepth + 1))
-                {
+                        inlineDepth + 1)) {
                     exactType = boxedValueType;
                     return true;
                 }
@@ -93,15 +86,13 @@ internal static class SymbolicRuntimeTypeFacts
                     CanCastExactRuntimeTypeToReferenceType(
                         operandExactType,
                         targetType,
-                        semanticModel.Compilation))
-                {
+                        semanticModel.Compilation)) {
                     exactType = operandExactType;
                     return true;
                 }
             }
 
-            if (IsNonNullableValueType(targetType))
-            {
+            if (IsNonNullableValueType(targetType)) {
                 exactType = targetType;
                 return true;
             }
@@ -111,10 +102,8 @@ internal static class SymbolicRuntimeTypeFacts
 
         if (expression is ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax or
             ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax
-            or AnonymousObjectCreationExpressionSyntax)
-        {
-            if (expressionType != null && !expressionType.IsAbstract)
-            {
+            or AnonymousObjectCreationExpressionSyntax) {
+            if (expressionType != null && !expressionType.IsAbstract) {
                 exactType = expressionType;
                 return true;
             }
@@ -123,8 +112,7 @@ internal static class SymbolicRuntimeTypeFacts
         }
 
         if (expression.IsKind(SyntaxKind.StringLiteralExpression) &&
-            expressionType?.SpecialType == SpecialType.System_String)
-        {
+            expressionType?.SpecialType == SpecialType.System_String) {
             exactType = expressionType;
             return true;
         }
@@ -139,8 +127,7 @@ internal static class SymbolicRuntimeTypeFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out ITypeSymbol exactType,
-        int inlineDepth)
-    {
+        int inlineDepth) {
         if (TryGetExactRuntimeType(
                 first,
                 useNode,
@@ -155,8 +142,7 @@ internal static class SymbolicRuntimeTypeFacts
                 cancellationToken,
                 out var secondType,
                 inlineDepth + 1) &&
-            SymbolEqualityComparer.Default.Equals(firstType, secondType))
-        {
+            SymbolEqualityComparer.Default.Equals(firstType, secondType)) {
             exactType = firstType;
             return true;
         }
@@ -168,8 +154,7 @@ internal static class SymbolicRuntimeTypeFacts
     internal static ITypeSymbol? GetNaturalExpressionType(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
         return typeInfo.Type ?? typeInfo.ConvertedType;
     }
@@ -177,8 +162,7 @@ internal static class SymbolicRuntimeTypeFacts
     internal static bool CanStoreExactRuntimeTypeInArrayElement(
         ITypeSymbol exactRuntimeType,
         ITypeSymbol elementType,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         if (exactRuntimeType.TypeKind == TypeKind.Dynamic ||
             elementType.TypeKind == TypeKind.Dynamic)
             return true;
@@ -186,8 +170,7 @@ internal static class SymbolicRuntimeTypeFacts
         return CanCastExactRuntimeTypeToReferenceType(exactRuntimeType, elementType, compilation);
     }
 
-    internal static bool CanUnboxExactRuntimeTypeToValueType(ITypeSymbol exactRuntimeType, ITypeSymbol targetType)
-    {
+    internal static bool CanUnboxExactRuntimeTypeToValueType(ITypeSymbol exactRuntimeType, ITypeSymbol targetType) {
         if (!IsNonNullableValueType(targetType)) return false;
 
         return SymbolEqualityComparer.Default.Equals(exactRuntimeType, targetType);
@@ -196,8 +179,7 @@ internal static class SymbolicRuntimeTypeFacts
     internal static bool CanCastExactRuntimeTypeToReferenceType(
         ITypeSymbol exactRuntimeType,
         ITypeSymbol targetType,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         if (targetType.TypeKind == TypeKind.Dynamic ||
             exactRuntimeType.TypeKind == TypeKind.Dynamic)
             return true;
@@ -211,24 +193,20 @@ internal static class SymbolicRuntimeTypeFacts
                (conversion.IsIdentity || conversion.IsImplicit);
     }
 
-    internal static bool TryGetRuntimeTypeTestKey(ITypeSymbol? targetType, out string typeKey)
-    {
+    internal static bool TryGetRuntimeTypeTestKey(ITypeSymbol? targetType, out string typeKey) {
         if (targetType == null ||
             targetType.TypeKind is TypeKind.Dynamic or TypeKind.Error or TypeKind.TypeParameter ||
-            !targetType.IsReferenceType)
-        {
+            !targetType.IsReferenceType) {
             typeKey = null!;
             return false;
         }
 
-        if (targetType.SpecialType == SpecialType.System_Object)
-        {
+        if (targetType.SpecialType == SpecialType.System_Object) {
             typeKey = "System.Object";
             return true;
         }
 
-        if (targetType.SpecialType == SpecialType.System_String)
-        {
+        if (targetType.SpecialType == SpecialType.System_String) {
             typeKey = "System.String";
             return true;
         }
@@ -245,8 +223,7 @@ internal static class SymbolicRuntimeTypeFacts
         SymbolicTerm value,
         INamedTypeSymbol exactType,
         SyntaxNode source,
-        string provenance)
-    {
+        string provenance) {
         if (!TryGetExactRuntimeTypeKey(exactType, out var typeKey)) return WithoutExactRuntimeType(state, value);
 
         state = WithoutExactRuntimeType(state, value);
@@ -258,8 +235,7 @@ internal static class SymbolicRuntimeTypeFacts
             "evidence.exact-runtime-type"));
     }
 
-    internal static SymbolicState WithoutExactRuntimeType(SymbolicState state, SymbolicTerm value)
-    {
+    internal static SymbolicState WithoutExactRuntimeType(SymbolicState state, SymbolicTerm value) {
         var facts = state.Facts.Where(fact =>
             fact.Atom is not SymbolicExactRuntimeTypeAtom exact || !Equals(exact.Value, value)).ToArray();
         return facts.Length == state.Facts.Length
@@ -274,10 +250,8 @@ internal static class SymbolicRuntimeTypeFacts
     internal static bool TryGetExactRuntimeType(
         SymbolicState state,
         SymbolicTerm value,
-        out INamedTypeSymbol exactType)
-    {
-        var match = state.Facts.FirstOrDefault(fact => fact is
-            {
+        out INamedTypeSymbol exactType) {
+        var match = state.Facts.FirstOrDefault(fact => fact is {
                 Polarity: true,
                 Confidence: SymbolicFactConfidence.Exact,
                 Atom: SymbolicExactRuntimeTypeAtom exact,
@@ -287,14 +261,12 @@ internal static class SymbolicRuntimeTypeFacts
         return exactType != null;
     }
 
-    internal static SymbolicState RetainExactRuntimeTypes(SymbolicState state)
-    {
+    internal static SymbolicState RetainExactRuntimeTypes(SymbolicState state) {
         return new SymbolicState(state.Facts.Where(static fact => fact.Atom is SymbolicExactRuntimeTypeAtom),
             symbolVersions: state.SymbolVersions);
     }
 
-    private static bool TryGetExactRuntimeTypeKey(ITypeSymbol type, out string typeKey)
-    {
+    private static bool TryGetExactRuntimeTypeKey(ITypeSymbol type, out string typeKey) {
         if (type.TypeKind is TypeKind.Dynamic or TypeKind.Error or TypeKind.TypeParameter)
             return Fail(out typeKey);
 
@@ -304,15 +276,13 @@ internal static class SymbolicRuntimeTypeFacts
             .Replace("global::", string.Empty);
         return true;
 
-        static bool Fail(out string value)
-        {
+        static bool Fail(out string value) {
             value = null!;
             return false;
         }
     }
 
-    private static bool IsNonNullableValueType(ITypeSymbol? typeSymbol)
-    {
+    private static bool IsNonNullableValueType(ITypeSymbol? typeSymbol) {
         return typeSymbol?.IsValueType == true &&
                !IsNullableType(typeSymbol);
     }

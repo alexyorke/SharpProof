@@ -1,21 +1,17 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal static class SmtComparisonOperatorFacts
-{
+internal static class SmtComparisonOperatorFacts {
     internal static bool TryExtract(
         SmtFormula formula,
         out SmtBinaryFormula comparison,
-        out int negationCount)
-    {
+        out int negationCount) {
         negationCount = 0;
-        while (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
-        {
+        while (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated) {
             negationCount++;
             formula = negated.Operand;
         }
 
-        if (formula is SmtBinaryFormula binary && IsComparison(binary.Operator))
-        {
+        if (formula is SmtBinaryFormula binary && IsComparison(binary.Operator)) {
             comparison = binary;
             return true;
         }
@@ -31,8 +27,7 @@ internal static class SmtComparisonOperatorFacts
         SmtFormula formula,
         out SmtFormula term,
         out SmtBinaryOperator op,
-        out long constant)
-    {
+        out long constant) {
         term = null!;
         op = default;
         constant = default;
@@ -40,8 +35,7 @@ internal static class SmtComparisonOperatorFacts
             return false;
 
         var effectiveOperator = ApplyNegations(binary.Operator, negationCount);
-        if (binary.Left.Kind == SmtValueKind.Int && binary.Right is SmtIntegerConstant right)
-        {
+        if (binary.Left.Kind == SmtValueKind.Int && binary.Right is SmtIntegerConstant right) {
             term = binary.Left;
             op = effectiveOperator;
             constant = right.Value;
@@ -57,8 +51,7 @@ internal static class SmtComparisonOperatorFacts
         return true;
     }
 
-    internal static bool AreComplements(SmtFormula left, SmtFormula right)
-    {
+    internal static bool AreComplements(SmtFormula left, SmtFormula right) {
         if (left is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } leftNot && leftNot.Operand.Equals(right) ||
             right is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } rightNot && rightNot.Operand.Equals(left))
             return true;
@@ -76,8 +69,7 @@ internal static class SmtComparisonOperatorFacts
     private static bool IsSymmetric(SmtBinaryOperator op) =>
         op is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual;
 
-    internal static bool IsComparison(SmtBinaryOperator op)
-    {
+    internal static bool IsComparison(SmtBinaryOperator op) {
         return op is SmtBinaryOperator.Equal or
             SmtBinaryOperator.NotEqual or
             SmtBinaryOperator.LessThan or
@@ -86,10 +78,8 @@ internal static class SmtComparisonOperatorFacts
             SmtBinaryOperator.GreaterThanOrEqual;
     }
 
-    internal static SmtBinaryOperator Reverse(SmtBinaryOperator op)
-    {
-        return op switch
-        {
+    internal static SmtBinaryOperator Reverse(SmtBinaryOperator op) {
+        return op switch {
             SmtBinaryOperator.LessThan => SmtBinaryOperator.GreaterThan,
             SmtBinaryOperator.LessThanOrEqual => SmtBinaryOperator.GreaterThanOrEqual,
             SmtBinaryOperator.GreaterThan => SmtBinaryOperator.LessThan,
@@ -98,10 +88,8 @@ internal static class SmtComparisonOperatorFacts
         };
     }
 
-    internal static SmtBinaryOperator Negate(SmtBinaryOperator op)
-    {
-        return op switch
-        {
+    internal static SmtBinaryOperator Negate(SmtBinaryOperator op) {
+        return op switch {
             SmtBinaryOperator.Equal => SmtBinaryOperator.NotEqual,
             SmtBinaryOperator.NotEqual => SmtBinaryOperator.Equal,
             SmtBinaryOperator.LessThan => SmtBinaryOperator.GreaterThanOrEqual,

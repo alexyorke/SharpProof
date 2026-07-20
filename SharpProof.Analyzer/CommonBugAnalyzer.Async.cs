@@ -1,11 +1,9 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class CommonBugAnalyzer
-{
+internal static partial class CommonBugAnalyzer {
     private static void AnalyzeAsyncCorrectness(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session)
-    {
+        AnalyzerSession session) {
         var operations = context.Snapshot.VisibleOperations;
         var method = context.MethodSymbol;
         var containsAwait = operations.Any(static operation => operation is IAwaitOperation);
@@ -22,8 +20,7 @@ internal static partial class CommonBugAnalyzer
         var nullTaskReturnReported = false;
         if (!method.IsAsync && IsTaskType(method.ReturnType))
             foreach (var returnOperation in operations.OfType<IReturnOperation>())
-                if (IsNullConstant(returnOperation.ReturnedValue))
-                {
+                if (IsNullConstant(returnOperation.ReturnedValue)) {
                     Report(
                         context,
                         session,
@@ -48,11 +45,9 @@ internal static partial class CommonBugAnalyzer
                 method.Name);
 
         var reportedTaskTextSpans = new HashSet<int>();
-        foreach (var operation in operations)
-        {
+        foreach (var operation in operations) {
             context.CancellationToken.ThrowIfCancellationRequested();
-            switch (operation)
-            {
+            switch (operation) {
                 case IAwaitOperation awaitOperation:
                     AnalyzeAwait(context, session, awaitOperation);
                     break;
@@ -63,8 +58,7 @@ internal static partial class CommonBugAnalyzer
                         interpolation.Expression,
                         reportedTaskTextSpans);
                     break;
-                case IBinaryOperation
-                    {
+                case IBinaryOperation {
                         OperatorKind: BinaryOperatorKind.Add,
                         Type.SpecialType: SpecialType.System_String
                     } concatenation:
@@ -126,8 +120,7 @@ internal static partial class CommonBugAnalyzer
     private static void AnalyzeAwait(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        IAwaitOperation awaitOperation)
-    {
+        IAwaitOperation awaitOperation) {
         if (Unwrap(awaitOperation.Operation) is not IConditionalAccessOperation conditionalAccess ||
             !IsTaskType(conditionalAccess.Type))
             return;
@@ -145,8 +138,7 @@ internal static partial class CommonBugAnalyzer
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
         IOperation expression,
-        HashSet<int> reportedSpans)
-    {
+        HashSet<int> reportedSpans) {
         expression = Unwrap(expression)!;
         if (!IsTaskType(expression.Type) || !reportedSpans.Add(expression.Syntax.SpanStart)) return;
 
@@ -162,8 +154,7 @@ internal static partial class CommonBugAnalyzer
     private static void AnalyzeTaskCompletionSource(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        IObjectCreationOperation creation)
-    {
+        IObjectCreationOperation creation) {
         var optionsArgument = creation.Arguments.FirstOrDefault(
             static argument =>
                 argument.Parameter?.Type is INamedTypeSymbol type &&
@@ -172,8 +163,7 @@ internal static partial class CommonBugAnalyzer
                     type.ContainingNamespace?.ToDisplayString(),
                     "System.Threading.Tasks",
                     StringComparison.Ordinal));
-        if (optionsArgument != null)
-        {
+        if (optionsArgument != null) {
             if (!TryGetIntegralConstant(optionsArgument.Value, out var options)) return;
 
             var optionType = optionsArgument.Parameter!.Type as INamedTypeSymbol;
@@ -198,8 +188,7 @@ internal static partial class CommonBugAnalyzer
     private static void AnalyzeTaskUsingResources(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        IOperation resources)
-    {
+        IOperation resources) {
         var taskResource = resources.DescendantsAndSelf()
             .FirstOrDefault(static resource => IsTaskResource(resource));
         if (taskResource == null) return;
@@ -217,8 +206,7 @@ internal static partial class CommonBugAnalyzer
             displayOperation.Syntax.ToString());
     }
 
-    private static bool IsTaskResource(IOperation operation)
-    {
+    private static bool IsTaskResource(IOperation operation) {
         return IsTaskType(operation.Type) ||
                operation is IVariableDeclaratorOperation declarator && IsTaskType(declarator.Symbol.Type);
     }
@@ -226,8 +214,7 @@ internal static partial class CommonBugAnalyzer
     private static void AnalyzeDeferredValidation(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        IReadOnlyCollection<IOperation> operations)
-    {
+        IReadOnlyCollection<IOperation> operations) {
         var method = context.MethodSymbol;
         if (!method.IsAsync || !IsExternallyVisible(method) || method.Parameters.Length == 0) return;
 
@@ -253,8 +240,7 @@ internal static partial class CommonBugAnalyzer
     private static bool IsParameterValidation(
         IOperation operation,
         IMethodSymbol method,
-        MethodBodyAnalysisContext context)
-    {
+        MethodBodyAnalysisContext context) {
         if (operation is IInvocationOperation invocation &&
             invocation.TargetMethod.IsStatic &&
             string.Equals(invocation.TargetMethod.Name, "ThrowIfNull", StringComparison.Ordinal) &&
@@ -276,26 +262,22 @@ internal static partial class CommonBugAnalyzer
                 SymbolEq.AreEqual(candidate, parameter)));
     }
 
-    private static bool ReferencesParameter(IOperation operation, IMethodSymbol method)
-    {
+    private static bool ReferencesParameter(IOperation operation, IMethodSymbol method) {
         return operation.DescendantsAndSelf()
             .OfType<IParameterReferenceOperation>()
             .Any(reference => method.Parameters.Any(parameter =>
                 SymbolEq.AreEqual(parameter, reference.Parameter)));
     }
 
-    private static bool IsBlockingResultProperty(IPropertyReferenceOperation propertyReference)
-    {
+    private static bool IsBlockingResultProperty(IPropertyReferenceOperation propertyReference) {
         return string.Equals(propertyReference.Property.Name, "Result", StringComparison.Ordinal) &&
                IsTaskType(propertyReference.Property.ContainingType);
     }
 
-    private static bool TryGetBlockedTask(IInvocationOperation invocation, out IOperation? task)
-    {
+    private static bool TryGetBlockedTask(IInvocationOperation invocation, out IOperation? task) {
         task = null;
         if (string.Equals(invocation.TargetMethod.Name, "Wait", StringComparison.Ordinal) &&
-            IsTaskType(invocation.TargetMethod.ContainingType))
-        {
+            IsTaskType(invocation.TargetMethod.ContainingType)) {
             task = invocation.Instance;
             return true;
         }
@@ -309,11 +291,9 @@ internal static partial class CommonBugAnalyzer
         return task != null;
     }
 
-    private static bool IsKnownCompletedTask(IOperation? operation)
-    {
+    private static bool IsKnownCompletedTask(IOperation? operation) {
         operation = Unwrap(operation);
-        return operation switch
-        {
+        return operation switch {
             IInvocationOperation invocation
                 when string.Equals(
                          invocation.TargetMethod.ContainingNamespace?.ToDisplayString(),
@@ -328,24 +308,20 @@ internal static partial class CommonBugAnalyzer
         };
     }
 
-    private static bool IsNullConstant(IOperation? operation)
-    {
+    private static bool IsNullConstant(IOperation? operation) {
         operation = Unwrap(operation);
         return operation?.ConstantValue is { HasValue: true, Value: null };
     }
 
-    private static bool TryGetIntegralConstant(IOperation operation, out long value)
-    {
+    private static bool TryGetIntegralConstant(IOperation operation, out long value) {
         value = default;
         operation = Unwrap(operation)!;
         return operation.ConstantValue is { HasValue: true, Value: { } constant } &&
                TryConvertToInt64(constant, out value);
     }
 
-    private static bool TryConvertToInt64(object value, out long converted)
-    {
-        switch (value)
-        {
+    private static bool TryConvertToInt64(object value, out long converted) {
+        switch (value) {
             case sbyte signedByte:
                 converted = signedByte;
                 return true;
@@ -373,8 +349,7 @@ internal static partial class CommonBugAnalyzer
         }
     }
 
-    private static bool IsEventHandlerShape(IMethodSymbol method)
-    {
+    private static bool IsEventHandlerShape(IMethodSymbol method) {
         if (method.Parameters.Length != 2 ||
             method.Parameters[0].Type.SpecialType != SpecialType.System_Object)
             return false;
@@ -382,17 +357,14 @@ internal static partial class CommonBugAnalyzer
         return IsOrDerivesFrom(method.Parameters[1].Type, "System.EventArgs");
     }
 
-    private static bool IsExternallyVisible(IMethodSymbol method)
-    {
+    private static bool IsExternallyVisible(IMethodSymbol method) {
         return method.DeclaredAccessibility is Accessibility.Public or
             Accessibility.Protected or
             Accessibility.ProtectedOrInternal;
     }
 
-    private static Location GetMethodIdentifierLocation(MethodBodyAnalysisContext context)
-    {
-        return context.Node switch
-        {
+    private static Location GetMethodIdentifierLocation(MethodBodyAnalysisContext context) {
+        return context.Node switch {
             MethodDeclarationSyntax declaration => declaration.Identifier.GetLocation(),
             LocalFunctionStatementSyntax localFunction => localFunction.Identifier.GetLocation(),
             _ => context.MethodSymbol.Locations.FirstOrDefault(static location => location.IsInSource) ??

@@ -2,8 +2,7 @@ namespace SharpProof.ProofCore.Smt;
 
 internal delegate bool TryResolveSmtIntegerValue(SmtFormula formula, out long value);
 
-internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, long offset)
-{
+internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, long offset) {
     internal SmtFormula? BaseTerm { get; } = scale == 0 ? null : baseTerm;
 
     internal long Scale { get; } = scale == 0 || baseTerm == null ? 0 : scale;
@@ -23,8 +22,7 @@ internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, 
         TryResolveSmtIntegerValue resolveConstant,
         bool resolveWholeFormula,
         Func<SmtFormula, bool> canUseBaseTerm,
-        out SmtAffineIntegerTerm affine)
-    {
+        out SmtAffineIntegerTerm affine) {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
         if (normalize == null) throw new ArgumentNullException(nameof(normalize));
         if (resolveConstant == null) throw new ArgumentNullException(nameof(resolveConstant));
@@ -44,24 +42,21 @@ internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, 
     internal static bool TryAdd(
         SmtAffineIntegerTerm left,
         SmtAffineIntegerTerm right,
-        out SmtAffineIntegerTerm result)
-    {
+        out SmtAffineIntegerTerm result) {
         return TryCombine(left, right, false, out result);
     }
 
     internal static bool TrySubtract(
         SmtAffineIntegerTerm left,
         SmtAffineIntegerTerm right,
-        out SmtAffineIntegerTerm result)
-    {
+        out SmtAffineIntegerTerm result) {
         return TryCombine(left, right, true, out result);
     }
 
     internal static bool TryScale(
         SmtAffineIntegerTerm value,
         long scale,
-        out SmtAffineIntegerTerm result)
-    {
+        out SmtAffineIntegerTerm result) {
         result = default;
         if (!SmtIntegerArithmetic.TryMultiply(value.Scale, scale, out var scaledScale) ||
             !SmtIntegerArithmetic.TryMultiply(value.Offset, scale, out var scaledOffset))
@@ -73,8 +68,7 @@ internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, 
         return true;
     }
 
-    internal static bool TryNegate(SmtAffineIntegerTerm value, out SmtAffineIntegerTerm result)
-    {
+    internal static bool TryNegate(SmtAffineIntegerTerm value, out SmtAffineIntegerTerm result) {
         result = default;
         if (!SmtIntegerArithmetic.TryNegate(value.Scale, out var scale) ||
             !SmtIntegerArithmetic.TryNegate(value.Offset, out var offset))
@@ -94,19 +88,16 @@ internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, 
         TryResolveSmtIntegerValue resolveConstant,
         bool resolveWholeFormula,
         Func<SmtFormula, bool> canUseBaseTerm,
-        out SmtAffineIntegerTerm affine)
-    {
+        out SmtAffineIntegerTerm affine) {
         formula = normalize(formula);
         if (depth > maxDepth) return TryCreateBaseTerm(formula, canUseBaseTerm, out affine);
 
-        if (resolveWholeFormula && resolveConstant(formula, out var resolved))
-        {
+        if (resolveWholeFormula && resolveConstant(formula, out var resolved)) {
             affine = Constant(resolved);
             return true;
         }
 
-        switch (formula)
-        {
+        switch (formula) {
             case SmtIntegerConstant constant:
                 affine = Constant(constant.Value);
                 return true;
@@ -150,11 +141,9 @@ internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, 
         TryResolveSmtIntegerValue resolveConstant,
         bool resolveWholeFormula,
         Func<SmtFormula, bool> canUseBaseTerm,
-        out SmtAffineIntegerTerm affine)
-    {
+        out SmtAffineIntegerTerm affine) {
         affine = default;
-        if (binary.Operator == SmtIntegerBinaryOperator.Multiply)
-        {
+        if (binary.Operator == SmtIntegerBinaryOperator.Multiply) {
             if (resolveConstant(binary.Left, out var leftConstant) &&
                 TryCreateCore(
                     binary.Right,
@@ -211,10 +200,8 @@ internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, 
     private static bool TryCreateBaseTerm(
         SmtFormula formula,
         Func<SmtFormula, bool> canUseBaseTerm,
-        out SmtAffineIntegerTerm affine)
-    {
-        if (!canUseBaseTerm(formula))
-        {
+        out SmtAffineIntegerTerm affine) {
+        if (!canUseBaseTerm(formula)) {
             affine = default;
             return false;
         }
@@ -227,8 +214,7 @@ internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, 
         SmtAffineIntegerTerm left,
         SmtAffineIntegerTerm right,
         bool subtractRight,
-        out SmtAffineIntegerTerm result)
-    {
+        out SmtAffineIntegerTerm result) {
         result = default;
         var rightScale = right.Scale;
         var rightOffset = right.Offset;
@@ -239,20 +225,17 @@ internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, 
 
         if (!SmtIntegerArithmetic.TryAdd(left.Offset, rightOffset, out var offset)) return false;
 
-        if (left.BaseTerm == null && right.BaseTerm == null)
-        {
+        if (left.BaseTerm == null && right.BaseTerm == null) {
             result = Constant(offset);
             return true;
         }
 
-        if (left.BaseTerm == null)
-        {
+        if (left.BaseTerm == null) {
             result = rightScale == 0 ? Constant(offset) : new SmtAffineIntegerTerm(right.BaseTerm, rightScale, offset);
             return true;
         }
 
-        if (right.BaseTerm == null)
-        {
+        if (right.BaseTerm == null) {
             result = left.Scale == 0 ? Constant(offset) : new SmtAffineIntegerTerm(left.BaseTerm, left.Scale, offset);
             return true;
         }
@@ -266,28 +249,23 @@ internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, 
     }
 }
 
-internal static class SmtIntegerArithmetic
-{
+internal static class SmtIntegerArithmetic {
     internal static bool TryEvaluateBinary(
         SmtIntegerBinaryOperator op,
         long left,
         long right,
-        out long value)
-    {
+        out long value) {
         if (op is not (SmtIntegerBinaryOperator.Add or
             SmtIntegerBinaryOperator.Subtract or
             SmtIntegerBinaryOperator.Multiply or
             SmtIntegerBinaryOperator.Divide or
-            SmtIntegerBinaryOperator.Remainder))
-        {
+            SmtIntegerBinaryOperator.Remainder)) {
             value = default;
             return false;
         }
 
-        try
-        {
-            value = op switch
-            {
+        try {
+            value = op switch {
                 SmtIntegerBinaryOperator.Add => checked(left + right),
                 SmtIntegerBinaryOperator.Subtract => checked(left - right),
                 SmtIntegerBinaryOperator.Multiply => checked(left * right),
@@ -297,8 +275,7 @@ internal static class SmtIntegerArithmetic
             };
             return true;
         }
-        catch (Exception exception) when (exception is OverflowException or DivideByZeroException)
-        {
+        catch (Exception exception) when (exception is OverflowException or DivideByZeroException) {
             value = default;
             return false;
         }
@@ -313,10 +290,8 @@ internal static class SmtIntegerArithmetic
     internal static bool TryMultiply(long left, long right, out long value) =>
         TryBinary(left, right, static (first, second) => checked(first * second), out value);
 
-    internal static bool TryNegate(long value, out long result)
-    {
-        if (value == long.MinValue)
-        {
+    internal static bool TryNegate(long value, out long result) {
+        if (value == long.MinValue) {
             result = default;
             return false;
         }
@@ -325,29 +300,24 @@ internal static class SmtIntegerArithmetic
         return true;
     }
 
-    internal static BigInteger FloorDivide(BigInteger dividend, BigInteger positiveDivisor)
-    {
+    internal static BigInteger FloorDivide(BigInteger dividend, BigInteger positiveDivisor) {
         var quotient = BigInteger.DivRem(dividend, positiveDivisor, out var remainder);
         return remainder != 0 && dividend.Sign < 0 ? quotient - BigInteger.One : quotient;
     }
 
-    internal static BigInteger CeilingDivide(BigInteger dividend, BigInteger positiveDivisor)
-    {
+    internal static BigInteger CeilingDivide(BigInteger dividend, BigInteger positiveDivisor) {
         var quotient = BigInteger.DivRem(dividend, positiveDivisor, out var remainder);
         return remainder != 0 && dividend.Sign > 0 ? quotient + BigInteger.One : quotient;
     }
 
 
 
-    private static bool TryBinary(long left, long right, Func<long, long, long> operation, out long value)
-    {
-        try
-        {
+    private static bool TryBinary(long left, long right, Func<long, long, long> operation, out long value) {
+        try {
             value = operation(left, right);
             return true;
         }
-        catch (OverflowException)
-        {
+        catch (OverflowException) {
             value = default;
             return false;
         }

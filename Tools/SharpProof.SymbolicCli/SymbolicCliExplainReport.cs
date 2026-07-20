@@ -117,17 +117,13 @@ internal sealed record SymbolicCliExplainReport(
         return new Dictionary<string, object?> {
             ["$schema"] = "https://json.schemastore.org/sarif-2.1.0.json",
             ["version"] = "2.1.0",
-            ["runs"] = new object[]
-            {
-                new Dictionary<string, object?>
-                {
-                    ["tool"] = new Dictionary<string, object?>
-                    {
+            ["runs"] = new object[] {
+                new Dictionary<string, object?> {
+                    ["tool"] = new Dictionary<string, object?> {
                         ["driver"] = new Dictionary<string, object?> { ["name"] = "SharpProof" }
                     },
                     ["results"] = results,
-                    ["properties"] = new Dictionary<string, object?>
-                    {
+                    ["properties"] = new Dictionary<string, object?> {
                         ["explainSchemaVersion"] = SchemaVersion,
                         ["evidenceSchemaVersion"] = EvidenceSchemaVersion,
                         ["reportTruncated"] = Truncation.IsTruncated
@@ -249,20 +245,15 @@ internal sealed record SymbolicCliExplainReport(
         };
         if (string.IsNullOrWhiteSpace(filePath) || !startLine.HasValue || !startColumn.HasValue) return result;
 
-        result["locations"] = new object[]
-        {
-            new Dictionary<string, object?>
-            {
-                ["physicalLocation"] = new Dictionary<string, object?>
-                {
-                    ["artifactLocation"] = new Dictionary<string, object?>
-                    {
+        result["locations"] = new object[] {
+            new Dictionary<string, object?> {
+                ["physicalLocation"] = new Dictionary<string, object?> {
+                    ["artifactLocation"] = new Dictionary<string, object?> {
                         ["uri"] = Path.IsPathRooted(filePath)
                             ? new Uri(Path.GetFullPath(filePath)).AbsoluteUri
                             : filePath.Replace('\\', '/')
                     },
-                    ["region"] = new Dictionary<string, object?>
-                    {
+                    ["region"] = new Dictionary<string, object?> {
                         ["startLine"] = Math.Max(1, startLine.Value),
                         ["startColumn"] = Math.Max(1, startColumn.Value),
                         ["endLine"] = endLine,

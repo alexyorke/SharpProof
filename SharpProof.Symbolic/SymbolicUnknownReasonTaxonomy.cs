@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal enum SymbolicUnknownReasonSource
-{
+internal enum SymbolicUnknownReasonSource {
     Proof,
     Capability,
     Complexity,
@@ -10,8 +9,7 @@ internal enum SymbolicUnknownReasonSource
     Ensures
 }
 
-internal enum SymbolicUnknownReasonCategory
-{
+internal enum SymbolicUnknownReasonCategory {
     None,
     UnsupportedSyntax,
     UnsupportedOperation,
@@ -36,13 +34,11 @@ internal sealed record SymbolicUnknownReasonInfo(
     string Code,
     string RawReason,
     bool IsRetryable,
-    bool IsConfigurationRelated)
-{
+    bool IsConfigurationRelated) {
     public bool IsUnknown => Category != SymbolicUnknownReasonCategory.None;
 }
 
-internal static class SymbolicUnknownReasonTaxonomy
-{
+internal static class SymbolicUnknownReasonTaxonomy {
     internal static SymbolicUnknownReasonInfo ForProof(SymbolicUnknownReason reason, string? rawReason = null) =>
         Create(SymbolicUnknownReasonSource.Proof, "proof", Describe(reason), rawReason);
 
@@ -61,8 +57,7 @@ internal static class SymbolicUnknownReasonTaxonomy
     internal static SymbolicUnknownReasonInfo ForRuntimeHazard(
         SymbolicRuntimeHazardStatus status,
         string? rawReason,
-        SymbolicUnknownReason proofReason)
-    {
+        SymbolicUnknownReason proofReason) {
         if (status is SymbolicRuntimeHazardStatus.Proven or SymbolicRuntimeHazardStatus.Unreachable)
             return Create(SymbolicUnknownReasonSource.RuntimeHazard, "runtime_hazard",
                 new(SymbolicUnknownReasonCategory.None, "none"), rawReason);
@@ -83,8 +78,7 @@ internal static class SymbolicUnknownReasonTaxonomy
 
     internal static SymbolicUnknownReasonInfo ForEnsures(
         string? rawReason,
-        SymbolicUnknownReason proofReason = SymbolicUnknownReason.Unknown)
-    {
+        SymbolicUnknownReason proofReason = SymbolicUnknownReason.Unknown) {
         if (proofReason is not (SymbolicUnknownReason.None or SymbolicUnknownReason.Unknown))
             return ChangeSource(ForProof(proofReason, rawReason), SymbolicUnknownReasonSource.Ensures, "ensures");
 
@@ -104,8 +98,7 @@ internal static class SymbolicUnknownReasonTaxonomy
             : ChangeSource(ForProof(classified, rawReason), SymbolicUnknownReasonSource.Ensures, "ensures");
     }
 
-    internal static SymbolicUnknownReasonInfo ForPurity(string? category, string? bclFallbackReason)
-    {
+    internal static SymbolicUnknownReasonInfo ForPurity(string? category, string? bclFallbackReason) {
         if (!string.IsNullOrWhiteSpace(bclFallbackReason))
             return Create(SymbolicUnknownReasonSource.Purity, "purity",
                 new(SymbolicUnknownReasonCategory.UnsupportedLibraryModel, "library_model_fallback"),
@@ -129,8 +122,7 @@ internal static class SymbolicUnknownReasonTaxonomy
         return Create(SymbolicUnknownReasonSource.Purity, "purity", descriptor, category);
     }
 
-    private static ReasonDescriptor Describe(SymbolicUnknownReason reason) => reason switch
-    {
+    private static ReasonDescriptor Describe(SymbolicUnknownReason reason) => reason switch {
         SymbolicUnknownReason.None => new(SymbolicUnknownReasonCategory.None, "none"),
         SymbolicUnknownReason.UnsupportedIrEncoding => new(SymbolicUnknownReasonCategory.UnsupportedSyntax,
             "unsupported_ir_encoding"),
@@ -150,8 +142,7 @@ internal static class SymbolicUnknownReasonTaxonomy
         _ => new(SymbolicUnknownReasonCategory.Unknown, "unknown")
     };
 
-    private static ReasonDescriptor Describe(SymbolicCapabilityUnknownReason reason) => reason switch
-    {
+    private static ReasonDescriptor Describe(SymbolicCapabilityUnknownReason reason) => reason switch {
         SymbolicCapabilityUnknownReason.None => new(SymbolicUnknownReasonCategory.None, "none"),
         SymbolicCapabilityUnknownReason.UnsupportedTarget => Syntax("unsupported_target"),
         SymbolicCapabilityUnknownReason.NoContainingMethodLikeBody => Syntax("no_containing_method_body"),
@@ -170,8 +161,7 @@ internal static class SymbolicUnknownReasonTaxonomy
         _ => new(SymbolicUnknownReasonCategory.Unknown, "unknown")
     };
 
-    private static ReasonDescriptor Describe(SymbolicComplexityUnknownReason reason) => reason switch
-    {
+    private static ReasonDescriptor Describe(SymbolicComplexityUnknownReason reason) => reason switch {
         SymbolicComplexityUnknownReason.None => new(SymbolicUnknownReasonCategory.None, "none"),
         SymbolicComplexityUnknownReason.UnsupportedTarget => Syntax("unsupported_target"),
         SymbolicComplexityUnknownReason.NoContainingMethodLikeBody => Syntax("no_containing_method_body"),

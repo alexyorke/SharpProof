@@ -1,6 +1,5 @@
 namespace SharpProof.Symbolic;
-internal sealed class SymbolicComplexityAnalysisSession
-{
+internal sealed class SymbolicComplexityAnalysisSession {
     private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
 
     private readonly SymbolicComplexityCallModel _callModel;
@@ -11,8 +10,7 @@ internal sealed class SymbolicComplexityAnalysisSession
     private readonly Dictionary<IMethodSymbol, MethodAnalysisSummary> _summaryCache =
         new(SymbolEqualityComparer.Default);
 
-    internal SymbolicComplexityAnalysisSession(Compilation compilation, CancellationToken cancellationToken)
-    {
+    internal SymbolicComplexityAnalysisSession(Compilation compilation, CancellationToken cancellationToken) {
         if (compilation == null) throw new ArgumentNullException(nameof(compilation));
         _cancellationToken = cancellationToken;
         _costModel = new SymbolicComplexityCostModel(cancellationToken);
@@ -30,8 +28,7 @@ internal sealed class SymbolicComplexityAnalysisSession
     private MethodAnalysisSummary AnalyzeMethod(
         IMethodSymbol methodSymbol,
         SyntaxNode bodyNode,
-        SemanticModel semanticModel)
-    {
+        SemanticModel semanticModel) {
         _cancellationToken.ThrowIfCancellationRequested();
 
         var canonical = methodSymbol.OriginalDefinition;
@@ -42,8 +39,7 @@ internal sealed class SymbolicComplexityAnalysisSession
                 SymbolicCostExpression.RecursiveUnknown(),
                 Array.Empty<SymbolicComplexityDriverInfo>(),
                 new[] { SymbolicComplexityUnknownReason.RecursiveCycle },
-                new[]
-                {
+                new[] {
                     SymbolicComplexityAlgebra.CreateCalleeInfo(
                         canonical.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
                         SymbolicCostExpression.RecursiveUnknown(),
@@ -51,8 +47,7 @@ internal sealed class SymbolicComplexityAnalysisSession
                 });
 
         _active.Add(canonical);
-        try
-        {
+        try {
             var operation = semanticModel.GetOperation(bodyNode, _cancellationToken);
             var bodyCost = operation != null
                 ? AnalyzeOperation(operation, semanticModel, canonical)
@@ -65,8 +60,7 @@ internal sealed class SymbolicComplexityAnalysisSession
             _summaryCache[canonical] = summary;
             return summary;
         }
-        finally
-        {
+        finally {
             _active.Remove(canonical);
         }
     }
@@ -74,20 +68,17 @@ internal sealed class SymbolicComplexityAnalysisSession
     private ComplexityArtifacts AnalyzeOperation(
         IOperation? operation,
         SemanticModel semanticModel,
-        IMethodSymbol currentMethod)
-    {
+        IMethodSymbol currentMethod) {
         _cancellationToken.ThrowIfCancellationRequested();
 
         if (operation == null) return ComplexityArtifacts.Constant;
 
-        switch (operation)
-        {
+        switch (operation) {
             case IBlockOperation block:
                 return SymbolicComplexityAlgebra.CombineSequence(block.Operations.Select(child =>
                     AnalyzeOperation(child, semanticModel, currentMethod)));
 
-            case IVariableDeclarationGroupOperation group:
-                {
+            case IVariableDeclarationGroupOperation group: {
                     var parts = new List<ComplexityArtifacts>();
                     foreach (var declaration in group.Declarations)
                         foreach (var declarator in declaration.Declarators)
@@ -108,8 +99,7 @@ internal sealed class SymbolicComplexityAnalysisSession
             case IReturnOperation returnOperation:
                 return returnOperation.ReturnedValue != null
                     ? SymbolicComplexityAlgebra.CombineSequence(
-                        new[]
-                        {
+                        new[] {
                             AnalyzeOperation(returnOperation.ReturnedValue, semanticModel, currentMethod)
                         }.Concat(returnOperation.ChildOperations
                             .Where(child => !ReferenceEquals(child, returnOperation.ReturnedValue))
@@ -177,8 +167,7 @@ internal sealed class SymbolicComplexityAnalysisSession
     private ComplexityArtifacts AnalyzeConditionalOperation(
         IConditionalOperation conditionalOperation,
         SemanticModel semanticModel,
-        IMethodSymbol currentMethod)
-    {
+        IMethodSymbol currentMethod) {
         var conditionCost = AnalyzeOperation(conditionalOperation.Condition, semanticModel, currentMethod);
         if (TryGetConstantBoolean(conditionalOperation.Condition.Syntax, semanticModel, out var constantValue))
             return SymbolicComplexityAlgebra.CombineSequence(
@@ -197,8 +186,7 @@ internal sealed class SymbolicComplexityAnalysisSession
     private ComplexityArtifacts AnalyzeForLoop(
         IForLoopOperation forLoopOperation,
         SemanticModel semanticModel,
-        IMethodSymbol currentMethod)
-    {
+        IMethodSymbol currentMethod) {
         var beforeCost =
             SymbolicComplexityAlgebra.CombineSequence(
                 forLoopOperation.Before.Select(op => AnalyzeOperation(op, semanticModel, currentMethod)));
@@ -235,8 +223,7 @@ internal sealed class SymbolicComplexityAnalysisSession
     private ComplexityArtifacts AnalyzeForEachLoop(
         IForEachLoopOperation forEachLoopOperation,
         SemanticModel semanticModel,
-        IMethodSymbol currentMethod)
-    {
+        IMethodSymbol currentMethod) {
         var collectionCost = AnalyzeOperation(forEachLoopOperation.Collection, semanticModel, currentMethod);
         var bodyCost = AnalyzeOperation(forEachLoopOperation.Body, semanticModel, currentMethod);
 
@@ -265,12 +252,10 @@ internal sealed class SymbolicComplexityAnalysisSession
     private ComplexityArtifacts AnalyzeWhileLikeLoop(
         IWhileLoopOperation loopOperation,
         SemanticModel semanticModel,
-        IMethodSymbol currentMethod)
-    {
+        IMethodSymbol currentMethod) {
         var conditionCost = AnalyzeOperation(loopOperation.Condition, semanticModel, currentMethod);
         var bodyCost = AnalyzeOperation(loopOperation.Body, semanticModel, currentMethod);
-        var (condition, body, driverKind, description) = loopOperation.Syntax switch
-        {
+        var (condition, body, driverKind, description) = loopOperation.Syntax switch {
             WhileStatementSyntax statement =>
                 (statement.Condition, statement.Statement, "WhileLoop", "while-loop"),
             DoStatementSyntax statement =>
@@ -307,8 +292,7 @@ internal sealed class SymbolicComplexityAnalysisSession
     private ComplexityArtifacts AnalyzeInvocation(
         IInvocationOperation invocationOperation,
         SemanticModel semanticModel,
-        IMethodSymbol currentMethod)
-    {
+        IMethodSymbol currentMethod) {
         var receiverAndArguments = new List<ComplexityArtifacts>();
         if (invocationOperation.Instance != null)
             receiverAndArguments.Add(AnalyzeOperation(invocationOperation.Instance, semanticModel, currentMethod));
@@ -331,8 +315,7 @@ internal sealed class SymbolicComplexityAnalysisSession
     private ComplexityArtifacts AnalyzeObjectCreation(
         IObjectCreationOperation objectCreationOperation,
         SemanticModel semanticModel,
-        IMethodSymbol currentMethod)
-    {
+        IMethodSymbol currentMethod) {
         var parts = new List<ComplexityArtifacts>();
         foreach (var argument in objectCreationOperation.Arguments)
             parts.Add(AnalyzeOperation(argument.Value, semanticModel, currentMethod));
@@ -356,8 +339,7 @@ internal sealed class SymbolicComplexityAnalysisSession
     private ComplexityArtifacts AnalyzePropertyReference(
         IPropertyReferenceOperation propertyReferenceOperation,
         SemanticModel semanticModel,
-        IMethodSymbol currentMethod)
-    {
+        IMethodSymbol currentMethod) {
         var parts = new List<ComplexityArtifacts>();
         if (propertyReferenceOperation.Instance != null)
             parts.Add(AnalyzeOperation(propertyReferenceOperation.Instance, semanticModel, currentMethod));
@@ -382,8 +364,7 @@ internal sealed class SymbolicComplexityAnalysisSession
     private ComplexityArtifacts AnalyzeArrayCreation(
         IArrayCreationOperation arrayCreationOperation,
         SemanticModel semanticModel,
-        IMethodSymbol currentMethod)
-    {
+        IMethodSymbol currentMethod) {
         var dimensionCosts = arrayCreationOperation.DimensionSizes
             .Select(size => AnalyzeOperation(size, semanticModel, currentMethod))
             .ToArray();
@@ -394,8 +375,7 @@ internal sealed class SymbolicComplexityAnalysisSession
     private ComplexityArtifacts AnalyzeSwitchOperation(
         ISwitchOperation switchOperation,
         SemanticModel semanticModel,
-        IMethodSymbol currentMethod)
-    {
+        IMethodSymbol currentMethod) {
         var conditionCost = AnalyzeOperation(switchOperation.Value, semanticModel, currentMethod);
         var branchCosts = switchOperation.Cases
             .Select(@case =>
@@ -410,8 +390,7 @@ internal sealed class SymbolicComplexityAnalysisSession
     private ComplexityArtifacts AnalyzeSwitchExpressionOperation(
         ISwitchExpressionOperation switchExpressionOperation,
         SemanticModel semanticModel,
-        IMethodSymbol currentMethod)
-    {
+        IMethodSymbol currentMethod) {
         var valueCost = AnalyzeOperation(switchExpressionOperation.Value, semanticModel, currentMethod);
         var armCosts = switchExpressionOperation.Arms
             .Select(arm => SymbolicComplexityAlgebra.CombineSequence(
@@ -427,10 +406,8 @@ internal sealed class SymbolicComplexityAnalysisSession
     private ComplexityArtifacts AnalyzeTryOperation(
         ITryOperation tryOperation,
         SemanticModel semanticModel,
-        IMethodSymbol currentMethod)
-    {
-        var paths = new List<ComplexityArtifacts>
-        {
+        IMethodSymbol currentMethod) {
+        var paths = new List<ComplexityArtifacts> {
             AnalyzeOperation(tryOperation.Body, semanticModel, currentMethod)
         };
         foreach (var @catch in tryOperation.Catches)
@@ -443,12 +420,10 @@ internal sealed class SymbolicComplexityAnalysisSession
     private bool TryGetConstantBoolean(
         SyntaxNode syntaxNode,
         SemanticModel semanticModel,
-        out bool value)
-    {
+        out bool value) {
         if (syntaxNode is ExpressionSyntax expression &&
             semanticModel.GetConstantValue(expression, _cancellationToken) is
-            { HasValue: true, Value: bool boolValue })
-        {
+            { HasValue: true, Value: bool boolValue }) {
             value = boolValue;
             return true;
         }

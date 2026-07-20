@@ -1,11 +1,9 @@
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowEngine
-{
+internal static partial class ExceptionFlowEngine {
     internal sealed record ExceptionFlowResult(
         ImmutableArray<ExceptionFlowSite> Sites,
-        ImmutableArray<SymbolicRuntimeHazard> RawHazards)
-    {
+        ImmutableArray<SymbolicRuntimeHazard> RawHazards) {
         public ExceptionEvidenceProjection Evidence { get; } = new(Sites);
     }
 
@@ -19,8 +17,7 @@ internal static partial class ExceptionFlowEngine
         string? ExceptionSymbol,
         ImmutableArray<ExceptionFlowEdge> Edges);
 
-    internal sealed class ExceptionEvidenceProjection(IEnumerable<ExceptionFlowSite> sites)
-    {
+    internal sealed class ExceptionEvidenceProjection(IEnumerable<ExceptionFlowSite> sites) {
         private readonly ImmutableArray<ExceptionFlowSite> _sites = sites.ToImmutableArray();
 
         public string[] Types => _sites.Select(static site => site.ExceptionType)
@@ -46,8 +43,7 @@ internal static partial class ExceptionFlowEngine
                     .OrderBy(static source => source, StringComparer.Ordinal)
                     .Select(source => group.Key + "=" + source)));
 
-        public string? FormatEdges()
-        {
+        public string? FormatEdges() {
             var edges = _sites.SelectMany(static site => site.Edges)
                 .Select((edge, index) => (edge, index))
                 .GroupBy(static item => item.edge.CreateKey(), StringComparer.Ordinal)
@@ -64,8 +60,7 @@ internal static partial class ExceptionFlowEngine
         string? SourcePath,
         string[] CallChain,
         string? CalleeIdentity,
-        int Depth)
-    {
+        int Depth) {
         internal string CreateKey() => ExceptionType + "|" + Category + "|" +
                                        (SourcePath ?? string.Empty) + "|" +
                                        string.Join(">", CallChain) + "|" +

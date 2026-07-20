@@ -7,15 +7,13 @@ internal sealed record MethodAnalysisSnapshot(
     SymbolicSourceInput Source,
     ImmutableArray<IOperation> OperationBlocks,
     IOperation? RootOperation,
-    ImmutableArray<IOperation> VisibleOperations)
-{
+    ImmutableArray<IOperation> VisibleOperations) {
     internal static MethodAnalysisSnapshot Create(
         IMethodSymbol methodSymbol,
         SyntaxNode declaration,
         SemanticModel semanticModel,
         ImmutableArray<IOperation> operationBlocks,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (methodSymbol == null) throw new ArgumentNullException(nameof(methodSymbol));
         if (declaration == null) throw new ArgumentNullException(nameof(declaration));
         if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
@@ -41,8 +39,7 @@ internal sealed record MethodAnalysisSnapshot(
             visibleOperations);
     }
 
-    private static IOperation? SelectRootOperation(ImmutableArray<IOperation> operationBlocks)
-    {
+    private static IOperation? SelectRootOperation(ImmutableArray<IOperation> operationBlocks) {
         if (operationBlocks.IsDefaultOrEmpty) return null;
 
         return operationBlocks

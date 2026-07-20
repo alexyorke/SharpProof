@@ -3,8 +3,7 @@ namespace SharpProof.Symbolic;
 internal sealed class SymbolicSourceMap(
     string sourceUri,
     int originalStartLine = 1,
-    int originalStartColumn = 1)
-{
+    int originalStartColumn = 1) {
     public string SourceUri { get; } = string.IsNullOrWhiteSpace(sourceUri)
         ? throw new ArgumentException("Source URI is required.", nameof(sourceUri))
         : sourceUri.Trim();

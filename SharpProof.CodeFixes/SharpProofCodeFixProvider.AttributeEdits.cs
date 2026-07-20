@@ -1,17 +1,14 @@
 namespace SharpProof;
 
-    public sealed partial class SharpProofCodeFixProvider
-    {
+    public sealed partial class SharpProofCodeFixProvider {
         private void RegisterSimpleRemovalCodeFix(
             CodeFixContext context,
             Document document,
             SyntaxNode root,
             Diagnostic diagnostic,
             SharpProofAttributeIdentityPolicy attributePolicy,
-            SimpleRemovalRegistration registration)
-        {
-            if (registration.Operation == SimpleRemovalOperation.MisplacedAttribute)
-            {
+            SimpleRemovalRegistration registration) {
+            if (registration.Operation == SimpleRemovalOperation.MisplacedAttribute) {
                 if (!TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var misplacedAttribute)) return;
 
                 context.RegisterCodeFix(
@@ -36,14 +33,12 @@ namespace SharpProof;
                 diagnostic);
         }
 
-        internal static bool TryFindPurityTargetDeclaration(SyntaxNode root, int position, out SyntaxNode declaration)
-        {
+        internal static bool TryFindPurityTargetDeclaration(SyntaxNode root, int position, out SyntaxNode declaration) {
             declaration = null!;
             for (var node = root.FindToken(position).Parent; node != null; node = node.Parent)
                 if (node is MethodDeclarationSyntax or ConstructorDeclarationSyntax or OperatorDeclarationSyntax or
                     ConversionOperatorDeclarationSyntax or IndexerDeclarationSyntax or PropertyDeclarationSyntax or
-                    AccessorDeclarationSyntax or LocalFunctionStatementSyntax)
-                {
+                    AccessorDeclarationSyntax or LocalFunctionStatementSyntax) {
                     declaration = node;
                     return true;
                 }
@@ -51,8 +46,7 @@ namespace SharpProof;
             return false;
         }
 
-        internal static bool TryFindAttributeSyntax(SyntaxNode root, TextSpan span, out AttributeSyntax attribute)
-        {
+        internal static bool TryFindAttributeSyntax(SyntaxNode root, TextSpan span, out AttributeSyntax attribute) {
             var node = root.FindNode(span, false, true);
             attribute = node.FirstAncestorOrSelf<AttributeSyntax>() ?? (node as AttributeSyntax)!;
             return attribute != null;
@@ -67,8 +61,7 @@ namespace SharpProof;
         private static SyntaxNode RemoveAttributeFromHost(
             SyntaxNode host,
             AttributeSyntax attrToRemove,
-            bool preserveLeadingTrivia = true)
-        {
+            bool preserveLeadingTrivia = true) {
             if (attrToRemove.Parent is not AttributeListSyntax list) return host;
 
             var nodeToRemove = list.Attributes.Count == 1
@@ -80,17 +73,14 @@ namespace SharpProof;
             return host.RemoveNode(nodeToRemove, options) ?? host;
         }
 
-        private static bool HasSignificantTrivia(SyntaxTriviaList trivia)
-        {
+        private static bool HasSignificantTrivia(SyntaxTriviaList trivia) {
             return trivia.Any(static item =>
                 !item.IsKind(SyntaxKind.WhitespaceTrivia) &&
                 !item.IsKind(SyntaxKind.EndOfLineTrivia));
         }
 
-        private static SyntaxList<AttributeListSyntax> GetAttributeLists(SyntaxNode host)
-        {
-            return host switch
-            {
+        private static SyntaxList<AttributeListSyntax> GetAttributeLists(SyntaxNode host) {
+            return host switch {
                 AccessorDeclarationSyntax a => a.AttributeLists,
                 MemberDeclarationSyntax m => m.AttributeLists,
                 ParameterSyntax p => p.AttributeLists,
@@ -100,10 +90,8 @@ namespace SharpProof;
             };
         }
 
-        private static SyntaxNode WithAttributeLists(SyntaxNode host, SyntaxList<AttributeListSyntax> lists)
-        {
-            return host switch
-            {
+        private static SyntaxNode WithAttributeLists(SyntaxNode host, SyntaxList<AttributeListSyntax> lists) {
+            return host switch {
                 AccessorDeclarationSyntax a => a.WithAttributeLists(lists),
                 MemberDeclarationSyntax m => m.WithAttributeLists(lists),
                 LocalFunctionStatementSyntax l => l.WithAttributeLists(lists),
@@ -117,16 +105,14 @@ namespace SharpProof;
             SyntaxNode declaration,
             SemanticModel model,
             Func<INamedTypeSymbol?, bool> shouldRemoveType,
-            out bool removedAny)
-        {
+            out bool removedAny) {
             var nodesToRemove = new List<SyntaxNode>();
             var hosts = new List<SyntaxNode> { declaration };
             if (declaration is BasePropertyDeclarationSyntax { AccessorList: { } accessorList })
                 hosts.AddRange(accessorList.Accessors);
 
             foreach (var host in hosts)
-            foreach (var list in GetAttributeLists(host))
-            {
+            foreach (var list in GetAttributeLists(host)) {
                 var matching = list.Attributes
                     .Where(attribute => shouldRemoveType(GetAttributeClass(model, attribute)))
                     .ToArray();
@@ -142,8 +128,7 @@ namespace SharpProof;
             if (!removedAny) return declaration;
 
             var trackedDeclaration = declaration.TrackNodes(nodesToRemove);
-            foreach (var original in nodesToRemove)
-            {
+            foreach (var original in nodesToRemove) {
                 var current = trackedDeclaration.GetCurrentNode(original);
                 if (current == null) continue;
 
@@ -157,8 +142,7 @@ namespace SharpProof;
         }
 
         private static INamedTypeSymbol? GetAttributeClass(SemanticModel model, AttributeSyntax attributeSyntax) =>
-            model.GetSymbolInfo(attributeSyntax).Symbol switch
-            {
+            model.GetSymbolInfo(attributeSyntax).Symbol switch {
                 IMethodSymbol { MethodKind: MethodKind.Constructor } constructor => constructor.ContainingType,
                 INamedTypeSymbol type => type,
                 _ => null
@@ -170,8 +154,7 @@ namespace SharpProof;
             type => attributeTypeNames.Any(name => policy.IsAccepted(type, name));
 
         internal static Task<Document> RemoveMisplacedAttributeAsync(Document document, SyntaxNode root, AttributeSyntax attr,
-            CancellationToken cancellationToken)
-        {
+            CancellationToken cancellationToken) {
             cancellationToken.ThrowIfCancellationRequested();
             var host = GetHostForAttribute(attr);
             if (host == null)
@@ -187,8 +170,7 @@ namespace SharpProof;
             Document document,
             SyntaxNode root,
             AttributeSyntax attribute,
-            CancellationToken cancellationToken)
-        {
+            CancellationToken cancellationToken) {
             var host = GetHostForAttribute(attribute);
             if (host is not PropertyDeclarationSyntax && host is not IndexerDeclarationSyntax) return document;
 
@@ -212,10 +194,8 @@ namespace SharpProof;
 
         private static SyntaxNode? AddAttributeToGetter(
             SyntaxNode host,
-            AttributeListSyntax attributeList)
-        {
-            return host switch
-            {
+            AttributeListSyntax attributeList) {
+            return host switch {
                 PropertyDeclarationSyntax property => AddAttributeToGetter(
                     property,
                     property.AccessorList,
@@ -248,10 +228,8 @@ namespace SharpProof;
             AttributeListSyntax attributeList,
             Func<TDeclaration, AccessorListSyntax, TDeclaration> withAccessorList,
             Func<TDeclaration, TDeclaration> withoutExpressionBody)
-            where TDeclaration : SyntaxNode
-        {
-            if (accessorList != null)
-            {
+            where TDeclaration : SyntaxNode {
+            if (accessorList != null) {
                 var getter = accessorList.Accessors.FirstOrDefault(static accessor =>
                     accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
                 if (getter == null) return null;
@@ -290,12 +268,10 @@ namespace SharpProof;
             Diagnostic diagnostic,
             SyntaxNode declaration,
             Func<INamedTypeSymbol?, bool> shouldRemoveType,
-            CancellationToken cancellationToken)
-        {
+            CancellationToken cancellationToken) {
             var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             if (model != null)
-                foreach (var location in new[] { diagnostic.Location }.Concat(diagnostic.AdditionalLocations))
-                {
+                foreach (var location in new[] { diagnostic.Location }.Concat(diagnostic.AdditionalLocations)) {
                     if (!location.IsInSource) continue;
 
                     if (TryFindAttributeSyntax(root, location.SourceSpan, out var attribute) &&
@@ -313,8 +289,7 @@ namespace SharpProof;
             SyntaxNode root,
             SyntaxNode declaration,
             Func<INamedTypeSymbol?, bool> shouldRemoveType,
-            CancellationToken cancellationToken)
-        {
+            CancellationToken cancellationToken) {
             var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             if (model == null)
                 return document;
@@ -334,14 +309,12 @@ namespace SharpProof;
             SyntaxNode root,
             SyntaxNode declaration,
             SharpProofAttributeIdentityPolicy attributePolicy,
-            CancellationToken cancellationToken)
-        {
+            CancellationToken cancellationToken) {
             var lists = GetAttributeLists(declaration);
             var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             if (model != null)
                 foreach (var list in lists)
-                    foreach (var attr in list.Attributes)
-                    {
+                    foreach (var attr in list.Attributes) {
                         var c = GetAttributeClass(model, attr);
                         if (attributePolicy.IsAccepted(c, "EnforcePureAttribute"))
                             return document;

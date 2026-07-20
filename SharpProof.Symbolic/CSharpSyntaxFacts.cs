@@ -1,8 +1,7 @@
 namespace SharpProof.Symbolic;
 
 [Flags]
-internal enum ExecutionRootPolicy
-{
+internal enum ExecutionRootPolicy {
     None = 0,
     Callable = 1 << 0,
     ExpressionBodiedPropertyOrIndexer = 1 << 1,
@@ -11,24 +10,20 @@ internal enum ExecutionRootPolicy
     SyntaxTreeRootFallback = 1 << 4
 }
 
-internal enum ExpressionCastUnwrapPolicy
-{
+internal enum ExpressionCastUnwrapPolicy {
     None,
     NullableOnly,
     All
 }
 
-internal static class CSharpSyntaxFacts
-{
+internal static class CSharpSyntaxFacts {
     public static IEnumerable<SyntaxNode> DescendantNodesInExecution(
         SyntaxNode root,
         bool includeSelf = true,
-        bool includeNestedCallables = false)
-    {
+        bool includeNestedCallables = false) {
         if (root == null) throw new ArgumentNullException(nameof(root));
 
-        bool DescendIntoChildren(SyntaxNode candidate)
-        {
+        bool DescendIntoChildren(SyntaxNode candidate) {
             return includeNestedCallables ||
                    ReferenceEquals(candidate, root) ||
                    !IsNestedLocalCallableBoundary(candidate);
@@ -39,16 +34,13 @@ internal static class CSharpSyntaxFacts
             : root.DescendantNodes(descendIntoTrivia: false, descendIntoChildren: DescendIntoChildren);
     }
 
-    public static bool IsNestedLocalCallableBoundary(SyntaxNode node)
-    {
+    public static bool IsNestedLocalCallableBoundary(SyntaxNode node) {
         return node is AnonymousFunctionExpressionSyntax ||
                node is LocalFunctionStatementSyntax;
     }
 
-    public static StatementSyntax? GetContainingLoopBody(SyntaxNode node)
-    {
-        return node.Ancestors().Select(static ancestor => ancestor switch
-            {
+    public static StatementSyntax? GetContainingLoopBody(SyntaxNode node) {
+        return node.Ancestors().Select(static ancestor => ancestor switch {
                 WhileStatementSyntax whileStatement => whileStatement.Statement,
                 DoStatementSyntax doStatement => doStatement.Statement,
                 ForStatementSyntax forStatement => forStatement.Statement,
@@ -59,8 +51,7 @@ internal static class CSharpSyntaxFacts
             .FirstOrDefault(body => body?.Span.Contains(node.SpanStart) == true);
     }
 
-    public static bool IsCallableBoundary(SyntaxNode node)
-    {
+    public static bool IsCallableBoundary(SyntaxNode node) {
         return node is MethodDeclarationSyntax or
             ConstructorDeclarationSyntax or
             DestructorDeclarationSyntax or
@@ -74,32 +65,27 @@ internal static class CSharpSyntaxFacts
     public static ITypeSymbol? GetExpressionType(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
         return typeInfo.ConvertedType ?? typeInfo.Type;
     }
 
-    public static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression)
-    {
+    public static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression) {
         while (expression is ParenthesizedExpressionSyntax parenthesized)
             expression = parenthesized.Expression;
 
         return expression;
     }
 
-    internal static bool IsMemberOrQualifiedNameRightSide(IdentifierNameSyntax identifier)
-    {
+    internal static bool IsMemberOrQualifiedNameRightSide(IdentifierNameSyntax identifier) {
         return identifier.Parent is MemberAccessExpressionSyntax memberAccess &&
                ReferenceEquals(memberAccess.Name, identifier) ||
                identifier.Parent is QualifiedNameSyntax qualifiedName &&
                ReferenceEquals(qualifiedName.Right, identifier);
     }
 
-    public static bool TryGetExpressionBody(SyntaxNode node, out ExpressionSyntax expression)
-    {
-        expression = node switch
-        {
+    public static bool TryGetExpressionBody(SyntaxNode node, out ExpressionSyntax expression) {
+        expression = node switch {
             MethodDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
             LocalFunctionStatementSyntax { ExpressionBody.Expression: { } body } => body,
             ConstructorDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
@@ -113,10 +99,8 @@ internal static class CSharpSyntaxFacts
         return expression != null;
     }
 
-    public static BlockSyntax? GetBlockBody(SyntaxNode node)
-    {
-        return node switch
-        {
+    public static BlockSyntax? GetBlockBody(SyntaxNode node) {
+        return node switch {
             MethodDeclarationSyntax method => method.Body,
             LocalFunctionStatementSyntax local => local.Body,
             ConstructorDeclarationSyntax constructor => constructor.Body,
@@ -128,17 +112,14 @@ internal static class CSharpSyntaxFacts
         };
     }
 
-    public static bool IsThrowOnlyStatement(StatementSyntax statement)
-    {
+    public static bool IsThrowOnlyStatement(StatementSyntax statement) {
         return statement is ThrowStatementSyntax ||
                statement is BlockSyntax { Statements.Count: 1 } block &&
                block.Statements[0] is ThrowStatementSyntax;
     }
 
-    internal static bool TryGetCompoundAssignmentBinaryKind(SyntaxKind assignmentKind, out SyntaxKind binaryKind)
-    {
-        binaryKind = assignmentKind switch
-        {
+    internal static bool TryGetCompoundAssignmentBinaryKind(SyntaxKind assignmentKind, out SyntaxKind binaryKind) {
+        binaryKind = assignmentKind switch {
             SyntaxKind.AddAssignmentExpression => SyntaxKind.AddExpression,
             SyntaxKind.SubtractAssignmentExpression => SyntaxKind.SubtractExpression,
             SyntaxKind.MultiplyAssignmentExpression => SyntaxKind.MultiplyExpression,
@@ -159,11 +140,9 @@ internal static class CSharpSyntaxFacts
     internal static bool TryGetIncrementOrDecrementOperand(
         ExpressionSyntax expression,
         out ExpressionSyntax operand,
-        out int delta)
-    {
+        out int delta) {
         expression = UnwrapParenthesesAndNullableSuppression(expression);
-        operand = expression switch
-        {
+        operand = expression switch {
             PrefixUnaryExpressionSyntax prefix when prefix.IsKind(SyntaxKind.PreIncrementExpression) ||
                                                     prefix.IsKind(SyntaxKind.PreDecrementExpression) => prefix.Operand,
             PostfixUnaryExpressionSyntax postfix when postfix.IsKind(SyntaxKind.PostIncrementExpression) ||
@@ -178,18 +157,15 @@ internal static class CSharpSyntaxFacts
     public static bool IsNullLiteral(ExpressionSyntax expression) =>
         UnwrapParentheses(expression).IsKind(SyntaxKind.NullLiteralExpression);
 
-    public static bool TryGetNullPatternPolarity(PatternSyntax pattern, out bool matchesNonNull)
-    {
-        if (pattern is ConstantPatternSyntax { Expression: var expression } && IsNullLiteral(expression))
-        {
+    public static bool TryGetNullPatternPolarity(PatternSyntax pattern, out bool matchesNonNull) {
+        if (pattern is ConstantPatternSyntax { Expression: var expression } && IsNullLiteral(expression)) {
             matchesNonNull = false;
             return true;
         }
 
         if (pattern is UnaryPatternSyntax unaryPattern &&
             unaryPattern.IsKind(SyntaxKind.NotPattern) &&
-            TryGetNullPatternPolarity(unaryPattern.Pattern, out var nestedMatchesNonNull))
-        {
+            TryGetNullPatternPolarity(unaryPattern.Pattern, out var nestedMatchesNonNull)) {
             matchesNonNull = !nestedMatchesNonNull;
             return true;
         }
@@ -198,8 +174,7 @@ internal static class CSharpSyntaxFacts
         return false;
     }
 
-    public static SyntaxNode GetContainingExecutionRoot(SyntaxNode node)
-    {
+    public static SyntaxNode GetContainingExecutionRoot(SyntaxNode node) {
         return GetContainingExecutionRoot(
             node,
             ExecutionRootPolicy.Callable | ExecutionRootPolicy.SyntaxTreeRootFallback)!;
@@ -207,12 +182,10 @@ internal static class CSharpSyntaxFacts
 
     public static SyntaxNode? GetContainingExecutionRoot(
         SyntaxNode node,
-        ExecutionRootPolicy policy)
-    {
+        ExecutionRootPolicy policy) {
         if (node == null) throw new ArgumentNullException(nameof(node));
 
-        foreach (var candidate in node.AncestorsAndSelf())
-        {
+        foreach (var candidate in node.AncestorsAndSelf()) {
             if ((policy & ExecutionRootPolicy.Callable) != 0 && IsCallableBoundary(candidate))
                 return candidate;
             if ((policy & ExecutionRootPolicy.ExpressionBodiedPropertyOrIndexer) != 0 &&
@@ -232,11 +205,9 @@ internal static class CSharpSyntaxFacts
 
     public static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(
         SyntaxNode node,
-        bool stopAtExecutionRoot = false)
-    {
+        bool stopAtExecutionRoot = false) {
         var executionRoot = stopAtExecutionRoot ? GetContainingExecutionRoot(node) : null;
-        for (var current = node; current != null; current = current.Parent)
-        {
+        for (var current = node; current != null; current = current.Parent) {
             if (current is StatementSyntax statement && statement.Parent is BlockSyntax block)
                 yield return (block, statement);
 
@@ -249,19 +220,15 @@ internal static class CSharpSyntaxFacts
 
     internal static ExpressionSyntax UnwrapExpression(
         ExpressionSyntax expression,
-        ExpressionCastUnwrapPolicy castPolicy)
-    {
-        while (true)
-        {
-            if (expression is ParenthesizedExpressionSyntax parenthesized)
-            {
+        ExpressionCastUnwrapPolicy castPolicy) {
+        while (true) {
+            if (expression is ParenthesizedExpressionSyntax parenthesized) {
                 expression = parenthesized.Expression;
                 continue;
             }
 
             if (expression is PostfixUnaryExpressionSyntax postfixUnary &&
-                postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression))
-            {
+                postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression)) {
                 expression = postfixUnary.Operand;
                 continue;
             }
@@ -269,8 +236,7 @@ internal static class CSharpSyntaxFacts
             if (expression is CastExpressionSyntax castExpression &&
                 (castPolicy == ExpressionCastUnwrapPolicy.All ||
                  castPolicy == ExpressionCastUnwrapPolicy.NullableOnly &&
-                 castExpression.Type is NullableTypeSyntax))
-            {
+                 castExpression.Type is NullableTypeSyntax)) {
                 expression = castExpression.Expression;
                 continue;
             }
@@ -280,34 +246,28 @@ internal static class CSharpSyntaxFacts
     }
 
     public static IEnumerable<ExpressionSyntax> GetExplicitArraySizeExpressions(
-        ArrayCreationExpressionSyntax arrayCreation)
-    {
+        ArrayCreationExpressionSyntax arrayCreation) {
         foreach (var rankSpecifier in arrayCreation.Type.RankSpecifiers)
             foreach (var sizeExpression in rankSpecifier.Sizes)
                 if (!sizeExpression.IsKind(SyntaxKind.OmittedArraySizeExpression))
                     yield return sizeExpression;
     }
 
-    public static ExpressionSyntax UnwrapConditionExpression(ExpressionSyntax expression)
-    {
-        while (true)
-        {
-            if (expression is ParenthesizedExpressionSyntax parenthesizedExpression)
-            {
+    public static ExpressionSyntax UnwrapConditionExpression(ExpressionSyntax expression) {
+        while (true) {
+            if (expression is ParenthesizedExpressionSyntax parenthesizedExpression) {
                 expression = parenthesizedExpression.Expression;
                 continue;
             }
 
             if (expression is PostfixUnaryExpressionSyntax postfixUnary &&
-                postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression))
-            {
+                postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression)) {
                 expression = postfixUnary.Operand;
                 continue;
             }
 
             if (expression is CheckedExpressionSyntax checkedExpression &&
-                checkedExpression.IsKind(SyntaxKind.CheckedExpression))
-            {
+                checkedExpression.IsKind(SyntaxKind.CheckedExpression)) {
                 expression = checkedExpression.Expression;
                 continue;
             }

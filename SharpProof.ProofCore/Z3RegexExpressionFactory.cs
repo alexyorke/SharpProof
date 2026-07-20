@@ -1,12 +1,10 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal sealed class Z3RegexExpressionFactory
-{
+internal sealed class Z3RegexExpressionFactory {
     private readonly Context _context;
     private ReExpr? _anyCharacter;
 
-    internal Z3RegexExpressionFactory(Context context)
-    {
+    internal Z3RegexExpressionFactory(Context context) {
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
@@ -14,8 +12,7 @@ internal sealed class Z3RegexExpressionFactory
 
     internal ReExpr OptionalFinalNewline() => _context.MkOption(Literal("\n"));
 
-    internal ReExpr AnyCharacter()
-    {
+    internal ReExpr AnyCharacter() {
         if (_anyCharacter != null) return _anyCharacter;
 
         const string marker = "__sharpproof_allchar";
@@ -36,12 +33,10 @@ internal sealed class Z3RegexExpressionFactory
         return allCharacter;
     }
 
-    internal ReExpr CharacterRange(char start, char end)
-    {
+    internal ReExpr CharacterRange(char start, char end) {
         if (start > end) throw new ArgumentOutOfRangeException(nameof(start));
 
-        if (start == char.MinValue)
-        {
+        if (start == char.MinValue) {
             if (end == char.MaxValue) return AnyCharacter();
 
             return _context.MkDiff(

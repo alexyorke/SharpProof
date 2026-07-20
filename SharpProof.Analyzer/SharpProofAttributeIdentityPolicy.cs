@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal sealed class SharpProofAttributeIdentityPolicy
-{
+internal sealed class SharpProofAttributeIdentityPolicy {
     internal const string OfficialNamespace = "SharpProof.Attributes";
     internal const string GlobalNamespaceToken = "<global>";
 
@@ -23,8 +22,7 @@ internal sealed class SharpProofAttributeIdentityPolicy
 
     private readonly ImmutableHashSet<string> _acceptedNamespaces;
 
-    private SharpProofAttributeIdentityPolicy(ImmutableHashSet<string> acceptedNamespaces)
-    {
+    private SharpProofAttributeIdentityPolicy(ImmutableHashSet<string> acceptedNamespaces) {
         _acceptedNamespaces = acceptedNamespaces;
     }
 
@@ -35,12 +33,10 @@ internal sealed class SharpProofAttributeIdentityPolicy
                 .Select(static value => value.Length == 0 ? GlobalNamespaceToken : value)
                 .OrderBy(static value => value, StringComparer.Ordinal));
 
-    internal static SharpProofAttributeIdentityPolicy Create(ImmutableHashSet<string> configuredStubNamespaces)
-    {
+    internal static SharpProofAttributeIdentityPolicy Create(ImmutableHashSet<string> configuredStubNamespaces) {
         var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         builder.Add(OfficialNamespace);
-        foreach (var configuredNamespace in configuredStubNamespaces)
-        {
+        foreach (var configuredNamespace in configuredStubNamespaces) {
             var normalized = NormalizeConfiguredNamespace(configuredNamespace);
             if (normalized != null) builder.Add(normalized);
         }
@@ -50,13 +46,11 @@ internal sealed class SharpProofAttributeIdentityPolicy
 
     internal INamedTypeSymbol? ResolveAttributeSymbol(
         Compilation compilation,
-        string attributeTypeName)
-    {
+        string attributeTypeName) {
         var official = compilation.GetTypeByMetadataName(OfficialNamespace + "." + attributeTypeName);
         if (official != null) return official;
 
-        foreach (var namespaceName in _acceptedNamespaces.OrderBy(static value => value, StringComparer.Ordinal))
-        {
+        foreach (var namespaceName in _acceptedNamespaces.OrderBy(static value => value, StringComparer.Ordinal)) {
             if (string.Equals(namespaceName, OfficialNamespace, StringComparison.Ordinal)) continue;
 
             var metadataName = namespaceName.Length == 0
@@ -71,15 +65,13 @@ internal sealed class SharpProofAttributeIdentityPolicy
 
     internal bool HasAttribute(
         ISymbol symbol,
-        string attributeTypeName)
-    {
+        string attributeTypeName) {
         return GetAcceptedAttributes(symbol, attributeTypeName).Any();
     }
 
     internal INamedTypeSymbol? GetAppliedAttributeSymbol(
         ISymbol symbol,
-        string attributeTypeName)
-    {
+        string attributeTypeName) {
         return GetAcceptedAttributes(symbol, attributeTypeName)
             .Select(static attribute => attribute.AttributeClass?.OriginalDefinition)
             .FirstOrDefault(static attributeClass => attributeClass != null);
@@ -87,8 +79,7 @@ internal sealed class SharpProofAttributeIdentityPolicy
 
     internal IEnumerable<AttributeData> GetAcceptedAttributes(
         ISymbol symbol,
-        string attributeTypeName)
-    {
+        string attributeTypeName) {
         var associatedAttributePolicy = GetAssociatedAttributePolicy(attributeTypeName);
         foreach (var attribute in SymbolAttributeTraversal.GetAttributes(symbol, associatedAttributePolicy))
             if (IsAccepted(attribute, attributeTypeName))
@@ -97,15 +88,13 @@ internal sealed class SharpProofAttributeIdentityPolicy
 
     internal bool IsAccepted(
         AttributeData attribute,
-        string attributeTypeName)
-    {
+        string attributeTypeName) {
         return IsAccepted(attribute.AttributeClass, attributeTypeName);
     }
 
     internal bool IsAccepted(
         INamedTypeSymbol? attributeClass,
-        string attributeTypeName)
-    {
+        string attributeTypeName) {
         var originalDefinition = attributeClass?.OriginalDefinition;
         if (originalDefinition == null ||
             !string.Equals(originalDefinition.Name, attributeTypeName, StringComparison.Ordinal))
@@ -116,8 +105,7 @@ internal sealed class SharpProofAttributeIdentityPolicy
 
 
     internal bool IsUnrecognizedSharpProofLikeAttribute(
-        INamedTypeSymbol? attributeClass)
-    {
+        INamedTypeSymbol? attributeClass) {
         attributeClass = attributeClass?.OriginalDefinition;
         if (attributeClass == null ||
             !SharpProofAttributeNames.Contains(attributeClass.Name))
@@ -128,32 +116,28 @@ internal sealed class SharpProofAttributeIdentityPolicy
         return !IsAccepted(attributeClass, attributeClass.Name);
     }
 
-    internal static bool IsRecognizedExternalPureAttribute(INamedTypeSymbol attributeClass)
-    {
+    internal static bool IsRecognizedExternalPureAttribute(INamedTypeSymbol attributeClass) {
         return string.Equals(attributeClass.Name, "PureAttribute", StringComparison.Ordinal) &&
                (string.Equals(GetNamespaceName(attributeClass), "JetBrains.Annotations", StringComparison.Ordinal) ||
                 string.Equals(GetNamespaceName(attributeClass), "System.Diagnostics.Contracts",
                     StringComparison.Ordinal));
     }
 
-    internal static string GetDisplayName(INamedTypeSymbol attributeClass)
-    {
+    internal static string GetDisplayName(INamedTypeSymbol attributeClass) {
         var display = attributeClass.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         return string.IsNullOrWhiteSpace(display)
             ? attributeClass.Name
             : display;
     }
 
-    internal static string GetNamespaceName(INamedTypeSymbol attributeClass)
-    {
+    internal static string GetNamespaceName(INamedTypeSymbol attributeClass) {
         var namespaceName = attributeClass.ContainingNamespace?.IsGlobalNamespace == true
             ? string.Empty
             : attributeClass.ContainingNamespace?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         return namespaceName ?? string.Empty;
     }
 
-    private static AssociatedAttributePolicy GetAssociatedAttributePolicy(string attributeTypeName)
-    {
+    private static AssociatedAttributePolicy GetAssociatedAttributePolicy(string attributeTypeName) {
         if (attributeTypeName == "ImpureAttribute")
             return AssociatedAttributePolicy.PropertyForAnyAccessor;
 
@@ -171,8 +155,7 @@ internal sealed class SharpProofAttributeIdentityPolicy
             : AssociatedAttributePolicy.None;
     }
 
-    private static string? NormalizeConfiguredNamespace(string value)
-    {
+    private static string? NormalizeConfiguredNamespace(string value) {
         if (string.IsNullOrWhiteSpace(value)) return null;
 
         var trimmed = value.Trim();

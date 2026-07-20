@@ -5,10 +5,8 @@ internal sealed record EffectSummaryArtifactSource(
     string? Framework,
     string? PackageId,
     string? PackageVersion,
-    string? PackageAssemblyRelativePath)
-{
-    internal static EffectSummaryArtifactSource? FromContract(EffectSummaryArtifactSourceContract? source)
-    {
+    string? PackageAssemblyRelativePath) {
+    internal static EffectSummaryArtifactSource? FromContract(EffectSummaryArtifactSourceContract? source) {
         var kind = source?.Kind?.Trim();
         if (string.IsNullOrWhiteSpace(kind)) return null;
 
@@ -20,8 +18,7 @@ internal sealed record EffectSummaryArtifactSource(
             source.PackageAssemblyRelativePath?.Trim());
     }
 
-    internal EffectSummaryCompatibility GetCompatibility(ActualAssemblyIdentity actualAssemblyIdentity)
-    {
+    internal EffectSummaryCompatibility GetCompatibility(ActualAssemblyIdentity actualAssemblyIdentity) {
         if (string.Equals(Kind, "framework", StringComparison.OrdinalIgnoreCase))
             return GetFrameworkCompatibility(actualAssemblyIdentity.AssemblyPath);
 
@@ -33,8 +30,7 @@ internal sealed record EffectSummaryArtifactSource(
             $"artifact source kind '{Kind}' is unsupported");
     }
 
-    private EffectSummaryCompatibility GetFrameworkCompatibility(string? assemblyPath)
-    {
+    private EffectSummaryCompatibility GetFrameworkCompatibility(string? assemblyPath) {
         if (string.IsNullOrWhiteSpace(Framework))
             return EffectSummaryCompatibility.Incompatible(
                 "effect_summary_artifact_source_incomplete",
@@ -57,8 +53,7 @@ internal sealed record EffectSummaryArtifactSource(
             $"artifact framework source '{Framework}' does not match '{actualFramework}'");
     }
 
-    private EffectSummaryCompatibility GetPackageCompatibility(string? assemblyPath)
-    {
+    private EffectSummaryCompatibility GetPackageCompatibility(string? assemblyPath) {
         if (string.IsNullOrWhiteSpace(PackageId) ||
             string.IsNullOrWhiteSpace(PackageVersion) ||
             string.IsNullOrWhiteSpace(PackageAssemblyRelativePath))
@@ -86,13 +81,11 @@ internal sealed record EffectSummaryArtifactSource(
             $"'{actualPackageId} {actualVersion} {actualRelativePath}'");
     }
 
-    private static string? InferFrameworkFromPath(string? assemblyPath)
-    {
+    private static string? InferFrameworkFromPath(string? assemblyPath) {
         if (string.IsNullOrWhiteSpace(assemblyPath)) return null;
 
         var segments = NormalizePath(assemblyPath!).Split('/');
-        for (var index = segments.Length - 1; index >= 0; index--)
-        {
+        for (var index = segments.Length - 1; index >= 0; index--) {
             var segment = segments[index];
             if (IsTargetFrameworkSegment(segment))
                 return segment;
@@ -107,8 +100,7 @@ internal sealed record EffectSummaryArtifactSource(
         return null;
     }
 
-    private static bool IsTargetFrameworkSegment(string segment)
-    {
+    private static bool IsTargetFrameworkSegment(string segment) {
         if (!segment.StartsWith("net", StringComparison.OrdinalIgnoreCase)) return false;
 
         var digitIndex = 3;
@@ -120,16 +112,14 @@ internal sealed record EffectSummaryArtifactSource(
         string? assemblyPath,
         out string packageId,
         out string packageVersion,
-        out string relativePath)
-    {
+        out string relativePath) {
         packageId = string.Empty;
         packageVersion = string.Empty;
         relativePath = string.Empty;
         if (string.IsNullOrWhiteSpace(assemblyPath)) return false;
 
         var segments = NormalizePath(assemblyPath!).Split('/');
-        for (var index = segments.Length - 4; index >= 0; index--)
-        {
+        for (var index = segments.Length - 4; index >= 0; index--) {
             if (!string.Equals(segments[index], "packages", StringComparison.OrdinalIgnoreCase)) continue;
 
             packageId = segments[index + 1];
@@ -141,8 +131,7 @@ internal sealed record EffectSummaryArtifactSource(
         return false;
     }
 
-    private static string NormalizeFramework(string framework)
-    {
+    private static string NormalizeFramework(string framework) {
         var normalized = framework.Trim().ToLowerInvariant();
         var platformSeparator = normalized.IndexOf('-');
         return platformSeparator < 0 ? normalized : normalized.Substring(0, platformSeparator);
@@ -151,8 +140,7 @@ internal sealed record EffectSummaryArtifactSource(
     private static string NormalizePath(string path) =>
         path.Trim().Replace('\\', '/').Trim('/');
 
-    private static string NormalizePackageVersion(string version)
-    {
+    private static string NormalizePackageVersion(string version) {
         var normalized = version.Trim();
         var metadataSeparator = normalized.IndexOf('+');
         if (metadataSeparator >= 0) normalized = normalized.Substring(0, metadataSeparator);

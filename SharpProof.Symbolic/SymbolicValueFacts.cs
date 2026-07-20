@@ -1,11 +1,8 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicValueFacts
-{
-    internal static bool IsIntegralOrDecimalZero(object? value)
-    {
-        switch (value)
-        {
+internal static class SymbolicValueFacts {
+    internal static bool IsIntegralOrDecimalZero(object? value) {
+        switch (value) {
             case byte byteValue:
                 return byteValue == 0;
             case sbyte sbyteValue:
@@ -32,8 +29,7 @@ internal static class SymbolicValueFacts
     public static bool TryGetInvocationArgumentExpression(
         IInvocationOperation invocationOperation,
         int parameterIndex,
-        out ExpressionSyntax expression)
-    {
+        out ExpressionSyntax expression) {
         expression = null!;
         if (parameterIndex < 0 ||
             parameterIndex >= invocationOperation.TargetMethod.Parameters.Length)
@@ -42,15 +38,13 @@ internal static class SymbolicValueFacts
         var parameter = invocationOperation.TargetMethod.Parameters[parameterIndex];
         foreach (var argument in invocationOperation.Arguments)
             if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
-                argument.Value.Syntax is ExpressionSyntax argumentExpression)
-            {
+                argument.Value.Syntax is ExpressionSyntax argumentExpression) {
                 expression = argumentExpression;
                 return true;
             }
 
         if (parameterIndex < invocationOperation.Arguments.Length &&
-            invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
-        {
+            invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression) {
             expression = fallbackExpression;
             return true;
         }
@@ -61,12 +55,10 @@ internal static class SymbolicValueFacts
     public static bool TryGetInvocationArgumentExpressionByOrdinal(
         IInvocationOperation invocationOperation,
         int parameterIndex,
-        out ExpressionSyntax expression)
-    {
+        out ExpressionSyntax expression) {
         foreach (var argument in invocationOperation.Arguments)
             if (argument.Parameter?.Ordinal == parameterIndex &&
-                argument.Value.Syntax is ExpressionSyntax argumentExpression)
-            {
+                argument.Value.Syntax is ExpressionSyntax argumentExpression) {
                 expression = argumentExpression;
                 return true;
             }
@@ -78,19 +70,15 @@ internal static class SymbolicValueFacts
     internal static bool TryGetInvocationArgumentExpressionsByOrdinal(
         IInvocationOperation invocationOperation,
         int count,
-        out ImmutableArray<ExpressionSyntax> expressions)
-    {
-        if (count < 0)
-        {
+        out ImmutableArray<ExpressionSyntax> expressions) {
+        if (count < 0) {
             expressions = default;
             return false;
         }
 
         var builder = ImmutableArray.CreateBuilder<ExpressionSyntax>(count);
-        for (var ordinal = 0; ordinal < count; ordinal++)
-        {
-            if (!TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, ordinal, out var expression))
-            {
+        for (var ordinal = 0; ordinal < count; ordinal++) {
+            if (!TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, ordinal, out var expression)) {
                 expressions = default;
                 return false;
             }

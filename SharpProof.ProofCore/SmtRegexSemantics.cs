@@ -1,7 +1,6 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal static class SmtRegexSemantics
-{
+internal static class SmtRegexSemantics {
     private const RegexOptions PreservedOptions =
         RegexOptions.ExplicitCapture |
         RegexOptions.Compiled |
@@ -14,8 +13,7 @@ internal static class SmtRegexSemantics
     internal static bool CanPreserveOptions(RegexOptions options) =>
         (options & ~PreservedOptions) == 0;
 
-    internal static bool CanEncodeOptions(RegexOptions options)
-    {
+    internal static bool CanEncodeOptions(RegexOptions options) {
         return CanPreserveOptions(options) &&
                ((options & RegexOptions.IgnoreCase) == 0 ||
                 (options & RegexOptions.CultureInvariant) != 0);

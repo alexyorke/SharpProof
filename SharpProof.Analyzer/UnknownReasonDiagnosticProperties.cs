@@ -1,11 +1,9 @@
 namespace SharpProof.Analyzer;
 
-internal static class UnknownReasonDiagnosticProperties
-{
+internal static class UnknownReasonDiagnosticProperties {
     internal static ImmutableDictionary<string, string?> Add(
         ImmutableDictionary<string, string?> properties,
-        SymbolicUnknownReasonInfo info)
-    {
+        SymbolicUnknownReasonInfo info) {
         if (properties == null) throw new ArgumentNullException(nameof(properties));
 
         if (info == null) throw new ArgumentNullException(nameof(info));

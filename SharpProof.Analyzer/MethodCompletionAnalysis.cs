@@ -7,16 +7,13 @@ internal readonly record struct MethodNormalCompletion(
     bool IncludeCurrentStatementCompletionFacts,
     string DisplayText);
 
-internal static class MethodCompletionAnalysis
-{
+internal static class MethodCompletionAnalysis {
     internal static ImmutableArray<MethodNormalCompletion> Collect(
         MethodBodyAnalysisContext context,
-        bool distinctByQueryPosition = false)
-    {
+        bool distinctByQueryPosition = false) {
         if (context.Snapshot.RootOperation == null) return ImmutableArray<MethodNormalCompletion>.Empty;
         var builder = ImmutableArray.CreateBuilder<MethodNormalCompletion>();
-        foreach (var operation in context.Snapshot.VisibleOperations)
-        {
+        foreach (var operation in context.Snapshot.VisibleOperations) {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (operation is not IReturnOperation returnOperation ||
                 AnalyzerSyntaxHelpers.IsCompilerMarkedUnreachable(
@@ -34,8 +31,7 @@ internal static class MethodCompletionAnalysis
                 expression?.ToString() ?? "return"));
         }
 
-        if (CSharpSyntaxFacts.TryGetExpressionBody(context.Node, out var expressionBody))
-        {
+        if (CSharpSyntaxFacts.TryGetExpressionBody(context.Node, out var expressionBody)) {
             var hasResultValue = AnalyzerSyntaxHelpers.HasResultValue(context.MethodSymbol);
             builder.Add(new MethodNormalCompletion(
                 hasResultValue ? expressionBody : null,
@@ -65,8 +61,7 @@ internal static class MethodCompletionAnalysis
         MethodBodyAnalysisContext context,
         SmtAnalysisService smtAnalysis,
         MethodNormalCompletion completion,
-        string condition)
-    {
+        string condition) {
         if (MethodEnsuresAnalyzer.TryCreateEntrySnapshotProofCondition(
                 condition,
                 context.MethodSymbol,

@@ -200,8 +200,7 @@ internal sealed class SymbolicInvariantQueryView {
             diagnostics.Add(Diagnostic("SP-SYM-REACHABILITY", "Warning",
                 "Some program point reachability checks are unknown or were not requested.",
                 Metrics.ReachabilityUnknownCount + Metrics.ReachabilityNotCheckedCount,
-                new[]
-                {
+                new[] {
                     $"Unknown={Metrics.ReachabilityUnknownCount}",
                     $"NotChecked={Metrics.ReachabilityNotCheckedCount}"
                 }));

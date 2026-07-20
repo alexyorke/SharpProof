@@ -2,10 +2,8 @@ namespace SharpProof.Symbolic;
 
 internal sealed record SymbolicProjectConfiguration(
     SmtAnalysisOptions SmtOptions,
-    SharpProofAnalysisBudget AnalysisLimits)
-{
-    public static SymbolicProjectConfiguration FromAnalyzerOptions(AnalyzerOptions analyzerOptions)
-    {
+    SharpProofAnalysisBudget AnalysisLimits) {
+    public static SymbolicProjectConfiguration FromAnalyzerOptions(AnalyzerOptions analyzerOptions) {
         if (analyzerOptions == null) throw new ArgumentNullException(nameof(analyzerOptions));
 
         var mode = GetSmtMode(analyzerOptions, SmtAnalysisOptions.Default.Mode);
@@ -59,13 +57,11 @@ internal sealed record SymbolicProjectConfiguration(
         return new SymbolicProjectConfiguration(smtOptions, analysisLimits);
     }
 
-    private static SmtAnalysisMode GetSmtMode(AnalyzerOptions options, SmtAnalysisMode fallback)
-    {
+    private static SmtAnalysisMode GetSmtMode(AnalyzerOptions options, SmtAnalysisMode fallback) {
         if (!AnalyzerConfigurationValueReader.TryGetGlobalOption(
                 options, "sharpproof_smt_mode", out var value)) return fallback;
 
-        return value.Trim().ToLowerInvariant() switch
-        {
+        return value.Trim().ToLowerInvariant() switch {
             "disabled" => SmtAnalysisMode.Off,
             "bounded" => SmtAnalysisMode.Bounded,
             "deep" => SmtAnalysisMode.Deep,
@@ -73,12 +69,10 @@ internal sealed record SymbolicProjectConfiguration(
         };
     }
 
-    private static bool GetBool(AnalyzerOptions options, string key, bool fallback)
-    {
+    private static bool GetBool(AnalyzerOptions options, string key, bool fallback) {
         if (!AnalyzerConfigurationValueReader.TryGetGlobalOption(options, key, out var value)) return fallback;
 
-        return value.Trim().ToLowerInvariant() switch
-        {
+        return value.Trim().ToLowerInvariant() switch {
             "1" or "true" or "yes" or "on" => true,
             "0" or "false" or "no" or "off" => false,
             _ => fallback
@@ -94,8 +88,7 @@ internal sealed class SymbolicProjectQueryContext(
     string projectName,
     string? projectFilePath = null,
     string? solutionFilePath = null,
-    IEnumerable<string>? analyzerConfigPaths = null)
-{
+    IEnumerable<string>? analyzerConfigPaths = null) {
     private readonly ImmutableArray<string> _analyzerConfigPaths = NormalizePaths(analyzerConfigPaths);
     private readonly ImmutableArray<string> _additionalFilePaths = NormalizePaths(
         (analyzerOptions ?? throw new ArgumentNullException(nameof(analyzerOptions)))
@@ -134,8 +127,7 @@ internal sealed class SymbolicProjectQueryContext(
         SmtAnalysisService? smtAnalysis = null,
         IEnumerable<string>? impliedConditions = null,
         bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false)
-    {
+        bool includeCurrentStatementCompletionFacts = false) {
         return new SymbolicQueryOptions(
                 smtAnalysis: smtAnalysis,
                 impliedConditions: impliedConditions,
@@ -144,8 +136,7 @@ internal sealed class SymbolicProjectQueryContext(
             .WithAnalysisLimits(Configuration.AnalysisLimits);
     }
 
-    private static ImmutableArray<string> NormalizePaths(IEnumerable<string>? paths)
-    {
+    private static ImmutableArray<string> NormalizePaths(IEnumerable<string>? paths) {
         return paths?
                    .Where(static path => !string.IsNullOrWhiteSpace(path))
                    .Select(static path => NormalizeOptionalPath(path)!)
@@ -154,8 +145,7 @@ internal sealed class SymbolicProjectQueryContext(
                    .ToImmutableArray() ?? ImmutableArray<string>.Empty;
     }
 
-    private static Compilation ValidateCompilation(Compilation? compilation, SyntaxTree? syntaxTree)
-    {
+    private static Compilation ValidateCompilation(Compilation? compilation, SyntaxTree? syntaxTree) {
         if (compilation == null) throw new ArgumentNullException(nameof(compilation));
         if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
         if (!compilation.SyntaxTrees.Contains(syntaxTree))
@@ -168,8 +158,7 @@ internal sealed class SymbolicProjectQueryContext(
             ? throw new ArgumentException("Project name is required.", nameof(projectName))
             : projectName!.Trim();
 
-    private static string? NormalizeOptionalPath(string? path)
-    {
+    private static string? NormalizeOptionalPath(string? path) {
         if (string.IsNullOrWhiteSpace(path)) return null;
 
         return Path.GetFullPath(path!.Trim());

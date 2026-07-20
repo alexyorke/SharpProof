@@ -12,12 +12,10 @@ using System.Security.Cryptography;
 
 namespace SharpProof.Analyzer;
 
-internal static class SummaryMethodIdentityMap
-{
+internal static class SummaryMethodIdentityMap {
     internal static ImmutableDictionary<string, ActualMethodIdentity> Load(
         string path,
-        bool includeMethodAttributes)
-    {
+        bool includeMethodAttributes) {
         using var stream = File.OpenRead(path);
         using var peReader = new PEReader(stream);
         if (!peReader.HasMetadata) return ImmutableDictionary<string, ActualMethodIdentity>.Empty;
@@ -25,8 +23,7 @@ internal static class SummaryMethodIdentityMap
         var metadataReader = peReader.GetMetadataReader();
         var builder = ImmutableDictionary.CreateBuilder<string, ActualMethodIdentity>(StringComparer.Ordinal);
         var methodBodyHashProvider = new MethodBodyHashProvider(path);
-        foreach (var handle in metadataReader.MethodDefinitions)
-        {
+        foreach (var handle in metadataReader.MethodDefinitions) {
             var definition = metadataReader.GetMethodDefinition(handle);
             var token = "0x" + MetadataTokens.GetToken(handle).ToString("X8");
             var identity = new ActualMethodIdentity(
@@ -45,8 +42,7 @@ internal static class SummaryMethodIdentityMap
         IEnumerable<string> methodKeys,
         string assemblyPath,
         bool includeMethodAttributes,
-        out ActualMethodIdentity identity)
-    {
+        out ActualMethodIdentity identity) {
         identity = null!;
         if (string.IsNullOrWhiteSpace(assemblyPath) || !File.Exists(assemblyPath)) return false;
 
@@ -54,8 +50,7 @@ internal static class SummaryMethodIdentityMap
             assemblyPath,
             path => Load(path, includeMethodAttributes));
         foreach (var key in methodKeys)
-            if (methodMap.TryGetValue(key, out var foundIdentity))
-            {
+            if (methodMap.TryGetValue(key, out var foundIdentity)) {
                 identity = foundIdentity;
                 return true;
             }
@@ -65,13 +60,11 @@ internal static class SummaryMethodIdentityMap
 
 }
 
-internal static class SummaryAssemblyReferenceResolver
-{
+internal static class SummaryAssemblyReferenceResolver {
     internal static string? FindContainingAssemblyReferencePath(
         IMethodSymbol methodSymbol,
         Compilation compilation,
-        bool requireMetadataLocation)
-    {
+        bool requireMetadataLocation) {
         if (requireMetadataLocation &&
             methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
             return null;
@@ -81,10 +74,8 @@ internal static class SummaryAssemblyReferenceResolver
 
     internal static string? FindAssemblyReferencePath(
         IAssemblySymbol containingAssembly,
-        Compilation compilation)
-    {
-        foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
-        {
+        Compilation compilation) {
+        foreach (var reference in compilation.References.OfType<PortableExecutableReference>()) {
             var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
             if (assemblySymbol == null ||
                 !SymbolEq.AreEqual(assemblySymbol, containingAssembly))
@@ -99,14 +90,12 @@ internal static class SummaryAssemblyReferenceResolver
     }
 }
 
-internal static class RuntimeImplementationAssemblyResolver
-{
+internal static class RuntimeImplementationAssemblyResolver {
     internal static string? Resolve(
         IEnumerable<string> methodKeys,
         IAssemblySymbol? containingAssembly,
         ConcurrentDictionary<string, string> pathByAssemblyName,
-        Func<ImmutableArray<string>, string, bool> containsMethodIdentity)
-    {
+        Func<ImmutableArray<string>, string, bool> containsMethodIdentity) {
         var keys = methodKeys.ToImmutableArray();
         if (keys.IsDefaultOrEmpty) return null;
 
@@ -124,42 +113,36 @@ internal static class RuntimeImplementationAssemblyResolver
             return cachedAssemblyPath;
 
         if (!string.IsNullOrWhiteSpace(assemblyName))
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
                 if (!string.Equals(assembly.GetName().Name, assemblyName, StringComparison.Ordinal)) continue;
 
                 if (!TryGetAssemblyLocation(assembly, out var location)) continue;
                 if (!string.IsNullOrWhiteSpace(location) &&
                     File.Exists(location) &&
-                    containsMethodIdentity(keys, location))
-                {
+                    containsMethodIdentity(keys, location)) {
                     pathByAssemblyName[assemblyName!] = location;
                     return location;
                 }
             }
 
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
             if (!TryGetAssemblyLocation(assembly, out var location)) continue;
             if (string.IsNullOrWhiteSpace(location) ||
                 !File.Exists(location) ||
                 string.Equals(location, coreLibPath, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            if (containsMethodIdentity(keys, location))
-            {
+            if (containsMethodIdentity(keys, location)) {
                 if (!string.IsNullOrWhiteSpace(assemblyName)) pathByAssemblyName[assemblyName!] = location;
 
                 return location;
             }
         }
 
-        foreach (var trustedPlatformAssemblyPath in RuntimeMetadataAssemblyLocator.GetTrustedPlatformAssemblyPaths())
-        {
+        foreach (var trustedPlatformAssemblyPath in RuntimeMetadataAssemblyLocator.GetTrustedPlatformAssemblyPaths()) {
             if (string.Equals(trustedPlatformAssemblyPath, coreLibPath, StringComparison.OrdinalIgnoreCase)) continue;
 
-            if (containsMethodIdentity(keys, trustedPlatformAssemblyPath))
-            {
+            if (containsMethodIdentity(keys, trustedPlatformAssemblyPath)) {
                 if (!string.IsNullOrWhiteSpace(assemblyName))
                     pathByAssemblyName[assemblyName!] = trustedPlatformAssemblyPath;
 
@@ -170,25 +153,21 @@ internal static class RuntimeImplementationAssemblyResolver
         return null;
     }
 
-    private static bool TryGetAssemblyLocation(System.Reflection.Assembly assembly, out string location)
-    {
+    private static bool TryGetAssemblyLocation(System.Reflection.Assembly assembly, out string location) {
         location = string.Empty;
         if (assembly.IsDynamic) return false;
 
-        try
-        {
+        try {
             location = assembly.Location;
             return !string.IsNullOrWhiteSpace(location);
         }
-        catch (NotSupportedException)
-        {
+        catch (NotSupportedException) {
             return false;
         }
     }
 }
 
-internal sealed class EffectSummaryIdentityResolver
-{
+internal sealed class EffectSummaryIdentityResolver {
     private readonly ConcurrentDictionary<string, ActualAssemblyIdentity?> _assemblyIdentityCache =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -210,8 +189,7 @@ internal sealed class EffectSummaryIdentityResolver
     internal EffectSummaryIdentityResolver(
         bool includeMethodAttributes,
         bool requireMetadataLocation,
-        Func<IMethodSymbol, string> methodCacheKeyFactory)
-    {
+        Func<IMethodSymbol, string> methodCacheKeyFactory) {
         _includeMethodAttributes = includeMethodAttributes;
         _requireMetadataLocation = requireMetadataLocation;
         _methodCacheKeyFactory = methodCacheKeyFactory;
@@ -219,8 +197,7 @@ internal sealed class EffectSummaryIdentityResolver
 
     internal ActualMethodIdentity? TryResolveActualMethodIdentity(
         IMethodSymbol methodSymbol,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         if (TryResolveValidatedRuntimeImplementation(methodSymbol) is { } implementation)
             return implementation.MethodIdentity;
 
@@ -236,8 +213,7 @@ internal sealed class EffectSummaryIdentityResolver
 
     internal ActualAssemblyIdentity? TryResolveActualAssemblyIdentity(
         IMethodSymbol methodSymbol,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         if (TryResolveValidatedRuntimeImplementation(methodSymbol) is { } implementation)
             return GetAssemblyIdentity(implementation.AssemblyPath);
 
@@ -249,8 +225,7 @@ internal sealed class EffectSummaryIdentityResolver
     }
 
     private (string AssemblyPath, ActualMethodIdentity MethodIdentity)? TryResolveValidatedRuntimeImplementation(
-        IMethodSymbol methodSymbol)
-    {
+        IMethodSymbol methodSymbol) {
         var assemblyPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
         return !string.IsNullOrWhiteSpace(assemblyPath) &&
                File.Exists(assemblyPath) &&
@@ -259,8 +234,7 @@ internal sealed class EffectSummaryIdentityResolver
             : null;
     }
 
-    internal ActualAssemblyIdentity? GetAssemblyIdentity(string assemblyPath)
-    {
+    internal ActualAssemblyIdentity? GetAssemblyIdentity(string assemblyPath) {
         return _assemblyIdentityCache.GetOrAdd(assemblyPath,
             static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
     }
@@ -268,8 +242,7 @@ internal sealed class EffectSummaryIdentityResolver
     internal bool TryResolveMethodIdentityFromPath(
         IMethodSymbol methodSymbol,
         string assemblyPath,
-        out ActualMethodIdentity identity)
-    {
+        out ActualMethodIdentity identity) {
         return TryResolveMethodIdentityFromPath(
             RoslynStructuralMethodIdentity.GetCanonicalKeys(methodSymbol),
             assemblyPath, out identity);
@@ -278,8 +251,7 @@ internal sealed class EffectSummaryIdentityResolver
     internal bool TryResolveMethodIdentityFromPath(
         IEnumerable<string> methodKeys,
         string assemblyPath,
-        out ActualMethodIdentity identity)
-    {
+        out ActualMethodIdentity identity) {
         return SummaryMethodIdentityMap.TryResolve(
             _methodIdentityCache,
             methodKeys,
@@ -288,8 +260,7 @@ internal sealed class EffectSummaryIdentityResolver
             out identity);
     }
 
-    internal string? TryResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol)
-    {
+    internal string? TryResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol) {
         var cacheKey = _methodCacheKeyFactory(methodSymbol.OriginalDefinition);
         return _runtimeImplementationAssemblyPathCache.GetOrAdd(
             cacheKey,
@@ -301,8 +272,7 @@ internal sealed class EffectSummaryIdentityResolver
     internal string? TryResolveRuntimeImplementationAssemblyPath(
         IAssemblySymbol? containingAssembly,
         ImmutableArray<string> methodKeys,
-        string cacheKey)
-    {
+        string cacheKey) {
         return _runtimeImplementationAssemblyPathCache.GetOrAdd(
             cacheKey,
             _ => ResolveRuntimeImplementationAssemblyPath(methodKeys, containingAssembly));
@@ -310,8 +280,7 @@ internal sealed class EffectSummaryIdentityResolver
 
     private string? ResolveRuntimeImplementationAssemblyPath(
         IEnumerable<string> methodKeys,
-        IAssemblySymbol? containingAssembly)
-    {
+        IAssemblySymbol? containingAssembly) {
         return RuntimeImplementationAssemblyResolver.Resolve(
             methodKeys,
             containingAssembly,
@@ -323,16 +292,14 @@ internal sealed class EffectSummaryIdentityResolver
 internal sealed record SummaryAssemblyIdentity(
     string? AssemblyName,
     string? AssemblySha256,
-    string? ModuleVersionId)
-{
+    string? ModuleVersionId) {
     public bool IsComplete =>
         !string.IsNullOrWhiteSpace(AssemblyName) &&
         !string.IsNullOrWhiteSpace(AssemblySha256) &&
         !string.IsNullOrWhiteSpace(ModuleVersionId);
 
 
-    public EffectSummaryCompatibility GetCompatibility(ActualAssemblyIdentity? actualAssemblyIdentity)
-    {
+    public EffectSummaryCompatibility GetCompatibility(ActualAssemblyIdentity? actualAssemblyIdentity) {
         if (!IsComplete)
             return EffectSummaryCompatibility.Incompatible(
                 "effect_summary_incomplete_assembly_identity",
@@ -370,8 +337,7 @@ internal sealed record SummaryAssemblyIdentity(
     public static SummaryAssemblyIdentity? FromContract(
         string? assemblyName,
         string? assemblySha256,
-        string? moduleVersionId)
-    {
+        string? moduleVersionId) {
         if (string.IsNullOrWhiteSpace(assemblyName) &&
             string.IsNullOrWhiteSpace(assemblySha256) &&
             string.IsNullOrWhiteSpace(moduleVersionId))
@@ -384,10 +350,8 @@ internal sealed record SummaryAssemblyIdentity(
     }
 }
 
-internal sealed record SummaryMethodIdentity(string? MetadataToken, string? MethodBodySha256)
-{
-    public bool MatchesMetadataToken(ActualMethodIdentity? actualMethodIdentity)
-    {
+internal sealed record SummaryMethodIdentity(string? MetadataToken, string? MethodBodySha256) {
+    public bool MatchesMetadataToken(ActualMethodIdentity? actualMethodIdentity) {
         return actualMethodIdentity != null &&
                !string.IsNullOrWhiteSpace(MetadataToken) &&
                string.Equals(MetadataToken, actualMethodIdentity.MetadataToken, StringComparison.OrdinalIgnoreCase);
@@ -395,8 +359,7 @@ internal sealed record SummaryMethodIdentity(string? MetadataToken, string? Meth
 
 
 
-    public EffectSummaryCompatibility GetCompatibility(ActualMethodIdentity? actualMethodIdentity)
-    {
+    public EffectSummaryCompatibility GetCompatibility(ActualMethodIdentity? actualMethodIdentity) {
         if (string.IsNullOrWhiteSpace(MetadataToken))
             return EffectSummaryCompatibility.Incompatible(
                 "effect_summary_incomplete_method_identity",
@@ -430,24 +393,21 @@ internal sealed record SummaryMethodIdentity(string? MetadataToken, string? Meth
         return EffectSummaryCompatibility.Compatible;
     }
 
-    public static SummaryMethodIdentity? FromContract(string? metadataToken, string? methodBodySha256)
-    {
+    public static SummaryMethodIdentity? FromContract(string? metadataToken, string? methodBodySha256) {
         if (string.IsNullOrWhiteSpace(metadataToken) && string.IsNullOrWhiteSpace(methodBodySha256)) return null;
 
         return new SummaryMethodIdentity(metadataToken?.Trim(), methodBodySha256?.Trim());
     }
 }
 
-internal sealed class ActualMethodIdentity
-{
+internal sealed class ActualMethodIdentity {
     private readonly MethodBodyHashProvider? _methodBodyHashProvider;
     private readonly object _methodBodySha256Lock = new();
     private readonly int _relativeVirtualAddress;
     private string? _methodBodySha256;
     private volatile bool _methodBodySha256Computed;
 
-    public ActualMethodIdentity(string metadataToken, string? methodBodySha256, MethodAttributes attributes = 0)
-    {
+    public ActualMethodIdentity(string metadataToken, string? methodBodySha256, MethodAttributes attributes = 0) {
         MetadataToken = metadataToken;
         _methodBodySha256 = methodBodySha256;
         _methodBodySha256Computed = true;
@@ -456,8 +416,7 @@ internal sealed class ActualMethodIdentity
     }
 
     public ActualMethodIdentity(string metadataToken, MethodBodyHashProvider methodBodyHashProvider,
-        int relativeVirtualAddress, MethodAttributes attributes = 0)
-    {
+        int relativeVirtualAddress, MethodAttributes attributes = 0) {
         MetadataToken = metadataToken;
         _methodBodyHashProvider = methodBodyHashProvider;
         _relativeVirtualAddress = relativeVirtualAddress;
@@ -470,16 +429,12 @@ internal sealed class ActualMethodIdentity
 
     public bool HasMethodBody { get; }
 
-    public string? MethodBodySha256
-    {
-        get
-        {
+    public string? MethodBodySha256 {
+        get {
             if (_methodBodySha256Computed) return _methodBodySha256;
 
-            lock (_methodBodySha256Lock)
-            {
-                if (!_methodBodySha256Computed)
-                {
+            lock (_methodBodySha256Lock) {
+                if (!_methodBodySha256Computed) {
                     _methodBodySha256 = _methodBodyHashProvider?.ComputeMethodBodySha256(_relativeVirtualAddress);
                     _methodBodySha256Computed = true;
                 }
@@ -497,19 +452,16 @@ internal sealed class ActualMethodIdentity
         !Attributes.HasFlag(MethodAttributes.Static);
 }
 
-internal sealed class MethodBodyHashProvider(string assemblyPath)
-{
+internal sealed class MethodBodyHashProvider(string assemblyPath) {
     private readonly string _assemblyPath = assemblyPath;
     private readonly Dictionary<int, string?> _cache = new();
     private readonly object _lock = new();
     private byte[]? _assemblyBytes;
 
-    public string? ComputeMethodBodySha256(int relativeVirtualAddress)
-    {
+    public string? ComputeMethodBodySha256(int relativeVirtualAddress) {
         if (relativeVirtualAddress == 0) return null;
 
-        lock (_lock)
-        {
+        lock (_lock) {
             if (_cache.TryGetValue(relativeVirtualAddress, out var cached)) return cached;
 
             var hash = ComputeMethodBodySha256Core(relativeVirtualAddress);
@@ -518,18 +470,15 @@ internal sealed class MethodBodyHashProvider(string assemblyPath)
         }
     }
 
-    private string? ComputeMethodBodySha256Core(int relativeVirtualAddress)
-    {
+    private string? ComputeMethodBodySha256Core(int relativeVirtualAddress) {
         if (string.IsNullOrWhiteSpace(_assemblyPath) ||
             !File.Exists(_assemblyPath))
             return null;
 
-        try
-        {
+        try {
             _assemblyBytes ??= File.ReadAllBytes(_assemblyPath);
             using (var stream = new MemoryStream(_assemblyBytes, false))
-            using (var peReader = new PEReader(stream))
-            {
+            using (var peReader = new PEReader(stream)) {
                 if (!peReader.HasMetadata) return null;
 
                 var body = peReader.GetMethodBody(relativeVirtualAddress);
@@ -540,12 +489,10 @@ internal sealed class MethodBodyHashProvider(string assemblyPath)
                 return LowerHexEncoding.Encode(sha256.ComputeHash(il));
             }
         }
-        catch (IOException)
-        {
+        catch (IOException) {
             return null;
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return null;
         }
     }
@@ -555,10 +502,8 @@ internal sealed record ActualAssemblyIdentity(
     string AssemblyName,
     string AssemblySha256,
     string ModuleVersionId,
-    string? AssemblyPath = null)
-{
-    public static ActualAssemblyIdentity? FromFile(string path)
-    {
+    string? AssemblyPath = null) {
+    public static ActualAssemblyIdentity? FromFile(string path) {
         using var stream = File.OpenRead(path);
         using var peReader = new PEReader(stream);
         if (!peReader.HasMetadata) return null;
@@ -573,27 +518,23 @@ internal sealed record ActualAssemblyIdentity(
         return new ActualAssemblyIdentity(assemblyName, assemblySha256, moduleVersionId, Path.GetFullPath(path));
     }
 
-    private static string ComputeSha256(string path)
-    {
+    private static string ComputeSha256(string path) {
         using var stream = File.OpenRead(path);
         using var sha256 = SHA256.Create();
         return LowerHexEncoding.Encode(sha256.ComputeHash(stream));
     }
 }
 
-internal static class RuntimeMetadataAssemblyLocator
-{
+internal static class RuntimeMetadataAssemblyLocator {
     private static readonly Lazy<ImmutableArray<string>> TrustedPlatformAssemblyPaths =
         new(CreateTrustedPlatformAssemblyPaths, LazyThreadSafetyMode.ExecutionAndPublication);
 
     public static IEnumerable<string> GetTrustedPlatformAssemblyPaths() =>
         TrustedPlatformAssemblyPaths.Value;
 
-    private static ImmutableArray<string> CreateTrustedPlatformAssemblyPaths()
-    {
+    private static ImmutableArray<string> CreateTrustedPlatformAssemblyPaths() {
         var trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
-        if (!string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-        {
+        if (!string.IsNullOrWhiteSpace(trustedPlatformAssemblies)) {
             var trustedPlatformAssembliesValue = trustedPlatformAssemblies!;
             return trustedPlatformAssembliesValue
                 .Split(Path.PathSeparator)

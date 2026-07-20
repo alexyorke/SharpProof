@@ -1,12 +1,10 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicSourceLocation
-{
+internal static class SymbolicSourceLocation {
     public static TextSpan GetLineSpan(
         SyntaxTree syntaxTree,
         int line,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return GetTextLine(syntaxTree, line, cancellationToken).Span;
     }
 
@@ -14,8 +12,7 @@ internal static class SymbolicSourceLocation
         SyntaxTree syntaxTree,
         int spanStart,
         int spanEnd,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var text = syntaxTree.GetText(cancellationToken);
         if (spanStart < 0)
             throw new ArgumentOutOfRangeException(nameof(spanStart), "--span-start must be zero or greater.");
@@ -33,8 +30,7 @@ internal static class SymbolicSourceLocation
         SyntaxTree syntaxTree,
         int line,
         int column,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (line < 1) throw new ArgumentOutOfRangeException(nameof(line), "--line must be 1 or greater.");
 
         if (column < 1) throw new ArgumentOutOfRangeException(nameof(column), "--column must be 1 or greater.");
@@ -50,8 +46,7 @@ internal static class SymbolicSourceLocation
     private static TextLine GetTextLine(
         SyntaxTree syntaxTree,
         int line,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (line < 1) throw new ArgumentOutOfRangeException(nameof(line), "--line must be 1 or greater.");
 
         var text = syntaxTree.GetText(cancellationToken);
@@ -65,8 +60,7 @@ internal static class SymbolicSourceLocation
         SyntaxTree syntaxTree,
         int position,
         CancellationToken cancellationToken,
-        bool validatePosition = false)
-    {
+        bool validatePosition = false) {
         var text = syntaxTree.GetText(cancellationToken);
         if (validatePosition && (position < 0 || position > text.Length))
             throw new ArgumentOutOfRangeException(nameof(position), "--position must be within the source text span.");
@@ -78,8 +72,7 @@ internal static class SymbolicSourceLocation
     public static NodeSourceSpan GetNodeSourceSpan(
         SyntaxTree syntaxTree,
         TextSpan span,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var text = syntaxTree.GetText(cancellationToken);
         var startLine = text.Lines.GetLineFromPosition(span.Start);
         var endLine = text.Lines.GetLineFromPosition(span.End);

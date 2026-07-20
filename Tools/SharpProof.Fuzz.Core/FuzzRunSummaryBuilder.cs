@@ -122,8 +122,7 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
     }
 
     private static ImmutableSortedDictionary<string, int> CreateRegistryExpectationCounts() {
-        var buckets = new[]
-        {
+        var buckets = new[] {
             FuzzExpectation.ConservativeBucket,
             FuzzExpectation.DefinitelyImpureBucket,
             FuzzExpectation.DefinitelyPureBucket

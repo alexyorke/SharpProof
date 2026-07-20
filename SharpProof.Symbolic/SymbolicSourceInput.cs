@@ -9,12 +9,10 @@ internal sealed record SymbolicSourceInput(
     SyntaxNode? Node = null,
     SemanticModel? SemanticModel = null,
     SymbolicSourceCompilationProfile? CompilationProfile = null,
-    SymbolicSourceMap? SourceMap = null)
-{
+    SymbolicSourceMap? SourceMap = null) {
     internal const string DefaultFilePath = "SharpProof.Symbolic.Query.cs";
 
-    public static SymbolicSourceInput FromFile(string filePath)
-    {
+    public static SymbolicSourceInput FromFile(string filePath) {
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("File path is required.", nameof(filePath));
 
@@ -23,8 +21,7 @@ internal sealed record SymbolicSourceInput(
 
     public static SymbolicSourceInput FromFile(
         string filePath,
-        SymbolicSourceCompilationProfile compilationProfile)
-    {
+        SymbolicSourceCompilationProfile compilationProfile) {
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("File path is required.", nameof(filePath));
 
@@ -35,8 +32,7 @@ internal sealed record SymbolicSourceInput(
                                 throw new ArgumentNullException(nameof(compilationProfile)));
     }
 
-    public static SymbolicSourceInput FromText(string sourceText, string? filePath = null)
-    {
+    public static SymbolicSourceInput FromText(string sourceText, string? filePath = null) {
         if (sourceText == null) throw new ArgumentNullException(nameof(sourceText));
 
         return FromTextWithProfile(sourceText, SymbolicSourceCompilationProfile.Default, filePath);
@@ -45,8 +41,7 @@ internal sealed record SymbolicSourceInput(
     public static SymbolicSourceInput FromTextWithProfile(
         string sourceText,
         SymbolicSourceCompilationProfile compilationProfile,
-        string? filePath = null)
-    {
+        string? filePath = null) {
         if (sourceText == null) throw new ArgumentNullException(nameof(sourceText));
 
         return new SymbolicSourceInput(
@@ -57,8 +52,7 @@ internal sealed record SymbolicSourceInput(
                                 throw new ArgumentNullException(nameof(compilationProfile)));
     }
 
-    public static SymbolicSourceInput FromSyntaxTree(SyntaxTree syntaxTree, Compilation compilation)
-    {
+    public static SymbolicSourceInput FromSyntaxTree(SyntaxTree syntaxTree, Compilation compilation) {
         return new SymbolicSourceInput(
             SymbolicSourceInputKind.SyntaxTree,
             syntaxTree?.FilePath,
@@ -66,8 +60,7 @@ internal sealed record SymbolicSourceInput(
             Compilation: compilation ?? throw new ArgumentNullException(nameof(compilation)));
     }
 
-    public static SymbolicSourceInput FromNode(SyntaxNode node, SemanticModel semanticModel)
-    {
+    public static SymbolicSourceInput FromNode(SyntaxNode node, SemanticModel semanticModel) {
         return new SymbolicSourceInput(
             SymbolicSourceInputKind.Node,
             node?.SyntaxTree.FilePath,
@@ -79,8 +72,7 @@ internal sealed record SymbolicSourceInput(
         this with { SourceMap = sourceMap ?? throw new ArgumentNullException(nameof(sourceMap)) };
 }
 
-internal enum SymbolicSourceInputKind
-{
+internal enum SymbolicSourceInputKind {
     File,
     Text,
     SyntaxTree,

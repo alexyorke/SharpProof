@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static class EffectSummaryEntryTrustEvaluator
-{
+internal static class EffectSummaryEntryTrustEvaluator {
     internal static bool IsTrusted(
         SummaryAssemblyIdentity? assemblyIdentity,
         EffectSummaryArtifactSource? artifactSource,
@@ -11,8 +10,7 @@ internal static class EffectSummaryEntryTrustEvaluator
         bool allowBuiltInMetadataTokenFallback,
         EffectSummaryCompatibilityReporter? compatibilityReporter,
         string? sourcePath,
-        string displaySymbol)
-    {
+        string displaySymbol) {
         var assemblyCompatibility = assemblyIdentity?.GetCompatibility(actualAssemblyIdentity) ??
                                     EffectSummaryCompatibility.Incompatible(
                                         "effect_summary_incomplete_assembly_identity",
@@ -42,8 +40,7 @@ internal static class EffectSummaryEntryTrustEvaluator
         EffectSummaryCompatibility compatibility,
         EffectSummaryCompatibilityReporter? compatibilityReporter,
         string? sourcePath,
-        string displaySymbol)
-    {
+        string displaySymbol) {
         compatibilityReporter?.Report(sourcePath ?? string.Empty, displaySymbol, compatibility);
         return false;
     }

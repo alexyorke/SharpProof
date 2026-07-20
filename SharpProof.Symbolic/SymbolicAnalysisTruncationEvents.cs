@@ -1,14 +1,12 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicAnalysisTruncationEventOrdering
-{
+internal static class SymbolicAnalysisTruncationEventOrdering {
     internal static IComparer<SymbolicAnalysisTruncationEvent> Canonical { get; } =
         Comparer<SymbolicAnalysisTruncationEvent>.Create(Compare);
 
     private static int Compare(
         SymbolicAnalysisTruncationEvent? left,
-        SymbolicAnalysisTruncationEvent? right)
-    {
+        SymbolicAnalysisTruncationEvent? right) {
         if (ReferenceEquals(left, right)) return 0;
         if (left == null) return -1;
         if (right == null) return 1;
@@ -31,8 +29,7 @@ internal static class SymbolicAnalysisTruncationEventOrdering
     }
 }
 
-internal sealed class SymbolicAnalysisTruncationEventAccumulator
-{
+internal sealed class SymbolicAnalysisTruncationEventAccumulator {
     private readonly Dictionary<
         (SymbolicAnalysisLimitKind Kind, int? SourceSpanStart, string Provenance),
         SymbolicAnalysisTruncationEvent> _events = new();
@@ -41,8 +38,7 @@ internal sealed class SymbolicAnalysisTruncationEventAccumulator
 
     internal IEnumerable<SymbolicAnalysisTruncationEvent> Events => _events.Values;
 
-    internal void Add(SymbolicAnalysisTruncationEvent item)
-    {
+    internal void Add(SymbolicAnalysisTruncationEvent item) {
         if (item == null) throw new ArgumentNullException(nameof(item));
 
         var key = (item.Kind, item.SourceSpanStart, item.Provenance);
@@ -50,8 +46,7 @@ internal sealed class SymbolicAnalysisTruncationEventAccumulator
             _events[key] = item;
     }
 
-    internal SymbolicAnalysisTruncationInfo ToInfo()
-    {
+    internal SymbolicAnalysisTruncationInfo ToInfo() {
         return Count == 0
             ? SymbolicAnalysisTruncationInfo.None
             : new SymbolicAnalysisTruncationInfo(

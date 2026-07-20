@@ -1,12 +1,9 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicProgramPointClassifier
-{
-    public static string? GetContainingMethodName(SyntaxNode node)
-    {
+internal static class SymbolicProgramPointClassifier {
+    public static string? GetContainingMethodName(SyntaxNode node) {
         foreach (var ancestor in node.AncestorsAndSelf())
-            switch (ancestor)
-            {
+            switch (ancestor) {
                 case MethodDeclarationSyntax method:
                     return method.Identifier.ValueText;
                 case LocalFunctionStatementSyntax localFunction:
@@ -24,10 +21,8 @@ internal static class SymbolicProgramPointClassifier
         return null;
     }
 
-    public static string GetProgramPointKind(SyntaxNode node)
-    {
-        return node switch
-        {
+    public static string GetProgramPointKind(SyntaxNode node) {
+        return node switch {
             StatementSyntax => SymbolicProgramPointKinds.Statement,
             ExpressionSyntax => SymbolicProgramPointKinds.Expression,
             _ => SymbolicProgramPointKinds.Other

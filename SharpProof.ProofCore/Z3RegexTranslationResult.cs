@@ -4,8 +4,7 @@ internal readonly record struct Z3RegexTranslationResult(
     bool Success,
     ReExpr? Regex,
     bool IsExact,
-    RegexTranslationFallback Fallback)
-{
+    RegexTranslationFallback Fallback) {
     internal static Z3RegexTranslationResult Succeeded(ReExpr regex, bool isExact) =>
         new(true, regex, isExact, RegexTranslationFallback.None);
 

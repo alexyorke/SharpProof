@@ -5,8 +5,7 @@ namespace SharpProof.Schema;
 
 public sealed record BaselineDocument(
     [property: JsonPropertyName("diagnostics")]
-    ImmutableArray<BaselineEntry> Diagnostics)
-{
+    ImmutableArray<BaselineEntry> Diagnostics) {
     [JsonPropertyName("version")] public int Version { get; init; } = 1;
 
     [JsonPropertyName("evidenceSchemaVersion")]
@@ -26,18 +25,14 @@ public sealed record BaselineEntry(
     [property: JsonPropertyName("evidenceSchemaVersion")]
     int EvidenceSchemaVersion = SharpProofEvidenceSchema.CurrentVersion);
 
-internal static class BaselineSchemaContract
-{
-    internal static JsonDocumentOptions DocumentOptions { get; } = new()
-    {
+internal static class BaselineSchemaContract {
+    internal static JsonDocumentOptions DocumentOptions { get; } = new() {
         AllowTrailingCommas = true,
         CommentHandling = JsonCommentHandling.Skip
     };
 
-    internal static bool TryValidateTree(JsonElement root, out BaselineSchemaValidationFailure failure)
-    {
-        if (!TryValidate(root, "evidenceSchemaVersion", true, out failure))
-        {
+    internal static bool TryValidateTree(JsonElement root, out BaselineSchemaValidationFailure failure) {
+        if (!TryValidate(root, "evidenceSchemaVersion", true, out failure)) {
             failure = failure with { IsRoot = true };
             return false;
         }
@@ -64,11 +59,9 @@ internal static class BaselineSchemaContract
         string versionPropertyName,
         bool required,
         out BaselineSchemaValidationFailure failure,
-        bool allowStringVersion = false)
-    {
+        bool allowStringVersion = false) {
         var hasVersion = TryGetPropertyIgnoreCase(element, versionPropertyName, out var versionElement);
-        if (!hasVersion)
-        {
+        if (!hasVersion) {
             failure = required
                 ? new BaselineSchemaValidationFailure(BaselineSchemaValidationFailureKind.Missing)
                 : default;
@@ -79,14 +72,12 @@ internal static class BaselineSchemaContract
         if (!(versionElement.ValueKind == JsonValueKind.Number && versionElement.TryGetInt32(out version) ||
               allowStringVersion &&
               versionElement.ValueKind == JsonValueKind.String &&
-              int.TryParse(versionElement.GetString(), out version)))
-        {
+              int.TryParse(versionElement.GetString(), out version))) {
             failure = new BaselineSchemaValidationFailure(BaselineSchemaValidationFailureKind.NonNumericVersion);
             return false;
         }
 
-        if (version != SharpProofEvidenceSchema.CurrentVersion)
-        {
+        if (version != SharpProofEvidenceSchema.CurrentVersion) {
             failure = new BaselineSchemaValidationFailure(
                 BaselineSchemaValidationFailureKind.UnsupportedVersion,
                 version);
@@ -109,8 +100,7 @@ internal static class BaselineSchemaContract
         ReadString(element, "operationKind"),
         ReadString(element, "evidenceKey"));
 
-    internal static (int CandidateCount, int ValidCount, int InvalidCount) CountEntries(JsonElement root)
-    {
+    internal static (int CandidateCount, int ValidCount, int InvalidCount) CountEntries(JsonElement root) {
         var candidateCount = 0;
         var validCount = 0;
         var invalidCount = 0;
@@ -118,10 +108,8 @@ internal static class BaselineSchemaContract
             diagnostics.ValueKind != JsonValueKind.Array)
             return default;
 
-        foreach (var candidate in diagnostics.EnumerateArray())
-        {
-            if (candidate.ValueKind != JsonValueKind.Object)
-            {
+        foreach (var candidate in diagnostics.EnumerateArray()) {
+            if (candidate.ValueKind != JsonValueKind.Object) {
                 invalidCount++;
                 continue;
             }
@@ -137,14 +125,12 @@ internal static class BaselineSchemaContract
         return (candidateCount, validCount, invalidCount);
     }
 
-    internal static ImmutableArray<BaselineEntry> Deduplicate(IEnumerable<BaselineEntry> entries)
-    {
+    internal static ImmutableArray<BaselineEntry> Deduplicate(IEnumerable<BaselineEntry> entries) {
         var seen = new HashSet<BaselineEntryKey>();
         var result = ImmutableArray.CreateBuilder<BaselineEntry>();
         foreach (var entry in entries.OrderBy(static entry => entry.Path, StringComparer.OrdinalIgnoreCase)
                      .ThenBy(static entry => entry.Id, StringComparer.Ordinal)
-                     .ThenBy(static entry => entry.Symbol, StringComparer.Ordinal))
-        {
+                     .ThenBy(static entry => entry.Symbol, StringComparer.Ordinal)) {
             var normalized = entry with { Path = NormalizePath(entry.Path ?? string.Empty) };
             if (seen.Add(BaselineEntryKey.Create(normalized))) result.Add(normalized);
         }
@@ -180,8 +166,7 @@ internal static class BaselineSchemaContract
     internal static string FormatValidationIssue(
         BaselineSchemaValidationFailure failure,
         string versionPropertyName,
-        string surfaceName) => failure.Kind switch
-    {
+        string surfaceName) => failure.Kind switch {
         BaselineSchemaValidationFailureKind.Missing =>
             surfaceName + " is missing required " + versionPropertyName,
         BaselineSchemaValidationFailureKind.NonNumericVersion =>
@@ -198,8 +183,7 @@ internal static class BaselineSchemaContract
         string versionPropertyName,
         string surfaceName,
         bool required,
-        bool allowStringVersion = false)
-    {
+        bool allowStringVersion = false) {
         if (element.ValueKind != JsonValueKind.Object)
             throw new NotSupportedException(surfaceName + " must be a JSON object.");
         if (TryValidate(
@@ -210,16 +194,14 @@ internal static class BaselineSchemaContract
                 allowStringVersion))
             return;
 
-        throw failure.Kind switch
-        {
+        throw failure.Kind switch {
             BaselineSchemaValidationFailureKind.Missing =>
                 new NotSupportedException(surfaceName + " must declare the current evidence schema."),
             _ => new NotSupportedException(surfaceName + " has an invalid " + versionPropertyName + ".")
         };
     }
 
-    internal static void ValidateTreeOrThrow(JsonElement root)
-    {
+    internal static void ValidateTreeOrThrow(JsonElement root) {
         if (root.ValueKind != JsonValueKind.Object)
             throw new NotSupportedException("baseline must be a JSON object.");
         if (TryValidateTree(root, out var failure)) return;
@@ -227,18 +209,15 @@ internal static class BaselineSchemaContract
         ValidateFailureOrThrow(failure, failure.IsRoot ? "baseline" : "baseline diagnostic");
     }
 
-    private static void ValidateFailureOrThrow(BaselineSchemaValidationFailure failure, string surface)
-    {
-        throw failure.Kind switch
-        {
+    private static void ValidateFailureOrThrow(BaselineSchemaValidationFailure failure, string surface) {
+        throw failure.Kind switch {
             BaselineSchemaValidationFailureKind.Missing =>
                 new NotSupportedException(surface + " must declare the current evidence schema."),
             _ => new NotSupportedException(surface + " has an invalid evidenceSchemaVersion.")
         };
     }
 
-    internal static string NormalizePath(string path)
-    {
+    internal static string NormalizePath(string path) {
         if (path == null) throw new ArgumentNullException(nameof(path));
 
         var trimmed = path.Trim();
@@ -252,28 +231,23 @@ internal static class BaselineSchemaContract
 
         var prefix = string.Empty;
         var segmentStart = 0;
-        if (normalized.StartsWith("//", StringComparison.Ordinal))
-        {
+        if (normalized.StartsWith("//", StringComparison.Ordinal)) {
             prefix = "//";
             segmentStart = 2;
         }
-        else if (normalized.StartsWith("/", StringComparison.Ordinal))
-        {
+        else if (normalized.StartsWith("/", StringComparison.Ordinal)) {
             prefix = "/";
             segmentStart = 1;
         }
-        else if (normalized.Length >= 3 && normalized[1] == ':' && normalized[2] == '/')
-        {
+        else if (normalized.Length >= 3 && normalized[1] == ':' && normalized[2] == '/') {
             prefix = normalized.Substring(0, 3);
             segmentStart = 3;
         }
 
         var segments = new List<string>();
-        foreach (var segment in normalized.Substring(segmentStart).Split('/'))
-        {
+        foreach (var segment in normalized.Substring(segmentStart).Split('/')) {
             if (segment.Length == 0 || segment == ".") continue;
-            if (segment == "..")
-            {
+            if (segment == "..") {
                 if (segments.Count > 0 && segments[segments.Count - 1] != "..")
                     segments.RemoveAt(segments.Count - 1);
                 else if (prefix.Length == 0)
@@ -293,11 +267,9 @@ internal static class BaselineSchemaContract
     private static bool TryGetPropertyIgnoreCase(
         JsonElement element,
         string propertyName,
-        out JsonElement value)
-    {
+        out JsonElement value) {
         foreach (var property in element.EnumerateObject())
-            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
-            {
+            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase)) {
                 value = property.Value;
                 return true;
             }
@@ -326,8 +298,7 @@ internal static class BaselineSchemaContract
         int? Column,
         string? Contract,
         string? OperationKind,
-        string? EvidenceKey)
-    {
+        string? EvidenceKey) {
         internal static BaselineEntryKey Create(BaselineEntry entry) => new(
             entry.Id,
             entry.Symbol,
@@ -353,8 +324,7 @@ internal readonly record struct BaselineEntryFields(
     int? Column,
     string? Contract,
     string? OperationKind,
-    string? EvidenceKey)
-{
+    string? EvidenceKey) {
     internal bool IsValid => Id != null && Symbol != null && Path != null;
 
     internal BaselineEntry ToEntry() => new(
@@ -366,8 +336,7 @@ internal readonly record struct BaselineSchemaValidationFailure(
     int Version = 0,
     bool IsRoot = false);
 
-internal enum BaselineSchemaValidationFailureKind
-{
+internal enum BaselineSchemaValidationFailureKind {
     None,
     Missing,
     NonNumericVersion,

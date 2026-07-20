@@ -2,8 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Symbolic;
 
-internal enum SymbolicQueryScopeKind
-{
+internal enum SymbolicQueryScopeKind {
     Point,
     Line,
     Span,

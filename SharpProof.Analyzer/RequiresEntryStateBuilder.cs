@@ -1,13 +1,11 @@
 namespace SharpProof.Analyzer;
 
-internal static class RequiresEntryStateBuilder
-{
+internal static class RequiresEntryStateBuilder {
     internal static SymbolicState CreateForUse(
         SyntaxNode useNode,
         SemanticModel semanticModel,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var methodNode = useNode.AncestorsAndSelf().FirstOrDefault(IsMethodLikeDeclaration);
         if (methodNode == null ||
             semanticModel.GetDeclaredSymbol(methodNode, cancellationToken) is not IMethodSymbol methodSymbol)
@@ -21,8 +19,7 @@ internal static class RequiresEntryStateBuilder
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var state = new SymbolicState();
         var contracts = RequiresContractHelpers.ValidContracts(
             methodSymbol,
@@ -31,8 +28,7 @@ internal static class RequiresEntryStateBuilder
         if (contracts.IsDefaultOrEmpty) return state;
 
         var position = RequiresContractHelpers.GetMethodEntrySpeculativePosition(methodNode);
-        foreach (var contract in contracts)
-        {
+        foreach (var contract in contracts) {
             cancellationToken.ThrowIfCancellationRequested();
             if (!RequiresContractHelpers.TryCreateCondition(
                     semanticModel,
@@ -56,8 +52,7 @@ internal static class RequiresEntryStateBuilder
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (!TryGetAnalysisContext(
                 methodNode,
                 semanticModel,
@@ -69,8 +64,7 @@ internal static class RequiresEntryStateBuilder
             return null;
 
         var conditions = new List<SymbolicCondition>();
-        foreach (var contract in contracts)
-        {
+        foreach (var contract in contracts) {
             cancellationToken.ThrowIfCancellationRequested();
             if (!ContractConditionHelpers.TryParse(
                     contract.Condition,
@@ -109,10 +103,8 @@ internal static class RequiresEntryStateBuilder
         CancellationToken cancellationToken,
         out IMethodSymbol methodSymbol,
         out ImmutableArray<RequiresContract> contracts,
-        out int speculativePosition)
-    {
-        if (semanticModel.GetDeclaredSymbol(methodNode, cancellationToken) is not IMethodSymbol declaredMethod)
-        {
+        out int speculativePosition) {
+        if (semanticModel.GetDeclaredSymbol(methodNode, cancellationToken) is not IMethodSymbol declaredMethod) {
             methodSymbol = null!;
             contracts = ImmutableArray<RequiresContract>.Empty;
             speculativePosition = default;
@@ -134,14 +126,12 @@ internal static class RequiresEntryStateBuilder
         IMethodSymbol methodSymbol,
         SyntaxNode methodNode,
         SemanticModel methodSemanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (conditionExpression.DescendantNodesAndSelf().Any(static node =>
                 node is InvocationExpressionSyntax or ElementAccessExpressionSyntax))
             return false;
 
-        foreach (var memberAccess in conditionExpression.DescendantNodesAndSelf().OfType<MemberAccessExpressionSyntax>())
-        {
+        foreach (var memberAccess in conditionExpression.DescendantNodesAndSelf().OfType<MemberAccessExpressionSyntax>()) {
             var member = conditionSemanticModel.GetSymbolInfo(memberAccess, cancellationToken).Symbol;
             if (!IsStableConditionMember(member, memberAccess, conditionSemanticModel, cancellationToken))
                 return false;
@@ -167,8 +157,7 @@ internal static class RequiresEntryStateBuilder
         ISymbol? member,
         MemberAccessExpressionSyntax memberAccess,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (member is not IPropertySymbol property) return false;
 
         var receiverType = semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).Type;
@@ -180,8 +169,7 @@ internal static class RequiresEntryStateBuilder
                receiverType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
     }
 
-    private static bool IsMethodLikeDeclaration(SyntaxNode node)
-    {
+    private static bool IsMethodLikeDeclaration(SyntaxNode node) {
         return node is MethodDeclarationSyntax or
             AccessorDeclarationSyntax or
             ConstructorDeclarationSyntax or

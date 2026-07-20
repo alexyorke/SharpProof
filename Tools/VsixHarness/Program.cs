@@ -64,8 +64,7 @@ internal sealed class SimpleAnalyzerAssemblyLoader : AssemblyLoadContext, IAnaly
 }
 
 internal static class Program {
-    private static readonly ImmutableHashSet<string> RequiredVsixEntries = new[]
-    {
+    private static readonly ImmutableHashSet<string> RequiredVsixEntries = new[] {
         "[Content_Types].xml",
         "catalog.json",
         "extension.vsixmanifest",

@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal enum EffectSummaryJsonFailureKind
-{
+internal enum EffectSummaryJsonFailureKind {
     None,
     MalformedJson,
     NonObjectRoot,
@@ -13,19 +12,15 @@ internal readonly record struct EffectSummaryJsonFailure(
     EffectSummaryJsonFailureKind Kind,
     int? SchemaVersion = null);
 
-internal static class EffectSummaryJsonParser
-{
+internal static class EffectSummaryJsonParser {
     internal static bool TryParse(
         string json,
         out JsonDocument document,
-        out EffectSummaryJsonFailure failure)
-    {
-        try
-        {
+        out EffectSummaryJsonFailure failure) {
+        try {
             document = JsonDocument.Parse(json);
         }
-        catch (JsonException)
-        {
+        catch (JsonException) {
             document = null!;
             failure = new EffectSummaryJsonFailure(EffectSummaryJsonFailureKind.MalformedJson);
             return false;
@@ -55,8 +50,7 @@ internal static class EffectSummaryJsonParser
         EffectSummaryJsonFailureKind kind,
         ref JsonDocument document,
         out EffectSummaryJsonFailure failure,
-        int? schemaVersion = null)
-    {
+        int? schemaVersion = null) {
         document.Dispose();
         document = null!;
         failure = new EffectSummaryJsonFailure(kind, schemaVersion);

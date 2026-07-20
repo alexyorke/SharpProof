@@ -1,14 +1,12 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolCurrentValueResolver
-{
+internal static class SymbolCurrentValueResolver {
     internal static bool TryResolveCurrentSimpleValueExpression(
         ExpressionSyntax expression,
         SyntaxNode useNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ExpressionSyntax valueExpression)
-    {
+        out ExpressionSyntax valueExpression) {
         valueExpression = null!;
         if (!SymbolMutationFacts.TryGetLocalOrParameterSymbol(
                 expression,
@@ -30,20 +28,17 @@ internal static class SymbolCurrentValueResolver
         SyntaxNode useNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ExpressionSyntax valueExpression)
-    {
+        out ExpressionSyntax valueExpression) {
         valueExpression = null!;
         if (IsMutatedAfterUseInContainingLoop(symbol, useNode, semanticModel, cancellationToken))
             return false;
 
         ExpressionSyntax? currentValue = null;
         foreach (var (block, containingStatement) in CSharpSyntaxFacts.EnumerateContainingBlocks(useNode).Reverse())
-            foreach (var statement in block.Statements)
-            {
+            foreach (var statement in block.Statements) {
                 if (ReferenceEquals(statement, containingStatement)) break;
 
-                if (statement is LocalDeclarationStatementSyntax localDeclaration)
-                {
+                if (statement is LocalDeclarationStatementSyntax localDeclaration) {
                     foreach (var declarator in localDeclaration.Declaration.Variables)
                         if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol &&
                             SymbolEqualityComparer.Default.Equals(localSymbol.OriginalDefinition, symbol))
@@ -59,23 +54,20 @@ internal static class SymbolCurrentValueResolver
                     continue;
                 }
 
-                if (statement is ExpressionStatementSyntax
-                    {
+                if (statement is ExpressionStatementSyntax {
                         Expression: AssignmentExpressionSyntax assignment
                     } &&
                     SymbolMutationFacts.ExpressionMatchesSymbol(
                         assignment.Left,
                         symbol,
                         semanticModel,
-                        cancellationToken))
-                {
+                        cancellationToken)) {
                     if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
                         SymbolMutationFacts.ExpressionReferencesSymbol(
                             assignment.Right,
                             symbol,
                             semanticModel,
-                            cancellationToken))
-                    {
+                            cancellationToken)) {
                         currentValue = null;
                         continue;
                     }
@@ -102,8 +94,7 @@ internal static class SymbolCurrentValueResolver
         ISymbol symbol,
         SyntaxNode useNode,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var loopBody = CSharpSyntaxFacts.GetContainingLoopBody(useNode);
         if (loopBody == null) return false;
 

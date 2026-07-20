@@ -135,8 +135,7 @@ internal static class AwaitPurityRule {
 
         if (awaiterType is not INamedTypeSymbol namedAwaiterType) yield break;
 
-        foreach (var interfaceName in new[]
-                 {
+        foreach (var interfaceName in new[] {
                      "System.Runtime.CompilerServices.INotifyCompletion",
                      "System.Runtime.CompilerServices.ICriticalNotifyCompletion"
                  }) {

@@ -780,19 +780,25 @@ Tests are excluded from the metric and must not be deleted.
   same-line opening braces. The policy is scoped away from tests and enforced
   by warning-as-error builds plus an architecture assertion; the transformation
   changes no diagnostics, proof outcomes, serialized bytes, or package content.
+- [x] Finished same-line opening-brace normalization across the remaining 213
+  maintained production C# files. This removed 3,222 physical lines without
+  changing a statement or test. The byte-sensitive Fuzz and VSIX source
+  templates remain deliberately Allman-formatted inside their string literals;
+  focused hash fixtures and the complete Tooling lane verify their exact bytes.
 
 ## Current evidence
 
-- Phase-two maintained production: 84,648 lines (80,686 C#, 3,228 scripts,
-  and 734 maintained specification lines). The 214-line temporary increase is
-  baseline/enforcement scaffolding and remains below the 84,934 migration
-  ceiling; 20,214 lines remain to the 64,434 completion ceiling.
+- Phase-two maintained production: 81,433 lines (77,471 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,001-line reduction from the
+  84,434-line phase-two baseline. Another 16,999 lines remain to the 64,434
+  completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.
 - Release solution build: zero warnings and errors.
-- Phase-two baseline six-lane run: 6,190 passing and zero skipped, run
-  sequentially with one NUnit worker: Oracle 573, Analyzer 487, Flow 257,
-  Core 257, MainGeneral 4,002, and Tooling 614.
+- Latest six-lane run: 6,191 passing and zero reported skipped, run sequentially
+  with one NUnit worker: Oracle 573, Analyzer 487, Flow 257, Core 257,
+  MainGeneral 4,002, and Tooling 615. The warning-as-error Release solution
+  build also completes with zero warnings and errors.
 
 ## Milestones
 

@@ -2,15 +2,13 @@ using static SharpProof.Symbolic.SymbolicStateFactBuilder;
 
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicStatementStateTransfer
-{
+internal static class SymbolicStatementStateTransfer {
     internal static void InvalidateStateForTryRegionEntry(
         ref SymbolicState state,
         SyntaxNode site,
         StatementSyntax containingStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (containingStatement is not TryStatementSyntax tryStatement ||
             tryStatement.Block.Span.Contains(site.SpanStart))
             return;
@@ -34,15 +32,13 @@ internal static class SymbolicStatementStateTransfer
         ref SymbolicState state,
         BlockSyntax block,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         RemoveStateFactsInvalidatedByForLoopEntry(ref state, block, semanticModel, cancellationToken);
 
         ExpressionSyntax? condition = null;
         var branchWhenTrue = true;
         StatementSyntax? loopStatement = null;
-        switch (block.Parent)
-        {
+        switch (block.Parent) {
             case IfStatementSyntax ifStatement when ReferenceEquals(ifStatement.Statement, block):
                 condition = ifStatement.Condition;
                 break;
@@ -67,8 +63,7 @@ internal static class SymbolicStatementStateTransfer
                 condition,
                 branchWhenTrue,
                 semanticModel,
-                cancellationToken))
-        {
+                cancellationToken)) {
             if (loopStatement != null)
                 SymbolicLoopStateTransfer.ApplyLoopBodyInvariantStateFacts(
                     ref state,
@@ -107,8 +102,7 @@ internal static class SymbolicStatementStateTransfer
         ref SymbolicState state,
         BlockSyntax block,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (block.Parent is not ForStatementSyntax forStatement ||
             !ReferenceEquals(forStatement.Statement, block))
             return;
@@ -125,8 +119,7 @@ internal static class SymbolicStatementStateTransfer
         CatchClauseSyntax catchClause,
         int useSpanStart,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (catchClause.Declaration != null &&
             semanticModel.GetDeclaredSymbol(catchClause.Declaration, cancellationToken) is ILocalSymbol localSymbol &&
             !SymbolicLoopStateTransfer.IsSymbolAssignedBetween(
@@ -158,8 +151,7 @@ internal static class SymbolicStatementStateTransfer
         ExpressionSyntax expression,
         StatementSyntax statement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         state = SymbolicSourceCompletionLowerer.ApplyThrowGuard(
             state,
             expression,
@@ -173,12 +165,10 @@ internal static class SymbolicStatementStateTransfer
         ref SymbolicState state,
         UsingStatementSyntax usingStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (usingStatement.Declaration == null) return;
 
-        foreach (var declarator in usingStatement.Declaration.Variables)
-        {
+        foreach (var declarator in usingStatement.Declaration.Variables) {
             if (declarator.Initializer == null ||
                 semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol localSymbol)
                 continue;
@@ -199,12 +189,10 @@ internal static class SymbolicStatementStateTransfer
         ExpressionSyntax initializer,
         StatementSyntax usingBody,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var throwGuardedValue = SymbolicAssignmentStateTransfer.GetThrowGuardedValue(initializer);
         var effectiveInitializer = throwGuardedValue.EffectiveValueExpression;
-        if (throwGuardedValue.HasGuard)
-        {
+        if (throwGuardedValue.HasGuard) {
             state = SymbolicSourceCompletionLowerer.ApplyThrowGuard(
                 state,
                 initializer,
@@ -235,14 +223,11 @@ internal static class SymbolicStatementStateTransfer
         ref SymbolicState state,
         SyntaxNode site,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (semanticModel.GetEnclosingSymbol(site.SpanStart, cancellationToken) is IMethodSymbol
-            {
+        CancellationToken cancellationToken) {
+        if (semanticModel.GetEnclosingSymbol(site.SpanStart, cancellationToken) is IMethodSymbol {
                 IsStatic: false,
                 ContainingType.IsReferenceType: true
-            } method)
-        {
+            } method) {
             var thisFact = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.NotEqual,
@@ -257,8 +242,7 @@ internal static class SymbolicStatementStateTransfer
         foreach (var parameter in GetDefinitelyNotNullEntryParameters(
                      site,
                      semanticModel,
-                     cancellationToken))
-        {
+                     cancellationToken)) {
             if (!TryCreateSymbolTerm(parameter, out var parameterTerm) ||
                 parameterTerm.Kind != SmtValueKind.Reference)
                 continue;
@@ -278,8 +262,7 @@ internal static class SymbolicStatementStateTransfer
     private static IEnumerable<IParameterSymbol> GetDefinitelyNotNullEntryParameters(
         SyntaxNode site,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (semanticModel.GetEnclosingSymbol(site.SpanStart, cancellationToken) is not IMethodSymbol method)
             yield break;
 
@@ -293,12 +276,10 @@ internal static class SymbolicStatementStateTransfer
         ref SymbolicState state,
         ExpressionSyntax condition,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         foreach (var assignment in condition
                      .DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
-                     .OfType<AssignmentExpressionSyntax>())
-        {
+                     .OfType<AssignmentExpressionSyntax>()) {
             if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)) continue;
 
             var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
@@ -311,20 +292,17 @@ internal static class SymbolicStatementStateTransfer
         ref SymbolicState state,
         StatementSyntax statement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (statement is LocalDeclarationStatementSyntax or ExpressionStatementSyntax &&
             SymbolicCfgProgramPointStateCollector.TryApplyPriorStatementCompletion(
                 ref state,
                 statement,
                 semanticModel,
-                cancellationToken))
-        {
+                cancellationToken)) {
             return;
         }
 
-        if (statement is BlockSyntax completedBlock)
-        {
+        if (statement is BlockSyntax completedBlock) {
             state = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
                 completedBlock,
                 state,
@@ -340,8 +318,7 @@ internal static class SymbolicStatementStateTransfer
                 statement,
                 state,
                 semanticModel,
-                cancellationToken) is { IsExact: true, Value: { } completedControlFlowState })
-        {
+                cancellationToken) is { IsExact: true, Value: { } completedControlFlowState }) {
             state = completedControlFlowState;
             return;
         }
@@ -351,8 +328,7 @@ internal static class SymbolicStatementStateTransfer
             statement,
             semanticModel,
             cancellationToken);
-        if (statement is UsingStatementSyntax completedUsingStatement)
-        {
+        if (statement is UsingStatementSyntax completedUsingStatement) {
             if (completedUsingStatement.Expression != null)
                 state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
                     state,

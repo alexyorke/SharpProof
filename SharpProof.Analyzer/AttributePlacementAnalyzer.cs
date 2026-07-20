@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static class AttributePlacementAnalyzer
-{
+internal static class AttributePlacementAnalyzer {
     private static readonly ImmutableArray<AttributePlacementRule> PlacementRules =
         ImmutableArray.Create(
             new AttributePlacementRule(
@@ -48,8 +47,7 @@ internal static class AttributePlacementAnalyzer
     internal static void AnalyzeNonMethodDeclaration(
         SyntaxNodeAnalysisContext context,
         DiagnosticBaseline baseline,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
         if (context.Node is not AttributeListSyntax attributeList) return;
 
         ReportUnrecognizedAttributeIdentities(context, baseline, attributePolicy, attributeList);
@@ -58,8 +56,7 @@ internal static class AttributePlacementAnalyzer
         var isAllowedPurityTarget = IsAllowedPurityTarget(attributeTarget);
         var isAllowedGetterAliasTarget = isAllowedPurityTarget ||
                                          AttributeTargetSyntaxFacts.IsGetterAliasTarget(attributeTarget);
-        foreach (var rule in PlacementRules)
-        {
+        foreach (var rule in PlacementRules) {
             var isAllowedTarget = rule.TargetPolicy == AttributeTargetPolicy.PurityOnly
                 ? isAllowedPurityTarget
                 : isAllowedGetterAliasTarget;
@@ -77,12 +74,10 @@ internal static class AttributePlacementAnalyzer
         AttributeListSyntax attributeList,
         SyntaxNode? attributeTarget,
         bool isAllowedTarget,
-        AttributePlacementRule rule)
-    {
+        AttributePlacementRule rule) {
         if (isAllowedTarget) return;
 
-        foreach (var attribute in attributeList.Attributes)
-        {
+        foreach (var attribute in attributeList.Attributes) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var attributeClass = GetAttributeClass(attribute, context.SemanticModel, context.CancellationToken);
             if (!attributePolicy.IsAccepted(attributeClass, rule.AttributeTypeName)) continue;
@@ -101,10 +96,8 @@ internal static class AttributePlacementAnalyzer
         SyntaxNodeAnalysisContext context,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        AttributeListSyntax attributeList)
-    {
-        foreach (var attribute in attributeList.Attributes)
-        {
+        AttributeListSyntax attributeList) {
+        foreach (var attribute in attributeList.Attributes) {
             var attributeClass = GetAttributeClass(attribute, context.SemanticModel, context.CancellationToken);
             if (attributeClass == null ||
                 !attributePolicy.IsUnrecognizedSharpProofLikeAttribute(attributeClass))
@@ -125,8 +118,7 @@ internal static class AttributePlacementAnalyzer
         Location location,
         string attributeName,
         SyntaxNode? attributeTarget,
-        SyntaxNodeAnalysisContext context)
-    {
+        SyntaxNodeAnalysisContext context) {
         var operationKind = "MisplacedAttribute";
         var evidenceKey = descriptor.Id + ":" + attributeName + ":" + attributeTarget?.Kind();
         var properties = ImmutableDictionary<string, string?>.Empty;
@@ -166,8 +158,7 @@ internal static class AttributePlacementAnalyzer
         INamedTypeSymbol attributeClass,
         Location location,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        SyntaxNodeAnalysisContext context)
-    {
+        SyntaxNodeAnalysisContext context) {
         var attributeName = attributeClass.Name;
         var displayName = SharpProofAttributeIdentityPolicy.GetDisplayName(attributeClass);
         var namespaceName = SharpProofAttributeIdentityPolicy.GetNamespaceName(attributeClass);
@@ -196,8 +187,7 @@ internal static class AttributePlacementAnalyzer
             location,
             null,
             properties,
-            new object[]
-            {
+            new object[] {
                 attributeName,
                 displayName
             });
@@ -206,8 +196,7 @@ internal static class AttributePlacementAnalyzer
     private static INamedTypeSymbol? GetAttributeClass(
         AttributeSyntax attribute,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var symbolInfo = semanticModel.GetSymbolInfo(attribute, cancellationToken);
         if (symbolInfo.Symbol is IMethodSymbol attributeConstructorSymbol)
             return attributeConstructorSymbol.ContainingType;
@@ -217,8 +206,7 @@ internal static class AttributePlacementAnalyzer
         return semanticModel.GetTypeInfo(attribute, cancellationToken).Type as INamedTypeSymbol;
     }
 
-    private static bool IsAllowedPurityTarget(SyntaxNode? node)
-    {
+    private static bool IsAllowedPurityTarget(SyntaxNode? node) {
         return node is MethodDeclarationSyntax ||
                node is AccessorDeclarationSyntax ||
                node is ConstructorDeclarationSyntax ||
@@ -227,8 +215,7 @@ internal static class AttributePlacementAnalyzer
                node is LocalFunctionStatementSyntax;
     }
 
-    private enum AttributeTargetPolicy
-    {
+    private enum AttributeTargetPolicy {
         PurityOnly,
         PurityOrGetterAlias
     }

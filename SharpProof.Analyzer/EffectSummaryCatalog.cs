@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal sealed class EffectSummaryCatalog
-{
+internal sealed class EffectSummaryCatalog {
     private const int BuiltInSourcePriority = 0;
     private const int AdditionalSourcePriority = 1;
 
@@ -27,8 +26,7 @@ internal sealed class EffectSummaryCatalog
 
     private readonly ImmutableDictionary<string, ImmutableArray<SummaryEntry>> _entriesBySymbol;
 
-    private EffectSummaryCatalog(ImmutableDictionary<string, ImmutableArray<SummaryEntry>> entriesBySymbol)
-    {
+    private EffectSummaryCatalog(ImmutableDictionary<string, ImmutableArray<SummaryEntry>> entriesBySymbol) {
         _entriesBySymbol = entriesBySymbol;
     }
 
@@ -38,8 +36,7 @@ internal sealed class EffectSummaryCatalog
 
     public static EffectSummaryCatalog FromOptions(
         AnalyzerOptions options,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return FromOptionsWithCompatibilityReporter(
             options,
             cancellationToken,
@@ -50,8 +47,7 @@ internal sealed class EffectSummaryCatalog
         AnalyzerOptions options,
         CancellationToken cancellationToken,
         EffectSummaryCompatibilityReporter compatibilityReporter,
-        bool includeCatalog = true)
-    {
+        bool includeCatalog = true) {
         var builtInCatalog = includeCatalog ? BuiltInCatalog.Value : Empty;
         if (!BuiltInEffectSummaryLoader.HasAdditionalSummaryJsonDocuments(options)) return builtInCatalog;
 
@@ -64,8 +60,7 @@ internal sealed class EffectSummaryCatalog
         return includeCatalog ? CreateCatalog(entries) : Empty;
     }
 
-    private static EffectSummaryCatalog CreateBuiltInCatalog()
-    {
+    private static EffectSummaryCatalog CreateBuiltInCatalog() {
         var entries = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
         BuiltInEffectSummaryLoader.LoadBuiltInSummaryJsonDocuments(
             json => AddJson(entries, json, BuiltInSourcePriority, null, null));
@@ -76,8 +71,7 @@ internal sealed class EffectSummaryCatalog
         new Scope(CurrentCatalog.Value, catalog.IsEmpty ? null : catalog);
 
     private static Dictionary<string, ImmutableArray<SummaryEntry>.Builder> CloneEntries(
-        ImmutableDictionary<string, ImmutableArray<SummaryEntry>> source)
-    {
+        ImmutableDictionary<string, ImmutableArray<SummaryEntry>> source) {
         var clone = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
         foreach (var item in source)
             clone.Add(item.Key, item.Value.ToBuilder());
@@ -85,8 +79,7 @@ internal sealed class EffectSummaryCatalog
     }
 
     private static EffectSummaryCatalog CreateCatalog(
-        Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol)
-    {
+        Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol) {
         if (entriesBySymbol.Count == 0) return Empty;
 
         return new EffectSummaryCatalog(entriesBySymbol.ToImmutableDictionary(
@@ -95,8 +88,7 @@ internal sealed class EffectSummaryCatalog
             StringComparer.Ordinal));
     }
 
-    public bool TryGetPurity(IMethodSymbol methodSymbol, Compilation compilation, out PurityEntry classification)
-    {
+    public bool TryGetPurity(IMethodSymbol methodSymbol, Compilation compilation, out PurityEntry classification) {
         classification = default;
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true) return false;
 
@@ -119,8 +111,7 @@ internal sealed class EffectSummaryCatalog
 
     internal ImmutableArray<TrustedPurityEntry> GetTrustedPurityEntries(
         IMethodSymbol methodSymbol,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
             return ImmutableArray<TrustedPurityEntry>.Empty;
 
@@ -156,8 +147,7 @@ internal sealed class EffectSummaryCatalog
         if (bestEntry == null) return ImmutableArray<TrustedPurityEntry>.Empty;
 
         var uniqueEntries = new Dictionary<string, TrustedPurityEntry>(StringComparer.Ordinal);
-        foreach (var entry in trustedEntries)
-        {
+        foreach (var entry in trustedEntries) {
             var source = entry.SourcePriority == AdditionalSourcePriority
                 ? "additional_generated_summary"
                 : "built_in_generated_summary";
@@ -166,8 +156,7 @@ internal sealed class EffectSummaryCatalog
                 : entry.DisplayName;
             var key = source + "\u001f" + value + "\u001f" + entry.Classification.Classification;
             var isSelected = ReferenceEquals(entry, bestEntry);
-            if (uniqueEntries.TryGetValue(key, out var existing))
-            {
+            if (uniqueEntries.TryGetValue(key, out var existing)) {
                 if (isSelected && !existing.IsSelected)
                     uniqueEntries[key] = new TrustedPurityEntry(
                         source,
@@ -175,8 +164,7 @@ internal sealed class EffectSummaryCatalog
                         entry.Classification,
                         true);
             }
-            else
-            {
+            else {
                 uniqueEntries.Add(key, new TrustedPurityEntry(
                     source,
                     value,
@@ -192,8 +180,7 @@ internal sealed class EffectSummaryCatalog
             .ToImmutableArray();
     }
 
-    private bool TryGetBuiltInFrameworkEntryByKeyOnly(IMethodSymbol methodSymbol, out PurityEntry classification)
-    {
+    private bool TryGetBuiltInFrameworkEntryByKeyOnly(IMethodSymbol methodSymbol, out PurityEntry classification) {
         classification = default;
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true ||
             !IsFrameworkAssemblyName(methodSymbol.ContainingAssembly?.Identity.Name))
@@ -212,16 +199,14 @@ internal sealed class EffectSummaryCatalog
         return true;
     }
 
-    private static bool IsBuiltInAbstractInterfaceEntry(IMethodSymbol methodSymbol, SummaryEntry entry)
-    {
+    private static bool IsBuiltInAbstractInterfaceEntry(IMethodSymbol methodSymbol, SummaryEntry entry) {
         return entry.SourcePriority == BuiltInSourcePriority &&
                methodSymbol.ContainingType?.TypeKind == TypeKind.Interface &&
                (string.Equals(entry.Classification.PrimaryCategory, "abstract", StringComparison.Ordinal) ||
                 entry.Classification.Categories.Contains("abstract", StringComparer.Ordinal));
     }
 
-    internal static bool IsFrameworkAssemblyName(string? assemblyName)
-    {
+    internal static bool IsFrameworkAssemblyName(string? assemblyName) {
         if (string.IsNullOrWhiteSpace(assemblyName)) return false;
 
         var name = assemblyName!;
@@ -234,8 +219,7 @@ internal sealed class EffectSummaryCatalog
     }
 
     private static bool TryGetImplicitMetadataValueTypeConstructorPurity(IMethodSymbol methodSymbol,
-        out PurityEntry classification)
-    {
+        out PurityEntry classification) {
         classification = default;
         if (methodSymbol.MethodKind != MethodKind.Constructor ||
             !methodSymbol.IsImplicitlyDeclared ||
@@ -255,8 +239,7 @@ internal sealed class EffectSummaryCatalog
         return true;
     }
 
-    public bool TryGetFieldPurity(IFieldSymbol fieldSymbol, Compilation compilation, out PurityEntry classification)
-    {
+    public bool TryGetFieldPurity(IFieldSymbol fieldSymbol, Compilation compilation, out PurityEntry classification) {
         classification = default;
         if (fieldSymbol.Locations.FirstOrDefault()?.IsInMetadata != true || !fieldSymbol.IsStatic) return false;
 
@@ -264,8 +247,7 @@ internal sealed class EffectSummaryCatalog
             .GetMembers(".cctor")
             .OfType<IMethodSymbol>()
             .FirstOrDefault();
-        if (staticConstructor == null)
-        {
+        if (staticConstructor == null) {
             var staticConstructorKeys = GetStaticConstructorKeys(fieldSymbol.ContainingType);
             return TryGetTrustedPurityByMethodKeys(fieldSymbol.ContainingAssembly, staticConstructorKeys, compilation,
                 out classification);
@@ -277,8 +259,7 @@ internal sealed class EffectSummaryCatalog
     internal bool TryGetSystemTypeRuntimeImplementationPurity(
         IMethodSymbol methodSymbol,
         Compilation compilation,
-        out PurityEntry classification)
-    {
+        out PurityEntry classification) {
         classification = default;
         if (methodSymbol == null ||
             methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true ||
@@ -297,10 +278,8 @@ internal sealed class EffectSummaryCatalog
     public bool TryGetExceptionInfos(
         IMethodSymbol methodSymbol,
         Compilation? compilation,
-        out ImmutableArray<SummaryExceptionInfo> exceptionInfos)
-    {
-        if (IsEmpty)
-        {
+        out ImmutableArray<SummaryExceptionInfo> exceptionInfos) {
+        if (IsEmpty) {
             exceptionInfos = ImmutableArray<SummaryExceptionInfo>.Empty;
             return false;
         }
@@ -317,16 +296,13 @@ internal sealed class EffectSummaryCatalog
             : ExceptionIdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
 
         foreach (var entry in EnumerateEntries(
-                     RoslynStructuralMethodIdentity.GetCanonicalKeys(methodSymbol)))
-        {
+                     RoslynStructuralMethodIdentity.GetCanonicalKeys(methodSymbol))) {
             if (entry.ExceptionInfos.IsDefaultOrEmpty ||
                 !entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity))
                 continue;
 
-            foreach (var exceptionInfo in entry.ExceptionInfos)
-            {
-                if (!matchedSources.TryGetValue(exceptionInfo.ExceptionType, out var sources))
-                {
+            foreach (var exceptionInfo in entry.ExceptionInfos) {
+                if (!matchedSources.TryGetValue(exceptionInfo.ExceptionType, out var sources)) {
                     sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
                     matchedSources.Add(exceptionInfo.ExceptionType, sources);
                 }
@@ -334,8 +310,7 @@ internal sealed class EffectSummaryCatalog
                 sources.UnionWith(exceptionInfo.Sources);
                 if (exceptionInfo.Edges.IsDefaultOrEmpty) continue;
 
-                if (!matchedEdges.TryGetValue(exceptionInfo.ExceptionType, out var edgeMap))
-                {
+                if (!matchedEdges.TryGetValue(exceptionInfo.ExceptionType, out var edgeMap)) {
                     edgeMap = new Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>(
                         SummaryExceptionEdgeInfoComparer.Instance);
                     matchedEdges.Add(exceptionInfo.ExceptionType, edgeMap);
@@ -345,8 +320,7 @@ internal sealed class EffectSummaryCatalog
             }
         }
 
-        if (matchedSources.Count == 0)
-        {
+        if (matchedSources.Count == 0) {
             exceptionInfos = ImmutableArray<SummaryExceptionInfo>.Empty;
             return false;
         }
@@ -363,8 +337,7 @@ internal sealed class EffectSummaryCatalog
         return true;
     }
 
-    private static int CompareTrustedPurityEntries(SummaryEntry left, SummaryEntry right)
-    {
+    private static int CompareTrustedPurityEntries(SummaryEntry left, SummaryEntry right) {
         var sourcePriorityComparison = left.SourcePriority.CompareTo(right.SourcePriority);
         if (sourcePriorityComparison != 0) return sourcePriorityComparison;
 
@@ -381,10 +354,8 @@ internal sealed class EffectSummaryCatalog
         return string.CompareOrdinal(left.DisplayName, right.DisplayName);
     }
 
-    private static int GetClassificationPriority(PurityEntry classification)
-    {
-        return classification.Classification switch
-        {
+    private static int GetClassificationPriority(PurityEntry classification) {
+        return classification.Classification switch {
             "impure" => 3,
             "pure" => 2,
             "conservative_unknown" => 1,
@@ -395,11 +366,9 @@ internal sealed class EffectSummaryCatalog
     private SummaryEntry? SelectBestEntry(
         IEnumerable<string> keys,
         Func<SummaryEntry, bool> isEligible,
-        ICollection<SummaryEntry>? eligibleEntries = null)
-    {
+        ICollection<SummaryEntry>? eligibleEntries = null) {
         SummaryEntry? bestEntry = null;
-        foreach (var entry in EnumerateEntries(keys))
-        {
+        foreach (var entry in EnumerateEntries(keys)) {
             if (!entry.HasPurity || !isEligible(entry)) continue;
 
             eligibleEntries?.Add(entry);
@@ -410,8 +379,7 @@ internal sealed class EffectSummaryCatalog
         return bestEntry;
     }
 
-    private IEnumerable<SummaryEntry> EnumerateEntries(IEnumerable<string> keys)
-    {
+    private IEnumerable<SummaryEntry> EnumerateEntries(IEnumerable<string> keys) {
         foreach (var key in keys)
             if (_entriesBySymbol.TryGetValue(key, out var entries))
                 foreach (var entry in entries)
@@ -419,8 +387,7 @@ internal sealed class EffectSummaryCatalog
     }
 
     internal static bool TryCanMetadataMethodBeOverridden(IMethodSymbol methodSymbol, Compilation compilation,
-        out bool canBeOverridden)
-    {
+        out bool canBeOverridden) {
         canBeOverridden = false;
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true) return false;
 
@@ -436,26 +403,21 @@ internal sealed class EffectSummaryCatalog
         string json,
         int sourcePriority,
         string? sourcePath,
-        EffectSummaryCompatibilityReporter? compatibilityReporter)
-    {
-        if (!EffectSummaryJsonParser.TryParse(json, out var document, out var parseFailure))
-        {
+        EffectSummaryCompatibilityReporter? compatibilityReporter) {
+        if (!EffectSummaryJsonParser.TryParse(json, out var document, out var parseFailure)) {
             if (sourcePath != null && compatibilityReporter != null)
                 compatibilityReporter.Report(sourcePath, FormatParseFailure(parseFailure));
             return;
         }
 
-        using (document)
-        {
+        using (document) {
             var root = document.RootElement;
             if (sourcePath != null && compatibilityReporter != null &&
                 !ValidateAdditionalDocument(root, sourcePath, compatibilityReporter))
                 return;
 
-            foreach (var entry in ParseEntries(root, sourcePriority, sourcePath, compatibilityReporter))
-            {
-                if (!entriesBySymbol.TryGetValue(entry.Symbol, out var entries))
-                {
+            foreach (var entry in ParseEntries(root, sourcePriority, sourcePath, compatibilityReporter)) {
+                if (!entriesBySymbol.TryGetValue(entry.Symbol, out var entries)) {
                     entries = ImmutableArray.CreateBuilder<SummaryEntry>();
                     entriesBySymbol.Add(entry.Symbol, entries);
                 }
@@ -465,8 +427,7 @@ internal sealed class EffectSummaryCatalog
         }
     }
 
-    private static string FormatParseFailure(EffectSummaryJsonFailure failure) => failure.Kind switch
-    {
+    private static string FormatParseFailure(EffectSummaryJsonFailure failure) => failure.Kind switch {
         EffectSummaryJsonFailureKind.MalformedJson => "malformed effect-summary JSON",
         EffectSummaryJsonFailureKind.NonObjectRoot => "unsupported effect-summary root; expected an object",
         EffectSummaryJsonFailureKind.MissingSchemaVersion => "effect-summary is missing a numeric SchemaVersion",
@@ -479,10 +440,8 @@ internal sealed class EffectSummaryCatalog
     private static bool ValidateAdditionalDocument(
         JsonElement root,
         string sourcePath,
-        EffectSummaryCompatibilityReporter reporter)
-    {
-        if (!BaselineSchemaContract.TryValidate(root, "EvidenceSchemaVersion", true, out var failure))
-        {
+        EffectSummaryCompatibilityReporter reporter) {
+        if (!BaselineSchemaContract.TryValidate(root, "EvidenceSchemaVersion", true, out var failure)) {
             reporter.Report(sourcePath, BaselineSchemaContract.FormatValidationIssue(
                 failure, "EvidenceSchemaVersion", "effect-summary"));
             return false;
@@ -493,8 +452,7 @@ internal sealed class EffectSummaryCatalog
             return ValidateGeneratedPurityCatalog(catalog, sourcePath, reporter);
 
         if (!root.TryGetProperty("Assemblies", out var assemblies) ||
-            assemblies.ValueKind != JsonValueKind.Array)
-        {
+            assemblies.ValueKind != JsonValueKind.Array) {
             reporter.Report(sourcePath,
                 "unsupported effect-summary layout; expected Assemblies or GeneratedPurityCatalog");
             return false;
@@ -503,12 +461,10 @@ internal sealed class EffectSummaryCatalog
         var validMethods = 0;
         var invalidAssemblies = 0;
         var invalidMethods = 0;
-        foreach (var assembly in assemblies.EnumerateArray())
-        {
+        foreach (var assembly in assemblies.EnumerateArray()) {
             if (assembly.ValueKind != JsonValueKind.Object ||
                 !assembly.TryGetProperty("Methods", out var methods) ||
-                methods.ValueKind != JsonValueKind.Array)
-            {
+                methods.ValueKind != JsonValueKind.Array) {
                 invalidAssemblies++;
                 continue;
             }
@@ -527,20 +483,17 @@ internal sealed class EffectSummaryCatalog
     private static bool ValidateGeneratedPurityCatalog(
         JsonElement catalog,
         string sourcePath,
-        EffectSummaryCompatibilityReporter reporter)
-    {
+        EffectSummaryCompatibilityReporter reporter) {
         if (!catalog.TryGetProperty("SchemaVersion", out var schemaVersion) ||
             schemaVersion.ValueKind != JsonValueKind.Number ||
             !schemaVersion.TryGetInt32(out var version) ||
-            version != EffectSummarySchemaContract.CurrentVersion)
-        {
+            version != EffectSummarySchemaContract.CurrentVersion) {
             reporter.Report(sourcePath, "GeneratedPurityCatalog SchemaVersion must be " +
                                         EffectSummarySchemaContract.CurrentVersion);
             return false;
         }
 
-        if (!catalog.TryGetProperty("Entries", out var entries) || entries.ValueKind != JsonValueKind.Array)
-        {
+        if (!catalog.TryGetProperty("Entries", out var entries) || entries.ValueKind != JsonValueKind.Array) {
             reporter.Report(sourcePath, "unsupported GeneratedPurityCatalog layout; expected an Entries array");
             return false;
         }
@@ -562,8 +515,7 @@ internal sealed class EffectSummaryCatalog
         EffectSummaryCompatibilityReporter reporter,
         string sourcePath,
         string source,
-        int count)
-    {
+        int count) {
         if (count != 0)
             reporter.Report(sourcePath,
                 $"{source} partially ignored {count} malformed {(count == 1 ? "entry" : "entries")}");
@@ -573,8 +525,7 @@ internal sealed class EffectSummaryCatalog
         JsonElement root,
         int sourcePriority,
         string? sourcePath,
-        EffectSummaryCompatibilityReporter? compatibilityReporter)
-    {
+        EffectSummaryCompatibilityReporter? compatibilityReporter) {
         JsonElement entriesElement = default;
         var hasGeneratedPurity =
             root.TryGetProperty("GeneratedPurityCatalog", out var generatedCatalog) &&
@@ -585,10 +536,8 @@ internal sealed class EffectSummaryCatalog
             generatedSchemaVersion == EffectSummarySchemaContract.CurrentVersion &&
             generatedCatalog.TryGetProperty("Entries", out entriesElement) &&
             entriesElement.ValueKind == JsonValueKind.Array;
-        if (hasGeneratedPurity)
-        {
-            foreach (var entryElement in entriesElement.EnumerateArray())
-            {
+        if (hasGeneratedPurity) {
+            foreach (var entryElement in entriesElement.EnumerateArray()) {
                 if (!EffectSummaryContractReader.TryReadMethod(entryElement, out var entry) ||
                     !TryCreatePurityEntry(entry.FlatPurity, out var purityEntry))
                     continue;
@@ -614,8 +563,7 @@ internal sealed class EffectSummaryCatalog
             assemblies.ValueKind != JsonValueKind.Array)
             yield break;
 
-        foreach (var assemblyElement in assemblies.EnumerateArray())
-        {
+        foreach (var assemblyElement in assemblies.EnumerateArray()) {
             if (!EffectSummaryContractReader.TryReadAssembly(assemblyElement, out var assembly))
                 continue;
 
@@ -624,8 +572,7 @@ internal sealed class EffectSummaryCatalog
                 assembly.AssemblySha256,
                 assembly.ModuleVersionId);
             var artifactSource = EffectSummaryArtifactSource.FromContract(assembly.ArtifactSource);
-            foreach (var methodElement in Values(assembly.Methods))
-            {
+            foreach (var methodElement in Values(assembly.Methods)) {
                 if (!EffectSummaryContractReader.TryReadMethod(methodElement, out var method))
                     continue;
                 var canonicalKey = method.CanonicalKey!.Trim();
@@ -655,8 +602,7 @@ internal sealed class EffectSummaryCatalog
         }
     }
 
-    private static ImmutableArray<SummaryExceptionInfo> ReadExceptionInfos(EffectSummaryMethodContract method)
-    {
+    private static ImmutableArray<SummaryExceptionInfo> ReadExceptionInfos(EffectSummaryMethodContract method) {
         var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
         var exceptionSources = new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
         var exceptionEdges =
@@ -667,8 +613,7 @@ internal sealed class EffectSummaryCatalog
         foreach (var provenance in Values(method.ThrownExceptionProvenance)
                      .Concat(Values(method.TransitiveThrownExceptionProvenance)))
             AddExceptionSource(exceptionTypes, exceptionSources, provenance.ExceptionType, provenance.SourcePath);
-        foreach (var edge in Values(method.TransitiveThrownExceptionEdges))
-        {
+        foreach (var edge in Values(method.TransitiveThrownExceptionEdges)) {
             var exceptionType = Normalize(edge.ExceptionType);
             if (exceptionType == null) continue;
             AddExceptionSource(exceptionTypes, exceptionSources, exceptionType, edge.SourcePath);
@@ -694,8 +639,7 @@ internal sealed class EffectSummaryCatalog
             .ToImmutableArray();
     }
 
-    private static bool TryCreatePurityEntry(EffectSummaryPurityContract contract, out PurityEntry purityEntry)
-    {
+    private static bool TryCreatePurityEntry(EffectSummaryPurityContract contract, out PurityEntry purityEntry) {
         purityEntry = default;
         var classification = Normalize(contract.Classification);
         if (classification == null) return false;
@@ -712,8 +656,7 @@ internal sealed class EffectSummaryCatalog
         return true;
     }
 
-    private static string PrimaryCategoryFallback(ImmutableArray<string> categories)
-    {
+    private static string PrimaryCategoryFallback(ImmutableArray<string> categories) {
         return categories.Length > 0
             ? categories[0]
             : "generated_purity_summary";
@@ -743,16 +686,14 @@ internal sealed class EffectSummaryCatalog
         ImmutableSortedSet<string>.Builder exceptionTypes,
         Dictionary<string, ImmutableSortedSet<string>.Builder> exceptionSources,
         string? exceptionType,
-        string? sourcePath)
-    {
+        string? sourcePath) {
         exceptionType = Normalize(exceptionType);
         if (exceptionType == null) return;
         exceptionTypes.Add(exceptionType);
         sourcePath = Normalize(sourcePath);
         if (sourcePath == null) return;
 
-        if (!exceptionSources.TryGetValue(exceptionType, out var sources))
-        {
+        if (!exceptionSources.TryGetValue(exceptionType, out var sources)) {
             sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
             exceptionSources.Add(exceptionType, sources);
         }
@@ -764,20 +705,17 @@ internal sealed class EffectSummaryCatalog
         IAssemblySymbol? containingAssembly,
         ImmutableArray<string> methodKeys,
         Compilation compilation,
-        out PurityEntry classification)
-    {
+        out PurityEntry classification) {
         classification = default;
         if (containingAssembly == null || methodKeys.IsDefaultOrEmpty) return false;
 
         var implementationPath =
             PurityIdentityResolver.TryResolveRuntimeImplementationAssemblyPath(
                 containingAssembly, methodKeys, methodKeys[0]);
-        if (!string.IsNullOrWhiteSpace(implementationPath))
-        {
+        if (!string.IsNullOrWhiteSpace(implementationPath)) {
             var path = implementationPath!;
             if (PurityIdentityResolver.TryResolveMethodIdentityFromPath(
-                    methodKeys, path, out var implementationIdentity))
-            {
+                    methodKeys, path, out var implementationIdentity)) {
                 var assemblyIdentity = PurityIdentityResolver.GetAssemblyIdentity(path);
                 if (TryMatchTrustedEntry(methodKeys, assemblyIdentity, implementationIdentity, out classification))
                     return true;
@@ -797,8 +735,7 @@ internal sealed class EffectSummaryCatalog
         IEnumerable<string> methodKeys,
         ActualAssemblyIdentity? actualAssemblyIdentity,
         ActualMethodIdentity? actualMethodIdentity,
-        out PurityEntry classification)
-    {
+        out PurityEntry classification) {
         classification = default;
         var bestEntry = SelectBestEntry(
             methodKeys,
@@ -810,8 +747,7 @@ internal sealed class EffectSummaryCatalog
         return true;
     }
 
-    private static ImmutableArray<string> GetStaticConstructorKeys(ITypeSymbol? typeSymbol)
-    {
+    private static ImmutableArray<string> GetStaticConstructorKeys(ITypeSymbol? typeSymbol) {
         if (typeSymbol is not INamedTypeSymbol namedType) return ImmutableArray<string>.Empty;
 
         var identity = new StructuralMethodIdentity(
@@ -835,8 +771,7 @@ internal sealed class EffectSummaryCatalog
         EffectSummaryArtifactSource? artifactSource,
         int sourcePriority,
         string? sourcePath,
-        EffectSummaryCompatibilityReporter? compatibilityReporter)
-    {
+        EffectSummaryCompatibilityReporter? compatibilityReporter) {
         private readonly EffectSummaryEntryTrustMetadata _trust = new(
             assemblyIdentity,
             methodIdentity,
@@ -876,8 +811,7 @@ internal sealed class EffectSummaryCatalog
         bool HasFreshArrayAllocationEvidence,
         string FreshnessClassification,
         bool HasUnsupportedEffects,
-        string EffectVisibilityClassification)
-    {
+        string EffectVisibilityClassification) {
         public bool IsPure => string.Equals(Classification, "pure", StringComparison.Ordinal);
         public bool IsImpure => string.Equals(Classification, "impure", StringComparison.Ordinal);
 
@@ -919,8 +853,7 @@ internal sealed class EffectSummaryCatalog
         StructuralMethodIdentity? CalleeIdentity,
         int? Depth);
 
-    private sealed class SummaryExceptionEdgeInfoComparer : IEqualityComparer<SummaryExceptionEdgeInfo>
-    {
+    private sealed class SummaryExceptionEdgeInfoComparer : IEqualityComparer<SummaryExceptionEdgeInfo> {
         internal static readonly SummaryExceptionEdgeInfoComparer Instance = new();
 
         public bool Equals(SummaryExceptionEdgeInfo? left, SummaryExceptionEdgeInfo? right) =>
@@ -931,10 +864,8 @@ internal sealed class EffectSummaryCatalog
             object.Equals(left.CalleeIdentity, right.CalleeIdentity) &&
             left.Depth == right.Depth;
 
-        public int GetHashCode(SummaryExceptionEdgeInfo edge)
-        {
-            unchecked
-            {
+        public int GetHashCode(SummaryExceptionEdgeInfo edge) {
+            unchecked {
                 var hash = 17;
                 hash = hash * 31 + (edge.SourcePath == null ? 0 : StringComparer.Ordinal.GetHashCode(edge.SourcePath));
                 foreach (var identity in edge.CallChain) hash = hash * 31 + identity.GetHashCode();
@@ -944,18 +875,15 @@ internal sealed class EffectSummaryCatalog
         }
     }
 
-    private sealed class Scope : IDisposable
-    {
+    private sealed class Scope : IDisposable {
         private readonly EffectSummaryCatalog? _previous;
 
-        public Scope(EffectSummaryCatalog? previous, EffectSummaryCatalog? current)
-        {
+        public Scope(EffectSummaryCatalog? previous, EffectSummaryCatalog? current) {
             _previous = previous;
             CurrentCatalog.Value = current;
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             CurrentCatalog.Value = _previous;
         }
     }

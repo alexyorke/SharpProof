@@ -1,13 +1,11 @@
 namespace SharpProof.Symbolic;
 
-internal static class MethodBodyOperationResolver
-{
+internal static class MethodBodyOperationResolver {
     internal static IOperation? GetMethodBodyRootOperation(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        bool includeConversionOperators = true)
-    {
+        bool includeConversionOperators = true) {
         var useDeclarationFallback = methodNode is DestructorDeclarationSyntax ||
                                      methodNode is ConversionOperatorDeclarationSyntax && !includeConversionOperators;
         var operationNode = useDeclarationFallback

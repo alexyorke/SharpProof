@@ -46,8 +46,7 @@ public static class RoslynShapeManifest {
         OperationEntries.Concat(SyntaxEntries).ToImmutableDictionary(static entry => entry.ShapeId, StringComparer.Ordinal);
 
     public static ImmutableDictionary<string, bool> ActionSurfaceEntries { get; } =
-        new[]
-        {
+        new[] {
             "CompilationStart", "CompilationEnd", "Operation", "OperationBlock", "OperationBlockStart",
             "SemanticModel", "Symbol", "SyntaxNode", "SyntaxTree"
         }.ToImmutableDictionary(static name => name, IsActionSurfaceUsed, StringComparer.Ordinal);

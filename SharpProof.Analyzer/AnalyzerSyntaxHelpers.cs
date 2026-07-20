@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer;
 
-internal static class AnalyzerSyntaxHelpers
-{
-    internal static bool IsBodylessAutoPropertyGetter(MethodBodyAnalysisContext context)
-    {
+internal static class AnalyzerSyntaxHelpers {
+    internal static bool IsBodylessAutoPropertyGetter(MethodBodyAnalysisContext context) {
         return context.MethodSymbol.MethodKind == MethodKind.PropertyGet &&
                !context.MethodSymbol.IsAbstract &&
                context.MethodSymbol.ContainingType?.TypeKind != TypeKind.Interface &&
@@ -14,17 +12,14 @@ internal static class AnalyzerSyntaxHelpers
                !accessor.SemicolonToken.IsMissing;
     }
 
-    internal static Location GetCallableDeclarationLocation(SyntaxNode node)
-    {
-        return node switch
-        {
+    internal static Location GetCallableDeclarationLocation(SyntaxNode node) {
+        return node switch {
             MethodDeclarationSyntax methodDeclaration => methodDeclaration.Identifier.GetLocation(),
             PropertyDeclarationSyntax propertyDeclaration => propertyDeclaration.Identifier.GetLocation(),
             IndexerDeclarationSyntax indexerDeclaration => indexerDeclaration.ThisKeyword.GetLocation(),
             LocalFunctionStatementSyntax localFunctionStatement => localFunctionStatement.Identifier.GetLocation(),
             ConstructorDeclarationSyntax constructorDeclaration => constructorDeclaration.Identifier.GetLocation(),
-            AccessorDeclarationSyntax accessorDeclaration => accessorDeclaration.Parent?.Parent switch
-            {
+            AccessorDeclarationSyntax accessorDeclaration => accessorDeclaration.Parent?.Parent switch {
                 PropertyDeclarationSyntax propertyDeclaration => propertyDeclaration.Identifier.GetLocation(),
                 IndexerDeclarationSyntax indexerDeclaration => indexerDeclaration.ThisKeyword.GetLocation(),
                 _ => accessorDeclaration.Keyword.GetLocation()
@@ -38,16 +33,14 @@ internal static class AnalyzerSyntaxHelpers
 
     internal static Location GetCallableDeclarationLocation(
         IMethodSymbol methodSymbol,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var syntaxReference = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
         return syntaxReference == null
             ? methodSymbol.Locations.First()
             : GetCallableDeclarationLocation(syntaxReference.GetSyntax(cancellationToken));
     }
 
-    internal static bool HasResultValue(IMethodSymbol methodSymbol)
-    {
+    internal static bool HasResultValue(IMethodSymbol methodSymbol) {
         return methodSymbol.MethodKind is not (MethodKind.Constructor or MethodKind.StaticConstructor) &&
                !methodSymbol.ReturnsVoid;
     }
@@ -55,14 +48,12 @@ internal static class AnalyzerSyntaxHelpers
     internal static bool IsCompilerMarkedUnreachable(
         SyntaxNode syntax,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         return semanticModel.GetDiagnostics(syntax.Span, cancellationToken)
             .Any(static diagnostic => diagnostic.Id == "CS0162");
     }
 
-    internal static bool BodyEndPointIsReachable(BlockSyntax body, SemanticModel semanticModel)
-    {
+    internal static bool BodyEndPointIsReachable(BlockSyntax body, SemanticModel semanticModel) {
         var controlFlow = semanticModel.AnalyzeControlFlow(body);
         return controlFlow == null ||
                !controlFlow.Succeeded ||
@@ -71,8 +62,7 @@ internal static class AnalyzerSyntaxHelpers
 
     internal static string GetFirstAttributeArgumentText(
         AttributeData attribute,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
             return attributeSyntax.ArgumentList?.Arguments.FirstOrDefault()?.ToString() ?? "<missing>";
 
@@ -81,8 +71,7 @@ internal static class AnalyzerSyntaxHelpers
 
     internal static string GetAttributeArgumentListText(
         AttributeData attribute,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
             return attributeSyntax.ArgumentList == null
                 ? "<missing>"

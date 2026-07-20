@@ -79,8 +79,7 @@ internal static class RuntimeAssemblyResolver {
     }
 
     private static IEnumerable<string> EnumerateCurrentRuntimeCandidates(string assemblyName) {
-        var directories = new[]
-        {
+        var directories = new[] {
             Path.GetDirectoryName(typeof(object).Assembly.Location),
             RuntimeEnvironment.GetRuntimeDirectory(),
             AppContext.BaseDirectory
@@ -117,8 +116,7 @@ internal static class RuntimeAssemblyResolver {
     }
 
     private static IEnumerable<string> EnumerateSharedRuntimeRoots() {
-        var sharedDirectories = new[]
-        {
+        var sharedDirectories = new[] {
             CombineIfRooted(Environment.GetEnvironmentVariable("DOTNET_ROOT"), "shared"),
             CombineIfRooted(Environment.GetEnvironmentVariable("DOTNET_ROOT(x86)"), "shared"),
             CombineIfRooted(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "shared"),
