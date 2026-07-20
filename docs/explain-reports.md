@@ -17,7 +17,7 @@ keeps its concise text output.
 
 `explain --json` emits one lower-camel JSON document with `kind: "explain"`
 and `schemaVersion: 3`. It also carries the shared
-`evidenceSchemaVersion` and `evidenceSchemaCompatibility` fields.
+`evidenceSchemaVersion` field.
 
 The document contains:
 

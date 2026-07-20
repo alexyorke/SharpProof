@@ -148,8 +148,7 @@ public static class TestClass
     {
         Assert.That(diagnostic.Properties[SharpProofEvidenceSchema.DiagnosticVersionProperty],
             Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion.ToString(CultureInfo.InvariantCulture)));
-        Assert.That(diagnostic.Properties[SharpProofEvidenceSchema.DiagnosticCompatibilityProperty],
-            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
+        Assert.That(diagnostic.Properties.ContainsKey("sharpproof.evidence.schema_compatibility"), Is.False);
 
         var lineSpan = diagnostic.Location.GetLineSpan();
         var line = lineSpan.StartLinePosition.Line + 1;

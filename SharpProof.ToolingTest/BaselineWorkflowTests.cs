@@ -35,12 +35,8 @@ public sealed class BaselineWorkflowTests
         Assert.That(baseline.Diagnostics[0].Contract, Is.EqualTo("[EnforcePure]"));
         Assert.That(baseline.Diagnostics[0].EvidenceKey, Is.EqualTo("impure-call"));
         Assert.That(baseline.EvidenceSchemaVersion, Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
-        Assert.That(baseline.EvidenceSchemaCompatibility,
-            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
         Assert.That(baseline.Diagnostics[0].EvidenceSchemaVersion,
             Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
-        Assert.That(baseline.Diagnostics[0].EvidenceSchemaCompatibility,
-            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
 
         var json = SharpProofBaseline.ToJson(baseline);
         Assert.That(json, Does.Contain(@"""diagnostics"""));
@@ -48,8 +44,7 @@ public sealed class BaselineWorkflowTests
         using var jsonDocument = JsonDocument.Parse(json);
         Assert.That(jsonDocument.RootElement.GetProperty("evidenceSchemaVersion").GetInt32(),
             Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
-        Assert.That(jsonDocument.RootElement.GetProperty("evidenceSchemaCompatibility").GetString(),
-            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
+        Assert.That(jsonDocument.RootElement.TryGetProperty("evidenceSchemaCompatibility", out _), Is.False);
         Assert.That(jsonDocument.RootElement.GetProperty("diagnostics")[0]
                 .GetProperty("evidenceSchemaVersion").GetInt32(),
             Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));

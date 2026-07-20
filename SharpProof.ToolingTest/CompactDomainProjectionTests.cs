@@ -22,10 +22,10 @@ public sealed class CompactDomainProjectionTests
         var service = new SymbolicQueryExecutor();
         var targets = new[]
         {
-            (Target: SharpProofTarget.AllLines(), Kind: "file"),
-            (Target: SharpProofTarget.LineNumber(1), Kind: "line"),
-            (Target: SharpProofTarget.Span(position, position + marker.Length), Kind: "span"),
-            (Target: SharpProofTarget.AtPosition(position), Kind: "point")
+            (Target: SharpProofTargetFactory.AllLines(), Kind: "file"),
+            (Target: SharpProofTargetFactory.LineNumber(1), Kind: "line"),
+            (Target: SharpProofTargetFactory.Span(position, position + marker.Length), Kind: "span"),
+            (Target: SharpProofTargetFactory.AtPosition(position), Kind: "point")
         };
 
         foreach (var (target, expectedKind) in targets)
@@ -79,19 +79,19 @@ public sealed class CompactDomainProjectionTests
 
         var invariant = service.Query(new SymbolicQueryContext(
             input,
-            SharpProofTarget.AllLines(),
+            SharpProofTargetFactory.AllLines(),
             options));
         var capability = Serialize(service.QueryCapabilities(new SymbolicQueryContext(
                 input,
-                SharpProofTarget.LineNumber(FindLine(source, "Console.WriteLine")),
+                SharpProofTargetFactory.LineNumber(FindLine(source, "Console.WriteLine")),
                 options)));
         var complexity = Serialize(service.QueryComplexity(new SymbolicQueryContext(
                 input,
-                SharpProofTarget.LineNumber(FindLine(source, "for (var index")),
+                SharpProofTargetFactory.LineNumber(FindLine(source, "for (var index")),
                 options)));
         var runtimeHazards = Serialize(service.QueryRuntimeHazards(new SymbolicQueryContext(
                 input,
-                SharpProofTarget.LineNumber(FindLine(source, "throw new InvalidOperationException")),
+                SharpProofTargetFactory.LineNumber(FindLine(source, "throw new InvalidOperationException")),
                 options)));
 
         var invariantJson = Serialize(invariant);
@@ -106,10 +106,10 @@ public sealed class CompactDomainProjectionTests
     public void PublicCompactRuntimeHazardOptions_ValidateBounds()
     {
         Assert.That(
-            () => SharpProofTarget.Span(-1, 0),
+            () => SharpProofTargetFactory.Span(-1, 0),
             Throws.TypeOf<ArgumentOutOfRangeException>());
         Assert.That(
-            () => SharpProofTarget.Span(2, 1),
+            () => SharpProofTargetFactory.Span(2, 1),
             Throws.TypeOf<ArgumentOutOfRangeException>());
     }
 

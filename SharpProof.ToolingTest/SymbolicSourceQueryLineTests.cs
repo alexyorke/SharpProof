@@ -107,26 +107,26 @@ internal sealed class SymbolicSourceQueryLineTests
 
         var invariants = service.Query(new SymbolicQueryContext(
             input,
-            SharpProofTarget.AllLines(),
+            SharpProofTargetFactory.AllLines(),
             options));
         Assert.That(invariants.ProgramPoints.Any(static point =>
             point.MethodName?.Contains("Identity", StringComparison.Ordinal) == true), Is.True);
 
         var hazards = service.QueryRuntimeHazards(new SymbolicQueryContext(
             input,
-            SharpProofTarget.LineNumber(FindLine(source, "throw new InvalidOperationException")),
+            SharpProofTargetFactory.LineNumber(FindLine(source, "throw new InvalidOperationException")),
             options));
         Assert.That(hazards.Hazards, Has.Some.Property("Kind").EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
 
         var capabilities = service.QueryCapabilities(new SymbolicQueryContext(
             input,
-            SharpProofTarget.LineNumber(FindLine(source, "Console.WriteLine")),
+            SharpProofTargetFactory.LineNumber(FindLine(source, "Console.WriteLine")),
             options));
         Assert.That(capabilities.CapabilityText, Does.Contain("Console"));
 
         var complexity = service.QueryComplexity(new SymbolicQueryContext(
             input,
-            SharpProofTarget.LineNumber(FindLine(source, "for (var index")),
+            SharpProofTargetFactory.LineNumber(FindLine(source, "for (var index")),
             options));
         Assert.That(complexity.MethodDisplayName, Does.Contain("Complexity"));
     }
@@ -161,7 +161,7 @@ internal class TestClass
 
         var textLine = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "TextInput.cs"),
-            SharpProofTarget.LineNumber(FindLine(source, "if (value > 0)")),
+            SharpProofTargetFactory.LineNumber(FindLine(source, "if (value > 0)")),
             options));
         Assert.That(textLine.ScopeKind, Is.EqualTo("line"));
         Assert.That(textLine.Scope.Kind, Is.EqualTo(SymbolicQueryScopeKind.Line));
@@ -170,7 +170,7 @@ internal class TestClass
 
         var textPosition = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "PositionInput.cs"),
-            SharpProofTarget.AtPosition(FindPosition(source, "return value;")),
+            SharpProofTargetFactory.AtPosition(FindPosition(source, "return value;")),
             options));
         Assert.That(textPosition.ScopeKind, Is.EqualTo("point"));
         Assert.That(textPosition.Scope.Kind, Is.EqualTo(SymbolicQueryScopeKind.Point));
@@ -179,7 +179,7 @@ internal class TestClass
 
         var syntaxSpan = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-            SharpProofTarget.Span(
+            SharpProofTargetFactory.Span(
                 FindPosition(source, "if (value > 0)"),
                 FindPosition(source, "return 0;")),
             SymbolicQueryOptions.Default));
@@ -190,7 +190,7 @@ internal class TestClass
 
         var syntaxAllLines = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-            SharpProofTarget.AllLines()));
+            SharpProofTargetFactory.AllLines()));
         Assert.That(syntaxAllLines.ScopeKind, Is.EqualTo("file"));
         Assert.That(syntaxAllLines.Scope.Kind, Is.EqualTo(SymbolicQueryScopeKind.File));
         Assert.That(syntaxAllLines.LineCount, Is.GreaterThan(0));
@@ -202,7 +202,7 @@ internal class TestClass
             .Single(statement => statement.ToString().Contains("return value;", StringComparison.Ordinal));
         var nodeResult = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromNode(returnNode, semanticModel),
-            SharpProofTarget.Node()));
+            SharpProofTargetFactory.Node()));
         Assert.That(nodeResult.ScopeKind, Is.EqualTo("point"));
         Assert.That(nodeResult.Scope.Kind, Is.EqualTo(SymbolicQueryScopeKind.Point));
         Assert.That(nodeResult.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
@@ -218,16 +218,16 @@ internal class TestClass
             File.WriteAllText(sourcePath, source);
             var fileTargets = new[]
             {
-                (SharpProofTarget.Point(FindLine(source, "return value;")), SymbolicQueryScopeKind.Point),
-                (SharpProofTarget.AtPosition(FindPosition(source, "return value;")), SymbolicQueryScopeKind.Point),
-                (SharpProofTarget.LineNumber(FindLine(source, "if (value > 0)")), SymbolicQueryScopeKind.Line),
-                (SharpProofTarget.Span(
+                (SharpProofTargetFactory.Point(FindLine(source, "return value;")), SymbolicQueryScopeKind.Point),
+                (SharpProofTargetFactory.AtPosition(FindPosition(source, "return value;")), SymbolicQueryScopeKind.Point),
+                (SharpProofTargetFactory.LineNumber(FindLine(source, "if (value > 0)")), SymbolicQueryScopeKind.Line),
+                (SharpProofTargetFactory.Span(
                     FindPosition(source, "if (value > 0)"),
                     FindPosition(source, "return 0;")), SymbolicQueryScopeKind.Span),
-                (SharpProofTarget.LineSpan(
+                (SharpProofTargetFactory.LineSpan(
                     FindLine(source, "if (value > 0)"), 1,
                     FindLine(source, "return 0;"), 1), SymbolicQueryScopeKind.Span),
-                (SharpProofTarget.AllLines(), SymbolicQueryScopeKind.File)
+                (SharpProofTargetFactory.AllLines(), SymbolicQueryScopeKind.File)
             };
 
             foreach (var (target, expectedScope) in fileTargets)
@@ -424,7 +424,7 @@ internal class TestClass
             var tree = CSharpSyntaxTree.ParseText(scenario.Source, new CSharpParseOptions(LanguageVersion.Preview), scenario.FileName);
             var compilation = CSharpCompilation.Create(Path.GetFileNameWithoutExtension(scenario.FileName), [tree], AnalyzerTestHost.GetTrustedPlatformReferences(), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
             var node = tree.GetRoot().DescendantNodes().Single(candidate => candidate.Kind().ToString() == scenario.Target);
-            point = new SymbolicQueryExecutor().Query(new SymbolicQueryContext(SymbolicSourceInput.FromNode(node, compilation.GetSemanticModel(tree)), SharpProofTarget.Node())).ProgramPoints.Single();
+            point = new SymbolicQueryExecutor().Query(new SymbolicQueryContext(SymbolicSourceInput.FromNode(node, compilation.GetSemanticModel(tree)), SharpProofTargetFactory.Node())).ProgramPoints.Single();
         }
         bool Matches(string expectation) => expectation switch
         {
@@ -457,12 +457,12 @@ internal class TestClass
             kinds: new[] { SymbolicRuntimeHazardKind.DivideByZero });
         var targets = new[]
         {
-            SharpProofTarget.Point(FindLine(source, "return value / 0;")),
-            SharpProofTarget.LineNumber(FindLine(source, "return value / 0;")),
-            SharpProofTarget.Span(
+            SharpProofTargetFactory.Point(FindLine(source, "return value / 0;")),
+            SharpProofTargetFactory.LineNumber(FindLine(source, "return value / 0;")),
+            SharpProofTargetFactory.Span(
                 FindPosition(source, "return value / 0;"),
                 FindPosition(source, "return value / 0;") + "return value / 0;".Length),
-            SharpProofTarget.AllLines()
+            SharpProofTargetFactory.AllLines()
         };
 
         void AssertHazard(SymbolicSourceInput input, SharpProofTarget target)
@@ -495,7 +495,7 @@ internal class TestClass
         var ex = Assert.Throws<ArgumentException>(() => new SymbolicQueryExecutor().QueryRuntimeHazards(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { int M(int value) => value; }", "HazardInput.cs"),
-                SharpProofTarget.AllLines(),
+                SharpProofTargetFactory.AllLines(),
                 SymbolicQueryOptions.Default)));
 
         Assert.That(ex!.Message, Does.Contain("Runtime hazard queries require SMT analysis."));
@@ -508,7 +508,7 @@ internal class TestClass
         var ex = Assert.Throws<ArgumentException>(() => new SymbolicQueryExecutor().Prove(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { int M(int value) => value; }", "ProofInput.cs"),
-                SharpProofTarget.LineNumber(1),
+                SharpProofTargetFactory.LineNumber(1),
                 new SymbolicQueryOptions(
                     AnalyzerTestHost.GetTrustedPlatformReferences(),
                     smtAnalysis)),
@@ -844,7 +844,7 @@ internal class TestClass
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var result = new SymbolicQueryExecutor().Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromNode(assignment, semanticModel),
-            SharpProofTarget.Node(),
+            SharpProofTargetFactory.Node(),
             new SymbolicQueryOptions(
                 smtAnalysis: smtAnalysis,
                 impliedConditions: new[] { "value == 7" },
@@ -1551,14 +1551,9 @@ internal class TestClass
     }
 
     [Test]
-    public void SharpProofEvidenceSchema_DefinesExactV2Compatibility()
+    public void SharpProofEvidenceSchema_ExposesCurrentNumericVersion()
     {
         Assert.That(SharpProofEvidenceSchema.CurrentVersion, Is.EqualTo(2));
-        Assert.That(SharpProofEvidenceSchema.CompatibilityPolicy, Is.EqualTo("exact-v2"));
-        Assert.That(SharpProofEvidenceSchema.IsReadCompatible(0), Is.False);
-        Assert.That(SharpProofEvidenceSchema.IsReadCompatible(SharpProofEvidenceSchema.CurrentVersion), Is.True);
-        Assert.That(SharpProofEvidenceSchema.IsReadCompatible(-1), Is.False);
-        Assert.That(SharpProofEvidenceSchema.IsReadCompatible(SharpProofEvidenceSchema.CurrentVersion + 1), Is.False);
     }
 
     [Test]

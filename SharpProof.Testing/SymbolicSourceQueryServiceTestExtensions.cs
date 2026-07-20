@@ -18,7 +18,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-                SharpProofTarget.Point(line, column),
+                SharpProofTargetFactory.Point(line, column),
                 new SymbolicQueryOptions(smtAnalysis: smtAnalysis, impliedConditions: impliedConditions)),
             cancellationToken).ProgramPoints.Single();
     }
@@ -36,7 +36,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-                SharpProofTarget.LineNumber(line),
+                SharpProofTargetFactory.LineNumber(line),
                 new SymbolicQueryOptions(
                     smtAnalysis: smtAnalysis,
                     impliedConditions: impliedConditions,
@@ -59,7 +59,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-                SharpProofTarget.Point(line, column),
+                SharpProofTargetFactory.Point(line, column),
                 new SymbolicQueryOptions(
                     smtAnalysis: smtAnalysis,
                     impliedConditions: impliedConditions,
@@ -82,7 +82,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-                SharpProofTarget.Span(spanStart, spanEnd),
+                SharpProofTargetFactory.Span(spanStart, spanEnd),
                 new SymbolicQueryOptions(
                     smtAnalysis: smtAnalysis,
                     impliedConditions: impliedConditions,
@@ -107,7 +107,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-                SharpProofTarget.LineSpan(startLine, startColumn, endLine, endColumn),
+                SharpProofTargetFactory.LineSpan(startLine, startColumn, endLine, endColumn),
                 new SymbolicQueryOptions(
                     smtAnalysis: smtAnalysis,
                     impliedConditions: impliedConditions,
@@ -128,7 +128,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-                SharpProofTarget.AllLines(),
+                SharpProofTargetFactory.AllLines(),
                 new SymbolicQueryOptions(
                     smtAnalysis: smtAnalysis,
                     impliedConditions: impliedConditions,
@@ -148,7 +148,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-                SharpProofTarget.AtPosition(position),
+                SharpProofTargetFactory.AtPosition(position),
                 new SymbolicQueryOptions(smtAnalysis: smtAnalysis, impliedConditions: impliedConditions)),
             cancellationToken).ProgramPoints.Single();
     }
@@ -171,7 +171,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         return executor.Prove(
             new SymbolicQueryContext(
                 source,
-                SharpProofTarget.Point(line, column),
+                SharpProofTargetFactory.Point(line, column),
                 new SymbolicQueryOptions(references, smtAnalysis)),
             conditionText,
             cancellationToken);
@@ -190,7 +190,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         return executor.Prove(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-                SharpProofTarget.Point(line, column),
+                SharpProofTargetFactory.Point(line, column),
                 new SymbolicQueryOptions(smtAnalysis: smtAnalysis)),
             conditionText,
             cancellationToken);
@@ -361,7 +361,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         return service.QuerySyntaxTreeRuntimeHazards(
             syntaxTree,
             compilation,
-            SharpProofTarget.AllLines(),
+            SharpProofTargetFactory.AllLines(),
             smtAnalysis,
             cancellationToken,
             options);
@@ -388,7 +388,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         return service.QuerySyntaxTreeRuntimeHazards(
             syntaxTree,
             compilation,
-            SharpProofTarget.LineNumber(line),
+            SharpProofTargetFactory.LineNumber(line),
             smtAnalysis,
             cancellationToken,
             options);
@@ -416,7 +416,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         return service.QuerySyntaxTreeRuntimeHazards(
             syntaxTree,
             compilation,
-            SharpProofTarget.Span(spanStart, spanEnd),
+            SharpProofTargetFactory.Span(spanStart, spanEnd),
             smtAnalysis,
             cancellationToken,
             options);

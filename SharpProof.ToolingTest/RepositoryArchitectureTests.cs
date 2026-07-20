@@ -197,6 +197,37 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void PreviewContracts_DoNotRestoreConvenienceOrCompatibilityAdapters()
+    {
+        var queryFactories = typeof(SharpProofQuery).GetMethods()
+            .Where(static method => method.IsStatic &&
+                                    method.IsPublic &&
+                                    !method.IsSpecialName)
+            .Select(static method => method.Name)
+            .ToArray();
+        var targetFactories = typeof(SharpProofTarget).GetMethods()
+            .Where(static method => method.IsStatic &&
+                                    method.IsPublic &&
+                                    !method.IsSpecialName)
+            .Select(static method => method.Name)
+            .ToArray();
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var identity = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Analyzer", "RoslynStructuralMethodIdentity.cs"));
+        var evidenceSchema = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Contracts", "ProofEvidenceSchemaContract.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(queryFactories, Is.Empty);
+            Assert.That(targetFactories, Is.Empty);
+            Assert.That(identity, Does.Not.Contain("GetCompatibleCanonicalKeys"));
+            Assert.That(evidenceSchema, Does.Not.Contain("CompatibilityPolicy"));
+            Assert.That(evidenceSchema, Does.Not.Contain("DiagnosticCompatibilityProperty"));
+        });
+    }
+
+    [Test]
     public void SymbolicAssembly_UsesOneMethodLikeQueryTarget()
     {
         var assembly = typeof(SharpProofAnalysisSession).Assembly;

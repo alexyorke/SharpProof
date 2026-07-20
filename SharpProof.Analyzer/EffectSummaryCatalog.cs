@@ -107,7 +107,7 @@ internal sealed class EffectSummaryCatalog
         if (actualAssemblyIdentity == null || actualMethodIdentity == null) return false;
 
         var bestEntry = SelectBestEntry(
-            RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol),
+            RoslynStructuralMethodIdentity.GetCanonicalKeys(methodSymbol),
             entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
                      entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity));
 
@@ -134,7 +134,7 @@ internal sealed class EffectSummaryCatalog
         var actualAssemblyIdentity = PurityIdentityResolver.TryResolveActualAssemblyIdentity(methodSymbol, compilation);
         var actualMethodIdentity = PurityIdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
         var trustedEntries = new List<SummaryEntry>();
-        var methodKeys = RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol).ToArray();
+        var methodKeys = RoslynStructuralMethodIdentity.GetCanonicalKeys(methodSymbol).ToArray();
         var bestEntry = actualAssemblyIdentity != null && actualMethodIdentity != null
             ? SelectBestEntry(
                 methodKeys,
@@ -200,7 +200,7 @@ internal sealed class EffectSummaryCatalog
             return false;
 
         var bestEntry = SelectBestEntry(
-            RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol),
+            RoslynStructuralMethodIdentity.GetCanonicalKeys(methodSymbol),
             entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
                      entry.SourcePriority == BuiltInSourcePriority &&
                      entry.AssemblyIdentity?.IsComplete == true &&
@@ -317,7 +317,7 @@ internal sealed class EffectSummaryCatalog
             : ExceptionIdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
 
         foreach (var entry in EnumerateEntries(
-                     RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(methodSymbol)))
+                     RoslynStructuralMethodIdentity.GetCanonicalKeys(methodSymbol)))
         {
             if (entry.ExceptionInfos.IsDefaultOrEmpty ||
                 !entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity))

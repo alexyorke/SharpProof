@@ -73,10 +73,10 @@ dotnet add package SharpProof.Symbolic --version 0.1.0-preview.1
 
 Use `SharpProofAnalysisSession` as the public entrypoint:
 
-- `SharpProofQuery.Invariant(...)` and `Reachability(...)` for source proofs
-- `SharpProofQuery.Condition(...)` for an SMT-backed condition
-- `SharpProofQuery.RuntimeHazards(...)` for bounded hazard candidates
-- `SharpProofQuery.Capabilities(...)` and `Complexity(...)` for method summaries
+- `SharpProofQueryKind.Invariant` and `Reachability` for source proofs
+- `SharpProofQueryKind.Condition` for an SMT-backed condition
+- `SharpProofQueryKind.RuntimeHazards` for bounded hazard candidates
+- `SharpProofQueryKind.Capabilities` and `Complexity` for method summaries
 
 For compilations loaded by a Roslyn workspace, use the project-aware CLI. The
 Roslyn adapter is internal and decodes the same global SMT and bounded-analysis

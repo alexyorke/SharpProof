@@ -121,7 +121,7 @@ internal static class MethodRequiresAnalyzer
                 var proofOutcome = AnalyzerSymbolicQueryBoundary.TryExecute(() => queryExecutor.Prove(
                         new SymbolicQueryContext(
                             source,
-                            SharpProofTarget.Point(line, column),
+                            new SharpProofTarget(SharpProofTargetKind.Point, Line: line, Column: column),
                             options),
                         rewrittenCondition,
                         context.CancellationToken));

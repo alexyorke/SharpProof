@@ -86,7 +86,9 @@ successful, unknown, failed, and canceled queries:
 ```csharp
 using var session = SharpProofAnalysisSession.FromText(sourceText, "virtual/Buffer.cs");
 var outcome = session.Analyze(
-    SharpProofQuery.Invariant(SharpProofTarget.Point(line: 42)));
+    new SharpProofQuery(
+        SharpProofQueryKind.Invariant,
+        new SharpProofTarget(SharpProofTargetKind.Point, Line: 42, Column: 1)));
 
 if (!outcome.IsSuccess)
 {

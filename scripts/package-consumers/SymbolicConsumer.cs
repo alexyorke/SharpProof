@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using SharpProof.Symbolic;
@@ -28,9 +29,11 @@ using var session = SharpProofAnalysisSession.FromText(
     source,
     "NativeSmtProbe.cs",
     new SharpProofAnalysisOptions(
-        enableSmt: true,
-        impliedConditions: new[] { "left < middle", "left < right" }));
-var response = session.Analyze(SharpProofQuery.Invariant(SharpProofTarget.Point(line: 10, column: 9)));
+        EnableSmt: true,
+        ImpliedConditions: ImmutableArray.Create("left < middle", "left < right")));
+var response = session.Analyze(new SharpProofQuery(
+    SharpProofQueryKind.Invariant,
+    new SharpProofTarget(SharpProofTargetKind.Point, Line: 10, Column: 9)));
 var result = (SourceQueryPayload)response.Payload!;
 var health = result.Smt;
 var proofsHold = result.ConditionProofCount == 2 && result.AllConditionsHold;

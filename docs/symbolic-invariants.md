@@ -12,12 +12,12 @@ The API accepts source text or a file and can reuse a project-loaded session.
 
 The primary entrypoint is `SharpProofAnalysisSession`:
 
-- `Analyze(SharpProofQuery.Invariant(target))` reports invariants for a file, text buffer, or loaded project.
+- `Analyze(new SharpProofQuery(SharpProofQueryKind.Invariant, target))` reports invariants for a file, text buffer, or loaded project.
 - `FromFile` and `FromText` create compilation-scoped sessions.
-- `SharpProofTarget.Point`, `AtPosition`, `LineNumber`, `Span`, `LineSpan`, and `AllLines` select the requested program point or aggregate scope.
+- A `SharpProofTarget` record plus `SharpProofTargetKind` selects a program point or aggregate scope.
 - `SharpProofAnalysisOptions` carries SMT enablement, implied conditions, and bounded-analysis limits.
-- `SharpProofQuery.Condition(...)` checks whether a source-level condition follows at a point.
-- `SharpProofQuery.RuntimeHazards(...)` queries proven or optionally unproven runtime-hazard candidates through the same session.
+- `SharpProofQueryKind.Condition` checks whether a source-level condition follows at a point.
+- `SharpProofQueryKind.RuntimeHazards` queries proven or optionally unproven runtime-hazard candidates through the same session.
 - Internal program-point state retains typed invariants, source spans, containing-method identity, point kind, path conditions, and proof outcomes. Public callers receive the focused `SourceQueryPayload`; the CLI compatibility projector consumes the richer internal snapshot.
 - `SymbolicInvariantResult.ConservativeUnknownCount` and `HasConservativeUnknowns` expose conservative placeholders directly on invariant summaries.
 - A `SourceQueryPayload` exposes the conservative merged invariant and bounded program-point count. Detailed legacy program-point state remains internal to the engine and CLI projection.

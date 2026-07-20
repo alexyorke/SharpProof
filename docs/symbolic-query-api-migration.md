@@ -12,18 +12,29 @@ queries:
 using var session = SharpProofAnalysisSession.FromText(
     sourceText,
     "Example.cs",
-    new SharpProofAnalysisOptions(enableSmt: true));
+    new SharpProofAnalysisOptions(EnableSmt: true));
 
 var invariant = session.Analyze(
-    SharpProofQuery.Invariant(SharpProofTarget.Point(42, 1)));
+    new SharpProofQuery(
+        SharpProofQueryKind.Invariant,
+        new SharpProofTarget(SharpProofTargetKind.Point, Line: 42, Column: 1)));
 var proof = session.Analyze(
-    SharpProofQuery.Condition(SharpProofTarget.Point(42, 1), "value >= 0"));
+    new SharpProofQuery(
+        SharpProofQueryKind.Condition,
+        new SharpProofTarget(SharpProofTargetKind.Point, Line: 42, Column: 1),
+        Condition: "value >= 0"));
 var hazards = session.Analyze(
-    SharpProofQuery.RuntimeHazards(SharpProofTarget.LineNumber(42)));
+    new SharpProofQuery(
+        SharpProofQueryKind.RuntimeHazards,
+        new SharpProofTarget(SharpProofTargetKind.Line, Line: 42)));
 var capabilities = session.Analyze(
-    SharpProofQuery.Capabilities(SharpProofTarget.LineNumber(42)));
+    new SharpProofQuery(
+        SharpProofQueryKind.Capabilities,
+        new SharpProofTarget(SharpProofTargetKind.Line, Line: 42)));
 var complexity = session.Analyze(
-    SharpProofQuery.Complexity(SharpProofTarget.LineNumber(42)));
+    new SharpProofQuery(
+        SharpProofQueryKind.Complexity,
+        new SharpProofTarget(SharpProofTargetKind.Line, Line: 42)));
 ```
 
 `SharpProofQueryResult` supplies common status, source location, structured

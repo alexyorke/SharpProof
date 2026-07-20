@@ -64,8 +64,9 @@ var budget = new SharpProofAnalysisBudget(
 using var session = SharpProofAnalysisSession.FromText(
     sourceText,
     "Example.cs",
-    new SharpProofAnalysisOptions(analysisBudget: budget));
-var result = session.Analyze(SharpProofQuery.Invariant(target));
+    new SharpProofAnalysisOptions(AnalysisBudget: budget));
+var result = session.Analyze(
+    new SharpProofQuery(SharpProofQueryKind.Invariant, target));
 
 if (result.Budget.IsExhausted)
 {

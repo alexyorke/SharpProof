@@ -17,10 +17,6 @@ internal partial class MethodInvocationPurityRule
         if (ContainsFormattedOrAlignedInterpolation(invocationOperation.Syntax)) return false;
 
         result = CheckPureViewInvocationInputs(invocationOperation, context, currentState);
-        if (result.IsPure)
-        {
-        }
-
         return true;
     }
 

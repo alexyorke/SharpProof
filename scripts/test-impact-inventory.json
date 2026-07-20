@@ -3533,7 +3533,7 @@
                             "declaredTypes":  [
                                                   "RoslynStructuralMethodIdentity"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "RoslynStructuralMethodIdentity"
                                                  ]
@@ -5137,9 +5137,7 @@
                             "declaredTypes":  [
                                                   "CapabilityQueryPayload",
                                                   "ComplexityQueryPayload",
-                                                  "ConditionQuery",
                                                   "ConditionQueryPayload",
-                                                  "RuntimeHazardQuery",
                                                   "RuntimeHazardQueryPayload",
                                                   "SharpProofAnalysisBudget",
                                                   "SharpProofAnalysisOptions",
@@ -5157,16 +5155,14 @@
                                                   "SharpProofQueryPayload",
                                                   "SharpProofQueryResult",
                                                   "SharpProofQueryStatus",
-                                                  "SharpProofRuntimeHazardOptions",
                                                   "SharpProofSmtMetadata",
                                                   "SharpProofTarget",
                                                   "SharpProofTargetKind",
                                                   "SharpProofTruncationReason",
                                                   "SharpProofUnknownReason",
-                                                  "SimpleQuery",
                                                   "SourceQueryPayload"
                                               ],
-                            "referencingFixtureCount":  15,
+                            "referencingFixtureCount":  10,
                             "referencedTokens":  [
                                                      "CapabilityQueryPayload",
                                                      "ComplexityQueryPayload",
@@ -5178,6 +5174,7 @@
                                                      "SharpProofError",
                                                      "SharpProofErrorCategory",
                                                      "SharpProofQuery",
+                                                     "SharpProofQueryKind",
                                                      "SharpProofQueryResult",
                                                      "SharpProofQueryStatus",
                                                      "SharpProofTarget",
@@ -6385,6 +6382,17 @@
                             "referencedTokens":  [
                                                      "CompilationFixture",
                                                      "RoslynTestFixture"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Testing/SharpProofTargetFactory.cs",
+                            "module":  "TestInfrastructure",
+                            "declaredTypes":  [
+                                                  "SharpProofTargetFactory"
+                                              ],
+                            "referencingFixtureCount":  10,
+                            "referencedTokens":  [
+                                                     "SharpProofTargetFactory"
                                                  ]
                         },
                         {
@@ -8489,12 +8497,13 @@
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "EffectSummarySymbolKeyFactoryTests",
+                                                                 "RepositoryArchitectureTests",
                                                                  "StructuralMethodIdentityTests"
                                                              ],
                                     "tokens":  [
                                                    "RoslynStructuralMethodIdentity"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/SharpProofAnalyzer.cs",
@@ -9623,18 +9632,13 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
-                                                                 "CapabilityContractTests",
-                                                                 "CompactDomainProjectionTests",
                                                                  "RepositoryArchitectureTests",
                                                                  "SharpProofAnalysisSessionTests",
                                                                  "SharpProofTargetTests",
                                                                  "SymbolicAnalysisLimitsTests",
                                                                  "SymbolicCfgProgramPointStateCollectorTests",
                                                                  "SymbolicCliErrorModelTests",
-                                                                 "SymbolicComplexityTests",
                                                                  "SymbolicErrorModelTests",
-                                                                 "SymbolicInvariantServiceTests",
-                                                                 "SymbolicQueryWitnessTests",
                                                                  "SymbolicSourceQueryLineTests",
                                                                  "SymbolicStateMergerTests"
                                                              ],
@@ -9649,13 +9653,14 @@
                                                    "SharpProofError",
                                                    "SharpProofErrorCategory",
                                                    "SharpProofQuery",
+                                                   "SharpProofQueryKind",
                                                    "SharpProofQueryResult",
                                                    "SharpProofQueryStatus",
                                                    "SharpProofTarget",
                                                    "SharpProofTargetKind",
                                                    "SourceQueryPayload"
                                                ],
-                                    "fixtureCount":  15
+                                    "fixtureCount":  10
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtAnalysisLifecycle.cs",
@@ -10474,6 +10479,26 @@
                                     "tokens":  [
                                                    "CompilationFixture",
                                                    "RoslynTestFixture"
+                                               ],
+                                    "fixtureCount":  10
+                                },
+                                {
+                                    "path":  "SharpProof.Testing/SharpProofTargetFactory.cs",
+                                    "module":  "TestInfrastructure",
+                                    "selectedTestFixtures":  [
+                                                                 "CapabilityContractTests",
+                                                                 "CompactDomainProjectionTests",
+                                                                 "SharpProofAnalysisSessionTests",
+                                                                 "SharpProofTargetTests",
+                                                                 "SymbolicAnalysisLimitsTests",
+                                                                 "SymbolicComplexityTests",
+                                                                 "SymbolicErrorModelTests",
+                                                                 "SymbolicInvariantServiceTests",
+                                                                 "SymbolicQueryWitnessTests",
+                                                                 "SymbolicSourceQueryLineTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SharpProofTargetFactory"
                                                ],
                                     "fixtureCount":  10
                                 },

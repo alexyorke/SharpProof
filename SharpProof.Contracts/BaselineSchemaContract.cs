@@ -11,9 +11,6 @@ public sealed record BaselineDocument(
 
     [JsonPropertyName("evidenceSchemaVersion")]
     public int EvidenceSchemaVersion { get; init; } = SharpProofEvidenceSchema.CurrentVersion;
-
-    [JsonPropertyName("evidenceSchemaCompatibility")]
-    public string EvidenceSchemaCompatibility { get; init; } = SharpProofEvidenceSchema.CompatibilityPolicy;
 }
 
 public sealed record BaselineEntry(
@@ -27,9 +24,7 @@ public sealed record BaselineEntry(
     [property: JsonPropertyName("operationKind")] string? OperationKind = null,
     [property: JsonPropertyName("evidenceKey")] string? EvidenceKey = null,
     [property: JsonPropertyName("evidenceSchemaVersion")]
-    int EvidenceSchemaVersion = SharpProofEvidenceSchema.CurrentVersion,
-    [property: JsonPropertyName("evidenceSchemaCompatibility")]
-    string EvidenceSchemaCompatibility = SharpProofEvidenceSchema.CompatibilityPolicy);
+    int EvidenceSchemaVersion = SharpProofEvidenceSchema.CurrentVersion);
 
 internal static class BaselineSchemaContract
 {
@@ -41,7 +36,7 @@ internal static class BaselineSchemaContract
 
     internal static bool TryValidateTree(JsonElement root, out BaselineSchemaValidationFailure failure)
     {
-        if (!TryValidate(root, "evidenceSchemaVersion", "evidenceSchemaCompatibility", true, out failure))
+        if (!TryValidate(root, "evidenceSchemaVersion", true, out failure))
         {
             failure = failure with { IsRoot = true };
             return false;
@@ -56,7 +51,6 @@ internal static class BaselineSchemaContract
                 !TryValidate(
                     entry,
                     "evidenceSchemaVersion",
-                    "evidenceSchemaCompatibility",
                     true,
                     out failure))
                 return false;
@@ -68,17 +62,12 @@ internal static class BaselineSchemaContract
     internal static bool TryValidate(
         JsonElement element,
         string versionPropertyName,
-        string compatibilityPropertyName,
         bool required,
         out BaselineSchemaValidationFailure failure,
         bool allowStringVersion = false)
     {
         var hasVersion = TryGetPropertyIgnoreCase(element, versionPropertyName, out var versionElement);
-        var hasCompatibility = TryGetPropertyIgnoreCase(
-            element,
-            compatibilityPropertyName,
-            out var compatibilityElement);
-        if (!hasVersion && !hasCompatibility)
+        if (!hasVersion)
         {
             failure = required
                 ? new BaselineSchemaValidationFailure(BaselineSchemaValidationFailureKind.Missing)
@@ -87,8 +76,7 @@ internal static class BaselineSchemaContract
         }
 
         var version = 0;
-        if (!hasVersion ||
-            !(versionElement.ValueKind == JsonValueKind.Number && versionElement.TryGetInt32(out version) ||
+        if (!(versionElement.ValueKind == JsonValueKind.Number && versionElement.TryGetInt32(out version) ||
               allowStringVersion &&
               versionElement.ValueKind == JsonValueKind.String &&
               int.TryParse(versionElement.GetString(), out version)))
@@ -97,23 +85,11 @@ internal static class BaselineSchemaContract
             return false;
         }
 
-        if (!SharpProofEvidenceSchema.IsReadCompatible(version))
+        if (version != SharpProofEvidenceSchema.CurrentVersion)
         {
             failure = new BaselineSchemaValidationFailure(
                 BaselineSchemaValidationFailureKind.UnsupportedVersion,
                 version);
-            return false;
-        }
-
-        if (!hasCompatibility ||
-            compatibilityElement.ValueKind != JsonValueKind.String ||
-            !string.Equals(
-                compatibilityElement.GetString(),
-                SharpProofEvidenceSchema.CompatibilityPolicy,
-                StringComparison.Ordinal))
-        {
-            failure = new BaselineSchemaValidationFailure(
-                BaselineSchemaValidationFailureKind.InvalidCompatibility);
             return false;
         }
 
@@ -204,27 +180,22 @@ internal static class BaselineSchemaContract
     internal static string FormatValidationIssue(
         BaselineSchemaValidationFailure failure,
         string versionPropertyName,
-        string compatibilityPropertyName,
         string surfaceName) => failure.Kind switch
     {
         BaselineSchemaValidationFailureKind.Missing =>
-            surfaceName + " is missing required " + versionPropertyName + " and " + compatibilityPropertyName,
+            surfaceName + " is missing required " + versionPropertyName,
         BaselineSchemaValidationFailureKind.NonNumericVersion =>
             surfaceName + " has a non-numeric " + versionPropertyName,
         BaselineSchemaValidationFailureKind.UnsupportedVersion =>
             "unsupported " + surfaceName + " " + versionPropertyName + " '" + failure.Version +
-            "'; supported versions are " + SharpProofEvidenceSchema.MinimumReadCompatibleVersion + "-" +
+            "'; supported version is " +
             SharpProofEvidenceSchema.CurrentVersion,
-        BaselineSchemaValidationFailureKind.InvalidCompatibility =>
-            surfaceName + " " + compatibilityPropertyName + " must be '" +
-            SharpProofEvidenceSchema.CompatibilityPolicy + "'",
         _ => throw new InvalidOperationException("Unknown evidence-schema validation failure.")
     };
 
     internal static void ValidateOrThrow(
         JsonElement element,
         string versionPropertyName,
-        string compatibilityPropertyName,
         string surfaceName,
         bool required,
         bool allowStringVersion = false)
@@ -234,7 +205,6 @@ internal static class BaselineSchemaContract
         if (TryValidate(
                 element,
                 versionPropertyName,
-                compatibilityPropertyName,
                 required,
                 out var failure,
                 allowStringVersion))
@@ -244,10 +214,6 @@ internal static class BaselineSchemaContract
         {
             BaselineSchemaValidationFailureKind.Missing =>
                 new NotSupportedException(surfaceName + " must declare the current evidence schema."),
-            BaselineSchemaValidationFailureKind.InvalidCompatibility =>
-                new NotSupportedException(
-                    surfaceName + " " + compatibilityPropertyName + " must be '" +
-                    SharpProofEvidenceSchema.CompatibilityPolicy + "'."),
             _ => new NotSupportedException(surfaceName + " has an invalid " + versionPropertyName + ".")
         };
     }
@@ -267,10 +233,6 @@ internal static class BaselineSchemaContract
         {
             BaselineSchemaValidationFailureKind.Missing =>
                 new NotSupportedException(surface + " must declare the current evidence schema."),
-            BaselineSchemaValidationFailureKind.InvalidCompatibility =>
-                new NotSupportedException(
-                    surface + " evidenceSchemaCompatibility must be '" +
-                    SharpProofEvidenceSchema.CompatibilityPolicy + "'."),
             _ => new NotSupportedException(surface + " has an invalid evidenceSchemaVersion.")
         };
     }
@@ -409,6 +371,5 @@ internal enum BaselineSchemaValidationFailureKind
     None,
     Missing,
     NonNumericVersion,
-    UnsupportedVersion,
-    InvalidCompatibility
+    UnsupportedVersion
 }

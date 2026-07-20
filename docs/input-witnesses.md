@@ -86,9 +86,11 @@ using SharpProof.Symbolic;
 using var session = SharpProofAnalysisSession.FromText(
     source,
     "Example.cs",
-    new SharpProofAnalysisOptions(enableSmt: true));
+    new SharpProofAnalysisOptions(EnableSmt: true));
 var response = session.Analyze(
-    SharpProofQuery.Reachability(SharpProofTarget.LineNumber(42)));
+    new SharpProofQuery(
+        SharpProofQueryKind.Reachability,
+        new SharpProofTarget(SharpProofTargetKind.Line, Line: 42)));
 var result = (SourceQueryPayload)response.Payload!;
 
 foreach (var evidence in response.Evidence)

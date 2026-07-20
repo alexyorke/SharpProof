@@ -46,7 +46,7 @@ public sealed class EffectSummarySchemaV5Tests
         var root = summary.RootElement;
         Assert.That(root.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(5));
         Assert.That(root.GetProperty("EvidenceSchemaVersion").GetInt32(), Is.EqualTo(2));
-        Assert.That(root.GetProperty("EvidenceSchemaCompatibility").GetString(), Is.EqualTo("exact-v2"));
+        Assert.That(root.TryGetProperty("EvidenceSchemaCompatibility", out _), Is.False);
 
         var outer = root.GetProperty("Assemblies")[0]
             .GetProperty("Methods")

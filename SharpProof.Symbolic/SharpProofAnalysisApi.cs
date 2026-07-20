@@ -42,94 +42,12 @@ public sealed record SharpProofTarget(
     int? StartColumn = null,
     int? EndLine = null,
     int? EndColumn = null,
-    bool IncludeNestedCallables = false)
-{
-    public static SharpProofTarget Point(int line, int column = 1)
-    {
-        ValidatePositive(line, nameof(line));
-        ValidatePositive(column, nameof(column));
-        return new SharpProofTarget(SharpProofTargetKind.Point, Line: line, Column: column);
-    }
+    bool IncludeNestedCallables = false);
 
-    public static SharpProofTarget AtPosition(int position)
-    {
-        ValidateNonNegative(position, nameof(position));
-        return new SharpProofTarget(SharpProofTargetKind.Position, Position: position);
-    }
-
-    public static SharpProofTarget LineNumber(int line)
-    {
-        ValidatePositive(line, nameof(line));
-        return new SharpProofTarget(SharpProofTargetKind.Line, Line: line);
-    }
-
-    public static SharpProofTarget Span(int start, int end)
-    {
-        ValidateNonNegative(start, nameof(start));
-        if (end < start) throw new ArgumentOutOfRangeException(nameof(end));
-        return new SharpProofTarget(SharpProofTargetKind.Span, SpanStart: start, SpanEnd: end);
-    }
-
-    public static SharpProofTarget LineSpan(
-        int startLine,
-        int startColumn,
-        int endLine,
-        int endColumn)
-    {
-        ValidatePositive(startLine, nameof(startLine));
-        ValidatePositive(startColumn, nameof(startColumn));
-        ValidatePositive(endLine, nameof(endLine));
-        ValidatePositive(endColumn, nameof(endColumn));
-        if (endLine < startLine) throw new ArgumentOutOfRangeException(nameof(endLine));
-        if (endLine == startLine && endColumn < startColumn)
-            throw new ArgumentOutOfRangeException(nameof(endColumn));
-        return new SharpProofTarget(
-            SharpProofTargetKind.LineSpan,
-            StartLine: startLine,
-            StartColumn: startColumn,
-            EndLine: endLine,
-            EndColumn: endColumn);
-    }
-
-    public static SharpProofTarget AllLines() => new(SharpProofTargetKind.AllLines);
-
-    internal static SharpProofTarget Node(bool includeNestedCallables = false) =>
-        new(SharpProofTargetKind.Node, IncludeNestedCallables: includeNestedCallables);
-
-    private static void ValidatePositive(int value, string parameterName)
-    {
-        if (value <= 0) throw new ArgumentOutOfRangeException(parameterName);
-    }
-
-    private static void ValidateNonNegative(int value, string parameterName)
-    {
-        if (value < 0) throw new ArgumentOutOfRangeException(parameterName);
-    }
-}
-
-public sealed record SharpProofAnalysisOptions
-{
-    public static SharpProofAnalysisOptions Default { get; } = new();
-
-    public SharpProofAnalysisOptions(
-        bool enableSmt = false,
-        IEnumerable<string>? impliedConditions = null,
-        SharpProofAnalysisBudget? analysisBudget = null)
-    {
-        EnableSmt = enableSmt;
-        ImpliedConditions = impliedConditions?
-            .Where(static condition => !string.IsNullOrWhiteSpace(condition))
-            .Select(static condition => condition.Trim())
-            .ToImmutableArray() ?? ImmutableArray<string>.Empty;
-        AnalysisBudget = analysisBudget ?? SharpProofAnalysisBudget.Default;
-    }
-
-    public bool EnableSmt { get; }
-
-    public ImmutableArray<string> ImpliedConditions { get; }
-
-    public SharpProofAnalysisBudget AnalysisBudget { get; }
-}
+public sealed record SharpProofAnalysisOptions(
+    bool EnableSmt = false,
+    ImmutableArray<string> ImpliedConditions = default,
+    SharpProofAnalysisBudget? AnalysisBudget = null);
 
 public sealed record SharpProofAnalysisBudget(
     int MaxMergedIfElseFacts = 16,
@@ -183,73 +101,12 @@ public sealed record SharpProofAnalysisBudget(
     }
 }
 
-public sealed record SharpProofRuntimeHazardOptions(
-    bool IncludeUnprovenCandidates = false,
-    ImmutableArray<string> Kinds = default)
-{
-    public static SharpProofRuntimeHazardOptions Default { get; } = new();
-
-    internal SymbolicRuntimeHazardQueryOptions ToEngineOptions() => new(
-        IncludeUnprovenCandidates,
-        Kinds.IsDefaultOrEmpty
-            ? null
-            : Kinds.Select(static kind =>
-                (SymbolicRuntimeHazardKind)Enum.Parse(typeof(SymbolicRuntimeHazardKind), kind, true)));
-
-}
-
-public abstract record SharpProofQuery(SharpProofQueryKind Kind, SharpProofTarget Target)
-{
-    public static SharpProofQuery SourceLocation(SharpProofTarget target) =>
-        Simple(SharpProofQueryKind.SourceLocation, target);
-
-    public static SharpProofQuery Method(SharpProofTarget target) =>
-        Simple(SharpProofQueryKind.Method, target);
-
-    public static SharpProofQuery Invariant(SharpProofTarget target) =>
-        Simple(SharpProofQueryKind.Invariant, target);
-
-    public static SharpProofQuery Reachability(SharpProofTarget target) =>
-        Simple(SharpProofQueryKind.Reachability, target);
-
-    public static SharpProofQuery Condition(SharpProofTarget target, string conditionText) =>
-        new ConditionQuery(target, conditionText);
-
-    public static SharpProofQuery RuntimeHazards(
-        SharpProofTarget target,
-        SharpProofRuntimeHazardOptions? options = null) =>
-        new RuntimeHazardQuery(target, options ?? SharpProofRuntimeHazardOptions.Default);
-
-    public static SharpProofQuery Capabilities(SharpProofTarget target) =>
-        Simple(SharpProofQueryKind.Capabilities, target);
-
-    public static SharpProofQuery Complexity(SharpProofTarget target) =>
-        Simple(SharpProofQueryKind.Complexity, target);
-
-    private static SharpProofQuery Simple(SharpProofQueryKind kind, SharpProofTarget target) =>
-        new SimpleQuery(kind, target ?? throw new ArgumentNullException(nameof(target)));
-
-    private sealed record SimpleQuery(SharpProofQueryKind QueryKind, SharpProofTarget QueryTarget)
-        : SharpProofQuery(QueryKind, QueryTarget);
-
-    internal sealed record ConditionQuery : SharpProofQuery
-    {
-        internal ConditionQuery(SharpProofTarget target, string conditionText)
-            : base(SharpProofQueryKind.Condition, target ?? throw new ArgumentNullException(nameof(target)))
-        {
-            if (string.IsNullOrWhiteSpace(conditionText))
-                throw new ArgumentException("Condition text is required.", nameof(conditionText));
-            ConditionText = conditionText;
-        }
-
-        internal string ConditionText { get; }
-    }
-
-    internal sealed record RuntimeHazardQuery(SharpProofTarget QueryTarget, SharpProofRuntimeHazardOptions Options)
-        : SharpProofQuery(
-            SharpProofQueryKind.RuntimeHazards,
-            QueryTarget ?? throw new ArgumentNullException(nameof(QueryTarget)));
-}
+public sealed record SharpProofQuery(
+    SharpProofQueryKind Kind,
+    SharpProofTarget Target,
+    string? Condition = null,
+    bool IncludeUnprovenHazards = false,
+    ImmutableArray<string> HazardKinds = default);
 
 public sealed record SharpProofLocation(
     string FilePath,
@@ -548,7 +405,7 @@ public sealed class SharpProofAnalysisSession : IDisposable
         string? filePath = null,
         SharpProofAnalysisOptions? options = null)
     {
-        options ??= SharpProofAnalysisOptions.Default;
+        options ??= new SharpProofAnalysisOptions();
         var smtAnalysis = options.EnableSmt
             ? new SmtAnalysisService(SmtAnalysisOptions.Default)
             : null;
@@ -562,7 +419,7 @@ public sealed class SharpProofAnalysisSession : IDisposable
         string filePath,
         SharpProofAnalysisOptions? options = null)
     {
-        options ??= SharpProofAnalysisOptions.Default;
+        options ??= new SharpProofAnalysisOptions();
         var smtAnalysis = options.EnableSmt
             ? new SmtAnalysisService(SmtAnalysisOptions.Default)
             : null;
@@ -572,19 +429,12 @@ public sealed class SharpProofAnalysisSession : IDisposable
             smtAnalysis);
     }
 
-    internal static SharpProofAnalysisSession Create(
-        SymbolicSourceInput source,
-        SymbolicQueryOptions options)
-    {
-        return new SharpProofAnalysisSession(source, options);
-    }
-
     public SharpProofQueryResult Analyze(
         SharpProofQuery query,
         CancellationToken cancellationToken = default)
     {
         if (query == null) throw new ArgumentNullException(nameof(query));
-        ThrowIfDisposed();
+        if (_disposed) throw new ObjectDisposedException(nameof(SharpProofAnalysisSession));
         if (cancellationToken.CanBeCanceled) return Execute(query, cancellationToken);
 
         var lazy = _results.GetOrAdd(
@@ -616,20 +466,29 @@ public sealed class SharpProofAnalysisSession : IDisposable
         try
         {
             var context = new SymbolicQueryContext(_source, query.Target, _options);
-            return query switch
+            return query.Kind switch
             {
-                SharpProofQuery.ConditionQuery condition => FromPayload(
+                SharpProofQueryKind.Condition => FromPayload(
                     query,
                     SharpProofPayloadProjector.From(
-                        _executor.Prove(context, condition.ConditionText, cancellationToken))),
-                SharpProofQuery.RuntimeHazardQuery hazards => FromPayload(
+                        _executor.Prove(context, RequireCondition(query), cancellationToken))),
+                SharpProofQueryKind.RuntimeHazards => FromPayload(
                     query,
                     SharpProofPayloadProjector.From(
-                        _executor.QueryRuntimeHazards(context, hazards.Options.ToEngineOptions(), cancellationToken))),
-                { Kind: SharpProofQueryKind.Capabilities } => FromPayload(
+                        _executor.QueryRuntimeHazards(
+                            context,
+                            new SymbolicRuntimeHazardQueryOptions(
+                                query.IncludeUnprovenHazards,
+                                query.HazardKinds.IsDefaultOrEmpty
+                                    ? null
+                                    : query.HazardKinds.Select(static kind =>
+                                        (SymbolicRuntimeHazardKind)Enum.Parse(
+                                            typeof(SymbolicRuntimeHazardKind), kind, true))),
+                            cancellationToken))),
+                SharpProofQueryKind.Capabilities => FromPayload(
                     query,
                     SharpProofPayloadProjector.From(_executor.QueryCapabilities(context, cancellationToken))),
-                { Kind: SharpProofQueryKind.Complexity } => FromPayload(
+                SharpProofQueryKind.Complexity => FromPayload(
                     query,
                     SharpProofPayloadProjector.From(_executor.QueryComplexity(context, cancellationToken))),
                 _ => FromPayload(
@@ -652,6 +511,13 @@ public sealed class SharpProofAnalysisSession : IDisposable
                 null,
                 error);
         }
+    }
+
+    private static string RequireCondition(SharpProofQuery query)
+    {
+        if (string.IsNullOrWhiteSpace(query.Condition))
+            throw new ArgumentException("Condition text is required.", nameof(query));
+        return query.Condition!;
     }
 
     private SharpProofQueryResult FromPayload(SharpProofQuery query, SharpProofQueryPayload payload)
@@ -695,18 +561,15 @@ public sealed class SharpProofAnalysisSession : IDisposable
             target.SpanEnd);
     }
 
-    private void ThrowIfDisposed()
-    {
-        if (_disposed) throw new ObjectDisposedException(nameof(SharpProofAnalysisSession));
-    }
-
     private static SymbolicQueryOptions CreateQueryOptions(
         SharpProofAnalysisOptions options,
         SmtAnalysisService? smtAnalysis)
     {
         return new SymbolicQueryOptions(
                 smtAnalysis: smtAnalysis,
-                impliedConditions: options.ImpliedConditions)
-            .WithAnalysisLimits(options.AnalysisBudget.Validate());
+                impliedConditions: options.ImpliedConditions.IsDefault
+                    ? ImmutableArray<string>.Empty
+                    : options.ImpliedConditions)
+            .WithAnalysisLimits((options.AnalysisBudget ?? SharpProofAnalysisBudget.Default).Validate());
     }
 }

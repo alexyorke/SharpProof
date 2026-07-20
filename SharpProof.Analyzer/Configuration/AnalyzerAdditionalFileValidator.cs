@@ -40,7 +40,6 @@ internal static class AnalyzerAdditionalFileValidator
                 AddIssue(issues, additionalFile, BaselineSchemaContract.FormatValidationIssue(
                     baselineFailure,
                     "evidenceSchemaVersion",
-                    "evidenceSchemaCompatibility",
                     baselineFailure.IsRoot ? "baseline" : "baseline entry"));
                 return;
             }
@@ -92,14 +91,12 @@ internal static class AnalyzerAdditionalFileValidator
             if (!BaselineSchemaContract.TryValidate(
                     root,
                     "EvidenceSchemaVersion",
-                    "EvidenceSchemaCompatibility",
                     true,
                     out var effectSummaryFailure))
             {
                 AddIssue(issues, additionalFile, BaselineSchemaContract.FormatValidationIssue(
                     effectSummaryFailure,
                     "EvidenceSchemaVersion",
-                    "EvidenceSchemaCompatibility",
                     "effect-summary"));
                 return;
             }

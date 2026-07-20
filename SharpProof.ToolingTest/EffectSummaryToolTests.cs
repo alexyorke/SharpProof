@@ -527,8 +527,7 @@ public partial class EffectSummaryToolTests
 
         Assert.That(summary.RootElement.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(5));
         Assert.That(summary.RootElement.GetProperty("EvidenceSchemaVersion").GetInt32(), Is.EqualTo(2));
-        Assert.That(summary.RootElement.GetProperty("EvidenceSchemaCompatibility").GetString(),
-            Is.EqualTo("exact-v2"));
+        Assert.That(summary.RootElement.TryGetProperty("EvidenceSchemaCompatibility", out _), Is.False);
         AssertPurityClassification(summary, "PurityFixture.PureLeaf()", "pure");
         AssertPurityClassification(summary, "PurityFixture.PureViaCallee()", "pure");
         AssertPurityClassification(summary, "PurityFixture.ImpureWrite()", "impure", "global_state_write");

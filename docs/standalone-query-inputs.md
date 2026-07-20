@@ -106,14 +106,18 @@ The public API accepts in-memory source, SMT enablement, implied conditions,
 and bounded-analysis limits directly:
 
 ```csharp
+using System.Collections.Immutable;
+
 using var session = SharpProofAnalysisSession.FromText(
     sourceText,
     "virtual/Buffer.cs",
     new SharpProofAnalysisOptions(
-        enableSmt: true,
-        impliedConditions: new[] { "value >= 0" }));
+        EnableSmt: true,
+        ImpliedConditions: ImmutableArray.Create("value >= 0")));
 var response = session.Analyze(
-    SharpProofQuery.Invariant(SharpProofTarget.Point(line: 2, column: 11)));
+    new SharpProofQuery(
+        SharpProofQueryKind.Invariant,
+        new SharpProofTarget(SharpProofTargetKind.Point, Line: 2, Column: 11)));
 var result = (SourceQueryPayload)response.Payload!;
 ```
 

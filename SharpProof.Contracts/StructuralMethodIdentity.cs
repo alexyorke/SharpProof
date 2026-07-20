@@ -15,10 +15,6 @@ internal static class StructuralRefKinds
     internal const string In = "in";
     internal const string RefReadonly = "ref-readonly";
 
-    internal static string CollapseUnavailableParameterKind(string refKind)
-    {
-        return refKind is Out or In or RefReadonly ? Ref : refKind;
-    }
 }
 
 internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIdentity>
@@ -85,21 +81,6 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
             Name,
             GenericArity,
             Parameters,
-            ReturnType,
-            ReturnRefKind);
-    }
-
-    internal StructuralMethodIdentity WithUnavailableParameterRefKindsCollapsed()
-    {
-        return new StructuralMethodIdentity(
-            ContainingMetadataType,
-            MethodKind,
-            Name,
-            GenericArity,
-            Parameters.Select(static parameter => parameter with
-            {
-                RefKind = StructuralRefKinds.CollapseUnavailableParameterKind(parameter.RefKind)
-            }),
             ReturnType,
             ReturnRefKind);
     }

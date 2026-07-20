@@ -329,7 +329,7 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task MismatchedEffectSummaryEvidenceCompatibility_ReportsSp0032()
+    public async Task UnrecognizedEffectSummaryCompatibilityMetadata_IsIgnored()
     {
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
             "public sealed class TestClass { }",
@@ -341,7 +341,7 @@ public sealed class TestClass
 
         var diagnostic = diagnostics.Single(item => item.Id == "SP0032");
         Assert.That(diagnostic.Properties["sharpproof.additional_file.reason"],
-            Does.Contain("EvidenceSchemaCompatibility must be 'exact-v2'"));
+            Does.Contain("effect-summary contains no usable assembly method entries"));
     }
 
     [TestCase(

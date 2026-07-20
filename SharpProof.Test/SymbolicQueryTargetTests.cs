@@ -41,7 +41,7 @@ public sealed class SharpProofTargetTests
     [Test]
     public void LineSpan_EndLineBeforeStartLine_Throws()
     {
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => SharpProofTarget.LineSpan(3, 1, 2, 1));
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => SharpProofTargetFactory.LineSpan(3, 1, 2, 1));
 
         Assert.That(exception!.ParamName, Is.EqualTo("endLine"));
     }
@@ -49,7 +49,7 @@ public sealed class SharpProofTargetTests
     [Test]
     public void LineSpan_EndColumnBeforeStartColumnOnSameLine_Throws()
     {
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => SharpProofTarget.LineSpan(3, 5, 3, 4));
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => SharpProofTargetFactory.LineSpan(3, 5, 3, 4));
 
         Assert.That(exception!.ParamName, Is.EqualTo("endColumn"));
     }
@@ -57,7 +57,7 @@ public sealed class SharpProofTargetTests
     [Test]
     public void LineSpan_SameLocation_IsAllowed()
     {
-        var target = SharpProofTarget.LineSpan(3, 5, 3, 5);
+        var target = SharpProofTargetFactory.LineSpan(3, 5, 3, 5);
 
         Assert.That(target.Kind, Is.EqualTo(SharpProofTargetKind.LineSpan));
         Assert.That(target.StartLine, Is.EqualTo(3));

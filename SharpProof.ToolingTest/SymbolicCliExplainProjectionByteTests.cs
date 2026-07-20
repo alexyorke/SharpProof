@@ -20,7 +20,7 @@ public sealed class SymbolicCliExplainProjectionByteTests
 
     private static readonly TestCaseData[] FormatCases =
     {
-        Case("Json", "BEF629705AAB7A1A261B250BDDFE1F98F4A2B3374C061CE15AC5EC682883944E", "--json"),
+        Case("Json", "63A8CAC681E688804C253D3A88B23AAB602C59BEF10A8905A9001E75259F5E44", "--json"),
         Case("Sarif", "88FB26CEA0E5D6731641F7B87240D13CF1D0DF67436C1B2B8DAEDA72021AC348", "--sarif")
     };
 

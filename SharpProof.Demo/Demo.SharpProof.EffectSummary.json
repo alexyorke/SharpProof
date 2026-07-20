@@ -96,6 +96,5 @@
       }
     ]
   },
-  "EvidenceSchemaVersion": 2,
-  "EvidenceSchemaCompatibility": "exact-v2"
+  "EvidenceSchemaVersion": 2
 }

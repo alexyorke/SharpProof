@@ -122,7 +122,7 @@ public class TestClass
         var exception = Assert.Throws<ArgumentException>(() => new SymbolicQueryExecutor().Prove(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(semanticModel.SyntaxTree, semanticModel.Compilation),
-                SharpProofTarget.Point(linePosition.Line + 1, linePosition.Character + 1)),
+                SharpProofTargetFactory.Point(linePosition.Line + 1, linePosition.Character + 1)),
             SymbolicFormulaDisplay.Format(condition)));
 
         Assert.That(exception!.Message, Does.Contain("SMT analysis"));

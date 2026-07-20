@@ -290,7 +290,7 @@ public sealed class SymbolicAnalysisLimitsTests
 
         var result = new SymbolicQueryExecutor().Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "Sample.cs"),
-            SharpProofTarget.AllLines(),
+            SharpProofTargetFactory.AllLines(),
             options));
 
         Assert.That(options.AnalysisLimits, Is.SameAs(limits));
@@ -326,7 +326,7 @@ public sealed class SymbolicAnalysisLimitsTests
 
         var result = new SymbolicQueryExecutor().QueryRuntimeHazards(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "Sample.cs"),
-            SharpProofTarget.AllLines(),
+            SharpProofTargetFactory.AllLines(),
             options),
             new SymbolicRuntimeHazardQueryOptions(
                 includeUnprovenCandidates: true,
@@ -508,7 +508,7 @@ public sealed class SymbolicAnalysisLimitsTests
                 var options = new SymbolicQueryOptions().WithAnalysisLimits(item.Limits);
                 var result = new SymbolicQueryExecutor().Query(new SymbolicQueryContext(
                     SymbolicSourceInput.FromText(item.Source, "Sample.cs"),
-                    SharpProofTarget.AllLines(),
+                    SharpProofTargetFactory.AllLines(),
                     options));
 
                 Assert.That(

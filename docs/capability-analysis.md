@@ -58,7 +58,7 @@ unknown external behavior do not count as success.
 ## Library API
 
 `SharpProof.Symbolic` exposes capability queries through
-`SharpProofAnalysisSession.Analyze(SharpProofQuery.Capabilities(...))`.
+`SharpProofAnalysisSession.Analyze(new SharpProofQuery(SharpProofQueryKind.Capabilities, target))`.
 
 Supported source shapes:
 
@@ -68,9 +68,9 @@ Supported source shapes:
 
 Supported target shapes:
 
-- `SharpProofTarget.Point(...)`
-- `SharpProofTarget.AtPosition(...)`
-- `SharpProofTarget.LineNumber(...)`
+- `new SharpProofTarget(SharpProofTargetKind.Point, Line: ..., Column: ...)`
+- `new SharpProofTarget(SharpProofTargetKind.Position, Position: ...)`
+- `new SharpProofTarget(SharpProofTargetKind.Line, Line: ...)`
 
 Capability queries resolve the containing method-like body and return:
 

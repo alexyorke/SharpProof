@@ -24,8 +24,6 @@ public static class SharpProofBaseline
     public const string BaselineContractProperty = "sharpproof.baseline.contract";
     public const string BaselineEvidenceKeyProperty = "sharpproof.baseline.evidence_key";
     public const string EvidenceSchemaVersionProperty = SharpProofEvidenceSchema.DiagnosticVersionProperty;
-    public const string EvidenceSchemaCompatibilityProperty =
-        SharpProofEvidenceSchema.DiagnosticCompatibilityProperty;
 
     private static readonly JsonSerializerOptions OutputJsonOptions = new()
     {
@@ -155,7 +153,6 @@ public static class SharpProofBaseline
         BaselineSchemaContract.ValidateOrThrow(
             properties,
             EvidenceSchemaVersionProperty,
-            EvidenceSchemaCompatibilityProperty,
             "SARIF diagnostic",
             required: false,
             allowStringVersion: true);

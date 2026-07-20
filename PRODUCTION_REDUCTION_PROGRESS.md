@@ -536,12 +536,21 @@ Tests are excluded from the metric and must not be deleted.
   supported-diagnostic ordering, code fixes, fuzz projections, and SARIF
   evidence remain unchanged; architecture coverage prevents the facade from
   returning.
+- [x] Removed the remaining unreleased query, target, structural-identity, and
+  evidence-schema compatibility adapters. One constructible `SharpProofQuery`
+  and `SharpProofTarget` record now carry every query shape, including hazard
+  options; structural method lookup uses one canonical key; and serialized
+  contracts use one numeric evidence version without a redundant compatibility
+  token. Test-only target builders retain concise fixture setup, the intentional
+  preview API and byte snapshots are updated, and architecture coverage prevents
+  the retired factories, fallback keys, and compatibility constants from
+  returning.
 
 ## Current evidence
 
-- Maintained production: 92,159 lines (88,240 C#, 3,189 scripts, and 730
-  specifications); net reduction: 15,467 lines; remaining reduction: 4,533.
-  This tranche removed 236 maintained lines without deleting tests.
+- Maintained production: 91,958 lines (88,039 C#, 3,189 scripts, and 730
+  specifications); net reduction: 15,668 lines; remaining reduction: 4,332.
+  This tranche removed 201 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,212 passing tests and two documented Main skips.
 

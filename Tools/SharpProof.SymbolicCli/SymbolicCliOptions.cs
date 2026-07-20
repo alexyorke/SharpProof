@@ -705,52 +705,56 @@ internal sealed class SymbolicCliOptions
 
     public SharpProofTarget CreateQueryTarget()
     {
-        if (AllLines) return SharpProofTarget.AllLines();
+        if (AllLines) return new SharpProofTarget(SharpProofTargetKind.AllLines);
 
         if (LineInvariants)
             return HasColumn
-                ? SharpProofTarget.Point(Line, Column)
-                : SharpProofTarget.LineNumber(Line);
+                ? new SharpProofTarget(SharpProofTargetKind.Point, Line: Line, Column: Column)
+                : new SharpProofTarget(SharpProofTargetKind.Line, Line: Line);
 
         if (IsAnySpanQuery)
             return IsLineColumnSpanQuery
-                ? SharpProofTarget.LineSpan(
-                    SpanStartLine!.Value,
-                    SpanStartColumn!.Value,
-                    SpanEndLine!.Value,
-                    SpanEndColumn!.Value)
-                : SharpProofTarget.Span(SpanStart!.Value, SpanEnd!.Value);
+                ? new SharpProofTarget(
+                    SharpProofTargetKind.LineSpan,
+                    StartLine: SpanStartLine!.Value,
+                    StartColumn: SpanStartColumn!.Value,
+                    EndLine: SpanEndLine!.Value,
+                    EndColumn: SpanEndColumn!.Value)
+                : new SharpProofTarget(
+                    SharpProofTargetKind.Span,
+                    SpanStart: SpanStart!.Value,
+                    SpanEnd: SpanEnd!.Value);
 
         return Position.HasValue
-            ? SharpProofTarget.AtPosition(Position.Value)
-            : SharpProofTarget.Point(Line, Column);
+            ? new SharpProofTarget(SharpProofTargetKind.Position, Position: Position.Value)
+            : new SharpProofTarget(SharpProofTargetKind.Point, Line: Line, Column: Column);
     }
 
     public SharpProofTarget CreateRuntimeHazardTarget()
     {
-        if (AllLines) return SharpProofTarget.AllLines();
+        if (AllLines) return new SharpProofTarget(SharpProofTargetKind.AllLines);
 
         return IsSpanQuery
-            ? SharpProofTarget.Span(SpanStart!.Value, SpanEnd!.Value)
-            : SharpProofTarget.LineNumber(Line);
+            ? new SharpProofTarget(SharpProofTargetKind.Span, SpanStart: SpanStart!.Value, SpanEnd: SpanEnd!.Value)
+            : new SharpProofTarget(SharpProofTargetKind.Line, Line: Line);
     }
 
     public SharpProofTarget CreateComplexityTarget()
     {
         return Position.HasValue
-            ? SharpProofTarget.AtPosition(Position.Value)
+            ? new SharpProofTarget(SharpProofTargetKind.Position, Position: Position.Value)
             : HasColumn
-                ? SharpProofTarget.Point(Line, Column)
-                : SharpProofTarget.LineNumber(Line);
+                ? new SharpProofTarget(SharpProofTargetKind.Point, Line: Line, Column: Column)
+                : new SharpProofTarget(SharpProofTargetKind.Line, Line: Line);
     }
 
     public SharpProofTarget CreateCapabilityTarget()
     {
         return Position.HasValue
-            ? SharpProofTarget.AtPosition(Position.Value)
+            ? new SharpProofTarget(SharpProofTargetKind.Position, Position: Position.Value)
             : HasColumn
-                ? SharpProofTarget.Point(Line, Column)
-                : SharpProofTarget.LineNumber(Line);
+                ? new SharpProofTarget(SharpProofTargetKind.Point, Line: Line, Column: Column)
+                : new SharpProofTarget(SharpProofTargetKind.Line, Line: Line);
     }
 
     public SymbolicRuntimeHazardQueryOptions CreateRuntimeHazardOptions()

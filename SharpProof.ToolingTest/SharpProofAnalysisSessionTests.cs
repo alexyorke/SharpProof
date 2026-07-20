@@ -25,19 +25,19 @@ public sealed class SharpProofAnalysisSessionTests
         using var session = SharpProofAnalysisSession.FromText(
             Source,
             "SessionTarget.cs",
-            new SharpProofAnalysisOptions(enableSmt: true));
-        var point = SharpProofTarget.Point(8, 9);
+            new SharpProofAnalysisOptions(EnableSmt: true));
+        var point = SharpProofTargetFactory.Point(8, 9);
 
         var results = new[]
         {
-            session.Analyze(SharpProofQuery.SourceLocation(point)),
-            session.Analyze(SharpProofQuery.Method(point)),
-            session.Analyze(SharpProofQuery.Invariant(point)),
-            session.Analyze(SharpProofQuery.Reachability(point)),
-            session.Analyze(SharpProofQuery.Condition(point, "value >= 0")),
-            session.Analyze(SharpProofQuery.RuntimeHazards(point)),
-            session.Analyze(SharpProofQuery.Capabilities(point)),
-            session.Analyze(SharpProofQuery.Complexity(point))
+            session.Analyze(new SharpProofQuery(SharpProofQueryKind.SourceLocation, point)),
+            session.Analyze(new SharpProofQuery(SharpProofQueryKind.Method, point)),
+            session.Analyze(new SharpProofQuery(SharpProofQueryKind.Invariant, point)),
+            session.Analyze(new SharpProofQuery(SharpProofQueryKind.Reachability, point)),
+            session.Analyze(new SharpProofQuery(SharpProofQueryKind.Condition, point, "value >= 0")),
+            session.Analyze(new SharpProofQuery(SharpProofQueryKind.RuntimeHazards, point)),
+            session.Analyze(new SharpProofQuery(SharpProofQueryKind.Capabilities, point)),
+            session.Analyze(new SharpProofQuery(SharpProofQueryKind.Complexity, point))
         };
 
         Assert.Multiple(() =>
@@ -59,7 +59,7 @@ public sealed class SharpProofAnalysisSessionTests
     public async Task Session_CachesEquivalentQueriesAcrossConcurrentCallers()
     {
         using var session = SharpProofAnalysisSession.FromText(Source, "CachedSession.cs");
-        var query = SharpProofQuery.Invariant(SharpProofTarget.Point(8, 9));
+        var query = new SharpProofQuery(SharpProofQueryKind.Invariant, SharpProofTargetFactory.Point(8, 9));
 
         var results = await Task.WhenAll(Enumerable.Range(0, 12)
             .Select(_ => Task.Run(() => session.Analyze(query))));
@@ -71,7 +71,9 @@ public sealed class SharpProofAnalysisSessionTests
     public void Session_ReturnsTypedFailureAndRejectsQueriesAfterDisposal()
     {
         var session = SharpProofAnalysisSession.FromText(Source, "FailedSession.cs");
-        var failure = session.Analyze(SharpProofQuery.Invariant(SharpProofTarget.Point(99, 1)));
+        var failure = session.Analyze(new SharpProofQuery(
+            SharpProofQueryKind.Invariant,
+            SharpProofTargetFactory.Point(99, 1)));
 
         Assert.Multiple(() =>
         {
@@ -82,14 +84,16 @@ public sealed class SharpProofAnalysisSessionTests
 
         session.Dispose();
         Assert.Throws<ObjectDisposedException>(() =>
-            session.Analyze(SharpProofQuery.Invariant(SharpProofTarget.Point(8, 9))));
+            session.Analyze(new SharpProofQuery(
+                SharpProofQueryKind.Invariant,
+                SharpProofTargetFactory.Point(8, 9))));
     }
 
     [Test]
     public void Session_ReturnsCancellationWithoutPoisoningTheQueryCache()
     {
         using var session = SharpProofAnalysisSession.FromText(Source, "CanceledSession.cs");
-        var query = SharpProofQuery.Invariant(SharpProofTarget.Point(8, 9));
+        var query = new SharpProofQuery(SharpProofQueryKind.Invariant, SharpProofTargetFactory.Point(8, 9));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 

@@ -17,7 +17,7 @@ public class EffectSummarySymbolKeyFactoryTests
     [TestCase("ref")]
     [TestCase("out")]
     [TestCase("in")]
-    public void CompatibleCanonicalKeys_IncludeMemberReferenceByRefFallback(string modifier)
+    public void CanonicalKeys_PreserveExactByRefKind(string modifier)
     {
         var body = modifier == "out" ? "value = 0;" : string.Empty;
         var source = $$"""
@@ -33,12 +33,10 @@ public class EffectSummarySymbolKeyFactoryTests
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var method = compilation.GetTypeByMetadataName("Fixture")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-        var keys = RoslynStructuralMethodIdentity.GetCompatibleCanonicalKeys(method);
-        var collapsed = RoslynStructuralMethodIdentity.Create(method)
-            .WithUnavailableParameterRefKindsCollapsed()
-            .ToCanonicalKey();
+        var keys = RoslynStructuralMethodIdentity.GetCanonicalKeys(method);
+        var canonical = RoslynStructuralMethodIdentity.Create(method).ToCanonicalKey();
 
-        Assert.That(keys, Does.Contain(collapsed));
+        Assert.That(keys, Is.EqualTo(new[] { canonical }));
     }
 
     [Test]

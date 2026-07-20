@@ -574,7 +574,7 @@ public sealed class SymbolicComplexityTests
         var result = new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromNode(localFunction, semanticModel),
-                SharpProofTarget.Node()));
+                SharpProofTargetFactory.Node()));
 
         Assert.That(result.MethodName, Is.EqualTo("Local"));
         Assert.That(result.Complexity.Text, Is.EqualTo("O(m)"));
@@ -611,7 +611,7 @@ public sealed class SymbolicComplexityTests
         var result = new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromNode(property, semanticModel),
-                SharpProofTarget.Node()));
+                SharpProofTargetFactory.Node()));
 
         Assert.That(result.MethodName, Is.EqualTo("get_Count"));
         Assert.That(result.DeclarationKind, Is.EqualTo("property_getter"));
@@ -649,7 +649,7 @@ public sealed class SymbolicComplexityTests
         var result = new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromNode(indexer, semanticModel),
-                SharpProofTarget.Node()));
+                SharpProofTargetFactory.Node()));
 
         Assert.That(result.MethodName, Is.EqualTo("get_Item"));
         Assert.That(result.DeclarationKind, Is.EqualTo("indexer_getter"));
@@ -700,8 +700,8 @@ public sealed class SymbolicComplexityTests
         if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
 
         var target = useLineTarget
-            ? SharpProofTarget.LineNumber(GetLineNumber(source, position))
-            : SharpProofTarget.AtPosition(position);
+            ? SharpProofTargetFactory.LineNumber(GetLineNumber(source, position))
+            : SharpProofTargetFactory.AtPosition(position);
         return new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText(source, "SymbolicComplexityTests.cs"),
@@ -724,7 +724,7 @@ public sealed class SymbolicComplexityTests
         var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { }", "SymbolicComplexityTests.cs"),
-                SharpProofTarget.AllLines())));
+                SharpProofTargetFactory.AllLines())));
 
         Assert.That(ex!.Message, Is.EqualTo("Complexity queries support point, position, line, or node targets only."));
     }

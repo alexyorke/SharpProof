@@ -13,10 +13,9 @@ configured member allowlists, and proof-result consumers.
 
 ## Evidence schema 2
 
-Analyzer evidence now requires `evidenceSchemaVersion: 2` and
-`evidenceSchemaCompatibility: exact-v2`. Analyzer readers reject missing,
-version-1, mismatched, and future evidence with `SP0032` instead of interpreting
-it loosely.
+Analyzer evidence now requires `evidenceSchemaVersion: 2`. Analyzer readers
+reject missing, version-1, and future evidence with `SP0032` instead of
+interpreting it loosely. Unknown optional metadata is ignored.
 
 Migrate an existing diagnostic baseline explicitly:
 

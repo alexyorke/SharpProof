@@ -392,8 +392,7 @@ public class TestClass
             ["id"] = diagnostic.Id,
             ["symbol"] = diagnostic.Properties[DiagnosticPropertyNames.BaselineSymbolProperty],
             ["path"] = diagnostic.Properties[DiagnosticPropertyNames.BaselinePathProperty],
-            ["evidenceSchemaVersion"] = SharpProofEvidenceSchema.CurrentVersion,
-            ["evidenceSchemaCompatibility"] = SharpProofEvidenceSchema.CompatibilityPolicy
+            ["evidenceSchemaVersion"] = SharpProofEvidenceSchema.CurrentVersion
         };
 
         if (diagnostic.Location != Location.None && diagnostic.Location.IsInSource)
@@ -410,7 +409,6 @@ public class TestClass
         return JsonSerializer.Serialize(new Dictionary<string, object?>
         {
             ["evidenceSchemaVersion"] = SharpProofEvidenceSchema.CurrentVersion,
-            ["evidenceSchemaCompatibility"] = SharpProofEvidenceSchema.CompatibilityPolicy,
             ["diagnostics"] = new[] { entry }
         });
     }

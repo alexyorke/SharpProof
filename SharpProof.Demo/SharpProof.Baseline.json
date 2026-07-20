@@ -4,11 +4,9 @@
       "id": "SP0002",
       "symbol": "M:SharpProof.Demo.Nonexistent.Member",
       "path": "Nonexistent.cs",
-      "evidenceSchemaVersion": 2,
-      "evidenceSchemaCompatibility": "exact-v2"
+      "evidenceSchemaVersion": 2
     }
   ],
   "version": 1,
-  "evidenceSchemaVersion": 2,
-  "evidenceSchemaCompatibility": "exact-v2"
+  "evidenceSchemaVersion": 2
 }

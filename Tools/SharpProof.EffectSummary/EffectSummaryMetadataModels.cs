@@ -76,8 +76,6 @@ internal sealed record EffectSummaryDocument(
     BclFallbackInventoryReport? BclFallbackInventory)
 {
     public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
-
-    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
 }
 
 internal sealed record AssemblyEffectReport(

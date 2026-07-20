@@ -20,9 +20,6 @@ internal sealed record SymbolicCliExplainReport(
     [JsonPropertyOrder(-2)]
     public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
 
-    [JsonPropertyOrder(-1)]
-    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
-
     internal static async Task<SymbolicCliExplainReport> CreateAsync(
         SymbolicCliOptions options,
         SymbolicCliInputContext inputContext,
@@ -36,8 +33,8 @@ internal sealed record SymbolicCliExplainReport(
         var source = inputContext.SourceInput;
         var queryOptions = options.CreateQueryOptions(smtAnalysis, false);
         var requestedTarget = options.Position.HasValue
-            ? SharpProofTarget.AtPosition(options.Position.Value)
-            : SharpProofTarget.Point(options.Line, options.Column);
+            ? new SharpProofTarget(SharpProofTargetKind.Position, Position: options.Position.Value)
+            : new SharpProofTarget(SharpProofTargetKind.Point, Line: options.Line, Column: options.Column);
         var executor = new SymbolicQueryExecutor();
         var invariant = executor.Query(new SymbolicQueryContext(source, requestedTarget, queryOptions),
             cancellationToken);
@@ -52,7 +49,10 @@ internal sealed record SymbolicCliExplainReport(
 
         var point = invariant.ProgramPoints[0];
         var hazardResult = executor.QueryRuntimeHazards(
-            new SymbolicQueryContext(source, SharpProofTarget.Point(point.Line, point.Column), queryOptions),
+            new SymbolicQueryContext(
+                source,
+                new SharpProofTarget(SharpProofTargetKind.Point, Line: point.Line, Column: point.Column),
+                queryOptions),
             options.CreateRuntimeHazardOptions(),
             cancellationToken);
         var hazards = hazardResult.Hazards.Take(options.ReportMaxHazards).ToArray();
