@@ -2,9 +2,6 @@ using static SharpProof.Symbolic.SymbolicStateFactBuilder;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal sealed record SymbolicSourceCompletionPlan(
-    ImmutableArray<SymbolicCondition> Conditions);
-
 internal static class SymbolicSourceCompletionLowerer {
     internal static SymbolicOperationTransitionResult ApplyNormalCompletion(
         SymbolicState state,
@@ -84,7 +81,7 @@ internal static class SymbolicSourceCompletionLowerer {
                 provenance,
                 ApplyConditions(
                     state,
-                    sourcePlan.Conditions,
+                    sourcePlan,
                     expression,
                     "ir.path.normal-completion.source"));
 
@@ -93,10 +90,10 @@ internal static class SymbolicSourceCompletionLowerer {
 
     internal static SymbolicOperationTransitionResult ApplyConditions(
         SymbolicState state,
-        ImmutableArray<SymbolicCondition> conditions,
+        IReadOnlyList<SymbolicCondition> conditions,
         SyntaxNode source,
         string provenance) =>
-        conditions.IsDefaultOrEmpty
+        conditions.Count == 0
             ? Exact(state, source, "no-conditions")
             : SymbolicOperationTransferKernel.AssumeAll(
                 state,
@@ -165,7 +162,7 @@ internal static class SymbolicSourceCompletionLowerer {
             nonNullProvenance);
     }
 
-    internal static SymbolicLoweringResult<SymbolicSourceCompletionPlan> Lower(
+    internal static SymbolicLoweringResult<IReadOnlyList<SymbolicCondition>> Lower(
         ExpressionSyntax expression,
         StatementSyntax statement,
         SemanticModel semanticModel,
@@ -173,8 +170,8 @@ internal static class SymbolicSourceCompletionLowerer {
         var conditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
         AddArrayBounds(conditions, expression, statement, semanticModel, cancellationToken);
         AddDereferenceSuccess(conditions, expression, statement, semanticModel, cancellationToken);
-        return SymbolicLoweringResult<SymbolicSourceCompletionPlan>.Exact(
-            new SymbolicSourceCompletionPlan(conditions.ToImmutable()),
+        return SymbolicLoweringResult<IReadOnlyList<SymbolicCondition>>.Exact(
+            conditions.ToImmutable(),
             new SymbolicLoweringProvenance("source-completion", expression.Span, "exact"));
     }
 

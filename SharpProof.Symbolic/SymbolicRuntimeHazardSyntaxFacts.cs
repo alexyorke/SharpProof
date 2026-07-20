@@ -309,7 +309,9 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
         ExpressionSyntax argumentExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
-        argumentExpression = UnwrapExpression(argumentExpression);
+        argumentExpression = CSharpSyntaxFacts.UnwrapExpression(
+            argumentExpression,
+            ExpressionCastUnwrapPolicy.All);
         if (argumentExpression is RangeExpressionSyntax) return true;
 
         var typeInfo = semanticModel.GetTypeInfo(argumentExpression, cancellationToken);
@@ -322,7 +324,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         return IsNonNullableValueType(targetType) &&
-               TryGetNullableUnderlyingType(
+               SymbolicTypeFacts.TryGetNullableUnderlyingType(
                    SymbolicRuntimeTypeFacts.GetNaturalExpressionType(castExpression.Expression, semanticModel,
                        cancellationToken), out _);
     }
@@ -334,11 +336,8 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
         CancellationToken cancellationToken) {
         var operandType = CSharpSyntaxFacts.GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
         return IsNonNullableValueType(targetType) &&
-               IsReferenceType(operandType);
+               SymbolicTypeFacts.IsReferenceType(operandType);
     }
-
-    internal static bool IsReferenceType(ITypeSymbol? typeSymbol) =>
-        SymbolicTypeFacts.IsReferenceType(typeSymbol);
 
 
     internal static bool IsDynamicExpression(
@@ -349,17 +348,13 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
             expression,
             semanticModel,
             cancellationToken,
-            UnwrapDynamicExpression);
+            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression);
     }
 
     internal static bool IsNonNullableValueType(ITypeSymbol? typeSymbol) {
         return typeSymbol is { IsValueType: true, TypeKind: not TypeKind.TypeParameter } &&
                typeSymbol.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T;
     }
-
-    internal static bool TryGetNullableUnderlyingType(ITypeSymbol? typeSymbol, out ITypeSymbol underlyingType) =>
-        SymbolicTypeFacts.TryGetNullableUnderlyingType(typeSymbol, out underlyingType);
-
 
     internal static IEnumerable<ExpressionSyntax> GetStackAllocLengthExpressions(
         StackAllocArrayCreationExpressionSyntax stackAllocCreation) {
@@ -371,9 +366,4 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
                     yield return size;
     }
 
-    internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression) =>
-        CSharpSyntaxFacts.UnwrapExpression(expression, ExpressionCastUnwrapPolicy.All);
-
-    internal static ExpressionSyntax UnwrapDynamicExpression(ExpressionSyntax expression) =>
-        CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
 }

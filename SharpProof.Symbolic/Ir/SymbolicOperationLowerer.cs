@@ -167,7 +167,7 @@ internal static partial class SymbolicOperationLowerer {
         out SymbolicHazardOperation hazard) {
         if (!SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
                 operation.Syntax,
-                SymbolicRuntimeHazardSyntaxFacts.UnwrapDynamicExpression,
+                CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression,
                 out _,
                 out var receiver,
                 out var category,
@@ -232,7 +232,7 @@ internal static partial class SymbolicOperationLowerer {
                 break;
             case AssignmentExpressionSyntax assignment
                 when assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
-                     SymbolicRuntimeHazardSyntaxFacts.UnwrapExpression(assignment.Left) is
+                     CSharpSyntaxFacts.UnwrapExpression(assignment.Left, ExpressionCastUnwrapPolicy.All) is
                          TupleExpressionSyntax or DeclarationExpressionSyntax &&
                      context.SemanticModel.GetDeconstructionInfo(assignment).Method is
                          IMethodSymbol { IsStatic: false }:
@@ -472,8 +472,9 @@ internal static partial class SymbolicOperationLowerer {
         SymbolicCondition? trigger = null;
         var provenance = "ir.runtime-hazard.index.out-of-range";
         if (elementAccess.ArgumentList.Arguments.Count == 1) {
-            var indexExpression = SymbolicRuntimeHazardSyntaxFacts.UnwrapExpression(
-                elementAccess.ArgumentList.Arguments[0].Expression);
+            var indexExpression = CSharpSyntaxFacts.UnwrapExpression(
+                elementAccess.ArgumentList.Arguments[0].Expression,
+                ExpressionCastUnwrapPolicy.All);
             if (indexExpression is InvocationExpressionSyntax absInvocation &&
                 CSharpMathPatternRecognizer.TryGetMathAbsRemainderOperands(
                     absInvocation,
@@ -797,7 +798,7 @@ internal static partial class SymbolicOperationLowerer {
         out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not AssignmentExpressionSyntax assignment ||
             !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-            SymbolicRuntimeHazardSyntaxFacts.UnwrapExpression(assignment.Left) is not
+            CSharpSyntaxFacts.UnwrapExpression(assignment.Left, ExpressionCastUnwrapPolicy.All) is not
                 ElementAccessExpressionSyntax elementAccess ||
             !SymbolicRuntimeHazardSyntaxFacts.TryGetArrayElementStoreType(
                 elementAccess,

@@ -620,8 +620,8 @@ internal static partial class SymbolicOperationLowerer {
             target.Kind != SmtValueKind.Reference)
             return;
 
-        var elementExpressions = finiteElements.Expressions;
-        for (var index = 0; index < elementExpressions.Length; index++) {
+        var elementExpressions = finiteElements;
+        for (var index = 0; index < elementExpressions.Count; index++) {
             var elementExpression = elementExpressions[index];
             if (SymbolMutationFacts.ExpressionReferencesSymbol(
                     elementExpression,
@@ -648,7 +648,7 @@ internal static partial class SymbolicOperationLowerer {
                 new SymbolicElementTerm(
                     target,
                     new SymbolicFromEndIndexTerm(
-                        new SymbolicIntegerConstantTerm(elementExpressions.Length - index)),
+                        new SymbolicIntegerConstantTerm(elementExpressions.Count - index)),
                     elementKind),
                 elementValue,
                 elementExpression,

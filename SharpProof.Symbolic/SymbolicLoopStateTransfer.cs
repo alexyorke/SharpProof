@@ -406,7 +406,7 @@ internal static class SymbolicLoopStateTransfer {
         var lowering = LowerLoopBodyInvariants(loopStatement, semanticModel, cancellationToken);
         if (lowering is not { IsExact: true, Value: { } plan })
             return;
-        foreach (var condition in plan.Conditions)
+        foreach (var condition in plan)
             state = SymbolicOperationTransferKernel.TransitionLoopEdge(
                 state,
                 edgeKind,
@@ -445,7 +445,7 @@ internal static class SymbolicLoopStateTransfer {
         if (lowering is not { IsExact: true, Value: { } plan })
             return;
 
-        foreach (var condition in plan.Conditions)
+        foreach (var condition in plan)
             state = SymbolicOperationTransferKernel.TransitionLoopEdge(
                 state, SymbolicLoopEdgeKind.Entry, condition, foreachStatement.Span,
                 "ir.path.foreach-entry.finite-domain").State;
@@ -573,7 +573,7 @@ internal static class SymbolicLoopStateTransfer {
                 "ir.path.for-initializer-entry").State;
     }
 
-    internal static SymbolicLoweringResult<SymbolicLoopInvariantPlan> LowerLoopBodyInvariants(
+    internal static SymbolicLoweringResult<IReadOnlyList<SymbolicCondition>> LowerLoopBodyInvariants(
         StatementSyntax loopStatement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
@@ -606,8 +606,8 @@ internal static class SymbolicLoopStateTransfer {
                 break;
         }
 
-        return SymbolicLoweringResult<SymbolicLoopInvariantPlan>.Exact(
-            new SymbolicLoopInvariantPlan(conditions.ToImmutable()),
+        return SymbolicLoweringResult<IReadOnlyList<SymbolicCondition>>.Exact(
+            conditions.ToImmutable(),
             new SymbolicLoweringProvenance("loop-invariants", loopStatement.Span, "exact"));
     }
 

@@ -144,16 +144,16 @@ internal static class SymbolicOperationTransferKernel {
 
     internal static SymbolicOperationTransitionResult AssumeAll(
         SymbolicState state,
-        ImmutableArray<SymbolicCondition> conditions,
+        IReadOnlyList<SymbolicCondition> conditions,
         Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
         string provenance) {
-        if (conditions.IsDefaultOrEmpty)
+        if (conditions.Count == 0)
             return SymbolicOperationTransitionResult.Exact(
                 state,
                 ImmutableArray<SymbolicLoweringProvenance>.Empty);
 
-        var operations = ImmutableArray.CreateBuilder<SymbolicOperationDescriptor>(conditions.Length);
-        for (var index = 0; index < conditions.Length; index++)
+        var operations = ImmutableArray.CreateBuilder<SymbolicOperationDescriptor>(conditions.Count);
+        for (var index = 0; index < conditions.Count; index++)
             operations.Add(new SymbolicBranchAssumptionOperation(
                 conditions[index],
                 true,

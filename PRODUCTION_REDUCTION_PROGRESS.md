@@ -842,12 +842,18 @@ Tests are excluded from the metric and must not be deleted.
   point, and `SymbolicMutationInventory` is the sole mutation-enumeration owner.
   Budget, source-profile, predicate, requires-entry, range/index, and CLI
   characterization remains green.
+- [x] Removed four one-field symbolic lowering carriers and the remaining
+  runtime-hazard type/unwrap forwarding helpers. Finite domains, loop
+  invariants, and source-completion conditions now flow as immutable
+  read-only collections directly through the lowering result and operation
+  transfer kernel. Focused finite-domain, CFG, and operation-transfer
+  characterization remains green.
 
 ## Current evidence
 
-- Phase-two maintained production: 80,994 lines (77,032 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,440-line reduction from the
-  84,434-line phase-two baseline. Another 16,560 lines remain to the 64,434
+- Phase-two maintained production: 80,981 lines (77,019 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,453-line reduction from the
+  84,434-line phase-two baseline. Another 16,547 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.

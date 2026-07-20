@@ -2,14 +2,8 @@ using static SharpProof.Symbolic.SymbolicStateFactBuilder;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal sealed record SymbolicForeachDomainPlan(
-    ImmutableArray<SymbolicCondition> Conditions);
-
-internal sealed record SymbolicFiniteElements(
-    ImmutableArray<ExpressionSyntax> Expressions);
-
 internal static class SymbolicFiniteDomainLowerer {
-    internal static SymbolicLoweringResult<SymbolicFiniteElements> LowerElements(
+    internal static SymbolicLoweringResult<IReadOnlyList<ExpressionSyntax>> LowerElements(
         ExpressionSyntax expression) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         switch (expression) {
@@ -48,7 +42,7 @@ internal static class SymbolicFiniteDomainLowerer {
         }
     }
 
-    internal static SymbolicLoweringResult<SymbolicForeachDomainPlan> LowerForeachDomain(
+    internal static SymbolicLoweringResult<IReadOnlyList<SymbolicCondition>> LowerForeachDomain(
         ExpressionSyntax expression,
         StatementSyntax foreachStatement,
         SemanticModel semanticModel,
@@ -73,7 +67,7 @@ internal static class SymbolicFiniteDomainLowerer {
         SymbolicCondition? finiteDomain = null;
         var allReferencesNonNull =
             SymbolicFactFactory.GetTrackedSymbolType(iterationSymbol.OriginalDefinition)?.IsReferenceType == true;
-        foreach (var element in finiteElements.Expressions) {
+        foreach (var element in finiteElements) {
             if (SymbolMutationFacts.ExpressionReferencesSymbol(
                     element,
                     iterationSymbol.OriginalDefinition,
@@ -121,12 +115,12 @@ internal static class SymbolicFiniteDomainLowerer {
 
         return conditions.Count == 0
             ? Unsupported(foreachStatement, "empty")
-            : SymbolicLoweringResult<SymbolicForeachDomainPlan>.Exact(
-                new SymbolicForeachDomainPlan(conditions.ToImmutable()),
+            : SymbolicLoweringResult<IReadOnlyList<SymbolicCondition>>.Exact(
+                conditions.ToImmutable(),
                 Provenance(foreachStatement, "exact"));
     }
 
-    private static SymbolicLoweringResult<SymbolicFiniteElements> LowerPriorAssignedElements(
+    private static SymbolicLoweringResult<IReadOnlyList<ExpressionSyntax>> LowerPriorAssignedElements(
         ExpressionSyntax expression,
         StatementSyntax foreachStatement,
         SemanticModel semanticModel,
@@ -159,7 +153,7 @@ internal static class SymbolicFiniteDomainLowerer {
                         semanticModel,
                         cancellationToken) ||
                     AnyReferencedSymbolInvalidated(
-                        elements.Expressions,
+                        elements,
                         containingBlock,
                         index + 1,
                         foreachStatement.SpanStart,
@@ -197,7 +191,7 @@ internal static class SymbolicFiniteDomainLowerer {
     }
 
     private static bool AnyReferencedSymbolInvalidated(
-        ImmutableArray<ExpressionSyntax> elements,
+        IReadOnlyList<ExpressionSyntax> elements,
         BlockSyntax block,
         int firstIndex,
         int beforeSpanStart,
@@ -266,7 +260,7 @@ internal static class SymbolicFiniteDomainLowerer {
             semanticModel,
             cancellationToken);
 
-    private static SymbolicLoweringResult<SymbolicFiniteElements> BoundElements(
+    private static SymbolicLoweringResult<IReadOnlyList<ExpressionSyntax>> BoundElements(
         SyntaxNode source,
         ImmutableArray<ExpressionSyntax> elements,
         string eventDetail) {
@@ -287,22 +281,22 @@ internal static class SymbolicFiniteDomainLowerer {
         return ExactElements(source, elements);
     }
 
-    private static SymbolicLoweringResult<SymbolicFiniteElements> ExactElements(
+    private static SymbolicLoweringResult<IReadOnlyList<ExpressionSyntax>> ExactElements(
         SyntaxNode source,
         ImmutableArray<ExpressionSyntax> elements) =>
-        SymbolicLoweringResult<SymbolicFiniteElements>.Exact(
-            new SymbolicFiniteElements(elements),
+        SymbolicLoweringResult<IReadOnlyList<ExpressionSyntax>>.Exact(
+            elements,
             Provenance(source, "elements"));
 
-    private static SymbolicLoweringResult<SymbolicFiniteElements> UnsupportedElements(
+    private static SymbolicLoweringResult<IReadOnlyList<ExpressionSyntax>> UnsupportedElements(
         SyntaxNode source,
         string detail) =>
-        SymbolicLoweringResult<SymbolicFiniteElements>.Unsupported(Provenance(source, detail));
+        SymbolicLoweringResult<IReadOnlyList<ExpressionSyntax>>.Unsupported(Provenance(source, detail));
 
-    private static SymbolicLoweringResult<SymbolicForeachDomainPlan> Unsupported(
+    private static SymbolicLoweringResult<IReadOnlyList<SymbolicCondition>> Unsupported(
         SyntaxNode source,
         string detail) =>
-        SymbolicLoweringResult<SymbolicForeachDomainPlan>.Unsupported(Provenance(source, detail));
+        SymbolicLoweringResult<IReadOnlyList<SymbolicCondition>>.Unsupported(Provenance(source, detail));
 
     private static SymbolicLoweringProvenance Provenance(SyntaxNode source, string detail) =>
         new("finite-foreach-domain", source.Span, detail);

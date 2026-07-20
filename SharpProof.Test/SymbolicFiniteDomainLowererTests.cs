@@ -29,6 +29,6 @@ public sealed class SymbolicFiniteDomainLowererTests
             CancellationToken.None);
 
         Assert.That(result.IsExact, Is.True, result.Provenance.Single().Detail);
-        Assert.That(result.Value!.Conditions, Has.Length.EqualTo(testCase.ConditionCount));
+        Assert.That(result.Value, Has.Count.EqualTo(testCase.ConditionCount));
     }
 }

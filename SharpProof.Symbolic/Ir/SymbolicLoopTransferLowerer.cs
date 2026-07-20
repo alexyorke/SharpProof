@@ -5,10 +5,7 @@ internal sealed record SymbolicLoopTransferPlan(
     SymbolicCondition EntryCondition,
     SymbolicCondition ExitCondition,
     ImmutableArray<SymbolicInvalidationTarget> BackEdgeInvalidations,
-    ImmutableArray<SymbolicCondition> Invariants);
-
-internal sealed record SymbolicLoopInvariantPlan(
-    ImmutableArray<SymbolicCondition> Conditions);
+    IReadOnlyList<SymbolicCondition> Invariants);
 
 internal static class SymbolicLoopTransferLowerer {
     internal static SymbolicLoweringResult<SymbolicLoopTransferPlan> Lower(
@@ -55,8 +52,8 @@ internal static class SymbolicLoopTransferLowerer {
             !allowAbruptCompletion)
             return Unsupported(loop, "invariants");
         var invariants = invariantLowering is { IsExact: true, Value: { } exactInvariantPlan }
-            ? exactInvariantPlan.Conditions
-            : ImmutableArray<SymbolicCondition>.Empty;
+            ? exactInvariantPlan
+            : Array.Empty<SymbolicCondition>();
         return SymbolicLoweringResult<SymbolicLoopTransferPlan>.Exact(
             new SymbolicLoopTransferPlan(
                 loop,
