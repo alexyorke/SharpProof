@@ -173,7 +173,7 @@ internal static class MethodEnsuresAnalyzer
                         out var initialState,
                         out var oldFailureReason))
                 {
-                    var proofOutcome = context.State.TryProveAtNode(
+                    proof = context.State.ProveAtNode(
                         completionSite.QueryNode,
                         proofCondition,
                         symbolicCondition,
@@ -181,22 +181,14 @@ internal static class MethodEnsuresAnalyzer
                         purityService.SmtAnalysis,
                         completionSite.IncludeCurrentStatementCompletionFacts,
                         context.CancellationToken);
-                    proof = AnalyzerSymbolicQueryBoundary.ResolveProof(
-                        proofOutcome,
-                        proofCondition,
-                        context.CancellationToken);
                 }
                 else if (oldFailureReason == null)
                 {
-                    var proofOutcome = context.State.TryProveAtNode(
-                            completionSite.QueryNode,
-                            proofCondition,
-                            purityService.SmtAnalysis,
-                            completionSite.IncludeCurrentStatementCompletionFacts,
-                            context.CancellationToken);
-                    proof = AnalyzerSymbolicQueryBoundary.ResolveProof(
-                        proofOutcome,
+                    proof = context.State.ProveAtNode(
+                        completionSite.QueryNode,
                         proofCondition,
+                        purityService.SmtAnalysis,
+                        completionSite.IncludeCurrentStatementCompletionFacts,
                         context.CancellationToken);
                 }
                 else

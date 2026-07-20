@@ -264,12 +264,12 @@ internal static class NullableContractAnalyzer
                 operand,
                 context,
                 session);
-            var proof = ProveAtSyntaxNode(
-                context,
-                session,
+            var proof = context.State.ProveAtNode(
                 suppression,
                 condition,
-                false);
+                session.PurityService.SmtAnalysis,
+                false,
+                context.CancellationToken);
             if (memberFactInvalidated && proof.TruthValue == SymbolicTruthValue.ProvenTrue)
             {
                 ReportInconclusive(context, session, suppression.GetLocation(), "null-forgiving", condition, proof);
@@ -414,24 +414,24 @@ internal static class NullableContractAnalyzer
                 out var symbolicCondition,
                 out var initialState,
                 out var snapshotFailureReason)
-                ? ProveAtSyntaxNode(
-                    context,
-                    session,
+                ? context.State.ProveAtNode(
                     completion.QueryNode,
                     condition,
                     symbolicCondition,
                     initialState,
-                    completion.IncludeCurrentStatementCompletionFacts)
+                    session.PurityService.SmtAnalysis,
+                    completion.IncludeCurrentStatementCompletionFacts,
+                    context.CancellationToken)
                 : new SymbolicConditionProofResult(
                     condition,
                     SymbolicTruthValue.Unknown,
                     snapshotFailureReason ?? "entry snapshot could not be created")
-            : ProveAtSyntaxNode(
-                context,
-                session,
+            : context.State.ProveAtNode(
                 completion.QueryNode,
                 condition,
-                completion.IncludeCurrentStatementCompletionFacts);
+                session.PurityService.SmtAnalysis,
+                completion.IncludeCurrentStatementCompletionFacts,
+                context.CancellationToken);
         if (proof.TruthValue is SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable) return;
 
         if (proof.TruthValue == SymbolicTruthValue.ProvenFalse ||
@@ -484,42 +484,6 @@ internal static class NullableContractAnalyzer
                    expression,
                    context.SemanticModel,
                    context.CancellationToken) == NullableFlowFactState.NotNull;
-    }
-
-    private static SymbolicConditionProofResult ProveAtSyntaxNode(
-        MethodBodyAnalysisContext context,
-        AnalyzerSession session,
-        SyntaxNode node,
-        string condition,
-        bool includeCurrentStatementCompletionFacts)
-    {
-        var outcome = context.State.TryProveAtNode(
-            node,
-            condition,
-            session.PurityService.SmtAnalysis,
-            includeCurrentStatementCompletionFacts,
-            context.CancellationToken);
-        return AnalyzerSymbolicQueryBoundary.ResolveProof(outcome, condition, context.CancellationToken);
-    }
-
-    private static SymbolicConditionProofResult ProveAtSyntaxNode(
-        MethodBodyAnalysisContext context,
-        AnalyzerSession session,
-        SyntaxNode node,
-        string condition,
-        SymbolicCondition symbolicCondition,
-        SymbolicState initialState,
-        bool includeCurrentStatementCompletionFacts)
-    {
-        var outcome = context.State.TryProveAtNode(
-            node,
-            condition,
-            symbolicCondition,
-            initialState,
-            session.PurityService.SmtAnalysis,
-            includeCurrentStatementCompletionFacts,
-            context.CancellationToken);
-        return AnalyzerSymbolicQueryBoundary.ResolveProof(outcome, condition, context.CancellationToken);
     }
 
     private static bool CanUseSuppressionCounterexample(

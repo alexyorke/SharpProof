@@ -388,7 +388,7 @@ public class TestClass
         SymbolicCondition condition,
         SmtAnalysisService smtAnalysis)
     {
-        return new SymbolicQueryExecutor().ProveAtSyntaxNode(
+        return new SymbolicConditionProofEngine(new SymbolicInvariantService()).ProveAtSyntaxNode(
             semanticModel,
             node,
             SymbolicFormulaDisplay.Format(condition),

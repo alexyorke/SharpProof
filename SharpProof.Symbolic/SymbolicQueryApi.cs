@@ -41,44 +41,6 @@ internal sealed partial class SymbolicQueryExecutor
             ProveSource(request, conditionText, token));
     }
 
-    internal SymbolicConditionProofResult ProveAtSyntaxNode(
-        SemanticModel semanticModel,
-        SyntaxNode node,
-        string conditionText,
-        SmtAnalysisService smtAnalysis,
-        bool includeCurrentStatementCompletionFacts,
-        CancellationToken cancellationToken = default)
-    {
-        return _conditionProofEngine.ProveAtSyntaxNode(
-            semanticModel,
-            node,
-            conditionText,
-            smtAnalysis,
-            includeCurrentStatementCompletionFacts,
-            cancellationToken);
-    }
-
-    internal SymbolicConditionProofResult ProveAtSyntaxNode(
-        SemanticModel semanticModel,
-        SyntaxNode node,
-        string conditionText,
-        SymbolicCondition symbolicCondition,
-        SymbolicState initialState,
-        SmtAnalysisService smtAnalysis,
-        bool includeCurrentStatementCompletionFacts,
-        CancellationToken cancellationToken = default)
-    {
-        return _conditionProofEngine.ProveAtSyntaxNode(
-            semanticModel,
-            node,
-            conditionText,
-            symbolicCondition,
-            initialState,
-            smtAnalysis,
-            includeCurrentStatementCompletionFacts,
-            cancellationToken);
-    }
-
     public SymbolicRuntimeHazardQueryResult QueryRuntimeHazards(
         SymbolicQueryContext context,
         SymbolicRuntimeHazardQueryOptions? hazardOptions = null,

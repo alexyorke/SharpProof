@@ -9,6 +9,8 @@ internal sealed class MethodBodyAnalysisState
 {
     private readonly ConcurrentDictionary<string, Lazy<object>> _symbolicQueryResults =
         new(StringComparer.Ordinal);
+    private readonly SymbolicConditionProofEngine _conditionProofEngine =
+        new(new SymbolicInvariantService());
 
     internal MethodBodyAnalysisState(MethodAnalysisSnapshot snapshot)
     {
@@ -39,14 +41,14 @@ internal sealed class MethodBodyAnalysisState
                 cancellationToken)));
     }
 
-    internal AnalyzerQueryOutcome<SymbolicConditionProofResult> TryProveAtNode(
+    internal SymbolicConditionProofResult ProveAtNode(
         SyntaxNode node,
         string condition,
         SmtAnalysisService smtAnalysis,
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken)
     {
-        return TryProveAtNode(node, () => QueryExecutor.ProveAtSyntaxNode(
+        return ProveAtNode(node, condition, cancellationToken, () => _conditionProofEngine.ProveAtSyntaxNode(
             Snapshot.SemanticModel,
             node,
             condition,
@@ -55,7 +57,7 @@ internal sealed class MethodBodyAnalysisState
             cancellationToken));
     }
 
-    internal AnalyzerQueryOutcome<SymbolicConditionProofResult> TryProveAtNode(
+    internal SymbolicConditionProofResult ProveAtNode(
         SyntaxNode node,
         string condition,
         SymbolicCondition symbolicCondition,
@@ -64,7 +66,7 @@ internal sealed class MethodBodyAnalysisState
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken)
     {
-        return TryProveAtNode(node, () => QueryExecutor.ProveAtSyntaxNode(
+        return ProveAtNode(node, condition, cancellationToken, () => _conditionProofEngine.ProveAtSyntaxNode(
             Snapshot.SemanticModel,
             node,
             condition,
@@ -75,12 +77,17 @@ internal sealed class MethodBodyAnalysisState
             cancellationToken));
     }
 
-    private AnalyzerQueryOutcome<SymbolicConditionProofResult> TryProveAtNode(
+    private SymbolicConditionProofResult ProveAtNode(
         SyntaxNode node,
+        string condition,
+        CancellationToken cancellationToken,
         Func<SymbolicConditionProofResult> prove)
     {
         ValidateNode(node);
-        return AnalyzerSymbolicQueryBoundary.TryExecute(prove);
+        return AnalyzerSymbolicQueryBoundary.ResolveProof(
+            AnalyzerSymbolicQueryBoundary.TryExecute(prove),
+            condition,
+            cancellationToken);
     }
 
     private void ValidateNode(SyntaxNode node)

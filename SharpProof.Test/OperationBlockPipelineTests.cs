@@ -185,20 +185,13 @@ public sealed class OperationBlockPipelineTests
 
         using (var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default))
         {
-            var failedProof = AnalyzerSymbolicQueryBoundary.TryExecute(() =>
-                state.QueryExecutor.ProveAtSyntaxNode(
-                    semanticModel,
-                    declaration,
-                    " ",
-                    smtAnalysis,
-                    false,
-                    CancellationToken.None));
-            var conservativeProof = AnalyzerSymbolicQueryBoundary.ResolveProof(
-                failedProof,
+            var conservativeProof = state.ProveAtNode(
+                declaration,
                 " ",
+                smtAnalysis,
+                false,
                 CancellationToken.None);
 
-            Assert.That(failedProof.IsSuccess, Is.False);
             Assert.That(conservativeProof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
             Assert.That(conservativeProof.Reason, Does.Contain(SymbolicErrorCodes.InvalidRequest));
         }
