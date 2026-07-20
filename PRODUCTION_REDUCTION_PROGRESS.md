@@ -612,13 +612,21 @@ Tests are excluded from the metric and must not be deleted.
   unreachable property-getter cache branch and inferred indirect-write and
   operand-size IL families from opcode metadata. Architecture coverage prevents
   the filter adapter from returning.
+- [x] Made the canonical baseline and EffectSummary loaders own additional-file
+  validation results. Deleted the 241-line `AnalyzerAdditionalFileValidator`
+  and its second JSON traversal; one session-owned issue accumulator now
+  receives schema, malformed-entry, unreadable-file, and stale-identity results
+  from the same parsed documents used by suppression and metadata analysis.
+  Exact SP0032 reason strings and reason codes remain characterized, and
+  architecture coverage prevents the parallel validator from returning.
 
 ## Current evidence
 
-- Maintained production: 91,120 lines (87,201 C#, 3,189 scripts, and 730
-  specifications); net reduction: 16,506 lines; remaining reduction: 3,494.
-  This CLI-filter ownership and final dead-code tranche removed 200 maintained-
-  production lines without deleting tests or changing serialized output.
+- Maintained production: 91,088 lines (87,169 C#, 3,189 scripts, and 730
+  specifications); net reduction: 16,538 lines; remaining reduction: 3,462.
+  This additional-file ownership tranche removed 32 maintained-production lines
+  while deleting a 241-line duplicate traversal without deleting tests or
+  changing diagnostic output.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,214 passing tests and two documented Main skips.
 

@@ -49,17 +49,19 @@ internal sealed class EffectSummaryCatalog
     internal static EffectSummaryCatalog FromOptionsWithCompatibilityReporter(
         AnalyzerOptions options,
         CancellationToken cancellationToken,
-        EffectSummaryCompatibilityReporter compatibilityReporter)
+        EffectSummaryCompatibilityReporter compatibilityReporter,
+        bool includeCatalog = true)
     {
-        var builtInCatalog = BuiltInCatalog.Value;
+        var builtInCatalog = includeCatalog ? BuiltInCatalog.Value : Empty;
         if (!BuiltInEffectSummaryLoader.HasAdditionalSummaryJsonDocuments(options)) return builtInCatalog;
 
         var entries = CloneEntries(builtInCatalog._entriesBySymbol);
         BuiltInEffectSummaryLoader.LoadAdditionalSummaryJsonDocuments(
             options,
             cancellationToken,
-            (path, json) => AddJson(entries, json, AdditionalSourcePriority, path, compatibilityReporter));
-        return CreateCatalog(entries);
+            (path, json) => AddJson(entries, json, AdditionalSourcePriority, path, compatibilityReporter),
+            compatibilityReporter);
+        return includeCatalog ? CreateCatalog(entries) : Empty;
     }
 
     private static EffectSummaryCatalog CreateBuiltInCatalog()
@@ -438,11 +440,20 @@ internal sealed class EffectSummaryCatalog
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        if (!EffectSummaryJsonParser.TryParse(json, out var document, out _)) return;
+        if (!EffectSummaryJsonParser.TryParse(json, out var document, out var parseFailure))
+        {
+            if (sourcePath != null && compatibilityReporter != null)
+                compatibilityReporter.Report(sourcePath, FormatParseFailure(parseFailure));
+            return;
+        }
 
         using (document)
         {
             var root = document.RootElement;
+            if (sourcePath != null && compatibilityReporter != null &&
+                !ValidateAdditionalDocument(root, sourcePath, compatibilityReporter))
+                return;
+
             foreach (var entry in ParseEntries(root, sourcePriority, sourcePath, compatibilityReporter))
             {
                 if (!entriesBySymbol.TryGetValue(entry.Symbol, out var entries))
@@ -454,6 +465,110 @@ internal sealed class EffectSummaryCatalog
                 entries.Add(entry);
             }
         }
+    }
+
+    private static string FormatParseFailure(EffectSummaryJsonFailure failure) => failure.Kind switch
+    {
+        EffectSummaryJsonFailureKind.MalformedJson => "malformed effect-summary JSON",
+        EffectSummaryJsonFailureKind.NonObjectRoot => "unsupported effect-summary root; expected an object",
+        EffectSummaryJsonFailureKind.MissingSchemaVersion => "effect-summary is missing a numeric SchemaVersion",
+        EffectSummaryJsonFailureKind.UnsupportedSchemaVersion =>
+            $"unsupported effect-summary SchemaVersion '{failure.SchemaVersion}'; supported version is " +
+            EffectSummarySchemaContract.CurrentVersion,
+        _ => "invalid effect-summary JSON"
+    };
+
+    private static bool ValidateAdditionalDocument(
+        JsonElement root,
+        string sourcePath,
+        EffectSummaryCompatibilityReporter reporter)
+    {
+        if (!BaselineSchemaContract.TryValidate(root, "EvidenceSchemaVersion", true, out var failure))
+        {
+            reporter.Report(sourcePath, BaselineSchemaContract.FormatValidationIssue(
+                failure, "EvidenceSchemaVersion", "effect-summary"));
+            return false;
+        }
+
+        if (root.TryGetProperty("GeneratedPurityCatalog", out var catalog) &&
+            catalog.ValueKind == JsonValueKind.Object)
+            return ValidateGeneratedPurityCatalog(catalog, sourcePath, reporter);
+
+        if (!root.TryGetProperty("Assemblies", out var assemblies) ||
+            assemblies.ValueKind != JsonValueKind.Array)
+        {
+            reporter.Report(sourcePath,
+                "unsupported effect-summary layout; expected Assemblies or GeneratedPurityCatalog");
+            return false;
+        }
+
+        var validMethods = 0;
+        var invalidAssemblies = 0;
+        var invalidMethods = 0;
+        foreach (var assembly in assemblies.EnumerateArray())
+        {
+            if (assembly.ValueKind != JsonValueKind.Object ||
+                !assembly.TryGetProperty("Methods", out var methods) ||
+                methods.ValueKind != JsonValueKind.Array)
+            {
+                invalidAssemblies++;
+                continue;
+            }
+
+            foreach (var method in methods.EnumerateArray())
+                if (EffectSummaryContractReader.TryReadMethod(method, out _)) validMethods++;
+                else invalidMethods++;
+        }
+
+        if (assemblies.GetArrayLength() == 0 || validMethods == 0)
+            reporter.Report(sourcePath, "effect-summary contains no usable assembly method entries");
+        ReportMalformedEntries(reporter, sourcePath, "effect-summary", invalidAssemblies + invalidMethods);
+        return true;
+    }
+
+    private static bool ValidateGeneratedPurityCatalog(
+        JsonElement catalog,
+        string sourcePath,
+        EffectSummaryCompatibilityReporter reporter)
+    {
+        if (!catalog.TryGetProperty("SchemaVersion", out var schemaVersion) ||
+            schemaVersion.ValueKind != JsonValueKind.Number ||
+            !schemaVersion.TryGetInt32(out var version) ||
+            version != EffectSummarySchemaContract.CurrentVersion)
+        {
+            reporter.Report(sourcePath, "GeneratedPurityCatalog SchemaVersion must be " +
+                                        EffectSummarySchemaContract.CurrentVersion);
+            return false;
+        }
+
+        if (!catalog.TryGetProperty("Entries", out var entries) || entries.ValueKind != JsonValueKind.Array)
+        {
+            reporter.Report(sourcePath, "unsupported GeneratedPurityCatalog layout; expected an Entries array");
+            return false;
+        }
+
+        var valid = 0;
+        var invalid = 0;
+        foreach (var entry in entries.EnumerateArray())
+            if (EffectSummaryContractReader.TryReadMethod(entry, out var method) &&
+                !string.IsNullOrWhiteSpace(method.Classification)) valid++;
+            else invalid++;
+
+        if (entries.GetArrayLength() == 0 || valid == 0)
+            reporter.Report(sourcePath, "GeneratedPurityCatalog contains no usable entries");
+        ReportMalformedEntries(reporter, sourcePath, "GeneratedPurityCatalog", invalid);
+        return true;
+    }
+
+    private static void ReportMalformedEntries(
+        EffectSummaryCompatibilityReporter reporter,
+        string sourcePath,
+        string source,
+        int count)
+    {
+        if (count != 0)
+            reporter.Report(sourcePath,
+                $"{source} partially ignored {count} malformed {(count == 1 ? "entry" : "entries")}");
     }
 
     private static IEnumerable<SummaryEntry> ParseEntries(

@@ -348,6 +348,8 @@ public sealed class RepositoryArchitectureTests
         Assert.Multiple(() =>
         {
             Assert.That(assembly.GetType("SharpProof.Analyzer.EffectSummaryJsonParser", true), Is.Not.Null);
+            Assert.That(assembly.GetType("SharpProof.Analyzer.Configuration.AnalyzerAdditionalFileValidator"), Is.Null,
+                "Canonical baseline and EffectSummary loaders must own their validation results.");
             Assert.That(assembly.GetType("SharpProof.Analyzer.EffectSummaryJsonDocument"), Is.Null,
                 "JSON lifetime and layout traversal must not regain a forwarding document facade.");
             Assert.That(assembly.GetType("SharpProof.Analyzer.EffectSummaryJsonAssembly"), Is.Null,

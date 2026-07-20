@@ -27,9 +27,6 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
         {
             SmtNativeLibraryBootstrap.TryLoadFromAnalyzerLocatorPaths(
                 startContext.Options.AdditionalFiles.Select(static file => file.Path));
-            var additionalFileIssues = AnalyzerAdditionalFileValidator.Validate(
-                startContext.Options,
-                startContext.CancellationToken);
             var session = new AnalyzerSession(
                 startContext.Compilation,
                 startContext.Options,
@@ -45,9 +42,6 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
                         var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue);
                         if (!session.Baseline.IsSuppressed(diagnostic)) endContext.ReportDiagnostic(diagnostic);
                     }
-
-                    foreach (var additionalFileIssue in additionalFileIssues)
-                        endContext.ReportDiagnostic(CreateInvalidAdditionalFileDiagnostic(additionalFileIssue));
 
                     foreach (var compatibilityIssue in session.EffectSummaryCompatibilityReporter.GetIssues())
                         endContext.ReportDiagnostic(CreateInvalidAdditionalFileDiagnostic(compatibilityIssue));

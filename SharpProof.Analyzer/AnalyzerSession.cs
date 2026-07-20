@@ -19,8 +19,11 @@ internal sealed class AnalyzerSession : IDisposable
         Features = AnalyzerFeatureDependencies.Expand(requestedFeatures);
         Configuration = AnalyzerConfiguration.FromOptions(options);
         AttributePolicy = SharpProofAttributeIdentityPolicy.Create(Configuration.AttributeStubNamespaces);
-        Baseline = DiagnosticBaseline.FromOptions(options, cancellationToken);
         EffectSummaryCompatibilityReporter = new EffectSummaryCompatibilityReporter();
+        Baseline = DiagnosticBaseline.FromOptions(
+            options,
+            cancellationToken,
+            EffectSummaryCompatibilityReporter);
 
         _purityService = new Lazy<CompilationPurityService>(
             () => new CompilationPurityService(
@@ -35,12 +38,11 @@ internal sealed class AnalyzerSession : IDisposable
                                     Features.Includes(AnalyzerFeatures.Suggestions) ||
                                     Features.Includes(AnalyzerFeatures.Purity) ||
                                     Configuration.TrustedBoundaryReviewMode != TrustedBoundaryReviewMode.Off);
-        EffectSummaryCatalog = needsEffectSummaries
-            ? EffectSummaryCatalog.FromOptionsWithCompatibilityReporter(
-                options,
-                cancellationToken,
-                EffectSummaryCompatibilityReporter)
-            : EffectSummaryCatalog.Empty;
+        EffectSummaryCatalog = EffectSummaryCatalog.FromOptionsWithCompatibilityReporter(
+            options,
+            cancellationToken,
+            EffectSummaryCompatibilityReporter,
+            needsEffectSummaries);
     }
 
     internal AnalyzerFeatures Features { get; }
