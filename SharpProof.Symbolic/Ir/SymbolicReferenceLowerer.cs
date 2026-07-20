@@ -62,7 +62,7 @@ internal static class SymbolicReferenceLowerer
             return true;
 
         if (expression is ElementAccessExpressionSyntax elementAccess &&
-            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerElementAccessTerm(elementAccess, context), out term) &&
+            SymbolicIndexingLowerer.TryLowerElementAccessTerm(elementAccess, context, out term) &&
             term.Kind == SmtValueKind.Reference)
             return true;
 

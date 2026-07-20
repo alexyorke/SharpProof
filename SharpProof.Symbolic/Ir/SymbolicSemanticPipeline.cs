@@ -531,7 +531,10 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerPatternCondition(value, valueType, pattern, source, context),
+            SymbolicPatternLowerer.TryLowerPatternCondition(
+                value, valueType, pattern, source, context, out var condition)
+                ? condition
+                : null,
             source,
             "pattern");
     }
@@ -544,7 +547,7 @@ internal static class SymbolicSemanticPipeline
             return Unsupported<SymbolicTerm>(expression, "reference-term");
 
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerReferenceTerm(expression, context),
+            SymbolicReferenceLowerer.TryLowerReferenceTerm(expression, context, out var term) ? term : null,
             expression,
             "reference-term");
     }
@@ -554,7 +557,7 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerStringTerm(expression, context),
+            SymbolicStringLowerer.TryLowerStringTerm(expression, context, out var term) ? term : null,
             expression,
             "string-term");
     }
@@ -564,7 +567,7 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerBooleanValueTerm(expression, context),
+            SymbolicSourcePredicateLowerer.TryLowerBooleanValueTerm(expression, context, out var term) ? term : null,
             expression,
             "boolean-term");
     }
@@ -574,7 +577,10 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerNotNullIfNotNullAssignedResultTerm(expression, context),
+            SymbolicNullableLowerer.TryLowerNotNullIfNotNullResultNonNullTerm(
+                expression, context, true, out var term)
+                ? term
+                : null,
             expression,
             "not-null-if-not-null-assigned-result");
     }
@@ -584,7 +590,7 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerBuiltInLengthTerm(expression, context),
+            SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(expression, context, out var term) ? term : null,
             expression,
             "built-in-length");
     }
@@ -607,7 +613,9 @@ internal static class SymbolicSemanticPipeline
         SyntaxNode source)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.ProjectBuiltInLengthTerm(receiverType, receiver),
+            SymbolicIndexingLowerer.TryCreateBuiltInLengthReferenceTerm(receiverType, receiver, out var term)
+                ? term
+                : null,
             source,
             "built-in-length-projection");
     }
@@ -617,7 +625,7 @@ internal static class SymbolicSemanticPipeline
         SyntaxNode source)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.ProjectStringContentTerm(receiver),
+            SymbolicStringLowerer.TryCreateStringContentReferenceTerm(receiver, out var term) ? term : null,
             source,
             "string-content-projection");
     }
@@ -628,7 +636,10 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerArrayDimensionLengthTerm(expression, dimension, context),
+            SymbolicIndexingLowerer.TryLowerArrayDimensionLengthTerm(
+                expression, dimension, context, out var term)
+                ? term
+                : null,
             expression,
             "array-dimension-length");
     }
@@ -638,7 +649,7 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerNullableHasValueTerm(expression, context),
+            SymbolicNullableLowerer.TryLowerNullableHasValueTerm(expression, context, out var term) ? term : null,
             expression,
             "nullable-has-value");
     }
@@ -648,7 +659,7 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerNullableValueTerm(expression, context),
+            SymbolicNullableLowerer.TryLowerNullableValueTerm(expression, context, out var term) ? term : null,
             expression,
             "nullable-value");
     }
@@ -658,7 +669,9 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerStringNonNullCondition(expression, context),
+            SymbolicStringLowerer.TryLowerStringNonNullCondition(expression, context, out var condition)
+                ? condition
+                : null,
             expression,
             "string-non-null");
     }
@@ -674,12 +687,14 @@ internal static class SymbolicSemanticPipeline
                                elementAccess.Expression,
                                context.CancellationToken).Type;
         if (receiverType is IArrayTypeSymbol { Rank: > 1 } &&
-            SymbolicIrLowerer.LowerArrayElementBoundsCondition(
+            SymbolicIndexingLowerer.TryCreateArrayElementBoundsCondition(
                 elementAccess.Expression,
                 elementAccess.ArgumentList.Arguments.Select(static argument => argument.Expression).ToArray(),
                 elementAccess,
                 "ir.element-access.multidimensional-bounds.in-range",
-                context) is { } multidimensionalCondition)
+                context,
+                out var multidimensionalCondition,
+                out _))
             return Exact(multidimensionalCondition, elementAccess, "element-access-in-range");
 
         if (elementAccess.ArgumentList.Arguments.Count == 1)
@@ -808,12 +823,15 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerBuiltInElementAccessInRangeCondition(
+            SymbolicIndexingLowerer.TryCreateBuiltInElementAccessInRangeCondition(
                 receiverExpression,
                 indexExpression,
                 source,
                 "ir.element-access.bounds.in-range",
-                context),
+                context,
+                out var condition)
+                ? condition
+                : null,
             source,
             "element-access-in-range");
     }
@@ -825,12 +843,16 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerArrayElementBoundsCondition(
+            SymbolicIndexingLowerer.TryCreateArrayElementBoundsCondition(
                 arrayExpression,
                 indexExpressions,
                 source,
                 "ir.array-element.bounds.in-range",
-                context),
+                context,
+                out var condition,
+                out _)
+                ? condition
+                : null,
             source,
             "array-element-in-range");
     }
@@ -844,14 +866,17 @@ internal static class SymbolicSemanticPipeline
         bool oneArgumentUpperBoundIsInclusive = true)
     {
         return LowerExactOrUnsupported(
-            SymbolicIrLowerer.LowerSubsequenceInRangeCondition(
+            SymbolicIndexingLowerer.TryCreateSubsequenceInRangeCondition(
                 receiverExpression,
                 startExpression,
                 lengthExpression,
                 source,
                 "ir.subsequence.in-range",
                 context,
-                oneArgumentUpperBoundIsInclusive),
+                oneArgumentUpperBoundIsInclusive,
+                out var condition)
+                ? condition
+                : null,
             source,
             "subsequence-in-range");
     }
@@ -867,7 +892,7 @@ internal static class SymbolicSemanticPipeline
     {
         var left = LowerTerm(leftExpression, context);
         var right = LowerTerm(rightExpression, context);
-        if (SymbolicIrLowerer.GetBinaryTermOperator(smtOperator) is { } binaryOperator &&
+        if (SymbolicOperatorLowerer.TryGetBinaryTermOperator(smtOperator, out var binaryOperator) &&
             binaryOperator is not (SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder) &&
             left is { IsExact: true, Value: { Kind: SmtValueKind.Int } leftTerm } &&
             right is { IsExact: true, Value: { Kind: SmtValueKind.Int } rightTerm })

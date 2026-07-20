@@ -4632,17 +4632,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Boundary.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicIrLowerer"
-                                              ],
-                            "referencingFixtureCount":  2,
-                            "referencedTokens":  [
-                                                     "SymbolicIrLowerer"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Conditions.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -9355,18 +9344,6 @@
                                                    "SymbolicIrFormulaEncoder"
                                                ],
                                     "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Boundary.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "RepositoryArchitectureTests",
-                                                                 "SymbolicInvariantServiceTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicIrLowerer"
-                                               ],
-                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Conditions.cs",

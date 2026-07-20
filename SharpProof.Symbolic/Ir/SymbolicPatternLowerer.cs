@@ -453,7 +453,7 @@ internal static class SymbolicPatternLowerer
 
             if (member.Name is "Length" or "Count" &&
                 memberKind == SmtValueKind.Int &&
-                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.ProjectBuiltInLengthTerm(currentType, current), out var lengthTerm))
+                SymbolicIndexingLowerer.TryCreateBuiltInLengthReferenceTerm(currentType, current, out var lengthTerm))
                 current = lengthTerm;
             else
                 current = new SymbolicMemberTerm(current, member.Name, memberKind);
@@ -663,7 +663,7 @@ internal static class SymbolicPatternLowerer
                 indexer != null &&
                 SymbolicTypeLowerer.TryGetValueKind(indexer.Type, out elementKind))
             {
-                if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.ProjectBuiltInLengthTerm(valueType, value), out length))
+                if (!SymbolicIndexingLowerer.TryCreateBuiltInLengthReferenceTerm(valueType, value, out length))
                     length = lengthProperty.Name == "Count"
                         ? new SymbolicCountTerm(value)
                         : new SymbolicLengthTerm(value);

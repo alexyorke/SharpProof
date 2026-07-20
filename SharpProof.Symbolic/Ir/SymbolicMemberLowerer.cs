@@ -89,7 +89,7 @@ internal static class SymbolicMemberLowerer
             if (receiverType?.SpecialType == SpecialType.System_String ||
                 receiverType is IArrayTypeSymbol ||
                 SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(receiverType))
-                return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerBuiltInLengthTerm(memberAccess.Expression, context), out term);
+                return SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(memberAccess.Expression, context, out term);
         }
 
         if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(memberAccess.Expression, context), out var receiver)) return false;

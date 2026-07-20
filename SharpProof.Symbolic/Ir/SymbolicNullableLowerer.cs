@@ -666,7 +666,8 @@ internal static class SymbolicNullableLowerer
             }
 
             if (receiverType is IArrayTypeSymbol { Rank: > 1 } multiDimensionalArray &&
-                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerArrayTotalLengthTerm(conditionalAccess.Expression, multiDimensionalArray, context), out term))
+                SymbolicIndexingLowerer.TryLowerArrayTotalLengthTerm(
+                    conditionalAccess.Expression, multiDimensionalArray, context, out term))
                 return true;
         }
 

@@ -26,7 +26,7 @@ internal static class SymbolicStringLengthLowerer
         if (constructor.Parameters.Length == 1 &&
             SymbolicTypeFacts.IsCharArrayType(constructor.Parameters[0].Type) &&
             SymbolicIndexingLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var charArrayExpression))
-            return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerBuiltInLengthTerm(charArrayExpression, context), out term);
+            return SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(charArrayExpression, context, out term);
 
         if (constructor.Parameters.Length == 3 &&
             SymbolicTypeFacts.IsCharArrayType(constructor.Parameters[0].Type) &&
@@ -40,7 +40,7 @@ internal static class SymbolicStringLengthLowerer
         if (constructor.Parameters.Length == 1 &&
             SymbolicTypeFacts.IsReadOnlySpanOfCharType(constructor.Parameters[0].Type) &&
             SymbolicIndexingLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var spanExpression))
-            return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerBuiltInLengthTerm(spanExpression, context), out term);
+            return SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(spanExpression, context, out term);
 
         term = null!;
         return false;
@@ -66,7 +66,7 @@ internal static class SymbolicStringLengthLowerer
             method.Parameters.Length == 1)
         {
             if (invocationOperation.Arguments.Length != 1 ||
-                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerBuiltInLengthTerm(sourceExpression, context), out var sourceLength) ||
+                !SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength) ||
                 !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocationOperation.Arguments[0].Syntax as ExpressionSyntax ??
                     invocationOperation.Arguments[0].Value.Syntax as ExpressionSyntax ??
                     invocationExpression.ArgumentList.Arguments[0].Expression, context), out var start) ||
@@ -81,7 +81,7 @@ internal static class SymbolicStringLengthLowerer
             method.Parameters.Length == 2)
         {
             if (invocationOperation.Arguments.Length != 2 ||
-                SymbolicIrLowerer.LowerBuiltInLengthTerm(sourceExpression, context) == null ||
+                !SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out _) ||
                 !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocationOperation.Arguments[0].Syntax as ExpressionSyntax ??
                     invocationExpression.ArgumentList.Arguments[0].Expression, context), out var startValue) ||
                 startValue.Kind != SmtValueKind.Int ||
@@ -96,7 +96,7 @@ internal static class SymbolicStringLengthLowerer
 
         if (string.Equals(method.Name, nameof(string.Remove), StringComparison.Ordinal))
         {
-            if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerBuiltInLengthTerm(sourceExpression, context), out var sourceLength)) return false;
+            if (!SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength)) return false;
 
             if (method.Parameters.Length == 1 &&
                 SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0,
@@ -145,7 +145,7 @@ internal static class SymbolicStringLengthLowerer
         if (method.Name is nameof(string.PadLeft) or nameof(string.PadRight) &&
             (method.Parameters.Length == 1 ||
              method.Parameters.Length == 2 && method.Parameters[1].Type.SpecialType == SpecialType.System_Char) &&
-            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerBuiltInLengthTerm(sourceExpression, context), out var padSourceLength) &&
+            SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out var padSourceLength) &&
             SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var widthExpression) &&
             SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(widthExpression, context), out var width) &&
             width.Kind == SmtValueKind.Int)

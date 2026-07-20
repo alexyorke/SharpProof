@@ -553,12 +553,20 @@ Tests are excluded from the metric and must not be deleted.
   member table and one operand checker, and the LINQ source path no longer keeps
   empty compatibility branches. Focused parsing, collection-view, string,
   networking, and reflection tests preserve the characterized semantics.
+- [x] Deleted the nullable `SymbolicIrLowerer.Boundary` compatibility layer.
+  The canonical typed `SymbolicSemanticPipeline` now calls specialized pattern,
+  reference, string, nullable, indexing, and operator lowerers directly, while
+  the two recursive IR entry points live with `SymbolicIrLowerer`. Internal
+  string-length, member, pattern, reference, and nullable lowering now consume
+  the underlying `TryLower*` contracts without converting through nullable
+  adapters. The impacted-test inventory was regenerated after removing the
+  production file.
 
 ## Current evidence
 
-- Maintained production: 91,818 lines (87,899 C#, 3,189 scripts, and 730
-  specifications); net reduction: 15,808 lines; remaining reduction: 4,192.
-  This tranche removed 140 maintained lines without deleting tests.
+- Maintained production: 91,698 lines (87,779 C#, 3,189 scripts, and 730
+  specifications); net reduction: 15,928 lines; remaining reduction: 4,072.
+  This tranche removed 120 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,213 passing tests and two documented Main skips.
 

@@ -5,6 +5,16 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
+    internal static SymbolicTerm? LowerTerm(ExpressionSyntax expression, SymbolicLoweringContext context)
+    {
+        return TryLowerTerm(expression, context, out var term) ? term : null;
+    }
+
+    internal static SymbolicCondition? LowerCondition(ExpressionSyntax expression, SymbolicLoweringContext context)
+    {
+        return TryLowerCondition(expression, context, out var condition) ? condition : null;
+    }
+
     private static bool TryLowerCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
