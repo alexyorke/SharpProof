@@ -1,14 +1,12 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
-{
+internal partial class PurityAnalysisEngine {
     internal static PotentialTargets? ResolvePotentialTargets(
         IOperation valueOperation,
         PurityAnalysisState currentState,
         CancellationToken cancellationToken,
         SemanticModel? semanticModel = null,
-        HashSet<ISymbol>? resolvingInitializerSymbols = null)
-    {
+        HashSet<ISymbol>? resolvingInitializerSymbols = null) {
         cancellationToken.ThrowIfCancellationRequested();
         resolvingInitializerSymbols ??= new HashSet<ISymbol>(SymbolEq.Default);
         var unwrapped = SkipImplicitConversions(valueOperation);
@@ -17,8 +15,7 @@ internal partial class PurityAnalysisEngine
             currentState.FlowCaptureTargets.TryGetValue(flowCaptureReference.Id, out var capturedTargets))
             return capturedTargets;
 
-        if (unwrapped is IConditionalOperation conditionalOperation)
-        {
+        if (unwrapped is IConditionalOperation conditionalOperation) {
             if (conditionalOperation.WhenTrue == null || conditionalOperation.WhenFalse == null)
                 return PotentialTargets.Unresolved;
 
@@ -31,8 +28,7 @@ internal partial class PurityAnalysisEngine
             return PotentialTargets.Merge(trueTargets.Value, falseTargets.Value);
         }
 
-        if (unwrapped is IMethodReferenceOperation methodRef)
-        {
+        if (unwrapped is IMethodReferenceOperation methodRef) {
             if (IsPotentiallyDispatchedDelegateTarget(methodRef)) return PotentialTargets.Unresolved;
 
             return PotentialTargets.FromSingle(methodRef.Method.OriginalDefinition);
@@ -43,11 +39,9 @@ internal partial class PurityAnalysisEngine
         if (unwrapped is IFlowAnonymousFunctionOperation flowAnonymousFunction && flowAnonymousFunction.Symbol != null)
             return PotentialTargets.FromSingle(flowAnonymousFunction.Symbol.OriginalDefinition);
 
-        if (unwrapped is IDelegateCreationOperation delegateCreation)
-        {
+        if (unwrapped is IDelegateCreationOperation delegateCreation) {
             var target = SkipImplicitConversions(delegateCreation.Target);
-            if (target is IMethodReferenceOperation lambdaRef)
-            {
+            if (target is IMethodReferenceOperation lambdaRef) {
                 if (IsPotentiallyDispatchedDelegateTarget(lambdaRef)) return PotentialTargets.Unresolved;
 
                 return PotentialTargets.FromSingle(lambdaRef.Method.OriginalDefinition);
@@ -65,11 +59,9 @@ internal partial class PurityAnalysisEngine
 
         if (valueSourceSymbol != null &&
             semanticModel != null &&
-            CanTrustDelegateInitializerSymbol(valueSourceSymbol, semanticModel, cancellationToken))
-        {
+            CanTrustDelegateInitializerSymbol(valueSourceSymbol, semanticModel, cancellationToken)) {
             if (!resolvingInitializerSymbols.Add(valueSourceSymbol)) return PotentialTargets.Unresolved;
-            try
-            {
+            try {
                 var initializerTargets = TryResolveDelegateInitializerTargets(
                     valueSourceSymbol,
                     semanticModel,
@@ -78,8 +70,7 @@ internal partial class PurityAnalysisEngine
                     resolvingInitializerSymbols);
                 if (initializerTargets != null) return initializerTargets;
             }
-            finally
-            {
+            finally {
                 resolvingInitializerSymbols.Remove(valueSourceSymbol);
             }
         }
@@ -87,8 +78,7 @@ internal partial class PurityAnalysisEngine
         return null;
     }
 
-    private static bool IsPotentiallyDispatchedDelegateTarget(IMethodReferenceOperation methodReference)
-    {
+    private static bool IsPotentiallyDispatchedDelegateTarget(IMethodReferenceOperation methodReference) {
         var method = methodReference.Method;
         if (method.IsSealed || method.ContainingType?.IsSealed == true) return false;
 
@@ -109,8 +99,7 @@ internal partial class PurityAnalysisEngine
     private static bool CanTrustDelegateInitializerSymbol(
         ISymbol symbol,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (symbol is ILocalSymbol) return true;
 
         if (symbol is IFieldSymbol fieldSymbol)
@@ -123,15 +112,12 @@ internal partial class PurityAnalysisEngine
     private static bool HasAssignmentToField(
         IFieldSymbol fieldSymbol,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var syntaxReference in fieldSymbol.ContainingType.DeclaringSyntaxReferences)
-        {
+        CancellationToken cancellationToken) {
+        foreach (var syntaxReference in fieldSymbol.ContainingType.DeclaringSyntaxReferences) {
             cancellationToken.ThrowIfCancellationRequested();
             if (syntaxReference.GetSyntax(cancellationToken) is not TypeDeclarationSyntax typeDeclaration) continue;
 
-            foreach (var assignment in typeDeclaration.DescendantNodes().OfType<AssignmentExpressionSyntax>())
-            {
+            foreach (var assignment in typeDeclaration.DescendantNodes().OfType<AssignmentExpressionSyntax>()) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var model = semanticModel.Compilation.GetSemanticModel(assignment.SyntaxTree);
                 var targetOperation = model.GetOperation(assignment.Left, cancellationToken);
@@ -148,16 +134,13 @@ internal partial class PurityAnalysisEngine
         SemanticModel semanticModel,
         PurityAnalysisState currentState,
         CancellationToken cancellationToken,
-        HashSet<ISymbol> resolvingInitializerSymbols)
-    {
-        foreach (var syntaxReference in symbol.DeclaringSyntaxReferences)
-        {
+        HashSet<ISymbol> resolvingInitializerSymbols) {
+        foreach (var syntaxReference in symbol.DeclaringSyntaxReferences) {
             cancellationToken.ThrowIfCancellationRequested();
             var syntax = syntaxReference.GetSyntax(cancellationToken);
             var model = semanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
 
-            SyntaxNode? initializerSyntax = syntax switch
-            {
+            SyntaxNode? initializerSyntax = syntax switch {
                 VariableDeclaratorSyntax variableDeclaratorSyntax => variableDeclaratorSyntax.Initializer?.Value,
                 PropertyDeclarationSyntax propertyDeclarationSyntax => propertyDeclarationSyntax.Initializer?.Value,
                 _ => null
@@ -177,30 +160,24 @@ internal partial class PurityAnalysisEngine
         return null;
     }
 
-    internal static IOperation? SkipImplicitConversions(IOperation? operation)
-    {
+    internal static IOperation? SkipImplicitConversions(IOperation? operation) {
         while (operation is IConversionOperation conv && conv.IsImplicit) operation = conv.Operand;
         return operation;
     }
 
 
-    internal static ISymbol? TryResolveSymbol(IOperation? operation)
-    {
-        return operation switch
-        {
-            ILocalReferenceOperation localRef => localRef.Local,
-            IParameterReferenceOperation paramRef => paramRef.Parameter,
-            IFieldReferenceOperation fieldRef => fieldRef.Field,
-            IPropertyReferenceOperation propRef => propRef.Property,
-            IEventReferenceOperation eventRef => eventRef.Event,
-            _ => null
-        };
-    }
+    internal static ISymbol? TryResolveSymbol(IOperation? operation) => operation switch {
+        ILocalReferenceOperation localRef => localRef.Local,
+        IParameterReferenceOperation paramRef => paramRef.Parameter,
+        IFieldReferenceOperation fieldRef => fieldRef.Field,
+        IPropertyReferenceOperation propRef => propRef.Property,
+        IEventReferenceOperation eventRef => eventRef.Event,
+        _ => null
+    };
 
     internal static ISymbol? TryResolveTrackedSymbol(
         IOperation? operation,
-        PurityAnalysisState currentState)
-    {
+        PurityAnalysisState currentState) {
         operation = SkipImplicitConversions(operation);
 
         while (operation is IParenthesizedOperation parenthesizedOperation)

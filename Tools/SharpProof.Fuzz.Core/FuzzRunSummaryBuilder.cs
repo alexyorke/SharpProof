@@ -1,31 +1,23 @@
 namespace SharpProof.Tools.Fuzz;
 
-internal sealed class FuzzRunSummaryBuilder
-{
+internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset startedUtc, string samplerMode) {
     private readonly SortedDictionary<string, int> _familyCounts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _diagnosticCounts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _findingIndices = new(StringComparer.Ordinal);
     private readonly ImmutableArray<FuzzFinding>.Builder _findings = ImmutableArray.CreateBuilder<FuzzFinding>();
     private readonly SortedDictionary<string, int> _operationKinds = new(StringComparer.Ordinal);
 
-    private readonly FuzzOptions _options;
+    private readonly FuzzOptions _options = options;
     private readonly SortedDictionary<string, int> _primaryShapeCounts = new(StringComparer.Ordinal);
-    private readonly string _samplerMode;
-    private readonly DateTimeOffset _startedUtc;
+    private readonly string _samplerMode = samplerMode;
+    private readonly DateTimeOffset _startedUtc = startedUtc;
     private readonly SortedDictionary<string, int> _syntaxKinds = new(StringComparer.Ordinal);
 
     private int _compilationErrorCount;
-    public FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset startedUtc, string samplerMode)
-    {
-        _options = options;
-        _startedUtc = startedUtc;
-        _samplerMode = samplerMode;
-    }
 
     public int CasesAnalyzed { get; private set; }
 
-    public void Add(FuzzCaseAnalysis analysis)
-    {
+    public void Add(FuzzCaseAnalysis analysis) {
         CasesAnalyzed++;
         _familyCounts.Increment(analysis.Case.Family);
         AddAll(_operationKinds, analysis.OperationKinds);
@@ -41,8 +33,7 @@ internal sealed class FuzzRunSummaryBuilder
     }
 
     public FuzzRunSummary Build(DateTimeOffset completedUtc, TimeSpan elapsed, string outputDirectory,
-        int interestingCasesSaved)
-    {
+        int interestingCasesSaved) {
         var findings = _findings
             .OrderByDescending(finding => finding.OccurrenceCount)
             .ThenBy(finding => finding.Category, StringComparer.Ordinal)
@@ -63,8 +54,7 @@ internal sealed class FuzzRunSummaryBuilder
             .Select(kind => kind.ToString())
             .OrderBy(kind => kind, StringComparer.Ordinal)
             .ToImmutableArray();
-        var manifestSurfaceCounts = new SortedDictionary<string, int>(StringComparer.Ordinal)
-        {
+        var manifestSurfaceCounts = new SortedDictionary<string, int>(StringComparer.Ordinal) {
             [RoslynShapeSurface.OperationKind.ToString()] = RoslynShapeManifest.OperationEntries.Length,
             [RoslynShapeSurface.SyntaxKind.ToString()] = RoslynShapeManifest.SyntaxEntries.Length,
             ["AnalyzerActionSurface"] = RoslynShapeManifest.ActionSurfaceEntries.Count
@@ -131,8 +121,7 @@ internal sealed class FuzzRunSummaryBuilder
             findings);
     }
 
-    private static ImmutableSortedDictionary<string, int> CreateRegistryExpectationCounts()
-    {
+    private static ImmutableSortedDictionary<string, int> CreateRegistryExpectationCounts() {
         var buckets = new[]
         {
             FuzzExpectation.ConservativeBucket,
@@ -147,14 +136,11 @@ internal sealed class FuzzRunSummaryBuilder
 
     private int DiagnosticCount(string id) => _diagnosticCounts.GetValueOrDefault(id);
 
-    private void AddFinding(string normalizedSourceHash, FuzzFinding finding)
-    {
+    private void AddFinding(string normalizedSourceHash, FuzzFinding finding) {
         var aggregationKey = normalizedSourceHash + "|" + finding.Identity;
-        if (_findingIndices.TryGetValue(aggregationKey, out var index))
-        {
+        if (_findingIndices.TryGetValue(aggregationKey, out var index)) {
             var existing = _findings[index];
-            _findings[index] = existing with
-            {
+            _findings[index] = existing with {
                 OccurrenceCount = existing.OccurrenceCount + finding.OccurrenceCount,
                 SourcePath = existing.SourcePath ?? finding.SourcePath
             };
@@ -165,8 +151,7 @@ internal sealed class FuzzRunSummaryBuilder
         _findings.Add(finding);
     }
 
-    private static void AddAll(SortedDictionary<string, int> target, IReadOnlyDictionary<string, int> source)
-    {
+    private static void AddAll(SortedDictionary<string, int> target, IReadOnlyDictionary<string, int> source) {
         foreach (var pair in source)
             target[pair.Key] = target.TryGetValue(pair.Key, out var count) ? count + pair.Value : pair.Value;
     }

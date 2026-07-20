@@ -1,10 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class PropertyReferencePurityRule
-{
+internal partial class PropertyReferencePurityRule {
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (!(operation is IPropertyReferenceOperation propertyReferenceOperation))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
@@ -78,10 +76,8 @@ internal partial class PropertyReferencePurityRule
             "config_known_impure",
             StringComparison.Ordinal);
 
-        if (isPureEnforcedProperty && !requiresDispatchCheck)
-        {
-            if (propertyReferenceOperation.Instance != null)
-            {
+        if (isPureEnforcedProperty && !requiresDispatchCheck) {
+            if (propertyReferenceOperation.Instance != null) {
                 var instanceResult = PurityAnalysisEngine.CheckSingleOperation(
                     propertyReferenceOperation.Instance,
                     context,
@@ -161,8 +157,7 @@ internal partial class PropertyReferencePurityRule
             propertySymbol.IsReadOnly)
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (requiresDispatchCheck)
-        {
+        if (requiresDispatchCheck) {
             var dispatchResult = CheckDispatchedGetterPurity(
                 propertyReferenceOperation,
                 context,
@@ -174,8 +169,7 @@ internal partial class PropertyReferencePurityRule
         }
 
 
-        if (propertySymbol.IsStatic)
-        {
+        if (propertySymbol.IsStatic) {
             var cctorResult =
                 PurityAnalysisEngine.CheckStaticConstructorPurity(propertySymbol.ContainingType, context);
             if (!cctorResult.IsPure)
@@ -212,20 +206,17 @@ internal partial class PropertyReferencePurityRule
         if (instanceOperation is IParameterReferenceOperation paramRef &&
             (paramRef.Parameter.RefKind == RefKind.In ||
              paramRef.Parameter.RefKind == RefKind.RefReadOnly ||
-             paramRef.Parameter.RefKind == RefKind.RefReadOnlyParameter))
-        {
+             paramRef.Parameter.RefKind == RefKind.RefReadOnlyParameter)) {
             if (dispatchGetterWasProvenPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context);
         }
 
         if (instanceOperation is IInstanceReferenceOperation instanceRef &&
-            instanceRef.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance)
-        {
+            instanceRef.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance) {
             if (dispatchGetterWasProvenPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-            var isReadonlyStruct = context.ContainingMethodSymbol?.ContainingType is
-            { IsReadOnly: true, IsValueType: true };
+            var isReadonlyStruct = context.ContainingMethodSymbol?.ContainingType is { IsReadOnly: true, IsValueType: true };
 
             if (isReadonlyStruct)
                 return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context);

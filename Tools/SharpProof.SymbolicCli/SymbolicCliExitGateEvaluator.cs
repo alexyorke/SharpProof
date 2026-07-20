@@ -2,12 +2,10 @@ using SharpProof.Attributes;
 
 internal sealed record SymbolicCliExitGateFailure(string Code, string Message);
 
-internal static class SymbolicCliExitGateEvaluator
-{
+internal static class SymbolicCliExitGateEvaluator {
     public static IReadOnlyList<SymbolicCliExitGateFailure> Evaluate(
         SymbolicCliOptions options,
-        object result)
-    {
+        object result) {
         if (options == null) throw new ArgumentNullException(nameof(options));
         if (result == null) throw new ArgumentNullException(nameof(result));
 
@@ -25,8 +23,7 @@ internal static class SymbolicCliExitGateEvaluator
     private static void EvaluateRuntimeHazards(
         SymbolicCliOptions options,
         object result,
-        ICollection<SymbolicCliExitGateFailure> failures)
-    {
+        ICollection<SymbolicCliExitGateFailure> failures) {
         if (!options.FailOnHazard || result is not SymbolicRuntimeHazardQueryResult hazards) return;
         if (hazards.HazardCount == 0) return;
 
@@ -38,8 +35,7 @@ internal static class SymbolicCliExitGateEvaluator
     private static void EvaluateInvariantProofs(
         SymbolicCliOptions options,
         object result,
-        ICollection<SymbolicCliExitGateFailure> failures)
-    {
+        ICollection<SymbolicCliExitGateFailure> failures) {
         if (!options.FailOnUnprovenImplies ||
             result is not SymbolicQueryResult queryResult)
             return;
@@ -58,12 +54,10 @@ internal static class SymbolicCliExitGateEvaluator
     private static void EvaluateCapabilities(
         SymbolicCliOptions options,
         object result,
-        ICollection<SymbolicCliExitGateFailure> failures)
-    {
+        ICollection<SymbolicCliExitGateFailure> failures) {
         if (result is not SymbolicCapabilityResult capabilities) return;
 
-        if (options.FailOnCapabilityViolation)
-        {
+        if (options.FailOnCapabilityViolation) {
             var allowed = SymbolicCapabilityFacts.ExpandAllowed(options.AllowedCapabilities.Aggregate(
                 SymbolicCapability.None,
                 static (current, capability) => current | capability));
@@ -87,8 +81,7 @@ internal static class SymbolicCliExitGateEvaluator
     private static void EvaluateComplexity(
         SymbolicCliOptions options,
         object result,
-        ICollection<SymbolicCliExitGateFailure> failures)
-    {
+        ICollection<SymbolicCliExitGateFailure> failures) {
         if (result is not SymbolicComplexityResult complexity) return;
 
         var comparison = options.MaximumComplexity.HasValue
@@ -117,8 +110,7 @@ internal static class SymbolicCliExitGateEvaluator
     private static void EvaluateConservativeUnknowns(
         SymbolicCliOptions options,
         object result,
-        ICollection<SymbolicCliExitGateFailure> failures)
-    {
+        ICollection<SymbolicCliExitGateFailure> failures) {
         if (!options.MaximumConservativeUnknowns.HasValue ||
             result is not SymbolicQueryResult queryResult ||
             queryResult.MergedPathFacts.ConservativeUnknownCount <= options.MaximumConservativeUnknowns.Value)
@@ -133,12 +125,10 @@ internal static class SymbolicCliExitGateEvaluator
     private static void EvaluateAnalysisTruncation(
         SymbolicCliOptions options,
         object result,
-        ICollection<SymbolicCliExitGateFailure> failures)
-    {
+        ICollection<SymbolicCliExitGateFailure> failures) {
         if (!options.FailOnAnalysisTruncation) return;
 
-        var isTruncated = result switch
-        {
+        var isTruncated = result switch {
             SymbolicQueryResult query => query.AnalysisTruncation.IsTruncated,
             SymbolicRuntimeHazardQueryResult hazards => hazards.AnalysisTruncation.IsTruncated,
             _ => false
@@ -153,10 +143,8 @@ internal static class SymbolicCliExitGateEvaluator
     private static void EvaluateThresholds(
         SymbolicCliOptions options,
         object result,
-        ICollection<SymbolicCliExitGateFailure> failures)
-    {
-        foreach (var threshold in options.Thresholds.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
-        {
+        ICollection<SymbolicCliExitGateFailure> failures) {
+        foreach (var threshold in options.Thresholds.OrderBy(static pair => pair.Key, StringComparer.Ordinal)) {
             var actual = GetMetric(result, threshold.Key);
             if (actual <= threshold.Value) continue;
 
@@ -167,11 +155,9 @@ internal static class SymbolicCliExitGateEvaluator
         }
     }
 
-    private static int GetMetric(object result, string metric)
-    {
+    private static int GetMetric(object result, string metric) {
         if (result is SymbolicQueryResult queryResult)
-            return metric switch
-            {
+            return metric switch {
                 "program-points" => queryResult.ProgramPointCount,
                 "conservative-unknowns" => queryResult.MergedPathFacts.ConservativeUnknownCount,
                 "proof-unknowns" => queryResult.Metrics.ProofUnknownCount,
@@ -179,8 +165,7 @@ internal static class SymbolicCliExitGateEvaluator
                 _ => throw new InvalidOperationException("Unsupported invariant threshold metric: " + metric)
             };
 
-        return result switch
-        {
+        return result switch {
             SymbolicRuntimeHazardQueryResult hazards when metric == "hazards" => hazards.HazardCount,
             SymbolicCapabilityResult capabilities when metric == "capability-sites" => capabilities.Sites.Count,
             SymbolicCapabilityResult capabilities when metric == "capability-unknowns" =>
@@ -196,8 +181,7 @@ internal static class SymbolicCliExitGateEvaluator
 
     private static ComplexityComparison CompareComplexity(
         SymbolicComplexityKind actual,
-        ComplexityKind maximum)
-    {
+        ComplexityKind maximum) {
         if (!TryMapActual(actual, out var actualClass)) return ComplexityComparison.Incomparable;
         var maximumClass = MapMaximum(maximum);
         if (actualClass == maximumClass || actualClass == ComplexityClass.Constant)
@@ -215,10 +199,8 @@ internal static class SymbolicCliExitGateEvaluator
         return ComplexityComparison.Incomparable;
     }
 
-    private static bool TryMapActual(SymbolicComplexityKind actual, out ComplexityClass complexityClass)
-    {
-        switch (actual)
-        {
+    private static bool TryMapActual(SymbolicComplexityKind actual, out ComplexityClass complexityClass) {
+        switch (actual) {
             case SymbolicComplexityKind.Constant:
                 complexityClass = ComplexityClass.Constant;
                 return true;
@@ -240,25 +222,19 @@ internal static class SymbolicCliExitGateEvaluator
         }
     }
 
-    private static ComplexityClass MapMaximum(ComplexityKind maximum)
-    {
-        return maximum switch
-        {
-            ComplexityKind.Constant => ComplexityClass.Constant,
-            ComplexityKind.Logarithmic => ComplexityClass.Logarithmic,
-            ComplexityKind.Linear => ComplexityClass.Linear,
-            ComplexityKind.Linearithmic => ComplexityClass.Linearithmic,
-            ComplexityKind.Quadratic => ComplexityClass.Quadratic,
-            ComplexityKind.Product => ComplexityClass.Product,
-            ComplexityKind.Max => ComplexityClass.Max,
-            _ => throw new ArgumentOutOfRangeException(nameof(maximum), maximum, "Complexity bound is not defined.")
-        };
-    }
+    private static ComplexityClass MapMaximum(ComplexityKind maximum) => maximum switch {
+        ComplexityKind.Constant => ComplexityClass.Constant,
+        ComplexityKind.Logarithmic => ComplexityClass.Logarithmic,
+        ComplexityKind.Linear => ComplexityClass.Linear,
+        ComplexityKind.Linearithmic => ComplexityClass.Linearithmic,
+        ComplexityKind.Quadratic => ComplexityClass.Quadratic,
+        ComplexityKind.Product => ComplexityClass.Product,
+        ComplexityKind.Max => ComplexityClass.Max,
+        _ => throw new ArgumentOutOfRangeException(nameof(maximum), maximum, "Complexity bound is not defined.")
+    };
 
-    private static bool TryGetChainRank(ComplexityClass complexity, out int rank)
-    {
-        switch (complexity)
-        {
+    private static bool TryGetChainRank(ComplexityClass complexity, out int rank) {
+        switch (complexity) {
             case ComplexityClass.Constant:
                 rank = 0;
                 return true;
@@ -280,15 +256,13 @@ internal static class SymbolicCliExitGateEvaluator
         }
     }
 
-    private enum ComplexityComparison
-    {
+    private enum ComplexityComparison {
         Within,
         Exceeds,
         Incomparable
     }
 
-    private enum ComplexityClass
-    {
+    private enum ComplexityClass {
         Constant,
         Logarithmic,
         Linear,

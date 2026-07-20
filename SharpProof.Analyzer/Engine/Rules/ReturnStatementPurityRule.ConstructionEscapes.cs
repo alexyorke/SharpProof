@@ -1,18 +1,15 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class ReturnStatementPurityRule
-{
+internal partial class ReturnStatementPurityRule {
     private static bool IsConstructionWithEscapingParameters(
         IObjectCreationOperation objectCreationOperation,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (objectCreationOperation.Type is not INamedTypeSymbol namedType ||
             objectCreationOperation.Constructor == null)
             return false;
 
-        foreach (var argument in objectCreationOperation.Arguments)
-        {
+        foreach (var argument in objectCreationOperation.Arguments) {
             cancellationToken.ThrowIfCancellationRequested();
             var parameter = argument.Parameter;
             if (parameter == null) continue;
@@ -39,15 +36,11 @@ internal partial class ReturnStatementPurityRule
         return false;
     }
 
-    private static bool IsInstanceMemberOfConstructedType(ISymbol member, INamedTypeSymbol constructedType)
-    {
-        return member is IFieldSymbol { IsStatic: false } or IPropertySymbol { IsStatic: false } &&
+    private static bool IsInstanceMemberOfConstructedType(ISymbol member, INamedTypeSymbol constructedType) => member is IFieldSymbol { IsStatic: false } or IPropertySymbol { IsStatic: false } &&
                SymbolEq.AreEqual(member.ContainingType.OriginalDefinition,
                    constructedType.OriginalDefinition);
-    }
 
-    private static bool HasMatchingRecordProperty(INamedTypeSymbol recordType, IParameterSymbol parameter)
-    {
+    private static bool HasMatchingRecordProperty(INamedTypeSymbol recordType, IParameterSymbol parameter) {
         foreach (var member in recordType.GetMembers())
             if (member is IPropertySymbol property &&
                 string.Equals(property.Name, parameter.Name, StringComparison.OrdinalIgnoreCase) &&

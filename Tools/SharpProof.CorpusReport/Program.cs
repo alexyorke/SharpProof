@@ -8,11 +8,9 @@ return await ToolCommandHost.RunAsync(
     Console.Error,
     static _ => WriteUsage());
 
-static async Task<int> RunAsync(string[] args)
-{
+static async Task<int> RunAsync(string[] args) {
     var options = CorpusReportOptions.Parse(args);
-    if (options.ShowHelp || options.Inputs.Count == 0)
-    {
+    if (options.ShowHelp || options.Inputs.Count == 0) {
         WriteUsage();
         return options.ShowHelp ? 0 : 1;
     }
@@ -32,14 +30,10 @@ static async Task<int> RunAsync(string[] args)
     return 0;
 }
 
-static void WriteUsage()
-{
-    Console.Error.WriteLine(
+static void WriteUsage() => Console.Error.WriteLine(
         "Usage: SharpProof.CorpusReport [--output report.json] <project-or-sarif> [more inputs...]");
-}
 
-internal sealed class CorpusReportOptions
-{
+internal sealed class CorpusReportOptions {
     public List<string> Inputs { get; } = new();
     public string? OutputPath { get; private set; }
     public bool ShowHelp { get; private set; }
@@ -50,8 +44,7 @@ internal sealed class CorpusReportOptions
             .Add(static (o, r, _) => o.OutputPath =
                 r.RequiredValue("--output", "--output requires a path."), "--output", "-o");
 
-    public static CorpusReportOptions Parse(string[] args)
-    {
+    public static CorpusReportOptions Parse(string[] args) {
         var options = new CorpusReportOptions();
         OptionSet.Parse(args, options, positional: static (o, value) => o.Inputs.Add(value));
 

@@ -1,15 +1,13 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class ExecutionVisibility
-{
+internal static partial class ExecutionVisibility {
     private static SymbolicState AddEvaluationPathState(
         SymbolicState pathState,
         SyntaxNode syntaxNode,
         SyntaxNode ancestor,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        Func<ISymbol, int>? getSymbolVersion)
-    {
+        Func<ISymbol, int>? getSymbolVersion) {
         if (TryGetEvaluationBranch(
                 ancestor,
                 syntaxNode.SpanStart,
@@ -54,8 +52,7 @@ internal static partial class ExecutionVisibility
                 "analyzer.evaluation.non-null",
                 getSymbolVersion);
 
-        if (ancestor is SwitchStatementSyntax switchStatement)
-        {
+        if (ancestor is SwitchStatementSyntax switchStatement) {
             var section = switchStatement.Sections.FirstOrDefault(candidate =>
                 candidate.Statements.Any(statement => statement.Span.Contains(syntaxNode.SpanStart)));
             if (section != null &&
@@ -76,8 +73,7 @@ internal static partial class ExecutionVisibility
                     getSymbolVersion);
         }
 
-        if (ancestor is SwitchExpressionSyntax switchExpression)
-        {
+        if (ancestor is SwitchExpressionSyntax switchExpression) {
             var arm = switchExpression.Arms.FirstOrDefault(candidate =>
                 candidate.Expression.Span.Contains(syntaxNode.SpanStart));
             if (arm != null &&
@@ -105,10 +101,8 @@ internal static partial class ExecutionVisibility
         int position,
         out ExpressionSyntax condition,
         out bool branchWhenTrue,
-        out SyntaxNode branchBody)
-    {
-        switch (ancestor)
-        {
+        out SyntaxNode branchBody) {
+        switch (ancestor) {
             case IfStatementSyntax ifStatement when ifStatement.Statement.Span.Contains(position):
                 condition = ifStatement.Condition;
                 branchWhenTrue = true;
@@ -166,12 +160,10 @@ internal static partial class ExecutionVisibility
         SymbolicCondition selectionCondition,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        Func<ISymbol, int>? getSymbolVersion)
-    {
+        Func<ISymbol, int>? getSymbolVersion) {
         if (SymbolicSemanticPipeline.LowerArrayLengthCountAliasCondition(
                 governingExpression,
-                new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion)) is
-            { IsExact: true, Value: { } aliasCondition })
+                new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion)) is { IsExact: true, Value: { } aliasCondition })
             pathState = SymbolicOperationTransferKernel.Assume(
                 pathState,
                 aliasCondition,

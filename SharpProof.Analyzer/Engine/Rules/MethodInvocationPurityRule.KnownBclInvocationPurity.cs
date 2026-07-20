@@ -2,8 +2,7 @@ using static SharpProof.Analyzer.Engine.Rules.ComparerInvocationPurity;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class MethodInvocationPurityRule
-{
+internal partial class MethodInvocationPurityRule {
     private static readonly (string MetadataName, Func<IMethodSymbol, bool> Matches)[]
         PureMetadataOperandRules =
         [
@@ -23,8 +22,7 @@ internal partial class MethodInvocationPurityRule
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (!IsDefaultInterpolatedStringHandlerInvocation(invocationOperation)) return false;
@@ -34,8 +32,7 @@ internal partial class MethodInvocationPurityRule
         return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
     }
 
-    private static bool IsDefaultInterpolatedStringHandlerInvocation(IInvocationOperation invocationOperation)
-    {
+    private static bool IsDefaultInterpolatedStringHandlerInvocation(IInvocationOperation invocationOperation) {
         var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
         if (targetMethod == null) return false;
 
@@ -46,8 +43,7 @@ internal partial class MethodInvocationPurityRule
         return targetMethod.Name is "AppendLiteral" or "AppendFormatted" or "ToStringAndClear";
     }
 
-    private static bool ContainsFormattedOrAlignedInterpolation(SyntaxNode syntax)
-    {
+    private static bool ContainsFormattedOrAlignedInterpolation(SyntaxNode syntax) {
         var interpolatedString = syntax.AncestorsAndSelf()
             .OfType<InterpolatedStringExpressionSyntax>()
             .FirstOrDefault();
@@ -58,16 +54,14 @@ internal partial class MethodInvocationPurityRule
             .Any(interpolation => interpolation.AlignmentClause != null || interpolation.FormatClause != null);
     }
 
-    private static bool IsUntrustedMetadataOnlyMethod(IMethodSymbol methodSymbol)
-    {
+    private static bool IsUntrustedMetadataOnlyMethod(IMethodSymbol methodSymbol) {
         if (methodSymbol.DeclaringSyntaxReferences.Length > 0 || methodSymbol.IsAbstract) return false;
 
         var assemblyName = methodSymbol.ContainingAssembly?.Identity.Name;
         return !EffectSummaryCatalog.IsFrameworkAssemblyName(assemblyName);
     }
 
-    private static bool IsArrayAsSpanInvocation(IInvocationOperation invocationOperation)
-    {
+    private static bool IsArrayAsSpanInvocation(IInvocationOperation invocationOperation) {
         var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
         if (targetMethod == null ||
             targetMethod.Name != "AsSpan" ||
@@ -79,16 +73,14 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool IsLinqEnumerableInvocation(IMethodSymbol methodSymbol, Compilation compilation)
-    {
+    private static bool IsLinqEnumerableInvocation(IMethodSymbol methodSymbol, Compilation compilation) {
         var enumerableType = compilation.GetTypeByMetadataName("System.Linq.Enumerable");
         var definition = GetExtensionDefinition(methodSymbol);
         return enumerableType != null &&
                SymbolEq.AreEqual(definition.ContainingType?.OriginalDefinition, enumerableType);
     }
 
-    private static bool IsLinqSourceLessFactory(IMethodSymbol methodSymbol)
-    {
+    private static bool IsLinqSourceLessFactory(IMethodSymbol methodSymbol) {
         var definition = GetExtensionDefinition(methodSymbol);
         return definition.ContainingType?.OriginalDefinition.ToDisplayString() == "System.Linq.Enumerable" &&
                definition.Name is "Empty" or "Range" or "Repeat";
@@ -97,9 +89,7 @@ internal partial class MethodInvocationPurityRule
     internal static IMethodSymbol GetExtensionDefinition(IMethodSymbol methodSymbol) =>
         methodSymbol.ReducedFrom ?? methodSymbol;
 
-    internal static bool ShouldDeferToSpecializedDispatchPurity(IMethodSymbol methodSymbol)
-    {
-        return TryGetDefaultComparisonCollectionKeyType(methodSymbol, out _) ||
+    internal static bool ShouldDeferToSpecializedDispatchPurity(IMethodSymbol methodSymbol) => TryGetDefaultComparisonCollectionKeyType(methodSymbol, out _) ||
                TryGetDefaultEqualityCollectionElementType(methodSymbol, out _, out _) ||
                TryGetLinqDefaultEqualityDispatchType(methodSymbol, out _) ||
                TryGetLinqDefaultComparisonDispatchType(methodSymbol, out _) ||
@@ -108,10 +98,8 @@ internal partial class MethodInvocationPurityRule
                IsHashCodeCombineMethod(methodSymbol) ||
                TryGetEqualityComparerElementType(methodSymbol, out _) ||
                TryGetComparerElementType(methodSymbol, out _);
-    }
 
-    private static bool IsMemoryExtensionsDefaultEqualityDispatchMethod(IMethodSymbol methodSymbol)
-    {
+    private static bool IsMemoryExtensionsDefaultEqualityDispatchMethod(IMethodSymbol methodSymbol) {
         var definition = GetExtensionDefinition(methodSymbol);
         return definition.ContainingType?.OriginalDefinition.ToDisplayString() == "System.MemoryExtensions" &&
                definition.Name is "SequenceEqual" or "Contains" or "IndexOf" or "LastIndexOf" or "StartsWith"
@@ -122,8 +110,7 @@ internal partial class MethodInvocationPurityRule
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod?.OriginalDefinition;
@@ -140,8 +127,7 @@ internal partial class MethodInvocationPurityRule
     private static bool IsDeclarationOrDiscardOutArgumentTarget(IOperation? operation) =>
         IsOutArgumentTarget(operation, false);
 
-    private static bool IsOutArgumentTarget(IOperation? operation, bool allowLocalReference)
-    {
+    private static bool IsOutArgumentTarget(IOperation? operation, bool allowLocalReference) {
         operation = PurityAnalysisEngine.SkipImplicitConversions(operation);
 
         if (operation is IConversionOperation conversionOperation)
@@ -152,8 +138,7 @@ internal partial class MethodInvocationPurityRule
                operation is IDiscardOperation;
     }
 
-    private static bool IsDeconstructOutArgumentMethod(IMethodSymbol methodSymbol)
-    {
+    private static bool IsDeconstructOutArgumentMethod(IMethodSymbol methodSymbol) {
         if (methodSymbol.Name != "Deconstruct") return false;
 
         var parameters = methodSymbol.ReducedFrom?.Parameters ?? methodSymbol.Parameters;
@@ -167,8 +152,7 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool IsDispatchAnalyzedOutArgumentMethod(IMethodSymbol methodSymbol)
-    {
+    private static bool IsDispatchAnalyzedOutArgumentMethod(IMethodSymbol methodSymbol) {
         if (methodSymbol.Name != "TryGetValue") return false;
 
         var typeDefinition = methodSymbol.ContainingType?.OriginalDefinition.ToDisplayString();
@@ -184,8 +168,7 @@ internal partial class MethodInvocationPurityRule
             "System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>";
     }
 
-    private static bool IsSemanticallyPureOutArgumentMethod(IMethodSymbol methodSymbol)
-    {
+    private static bool IsSemanticallyPureOutArgumentMethod(IMethodSymbol methodSymbol) {
         var originalDefinition = methodSymbol.OriginalDefinition;
         return IsBooleanTryParseMethod(originalDefinition) ||
                IsEnumTryParseMethod(originalDefinition);
@@ -195,8 +178,7 @@ internal partial class MethodInvocationPurityRule
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod.OriginalDefinition;
@@ -204,8 +186,7 @@ internal partial class MethodInvocationPurityRule
 
         var enumerableArgument = invocationOperation.Arguments[1].Value;
         var enumerablePurity = CheckLinqSourceEnumeratorPurity(enumerableArgument, context, currentState);
-        if (!enumerablePurity.IsPure)
-        {
+        if (!enumerablePurity.IsPure) {
             result = enumerablePurity;
             return true;
         }
@@ -213,8 +194,7 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool IsStringEnumerableJoinOverload(IMethodSymbol methodSymbol)
-    {
+    private static bool IsStringEnumerableJoinOverload(IMethodSymbol methodSymbol) {
         if (methodSymbol.Name != "Join" ||
             methodSymbol.ContainingType?.SpecialType != SpecialType.System_String ||
             methodSymbol.IsGenericMethod ||
@@ -228,23 +208,18 @@ internal partial class MethodInvocationPurityRule
                enumerableType.TypeArguments[0].SpecialType == SpecialType.System_String;
     }
 
-    private static bool IsImmutableHashSetCreateRangeWithComparer(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.Name == "CreateRange" &&
+    private static bool IsImmutableHashSetCreateRangeWithComparer(IMethodSymbol methodSymbol) => methodSymbol.Name == "CreateRange" &&
                methodSymbol.ContainingType?.OriginalDefinition.Name == "ImmutableHashSet" &&
                methodSymbol.ContainingType?.ContainingNamespace.ToDisplayString() == "System.Collections.Immutable";
-    }
 
     private static bool IsCompilerGeneratedArrayForeachInvocation(
         IInvocationOperation invocationOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (invocationOperation.TargetMethod.Parameters.Length != 0 ||
             !IsArrayForeachSyntax(invocationOperation.Syntax, context))
             return false;
 
-        return invocationOperation.TargetMethod.Name switch
-        {
+        return invocationOperation.TargetMethod.Name switch {
             nameof(IDisposable.Dispose) => invocationOperation.TargetMethod.ContainingType?.SpecialType ==
                                            SpecialType.System_IDisposable,
             "GetEnumerator" => invocationOperation.TargetMethod.ContainingType?.ToDisplayString() ==
@@ -255,8 +230,7 @@ internal partial class MethodInvocationPurityRule
         };
     }
 
-    private static bool IsArrayForeachSyntax(SyntaxNode syntax, PurityAnalysisContext context)
-    {
+    private static bool IsArrayForeachSyntax(SyntaxNode syntax, PurityAnalysisContext context) {
         if (!syntax.IsKind(SyntaxKind.IdentifierName) &&
             !syntax.IsKind(SyntaxKind.SimpleMemberAccessExpression) &&
             !syntax.IsKind(SyntaxKind.ElementAccessExpression))
@@ -269,23 +243,18 @@ internal partial class MethodInvocationPurityRule
     private static ITypeSymbol? TryGetForeachCollectionType(
         SyntaxNode? syntaxNode,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return syntaxNode switch
-        {
+        CancellationToken cancellationToken) => syntaxNode switch {
             ForEachStatementSyntax forEachStatement =>
                 semanticModel.GetTypeInfo(forEachStatement.Expression, cancellationToken).Type,
             ForEachVariableStatementSyntax forEachVariableStatement =>
                 semanticModel.GetTypeInfo(forEachVariableStatement.Expression, cancellationToken).Type,
             _ => null
         };
-    }
 
 
     private static bool TryCheckStringComparisonPurity(
         IInvocationOperation invocationOperation,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod?.OriginalDefinition;
@@ -297,8 +266,7 @@ internal partial class MethodInvocationPurityRule
             return true;
 
         if (methodSymbol.Name is "ToLower" or "ToUpper" &&
-            methodSymbol.Parameters.Length == 0)
-        {
+            methodSymbol.Parameters.Length == 0) {
             result = CreateReflectionEnvironmentSourceImpurity(
                 invocationOperation,
                 methodSymbol,
@@ -306,11 +274,9 @@ internal partial class MethodInvocationPurityRule
             return true;
         }
 
-        if (methodSymbol.Name is "Contains" or "StartsWith" or "EndsWith" or "Equals" or "IndexOf")
-        {
+        if (methodSymbol.Name is "Contains" or "StartsWith" or "EndsWith" or "Equals" or "IndexOf") {
             var comparisonParameterIndex = GetStringComparisonParameterIndex(methodSymbol);
-            if (comparisonParameterIndex >= 0 && comparisonParameterIndex < invocationOperation.Arguments.Length)
-            {
+            if (comparisonParameterIndex >= 0 && comparisonParameterIndex < invocationOperation.Arguments.Length) {
                 if (IsDeterministicStringComparison(invocationOperation.Arguments[comparisonParameterIndex].Value))
                     return true;
 
@@ -324,8 +290,7 @@ internal partial class MethodInvocationPurityRule
 
         if (methodSymbol.Name is "StartsWith" or "EndsWith" &&
             methodSymbol.Parameters.Length == 1 &&
-            methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String)
-        {
+            methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String) {
             result = CreateReflectionEnvironmentSourceImpurity(
                 invocationOperation,
                 methodSymbol,
@@ -339,31 +304,24 @@ internal partial class MethodInvocationPurityRule
     private static PurityAnalysisEngine.PurityAnalysisResult CreateReflectionEnvironmentSourceImpurity(
         IInvocationOperation invocationOperation,
         IMethodSymbol methodSymbol,
-        string catalogSource)
-    {
-        return PurityAnalysisEngine.ImpureResult(
+        string catalogSource) => PurityAnalysisEngine.ImpureResult(
             invocationOperation,
             "reflection_environment_source",
             nameof(MethodInvocationPurityRule),
             methodSymbol,
             catalogSource);
-    }
 
     private static bool IsMemberOfMetadataType(
         IMethodSymbol methodSymbol,
         PurityAnalysisContext context,
-        string metadataName)
-    {
-        return context.SemanticModel.Compilation.GetTypeByMetadataName(metadataName) is { } metadataType &&
+        string metadataName) => context.SemanticModel.Compilation.GetTypeByMetadataName(metadataName) is { } metadataType &&
                SymbolEq.AreEqual(methodSymbol.ContainingType?.OriginalDefinition, metadataType);
-    }
 
     private static bool TryCheckStringComparerInvocationPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
@@ -382,8 +340,7 @@ internal partial class MethodInvocationPurityRule
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
@@ -399,8 +356,7 @@ internal partial class MethodInvocationPurityRule
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = RuleAnalysisHelper.CheckInstanceAndArguments(
             invocationOperation.Instance,
             invocationOperation.Arguments,
@@ -409,8 +365,7 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool IsSemanticallyPureParseInvocation(IInvocationOperation invocationOperation)
-    {
+    private static bool IsSemanticallyPureParseInvocation(IInvocationOperation invocationOperation) {
         var methodSymbol = invocationOperation.TargetMethod?.OriginalDefinition;
         if (methodSymbol == null) return false;
 
@@ -423,26 +378,19 @@ internal partial class MethodInvocationPurityRule
                IsIPAddressParseMethod(methodSymbol);
     }
 
-    private static bool IsBooleanParseMethod(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.ContainingType?.SpecialType == SpecialType.System_Boolean &&
+    private static bool IsBooleanParseMethod(IMethodSymbol methodSymbol) => methodSymbol.ContainingType?.SpecialType == SpecialType.System_Boolean &&
                methodSymbol.Name == "Parse" &&
                methodSymbol.Parameters.Length == 1 &&
                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(methodSymbol.Parameters[0].Type);
-    }
 
-    private static bool IsBooleanTryParseMethod(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.ContainingType?.SpecialType == SpecialType.System_Boolean &&
+    private static bool IsBooleanTryParseMethod(IMethodSymbol methodSymbol) => methodSymbol.ContainingType?.SpecialType == SpecialType.System_Boolean &&
                methodSymbol.Name == "TryParse" &&
                methodSymbol.Parameters.Length == 2 &&
                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(methodSymbol.Parameters[0].Type) &&
                methodSymbol.Parameters[1].RefKind == RefKind.Out &&
                methodSymbol.Parameters[1].Type.SpecialType == SpecialType.System_Boolean;
-    }
 
-    private static bool IsEnumTryParseMethod(IMethodSymbol methodSymbol)
-    {
+    private static bool IsEnumTryParseMethod(IMethodSymbol methodSymbol) {
         if (methodSymbol.ContainingType?.ToDisplayString() != "System.Enum" ||
             methodSymbol.Name != "TryParse" ||
             !methodSymbol.IsGenericMethod ||
@@ -460,8 +408,7 @@ internal partial class MethodInvocationPurityRule
                SymbolEq.AreEqual(outParameter.Type, methodSymbol.TypeParameters[0]);
     }
 
-    private static bool IsEnumParseMethod(IMethodSymbol methodSymbol)
-    {
+    private static bool IsEnumParseMethod(IMethodSymbol methodSymbol) {
         if (methodSymbol.ContainingType?.ToDisplayString() != "System.Enum" ||
             methodSymbol.Name != "Parse" ||
             methodSymbol.Parameters.Length is not (2 or 3) ||
@@ -473,23 +420,18 @@ internal partial class MethodInvocationPurityRule
                methodSymbol.Parameters[2].Type.SpecialType == SpecialType.System_Boolean;
     }
 
-    private static bool IsCompileTimeEnumTypeArgument(IOperation operation)
-    {
+    private static bool IsCompileTimeEnumTypeArgument(IOperation operation) {
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         return unwrappedOperation is ITypeOfOperation typeOfOperation &&
                typeOfOperation.TypeOperand.TypeKind == TypeKind.Enum;
     }
 
-    private static bool IsIPAddressParseMethod(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.ContainingType?.ToDisplayString() == "System.Net.IPAddress" &&
+    private static bool IsIPAddressParseMethod(IMethodSymbol methodSymbol) => methodSymbol.ContainingType?.ToDisplayString() == "System.Net.IPAddress" &&
                methodSymbol.Name == "Parse" &&
                methodSymbol.Parameters.Length == 1 &&
                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(methodSymbol.Parameters[0].Type);
-    }
 
-    private static int GetStringComparisonParameterIndex(IMethodSymbol methodSymbol)
-    {
+    private static int GetStringComparisonParameterIndex(IMethodSymbol methodSymbol) {
         for (var i = 0; i < methodSymbol.Parameters.Length; i++)
             if (methodSymbol.Parameters[i].Type.ToDisplayString() == "System.StringComparison")
                 return i;
@@ -497,8 +439,7 @@ internal partial class MethodInvocationPurityRule
         return -1;
     }
 
-    private static bool IsDeterministicStringComparison(IOperation? operation)
-    {
+    private static bool IsDeterministicStringComparison(IOperation? operation) {
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         return unwrappedOperation?.ConstantValue.HasValue == true &&
                unwrappedOperation.ConstantValue.Value is int comparison &&
@@ -508,8 +449,7 @@ internal partial class MethodInvocationPurityRule
     private static bool TryCheckMemoryExtensionsDefaultEqualityDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
@@ -531,15 +471,13 @@ internal partial class MethodInvocationPurityRule
     private static bool TryCheckHashCodeCombineDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
         if (!IsHashCodeCombineMethod(methodSymbol)) return false;
 
-        foreach (var typeArgument in methodSymbol.TypeArguments)
-        {
+        foreach (var typeArgument in methodSymbol.TypeArguments) {
             result = CheckDefaultHashDispatchPurity(typeArgument, invocationOperation, context);
             if (!result.IsPure) return true;
         }
@@ -547,19 +485,15 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool IsHashCodeCombineMethod(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.ContainingType?.ToDisplayString() == "System.HashCode" &&
+    private static bool IsHashCodeCombineMethod(IMethodSymbol methodSymbol) => methodSymbol.ContainingType?.ToDisplayString() == "System.HashCode" &&
                methodSymbol.Name == "Combine" &&
                methodSymbol.IsGenericMethod &&
                methodSymbol.TypeArguments.Length > 0;
-    }
 
 
     private static bool IsImmediateFreshArrayLinqSource(
         IOperation sourceOperation,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         var unwrappedSource = PurityAnalysisEngine.SkipImplicitConversions(sourceOperation) ?? sourceOperation;
         if (unwrappedSource is not IInvocationOperation invocationOperation ||
             invocationOperation.Type is not IArrayTypeSymbol)

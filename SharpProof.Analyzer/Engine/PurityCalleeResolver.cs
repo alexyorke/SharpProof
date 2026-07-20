@@ -2,13 +2,11 @@ using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal static class PurityCalleeResolver
-{
+internal static class PurityCalleeResolver {
     internal static string? GetKnownImpureMemberSource(ISymbol symbol) =>
         ImpurityCatalog.GetKnownImpureMemberSource(symbol);
 
-    internal static bool IsKnownMutableCollectionBoundaryType(ITypeSymbol? typeSymbol)
-    {
+    internal static bool IsKnownMutableCollectionBoundaryType(ITypeSymbol? typeSymbol) {
         if (typeSymbol is not INamedTypeSymbol namedType ||
             namedType.IsValueType ||
             namedType.TypeKind == TypeKind.Delegate ||
@@ -35,8 +33,7 @@ internal static class PurityCalleeResolver
 
     internal static PurityAnalysisResult GetCalleePurity(
         IMethodSymbol methodSymbol,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         var calleeSemanticModel = context.SemanticModelResolver?.Invoke(methodSymbol.OriginalDefinition) ??
                                   context.SemanticModel;
         var result = DeterminePurityRecursiveInternal(
@@ -66,8 +63,7 @@ internal static class PurityCalleeResolver
     internal static PurityAnalysisResult GetCalleePurityAtUse(
         IMethodSymbol methodSymbol,
         SyntaxNode useSyntax,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         var result = GetCalleePurity(methodSymbol, context);
         return result.IsPure ? PurityAnalysisResult.Pure : result.WithCallee(methodSymbol, useSyntax);
     }

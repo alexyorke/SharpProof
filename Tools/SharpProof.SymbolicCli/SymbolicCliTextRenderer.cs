@@ -1,21 +1,17 @@
-internal static class SymbolicCliTextRenderer
-{
-    internal static void PrintFileResult(SymbolicQueryResult result, SymbolicCliOptions options)
-    {
+internal static class SymbolicCliTextRenderer {
+    internal static void PrintFileResult(SymbolicQueryResult result, SymbolicCliOptions options) {
         Console.WriteLine(result.FilePath);
         Console.WriteLine($"Total lines: {result.LineCount}");
         Console.WriteLine($"Program points: {result.ProgramPointCount}");
         PrintScopedResult(result, "Merged", options);
     }
 
-    internal static void PrintLineResult(SymbolicQueryResult result, SymbolicCliOptions options)
-    {
+    internal static void PrintLineResult(SymbolicQueryResult result, SymbolicCliOptions options) {
         Console.WriteLine($"{result.FilePath}:{result.Line}");
         PrintScopedResult(result, "Line", options);
     }
 
-    internal static void PrintSpanResult(SymbolicQueryResult result, SymbolicCliOptions options)
-    {
+    internal static void PrintSpanResult(SymbolicQueryResult result, SymbolicCliOptions options) {
         Console.WriteLine($"{result.FilePath}:{result.SpanStart}-{result.SpanEnd}");
         PrintScopedResult(result, "Span", options);
     }
@@ -23,15 +19,13 @@ internal static class SymbolicCliTextRenderer
     private static void PrintScopedResult(
         SymbolicQueryResult result,
         string label,
-        SymbolicCliOptions options)
-    {
+        SymbolicCliOptions options) {
         Console.WriteLine($"Program points: {result.ProgramPoints.Count}");
         Console.WriteLine($"{label} invariant: {result.MergedInvariantText}");
         PrintInvariantQuery(label + " invariant query", SymbolicInvariantQueryView.From(result), options);
         PrintConditionProofSummaries(result.ConditionProofs, options);
         PrintAnalysisTruncation(result.AnalysisTruncation);
-        foreach (var point in result.ProgramPoints)
-        {
+        foreach (var point in result.ProgramPoints) {
             Console.WriteLine();
             PrintPointResult(point, options, true);
         }
@@ -39,16 +33,14 @@ internal static class SymbolicCliTextRenderer
             PrintSmtDiagnostics(result.SmtDiagnostics);
     }
 
-    internal static void PrintRuntimeHazardResult(SymbolicRuntimeHazardQueryResult result)
-    {
+    internal static void PrintRuntimeHazardResult(SymbolicRuntimeHazardQueryResult result) {
         Console.WriteLine(result.FilePath);
         Console.WriteLine($"Runtime hazards: {result.HazardCount}");
         PrintCountSummary("Hazard status summary", result.Hazards, static hazard => hazard.Status.ToString());
         PrintCountSummary("Hazard exception summary", result.Hazards, static hazard => hazard.ExceptionType);
         PrintCountSummary("Hazard category summary", result.Hazards, static hazard => hazard.Category);
         PrintAnalysisTruncation(result.AnalysisTruncation);
-        foreach (var hazard in result.Hazards)
-        {
+        foreach (var hazard in result.Hazards) {
             Console.WriteLine();
             Console.WriteLine($"{hazard.FilePath}:{hazard.Line}:{hazard.Column} {hazard.Kind} {hazard.Status}");
             Console.WriteLine($"Exception: {hazard.ExceptionType}");
@@ -64,15 +56,13 @@ internal static class SymbolicCliTextRenderer
     internal static async Task PrintExplainResultAsync(
         SymbolicCliOptions options,
         SymbolicCliInputContext inputContext,
-        SmtAnalysisService smtAnalysis)
-    {
+        SmtAnalysisService smtAnalysis) {
         var report = await SymbolicCliExplainReport.CreateAsync(options, inputContext, smtAnalysis)
             .ConfigureAwait(false);
         Console.Out.Write(report.ToText());
     }
 
-    internal static void PrintComplexityResult(SymbolicComplexityResult result)
-    {
+    internal static void PrintComplexityResult(SymbolicComplexityResult result) {
         Console.WriteLine(result.FilePath);
         Console.WriteLine($"Method: {result.MethodDisplayName}");
         Console.WriteLine($"Complexity: {result.Complexity.Text}");
@@ -86,16 +76,14 @@ internal static class SymbolicCliTextRenderer
             Console.WriteLine($"Callee: {callee.MethodDisplayName} => {callee.ComplexityText}");
     }
 
-    internal static void PrintCapabilityResult(SymbolicCapabilityResult result)
-    {
+    internal static void PrintCapabilityResult(SymbolicCapabilityResult result) {
         Console.WriteLine(result.FilePath);
         Console.WriteLine($"Method: {result.MethodDisplayName}");
         Console.WriteLine($"Capabilities: {result.CapabilityText}");
         Console.WriteLine($"Conservative: {result.IsConservative}");
         if (result.UnknownReasons.Count != 0)
             Console.WriteLine("Unknown reasons: " + string.Join(", ", result.UnknownReasons));
-        foreach (var site in result.Sites)
-        {
+        foreach (var site in result.Sites) {
             var value = site.IsUnknown ? "Unknown" : site.CapabilityText;
             var detail = string.IsNullOrWhiteSpace(site.SymbolDisplayName)
                 ? site.OperationText
@@ -107,8 +95,7 @@ internal static class SymbolicCliTextRenderer
     internal static void PrintPointResult(
         SymbolicProgramPointResult result,
         SymbolicCliOptions options,
-        bool includeLocation)
-    {
+        bool includeLocation) {
         if (includeLocation) Console.WriteLine($"{result.FilePath}:{result.Line}:{result.Column}");
         Console.WriteLine($"Node: {result.NodeKind}");
         Console.WriteLine($"Program point kind: {result.ProgramPointKind}");
@@ -118,8 +105,7 @@ internal static class SymbolicCliTextRenderer
         Console.WriteLine($"Reachability reason: {result.ReachabilityReason}");
         PrintInvariantQuery("Invariant query", SymbolicInvariantQueryView.From(result), options);
         PrintAnalysisTruncation(result.AnalysisTruncation);
-        foreach (var proof in result.ConditionProofs)
-        {
+        foreach (var proof in result.ConditionProofs) {
             Console.WriteLine(
                 $"Implies '{proof.Condition}' target={FormatTarget(proof.Target)} " +
                 $"kind={proof.Proof.DisplayKind}: {proof.TruthValue}");
@@ -142,8 +128,7 @@ internal static class SymbolicCliTextRenderer
     private static void PrintInvariantQuery(
         string label,
         SymbolicInvariantQueryView query,
-        SymbolicCliOptions options)
-    {
+        SymbolicCliOptions options) {
         var targets = SymbolicInvariantTargetFilter.ApplyToTargets(
             query.TargetSummaries,
             options.InvariantTargets,
@@ -174,8 +159,7 @@ internal static class SymbolicCliTextRenderer
         Console.WriteLine($"{label} text: {text}");
         Console.WriteLine($"{label} status: {query.Status}");
         Console.WriteLine($"{label} status reason: {query.StatusReason}");
-        if (options.HasInvariantTargetFilter)
-        {
+        if (options.HasInvariantTargetFilter) {
             var matched = query.GetMatchedTargets(options.InvariantTargets);
             var unmatched = SymbolicInvariantTargetFilter.GetUnmatchedTargetFilters(options.InvariantTargets, matched);
             Console.WriteLine($"{label} target filter: {string.Join(", ", options.InvariantTargets)}");
@@ -183,15 +167,13 @@ internal static class SymbolicCliTextRenderer
             if (matched.Count != 0) Console.WriteLine($"{label} matched target filters: {string.Join(", ", matched)}");
             if (unmatched.Count != 0) Console.WriteLine($"{label} unmatched target filters: {string.Join(", ", unmatched)}");
         }
-        foreach (var target in targets.Take(16))
-        {
+        foreach (var target in targets.Take(16)) {
             Console.WriteLine(
                 $"{label} target: {target.Target} status={target.Status} " +
                 $"reason={target.StatusReason} code={target.ReasonCode}");
             Console.WriteLine($"{label} target summary: {target.Summary}");
         }
-        foreach (var path in paths.Take(16))
-        {
+        foreach (var path in paths.Take(16)) {
             Console.WriteLine(
                 $"{label} target path: {path.Target} conditions={path.PathConditionCount} " +
                 $"smt={path.SmtConditionCount} points={path.ProgramPointCount} " +
@@ -207,10 +189,8 @@ internal static class SymbolicCliTextRenderer
 
     private static void PrintConditionProofSummaries(
         IReadOnlyList<SymbolicConditionProofSummary> proofs,
-        SymbolicCliOptions options)
-    {
-        foreach (var proof in proofs)
-        {
+        SymbolicCliOptions options) {
+        foreach (var proof in proofs) {
             var target = proof.Target;
             if (options.InvariantTargets.Count != 0 &&
                 !SymbolicInvariantTargetFilter.Matches(target, options.InvariantTargets))
@@ -225,8 +205,7 @@ internal static class SymbolicCliTextRenderer
         }
     }
 
-    private static void PrintCountSummary<T>(string label, IEnumerable<T> values, Func<T, string> key)
-    {
+    private static void PrintCountSummary<T>(string label, IEnumerable<T> values, Func<T, string> key) {
         var counts = values.GroupBy(key, StringComparer.Ordinal)
             .OrderBy(static group => group.Key, StringComparer.Ordinal)
             .Select(static group => $"{group.Key}={group.Count()}");
@@ -236,8 +215,7 @@ internal static class SymbolicCliTextRenderer
     private static string FormatTarget(string? target) =>
         string.IsNullOrWhiteSpace(target) ? "<unknown>" : target!;
 
-    private static void PrintSmtDiagnostics(SymbolicSmtDiagnostics diagnostics)
-    {
+    private static void PrintSmtDiagnostics(SymbolicSmtDiagnostics diagnostics) {
         Console.WriteLine("SMT:");
         Console.WriteLine($"  Mode: {diagnostics.Mode}");
         Console.WriteLine($"  Enabled: {diagnostics.IsEnabled}");
@@ -252,8 +230,7 @@ internal static class SymbolicCliTextRenderer
         Console.WriteLine($"  Context recycles: {diagnostics.Health.ContextRecycleCount}");
     }
 
-    private static void PrintAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation)
-    {
+    private static void PrintAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation) {
         if (!truncation.IsTruncated) return;
         Console.WriteLine($"Analysis limits hit: {truncation.Events.Count}");
         foreach (var item in truncation.Events)

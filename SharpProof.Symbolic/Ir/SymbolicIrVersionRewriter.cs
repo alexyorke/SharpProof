@@ -1,36 +1,27 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicIrVersionRewriter
-{
+internal static class SymbolicIrVersionRewriter {
     internal static SymbolicCondition RewriteToCurrentVersions(
         SymbolicCondition condition,
-        ImmutableDictionary<string, int> symbolVersions)
-    {
+        ImmutableDictionary<string, int> symbolVersions) {
         if (condition == null) throw new ArgumentNullException(nameof(condition));
         return symbolVersions.IsEmpty ? condition : new CurrentVersionRewriter(symbolVersions).Rewrite(condition);
     }
 
     internal static SymbolicFact RewriteToCurrentVersions(
         SymbolicFact fact,
-        ImmutableDictionary<string, int> symbolVersions)
-    {
+        ImmutableDictionary<string, int> symbolVersions) {
         if (fact == null) throw new ArgumentNullException(nameof(fact));
         return symbolVersions.IsEmpty ? fact : new CurrentVersionRewriter(symbolVersions).Rewrite(fact);
     }
 
-    private sealed class CurrentVersionRewriter : SymbolicIrRewriter
-    {
+    private sealed class CurrentVersionRewriter : SymbolicIrRewriter {
         private readonly ImmutableDictionary<string, int> _symbolVersions;
 
-        internal CurrentVersionRewriter(ImmutableDictionary<string, int> symbolVersions)
-        {
-            _symbolVersions = symbolVersions;
-        }
+        internal CurrentVersionRewriter(ImmutableDictionary<string, int> symbolVersions) => _symbolVersions = symbolVersions;
 
-        protected override bool TryRewriteTerm(SymbolicTerm term, out SymbolicTerm rewritten)
-        {
-            switch (term)
-            {
+        protected override bool TryRewriteTerm(SymbolicTerm term, out SymbolicTerm rewritten) {
+            switch (term) {
                 case SymbolicVariableTerm variable:
                     return TryRewriteVariableLike(
                         variable,
@@ -60,11 +51,9 @@ internal static class SymbolicIrVersionRewriter
             string name,
             Func<TTerm, string, SymbolicTerm> factory,
             out SymbolicTerm rewritten)
-            where TTerm : SymbolicTerm
-        {
+            where TTerm : SymbolicTerm {
             var rewrittenName = RewriteVariableLikeName(name);
-            if (string.Equals(rewrittenName, name, StringComparison.Ordinal))
-            {
+            if (string.Equals(rewrittenName, name, StringComparison.Ordinal)) {
                 rewritten = term;
                 return true;
             }
@@ -73,8 +62,7 @@ internal static class SymbolicIrVersionRewriter
             return true;
         }
 
-        private string RewriteVariableLikeName(string name)
-        {
+        private string RewriteVariableLikeName(string name) {
             if (string.IsNullOrEmpty(name)) return name;
 
             var (baseName, currentVersion) = SplitVersionedName(name);
@@ -88,8 +76,7 @@ internal static class SymbolicIrVersionRewriter
         }
     }
 
-    private static (string BaseName, int Version) SplitVersionedName(string name)
-    {
+    private static (string BaseName, int Version) SplitVersionedName(string name) {
         var markerIndex = name.LastIndexOf("@v", StringComparison.Ordinal);
         if (markerIndex < 0 ||
             markerIndex + 2 >= name.Length ||

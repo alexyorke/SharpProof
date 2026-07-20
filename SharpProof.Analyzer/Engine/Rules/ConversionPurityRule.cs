@@ -1,10 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class ConversionPurityRule
-{
+internal static class ConversionPurityRule {
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IConversionOperation conversionOperation,
-        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState) {
 
         if (conversionOperation.Operand == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
@@ -22,8 +20,7 @@ internal static class ConversionPurityRule
                 nameof(ConversionPurityRule));
 
 
-        if (conversionOperation.Conversion.IsUserDefined && conversionOperation.Conversion.MethodSymbol != null)
-        {
+        if (conversionOperation.Conversion.IsUserDefined && conversionOperation.Conversion.MethodSymbol != null) {
             var operatorMethod = conversionOperation.Conversion.MethodSymbol;
 
 
@@ -47,8 +44,7 @@ internal static class ConversionPurityRule
         return operandResult;
     }
 
-    private static bool IsPurityNeutralIntrinsicConversion(IMethodSymbol operatorMethod)
-    {
+    private static bool IsPurityNeutralIntrinsicConversion(IMethodSymbol operatorMethod) {
         if (operatorMethod.Name != "op_Implicit" ||
             operatorMethod.Parameters.Length != 1)
             return false;
@@ -70,8 +66,7 @@ internal static class ConversionPurityRule
         var parameterTypeDefinition = parameterType.OriginalDefinition.ToDisplayString();
         var returnTypeDefinition = returnType.OriginalDefinition.ToDisplayString();
 
-        return containingTypeDefinition switch
-        {
+        return containingTypeDefinition switch {
             "System.Span<T>" =>
                 parameterTypeDefinition == "System.Span<T>" &&
                 returnTypeDefinition == "System.ReadOnlySpan<T>",

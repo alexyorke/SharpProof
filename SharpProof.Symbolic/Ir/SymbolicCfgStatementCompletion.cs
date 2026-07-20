@@ -2,14 +2,12 @@ using static SharpProof.Symbolic.Ir.SymbolicCfgProgramPointStateCollector;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicCfgStatementCompletion
-{
+internal static class SymbolicCfgStatementCompletion {
     internal static SymbolicLoweringResult<SymbolicState> CollectCompletedStatementState(
         StatementSyntax statement,
         SymbolicState entryState,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         using var limitScope = SymbolicAnalysisLimitContext.Push(
             SymbolicAnalysisLimitContext.Limits,
@@ -28,8 +26,7 @@ internal static class SymbolicCfgStatementCompletion
         StatementSyntax statement,
         SymbolicState entryState,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (statement is IfStatementSyntax abruptIf &&
             TryCollectAbruptIfCompletionState(
                 abruptIf,
@@ -39,8 +36,7 @@ internal static class SymbolicCfgStatementCompletion
                 out var abruptCompletion))
             return abruptCompletion;
         if (statement is WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax &&
-            SymbolicControlFlowFacts.StatementDefinitelyExits(statement, semanticModel, cancellationToken))
-        {
+            SymbolicControlFlowFacts.StatementDefinitelyExits(statement, semanticModel, cancellationToken)) {
             var terminalState = entryState;
             SymbolicStateInvalidator.InvalidateNestedMutations(
                 ref terminalState,
@@ -72,10 +68,8 @@ internal static class SymbolicCfgStatementCompletion
             return Unsupported(statement, failure);
 
         var entryPoint = region.EntryPoint;
-        var incoming = new Dictionary<CfgTraversalPoint, Dictionary<CfgIncomingEdge, CfgPathState>>
-        {
-            [entryPoint] = new()
-            {
+        var incoming = new Dictionary<CfgTraversalPoint, Dictionary<CfgIncomingEdge, CfgPathState>> {
+            [entryPoint] = new() {
                 [new CfgIncomingEdge(null, null, CfgIncomingEdgeKind.Entry)] = new(entryState, null)
             }
         };
@@ -97,16 +91,14 @@ internal static class SymbolicCfgStatementCompletion
         queue.Enqueue(entryPoint);
         var iterations = 0;
         var iterationLimit = graph.Blocks.Length * (4 + loopPlans.Count * 2);
-        while (queue.Count != 0 && iterations++ < iterationLimit)
-        {
+        while (queue.Count != 0 && iterations++ < iterationLimit) {
             var point = queue.Dequeue();
             queued.Remove(point);
             var currentPath = MergeIncomingStates(incoming[point].Values.ToArray(), statement);
             var state = currentPath.State;
             var slice = region.Blocks[point.Block.Ordinal];
             var completedInBlock = false;
-            for (var index = point.OperationIndex; index < slice.EndOperationIndexExclusive; index++)
-            {
+            for (var index = point.OperationIndex; index < slice.EndOperationIndexExclusive; index++) {
                 var operation = point.Block.Operations[index];
                 if (operation.IsImplicit && ReferenceEquals(operation.Syntax, executionRoot) ||
                     operation is IFlowCaptureOperation)
@@ -125,8 +117,7 @@ internal static class SymbolicCfgStatementCompletion
                         out invalidatedGuardTarget))
                     return Unsupported(operation.Syntax, "operation-" + operation.Kind);
                 if (!summarizesLoop && invalidatedGuardTarget != null)
-                    currentPath = currentPath with
-                    {
+                    currentPath = currentPath with {
                         GuardFrame = InvalidateGuards(currentPath.GuardFrame, invalidatedGuardTarget)
                     };
                 if (!summarizesLoop)
@@ -139,8 +130,7 @@ internal static class SymbolicCfgStatementCompletion
                     SymbolicControlFlowFacts.StatementDefinitelyExits(
                         operationStatement,
                         semanticModel,
-                        cancellationToken))
-                {
+                        cancellationToken)) {
                     region.TerminalPaths.Add(currentPath with { State = state });
                     completedInBlock = true;
                     break;
@@ -169,8 +159,7 @@ internal static class SymbolicCfgStatementCompletion
                 : Unsupported(statement, "statement-region.loop-summary");
 
         SymbolicState? result = null;
-        if (region.CompletedPaths.Count != 0)
-        {
+        if (region.CompletedPaths.Count != 0) {
             var path = MergeIncomingStates(
                 region.CompletedPaths.Select(static completion => completion.Path).ToArray(),
                 statement);
@@ -179,8 +168,7 @@ internal static class SymbolicCfgStatementCompletion
                 path,
                 region.CompletedPaths.Count == 1 && !HasInvalidatedGuard(path.GuardFrame));
         }
-        else if (region.TerminalPaths.Count != 0)
-        {
+        else if (region.TerminalPaths.Count != 0) {
             var path = CollapseTerminalCompletionPaths(region.TerminalPaths, statement);
             result = OrderTargetState(
                 SymbolicOperationTransferKernel.Complete(path.State, statement.Span).State,
@@ -204,16 +192,13 @@ internal static class SymbolicCfgStatementCompletion
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out ControlFlowGraph graph,
-        out string failure)
-    {
-        try
-        {
+        out string failure) {
+        try {
             graph = ControlFlowGraph.Create(executionRoot, semanticModel, cancellationToken)!;
             failure = graph == null || graph.Blocks.IsDefaultOrEmpty ? "cfg-empty" : string.Empty;
             return failure.Length == 0;
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
+        catch (Exception exception) when (exception is not OperationCanceledException) {
             graph = null!;
             failure = "cfg";
             return false;

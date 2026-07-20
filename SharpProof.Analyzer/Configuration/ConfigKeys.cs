@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer.Configuration;
 
-internal static class ConfigKeys
-{
+internal static class ConfigKeys {
     public const string KnownImpureMethods = "sharpproof_known_impure_methods";
     public const string KnownPureMethods = "sharpproof_known_pure_methods";
     public const string KnownImpureNamespaces = "sharpproof_known_impure_namespaces";

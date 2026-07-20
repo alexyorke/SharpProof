@@ -2,13 +2,11 @@ using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal static class PurityAssignmentStateTransfer
-{
+internal static class PurityAssignmentStateTransfer {
     internal static PurityAnalysisState UpdateDelegateMapForOperation(
         IOperation operation,
         PurityAnalysisContext context,
-        PurityAnalysisState currentState)
-    {
+        PurityAnalysisState currentState) {
         operation = operation is IExpressionStatementOperation expressionStatement
             ? expressionStatement.Operation
             : operation;

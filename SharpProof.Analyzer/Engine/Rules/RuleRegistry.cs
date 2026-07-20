@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class RuleRegistry
-{
-    internal static ImmutableDictionary<OperationKind, PurityRuleHandler> GetDefaultRules()
-    {
+internal static class RuleRegistry {
+    internal static ImmutableDictionary<OperationKind, PurityRuleHandler> GetDefaultRules() {
         var rules = ImmutableDictionary.CreateBuilder<OperationKind, PurityRuleHandler>();
 
         // Registration order preserves the former first-rule-wins behavior.
@@ -105,10 +103,8 @@ internal static class RuleRegistry
     private static void Add(
         ImmutableDictionary<OperationKind, PurityRuleHandler>.Builder rules,
         PurityRuleHandler handler,
-        params OperationKind[] operationKinds)
-    {
-        foreach (var kind in operationKinds)
-        {
+        params OperationKind[] operationKinds) {
+        foreach (var kind in operationKinds) {
             if (!rules.ContainsKey(kind)) rules.Add(kind, handler);
         }
     }

@@ -1,7 +1,5 @@
-internal static class BclFallbackInventoryBuilder
-{
-    public static BclFallbackInventoryReport Build(AssemblyEffectReport[] assemblies)
-    {
+internal static class BclFallbackInventoryBuilder {
+    public static BclFallbackInventoryReport Build(AssemblyEffectReport[] assemblies) {
         var entries = assemblies
             .SelectMany(assembly => GetInventoryMethods(assembly)
                 .Select(method => TryCreateEntry(assembly, method, out var entry) ? entry : null))
@@ -23,18 +21,14 @@ internal static class BclFallbackInventoryBuilder
             entries);
     }
 
-    private static IEnumerable<MethodEffectSummary> GetInventoryMethods(AssemblyEffectReport assembly)
-    {
-        return assembly.ClassificationMethods.Length == 0
+    private static IEnumerable<MethodEffectSummary> GetInventoryMethods(AssemblyEffectReport assembly) => assembly.ClassificationMethods.Length == 0
             ? assembly.Methods
             : assembly.ClassificationMethods;
-    }
 
     private static bool TryCreateEntry(
         AssemblyEffectReport assembly,
         MethodEffectSummary method,
-        out BclFallbackInventoryEntry? entry)
-    {
+        out BclFallbackInventoryEntry? entry) {
         entry = null;
         if (!TryCreateShape(assembly, method, out var shape)) return false;
 
@@ -56,8 +50,7 @@ internal static class BclFallbackInventoryBuilder
     private static bool TryCreateShape(
         AssemblyEffectReport assembly,
         MethodEffectSummary method,
-        out BclPurityFallbackHeuristics.Shape shape)
-    {
+        out BclPurityFallbackHeuristics.Shape shape) {
         shape = default;
         if (!BclPurityFallbackHeuristics.IsFrameworkSystemAssemblyName(assembly.AssemblyName) ||
             !BclPurityFallbackHeuristics.IsSystemNamespace(GetNamespaceName(method.Identity.ContainingMetadataType)))
@@ -87,8 +80,7 @@ internal static class BclFallbackInventoryBuilder
             hasRefOrOutParameter,
             BclPurityFallbackHeuristics.IsValueLikeTypeName(returnTypeName),
             BclPurityFallbackHeuristics.IsKnownValueTypeName(containingTypeName),
-            method.Identity.Parameters.All(static parameter =>
-            {
+            method.Identity.Parameters.All(static parameter => {
                 var typeName = GetHeuristicTypeName(parameter.Type);
                 return BclPurityFallbackHeuristics.IsValueLikeTypeName(typeName) ||
                        BclPurityFallbackHeuristics.IsReadOnlyViewTypeName(typeName);
@@ -97,10 +89,8 @@ internal static class BclFallbackInventoryBuilder
         return true;
     }
 
-    private static string GetHeuristicTypeName(string structuralType)
-    {
-        if (structuralType.StartsWith("named:", StringComparison.Ordinal))
-        {
+    private static string GetHeuristicTypeName(string structuralType) {
+        if (structuralType.StartsWith("named:", StringComparison.Ordinal)) {
             var typeName = structuralType.Substring("named:".Length);
             var argumentsStart = typeName.IndexOf('[', StringComparison.Ordinal);
             return argumentsStart < 0 ? typeName : typeName.Substring(0, argumentsStart);
@@ -109,8 +99,7 @@ internal static class BclFallbackInventoryBuilder
         return structuralType;
     }
 
-    private static string GetNamespaceName(string typeName)
-    {
+    private static string GetNamespaceName(string typeName) {
         var lastSeparator = typeName.LastIndexOf('.');
         return lastSeparator <= 0 ? string.Empty : typeName.Substring(0, lastSeparator);
     }

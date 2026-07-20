@@ -1,10 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class AwaitPurityRule
-{
+internal static class AwaitPurityRule {
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IAwaitOperation awaitOperation,
-        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState) {
 
 
         var awaitedExpressionResult =
@@ -18,8 +16,7 @@ internal static class AwaitPurityRule
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckAwaitablePatternMembers(
         ITypeSymbol? awaitableType,
         SyntaxNode awaitSyntax,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         var getAwaiterMethod = awaitableType?
             .GetMembers("GetAwaiter")
             .OfType<IMethodSymbol>()
@@ -44,8 +41,7 @@ internal static class AwaitPurityRule
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckAwaitPatternMembers(
         IAwaitOperation awaitOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (awaitOperation.Syntax is not AwaitExpressionSyntax awaitSyntax)
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
@@ -63,8 +59,7 @@ internal static class AwaitPurityRule
         IPropertySymbol? isCompletedProperty,
         IMethodSymbol? getResultMethod,
         SyntaxNode awaitSyntax,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         var getAwaiterResult = CheckAwaitPatternMethod(getAwaiterMethod, awaitSyntax, context);
         if (!getAwaiterResult.IsPure) return getAwaiterResult;
 
@@ -73,8 +68,7 @@ internal static class AwaitPurityRule
         if (!isCompletedResult.IsPure) return isCompletedResult;
 
         if (!IsKnownConstantTrueIsCompletedGetter(isCompletedProperty?.GetMethod, context.SemanticModel,
-                context.CancellationToken))
-        {
+                context.CancellationToken)) {
             var continuationSchedulingResult = CheckAwaitContinuationSchedulingMethods(
                 getAwaiterMethod?.ReturnType,
                 awaitSyntax,
@@ -88,12 +82,10 @@ internal static class AwaitPurityRule
     private static bool IsKnownConstantTrueIsCompletedGetter(
         IMethodSymbol? getter,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (getter == null) return false;
 
-        foreach (var syntaxReference in getter.DeclaringSyntaxReferences)
-        {
+        foreach (var syntaxReference in getter.DeclaringSyntaxReferences) {
             cancellationToken.ThrowIfCancellationRequested();
             if (syntaxReference.GetSyntax(cancellationToken) is not AccessorDeclarationSyntax accessor) continue;
 
@@ -118,13 +110,11 @@ internal static class AwaitPurityRule
     private static PurityAnalysisEngine.PurityAnalysisResult CheckAwaitContinuationSchedulingMethods(
         ITypeSymbol? awaiterType,
         SyntaxNode awaitSyntax,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (awaiterType == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         foreach (var schedulingMethod in EnumerateAwaitContinuationSchedulingMethods(awaiterType,
-                     context.SemanticModel.Compilation))
-        {
+                     context.SemanticModel.Compilation)) {
             var schedulingResult = CheckAwaitPatternMethod(schedulingMethod, awaitSyntax, context);
             if (!schedulingResult.IsPure) return schedulingResult;
         }
@@ -134,8 +124,7 @@ internal static class AwaitPurityRule
 
     private static IEnumerable<IMethodSymbol> EnumerateAwaitContinuationSchedulingMethods(
         ITypeSymbol awaiterType,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
 
         foreach (var method in awaiterType.GetMembers()
@@ -150,8 +139,7 @@ internal static class AwaitPurityRule
                  {
                      "System.Runtime.CompilerServices.INotifyCompletion",
                      "System.Runtime.CompilerServices.ICriticalNotifyCompletion"
-                 })
-        {
+                 }) {
             var interfaceType = compilation.GetTypeByMetadataName(interfaceName);
             if (interfaceType == null ||
                 (!SymbolEq.AreEqual(namedAwaiterType, interfaceType) &&
@@ -160,8 +148,7 @@ internal static class AwaitPurityRule
 
             foreach (var interfaceMethod in interfaceType.GetMembers()
                          .OfType<IMethodSymbol>()
-                         .Where(AwaitableRuntimeMemberClassifier.IsContinuationSchedulingMethod))
-            {
+                         .Where(AwaitableRuntimeMemberClassifier.IsContinuationSchedulingMethod)) {
                 var implementation =
                     namedAwaiterType.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol;
                 if (implementation != null && seen.Add(implementation.OriginalDefinition)) yield return implementation;
@@ -172,8 +159,7 @@ internal static class AwaitPurityRule
     private static PurityAnalysisEngine.PurityAnalysisResult CheckAwaitPatternMethod(
         IMethodSymbol? methodSymbol,
         SyntaxNode awaitSyntax,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (methodSymbol == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         return PurityCalleeResolver.GetCanonicalCalleePurityAtUse(methodSymbol, awaitSyntax, context);

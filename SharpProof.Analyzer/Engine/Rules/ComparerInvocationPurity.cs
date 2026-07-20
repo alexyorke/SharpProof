@@ -2,8 +2,7 @@ using static SharpProof.Analyzer.Engine.Rules.MethodInvocationPurityRule;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static partial class ComparerInvocationPurity
-{
+internal static partial class ComparerInvocationPurity {
     private sealed record CollectionDispatchRule(
         string TypeDefinition,
         int TypeArgumentIndex,
@@ -58,8 +57,7 @@ internal static partial class ComparerInvocationPurity
     internal static bool TryCheckEqualityComparerDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
@@ -67,11 +65,9 @@ internal static partial class ComparerInvocationPurity
 
         if (ComparerDispatchHelper.IsBuiltinValueComparerKey(elementType)) return true;
 
-        if (methodSymbol.Name == nameof(object.Equals) && methodSymbol.Parameters.Length == 2)
-        {
+        if (methodSymbol.Name == nameof(object.Equals) && methodSymbol.Parameters.Length == 2) {
             if (DispatchedMemberResolution.TryGetIEquatableEqualsImplementation(elementType,
-                    out var equalsImplementation))
-            {
+                    out var equalsImplementation)) {
                 result = PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
                     equalsImplementation,
                     invocationOperation.Syntax,
@@ -80,8 +76,7 @@ internal static partial class ComparerInvocationPurity
             }
 
             if (DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(object.Equals), 1,
-                    out var objectEqualsOverride))
-            {
+                    out var objectEqualsOverride)) {
                 result = PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
                     objectEqualsOverride,
                     invocationOperation.Syntax,
@@ -89,11 +84,9 @@ internal static partial class ComparerInvocationPurity
                 return true;
             }
         }
-        else if (methodSymbol.Name == nameof(GetHashCode) && methodSymbol.Parameters.Length == 1)
-        {
+        else if (methodSymbol.Name == nameof(GetHashCode) && methodSymbol.Parameters.Length == 1) {
             if (DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(GetHashCode), 0,
-                    out var getHashCodeOverride))
-            {
+                    out var getHashCodeOverride)) {
                 result = PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
                     getHashCodeOverride,
                     invocationOperation.Syntax,
@@ -101,8 +94,7 @@ internal static partial class ComparerInvocationPurity
                 return true;
             }
         }
-        else
-        {
+        else {
             return false;
         }
 
@@ -113,8 +105,7 @@ internal static partial class ComparerInvocationPurity
     internal static bool TryCheckComparerDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
@@ -127,8 +118,7 @@ internal static partial class ComparerInvocationPurity
     internal static bool TryCheckNullableComparisonDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (!TryGetNullableDefaultDispatchType(
@@ -146,8 +136,7 @@ internal static partial class ComparerInvocationPurity
     internal static bool TryGetNullableDefaultDispatchType(
         IMethodSymbol methodSymbol,
         out ITypeSymbol valueType,
-        out bool isComparison)
-    {
+        out bool isComparison) {
         valueType = null!;
         var definition = methodSymbol.OriginalDefinition;
         isComparison = definition.Name == "Compare";
@@ -164,8 +153,7 @@ internal static partial class ComparerInvocationPurity
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
@@ -173,15 +161,13 @@ internal static partial class ComparerInvocationPurity
             return false;
 
         var receiverComparerResult = CheckHashSetReceiverComparerPurity(invocationOperation, context);
-        if (!receiverComparerResult.IsPure)
-        {
+        if (!receiverComparerResult.IsPure) {
             result = receiverComparerResult;
             return true;
         }
 
         if (IsHashSetRelationMethod(methodSymbol) &&
-            invocationOperation.Arguments.Length > 0)
-        {
+            invocationOperation.Arguments.Length > 0) {
             result = CheckLinqSourceEnumeratorPurity(invocationOperation.Arguments[0].Value, context, currentState);
             if (!result.IsPure) return true;
         }
@@ -192,8 +178,7 @@ internal static partial class ComparerInvocationPurity
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckHashSetReceiverComparerPurity(
         IInvocationOperation invocationOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         var methodSymbol = invocationOperation.TargetMethod;
         if (methodSymbol.ContainingType?.OriginalDefinition.ToDisplayString() !=
             "System.Collections.Generic.HashSet<T>") return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -217,8 +202,7 @@ internal static partial class ComparerInvocationPurity
     private static PurityAnalysisEngine.PurityAnalysisResult CheckHashSetSubtypeConstructorComparerPurity(
         INamedTypeSymbol receiverType,
         IInvocationOperation invocationOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (receiverType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.HashSet<T>" ||
             !DerivesFromHashSet(receiverType))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -229,8 +213,7 @@ internal static partial class ComparerInvocationPurity
             value => CheckComparerValuePurity(value, invocationOperation, context));
     }
 
-    private static bool DerivesFromHashSet(INamedTypeSymbol typeSymbol)
-    {
+    private static bool DerivesFromHashSet(INamedTypeSymbol typeSymbol) {
         for (var baseType = typeSymbol.BaseType; baseType != null; baseType = baseType.BaseType)
             if (baseType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.HashSet<T>")
                 return true;
@@ -238,25 +221,20 @@ internal static partial class ComparerInvocationPurity
         return false;
     }
 
-    private static bool IsConcreteHashSetType(ITypeSymbol? typeSymbol)
-    {
-        return typeSymbol is INamedTypeSymbol namedType &&
+    private static bool IsConcreteHashSetType(ITypeSymbol? typeSymbol) => typeSymbol is INamedTypeSymbol namedType &&
                namedType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.HashSet<T>";
-    }
 
     internal static bool TryCheckCollectionComparisonDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
         if (!TryGetDefaultComparisonCollectionKeyType(methodSymbol, out var keyType)) return false;
 
         var receiverComparerResult = CheckSortedCollectionReceiverComparerPurity(invocationOperation, context);
-        if (!receiverComparerResult.IsPure)
-        {
+        if (!receiverComparerResult.IsPure) {
             result = receiverComparerResult;
             return true;
         }
@@ -267,8 +245,7 @@ internal static partial class ComparerInvocationPurity
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckSortedCollectionReceiverComparerPurity(
         IInvocationOperation invocationOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         var methodSymbol = invocationOperation.TargetMethod;
         if (!IsConcreteSortedCollectionType(methodSymbol.ContainingType))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -286,8 +263,7 @@ internal static partial class ComparerInvocationPurity
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
 
-    private static bool IsConcreteSortedCollectionType(ITypeSymbol? typeSymbol)
-    {
+    private static bool IsConcreteSortedCollectionType(ITypeSymbol? typeSymbol) {
         if (typeSymbol is not INamedTypeSymbol namedType) return false;
 
         return namedType.OriginalDefinition.ToDisplayString() is
@@ -299,8 +275,7 @@ internal static partial class ComparerInvocationPurity
     internal static bool TryCheckLinqDefaultEqualityDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
@@ -315,8 +290,7 @@ internal static partial class ComparerInvocationPurity
     internal static bool TryCheckLinqDefaultComparisonDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
@@ -330,13 +304,9 @@ internal static partial class ComparerInvocationPurity
 
     internal static bool TryGetLinqDefaultComparisonDispatchType(
         IMethodSymbol methodSymbol,
-        out ITypeSymbol comparisonType)
-    {
-        return TryGetLinqDispatchType(methodSymbol, LinqComparisonDispatchRules, out comparisonType);
-    }
+        out ITypeSymbol comparisonType) => TryGetLinqDispatchType(methodSymbol, LinqComparisonDispatchRules, out comparisonType);
 
-    private static bool IsLinqDefaultComparisonOverload(IInvocationOperation invocationOperation)
-    {
+    private static bool IsLinqDefaultComparisonOverload(IInvocationOperation invocationOperation) {
         if (TryGetComparerArgument(invocationOperation, out var comparerArgument))
             return ComparerDispatchHelper.IsNullOrDefaultComparerArgument(comparerArgument);
 
@@ -345,22 +315,17 @@ internal static partial class ComparerInvocationPurity
 
     internal static bool TryGetLinqDefaultEqualityDispatchType(
         IMethodSymbol methodSymbol,
-        out ITypeSymbol equalityType)
-    {
-        return TryGetLinqDispatchType(methodSymbol, LinqEqualityDispatchRules, out equalityType);
-    }
+        out ITypeSymbol equalityType) => TryGetLinqDispatchType(methodSymbol, LinqEqualityDispatchRules, out equalityType);
 
     private static bool TryGetLinqDispatchType(
         IMethodSymbol methodSymbol,
         IReadOnlyList<GenericDispatchRule> rules,
-        out ITypeSymbol dispatchType)
-    {
+        out ITypeSymbol dispatchType) {
         dispatchType = null!;
         var definition = GetExtensionDefinition(methodSymbol);
         if (definition.ContainingType?.OriginalDefinition.ToDisplayString() != "System.Linq.Enumerable") return false;
 
-        foreach (var rule in rules)
-        {
+        foreach (var rule in rules) {
             var typeArgumentCount = methodSymbol.TypeArguments.Length;
             if (!rule.MethodNames.Contains(definition.Name, StringComparer.Ordinal) ||
                 typeArgumentCount < rule.RequiredTypeArgumentCount ||
@@ -374,8 +339,7 @@ internal static partial class ComparerInvocationPurity
         return false;
     }
 
-    private static bool IsLinqDefaultEqualityOverload(IInvocationOperation invocationOperation)
-    {
+    private static bool IsLinqDefaultEqualityOverload(IInvocationOperation invocationOperation) {
         if (TryGetEqualityComparerArgument(invocationOperation, out var comparerArgument))
             return ComparerDispatchHelper.IsNullOrDefaultComparerArgument(comparerArgument);
 
@@ -384,26 +348,18 @@ internal static partial class ComparerInvocationPurity
 
     private static bool TryGetComparerArgument(
         IInvocationOperation invocationOperation,
-        out IArgumentOperation comparerArgument)
-    {
-        return TryGetArgumentByParameterType(invocationOperation, IsComparerType, out comparerArgument);
-    }
+        out IArgumentOperation comparerArgument) => TryGetArgumentByParameterType(invocationOperation, IsComparerType, out comparerArgument);
 
     private static bool TryGetEqualityComparerArgument(
         IInvocationOperation invocationOperation,
-        out IArgumentOperation comparerArgument)
-    {
-        return TryGetArgumentByParameterType(invocationOperation, IsEqualityComparerType, out comparerArgument);
-    }
+        out IArgumentOperation comparerArgument) => TryGetArgumentByParameterType(invocationOperation, IsEqualityComparerType, out comparerArgument);
 
     private static bool TryGetArgumentByParameterType(
         IInvocationOperation invocationOperation,
         Func<ITypeSymbol?, bool> matchesParameterType,
-        out IArgumentOperation matchingArgument)
-    {
+        out IArgumentOperation matchingArgument) {
         foreach (var argument in invocationOperation.Arguments)
-            if (matchesParameterType(argument.Parameter?.Type))
-            {
+            if (matchesParameterType(argument.Parameter?.Type)) {
                 matchingArgument = argument;
                 return true;
             }
@@ -416,63 +372,48 @@ internal static partial class ComparerInvocationPurity
         INamedTypeSymbol type,
         IMethodSymbol target,
         ISet<IMethodSymbol> targets,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (!TypeHierarchyEnumeration.ImplementsInterface(type, target.ContainingType, true)) return;
 
         if (type.Kind == SymbolKind.NamedType &&
             (type.TypeKind == TypeKind.Interface ||
              type.TypeKind == TypeKind.Struct ||
-             type.TypeKind == TypeKind.Class))
-        {
+             type.TypeKind == TypeKind.Class)) {
             var implementation = ResolveKnownInterfaceImplementation(type, target, cancellationToken);
             if (implementation != null) targets.Add(implementation.OriginalDefinition);
         }
     }
 
-    private static bool IsComparerType(ITypeSymbol? typeSymbol)
-    {
-        return typeSymbol is INamedTypeSymbol namedType &&
+    private static bool IsComparerType(ITypeSymbol? typeSymbol) => typeSymbol is INamedTypeSymbol namedType &&
                namedType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.IComparer<T>";
-    }
 
-    private static bool IsEqualityComparerType(ITypeSymbol? typeSymbol)
-    {
-        return typeSymbol is INamedTypeSymbol namedType &&
+    private static bool IsEqualityComparerType(ITypeSymbol? typeSymbol) => typeSymbol is INamedTypeSymbol namedType &&
                namedType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.IEqualityComparer<T>";
-    }
 
 
     internal static bool TryGetEqualityComparerElementType(
         IMethodSymbol methodSymbol,
-        out ITypeSymbol elementType)
-    {
-        return TryGetComparerElementType(
+        out ITypeSymbol elementType) => TryGetComparerElementType(
             methodSymbol,
             "System.Collections.Generic.EqualityComparer<T>",
             static method =>
                 (method.Name == nameof(object.Equals) && method.Parameters.Length == 2) ||
                 (method.Name == nameof(GetHashCode) && method.Parameters.Length == 1),
             out elementType);
-    }
 
     internal static bool TryGetComparerElementType(
         IMethodSymbol methodSymbol,
-        out ITypeSymbol elementType)
-    {
-        return TryGetComparerElementType(
+        out ITypeSymbol elementType) => TryGetComparerElementType(
             methodSymbol,
             "System.Collections.Generic.Comparer<T>",
             static method => method.Name == "Compare" && method.Parameters.Length == 2,
             out elementType);
-    }
 
     private static bool TryGetComparerElementType(
         IMethodSymbol methodSymbol,
         string expectedTypeDefinition,
         Func<IMethodSymbol, bool> methodMatches,
-        out ITypeSymbol elementType)
-    {
+        out ITypeSymbol elementType) {
         elementType = null!;
 
         if (methodSymbol.ContainingType is not INamedTypeSymbol { TypeArguments.Length: 1 } containingType ||
@@ -487,8 +428,7 @@ internal static partial class ComparerInvocationPurity
     internal static bool TryGetDefaultEqualityCollectionElementType(
         IMethodSymbol methodSymbol,
         out ITypeSymbol elementType,
-        out bool requiresHashCode)
-    {
+        out bool requiresHashCode) {
         elementType = null!;
         requiresHashCode = false;
 
@@ -500,8 +440,7 @@ internal static partial class ComparerInvocationPurity
             methodSymbol.IsGenericMethod &&
             methodSymbol.TypeArguments.Length == 1 &&
             methodSymbol.Parameters.Length >= 2 &&
-            methodSymbol.Name is "IndexOf" or "LastIndexOf")
-        {
+            methodSymbol.Name is "IndexOf" or "LastIndexOf") {
             elementType = methodSymbol.TypeArguments[0];
             return true;
         }
@@ -514,16 +453,14 @@ internal static partial class ComparerInvocationPurity
             out requiresHashCode);
     }
 
-    private static bool IsHashSetRelationMethod(IMethodSymbol methodSymbol)
-    {
+    private static bool IsHashSetRelationMethod(IMethodSymbol methodSymbol) {
         var typeDefinition = methodSymbol.ContainingType?.OriginalDefinition.ToDisplayString();
         return IsHashSetTypeDefinition(typeDefinition) && IsHashSetRelationName(methodSymbol.Name);
     }
 
     internal static bool TryGetDefaultComparisonCollectionKeyType(
         IMethodSymbol methodSymbol,
-        out ITypeSymbol keyType)
-    {
+        out ITypeSymbol keyType) {
         keyType = null!;
 
         if (methodSymbol.ContainingType is not INamedTypeSymbol containingType)
@@ -534,8 +471,7 @@ internal static partial class ComparerInvocationPurity
             methodSymbol.IsGenericMethod &&
             methodSymbol.Name == "BinarySearch" &&
             methodSymbol.TypeArguments.Length == 1 &&
-            methodSymbol.Parameters.Length >= 2)
-        {
+            methodSymbol.Parameters.Length >= 2) {
             keyType = methodSymbol.TypeArguments[0];
             return true;
         }
@@ -543,8 +479,7 @@ internal static partial class ComparerInvocationPurity
         if (typeDefinition == "System.MemoryExtensions" &&
             methodSymbol.IsGenericMethod &&
             methodSymbol.Name is "BinarySearch" or "SequenceCompareTo" &&
-            methodSymbol.Parameters.Length == 2)
-        {
+            methodSymbol.Parameters.Length == 2) {
             keyType = methodSymbol.Name == "BinarySearch"
                 ? methodSymbol.Parameters[1].Type
                 : methodSymbol.TypeArguments[0];
@@ -564,14 +499,12 @@ internal static partial class ComparerInvocationPurity
         INamedTypeSymbol containingType,
         IReadOnlyList<CollectionDispatchRule> rules,
         out ITypeSymbol dispatchType,
-        out bool requiresHashCode)
-    {
+        out bool requiresHashCode) {
         dispatchType = null!;
         requiresHashCode = false;
         var typeDefinition = containingType.OriginalDefinition.ToDisplayString();
 
-        foreach (var rule in rules)
-        {
+        foreach (var rule in rules) {
             if (rule.TypeDefinition != typeDefinition ||
                 containingType.TypeArguments.Length <= rule.TypeArgumentIndex ||
                 rule.ParameterCount is { } parameterCount && methodSymbol.Parameters.Length != parameterCount ||
@@ -587,37 +520,27 @@ internal static partial class ComparerInvocationPurity
         return false;
     }
 
-    private static bool IsHashSetTypeDefinition(string? typeDefinition)
-    {
-        return typeDefinition is "System.Collections.Generic.HashSet<T>" or
+    private static bool IsHashSetTypeDefinition(string? typeDefinition) => typeDefinition is "System.Collections.Generic.HashSet<T>" or
             "System.Collections.Immutable.ImmutableHashSet<T>";
-    }
 
-    private static bool IsHashSetRelationName(string methodName)
-    {
-        return methodName is "SetEquals" or "Overlaps" or "IsSubsetOf" or "IsSupersetOf" or "IsProperSubsetOf" or
+    private static bool IsHashSetRelationName(string methodName) => methodName is "SetEquals" or "Overlaps" or "IsSubsetOf" or "IsSupersetOf" or "IsProperSubsetOf" or
             "IsProperSupersetOf";
-    }
 
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckComparerValuePurity(
         IOperation value,
         IInvocationOperation invocationOperation,
-        PurityAnalysisContext context)
-    {
-        return ComparerDispatchHelper.CheckComparerValuePurity(
+        PurityAnalysisContext context) => ComparerDispatchHelper.CheckComparerValuePurity(
             value,
             context,
             invocationOperation.Syntax,
             invocationOperation,
             nameof(MethodInvocationPurityRule),
             invocationOperation.TargetMethod);
-    }
 
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckLinqComparerArgumentPurity(
         IArgumentOperation argument,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         var value = PurityAnalysisEngine.SkipImplicitConversions(argument.Value) ?? argument.Value;
         return ComparerDispatchHelper.CheckComparerValuePurity(
             value,

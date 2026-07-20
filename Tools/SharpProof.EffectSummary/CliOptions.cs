@@ -1,5 +1,4 @@
-internal sealed class CliOptions
-{
+internal sealed class CliOptions {
     public const int DefaultMaxExceptionEdges = 4096;
 
     public List<string> AssemblyPaths { get; } = new();
@@ -69,8 +68,7 @@ internal sealed class CliOptions
     private static readonly ToolOptionSet<CliOptions> OptionSet = new ToolOptionSet<CliOptions>()
         .Add(static (o, r, a) => o.AssemblyPaths.Add(r.RequiredValue(a, $"Missing value for {a}.")), "--assembly")
         .Add(static (o, r, a) => o.ArtifactSpecPath = r.RequiredValue(a, $"Missing value for {a}."), "--artifact-spec")
-        .Add(static (o, r, a) =>
-        {
+        .Add(static (o, r, a) => {
             o.ArtifactSpecPath = r.RequiredValue(a, $"Missing value for {a}.");
             o.WriteArtifactSpecDependencyManifests = true;
         }, "--artifact-spec-dependencies")
@@ -90,8 +88,7 @@ internal sealed class CliOptions
         .Add(static (o, _, _) => o.Resume = true, "--resume")
         .Add(static (o, _, _) => o.IncludePurityClassification = true, "--classify-purity")
         .Add(static (o, _, _) => o.IncludeBclFallbackInventory = true, "--bcl-fallback-inventory")
-        .Add(static (o, _, _) =>
-        {
+        .Add(static (o, _, _) => {
             o.IncludePurityClassification = true;
             o.CompareManualCatalogs = true;
         }, "--compare-manual-catalogs")
@@ -99,8 +96,7 @@ internal sealed class CliOptions
         .Add(static (o, r, a) => o.Limit = ReadInt(r, a), "--limit")
         .Add(static (o, _, _) => o.ShowHelp = true, "--help", "-h", "/?");
 
-    public static CliOptions Parse(string[] args)
-    {
+    public static CliOptions Parse(string[] args) {
         var options = new CliOptions();
         OptionSet.Parse(args, options);
 
@@ -112,10 +108,8 @@ internal sealed class CliOptions
     public static CliOptions FromArtifactSpec(
         ArtifactSpecDefaults? defaults,
         ArtifactSpecEntry artifact,
-        string? artifactSpecDirectory = null)
-    {
-        var options = new CliOptions
-        {
+        string? artifactSpecDirectory = null) {
+        var options = new CliOptions {
             Framework = artifact.Framework ?? defaults?.Framework ?? "net8.0",
             RuntimeAssemblyName = artifact.RuntimeAssemblyName ??
                                   defaults?.RuntimeAssemblyName ?? "System.Private.CoreLib.dll",
@@ -152,8 +146,7 @@ internal sealed class CliOptions
 
         if (packageAssemblyPath != null) options.AssemblyPaths.Add(packageAssemblyPath);
 
-        if (options.AssemblyPaths.Count > 1)
-        {
+        if (options.AssemblyPaths.Count > 1) {
             var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
             var distinctResolvedPaths = options.AssemblyPaths
                 .Select(Path.GetFullPath)
@@ -170,8 +163,7 @@ internal sealed class CliOptions
         else if (defaults?.ExcludedSymbolPrefixes != null)
             options.ExcludedSymbolPrefixes.AddRange(defaults.ExcludedSymbolPrefixes);
 
-        if (!string.IsNullOrWhiteSpace(artifact.SourceSummaryPath))
-        {
+        if (!string.IsNullOrWhiteSpace(artifact.SourceSummaryPath)) {
             options.SourceSummaryPath = ResolveArtifactSpecInputPath(
                 artifact.SourceSummaryPath!,
                 artifactSpecDirectory);
@@ -190,8 +182,7 @@ internal sealed class CliOptions
         return options;
     }
 
-    internal EffectSummaryArtifactSource? GetArtifactSource(string assemblyPath)
-    {
+    internal EffectSummaryArtifactSource? GetArtifactSource(string assemblyPath) {
         if (!IsFromArtifactSpec) return null;
 
         var pathComparison = OperatingSystem.IsWindows()
@@ -222,12 +213,10 @@ internal sealed class CliOptions
             : null;
     }
 
-    private void Validate()
-    {
+    private void Validate() {
         if (MaxExceptionEdges <= 0) throw new ArgumentException("MaxExceptionEdges must be greater than zero.");
 
-        if (!WriteArtifactSpecDependencyManifests)
-        {
+        if (!WriteArtifactSpecDependencyManifests) {
             if (InputManifestPath != null || OutputManifestPath != null || DependencyOutputRoot != null)
                 throw new ArgumentException(
                     "--input-manifest, --output-manifest, and --dependency-output-root require --artifact-spec-dependencies.");
@@ -245,24 +234,19 @@ internal sealed class CliOptions
                 "--artifact-spec-dependencies cannot be combined with generation, sharding, output, progress, or resume options.");
     }
 
-    private static bool HasPackageAssembly(ArtifactSpecEntry artifact)
-    {
-        return !string.IsNullOrWhiteSpace(artifact.PackageId) ||
+    private static bool HasPackageAssembly(ArtifactSpecEntry artifact) => !string.IsNullOrWhiteSpace(artifact.PackageId) ||
                !string.IsNullOrWhiteSpace(artifact.PackageVersion) ||
                !string.IsNullOrWhiteSpace(artifact.PackageAssemblyRelativePath);
-    }
 
     private static IEnumerable<string> ResolveArtifactSpecAssemblyPaths(
         IEnumerable<string>? assemblyPaths,
-        string? artifactSpecDirectory)
-    {
+        string? artifactSpecDirectory) {
         if (assemblyPaths == null) return Array.Empty<string>();
 
         return assemblyPaths.Select(path => ResolveArtifactSpecInputPath(path, artifactSpecDirectory));
     }
 
-    private static string? ResolveArtifactSpecOutputPath(string? path, string? artifactSpecDirectory)
-    {
+    private static string? ResolveArtifactSpecOutputPath(string? path, string? artifactSpecDirectory) {
         if (string.IsNullOrWhiteSpace(path) || Path.IsPathRooted(path) ||
             string.IsNullOrWhiteSpace(artifactSpecDirectory)) return path;
 
@@ -280,8 +264,7 @@ internal sealed class CliOptions
         return currentRelativeCandidate;
     }
 
-    private static string ResolveArtifactSpecInputPath(string path, string? artifactSpecDirectory)
-    {
+    private static string ResolveArtifactSpecInputPath(string path, string? artifactSpecDirectory) {
         if (Path.IsPathRooted(path) || string.IsNullOrWhiteSpace(artifactSpecDirectory)) return path;
 
         var specRelativeCandidate = Path.GetFullPath(Path.Combine(artifactSpecDirectory, path));
@@ -294,8 +277,7 @@ internal sealed class CliOptions
         return specRelativeCandidate;
     }
 
-    private static string ResolveNuGetPackageAssemblyPath(ArtifactSpecEntry artifact)
-    {
+    private static string ResolveNuGetPackageAssemblyPath(ArtifactSpecEntry artifact) {
         if (string.IsNullOrWhiteSpace(artifact.PackageId) ||
             string.IsNullOrWhiteSpace(artifact.PackageVersion) ||
             string.IsNullOrWhiteSpace(artifact.PackageAssemblyRelativePath))
@@ -320,8 +302,7 @@ internal sealed class CliOptions
         return assemblyPath;
     }
 
-    private static string ResolveNuGetPackageVersionDirectoryPath(string packageIdDirectory, string packageVersion)
-    {
+    private static string ResolveNuGetPackageVersionDirectoryPath(string packageIdDirectory, string packageVersion) {
         var exactDirectory = Path.Combine(packageIdDirectory, packageVersion.Trim().ToLowerInvariant());
         if (Directory.Exists(exactDirectory)) return Path.GetFullPath(exactDirectory);
 
@@ -330,8 +311,7 @@ internal sealed class CliOptions
                 $"NuGet package directory '{packageIdDirectory}' was not found.");
 
         var normalizedRequestedVersion = NormalizeNuGetVersionIdentity(packageVersion);
-        foreach (var candidateDirectory in Directory.EnumerateDirectories(packageIdDirectory))
-        {
+        foreach (var candidateDirectory in Directory.EnumerateDirectories(packageIdDirectory)) {
             var candidateVersion = Path.GetFileName(candidateDirectory);
             if (string.Equals(
                     NormalizeNuGetVersionIdentity(candidateVersion),
@@ -344,8 +324,7 @@ internal sealed class CliOptions
             $"NuGet package version directory for '{Path.GetFileName(packageIdDirectory)} {packageVersion}' was not found under '{packageIdDirectory}'.");
     }
 
-    private static string NormalizePackageAssemblyRelativePath(string relativePath)
-    {
+    private static string NormalizePackageAssemblyRelativePath(string relativePath) {
         var normalizedPath = relativePath
             .Trim()
             .Replace('\\', Path.DirectorySeparatorChar)
@@ -360,8 +339,7 @@ internal sealed class CliOptions
         return normalizedPath;
     }
 
-    private static bool IsPathWithinDirectory(string candidatePath, string directoryPath)
-    {
+    private static bool IsPathWithinDirectory(string candidatePath, string directoryPath) {
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         var normalizedDirectoryPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directoryPath));
         var normalizedCandidatePath = Path.GetFullPath(candidatePath);
@@ -369,8 +347,7 @@ internal sealed class CliOptions
                normalizedCandidatePath.StartsWith(normalizedDirectoryPath + Path.DirectorySeparatorChar, comparison);
     }
 
-    private static string NormalizeNuGetVersionIdentity(string version)
-    {
+    private static string NormalizeNuGetVersionIdentity(string version) {
         var trimmed = version.Trim();
         if (trimmed.Length == 0) return string.Empty;
 
@@ -394,8 +371,7 @@ internal sealed class CliOptions
         return normalizedRelease + "-" + prereleasePart.ToLowerInvariant();
     }
 
-    private static string ResolveNuGetPackageRoot()
-    {
+    private static string ResolveNuGetPackageRoot() {
         var configuredRoot = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
         if (!string.IsNullOrWhiteSpace(configuredRoot)) return Path.GetFullPath(configuredRoot.Trim());
 
@@ -407,16 +383,14 @@ internal sealed class CliOptions
         return Path.Combine(userProfile, ".nuget", "packages");
     }
 
-    private static int ReadPositiveInt(ToolArgumentReader reader, string option)
-    {
+    private static int ReadPositiveInt(ToolArgumentReader reader, string option) {
         var value = ReadInt(reader, option);
         if (value <= 0) throw new ArgumentException($"{option} must be greater than zero.");
 
         return value;
     }
 
-    private static int ReadInt(ToolArgumentReader reader, string option)
-    {
+    private static int ReadInt(ToolArgumentReader reader, string option) {
         var text = reader.RequiredValue(option, $"Missing value for {option}.");
         if (!int.TryParse(text, out var value))
             throw new ArgumentException($"{option} requires an integer value, but received '{text}'.");

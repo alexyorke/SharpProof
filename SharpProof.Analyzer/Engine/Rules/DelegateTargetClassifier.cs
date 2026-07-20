@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal enum DelegateTargetKind
-{
+internal enum DelegateTargetKind {
     Method,
     AnonymousFunction,
     ExistingDelegate,
@@ -12,30 +11,24 @@ internal readonly record struct DelegateTargetClassification(
     DelegateTargetKind Kind,
     IOperation Operation);
 
-internal static class DelegateTargetClassifier
-{
-    internal static DelegateTargetClassification Classify(IOperation target)
-    {
+internal static class DelegateTargetClassifier {
+    internal static DelegateTargetClassification Classify(IOperation target) {
         if (target == null) throw new ArgumentNullException(nameof(target));
 
         var current = target;
-        while (true)
-        {
+        while (true) {
             var unwrapped = PurityAnalysisEngine.SkipImplicitConversions(current);
-            if (unwrapped != null && !ReferenceEquals(unwrapped, current))
-            {
+            if (unwrapped != null && !ReferenceEquals(unwrapped, current)) {
                 current = unwrapped;
                 continue;
             }
 
-            if (current is IConversionOperation conversion)
-            {
+            if (current is IConversionOperation conversion) {
                 current = conversion.Operand;
                 continue;
             }
 
-            if (current is IParenthesizedOperation parenthesized)
-            {
+            if (current is IParenthesizedOperation parenthesized) {
                 current = parenthesized.Operand;
                 continue;
             }
@@ -43,8 +36,7 @@ internal static class DelegateTargetClassifier
             break;
         }
 
-        var kind = current switch
-        {
+        var kind = current switch {
             IMethodReferenceOperation => DelegateTargetKind.Method,
             IAnonymousFunctionOperation or IFlowAnonymousFunctionOperation => DelegateTargetKind.AnonymousFunction,
             ILocalReferenceOperation or

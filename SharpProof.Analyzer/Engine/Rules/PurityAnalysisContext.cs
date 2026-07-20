@@ -11,8 +11,7 @@ internal sealed record PurityAnalysisContext(
     CancellationToken CancellationToken,
     SmtAnalysisService smtAnalysis,
     SharpProofAttributeIdentityPolicy? attributePolicy = null,
-    Func<IMethodSymbol, SemanticModel?>? semanticModelResolver = null)
-{
+    Func<IMethodSymbol, SemanticModel?>? semanticModelResolver = null) {
     public SmtAnalysisService SmtAnalysis { get; } = smtAnalysis ?? throw new ArgumentNullException(nameof(smtAnalysis));
     public SharpProofAttributeIdentityPolicy AttributePolicy { get; } = attributePolicy ??
         RequiresContractHelpers.OfficialAttributePolicy;

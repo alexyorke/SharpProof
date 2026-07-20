@@ -4,14 +4,12 @@ using SharpProof.Analyzer.Engine.Rules;
 
 namespace SharpProof.Tools.Fuzz;
 
-public enum RoslynShapeSurface
-{
+public enum RoslynShapeSurface {
     OperationKind,
     SyntaxKind
 }
 
-public enum ShapeClassification
-{
+public enum ShapeClassification {
     Handled,
     GeneratorBacked,
     ParentHandled,
@@ -28,8 +26,7 @@ public sealed record RoslynShapeManifestEntry(
     string DisplayName,
     ShapeClassification Classification);
 
-public static class RoslynShapeManifest
-{
+public static class RoslynShapeManifest {
     private static readonly ImmutableHashSet<OperationKind> RegisteredRuleKinds =
         RuleRegistry.GetDefaultRules().Keys.ToImmutableHashSet();
 
@@ -62,8 +59,7 @@ public static class RoslynShapeManifest
             .OrderBy(static shapeId => shapeId, StringComparer.Ordinal)
             .ToImmutableArray();
 
-    public static bool IsActionableUnobservedOperationKind(OperationKind kind)
-    {
+    public static bool IsActionableUnobservedOperationKind(OperationKind kind) {
         if (kind is OperationKind.Invalid or OperationKind.InterpolatedStringAppendInvalid ||
             IsParentHandled(kind))
             return false;
@@ -77,8 +73,7 @@ public static class RoslynShapeManifest
 
     public static string SyntaxShapeId(SyntaxKind syntaxKind) => "syntax:" + syntaxKind;
 
-    private static RoslynShapeManifestEntry CreateOperationEntry(OperationKind kind)
-    {
+    private static RoslynShapeManifestEntry CreateOperationEntry(OperationKind kind) {
         var classification = ClassifyOperation(kind);
         return new RoslynShapeManifestEntry(
             RoslynShapeSurface.OperationKind,
@@ -87,8 +82,7 @@ public static class RoslynShapeManifest
             classification);
     }
 
-    private static ShapeClassification ClassifyOperation(OperationKind kind)
-    {
+    private static ShapeClassification ClassifyOperation(OperationKind kind) {
         if (GeneratorBackedOperationShapeIds.Contains(OperationShapeId(kind)))
             return ShapeClassification.GeneratorBacked;
         if (RegisteredRuleKinds.Contains(kind))
@@ -139,8 +133,7 @@ public static class RoslynShapeManifest
         OperationKind.YieldBreak ||
         kind == OperationKindValue("CollectionElementInitializer");
 
-    private static RoslynShapeManifestEntry CreateSyntaxEntry(SyntaxKind kind)
-    {
+    private static RoslynShapeManifestEntry CreateSyntaxEntry(SyntaxKind kind) {
         var name = kind.ToString();
         var classification = kind == SyntaxKind.None
             ? ShapeClassification.CSharpNotApplicable

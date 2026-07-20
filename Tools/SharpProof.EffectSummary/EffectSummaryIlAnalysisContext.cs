@@ -6,8 +6,7 @@ internal sealed record EffectSummaryIlAnalysisContext(
     IReadOnlyDictionary<string, FieldDefinitionHandle> FieldsByExactKey,
     IReadOnlyDictionary<int, StaticFieldFact> StaticFields,
     Dictionary<int, TrackedStackValue> KnownMethodReturns,
-    HashSet<int> ReturnValueVisiting)
-{
+    HashSet<int> ReturnValueVisiting) {
     internal EffectSummaryIlAnalysisContext WithStaticFields(
         IReadOnlyDictionary<int, StaticFieldFact> staticFields) =>
         this with { StaticFields = staticFields };

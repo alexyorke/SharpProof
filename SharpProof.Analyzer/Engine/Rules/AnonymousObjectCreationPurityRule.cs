@@ -1,16 +1,12 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class AnonymousObjectCreationPurityRule
-{
+internal static class AnonymousObjectCreationPurityRule {
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
         IAnonymousObjectCreationOperation anonymousObjectCreationOperation,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
-        foreach (var initializer in anonymousObjectCreationOperation.Initializers)
-        {
-            if (initializer is ISimpleAssignmentOperation assignment)
-            {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
+        foreach (var initializer in anonymousObjectCreationOperation.Initializers) {
+            if (initializer is ISimpleAssignmentOperation assignment) {
                 if (assignment.Value == null)
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(assignment.Syntax);
 

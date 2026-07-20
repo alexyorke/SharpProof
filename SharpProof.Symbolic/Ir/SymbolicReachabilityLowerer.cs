@@ -2,15 +2,13 @@ using static SharpProof.Symbolic.SymbolicStateFactBuilder;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicReachabilityLowerer
-{
+internal static class SymbolicReachabilityLowerer {
     internal static SymbolicOperationTransitionResult Apply(
         SymbolicState state,
         ExpressionSyntax condition,
         bool branchWhenTrue,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         condition = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition);
         if (branchWhenTrue &&
             condition is BinaryExpressionSyntax andCondition &&
@@ -64,8 +62,7 @@ internal static class SymbolicReachabilityLowerer
         bool branchWhenTrue,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        Func<ISymbol, int>? getSymbolVersion = null)
-    {
+        Func<ISymbol, int>? getSymbolVersion = null) {
         var lowering = SymbolicSemanticPipeline.LowerBranchCondition(
             condition,
             branchWhenTrue,
@@ -88,14 +85,11 @@ internal static class SymbolicReachabilityLowerer
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SymbolicCondition branchCondition,
-        Func<ISymbol, int>? getSymbolVersion = null)
-    {
+        Func<ISymbol, int>? getSymbolVersion = null) {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
         SyntaxNode source;
         if (condition is IIsNullOperation { Operand.Syntax: ExpressionSyntax operand } &&
-            SymbolicSemanticPipeline.LowerTerm(operand, context) is
-                { IsExact: true, Value: { Kind: SmtValueKind.Reference } subject })
-        {
+            SymbolicSemanticPipeline.LowerTerm(operand, context) is { IsExact: true, Value: { Kind: SmtValueKind.Reference } subject }) {
             source = operand;
             branchCondition = SymbolicIrLowerer.CreateRelationCondition(
                 branchWhenTrue
@@ -107,9 +101,7 @@ internal static class SymbolicReachabilityLowerer
                 "operation-transfer.branch-null-assumption");
         }
         else if (condition is IIsNullOperation { Operand.Syntax: ExpressionSyntax nullableOperand } &&
-                 SymbolicSemanticPipeline.LowerNullableHasValueTerm(nullableOperand, context) is
-                     { IsExact: true, Value: { } hasValue })
-        {
+                 SymbolicSemanticPipeline.LowerNullableHasValueTerm(nullableOperand, context) is { IsExact: true, Value: { } hasValue }) {
             source = nullableOperand;
             var hasValueCondition = SymbolicIrLowerer.CreateFactCondition(
                 new SymbolicTruthAtom(hasValue),
@@ -123,13 +115,11 @@ internal static class SymbolicReachabilityLowerer
                  SymbolicSemanticPipeline.LowerBranchCondition(
                      expression,
                      branchWhenTrue,
-                     context) is { IsExact: true, Value: { } lowered })
-        {
+                     context) is { IsExact: true, Value: { } lowered }) {
             source = expression;
             branchCondition = lowered;
         }
-        else
-        {
+        else {
             branchCondition = null!;
             return Unsupported(state, condition.Syntax, "condition-operation");
         }
@@ -148,8 +138,7 @@ internal static class SymbolicReachabilityLowerer
         ExpressionSyntax second,
         bool branchWhenTrue,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var firstTransition = Apply(
             state,
             first,
@@ -175,8 +164,7 @@ internal static class SymbolicReachabilityLowerer
         bool branchWhenTrue,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out SymbolicOperationTransitionResult transition)
-    {
+        out SymbolicOperationTransitionResult transition) {
         if (condition is PrefixUnaryExpressionSyntax negation &&
             negation.IsKind(SyntaxKind.LogicalNotExpression))
             return TryApplyInlineAssignment(
@@ -188,8 +176,7 @@ internal static class SymbolicReachabilityLowerer
                 out transition);
 
         if (condition is not BinaryExpressionSyntax comparison ||
-            !SymbolicOperatorLowerer.TryGetRelationOperator(comparison.Kind(), out var relation))
-        {
+            !SymbolicOperatorLowerer.TryGetRelationOperator(comparison.Kind(), out var relation)) {
             transition = null!;
             return false;
         }
@@ -198,8 +185,7 @@ internal static class SymbolicReachabilityLowerer
             AssignmentExpressionSyntax;
         var rightAssignment = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(comparison.Right) as
             AssignmentExpressionSyntax;
-        if (leftAssignment is null == rightAssignment is null)
-        {
+        if (leftAssignment is null == rightAssignment is null) {
             transition = null!;
             return false;
         }
@@ -208,8 +194,7 @@ internal static class SymbolicReachabilityLowerer
         var assignment = assignmentIsLeft ? leftAssignment! : rightAssignment!;
         var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
         if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-            assignedSymbol is not ILocalSymbol and not IParameterSymbol)
-        {
+            assignedSymbol is not ILocalSymbol and not IParameterSymbol) {
             transition = null!;
             return false;
         }
@@ -221,8 +206,7 @@ internal static class SymbolicReachabilityLowerer
                 sibling,
                 assignedSymbol,
                 semanticModel,
-                cancellationToken))
-        {
+                cancellationToken)) {
             transition = Unsupported(state, comparison, "assignment-order");
             return true;
         }
@@ -247,8 +231,7 @@ internal static class SymbolicReachabilityLowerer
             SymbolicSemanticPipeline.LowerTerm(
                 sibling,
                 new SymbolicLoweringContext(semanticModel, cancellationToken)) is not
-                { IsExact: true, Value: { } siblingTerm })
-        {
+                { IsExact: true, Value: { } siblingTerm }) {
             transition = Unsupported(state, comparison, "assignment-value");
             return true;
         }
@@ -273,16 +256,14 @@ internal static class SymbolicReachabilityLowerer
                 provenance: "ir.path.inline-assignment",
                 bindingProvenance: "ir.path.inline-assignment.assigned-value",
                 postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic);
-        if (!assignmentTransition.IsExact)
-        {
+        if (!assignmentTransition.IsExact) {
             transition = assignmentTransition;
             return true;
         }
 
         var left = assignmentIsLeft ? assignedTerm : siblingTerm;
         var right = assignmentIsLeft ? siblingTerm : assignedTerm;
-        if (!CanCompareIrTerms(left, right))
-        {
+        if (!CanCompareIrTerms(left, right)) {
             transition = Unsupported(state, comparison, "comparison");
             return true;
         }
@@ -309,10 +290,8 @@ internal static class SymbolicReachabilityLowerer
         bool selfReferential,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out SymbolicTerm value)
-    {
-        if (selfReferential)
-        {
+        out SymbolicTerm value) {
+        if (selfReferential) {
             value = null!;
             return SymbolicStateValueFacts.TryGetCurrentValue(state, assignedSymbol, out var previous) &&
                 SymbolicAssignmentStateTransfer.TryCreateSelfReferentialAssignedValueStateTerm(
@@ -327,8 +306,7 @@ internal static class SymbolicReachabilityLowerer
         var lowering = SymbolicSemanticPipeline.LowerTerm(
             effectiveValue,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
-        if (lowering is { IsExact: true, Value: { } lowered })
-        {
+        if (lowering is { IsExact: true, Value: { } lowered }) {
             value = lowered;
             return true;
         }
@@ -336,8 +314,7 @@ internal static class SymbolicReachabilityLowerer
         if (TryCreateSymbolTerm(assignedSymbol, out var assignedTerm) &&
             assignedTerm.Kind == SmtValueKind.Reference &&
             effectiveValue is BinaryExpressionSyntax asExpression &&
-            asExpression.IsKind(SyntaxKind.AsExpression))
-        {
+            asExpression.IsKind(SyntaxKind.AsExpression)) {
             value = assignedTerm;
             return true;
         }
@@ -351,8 +328,7 @@ internal static class SymbolicReachabilityLowerer
         ExpressionSyntax condition,
         bool branchWhenTrue,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         condition = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition);
         if (condition is PrefixUnaryExpressionSyntax negation &&
             negation.IsKind(SyntaxKind.LogicalNotExpression))

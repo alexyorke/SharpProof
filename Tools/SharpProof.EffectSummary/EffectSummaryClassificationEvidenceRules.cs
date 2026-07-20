@@ -1,10 +1,8 @@
-internal static class EffectSummaryClassificationEvidenceRules
-{
+internal static class EffectSummaryClassificationEvidenceRules {
     private static readonly string[] CommonFreshResultDisqualifyingEffects =
         ["writes_static_field", "writes_instance_field", "indirect_call", "virtual_call", "block_memory_write"];
 
-    internal static string GetFreshnessClassification(MethodEffectSummary? summary, string classification)
-    {
+    internal static string GetFreshnessClassification(MethodEffectSummary? summary, string classification) {
         if (summary == null) return "none";
 
         if (summary.RootCandidates.Contains("fresh_owned_object_write", StringComparer.Ordinal))
@@ -40,15 +38,13 @@ internal static class EffectSummaryClassificationEvidenceRules
         return "fresh_array_candidate_with_unknown_escape_risk";
     }
 
-    internal static bool HasFreshOwnedArrayWritePattern(MethodEffectSummary? summary)
-    {
+    internal static bool HasFreshOwnedArrayWritePattern(MethodEffectSummary? summary) {
         if (summary == null) return false;
 
         if (HasByRefParameter(summary.Identity)) return false;
 
         if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) &&
-            summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
-        {
+            summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal)) {
             if (HasFreshResultDisqualifyingEffect(summary, "reads_instance_field"))
                 return false;
 
@@ -60,8 +56,7 @@ internal static class EffectSummaryClassificationEvidenceRules
         return HasAllocateUninitializedArrayWrapperPattern(summary);
     }
 
-    internal static bool HasFreshOwnedStringWritePattern(MethodEffectSummary? summary)
-    {
+    internal static bool HasFreshOwnedStringWritePattern(MethodEffectSummary? summary) {
         if (summary == null ||
             !summary.Effects.Contains("allocates_object", StringComparer.Ordinal) ||
             !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
@@ -79,8 +74,7 @@ internal static class EffectSummaryClassificationEvidenceRules
         return true;
     }
 
-    internal static bool HasLocalScratchMemoryWritePattern(MethodEffectSummary? summary)
-    {
+    internal static bool HasLocalScratchMemoryWritePattern(MethodEffectSummary? summary) {
         if (summary == null ||
             !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
             return false;
@@ -101,8 +95,7 @@ internal static class EffectSummaryClassificationEvidenceRules
             CommonFreshResultDisqualifyingEffects.Contains(effect, StringComparer.Ordinal) ||
             additionalEffects.Contains(effect, StringComparer.Ordinal));
 
-    internal static bool HasReturnValueInitializationPattern(MethodEffectSummary? summary)
-    {
+    internal static bool HasReturnValueInitializationPattern(MethodEffectSummary? summary) {
         if (summary == null ||
             !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
             return false;
@@ -116,8 +109,7 @@ internal static class EffectSummaryClassificationEvidenceRules
         return HasParameterlessNonVoidReturn(summary.Identity);
     }
 
-    internal static bool HasByRefLikeViewConstructionPattern(MethodEffectSummary? summary)
-    {
+    internal static bool HasByRefLikeViewConstructionPattern(MethodEffectSummary? summary) {
         if (summary == null) return false;
 
         var hasIndirectWrite = summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal);
@@ -127,8 +119,7 @@ internal static class EffectSummaryClassificationEvidenceRules
         if (!hasIndirectWrite && !isReadOnlyProjection) return false;
 
         var allowsTupleOffsetReads = HasOnlyByRefLikeViewHelperFieldReads(summary);
-        foreach (var effect in summary.Effects)
-        {
+        foreach (var effect in summary.Effects) {
             if (string.Equals(effect, "allocates_object", StringComparison.Ordinal) ||
                 string.Equals(effect, "calls_method", StringComparison.Ordinal) ||
                 string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal) ||
@@ -139,10 +130,8 @@ internal static class EffectSummaryClassificationEvidenceRules
         }
 
         var sawByRefLikeConstructor = false;
-        foreach (var call in summary.Calls)
-        {
-            if (IsByRefLikeViewConstructionCall(call))
-            {
+        foreach (var call in summary.Calls) {
+            if (IsByRefLikeViewConstructionCall(call)) {
                 sawByRefLikeConstructor = true;
                 continue;
             }
@@ -161,8 +150,7 @@ internal static class EffectSummaryClassificationEvidenceRules
         identity.ReturnType.StartsWith("named:System.Span`1[", StringComparison.Ordinal) ||
         identity.ReturnType.StartsWith("named:System.ReadOnlySpan`1[", StringComparison.Ordinal);
 
-    internal static bool HasOnlyByRefLikeViewHelperFieldReads(MethodEffectSummary summary)
-    {
+    internal static bool HasOnlyByRefLikeViewHelperFieldReads(MethodEffectSummary summary) {
         if (!summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal)) return true;
 
         return summary.Fields.All(static field =>
@@ -175,8 +163,7 @@ internal static class EffectSummaryClassificationEvidenceRules
             string.Equals(field, "System.Span`1._reference", StringComparison.Ordinal));
     }
 
-    internal static bool HasOnlySafeStaticReads(MethodEffectSummary summary)
-    {
+    internal static bool HasOnlySafeStaticReads(MethodEffectSummary summary) {
         if (!summary.Effects.Contains("reads_static_field", StringComparer.Ordinal)) return true;
 
         return summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
@@ -185,8 +172,7 @@ internal static class EffectSummaryClassificationEvidenceRules
 
     internal static bool HasOnlyResolvedVirtualCallTargets(
         MethodEffectSummary summary,
-        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol)
-    {
+        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol) {
         if (!summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
             summary.Calls.Length == 0 ||
             summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
@@ -198,8 +184,7 @@ internal static class EffectSummaryClassificationEvidenceRules
             return false;
 
         var sawResolvedCall = false;
-        foreach (var callSite in EnumerateCallSites(summary))
-        {
+        foreach (var callSite in EnumerateCallSites(summary)) {
             if (IsPurityNeutralIntrinsicHelperCall(callSite.DisplayName)) continue;
 
             if (callSite.CanonicalKey == null ||
@@ -222,10 +207,8 @@ internal static class EffectSummaryClassificationEvidenceRules
         string canonicalKey,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         out string resolvedCallKey,
-        out MethodEffectSummary resolvedCallSummary)
-    {
-        if (bySymbol.TryGetValue(canonicalKey, out resolvedCallSummary!))
-        {
+        out MethodEffectSummary resolvedCallSummary) {
+        if (bySymbol.TryGetValue(canonicalKey, out resolvedCallSummary!)) {
             resolvedCallKey = canonicalKey;
             return true;
         }
@@ -240,10 +223,8 @@ internal static class EffectSummaryClassificationEvidenceRules
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
         out string resolvedCallKey,
         out GeneratedPurityCatalogEntry resolvedEntry,
-        out MethodPurityClassification classification)
-    {
-        if (TryGetExternalEntry(call, externalGeneratedPurityEntries, out resolvedCallKey, out resolvedEntry))
-        {
+        out MethodPurityClassification classification) {
+        if (TryGetExternalEntry(call, externalGeneratedPurityEntries, out resolvedCallKey, out resolvedEntry)) {
             classification = CreateClassification(resolvedEntry);
             return true;
         }
@@ -259,8 +240,7 @@ internal static class EffectSummaryClassificationEvidenceRules
         string symbol,
         MethodEffectSummary summary,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
-        out MethodPurityClassification classification)
-    {
+        out MethodPurityClassification classification) {
         classification = default!;
         if (!TryGetExternalEntry(symbol, externalGeneratedPurityEntries, out _, out var entry) ||
             !IsSameReviewedMethodImplementation(assembly, summary, entry))
@@ -274,10 +254,8 @@ internal static class EffectSummaryClassificationEvidenceRules
         string canonicalKey,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
         out string resolvedCallKey,
-        out GeneratedPurityCatalogEntry resolvedEntry)
-    {
-        if (externalGeneratedPurityEntries.TryGetValue(canonicalKey, out resolvedEntry!))
-        {
+        out GeneratedPurityCatalogEntry resolvedEntry) {
+        if (externalGeneratedPurityEntries.TryGetValue(canonicalKey, out resolvedEntry!)) {
             resolvedCallKey = canonicalKey;
             return true;
         }
@@ -290,8 +268,7 @@ internal static class EffectSummaryClassificationEvidenceRules
     internal static bool IsSameReviewedMethodImplementation(
         AssemblyEffectReport assembly,
         MethodEffectSummary summary,
-        GeneratedPurityCatalogEntry entry)
-    {
+        GeneratedPurityCatalogEntry entry) {
         if (!string.Equals(assembly.AssemblyName, entry.AssemblyName, StringComparison.Ordinal) ||
             !string.Equals(assembly.AssemblySha256, entry.AssemblySha256, StringComparison.Ordinal) ||
             !string.Equals(assembly.ModuleVersionId, entry.ModuleVersionId, StringComparison.Ordinal) ||
@@ -310,9 +287,7 @@ internal static class EffectSummaryClassificationEvidenceRules
         return string.Equals(summaryBodyHash, entryBodyHash, StringComparison.Ordinal);
     }
 
-    internal static MethodPurityClassification CreateClassification(GeneratedPurityCatalogEntry entry)
-    {
-        return new MethodPurityClassification(
+    internal static MethodPurityClassification CreateClassification(GeneratedPurityCatalogEntry entry) => new MethodPurityClassification(
             entry.Classification,
             entry.Categories,
             entry.FirstBlockingCallChain,
@@ -321,15 +296,12 @@ internal static class EffectSummaryClassificationEvidenceRules
             entry.HasUnsupportedEffects,
             entry.FreshnessClassification,
             entry.EffectVisibilityClassification);
-    }
 
     internal static bool TryClassifyUnresolvedInteropBoundaryCall(
         MethodEffectSummary callerSummary,
         string callSymbol,
-        out string category)
-    {
-        if (IsInteropLastErrorBookkeepingCall(callerSummary, callSymbol))
-        {
+        out string category) {
+        if (IsInteropLastErrorBookkeepingCall(callerSummary, callSymbol)) {
             category = string.Empty;
             return false;
         }
@@ -344,8 +316,7 @@ internal static class EffectSummaryClassificationEvidenceRules
             callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastPInvokeError(",
                 StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastSystemError(",
-                StringComparison.Ordinal))
-        {
+                StringComparison.Ordinal)) {
             category = IsSetterLikeUnresolvedInteropBoundaryCall(callSymbol)
                 ? "global_state_write"
                 : "global_state_read";
@@ -358,9 +329,7 @@ internal static class EffectSummaryClassificationEvidenceRules
 
     internal static bool IsInteropLastErrorBookkeepingCall(
         MethodEffectSummary callerSummary,
-        string calleeSymbol)
-    {
-        return (IsInteropBoundaryWrapper(callerSummary.Symbol) || UsesWin32ErrorTranslation(callerSummary)) &&
+        string calleeSymbol) => (IsInteropBoundaryWrapper(callerSummary.Symbol) || UsesWin32ErrorTranslation(callerSummary)) &&
                (calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastPInvokeError(",
                     StringComparison.Ordinal) ||
                 calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastSystemError(",
@@ -369,36 +338,22 @@ internal static class EffectSummaryClassificationEvidenceRules
                     StringComparison.Ordinal) ||
                 calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastSystemError(",
                     StringComparison.Ordinal));
-    }
 
-    internal static bool IsInteropBoundaryWrapper(string symbol)
-    {
-        return symbol.StartsWith("Interop+", StringComparison.Ordinal) ||
+    internal static bool IsInteropBoundaryWrapper(string symbol) => symbol.StartsWith("Interop+", StringComparison.Ordinal) ||
                symbol.StartsWith("Internal.Win32.", StringComparison.Ordinal);
-    }
 
-    internal static bool UsesWin32ErrorTranslation(MethodEffectSummary summary)
-    {
-        return summary.Calls.Any(call =>
-            call.StartsWith("System.IO.Win32Marshal.GetExceptionForWin32Error(", StringComparison.Ordinal));
-    }
+    internal static bool UsesWin32ErrorTranslation(MethodEffectSummary summary) => summary.Calls.Any(call =>
+                                                                                            call.StartsWith("System.IO.Win32Marshal.GetExceptionForWin32Error(", StringComparison.Ordinal));
 
-    internal static bool IsSetterLikeUnresolvedInteropBoundaryCall(string callSymbol)
-    {
-        return callSymbol.Contains(".set_", StringComparison.Ordinal) ||
+    internal static bool IsSetterLikeUnresolvedInteropBoundaryCall(string callSymbol) => callSymbol.Contains(".set_", StringComparison.Ordinal) ||
                callSymbol.Contains(".Set", StringComparison.Ordinal) ||
                callSymbol.Contains("<Set", StringComparison.Ordinal);
-    }
 
-    internal static bool HasFreshArrayAllocationEvidence(MethodEffectSummary? summary)
-    {
-        return summary != null &&
+    internal static bool HasFreshArrayAllocationEvidence(MethodEffectSummary? summary) => summary != null &&
                (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
                 HasAllocateUninitializedArrayWrapperPattern(summary));
-    }
 
-    internal static bool HasAllocateUninitializedArrayWrapperPattern(MethodEffectSummary summary)
-    {
+    internal static bool HasAllocateUninitializedArrayWrapperPattern(MethodEffectSummary summary) {
         if (!summary.Calls.Any(static call =>
                 call.StartsWith("System.GC.AllocateUninitializedArray(int, bool)", StringComparison.Ordinal)))
             return false;
@@ -414,35 +369,28 @@ internal static class EffectSummaryClassificationEvidenceRules
 
     internal static bool IsFreshOwnedObjectInitializationCompatible(
         string symbol,
-        PurityClassificationContext context)
-    {
-        return IsClassificationCompatible(
+        PurityClassificationContext context) => IsClassificationCompatible(
             symbol,
             context,
             context.FreshOwnedInitializationMemo,
             "object_state_write",
             "writes_instance_field");
-    }
 
     internal static bool IsValidationThrowHelperCompatible(
         string symbol,
-        PurityClassificationContext context)
-    {
-        return IsClassificationCompatible(
+        PurityClassificationContext context) => IsClassificationCompatible(
             symbol,
             context,
             context.ValidationThrowHelperMemo,
             "throw",
             "throws");
-    }
 
     private static bool IsClassificationCompatible(
         string symbol,
         PurityClassificationContext context,
         Dictionary<string, bool> memo,
         string allowedRoot,
-        string allowedEffect)
-    {
+        string allowedEffect) {
         if (memo.TryGetValue(symbol, out var cached)) return cached;
 
         var compatibilityVisiting = new HashSet<string>(StringComparer.Ordinal);
@@ -463,8 +411,7 @@ internal static class EffectSummaryClassificationEvidenceRules
         Dictionary<string, bool> memo,
         HashSet<string> compatibilityVisiting,
         string allowedRoot,
-        string allowedEffect)
-    {
+        string allowedEffect) {
         if (memo.TryGetValue(symbol, out var cached)) return cached;
         if (!context.BySymbol.TryGetValue(symbol, out var summary)) return false;
         if (!compatibilityVisiting.Add(symbol)) return false;
@@ -474,14 +421,12 @@ internal static class EffectSummaryClassificationEvidenceRules
                 !string.Equals(root, allowedRoot, StringComparison.Ordinal)) ||
             summary.Effects.Any(effect =>
                 !SafeEffects.Contains(effect) &&
-                !string.Equals(effect, allowedEffect, StringComparison.Ordinal)))
-        {
+                !string.Equals(effect, allowedEffect, StringComparison.Ordinal))) {
             compatibilityVisiting.Remove(symbol);
             return false;
         }
 
-        foreach (var callSite in EnumerateCallSites(summary))
-        {
+        foreach (var callSite in EnumerateCallSites(summary)) {
             var call = callSite.DisplayName;
             if (IsPurityNeutralIntrinsicHelperCall(call) ||
                 IsValidationThrowHelperSupportCall(call))
@@ -492,10 +437,8 @@ internal static class EffectSummaryClassificationEvidenceRules
                     callSite.CanonicalKey,
                     context.BySymbol,
                     out var resolvedCallKey,
-                    out var resolvedCallSummary))
-            {
-                if (TryClassifyUnresolvedInteropBoundaryCall(summary, call, out _))
-                {
+                    out var resolvedCallSummary)) {
+                if (TryClassifyUnresolvedInteropBoundaryCall(summary, call, out _)) {
                     compatibilityVisiting.Remove(symbol);
                     return false;
                 }
@@ -531,14 +474,12 @@ internal static class EffectSummaryClassificationEvidenceRules
         return true;
     }
 
-    internal static bool IsFreshOwnedObjectConstructor(MethodEffectSummary summary)
-    {
+    internal static bool IsFreshOwnedObjectConstructor(MethodEffectSummary summary) {
         if (string.IsNullOrWhiteSpace(summary.Symbol) ||
             !summary.Symbol.Contains("..ctor(", StringComparison.Ordinal))
             return false;
 
-        foreach (var effect in summary.Effects)
-        {
+        foreach (var effect in summary.Effects) {
             if (string.Equals(effect, "calls_method", StringComparison.Ordinal) ||
                 string.Equals(effect, "writes_instance_field", StringComparison.Ordinal) ||
                 string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal) ||
@@ -551,14 +492,12 @@ internal static class EffectSummaryClassificationEvidenceRules
         return true;
     }
 
-    internal static string GetMethodBaseSymbol(string symbol)
-    {
+    internal static string GetMethodBaseSymbol(string symbol) {
         var openParenIndex = symbol.IndexOf('(');
         return openParenIndex >= 0 ? symbol.Substring(0, openParenIndex) : symbol;
     }
 
-    internal static bool IsValidationThrowHelperSupportCall(string symbol)
-    {
+    internal static bool IsValidationThrowHelperSupportCall(string symbol) {
         var methodBaseSymbol = GetMethodBaseSymbol(symbol);
         return methodBaseSymbol.EndsWith("Exception..ctor", StringComparison.Ordinal) ||
                methodBaseSymbol.StartsWith("System.SR.get_", StringComparison.Ordinal) ||
@@ -566,8 +505,7 @@ internal static class EffectSummaryClassificationEvidenceRules
                string.Equals(methodBaseSymbol, "System.SR.Format", StringComparison.Ordinal);
     }
 
-    internal static string GetEffectVisibilityClassification(MethodEffectSummary? summary, string classification)
-    {
+    internal static string GetEffectVisibilityClassification(MethodEffectSummary? summary, string classification) {
         if (summary == null) return "unknown";
 
         if (string.Equals(classification, "conservative_unknown", StringComparison.Ordinal)) return "unknown";
@@ -590,9 +528,7 @@ internal static class EffectSummaryClassificationEvidenceRules
         return "none";
     }
 
-    internal static bool IsPurityNeutralIntrinsicHelperCall(string callSymbol)
-    {
-        return callSymbol.StartsWith("System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(",
+    internal static bool IsPurityNeutralIntrinsicHelperCall(string callSymbol) => callSymbol.StartsWith("System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(",
                    StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsPointer(", StringComparison.Ordinal) ||
@@ -623,11 +559,8 @@ internal static class EffectSummaryClassificationEvidenceRules
                 callSymbol.Contains(".get_Length()", StringComparison.Ordinal)) ||
                callSymbol.StartsWith("System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences(",
                    StringComparison.Ordinal);
-    }
 
-    internal static bool IsByRefLikeViewConstructionHelperCall(string callSymbol)
-    {
-        return EffectSummaryKnownFrameworkCalls.IsArrayDataReference(callSymbol) ||
+    internal static bool IsByRefLikeViewConstructionHelperCall(string callSymbol) => EffectSummaryKnownFrameworkCalls.IsArrayDataReference(callSymbol) ||
                callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetReference(System.Span`1<",
                    StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetReference(System.ReadOnlySpan`1<",
@@ -640,39 +573,25 @@ internal static class EffectSummaryClassificationEvidenceRules
                callSymbol.StartsWith("System.Range.get_Start()", StringComparison.Ordinal) ||
                EffectSummaryKnownFrameworkCalls.IsByRefLikeRuntimeTypeHelper(callSymbol) ||
                IsSemanticallyNeutralValidationThrowHelper(callSymbol);
-    }
 
-    internal static bool IsByRefLikeViewConstructionCall(string callSymbol)
-    {
-        return (callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) &&
+    internal static bool IsByRefLikeViewConstructionCall(string callSymbol) => (callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) &&
                 (callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal) ||
                  callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal))) ||
                (callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) &&
                 (callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal) ||
                  callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal)));
-    }
 
-    internal static bool HasParameterlessNonVoidReturn(StructuralMethodIdentity identity)
-    {
-        return identity.Parameters.IsDefaultOrEmpty &&
+    internal static bool HasParameterlessNonVoidReturn(StructuralMethodIdentity identity) => identity.Parameters.IsDefaultOrEmpty &&
                !string.Equals(identity.ReturnType, "named:System.Void", StringComparison.Ordinal) &&
                string.Equals(identity.ReturnRefKind, "none", StringComparison.Ordinal);
-    }
 
-    internal static bool HasByRefParameter(StructuralMethodIdentity identity)
-    {
-        return identity.Parameters.Any(static parameter =>
-            !string.Equals(parameter.RefKind, "none", StringComparison.Ordinal));
-    }
+    internal static bool HasByRefParameter(StructuralMethodIdentity identity) => identity.Parameters.Any(static parameter =>
+                                                                                          !string.Equals(parameter.RefKind, "none", StringComparison.Ordinal));
 
-    internal static bool HasReturnType(StructuralMethodIdentity identity, string returnType)
-    {
-        return string.Equals(identity.ReturnType, returnType, StringComparison.Ordinal) &&
+    internal static bool HasReturnType(StructuralMethodIdentity identity, string returnType) => string.Equals(identity.ReturnType, returnType, StringComparison.Ordinal) &&
                string.Equals(identity.ReturnRefKind, "none", StringComparison.Ordinal);
-    }
 
-    internal static bool IsPureArgumentGuardWrapper(string symbol)
-    {
+    internal static bool IsPureArgumentGuardWrapper(string symbol) {
         var methodBaseSymbol = GetMethodBaseSymbol(symbol);
         if (!methodBaseSymbol.StartsWith("System.Argument", StringComparison.Ordinal) ||
             !methodBaseSymbol.Contains(".ThrowIf", StringComparison.Ordinal))
@@ -682,8 +601,7 @@ internal static class EffectSummaryClassificationEvidenceRules
                !symbol.Contains("nint", StringComparison.Ordinal);
     }
 
-    internal static bool IsArgumentGuardThrowHelper(string symbol)
-    {
+    internal static bool IsArgumentGuardThrowHelper(string symbol) {
         var methodBaseSymbol = GetMethodBaseSymbol(symbol);
         if (!methodBaseSymbol.StartsWith("System.Argument", StringComparison.Ordinal)) return false;
 
@@ -691,16 +609,14 @@ internal static class EffectSummaryClassificationEvidenceRules
                !methodBaseSymbol.Contains(".ThrowIf", StringComparison.Ordinal);
     }
 
-    internal static bool IsSemanticallyNeutralValidationThrowHelper(string symbol)
-    {
+    internal static bool IsSemanticallyNeutralValidationThrowHelper(string symbol) {
         if (IsArgumentGuardThrowHelper(symbol)) return true;
 
         var methodBaseSymbol = GetMethodBaseSymbol(symbol);
         return methodBaseSymbol.StartsWith("System.ThrowHelper.Throw", StringComparison.Ordinal);
     }
 
-    internal static bool IsSemanticallyCheckedDelegateInvokingBclMethod(string symbol)
-    {
+    internal static bool IsSemanticallyCheckedDelegateInvokingBclMethod(string symbol) {
         var methodBaseSymbol = GetMethodBaseSymbol(symbol);
         var lastDotIndex = methodBaseSymbol.LastIndexOf('.');
         if (lastDotIndex <= 0 || lastDotIndex == methodBaseSymbol.Length - 1) return false;
@@ -710,8 +626,7 @@ internal static class EffectSummaryClassificationEvidenceRules
 
         // These helpers already rely on analyzer-side semantic checking of the delegate target.
         // The runtime summaries should ignore delegate dispatch noise and validation throw helpers.
-        return containingType switch
-        {
+        return containingType switch {
             "System.Array" => methodName is
                 "Exists" or
                 "Find" or

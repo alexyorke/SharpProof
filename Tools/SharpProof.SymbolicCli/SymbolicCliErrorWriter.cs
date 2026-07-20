@@ -1,19 +1,15 @@
-internal static class SymbolicCliErrorWriter
-{
-    public static int Write(Exception exception, IReadOnlyList<string> arguments)
-    {
+internal static class SymbolicCliErrorWriter {
+    public static int Write(Exception exception, IReadOnlyList<string> arguments) {
         if (exception == null) throw new ArgumentNullException(nameof(exception));
         if (arguments == null) throw new ArgumentNullException(nameof(arguments));
 
         var error = SymbolicErrorClassifier.FromException(exception);
-        if (ShouldWriteJson(arguments))
-        {
+        if (ShouldWriteJson(arguments)) {
             Console.Out.WriteLine(JsonSerializer.Serialize(
                 new SymbolicErrorEnvelope(error),
                 SymbolicCliOutputPolicy.JsonOptions));
         }
-        else
-        {
+        else {
             Console.Error.WriteLine($"{error.Code} [{error.Category}]: {error.Message}");
             if (error.Category == SharpProofErrorCategory.Usage)
                 Console.Error.WriteLine(SymbolicCliOptions.Usage);
@@ -29,8 +25,7 @@ internal static class SymbolicCliErrorWriter
         int exitCode,
         string? detailName = null,
         string? detailValue = null,
-        Exception? innerException = null)
-    {
+        Exception? innerException = null) {
         var details = string.IsNullOrWhiteSpace(detailName)
             ? null
             : new[]
@@ -50,9 +45,6 @@ internal static class SymbolicCliErrorWriter
             : new SymbolicQueryException(error, innerException);
     }
 
-    private static bool ShouldWriteJson(IReadOnlyList<string> arguments)
-    {
-        return arguments.Any(static argument =>
-            SymbolicCliOutputPolicy.RequestsJsonErrors(argument));
-    }
+    private static bool ShouldWriteJson(IReadOnlyList<string> arguments) => arguments.Any(static argument =>
+                                                                                     SymbolicCliOutputPolicy.RequestsJsonErrors(argument));
 }

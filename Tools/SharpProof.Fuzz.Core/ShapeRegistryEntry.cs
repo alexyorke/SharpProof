@@ -1,14 +1,12 @@
 namespace SharpProof.Tools.Fuzz;
 
-public enum Sp0002ExpectationKind
-{
+public enum Sp0002ExpectationKind {
     MustNotEmit,
     MustEmit,
     MayEmitConservatively
 }
 
-public enum Sp0010ExpectationKind
-{
+public enum Sp0010ExpectationKind {
     Ignore,
     MustNotEmit,
     MustEmit,
@@ -20,8 +18,7 @@ public sealed record FuzzExpectation(
     Sp0010ExpectationKind Sp0010,
     ImmutableArray<string> RequiredSp0002Properties,
     ImmutableArray<string> RequiredSp0010Properties,
-    ImmutableArray<string> RequiredAnySp0010Properties)
-{
+    ImmutableArray<string> RequiredAnySp0010Properties) {
     public const string ConservativeBucket = "conservative";
     public const string DefinitelyImpureBucket = "definitely_impure";
     public const string DefinitelyPureBucket = "definitely_pure";

@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicStateMerger
-{
+internal static class SymbolicStateMerger {
     internal readonly record struct GuardedState(SymbolicCondition Condition, SymbolicState State);
 
     private static readonly PathConditionMergeStrategy<SymbolicCondition> Strategy = new(
@@ -11,15 +10,11 @@ internal static class SymbolicStateMerger
         static conditions => Combine(SymbolicConditionOperator.Or, conditions));
 
     internal static ImmutableArray<SymbolicCondition> MergePathConditionsAcrossAll(
-        IReadOnlyList<SymbolicState> states)
-    {
-        return MergePathConditionsAcrossAll(
+        IReadOnlyList<SymbolicState> states) => MergePathConditionsAcrossAll(
             states.Select(static state => (IReadOnlyList<SymbolicCondition>)state.PathConditions).ToArray());
-    }
 
     internal static ImmutableArray<SymbolicCondition> MergePathConditionsAcrossAll(
-        IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets)
-    {
+        IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets) {
         var limits = SymbolicAnalysisLimitContext.Limits;
         return PathConditionMergeEngine.MergeAcrossAll(
             conditionSets,
@@ -43,8 +38,7 @@ internal static class SymbolicStateMerger
 
     internal static SymbolicState MergeCommonStates(
         SymbolicState baseline,
-        IReadOnlyList<SymbolicState> states)
-    {
+        IReadOnlyList<SymbolicState> states) {
         if (states.Count == 0) return baseline;
 
         var conditionKeys = GetCommonConditionKeys(states);
@@ -62,8 +56,7 @@ internal static class SymbolicStateMerger
         SyntaxNode source,
         SymbolicAnalysisLimitKind limitKind,
         int limit,
-        string provenance)
-    {
+        string provenance) {
         var states = branches.Select(static branch => branch.State).ToArray();
         var commonFactKeys = new HashSet<string>(
             IntersectFactsAcrossAll(states).Select(SymbolicState.CreateProofFactKey),
@@ -71,16 +64,14 @@ internal static class SymbolicStateMerger
         var commonConditionKeys = GetCommonConditionKeys(states);
         var state = MergeCommonStates(baseline, states);
         var addedCount = 0;
-        foreach (var branch in branches)
-        {
+        foreach (var branch in branches) {
             foreach (var fact in branch.State.Facts)
                 if (!commonFactKeys.Contains(SymbolicState.CreateProofFactKey(fact)) &&
                     !TryAddGuardedFact(ref state, branch.Condition, new SymbolicFactCondition(fact)))
                     return state;
 
             var branchConditionKey = SymbolicState.CreateProofConditionKey(branch.Condition);
-            foreach (var condition in branch.State.PathConditions)
-            {
+            foreach (var condition in branch.State.PathConditions) {
                 var key = SymbolicState.CreateProofConditionKey(condition);
                 if (commonConditionKeys.Contains(key) || key == branchConditionKey) continue;
                 if (!TryAddGuardedFact(ref state, branch.Condition, condition)) return state;
@@ -92,10 +83,8 @@ internal static class SymbolicStateMerger
         bool TryAddGuardedFact(
             ref SymbolicState target,
             SymbolicCondition branchCondition,
-            SymbolicCondition branchFact)
-        {
-            if (addedCount >= limit)
-            {
+            SymbolicCondition branchFact) {
+            if (addedCount >= limit) {
                 SymbolicAnalysisLimitContext.Record(
                     limitKind, limit, addedCount + 1, source, provenance);
                 return false;
@@ -107,8 +96,7 @@ internal static class SymbolicStateMerger
         }
     }
 
-    private static HashSet<string> GetCommonConditionKeys(IReadOnlyList<SymbolicState> states)
-    {
+    private static HashSet<string> GetCommonConditionKeys(IReadOnlyList<SymbolicState> states) {
         var keys = new HashSet<string>(
             states[0].PathConditions.Select(SymbolicState.CreateProofConditionKey),
             StringComparer.Ordinal);
@@ -119,13 +107,11 @@ internal static class SymbolicStateMerger
 
     internal static ImmutableArray<SymbolicFact> IntersectFactsAcrossAll(
         IReadOnlyList<SymbolicState> states,
-        Func<SymbolicFact, SymbolicFact, bool>? equivalent = null)
-    {
+        Func<SymbolicFact, SymbolicFact, bool>? equivalent = null) {
         if (states.Count == 0) return ImmutableArray<SymbolicFact>.Empty;
 
         var common = states[0].Facts;
-        for (var index = 1; index < states.Count && !common.IsEmpty; index++)
-        {
+        for (var index = 1; index < states.Count && !common.IsEmpty; index++) {
             var candidateFacts = states[index].Facts;
             common = common.Where(fact => candidateFacts.Any(candidate => equivalent?.Invoke(fact, candidate) ??
                 SymbolicState.CreateProofFactKey(fact) == SymbolicState.CreateProofFactKey(candidate))).ToImmutableArray();
@@ -137,8 +123,7 @@ internal static class SymbolicStateMerger
     internal static SymbolicState MergePathStatesAcrossAll(
         IReadOnlyList<SymbolicState> states,
         Func<SymbolicFact, SymbolicFact, bool> equivalent,
-        int phiScope)
-    {
+        int phiScope) {
         if (states.Count == 0) return new SymbolicState();
 
         var versions = MergePhiVersions(states, phiScope);
@@ -149,13 +134,11 @@ internal static class SymbolicStateMerger
 
     private static ImmutableDictionary<string, int> MergePhiVersions(
         IReadOnlyList<SymbolicState> states,
-        int phiScope)
-    {
+        int phiScope) {
         var keys = states.SelectMany(static state => state.SymbolVersions.Keys)
             .Distinct(StringComparer.Ordinal);
         var builder = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
-        foreach (var key in keys)
-        {
+        foreach (var key in keys) {
             var versions = states.Select(state => state.SymbolVersions.TryGetValue(key, out var version) ? version : 0)
                 .Distinct()
                 .Take(2)
@@ -185,18 +168,15 @@ internal static class SymbolicStateMerger
 
     internal static IEnumerable<SymbolicTerm> EnumerateExactAliasComponent(
         SymbolicTerm root,
-        IReadOnlyList<SymbolicFact> facts)
-    {
+        IReadOnlyList<SymbolicFact> facts) {
         var pending = new Queue<SymbolicTerm>();
         var visited = new HashSet<SymbolicTerm>();
         pending.Enqueue(root);
-        while (pending.Count != 0)
-        {
+        while (pending.Count != 0) {
             var term = pending.Dequeue();
             if (!visited.Add(term)) continue;
             yield return term;
-            foreach (var fact in facts)
-            {
+            foreach (var fact in facts) {
                 if (!fact.Polarity || fact.Confidence != SymbolicFactConfidence.Exact ||
                     fact.Atom is not SymbolicAliasAtom { MayAlias: true } alias)
                     continue;
@@ -219,22 +199,18 @@ internal static class SymbolicStateMerger
 
     private static ImmutableArray<SymbolicFact> MergeResourceStateFacts(
         ImmutableArray<SymbolicFact> commonFacts,
-        IReadOnlyList<SymbolicState> states)
-    {
+        IReadOnlyList<SymbolicState> states) {
         var builder = commonFacts.ToBuilder();
         var resources = new List<(SymbolicTerm Resource, ISymbol? Symbol)>();
-        foreach (var fact in states.SelectMany(static state => state.Facts))
-        {
+        foreach (var fact in states.SelectMany(static state => state.Facts)) {
             if (!TryGetResourceStateIdentity(fact, out var resource, out var symbol) ||
                 resources.Any(key => ResourceStateIdentityMatches(key.Resource, key.Symbol, resource, symbol)))
                 continue;
             resources.Add((resource, symbol));
         }
 
-        foreach (var (resource, symbol) in resources)
-        {
-            if (states.All(state => HasExactResourceRelease(state, resource, symbol)))
-            {
+        foreach (var (resource, symbol) in resources) {
+            if (states.All(state => HasExactResourceRelease(state, resource, symbol))) {
                 var representative = states
                     .SelectMany(state => state.Facts.Select(fact => (State: state, Fact: fact)))
                     .First(pair =>
@@ -243,8 +219,7 @@ internal static class SymbolicStateMerger
                          EnumerateExactAliasComponent(resource, pair.State.Facts)
                              .Any(term => Equals(term, released))))
                     .Fact;
-                var mergedFact = representative with
-                {
+                var mergedFact = representative with {
                     Atom = new SymbolicResourceLifetimeAtom(resource, SymbolicResourceLifetimeState.Released),
                     Provenance = "analyzer.resource.merge.all-path-release",
                     EvidenceKey = representative.EvidenceKey ?? "evidence.resource.released",
@@ -262,11 +237,9 @@ internal static class SymbolicStateMerger
         return builder.ToImmutable();
     }
 
-    private static bool HasExactResourceRelease(SymbolicState state, SymbolicTerm resource, ISymbol? symbol)
-    {
+    private static bool HasExactResourceRelease(SymbolicState state, SymbolicTerm resource, ISymbol? symbol) {
         var releasedResources = new HashSet<SymbolicTerm>();
-        foreach (var release in EnumerateExactResourceReleases(state))
-        {
+        foreach (var release in EnumerateExactResourceReleases(state)) {
             if (ResourceStateIdentityMatches(resource, symbol, release.Resource, release.Symbol)) return true;
             releasedResources.Add(release.Resource);
         }
@@ -277,13 +250,11 @@ internal static class SymbolicStateMerger
     private static bool TryGetResourceStateIdentity(
         SymbolicFact fact,
         out SymbolicTerm resource,
-        out ISymbol? symbol)
-    {
+        out ISymbol? symbol) {
         if (TryGetExactResourceRelease(fact, out resource, out symbol)) return true;
 
         symbol = fact.Symbol;
-        resource = fact.Atom switch
-        {
+        resource = fact.Atom switch {
             SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime =>
                 lifetime.Resource,
             SymbolicDisposalAtom { State: SymbolicDisposalState.NotDisposed } disposal => disposal.Resource,
@@ -297,12 +268,10 @@ internal static class SymbolicStateMerger
     private static bool IsOutstandingResourceFactFor(
         SymbolicFact fact,
         SymbolicTerm resource,
-        ISymbol? symbol)
-    {
+        ISymbol? symbol) {
         if (!fact.Polarity || fact.Confidence != SymbolicFactConfidence.Exact) return false;
 
-        var outstanding = fact.Atom switch
-        {
+        var outstanding = fact.Atom switch {
             SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime =>
                 lifetime.Resource,
             SymbolicDisposalAtom { State: SymbolicDisposalState.NotDisposed } disposal => disposal.Resource,
@@ -321,8 +290,7 @@ internal static class SymbolicStateMerger
             : Equals(firstResource, secondResource);
 
     private static IEnumerable<(SymbolicTerm Resource, ISymbol? Symbol)> EnumerateExactResourceReleases(
-        SymbolicState state)
-    {
+        SymbolicState state) {
         foreach (var fact in state.Facts)
             if (TryGetExactResourceRelease(fact, out var resource, out var symbol))
                 yield return (resource, symbol);
@@ -331,12 +299,9 @@ internal static class SymbolicStateMerger
     private static bool TryGetExactResourceRelease(
         SymbolicFact fact,
         out SymbolicTerm resource,
-        out ISymbol? symbol)
-    {
-        resource = fact.Atom switch
-        {
-            SymbolicResourceLifetimeAtom
-                { State: SymbolicResourceLifetimeState.Released or SymbolicResourceLifetimeState.Returned } lifetime =>
+        out ISymbol? symbol) {
+        resource = fact.Atom switch {
+            SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Released or SymbolicResourceLifetimeState.Returned } lifetime =>
                 lifetime.Resource,
             SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal => disposal.Resource,
             _ => null!
@@ -348,8 +313,7 @@ internal static class SymbolicStateMerger
     internal static SymbolicState MergeCompletionStates(
         IReadOnlyList<SymbolicState> states,
         SymbolicState entryState,
-        Microsoft.CodeAnalysis.SyntaxNode source)
-    {
+        Microsoft.CodeAnalysis.SyntaxNode source) {
         if (states.Count == 1) return states[0];
 
         var retainedFacts = entryState.Facts.ToList();
@@ -381,14 +345,11 @@ internal static class SymbolicStateMerger
         IEnumerable<string> retainedKeys,
         Func<T, string> getKey,
         Microsoft.CodeAnalysis.SyntaxNode source,
-        ref int addedCount)
-    {
+        ref int addedCount) {
         var limit = SymbolicAnalysisLimitContext.Limits.MaxMergedTryFacts;
         var keys = new HashSet<string>(retainedKeys, StringComparer.Ordinal);
-        foreach (var candidate in candidates.Where(candidate => keys.Add(getKey(candidate))))
-        {
-            if (addedCount >= limit)
-            {
+        foreach (var candidate in candidates.Where(candidate => keys.Add(getKey(candidate)))) {
+            if (addedCount >= limit) {
                 SymbolicAnalysisLimitContext.Record(
                     SymbolicAnalysisLimitKind.TryFactMerge, limit, addedCount + 1, source,
                     "program_point.try_fact_merge");
@@ -402,8 +363,7 @@ internal static class SymbolicStateMerger
 
     private static SymbolicCondition Combine(
         SymbolicConditionOperator op,
-        IReadOnlyList<SymbolicCondition> conditions)
-    {
+        IReadOnlyList<SymbolicCondition> conditions) {
         var result = conditions[0];
         for (var index = 1; index < conditions.Count; index++)
             result = new SymbolicBinaryCondition(op, result, conditions[index]);
@@ -411,10 +371,8 @@ internal static class SymbolicStateMerger
         return result;
     }
 
-    private static bool TryGetMergeTargetKey(SymbolicCondition condition, out string targetKey)
-    {
-        if (TryGetMergeTarget(condition, out var target))
-        {
+    private static bool TryGetMergeTargetKey(SymbolicCondition condition, out string targetKey) {
+        if (TryGetMergeTarget(condition, out var target)) {
             targetKey = SymbolicState.CreateProofTermKey(target);
             return true;
         }
@@ -423,19 +381,16 @@ internal static class SymbolicStateMerger
         return false;
     }
 
-    private static bool TryGetMergeTarget(SymbolicCondition condition, out SymbolicTerm target)
-    {
+    private static bool TryGetMergeTarget(SymbolicCondition condition, out SymbolicTerm target) {
         if (condition is SymbolicNotCondition { Operand: { } operand }) condition = operand;
 
         if (condition is SymbolicFactCondition { Fact.Atom: SymbolicRelationAtom relation } &&
             (TryGetTargetTerm(relation.Left, out target) || TryGetTargetTerm(relation.Right, out target)))
             return true;
 
-        if (condition is SymbolicFactCondition
-            {
-                Fact.Atom: SymbolicTruthAtom { Condition: SymbolicVariableTerm variable }
-            })
-        {
+        if (condition is SymbolicFactCondition {
+            Fact.Atom: SymbolicTruthAtom { Condition: SymbolicVariableTerm variable }
+        }) {
             target = variable;
             return true;
         }
@@ -444,10 +399,8 @@ internal static class SymbolicStateMerger
         return false;
     }
 
-    private static bool TryGetTargetTerm(SymbolicTerm term, out SymbolicTerm target)
-    {
-        switch (term)
-        {
+    private static bool TryGetTargetTerm(SymbolicTerm term, out SymbolicTerm target) {
+        switch (term) {
             case SymbolicVariableTerm:
             case SymbolicMemberTerm:
             case SymbolicElementTerm:

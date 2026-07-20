@@ -1,12 +1,10 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
-{
+internal partial class PurityAnalysisEngine {
     private static PurityAnalysisResult AnalyzePurityUsingCFGInternal(
         SyntaxNode bodyNode,
         PurityAnalysisContext context,
-        out PurityAnalysisState mergedNormalExitState)
-    {
+        out PurityAnalysisState mergedNormalExitState) {
         var cancellationToken = context.CancellationToken;
         var semanticModel = context.SemanticModel;
         var smtAnalysis = context.SmtAnalysis;
@@ -15,12 +13,10 @@ internal partial class PurityAnalysisEngine
         // Roslyn 4.x: Create(BlockSyntax|ArrowClause, model) throws ("operation has a non-null parent").
         // Create(BaseMethodDeclarationSyntax|LocalFunctionStatement|ConstructorDeclaration|... , model) is the supported root.
         ControlFlowGraph? cfg;
-        try
-        {
+        try {
             cfg = ControlFlowGraph.Create(bodyNode, semanticModel);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
+        catch (Exception ex) when (ex is not OperationCanceledException) {
             return PurityAnalysisResult.Impure(bodyNode);
         }
 
@@ -34,10 +30,8 @@ internal partial class PurityAnalysisEngine
         var queued = new HashSet<(BasicBlock Block, CfgFinallyContinuation? Continuation)> { entry };
         var exitStates = new Dictionary<(BasicBlock Block, CfgFinallyContinuation? Continuation), PurityAnalysisState>();
 
-        void SchedulePoint((BasicBlock Block, CfgFinallyContinuation? Continuation) point, PurityAnalysisState state)
-        {
-            if (states.TryGetValue(point, out var previous))
-            {
+        void SchedulePoint((BasicBlock Block, CfgFinallyContinuation? Continuation) point, PurityAnalysisState state) {
+            if (states.TryGetValue(point, out var previous)) {
                 state = PurityAnalysisStateMerger.MergeStates(previous, state, point.Block.Ordinal);
                 if (state.Equals(previous)) return;
             }
@@ -46,35 +40,29 @@ internal partial class PurityAnalysisEngine
         }
 
         void ScheduleBranch(ControlFlowBranch? branch, CfgFinallyContinuation? continuation, IOperation? branchValue,
-            PurityAnalysisState state)
-        {
+            PurityAnalysisState state) {
             if (branch == null) return;
             if (branch.Semantics == ControlFlowBranchSemantics.Return && branchValue != null)
                 state = PurityResourceStateFacts.AddReturnedOwnedResourceFacts(state, branchValue, state);
-            if (!branch.FinallyRegions.IsDefaultOrEmpty)
-            {
+            if (!branch.FinallyRegions.IsDefaultOrEmpty) {
                 continuation = new CfgFinallyContinuation(branch.FinallyRegions, 0, branch.Destination, continuation);
                 SchedulePoint((cfg.Blocks[branch.FinallyRegions[0].FirstBlockOrdinal], continuation), state);
                 return;
             }
-            if (branch.Destination != null)
-            {
+            if (branch.Destination != null) {
                 SchedulePoint((branch.Destination, continuation), state);
                 return;
             }
-            while (continuation != null)
-            {
+            while (continuation != null) {
                 var nextRegion = continuation.RegionIndex + 1;
-                if (nextRegion < continuation.Regions.Length)
-                {
+                if (nextRegion < continuation.Regions.Length) {
                     continuation = continuation with { RegionIndex = nextRegion };
                     SchedulePoint((cfg.Blocks[continuation.Regions[nextRegion].FirstBlockOrdinal], continuation), state);
                     return;
                 }
                 var destination = continuation.Destination;
                 continuation = continuation.Parent;
-                if (destination != null)
-                {
+                if (destination != null) {
                     SchedulePoint((destination, continuation), state);
                     return;
                 }
@@ -82,16 +70,14 @@ internal partial class PurityAnalysisEngine
         }
 
         var iterations = 0;
-        while (queue.Count != 0 && iterations++ < cfg.Blocks.Length * 200)
-        {
+        while (queue.Count != 0 && iterations++ < cfg.Blocks.Length * 200) {
             var currentPoint = queue.Dequeue();
             queued.Remove(currentPoint);
             var currentBlock = currentPoint.Block;
             var stateAfter = ApplyTransferFunction(currentBlock, states[currentPoint], context);
             exitStates[currentPoint] = stateAfter;
             if (TryGetConstantBranchDecision(currentBlock.BranchValue, semanticModel, smtAnalysis, cancellationToken,
-                    out var takeConditionalSuccessor))
-            {
+                    out var takeConditionalSuccessor)) {
                 var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock);
                 var takenBranch = takeConditionalSuccessor == trueUsesConditionalSuccessor
                     ? currentBlock.ConditionalSuccessor
@@ -100,8 +86,7 @@ internal partial class PurityAnalysisEngine
                         takeConditionalSuccessor, smtAnalysis, cancellationToken, out var takenState))
                     ScheduleBranch(takenBranch, currentPoint.Continuation, currentBlock.BranchValue, takenState);
             }
-            else
-            {
+            else {
                 var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock);
                 if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel,
                         trueUsesConditionalSuccessor, smtAnalysis, cancellationToken, out var conditionalState))
@@ -131,8 +116,7 @@ internal partial class PurityAnalysisEngine
     private static PurityAnalysisState ApplyTransferFunction(
         BasicBlock block,
         PurityAnalysisState stateBefore,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         var cancellationToken = context.CancellationToken;
         var semanticModel = context.SemanticModel;
         var smtAnalysis = context.SmtAnalysis;
@@ -148,14 +132,12 @@ internal partial class PurityAnalysisEngine
         var currentStateInBlock = stateBefore;
         PurityAnalysisResult? deferredRecursiveImpurity = null;
         SyntaxNode? deferredRecursiveSyntax = null;
-        foreach (var op in block.Operations)
-        {
+        foreach (var op in block.Operations) {
             if (op == null) continue;
             var opResult = CheckAndTrackOperation(op, context, ref currentStateInBlock);
             if (opResult.IsPure) continue;
             if (IsImpurityProvenUnreachable(opResult, semanticModel, smtAnalysis, cancellationToken)) continue;
-            if (op is not IFlowCaptureOperation && IsRecursivePlaceholderImpurity(opResult))
-            {
+            if (op is not IFlowCaptureOperation && IsRecursivePlaceholderImpurity(opResult)) {
                 deferredRecursiveImpurity ??= opResult.WithEvidence(
                     opResult.Evidence.WithSymbol(context.ContainingMethodSymbol.ToDisplayString(_signatureFormat)));
                 deferredRecursiveSyntax ??= op.Syntax;
@@ -165,8 +147,7 @@ internal partial class PurityAnalysisEngine
             break;
         }
 
-        if (!currentStateInBlock.HasPotentialImpurity && deferredRecursiveImpurity.HasValue)
-        {
+        if (!currentStateInBlock.HasPotentialImpurity && deferredRecursiveImpurity.HasValue) {
             var fallbackSyntax = deferredRecursiveSyntax ??
                                  block.Operations.FirstOrDefault()?.Syntax ??
                                  context.ContainingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()
@@ -180,27 +161,23 @@ internal partial class PurityAnalysisEngine
         if (!currentStateInBlock.HasPotentialImpurity &&
             block.BranchValue != null &&
             TryCreateThrowBranchImpurity(block.BranchValue, context, currentStateInBlock,
-                out var throwBranchResult))
-        {
+                out var throwBranchResult)) {
             currentStateInBlock = currentStateInBlock.WithImpurity(throwBranchResult,
                 throwBranchResult.ImpureSyntaxNode ?? block.BranchValue.Syntax);
         }
         else if (!currentStateInBlock.HasPotentialImpurity &&
                  block.BranchValue != null &&
-                 ShouldAnalyzeStateSensitiveBranchValue(block.BranchValue.Syntax))
-        {
+                 ShouldAnalyzeStateSensitiveBranchValue(block.BranchValue.Syntax)) {
             var operationToCheck = TryGetCfgReturnOperation(
                 block.BranchValue,
                 semanticModel,
                 cancellationToken) ?? block.BranchValue;
             var branchValueResult = CheckSingleOperation(operationToCheck, context, currentStateInBlock);
-            if (!branchValueResult.IsPure)
-            {
+            if (!branchValueResult.IsPure) {
                 if (!IsImpurityProvenUnreachable(branchValueResult, semanticModel, smtAnalysis, cancellationToken))
                     currentStateInBlock = currentStateInBlock.WithImpurity(branchValueResult, block.BranchValue.Syntax);
             }
-            else
-            {
+            else {
                 currentStateInBlock =
                     PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(block.BranchValue, context, currentStateInBlock);
             }
@@ -212,8 +189,7 @@ internal partial class PurityAnalysisEngine
     private static IReturnOperation? TryGetCfgReturnOperation(
         IOperation branchValue,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var returnStatement = branchValue.Syntax.FirstAncestorOrSelf<ReturnStatementSyntax>();
         if (returnStatement != null)
             return semanticModel.GetOperation(returnStatement, cancellationToken) as IReturnOperation;
@@ -234,8 +210,7 @@ internal partial class PurityAnalysisEngine
         IOperation branchValue,
         PurityAnalysisContext context,
         PurityAnalysisState currentState,
-        out PurityAnalysisResult result)
-    {
+        out PurityAnalysisResult result) {
         result = PurityAnalysisResult.Pure;
 
         var throwSyntax = branchValue.Syntax.FirstAncestorOrSelf<ThrowStatementSyntax>() ??
@@ -243,8 +218,7 @@ internal partial class PurityAnalysisEngine
         if (throwSyntax == null) return false;
 
         var exceptionResult = CheckSingleOperation(branchValue, context, currentState);
-        if (!exceptionResult.IsPure)
-        {
+        if (!exceptionResult.IsPure) {
             result = exceptionResult;
             return true;
         }
@@ -259,18 +233,14 @@ internal partial class PurityAnalysisEngine
         return true;
     }
 
-    internal static bool IsRecursivePlaceholderImpurity(PurityAnalysisResult result)
-    {
-        return !result.IsPure &&
+    internal static bool IsRecursivePlaceholderImpurity(PurityAnalysisResult result) => !result.IsPure &&
                result.Evidence.RuleName == "RecursivePurityAnalysis" &&
                result.Evidence.CatalogSource == "recursive_call";
-    }
 
     private static PurityAnalysisResult CheckAndTrackOperation(
         IOperation operation,
         PurityAnalysisContext context,
-        ref PurityAnalysisState state)
-    {
+        ref PurityAnalysisState state) {
         var result = operation is IFlowCaptureOperation capture
             ? CheckSingleOperation(capture.Value, context, state)
             : CheckSingleOperation(operation, context, state);
@@ -284,8 +254,7 @@ internal partial class PurityAnalysisEngine
 
     private static PurityAnalysisResult AnalyzeOperationSubtreePurity(
         IOperation rootOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         var cancellationToken = context.CancellationToken;
         var semanticModel = context.SemanticModel;
         cancellationToken.ThrowIfCancellationRequested();
@@ -297,8 +266,7 @@ internal partial class PurityAnalysisEngine
             context.AttributePolicy,
             cancellationToken);
         var visitedOperations = new HashSet<IOperation>();
-        foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation))
-        {
+        foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation)) {
             var operationToAnalyze = operation is IExpressionStatementOperation expressionStatementOperation
                 ? expressionStatementOperation.Operation
                 : operation;

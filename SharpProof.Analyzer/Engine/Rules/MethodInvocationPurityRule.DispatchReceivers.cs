@@ -1,13 +1,10 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class MethodInvocationPurityRule
-{
-    private static bool IsDynamicInvocationReceiver(IOperation? operation)
-    {
+internal partial class MethodInvocationPurityRule {
+    private static bool IsDynamicInvocationReceiver(IOperation? operation) {
         var current = operation;
 
-        while (current != null)
-        {
+        while (current != null) {
             current = NormalizeReceiverOperation(current);
             if (current == null) return false;
 
@@ -17,8 +14,7 @@ internal partial class MethodInvocationPurityRule
                 asOperand?.Type?.TypeKind == TypeKind.Dynamic)
                 return true;
 
-            if (TryUnwrapReceiverOperation(current, out var unwrapped))
-            {
+            if (TryUnwrapReceiverOperation(current, out var unwrapped)) {
                 current = unwrapped;
                 continue;
             }
@@ -29,18 +25,15 @@ internal partial class MethodInvocationPurityRule
         return false;
     }
 
-    internal static INamedTypeSymbol? GetKnownReceiverType(IOperation? invocationInstance)
-    {
+    internal static INamedTypeSymbol? GetKnownReceiverType(IOperation? invocationInstance) {
         var current = invocationInstance;
 
-        while (true)
-        {
+        while (true) {
             current = NormalizeReceiverOperation(current);
 
             if (current == null) return null;
 
-            if (current is IConditionalOperation conditional)
-            {
+            if (current is IConditionalOperation conditional) {
                 var whenTrueType = GetKnownReceiverType(conditional.WhenTrue);
                 var whenFalseType = GetKnownReceiverType(conditional.WhenFalse);
 
@@ -52,24 +45,19 @@ internal partial class MethodInvocationPurityRule
                 return current.Type as INamedTypeSymbol;
             }
 
-            if (TryGetAsConversion(current, out var asOperand, out var asTargetType))
-            {
-                if (asTargetType != null)
-                {
+            if (TryGetAsConversion(current, out var asOperand, out var asTargetType)) {
+                if (asTargetType != null) {
                     var operandType = asOperand?.Type as INamedTypeSymbol;
                     if (operandType != null &&
-                        TypeHierarchyEnumeration.ImplementsInterface(operandType, asTargetType, true))
-                    {
+                        TypeHierarchyEnumeration.ImplementsInterface(operandType, asTargetType, true)) {
                         current = asOperand;
                         continue;
                     }
 
-                    if (asOperand?.Type is ITypeParameterSymbol typeParameter)
-                    {
+                    if (asOperand?.Type is ITypeParameterSymbol typeParameter) {
                         var constrainedType = ResolveConstrainedSealedType(typeParameter);
                         if (constrainedType != null &&
-                            TypeHierarchyEnumeration.ImplementsInterface(constrainedType, asTargetType, true))
-                        {
+                            TypeHierarchyEnumeration.ImplementsInterface(constrainedType, asTargetType, true)) {
                             current = asOperand;
                             continue;
                         }
@@ -79,14 +67,12 @@ internal partial class MethodInvocationPurityRule
                 return asTargetType;
             }
 
-            if (TryUnwrapReceiverOperation(current, out var unwrapped))
-            {
+            if (TryUnwrapReceiverOperation(current, out var unwrapped)) {
                 current = unwrapped;
                 continue;
             }
 
-            if (current.Type is ITypeParameterSymbol typeParameterSymbol)
-            {
+            if (current.Type is ITypeParameterSymbol typeParameterSymbol) {
                 var constrainedSealedType = ResolveConstrainedSealedType(typeParameterSymbol);
                 if (constrainedSealedType != null) return constrainedSealedType;
 
@@ -99,8 +85,7 @@ internal partial class MethodInvocationPurityRule
         return current?.Type as INamedTypeSymbol;
     }
 
-    private static INamedTypeSymbol? GetKnownStaticInterfaceReceiverType(IMethodSymbol invokedMethodSymbol)
-    {
+    private static INamedTypeSymbol? GetKnownStaticInterfaceReceiverType(IMethodSymbol invokedMethodSymbol) {
         if (!invokedMethodSymbol.IsStatic ||
             invokedMethodSymbol.ContainingType?.TypeKind != TypeKind.Interface ||
             invokedMethodSymbol.ContainingType is not INamedTypeSymbol interfaceType ||
@@ -119,30 +104,23 @@ internal partial class MethodInvocationPurityRule
         return null;
     }
 
-    private static INamedTypeSymbol? ResolveConstrainedSealedType(ITypeParameterSymbol typeParameter)
-    {
-        return ResolveConstrainedSealedType(typeParameter,
+    private static INamedTypeSymbol? ResolveConstrainedSealedType(ITypeParameterSymbol typeParameter) => ResolveConstrainedSealedType(typeParameter,
             new HashSet<ITypeParameterSymbol>(SymbolEq.Default));
-    }
 
     private static INamedTypeSymbol? ResolveConstrainedSealedType(
         ITypeParameterSymbol typeParameter,
-        HashSet<ITypeParameterSymbol> visitedTypeParameters)
-    {
+        HashSet<ITypeParameterSymbol> visitedTypeParameters) {
         if (!visitedTypeParameters.Add(typeParameter)) return null;
 
         INamedTypeSymbol? constrainedType = null;
 
-        foreach (var constraintType in typeParameter.ConstraintTypes)
-        {
+        foreach (var constraintType in typeParameter.ConstraintTypes) {
             INamedTypeSymbol? resolvedConstraintType = null;
 
-            if (constraintType is ITypeParameterSymbol nestedTypeParameter)
-            {
+            if (constraintType is ITypeParameterSymbol nestedTypeParameter) {
                 resolvedConstraintType = ResolveConstrainedSealedType(nestedTypeParameter, visitedTypeParameters);
             }
-            else if (constraintType is INamedTypeSymbol namedType)
-            {
+            else if (constraintType is INamedTypeSymbol namedType) {
                 if (namedType.TypeKind == TypeKind.Interface) continue;
 
                 if ((namedType.TypeKind != TypeKind.Class &&
@@ -165,8 +143,7 @@ internal partial class MethodInvocationPurityRule
         return constrainedType;
     }
 
-    private static bool IsTypeEffectivelyExternallyAccessible(INamedTypeSymbol typeSymbol)
-    {
+    private static bool IsTypeEffectivelyExternallyAccessible(INamedTypeSymbol typeSymbol) {
         for (var current = typeSymbol; current != null; current = current.ContainingType)
             if (current.DeclaredAccessibility == Accessibility.Private ||
                 current.DeclaredAccessibility == Accessibility.Internal)
@@ -175,17 +152,14 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool IsAllocationOnlyInterfaceReceiver(IOperation? invocationInstance)
-    {
+    private static bool IsAllocationOnlyInterfaceReceiver(IOperation? invocationInstance) {
         var current = invocationInstance;
 
-        while (current != null)
-        {
+        while (current != null) {
             current = NormalizeReceiverOperation(current);
             if (current == null) return false;
 
-            if (TryUnwrapReceiverOperation(current, out var unwrapped))
-            {
+            if (TryUnwrapReceiverOperation(current, out var unwrapped)) {
                 current = unwrapped;
                 continue;
             }
@@ -196,8 +170,7 @@ internal partial class MethodInvocationPurityRule
         return false;
     }
 
-    private static IOperation? NormalizeReceiverOperation(IOperation? operation)
-    {
+    private static IOperation? NormalizeReceiverOperation(IOperation? operation) {
         if (operation is not IConditionalAccessInstanceOperation) return operation;
 
         for (var current = operation.Parent; current != null; current = current.Parent)
@@ -207,10 +180,8 @@ internal partial class MethodInvocationPurityRule
         return operation;
     }
 
-    private static bool TryUnwrapReceiverOperation(IOperation operation, out IOperation? unwrapped)
-    {
-        unwrapped = operation switch
-        {
+    private static bool TryUnwrapReceiverOperation(IOperation operation, out IOperation? unwrapped) {
+        unwrapped = operation switch {
             IConditionalAccessOperation conditionalAccess => conditionalAccess.Operation,
             IConversionOperation conversion => conversion.Operand,
             IParenthesizedOperation parenthesized => parenthesized.Operand,
@@ -222,11 +193,9 @@ internal partial class MethodInvocationPurityRule
     private static bool TryGetAsConversion(
         IOperation? operation,
         out IOperation? operand,
-        out INamedTypeSymbol? targetType)
-    {
+        out INamedTypeSymbol? targetType) {
         if (operation is IConversionOperation conversion &&
-            IsAsConversionSyntax(conversion.Syntax))
-        {
+            IsAsConversionSyntax(conversion.Syntax)) {
             operand = conversion.Operand;
             targetType = conversion.Type as INamedTypeSymbol;
             return true;
@@ -237,8 +206,7 @@ internal partial class MethodInvocationPurityRule
         return false;
     }
 
-    private static bool IsAsConversionSyntax(SyntaxNode syntax)
-    {
+    private static bool IsAsConversionSyntax(SyntaxNode syntax) {
         if (syntax.IsKind(SyntaxKind.AsExpression)) return true;
 
         return syntax.DescendantNodesAndSelf()

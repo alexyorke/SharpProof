@@ -1,23 +1,19 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicReferenceLowerer
-{
+internal static class SymbolicReferenceLowerer {
     internal static bool TryLowerReferenceTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
         var expressionType = typeInfo.ConvertedType ?? typeInfo.Type;
-        if (expressionType is not { IsReferenceType: true })
-        {
+        if (expressionType is not { IsReferenceType: true }) {
             term = null!;
             return false;
         }
 
-        if (SymbolicNullableLowerer.IsNullConstant(expression, context))
-        {
+        if (SymbolicNullableLowerer.IsNullConstant(expression, context)) {
             term = new SymbolicNullTerm();
             return true;
         }
@@ -29,8 +25,7 @@ internal static class SymbolicReferenceLowerer
         if (expression is ConditionalExpressionSyntax conditionalExpression &&
             SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(conditionalExpression.Condition, context), out var condition) &&
             TryLowerReferenceTerm(conditionalExpression.WhenTrue, context, out var whenTrue) &&
-            TryLowerReferenceTerm(conditionalExpression.WhenFalse, context, out var whenFalse))
-        {
+            TryLowerReferenceTerm(conditionalExpression.WhenFalse, context, out var whenFalse)) {
             term = new SymbolicConditionalTerm(condition, whenTrue, whenFalse);
             return true;
         }
@@ -38,8 +33,7 @@ internal static class SymbolicReferenceLowerer
         if (expression is BinaryExpressionSyntax coalesceExpression &&
             coalesceExpression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.CoalesceExpression) &&
             TryLowerReferenceTerm(coalesceExpression.Left, context, out var coalesceLeft) &&
-            TryLowerReferenceTerm(coalesceExpression.Right, context, out var coalesceRight))
-        {
+            TryLowerReferenceTerm(coalesceExpression.Right, context, out var coalesceRight)) {
             term = new SymbolicConditionalTerm(
                 SymbolicIrLowerer.CreateReferenceNullCondition(
                     coalesceLeft,
@@ -66,8 +60,7 @@ internal static class SymbolicReferenceLowerer
             term.Kind == SmtValueKind.Reference)
             return true;
 
-        if (expression is ThisExpressionSyntax)
-        {
+        if (expression is ThisExpressionSyntax) {
             term = context.ImplicitThis;
             return true;
         }
@@ -81,8 +74,7 @@ internal static class SymbolicReferenceLowerer
             term.Kind == SmtValueKind.Reference)
             return true;
 
-        if (symbol is ILocalSymbol or IParameterSymbol)
-        {
+        if (symbol is ILocalSymbol or IParameterSymbol) {
             term = new SymbolicVariableTerm(context.GetVariableName(symbol), SmtValueKind.Reference);
             return true;
         }
@@ -94,8 +86,7 @@ internal static class SymbolicReferenceLowerer
     internal static bool TryLowerReferenceConditionalAccessTerm(
         ConditionalAccessExpressionSyntax conditionalAccess,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         term = null!;
         var resultType =
             context.SemanticModel.GetTypeInfo(conditionalAccess, context.CancellationToken).ConvertedType ??
@@ -127,11 +118,9 @@ internal static class SymbolicReferenceLowerer
         SymbolicTerm receiver,
         ITypeSymbol expectedType,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         term = null!;
-        if (conditionalAccess.WhenNotNull is MemberBindingExpressionSyntax memberBinding)
-        {
+        if (conditionalAccess.WhenNotNull is MemberBindingExpressionSyntax memberBinding) {
             if (!SymbolicMemberLowerer.TryGetInstanceMemberSymbol(memberBinding, context, out var memberSymbol) ||
                 !SymbolicTypeLowerer.TryGetSymbolType(memberSymbol, out var memberType) ||
                 !SymbolEqualityComparer.Default.Equals(memberType, expectedType) ||
@@ -151,8 +140,7 @@ internal static class SymbolicReferenceLowerer
             SymbolicTypeLowerer.TryGetValueKind(arrayType.ElementType, out var elementKind) &&
             elementKind == SmtValueKind.Reference &&
             SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(elementBinding.ArgumentList.Arguments[0].Expression, context), out var index) &&
-            index.Kind == SmtValueKind.Int)
-        {
+            index.Kind == SmtValueKind.Int) {
             term = new SymbolicElementTerm(receiver, index, elementKind);
             return true;
         }

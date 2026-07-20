@@ -2,10 +2,8 @@ using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class PurityResourceStateFacts
-{
-    internal static bool IsParameterlessDisposeInvocation(IInvocationOperation invocationOperation)
-    {
+internal static partial class PurityResourceStateFacts {
+    internal static bool IsParameterlessDisposeInvocation(IInvocationOperation invocationOperation) {
         var targetMethod = invocationOperation.TargetMethod?.ReducedFrom ?? invocationOperation.TargetMethod;
         return targetMethod != null &&
                targetMethod.Parameters.Length == 0 &&
@@ -23,8 +21,7 @@ internal static partial class PurityResourceStateFacts
         PurityAnalysisState currentState,
         CancellationToken cancellationToken,
         string ruleName,
-        out PurityEvidence evidence)
-    {
+        out PurityEvidence evidence) {
         cancellationToken.ThrowIfCancellationRequested();
         evidence = PurityEvidence.None;
         if (TryResolveTrackedSymbol(resourceOperation, currentState) is not { } resourceSymbol ||
@@ -47,8 +44,7 @@ internal static partial class PurityResourceStateFacts
         PurityAnalysisState currentState,
         CancellationToken cancellationToken,
         string ruleName,
-        out PurityEvidence evidence)
-    {
+        out PurityEvidence evidence) {
         cancellationToken.ThrowIfCancellationRequested();
         evidence = PurityEvidence.None;
         if (!IsParameterlessDisposeInvocation(invocationOperation) ||
@@ -74,23 +70,16 @@ internal static partial class PurityResourceStateFacts
 
     private static bool IsDisposedResourceFactForTerm(
         SymbolicFact fact,
-        SymbolicTerm resourceTerm)
-    {
-        return fact.Atom switch
-        {
+        SymbolicTerm resourceTerm) => fact.Atom switch {
             SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal =>
                 Equals(disposal.Resource, resourceTerm),
             SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Released } lifetime =>
                 Equals(lifetime.Resource, resourceTerm) && IsMergedAllPathReleaseFact(fact),
             _ => false
         };
-    }
 
-    private static bool IsMergedAllPathReleaseFact(SymbolicFact fact)
-    {
-        return string.Equals(
+    private static bool IsMergedAllPathReleaseFact(SymbolicFact fact) => string.Equals(
             fact.Provenance,
             "analyzer.resource.merge.all-path-release",
             StringComparison.Ordinal);
-    }
 }

@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class ImpurityCatalog
-{
-    private static bool IsSemanticallyPureMathMember(ISymbol symbol)
-    {
+internal static partial class ImpurityCatalog {
+    private static bool IsSemanticallyPureMathMember(ISymbol symbol) {
         if (symbol is not IMethodSymbol methodSymbol ||
             !methodSymbol.IsStatic ||
             methodSymbol.MethodKind != MethodKind.Ordinary ||
@@ -24,16 +22,14 @@ internal static partial class ImpurityCatalog
         return methodSymbol.Parameters.All(parameter => IsSemanticallyPureMathType(parameter.Type));
     }
 
-    private static bool IsSemanticallyPureMathType(ITypeSymbol typeSymbol)
-    {
+    private static bool IsSemanticallyPureMathType(ITypeSymbol typeSymbol) {
         if (typeSymbol.TypeKind == TypeKind.Enum) return true;
 
         if (typeSymbol.SpecialType != SpecialType.System_Char &&
             SymbolicTypeFacts.IsBuiltInIntegralType(typeSymbol))
             return true;
 
-        switch (typeSymbol.SpecialType)
-        {
+        switch (typeSymbol.SpecialType) {
             case SpecialType.System_Boolean:
             case SpecialType.System_Single:
             case SpecialType.System_Double:

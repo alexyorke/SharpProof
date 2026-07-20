@@ -1,19 +1,16 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicOperationTransferKernel
-{
+internal static class SymbolicOperationTransferKernel {
     internal static SymbolicOperationTransitionResult Apply(
         SymbolicState initialState,
-        SymbolicOperationSequence sequence)
-    {
+        SymbolicOperationSequence sequence) {
         if (initialState == null) throw new ArgumentNullException(nameof(initialState));
         if (sequence == null) throw new ArgumentNullException(nameof(sequence));
 
         var state = initialState;
         var provenance = ImmutableArray.CreateBuilder<SymbolicLoweringProvenance>(sequence.Operations.Length);
         var previousSequence = -1;
-        foreach (var operation in sequence.Operations)
-        {
+        foreach (var operation in sequence.Operations) {
             provenance.Add(new SymbolicLoweringProvenance(
                 "operation-transfer",
                 operation.Origin.SourceSpan,
@@ -34,26 +31,22 @@ internal static class SymbolicOperationTransferKernel
             if (operation is SymbolicLifetimeOperation lifetime &&
                 TryApplyLifetime(ref state, lifetime))
                 continue;
-            if (operation is SymbolicBranchAssumptionOperation branch)
-            {
+            if (operation is SymbolicBranchAssumptionOperation branch) {
                 state = state.AddPathCondition(branch.AssumeTrue
                     ? branch.Condition
                     : new SymbolicNotCondition(branch.Condition));
                 continue;
             }
-            if (operation is SymbolicLoopEdgeOperation loop)
-            {
+            if (operation is SymbolicLoopEdgeOperation loop) {
                 if (loop.Condition != null) state = state.AddPathCondition(loop.Condition);
                 continue;
             }
-            if (operation is SymbolicCompletionOperation completion)
-            {
+            if (operation is SymbolicCompletionOperation completion) {
                 if (completion.CompletionKind != SymbolicCompletionKind.Normal)
                     state = state.MarkContradictory();
                 continue;
             }
-            if (operation is SymbolicMergeOperation merge)
-            {
+            if (operation is SymbolicMergeOperation merge) {
                 state = SymbolicStateMerger.MergeCompletionStates(
                     merge.IncomingStates,
                     state,
@@ -74,8 +67,7 @@ internal static class SymbolicOperationTransferKernel
         SymbolicState state,
         ImmutableArray<SymbolicInvalidationTarget> targets,
         Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
-        string provenance)
-    {
+        string provenance) {
         var operation = new SymbolicMutationOperation(
             ImmutableArray<SymbolicAssignmentBinding>.Empty,
             targets,
@@ -89,8 +81,7 @@ internal static class SymbolicOperationTransferKernel
         return Apply(state, SymbolicOperationSequence.Single(operation));
     }
 
-    internal static int GetDefinitionVersion(Microsoft.CodeAnalysis.Text.TextSpan sourceSpan)
-    {
+    internal static int GetDefinitionVersion(Microsoft.CodeAnalysis.Text.TextSpan sourceSpan) {
         var spanStart = Math.Max(0, sourceSpan.Start);
         // Definition versions are even; CFG join (phi) versions are odd. Using the
         // syntax position keeps reprocessing the same block idempotent.
@@ -108,9 +99,7 @@ internal static class SymbolicOperationTransferKernel
         Microsoft.CodeAnalysis.ISymbol? symbol = null,
         string? evidenceKey = null,
         SymbolicTerm? relatedSubject = null,
-        SymbolicEscapeKind escapeKind = SymbolicEscapeKind.Unknown)
-    {
-        return Apply(
+        SymbolicEscapeKind escapeKind = SymbolicEscapeKind.Unknown) => Apply(
             state,
             SymbolicOperationSequence.Single(new SymbolicLifetimeOperation(
                 subject,
@@ -120,7 +109,6 @@ internal static class SymbolicOperationTransferKernel
                 symbol,
                 evidenceKey,
                 new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
-    }
 
     internal static SymbolicOperationTransitionResult TransitionMutation(
         SymbolicState state,
@@ -129,9 +117,7 @@ internal static class SymbolicOperationTransferKernel
         string provenance,
         Microsoft.CodeAnalysis.ISymbol? symbol = null,
         string? evidenceKey = null,
-        bool callerVisible = true)
-    {
-        return Apply(
+        bool callerVisible = true) => Apply(
             state,
             SymbolicOperationSequence.Single(new SymbolicMutationOperation(
                 ImmutableArray<SymbolicAssignmentBinding>.Empty,
@@ -143,29 +129,24 @@ internal static class SymbolicOperationTransferKernel
                 symbol,
                 evidenceKey,
                 new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
-    }
 
     internal static SymbolicOperationTransitionResult Assume(
         SymbolicState state,
         SymbolicCondition condition,
         bool assumeTrue,
         Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
-        string provenance)
-    {
-        return Apply(
+        string provenance) => Apply(
             state,
             SymbolicOperationSequence.Single(new SymbolicBranchAssumptionOperation(
                 condition,
                 assumeTrue,
                 new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
-    }
 
     internal static SymbolicOperationTransitionResult AssumeAll(
         SymbolicState state,
         ImmutableArray<SymbolicCondition> conditions,
         Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
-        string provenance)
-    {
+        string provenance) {
         if (conditions.IsDefaultOrEmpty)
             return SymbolicOperationTransitionResult.Exact(
                 state,
@@ -216,8 +197,7 @@ internal static class SymbolicOperationTransferKernel
 
     private static bool TryApplyAssignment(
         ref SymbolicState state,
-        SymbolicAssignmentOperation assignment)
-    {
+        SymbolicAssignmentOperation assignment) {
         ApplyInvalidations(ref state, assignment.Invalidations);
         if (!TryApplyBindings(ref state, assignment.Bindings, assignment.Origin)) return false;
         foreach (var postcondition in assignment.Postconditions)
@@ -233,8 +213,7 @@ internal static class SymbolicOperationTransferKernel
 
     private static bool TryApplyMutation(
         ref SymbolicState state,
-        SymbolicMutationOperation mutation)
-    {
+        SymbolicMutationOperation mutation) {
         ApplyInvalidations(ref state, mutation.Invalidations);
         if (!TryApplyBindings(ref state, mutation.Bindings, mutation.Origin)) return false;
         if (mutation.MutationKind != SymbolicMutationOperationKind.CallerVisible) return true;
@@ -253,11 +232,9 @@ internal static class SymbolicOperationTransferKernel
 
     private static void ApplyInvalidations(
         ref SymbolicState state,
-        ImmutableArray<SymbolicInvalidationTarget> targets)
-    {
+        ImmutableArray<SymbolicInvalidationTarget> targets) {
         if (targets.IsDefaultOrEmpty) return;
-        foreach (var target in targets)
-        {
+        foreach (var target in targets) {
             state = target.MatchKind == SymbolicInvalidationMatchKind.VariablePrefix
                 ? SymbolicIrReferenceScanner.RemoveVariableReferences(state, target.Key)
                 : SymbolicIrReferenceScanner.RemoveVariableOrMemberReferences(state, target.Key);
@@ -268,8 +245,7 @@ internal static class SymbolicOperationTransferKernel
 
     private static bool TryApplyLifetime(
         ref SymbolicState state,
-        SymbolicLifetimeOperation lifetime)
-    {
+        SymbolicLifetimeOperation lifetime) {
         if (lifetime.LifetimeKind is SymbolicLifetimeOperationKind.Return or
             SymbolicLifetimeOperationKind.Dispose)
             state = RemoveExclusiveLifetimeFacts(
@@ -278,8 +254,7 @@ internal static class SymbolicOperationTransferKernel
                 lifetime.Symbol,
                 removeDisposal: lifetime.LifetimeKind == SymbolicLifetimeOperationKind.Dispose);
 
-        var atoms = lifetime.LifetimeKind switch
-        {
+        var atoms = lifetime.LifetimeKind switch {
             SymbolicLifetimeOperationKind.Alias when lifetime.RelatedSubject != null =>
                 ImmutableArray.Create<(SymbolicAtom Atom, string Provenance)>(
                     (new SymbolicAliasAtom(lifetime.Subject, lifetime.RelatedSubject, true), lifetime.Origin.Provenance)),
@@ -327,10 +302,8 @@ internal static class SymbolicOperationTransferKernel
         SymbolicState state,
         SymbolicTerm resource,
         Microsoft.CodeAnalysis.ISymbol? symbol,
-        bool removeDisposal)
-    {
-        var facts = state.Facts.Where(fact => fact.Atom switch
-        {
+        bool removeDisposal) {
+        var facts = state.Facts.Where(fact => fact.Atom switch {
             SymbolicDisposalAtom disposal when removeDisposal =>
                 !Equals(disposal.Resource, resource) && !MatchesSymbol(fact.Symbol, symbol),
             SymbolicResourceLifetimeAtom lifetime =>
@@ -342,15 +315,11 @@ internal static class SymbolicOperationTransferKernel
 
     private static bool MatchesSymbol(
         Microsoft.CodeAnalysis.ISymbol? left,
-        Microsoft.CodeAnalysis.ISymbol? right)
-    {
-        return right != null && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(left, right);
-    }
+        Microsoft.CodeAnalysis.ISymbol? right) => right != null && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(left, right);
 
     private static ImmutableArray<(SymbolicAtom Atom, string Provenance)> CreateOwnedAtoms(
         SymbolicLifetimeOperation lifetime,
-        bool includeLifetime)
-    {
+        bool includeLifetime) {
         var builder = ImmutableArray.CreateBuilder<(SymbolicAtom, string)>(includeLifetime ? 3 : 2);
         builder.Add((new SymbolicFreshnessAtom(lifetime.Subject), lifetime.Origin.Provenance + ".fresh"));
         builder.Add((new SymbolicOwnershipAtom(lifetime.Subject, false), lifetime.Origin.Provenance + ".owned"));
@@ -364,8 +333,7 @@ internal static class SymbolicOperationTransferKernel
     internal static SymbolicState PropagateSourceFacts(
         SymbolicState state,
         SymbolicTerm source,
-        SymbolicTerm target)
-    {
+        SymbolicTerm target) {
         if (!SymbolicStateFactBuilder.CanCompareIrTerms(source, target) ||
             string.Equals(
                 SymbolicState.CreateProofTermKey(source),
@@ -375,8 +343,7 @@ internal static class SymbolicOperationTransferKernel
 
         var facts = state.Facts;
         var conditions = state.PathConditions;
-        foreach (var fact in facts)
-        {
+        foreach (var fact in facts) {
             var substituted = SymbolicIrSubstitution.ReplaceTerm(fact, source, target);
             if (!string.Equals(
                     SymbolicState.CreateProofFactKey(substituted),
@@ -385,8 +352,7 @@ internal static class SymbolicOperationTransferKernel
                 state = state.AddFact(substituted);
         }
 
-        foreach (var condition in conditions)
-        {
+        foreach (var condition in conditions) {
             var substituted = SymbolicIrSubstitution.ReplaceTerm(condition, source, target);
             if (!string.Equals(
                     SymbolicState.CreateProofConditionKey(substituted),
@@ -401,10 +367,8 @@ internal static class SymbolicOperationTransferKernel
     private static bool TryApplyBindings(
         ref SymbolicState state,
         ImmutableArray<SymbolicAssignmentBinding> bindings,
-        SymbolicOperationOrigin origin)
-    {
-        foreach (var binding in bindings)
-        {
+        SymbolicOperationOrigin origin) {
+        foreach (var binding in bindings) {
             if (binding.Source == null ||
                 !SymbolicStateFactBuilder.CanCompareIrTerms(binding.Target, binding.Source))
                 return false;
@@ -432,8 +396,7 @@ internal static class SymbolicOperationTransferKernel
     private static void AddDerivedIntegerBounds(
         ref SymbolicState state,
         SymbolicAssignmentBinding binding,
-        SymbolicOperationOrigin origin)
-    {
+        SymbolicOperationOrigin origin) {
         if (binding.Target.Kind != SmtValueKind.Int || binding.Source is not { Kind: SmtValueKind.Int } source)
             return;
 
@@ -454,12 +417,11 @@ internal static class SymbolicOperationTransferKernel
                 origin,
                 ".assigned-integer.non-negative");
 
-        if (source is not SymbolicBinaryTerm
-            {
-                Operator: SymbolicBinaryTermOperator.Remainder,
-                Left: { Kind: SmtValueKind.Int } dividend,
-                Right: { Kind: SmtValueKind.Int } divisor
-            } ||
+        if (source is not SymbolicBinaryTerm {
+            Operator: SymbolicBinaryTermOperator.Remainder,
+            Left: { Kind: SmtValueKind.Int } dividend,
+            Right: { Kind: SmtValueKind.Int } divisor
+        } ||
             !StateProvesIntegerBound(state, dividend, strictlyPositive: false) ||
             !StateProvesIntegerBound(state, divisor, strictlyPositive: true))
             return;
@@ -483,19 +445,13 @@ internal static class SymbolicOperationTransferKernel
     private static bool StateProvesIntegerBound(
         SymbolicState state,
         SymbolicTerm term,
-        bool strictlyPositive)
-    {
-        return state.PathConditions.Any(condition => ConditionProvesIntegerBound(condition, term, strictlyPositive)) ||
+        bool strictlyPositive) => state.PathConditions.Any(condition => ConditionProvesIntegerBound(condition, term, strictlyPositive)) ||
                state.Facts.Any(fact => FactProvesIntegerBound(fact, term, strictlyPositive));
-    }
 
     private static bool ConditionProvesIntegerBound(
         SymbolicCondition condition,
         SymbolicTerm term,
-        bool strictlyPositive)
-    {
-        return condition switch
-        {
+        bool strictlyPositive) => condition switch {
             SymbolicFactCondition fact => FactProvesIntegerBound(fact.Fact, term, strictlyPositive),
             SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } binary =>
                 ConditionProvesIntegerBound(binary.Left, term, strictlyPositive) ||
@@ -505,13 +461,11 @@ internal static class SymbolicOperationTransferKernel
                 ConditionProvesIntegerBound(binary.Right, term, strictlyPositive),
             _ => false
         };
-    }
 
     private static bool FactProvesIntegerBound(
         SymbolicFact fact,
         SymbolicTerm term,
-        bool strictlyPositive)
-    {
+        bool strictlyPositive) {
         if (!fact.Polarity || fact.Atom is not SymbolicRelationAtom relation) return false;
         return Equals(relation.Left, term) && relation.Right is SymbolicIntegerConstantTerm right
             ? RelationProvesIntegerBound(relation.Operator, right.Value, strictlyPositive, termOnLeft: true)
@@ -523,10 +477,7 @@ internal static class SymbolicOperationTransferKernel
         SymbolicRelationOperator relation,
         long constant,
         bool strictlyPositive,
-        bool termOnLeft)
-    {
-        return (termOnLeft, relation) switch
-        {
+        bool termOnLeft) => (termOnLeft, relation) switch {
             (true, SymbolicRelationOperator.GreaterThan) => strictlyPositive ? constant >= 0 : constant >= -1,
             (true, SymbolicRelationOperator.GreaterThanOrEqual) => strictlyPositive ? constant > 0 : constant >= 0,
             (true, SymbolicRelationOperator.Equal) => strictlyPositive ? constant > 0 : constant >= 0,
@@ -535,7 +486,6 @@ internal static class SymbolicOperationTransferKernel
             (false, SymbolicRelationOperator.Equal) => strictlyPositive ? constant > 0 : constant >= 0,
             _ => false
         };
-    }
 
     private static void AddIntegerBound(
         ref SymbolicState state,
@@ -543,9 +493,7 @@ internal static class SymbolicOperationTransferKernel
         SymbolicRelationOperator relation,
         SymbolicTerm right,
         SymbolicOperationOrigin origin,
-        string provenanceSuffix)
-    {
-        state = state.AddPathCondition(new SymbolicFactCondition(new SymbolicFact(
+        string provenanceSuffix) => state = state.AddPathCondition(new SymbolicFactCondition(new SymbolicFact(
             new SymbolicRelationAtom(relation, left, right),
             true,
             SymbolicFactConfidence.Exact,
@@ -553,5 +501,4 @@ internal static class SymbolicOperationTransferKernel
             origin.SourceSpan,
             null,
             null)));
-    }
 }

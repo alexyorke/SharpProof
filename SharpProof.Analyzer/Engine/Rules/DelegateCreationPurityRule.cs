@@ -1,10 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class DelegateCreationPurityRule
-{
+internal class DelegateCreationPurityRule {
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (!(operation is IDelegateCreationOperation delegateCreation))
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(operation.Syntax);
 
@@ -12,12 +10,9 @@ internal class DelegateCreationPurityRule
         var targetClassification = DelegateTargetClassifier.Classify(delegateCreation.Target);
         var target = targetClassification.Operation;
 
-        if (!IsEscapingDelegateCreation(delegateCreation))
-        {
-            if (target is IMethodReferenceOperation nonEscapingMethodReference)
-            {
-                if (nonEscapingMethodReference.Instance != null)
-                {
+        if (!IsEscapingDelegateCreation(delegateCreation)) {
+            if (target is IMethodReferenceOperation nonEscapingMethodReference) {
+                if (nonEscapingMethodReference.Instance != null) {
                     var instanceResult =
                         PurityAnalysisEngine.CheckSingleOperation(nonEscapingMethodReference.Instance, context,
                             currentState);
@@ -52,12 +47,10 @@ internal class DelegateCreationPurityRule
             return CheckEscapingAnonymousFunction(
                 delegateCreation, flowAnonymousFunction, flowAnonymousFunction.Symbol, context, currentState);
 
-        if (target is IMethodReferenceOperation methodReference)
-        {
+        if (target is IMethodReferenceOperation methodReference) {
             var targetMethodSymbol = methodReference.Method;
 
-            if (methodReference.Instance != null)
-            {
+            if (methodReference.Instance != null) {
                 var instanceResult =
                     PurityAnalysisEngine.CheckSingleOperation(methodReference.Instance, context, currentState);
                 if (!instanceResult.IsPure) return instanceResult;
@@ -77,8 +70,7 @@ internal class DelegateCreationPurityRule
                         delegateCreation,
                         symbol: targetMethodSymbol));
 
-            foreach (var targetMethod in potentialTargets.Value.MethodSymbols)
-            {
+            foreach (var targetMethod in potentialTargets.Value.MethodSymbols) {
                 var methodResult = PurityCalleeResolver.GetCalleePurityAtUse(targetMethod, delegateCreation.Syntax, context);
                 if (!methodResult.IsPure) return methodResult;
 
@@ -119,8 +111,7 @@ internal class DelegateCreationPurityRule
         IOperation anonymousFunction,
         IMethodSymbol? lambdaSymbol,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (lambdaSymbol == null)
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(anonymousFunction.Syntax);
 
@@ -166,9 +157,7 @@ internal class DelegateCreationPurityRule
         IDelegateCreationOperation delegateCreation,
         SyntaxNode syntax,
         ISymbol symbol,
-        string detail)
-    {
-        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+        string detail) => PurityAnalysisEngine.PurityAnalysisResult.Impure(
             syntax,
             PurityAnalysisEngine.PurityEvidence.Create(
                 "mutable_state_escape",
@@ -177,10 +166,8 @@ internal class DelegateCreationPurityRule
                 syntax,
                 symbol,
                 detail));
-    }
 
-    private static bool IsEscapingDelegateCreation(IDelegateCreationOperation delegateCreation)
-    {
+    private static bool IsEscapingDelegateCreation(IDelegateCreationOperation delegateCreation) {
         var parent = delegateCreation.Parent;
         while (parent is IConversionOperation or IFlowCaptureOperation) parent = parent.Parent;
 
@@ -192,8 +179,7 @@ internal class DelegateCreationPurityRule
                 variableDeclarator.Symbol is IFieldSymbol);
     }
 
-    private static bool IsNonLocalAssignmentTarget(IOperation? targetOperation)
-    {
+    private static bool IsNonLocalAssignmentTarget(IOperation? targetOperation) {
         var unwrappedTarget = PurityAnalysisEngine.SkipImplicitConversions(targetOperation);
         return unwrappedTarget is IFieldReferenceOperation or IPropertyReferenceOperation;
     }
@@ -202,14 +188,11 @@ internal class DelegateCreationPurityRule
         IOperation anonymousFunctionOperation,
         CancellationToken cancellationToken,
         out SyntaxNode mutationSyntax,
-        out ILocalSymbol mutatedLocal)
-    {
+        out ILocalSymbol mutatedLocal) {
         var lambdaSpan = anonymousFunctionOperation.Syntax.Span;
-        foreach (var operation in anonymousFunctionOperation.DescendantsAndSelf())
-        {
+        foreach (var operation in anonymousFunctionOperation.DescendantsAndSelf()) {
             cancellationToken.ThrowIfCancellationRequested();
-            switch (operation)
-            {
+            switch (operation) {
                 case IAssignmentOperation assignmentOperation
                     when TryGetMutatedCapturedLocal(assignmentOperation.Target, lambdaSpan, cancellationToken,
                         out mutatedLocal):
@@ -235,12 +218,10 @@ internal class DelegateCreationPurityRule
                     return true;
 
                 case IInvocationOperation invocationOperation:
-                    foreach (var argument in invocationOperation.Arguments)
-                    {
+                    foreach (var argument in invocationOperation.Arguments) {
                         cancellationToken.ThrowIfCancellationRequested();
                         if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
-                            TryGetMutatedCapturedLocal(argument.Value, lambdaSpan, cancellationToken, out mutatedLocal))
-                        {
+                            TryGetMutatedCapturedLocal(argument.Value, lambdaSpan, cancellationToken, out mutatedLocal)) {
                             mutationSyntax = argument.Value.Syntax;
                             return true;
                         }
@@ -259,20 +240,17 @@ internal class DelegateCreationPurityRule
         IOperation? targetOperation,
         TextSpan lambdaSpan,
         CancellationToken cancellationToken,
-        out ILocalSymbol localSymbol)
-    {
+        out ILocalSymbol localSymbol) {
         cancellationToken.ThrowIfCancellationRequested();
         var unwrappedTarget = PurityAnalysisEngine.SkipImplicitConversions(targetOperation);
         if (unwrappedTarget is ILocalReferenceOperation localReference &&
-            IsDeclaredOutsideSpan(localReference.Local, lambdaSpan, cancellationToken))
-        {
+            IsDeclaredOutsideSpan(localReference.Local, lambdaSpan, cancellationToken)) {
             localSymbol = localReference.Local;
             return true;
         }
 
         if (unwrappedTarget is ITupleOperation tupleOperation)
-            foreach (var element in tupleOperation.Elements)
-            {
+            foreach (var element in tupleOperation.Elements) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (TryGetMutatedCapturedLocal(element, lambdaSpan, cancellationToken, out localSymbol)) return true;
             }
@@ -285,10 +263,8 @@ internal class DelegateCreationPurityRule
         IMethodSymbol methodSymbol,
         PurityAnalysisContext context,
         out SyntaxNode mutationSyntax,
-        out ILocalSymbol mutatedLocal)
-    {
-        foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
-        {
+        out ILocalSymbol mutatedLocal) {
+        foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences) {
             var syntax = syntaxReference.GetSyntax(context.CancellationToken);
             var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
             var operation = semanticModel.GetOperation(syntax, context.CancellationToken);
@@ -309,20 +285,16 @@ internal class DelegateCreationPurityRule
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SyntaxNode captureSyntax,
-        out ILocalSymbol capturedLocal)
-    {
-        return TryFindCapturedOwnedLocal(
+        out ILocalSymbol capturedLocal) => TryFindCapturedOwnedLocal(
             anonymousFunctionOperation, currentState, null, semanticModel, cancellationToken,
             freshMutableObject: false, out captureSyntax, out capturedLocal);
-    }
 
     internal static bool TryFindLocalFunctionCapturedOwnedLocalArray(
         IMethodSymbol methodSymbol,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
         out SyntaxNode captureSyntax,
-        out ILocalSymbol capturedLocal)
-    {
+        out ILocalSymbol capturedLocal) {
         foreach (var (operation, semanticModel) in EnumerateLocalFunctionOperations(methodSymbol, context))
             if (TryFindCapturedOwnedLocalArray(
                     operation,
@@ -346,10 +318,8 @@ internal class DelegateCreationPurityRule
         CancellationToken cancellationToken,
         bool freshMutableObject,
         out SyntaxNode captureSyntax,
-        out ILocalSymbol capturedLocal)
-    {
-        foreach (var identifierName in anonymousFunctionSyntax.DescendantNodes().OfType<IdentifierNameSyntax>())
-        {
+        out ILocalSymbol capturedLocal) {
+        foreach (var identifierName in anonymousFunctionSyntax.DescendantNodes().OfType<IdentifierNameSyntax>()) {
             cancellationToken.ThrowIfCancellationRequested();
             if (semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol localSymbol &&
                 IsDeclaredOutsideSpan(localSymbol, lambdaSpan, cancellationToken) &&
@@ -358,8 +328,7 @@ internal class DelegateCreationPurityRule
                       PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(localSymbol, currentState)
                     : localSymbol.Type is IArrayTypeSymbol &&
                       (PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(localSymbol, currentState) ||
-                       currentState.IsOwnedLocalArraySymbol(localSymbol))))
-            {
+                       currentState.IsOwnedLocalArraySymbol(localSymbol)))) {
                 captureSyntax = identifierName;
                 capturedLocal = localSymbol;
                 return true;
@@ -374,8 +343,7 @@ internal class DelegateCreationPurityRule
                     fact.Symbol is ILocalSymbol factLocal &&
                     identifierName.Identifier.ValueText == factLocal.Name &&
                     IsDeclaredOutsideSpan(factLocal, lambdaSpan, cancellationToken) &&
-                    RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(factLocal.Type))
-                {
+                    RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(factLocal.Type)) {
                     captureSyntax = identifierName;
                     capturedLocal = factLocal;
                     return true;
@@ -392,16 +360,14 @@ internal class DelegateCreationPurityRule
         TextSpan lambdaSpan,
         PurityAnalysisEngine.PurityAnalysisState currentState,
         CancellationToken cancellationToken,
-        out ILocalSymbol localSymbol)
-    {
+        out ILocalSymbol localSymbol) {
         cancellationToken.ThrowIfCancellationRequested();
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         if (unwrappedOperation is ILocalReferenceOperation localReference &&
             localReference.Local.Type is IArrayTypeSymbol &&
             (PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(localReference.Local, currentState) ||
              currentState.IsOwnedLocalArraySymbol(localReference.Local)) &&
-            IsDeclaredOutsideSpan(localReference.Local, lambdaSpan, cancellationToken))
-        {
+            IsDeclaredOutsideSpan(localReference.Local, lambdaSpan, cancellationToken)) {
             localSymbol = localReference.Local;
             return true;
         }
@@ -417,21 +383,16 @@ internal class DelegateCreationPurityRule
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SyntaxNode captureSyntax,
-        out ILocalSymbol capturedLocal)
-    {
-        return TryFindCapturedOwnedLocal(
+        out ILocalSymbol capturedLocal) => TryFindCapturedOwnedLocal(
             anonymousFunctionOperation, currentState, delegateCreationSyntax, semanticModel, cancellationToken,
             freshMutableObject: true, out captureSyntax, out capturedLocal);
-    }
 
     private static bool TryFindCapturedOwnedLocal(
         IOperation anonymousFunctionOperation, PurityAnalysisEngine.PurityAnalysisState currentState,
         SyntaxNode? delegateCreationSyntax, SemanticModel semanticModel, CancellationToken cancellationToken,
-        bool freshMutableObject, out SyntaxNode captureSyntax, out ILocalSymbol capturedLocal)
-    {
+        bool freshMutableObject, out SyntaxNode captureSyntax, out ILocalSymbol capturedLocal) {
         var lambdaSpan = anonymousFunctionOperation.Syntax.Span;
-        foreach (var operation in anonymousFunctionOperation.DescendantsAndSelf())
-        {
+        foreach (var operation in anonymousFunctionOperation.DescendantsAndSelf()) {
             cancellationToken.ThrowIfCancellationRequested();
             var captured = freshMutableObject
                 ? TryGetCapturedFreshMutableObject(
@@ -439,8 +400,7 @@ internal class DelegateCreationPurityRule
                     out capturedLocal)
                 : TryGetCapturedOwnedLocalArray(
                     operation, lambdaSpan, currentState, cancellationToken, out capturedLocal);
-            if (captured)
-            {
+            if (captured) {
                 captureSyntax = operation.Syntax;
                 return true;
             }
@@ -463,8 +423,7 @@ internal class DelegateCreationPurityRule
         SyntaxNode delegateCreationSyntax,
         PurityAnalysisContext context,
         out SyntaxNode captureSyntax,
-        out ILocalSymbol capturedLocal)
-    {
+        out ILocalSymbol capturedLocal) {
         foreach (var (operation, semanticModel) in EnumerateLocalFunctionOperations(methodSymbol, context))
             if (TryFindCapturedFreshMutableObject(
                     operation,
@@ -482,10 +441,8 @@ internal class DelegateCreationPurityRule
     }
 
     private static IEnumerable<(IOperation Operation, SemanticModel SemanticModel)> EnumerateLocalFunctionOperations(
-        IMethodSymbol methodSymbol, PurityAnalysisContext context)
-    {
-        foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
-        {
+        IMethodSymbol methodSymbol, PurityAnalysisContext context) {
+        foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences) {
             var syntax = syntaxReference.GetSyntax(context.CancellationToken);
             var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
             if (semanticModel.GetOperation(syntax, context.CancellationToken) is { } operation)
@@ -500,8 +457,7 @@ internal class DelegateCreationPurityRule
         SyntaxNode delegateCreationSyntax,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ILocalSymbol localSymbol)
-    {
+        out ILocalSymbol localSymbol) {
         cancellationToken.ThrowIfCancellationRequested();
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         if (unwrappedOperation is IFieldReferenceOperation fieldReference &&
@@ -530,8 +486,7 @@ internal class DelegateCreationPurityRule
                 currentState) is ILocalSymbol resolvedLocal &&
             IsDeclaredOutsideSpan(resolvedLocal, lambdaSpan, cancellationToken) &&
             RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(resolvedLocal.Type) &&
-            PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(resolvedLocal, currentState))
-        {
+            PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(resolvedLocal, currentState)) {
             localSymbol = resolvedLocal;
             return true;
         }
@@ -539,8 +494,7 @@ internal class DelegateCreationPurityRule
         if (unwrappedOperation is ILocalReferenceOperation localReferenceFallback &&
             IsDeclaredOutsideSpan(localReferenceFallback.Local, lambdaSpan, cancellationToken) &&
             HasStableFreshMutableObjectInitializer(localReferenceFallback.Local, delegateCreationSyntax, semanticModel,
-                cancellationToken))
-        {
+                cancellationToken)) {
             localSymbol = localReferenceFallback.Local;
             return true;
         }
@@ -553,23 +507,19 @@ internal class DelegateCreationPurityRule
         ILocalSymbol localSymbol,
         SyntaxNode delegateCreationSyntax,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return HasStableFreshMutableObjectInitializer(
+        CancellationToken cancellationToken) => HasStableFreshMutableObjectInitializer(
             localSymbol,
             delegateCreationSyntax,
             semanticModel,
             new HashSet<ILocalSymbol>(SymbolEq.Default),
             cancellationToken);
-    }
 
     private static bool HasStableFreshMutableObjectInitializer(
         ILocalSymbol localSymbol,
         SyntaxNode delegateCreationSyntax,
         SemanticModel semanticModel,
         HashSet<ILocalSymbol> visitedLocals,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (!RuleAnalysisHelper.TryGetStableLocalInitializer(
                 localSymbol,
                 delegateCreationSyntax,
@@ -595,8 +545,7 @@ internal class DelegateCreationPurityRule
     }
 
     private static bool IsDeclaredOutsideSpan(ILocalSymbol localSymbol, TextSpan span,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var syntaxReferences = localSymbol.DeclaringSyntaxReferences;
         return syntaxReferences.Length > 0 &&
                syntaxReferences

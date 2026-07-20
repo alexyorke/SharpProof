@@ -2,26 +2,22 @@ using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class PurityResourceStateFacts
-{
+internal static partial class PurityResourceStateFacts {
     internal static bool TryCreateMissingOwnedResourceDisposalResult(
         PurityAnalysisState state,
         IMethodSymbol containingMethodSymbol,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out PurityAnalysisResult result)
-    {
+        out PurityAnalysisResult result) {
         cancellationToken.ThrowIfCancellationRequested();
         result = PurityAnalysisResult.Pure;
 
         var ownedResources = new Dictionary<SymbolicTerm, ISymbol?>();
-        foreach (var fact in state.PathState.Facts)
-        {
+        foreach (var fact in state.PathState.Facts) {
             cancellationToken.ThrowIfCancellationRequested();
             if (!fact.Polarity || fact.Confidence != SymbolicFactConfidence.Exact) continue;
 
-            switch (fact.Atom)
-            {
+            switch (fact.Atom) {
                 case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime:
                     ownedResources[lifetime.Resource] = fact.Symbol;
                     break;
@@ -31,8 +27,7 @@ internal static partial class PurityResourceStateFacts
             }
         }
 
-        foreach (var resource in ownedResources)
-        {
+        foreach (var resource in ownedResources) {
             cancellationToken.ThrowIfCancellationRequested();
             if (SymbolicStateMerger.HasExactResourceRelease(state.PathState, resource.Key)) continue;
 

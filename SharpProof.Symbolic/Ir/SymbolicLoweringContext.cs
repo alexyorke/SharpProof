@@ -16,8 +16,7 @@ internal sealed class SymbolicLoweringContext(
     SymbolicTerm? implicitThis = null,
     int inlineDepth = 0,
     IReadOnlyDictionary<ISymbol, SymbolicTerm>? symbolSubstitutions = null,
-    SymbolicInvocationTermTypeResolver? invocationTermTypeResolver = null)
-{
+    SymbolicInvocationTermTypeResolver? invocationTermTypeResolver = null) {
     internal const int MaxSourcePredicateInlineDepth = 8;
 
     public SemanticModel SemanticModel { get; } = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
@@ -42,8 +41,7 @@ internal sealed class SymbolicLoweringContext(
 
     public SymbolicInvocationTermTypeResolver? InvocationTermTypeResolver { get; } = invocationTermTypeResolver;
 
-    public bool TryGetSubstitution(ISymbol symbol, out SymbolicTerm term)
-    {
+    public bool TryGetSubstitution(ISymbol symbol, out SymbolicTerm term) {
         if (SymbolSubstitutions != null &&
             SymbolSubstitutions.TryGetValue(symbol.OriginalDefinition, out term!))
             return true;
@@ -52,8 +50,7 @@ internal sealed class SymbolicLoweringContext(
         return false;
     }
 
-    public string GetVariableName(ISymbol symbol)
-    {
+    public string GetVariableName(ISymbol symbol) {
         var name = SymbolicFactFactory.GetSmtVariableName(symbol);
         var version = GetSymbolVersion?.Invoke(symbol.OriginalDefinition) ?? 0;
         return version > 0

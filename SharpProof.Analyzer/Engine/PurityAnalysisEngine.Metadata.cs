@@ -1,15 +1,12 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
-{
+internal partial class PurityAnalysisEngine {
     internal static PurityAnalysisResult ImpureResult(
         IOperation operation,
         string category,
         string? ruleName = null,
         ISymbol? symbol = null,
-        string? catalogSource = null)
-    {
-        return PurityAnalysisResult.Impure(
+        string? catalogSource = null) => PurityAnalysisResult.Impure(
             operation.Syntax,
             PurityEvidence.Create(
                 category,
@@ -17,16 +14,13 @@ internal partial class PurityAnalysisEngine
                 operation,
                 symbol: symbol,
                 catalogSource: catalogSource));
-    }
 
     internal static PurityAnalysisResult ImpureResult(
         SyntaxNode? syntaxNode,
         string category,
         string? ruleName = null,
         ISymbol? symbol = null,
-        string? catalogSource = null)
-    {
-        return ImpureResult(
+        string? catalogSource = null) => ImpureResult(
             syntaxNode,
             PurityEvidence.Create(
                 category,
@@ -34,15 +28,13 @@ internal partial class PurityAnalysisEngine
                 syntaxNode: syntaxNode,
                 symbol: symbol,
                 catalogSource: catalogSource));
-    }
 
     internal static bool TryCreateBclFallbackImpurity(
         ISymbol? symbol,
         SyntaxNode? syntaxNode,
         IOperation? operation,
         string ruleName,
-        out PurityAnalysisResult result)
-    {
+        out PurityAnalysisResult result) {
         result = PurityAnalysisResult.Pure;
         if (!BclPurityFallbackClassifier.TryClassify(symbol, out var classification)) return false;
 
@@ -63,10 +55,7 @@ internal partial class PurityAnalysisEngine
     internal static bool TryGetTrustedGeneratedPurity(
         IMethodSymbol methodSymbol,
         Compilation compilation,
-        out EffectSummaryCatalog.PurityEntry purity)
-    {
-        return EffectSummaryCatalog.Current.TryGetPurity(methodSymbol, compilation, out purity);
-    }
+        out EffectSummaryCatalog.PurityEntry purity) => EffectSummaryCatalog.Current.TryGetPurity(methodSymbol, compilation, out purity);
 
     internal static bool IsMetadataSymbol(ISymbol? symbol) =>
         symbol?.Locations.FirstOrDefault()?.IsInMetadata == true;
@@ -74,33 +63,26 @@ internal partial class PurityAnalysisEngine
     internal static bool TryGetTrustedDefinitiveGeneratedPurity(
         IMethodSymbol? methodSymbol,
         Compilation compilation,
-        out EffectSummaryCatalog.PurityEntry purity)
-    {
-        return TryGetTrustedGeneratedPurityCore(
+        out EffectSummaryCatalog.PurityEntry purity) => TryGetTrustedGeneratedPurityCore(
             methodSymbol,
             compilation,
             requireDefinitive: true,
             TryGetTrustedGeneratedPurity,
             out purity);
-    }
 
     internal static bool TryGetTrustedGeneratedPurityCoverage(
         IMethodSymbol? methodSymbol,
         Compilation compilation,
-        out EffectSummaryCatalog.PurityEntry purity)
-    {
-        return TryGetTrustedGeneratedPurityCore(
+        out EffectSummaryCatalog.PurityEntry purity) => TryGetTrustedGeneratedPurityCore(
             methodSymbol,
             compilation,
             requireDefinitive: false,
             TryGetTrustedGeneratedPurity,
             out purity);
-    }
 
     internal static TrustedMethodPurityMetadata GetTrustedMethodPurityMetadata(
         IMethodSymbol methodSymbol,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         if (methodSymbol == null) return default;
 
         var originalDefinition = methodSymbol.OriginalDefinition;
@@ -124,23 +106,17 @@ internal partial class PurityAnalysisEngine
     internal static bool TryGetTrustedGeneratedFieldPurity(
         IFieldSymbol fieldSymbol,
         Compilation compilation,
-        out EffectSummaryCatalog.PurityEntry purity)
-    {
-        return EffectSummaryCatalog.Current.TryGetFieldPurity(fieldSymbol, compilation, out purity);
-    }
+        out EffectSummaryCatalog.PurityEntry purity) => EffectSummaryCatalog.Current.TryGetFieldPurity(fieldSymbol, compilation, out purity);
 
     internal static bool TryGetTrustedDefinitiveGeneratedFieldPurity(
         IFieldSymbol? fieldSymbol,
         Compilation compilation,
-        out EffectSummaryCatalog.PurityEntry purity)
-    {
-        return TryGetTrustedGeneratedPurityCore(
+        out EffectSummaryCatalog.PurityEntry purity) => TryGetTrustedGeneratedPurityCore(
             fieldSymbol,
             compilation,
             requireDefinitive: true,
             TryGetTrustedGeneratedFieldPurity,
             out purity);
-    }
 
     private static bool TryGetTrustedGeneratedPurityCore<TSymbol>(
         TSymbol? symbol,
@@ -148,8 +124,7 @@ internal partial class PurityAnalysisEngine
         bool requireDefinitive,
         TryGetGeneratedPurity<TSymbol> lookup,
         out EffectSummaryCatalog.PurityEntry purity)
-        where TSymbol : class, ISymbol
-    {
+        where TSymbol : class, ISymbol {
         purity = default;
         return symbol != null &&
                IsMetadataSymbol(symbol) &&
@@ -166,27 +141,20 @@ internal partial class PurityAnalysisEngine
 
     internal static bool IsTrustedGeneratedFreshOwnedArrayReturningMember(
         IMethodSymbol methodSymbol,
-        Compilation compilation)
-    {
-        return TryGetTrustedGeneratedPurity(methodSymbol, compilation, out var purity) &&
+        Compilation compilation) => TryGetTrustedGeneratedPurity(methodSymbol, compilation, out var purity) &&
                purity.IsPure &&
                purity.IsFreshArrayCandidate;
-    }
 
     internal static bool IsTrustedGeneratedNonEscapingArrayReturningMember(
         IMethodSymbol methodSymbol,
-        Compilation compilation)
-    {
-        return methodSymbol?.ReturnType is IArrayTypeSymbol &&
+        Compilation compilation) => methodSymbol?.ReturnType is IArrayTypeSymbol &&
                TryGetTrustedGeneratedPurity(methodSymbol, compilation, out var purity) &&
                purity.AllowsNonEscapingArrayReturn;
-    }
 
     internal readonly record struct TrustedMethodPurityMetadata(
         string? KnownImpureMemberSource,
         bool HasTrustedGeneratedPurity,
-        EffectSummaryCatalog.PurityEntry GeneratedPurity)
-    {
+        EffectSummaryCatalog.PurityEntry GeneratedPurity) {
         public bool HasConfiguredKnownImpureMember =>
             string.Equals(KnownImpureMemberSource, "config_known_impure", StringComparison.Ordinal);
 

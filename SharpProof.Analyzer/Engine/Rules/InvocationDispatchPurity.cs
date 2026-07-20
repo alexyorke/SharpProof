@@ -3,14 +3,12 @@ using static SharpProof.Analyzer.Engine.Rules.MethodInvocationPurityRule;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class InvocationDispatchPurity
-{
+internal static class InvocationDispatchPurity {
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckDispatchedInvocationPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         INamedTypeSymbol? knownReceiverType,
-        bool hasExactReceiverType)
-    {
+        bool hasExactReceiverType) {
         var invokedMethodSymbol = invocationOperation.TargetMethod;
         if (invokedMethodSymbol == null)
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(invocationOperation.Syntax);
@@ -41,8 +39,7 @@ internal static class InvocationDispatchPurity
             .ToImmutableHashSet<IMethodSymbol>(SymbolEq.Default);
 
         if (CanHaveExternalDispatchTargets(invokedMethodSymbol, invocationOperation, knownReceiverType,
-                hasExactReceiverType))
-        {
+                hasExactReceiverType)) {
             var isTypeParameterReceiver = invocationOperation.Instance?.Type?.TypeKind == TypeKind.TypeParameter;
             var hasConcreteImplementationCandidate =
                 invokedMethodSymbol.ContainingType?.TypeKind == TypeKind.Interface &&
@@ -64,8 +61,7 @@ internal static class InvocationDispatchPurity
                 nameof(MethodInvocationPurityRule),
                 invokedMethodSymbol);
 
-        foreach (var candidateMethod in candidateMethods)
-        {
+        foreach (var candidateMethod in candidateMethods) {
             if (SymbolEq.AreEqual(
                     candidateMethod.OriginalDefinition,
                     context.ContainingMethodSymbol.OriginalDefinition))

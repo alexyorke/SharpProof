@@ -1,8 +1,6 @@
 internal sealed class TypeNameProvider(bool eraseGenericInstantiationsForLookup = false)
-    : ISignatureTypeProvider<string, object?>
-{
-    public string GetArrayType(string elementType, ArrayShape shape)
-    {
+    : ISignatureTypeProvider<string, object?> {
+    public string GetArrayType(string elementType, ArrayShape shape) {
         var rank = Math.Max(shape.Rank, 1);
         return $"{elementType}[{new string(',', rank - 1)}]";
     }
@@ -11,8 +9,7 @@ internal sealed class TypeNameProvider(bool eraseGenericInstantiationsForLookup 
 
     public string GetFunctionPointerType(MethodSignature<string> signature) => "delegate*";
 
-    public string GetGenericInstantiation(string genericType, ImmutableArray<string> typeArguments)
-    {
+    public string GetGenericInstantiation(string genericType, ImmutableArray<string> typeArguments) {
         if (eraseGenericInstantiationsForLookup) return genericType;
 
         return $"{genericType}<{string.Join(", ", typeArguments)}>";
@@ -29,8 +26,7 @@ internal sealed class TypeNameProvider(bool eraseGenericInstantiationsForLookup 
     public string GetPointerType(string elementType) => $"{elementType}*";
 
     public string GetPrimitiveType(PrimitiveTypeCode typeCode) =>
-        typeCode switch
-        {
+        typeCode switch {
             PrimitiveTypeCode.Boolean => "bool",
             PrimitiveTypeCode.Byte => "byte",
             PrimitiveTypeCode.Char => "char",
@@ -73,8 +69,7 @@ internal sealed record EffectSummaryDocument(
     AssemblyEffectReport[] Assemblies,
     PurityClassificationReport? PurityReport,
     GeneratedPurityCatalogDocument? GeneratedPurityCatalog,
-    BclFallbackInventoryReport? BclFallbackInventory)
-{
+    BclFallbackInventoryReport? BclFallbackInventory) {
     public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
 }
 
@@ -85,8 +80,7 @@ internal sealed record AssemblyEffectReport(
     string ModuleVersionId,
     int MethodCount,
     int EmittedMethodCount,
-    MethodEffectSummary[] Methods)
-{
+    MethodEffectSummary[] Methods) {
     public EffectSummaryArtifactSource? ArtifactSource { get; init; }
 
     [JsonIgnore] public MethodEffectSummary[] ClassificationMethods { get; init; } = Array.Empty<MethodEffectSummary>();
@@ -113,15 +107,13 @@ internal sealed record MethodEffectSummary(
     ExceptionProvenance[] ThrownExceptionProvenance,
     ExceptionProvenance[] TransitiveThrownExceptionProvenance,
     [property: JsonIgnore] string[] Calls,
-    string[] Fields)
-{
+    string[] Fields) {
     [JsonConstructor]
     private MethodEffectSummary()
         : this(string.Empty, string.Empty, 0, null, string.Empty,
             Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<string>(), Array.Empty<string>(), Array.Empty<ExceptionProvenance>(),
-            Array.Empty<ExceptionProvenance>(), Array.Empty<string>(), Array.Empty<string>())
-    {
+            Array.Empty<ExceptionProvenance>(), Array.Empty<string>(), Array.Empty<string>()) {
     }
 
     [JsonIgnore] public string Symbol => DisplayName;
@@ -221,15 +213,13 @@ internal sealed record ExceptionPropagationSccIndex(
 
 internal sealed record ExceptionPropagationTarjanFrame(
     StructuralMethodIdentity Identity,
-    StructuralMethodIdentity? Parent)
-{
+    StructuralMethodIdentity? Parent) {
     public bool IsEntered { get; set; }
 
     public int NextNeighborIndex { get; set; }
 }
 
-internal sealed record CallSiteSummary([property: JsonIgnore] string DisplayName)
-{
+internal sealed record CallSiteSummary([property: JsonIgnore] string DisplayName) {
     public StructuralMethodIdentity? Identity { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -261,8 +251,7 @@ internal sealed record BranchTrackedState(
     List<TrackedStackValue> Stack,
     Dictionary<int, TrackedStackValue> Locals);
 
-internal enum StaticFieldFactKind
-{
+internal enum StaticFieldFactKind {
     Unknown,
     Constant,
     StableIdentity
@@ -273,8 +262,7 @@ internal readonly record struct StaticFieldFact(
     StaticFieldFactKind Kind,
     TrackedStackValue TrackedValue);
 
-internal struct StaticFieldUsage
-{
+internal struct StaticFieldUsage {
     public int TotalWriteCount;
 
     public int OwningTypeInitializerWriteCount;
@@ -284,8 +272,7 @@ internal struct StaticFieldUsage
     public bool HasAddressExposure;
 }
 
-internal enum StaticFieldInitializerValueKind
-{
+internal enum StaticFieldInitializerValueKind {
     Unknown,
     Constant,
     StableIdentity
@@ -293,8 +280,7 @@ internal enum StaticFieldInitializerValueKind
 
 internal readonly record struct StaticFieldInitializerValue(
     StaticFieldInitializerValueKind Kind,
-    TrackedStackValue TrackedValue)
-{
+    TrackedStackValue TrackedValue) {
     public static StaticFieldInitializerValue Unknown =>
         new(StaticFieldInitializerValueKind.Unknown, TrackedStackValue.Unknown);
 
@@ -314,8 +300,7 @@ internal readonly record struct StaticFieldInitializerValue(
 internal readonly record struct TrackedStackValue(
     int? Int32Constant,
     string? KnownStringComparer,
-    string? KnownExceptionType)
-{
+    string? KnownExceptionType) {
     public static TrackedStackValue Unknown => default;
 
     public bool IsUnknown =>

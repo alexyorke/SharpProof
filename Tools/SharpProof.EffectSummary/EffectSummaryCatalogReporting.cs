@@ -1,9 +1,7 @@
-internal static class EffectSummaryCatalogReporting
-{
+internal static class EffectSummaryCatalogReporting {
     internal static PurityClassificationReport BuildReport(
         IReadOnlyList<MethodEffectSummary> methods,
-        bool includeCatalogComparison)
-    {
+        bool includeCatalogComparison) {
         var pureCount = methods.Count(static method => string.Equals(
             method.PurityClassification?.Classification,
             "pure",
@@ -33,24 +31,18 @@ internal static class EffectSummaryCatalogReporting
             Array.Empty<CatalogComparisonRow>());
 
     internal static GeneratedPurityCatalogDocument BuildGeneratedPurityCatalog(
-        IReadOnlyList<AssemblyEffectReport> assemblies)
-    {
-        return new GeneratedPurityCatalogDocument(
+        IReadOnlyList<AssemblyEffectReport> assemblies) => new GeneratedPurityCatalogDocument(
             EffectSummarySchemaContract.CurrentVersion,
             assemblies
                 .SelectMany(assembly => assembly.Methods.Select(method => CreateGeneratedPurityEntry(assembly, method)))
                 .OrderBy(static entry => entry.CanonicalKey, StringComparer.Ordinal)
                 .ToArray());
-    }
 
     internal static Dictionary<string, GeneratedPurityCatalogEntry> MergeGeneratedPurityEntries(
-        IEnumerable<GeneratedPurityCatalogEntry> entries)
-    {
+        IEnumerable<GeneratedPurityCatalogEntry> entries) {
         var candidatesByKey = new Dictionary<string, List<GeneratedPurityCatalogEntry>>(StringComparer.Ordinal);
-        foreach (var entry in entries)
-        {
-            if (!candidatesByKey.TryGetValue(entry.CanonicalKey, out var candidates))
-            {
+        foreach (var entry in entries) {
+            if (!candidatesByKey.TryGetValue(entry.CanonicalKey, out var candidates)) {
                 candidates = new List<GeneratedPurityCatalogEntry>();
                 candidatesByKey.Add(entry.CanonicalKey, candidates);
             }
@@ -59,8 +51,7 @@ internal static class EffectSummaryCatalogReporting
         }
 
         var resolvedEntries = new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
-        foreach (var pair in candidatesByKey)
-        {
+        foreach (var pair in candidatesByKey) {
             var resolvedEntry = ResolveGeneratedPurityEntryCandidates(pair.Value);
             if (resolvedEntry != null) resolvedEntries[pair.Key] = resolvedEntry;
         }
@@ -69,12 +60,10 @@ internal static class EffectSummaryCatalogReporting
     }
 
     internal static GeneratedPurityCatalogEntry? ResolveGeneratedPurityEntryCandidates(
-        IReadOnlyList<GeneratedPurityCatalogEntry> candidates)
-    {
+        IReadOnlyList<GeneratedPurityCatalogEntry> candidates) {
         GeneratedPurityCatalogEntry? bestEntry = null;
         foreach (var implementationGroup in candidates
-                     .GroupBy(CreateGeneratedPurityImplementationKey, StringComparer.Ordinal))
-        {
+                     .GroupBy(CreateGeneratedPurityImplementationKey, StringComparer.Ordinal)) {
             var resolvedEntry = ResolveSameImplementationGeneratedPurityEntries(
                 implementationGroup.ToArray());
             if (resolvedEntry == null) continue;
@@ -89,13 +78,11 @@ internal static class EffectSummaryCatalogReporting
     }
 
     internal static GeneratedPurityCatalogEntry? ResolveSameImplementationGeneratedPurityEntries(
-        IReadOnlyList<GeneratedPurityCatalogEntry> candidates)
-    {
+        IReadOnlyList<GeneratedPurityCatalogEntry> candidates) {
         if (candidates.Count == 0) return null;
 
         GeneratedPurityCatalogEntry? bestEntry = candidates[0];
-        for (var i = 1; i < candidates.Count; i++)
-        {
+        for (var i = 1; i < candidates.Count; i++) {
             bestEntry = ResolveDominantGeneratedPurityEntry(bestEntry, candidates[i]);
             if (bestEntry == null) return null;
         }
@@ -105,8 +92,7 @@ internal static class EffectSummaryCatalogReporting
 
     private static GeneratedPurityCatalogEntry? ResolveDominantGeneratedPurityEntry(
         GeneratedPurityCatalogEntry left,
-        GeneratedPurityCatalogEntry right)
-    {
+        GeneratedPurityCatalogEntry right) {
         if (GeneratedPurityCatalogEntryRelations.AreEquivalent(left, right)) return left;
 
         var leftDominates = GeneratedPurityCatalogEntryRelations.DoesDominate(left, right);
@@ -116,8 +102,7 @@ internal static class EffectSummaryCatalogReporting
 
     internal static bool HaveSameGeneratedPurityEntryMap(
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> left,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> right)
-    {
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> right) {
         if (left.Count != right.Count) return false;
 
         foreach (var pair in left)
@@ -128,21 +113,17 @@ internal static class EffectSummaryCatalogReporting
         return true;
     }
 
-    internal static string CreateGeneratedPurityImplementationKey(GeneratedPurityCatalogEntry entry)
-    {
-        return string.Join(
+    internal static string CreateGeneratedPurityImplementationKey(GeneratedPurityCatalogEntry entry) => string.Join(
             "|",
             entry.AssemblyName,
             entry.AssemblySha256,
             entry.ModuleVersionId,
             entry.MetadataToken,
             entry.MethodBodySha256 ?? string.Empty);
-    }
 
     internal static GeneratedPurityCatalogEntry CreateGeneratedPurityEntry(
         AssemblyEffectReport assembly,
-        MethodEffectSummary method)
-    {
+        MethodEffectSummary method) {
         var classification = method.PurityClassification ?? CreateUnknown(
             new[] { "missing_classification" },
             Array.Empty<string>(),
@@ -166,14 +147,12 @@ internal static class EffectSummaryCatalogReporting
             classification.HasFreshObjectAllocationEvidence,
             classification.HasUnsupportedEffects,
             classification.FreshnessClassification,
-            classification.EffectVisibilityClassification)
-        {
+            classification.EffectVisibilityClassification) {
             Identity = method.Identity
         };
     }
 
-    internal static string GetPrimaryCategory(IReadOnlyList<string> categories)
-    {
+    internal static string GetPrimaryCategory(IReadOnlyList<string> categories) {
         if (categories.Contains("global_state_write", StringComparer.Ordinal)) return "global_state_write";
 
         return categories.FirstOrDefault() ?? "generated_purity_summary";

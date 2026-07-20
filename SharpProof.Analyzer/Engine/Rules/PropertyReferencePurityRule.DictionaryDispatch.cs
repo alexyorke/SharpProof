@@ -1,12 +1,10 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class PropertyReferencePurityRule
-{
+internal partial class PropertyReferencePurityRule {
     private static bool TryCheckDictionaryIndexerKeyDispatchPurity(
         IPropertyReferenceOperation propertyReferenceOperation,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (!TryMatchIndexerContainer(
@@ -17,8 +15,7 @@ internal partial class PropertyReferencePurityRule
             return false;
 
         var receiverComparerResult = CheckDictionaryReceiverComparerPurity(propertyReferenceOperation, context);
-        if (!receiverComparerResult.IsPure)
-        {
+        if (!receiverComparerResult.IsPure) {
             result = receiverComparerResult;
             return true;
         }
@@ -30,8 +27,7 @@ internal partial class PropertyReferencePurityRule
     private static bool TryCheckSortedDictionaryIndexerComparisonDispatchPurity(
         IPropertyReferenceOperation propertyReferenceOperation,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (!TryMatchIndexerContainer(
@@ -49,8 +45,7 @@ internal partial class PropertyReferencePurityRule
     private static bool TryMatchIndexerContainer(
         IPropertyReferenceOperation propertyReferenceOperation,
         out ITypeSymbol keyType,
-        params string[] typeDefinitions)
-    {
+        params string[] typeDefinitions) {
         keyType = null!;
         var propertySymbol = propertyReferenceOperation.Property;
         if (!propertySymbol.IsIndexer ||
@@ -68,8 +63,7 @@ internal partial class PropertyReferencePurityRule
     private static PurityAnalysisEngine.PurityAnalysisResult CheckDictionaryKeyDispatchPurity(
         ITypeSymbol keyType,
         IPropertyReferenceOperation propertyReferenceOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (ComparerDispatchHelper.IsBuiltinValueComparerKey(keyType))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
@@ -100,20 +94,16 @@ internal partial class PropertyReferencePurityRule
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckDictionaryReceiverComparerPurity(
         IPropertyReferenceOperation propertyReferenceOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         var receiverOperation = PurityAnalysisEngine.SkipImplicitConversions(propertyReferenceOperation.Instance) ??
                                 propertyReferenceOperation.Instance;
-        PurityAnalysisEngine.PurityAnalysisResult CheckComparerValue(IOperation value)
-        {
-            return ComparerDispatchHelper.CheckComparerValuePurity(
+        PurityAnalysisEngine.PurityAnalysisResult CheckComparerValue(IOperation value) => ComparerDispatchHelper.CheckComparerValuePurity(
                 value,
                 context,
                 propertyReferenceOperation.Syntax,
                 propertyReferenceOperation,
                 nameof(PropertyReferencePurityRule),
                 null);
-        }
 
         var knownConstructionComparerResult = ComparerDispatchHelper.CheckKnownConstructionComparerPurity(
             receiverOperation,
@@ -133,32 +123,23 @@ internal partial class PropertyReferencePurityRule
             CheckComparerValue);
     }
 
-    private static bool IsConcreteDictionaryType(ITypeSymbol? typeSymbol)
-    {
-        return typeSymbol is INamedTypeSymbol namedType &&
+    private static bool IsConcreteDictionaryType(ITypeSymbol? typeSymbol) => typeSymbol is INamedTypeSymbol namedType &&
                namedType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.Dictionary<TKey, TValue>";
-    }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckSortedDictionaryKeyDispatchPurity(
         ITypeSymbol keyType,
         IPropertyReferenceOperation propertyReferenceOperation,
-        PurityAnalysisContext context)
-    {
-        return ComparerDispatchHelper.CheckDefaultComparisonPurity(
+        PurityAnalysisContext context) => ComparerDispatchHelper.CheckDefaultComparisonPurity(
             keyType,
             propertyReferenceOperation.Syntax,
             context,
             () => UnknownKeyDispatch(propertyReferenceOperation));
-    }
 
     private static PurityAnalysisEngine.PurityAnalysisResult UnknownKeyDispatch(
         IPropertyReferenceOperation propertyReferenceOperation,
-        ISymbol? symbol = null)
-    {
-        return PurityAnalysisEngine.ImpureResult(
+        ISymbol? symbol = null) => PurityAnalysisEngine.ImpureResult(
             propertyReferenceOperation,
             "unknown_external_call",
             nameof(PropertyReferencePurityRule),
             symbol ?? propertyReferenceOperation.Property.GetMethod);
-    }
 }

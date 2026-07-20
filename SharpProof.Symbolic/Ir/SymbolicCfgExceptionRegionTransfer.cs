@@ -1,27 +1,23 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicCfgExceptionRegionTransfer
-{
+internal static class SymbolicCfgExceptionRegionTransfer {
     internal static SymbolicLoweringResult<SymbolicState> CollectCompletedTryState(
         ControlFlowGraph graph,
         TryStatementSyntax statement,
         SymbolicState entryState,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (!TryCreatePlan(graph, statement, semanticModel, cancellationToken, out var plan))
             return Unsupported(statement, "statement-region.try-shape");
 
         var completionStates = new List<SymbolicState>();
         AddCompletion(statement.Block, entryState);
-        foreach (var route in plan.Catches)
-        {
+        foreach (var route in plan.Catches) {
             if (!CanHandle(route, plan.KnownThrownType, plan.HasKnownThrownType,
                     semanticModel, cancellationToken))
                 continue;
             var branchLimit = SymbolicAnalysisLimitContext.Limits.MaxTryCompletionBranches;
-            if (completionStates.Count >= branchLimit)
-            {
+            if (completionStates.Count >= branchLimit) {
                 SymbolicAnalysisLimitContext.Record(
                     SymbolicAnalysisLimitKind.TryCompletionBranches,
                     branchLimit,
@@ -44,8 +40,7 @@ internal static class SymbolicCfgExceptionRegionTransfer
             entryState,
             completionStates.ToImmutableArray(),
             statement).State;
-        if (statement.Finally?.Block is { } finallyBlock)
-        {
+        if (statement.Finally?.Block is { } finallyBlock) {
             state = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
                 finallyBlock,
                 state,
@@ -65,8 +60,7 @@ internal static class SymbolicCfgExceptionRegionTransfer
             state = SymbolicStateValueFacts.RemoveReferences(state, hiddenSymbol);
         return Exact(state, statement);
 
-        void AddCompletion(BlockSyntax block, SymbolicState branchState)
-        {
+        void AddCompletion(BlockSyntax block, SymbolicState branchState) {
             if (SymbolicControlFlowFacts.StatementDefinitelyExits(
                     block,
                     semanticModel,
@@ -87,8 +81,7 @@ internal static class SymbolicCfgExceptionRegionTransfer
         TryStatementSyntax statement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out CfgExceptionRegionPlan plan)
-    {
+        out CfgExceptionRegionPlan plan) {
         var regions = SymbolicCfgProgramPointStateCollector.EnumerateRegions(graph.Root).ToArray();
         var candidates = regions
             .Where(static region => region.Kind == ControlFlowRegionKind.TryAndCatch)
@@ -105,8 +98,7 @@ internal static class SymbolicCfgExceptionRegionTransfer
                 SymbolicCfgProgramPointStateCollector.RegionContainsSyntax(
                     region,
                     graph,
-                    statement.Finally.Block)))
-        {
+                    statement.Finally.Block))) {
             plan = null!;
             return false;
         }
@@ -137,8 +129,7 @@ internal static class SymbolicCfgExceptionRegionTransfer
         ControlFlowRegion region,
         ControlFlowGraph graph,
         TryStatementSyntax statement,
-        out ImmutableArray<CfgCatchRoute> routes)
-    {
+        out ImmutableArray<CfgCatchRoute> routes) {
         routes = default;
         var tryRegion = region.NestedRegions.FirstOrDefault(static nested =>
             nested.Kind == ControlFlowRegionKind.Try);
@@ -161,8 +152,7 @@ internal static class SymbolicCfgExceptionRegionTransfer
             return false;
 
         var builder = ImmutableArray.CreateBuilder<CfgCatchRoute>(catchRegions.Length);
-        for (var index = 0; index < catchRegions.Length; index++)
-        {
+        for (var index = 0; index < catchRegions.Length; index++) {
             var clause = statement.Catches[index];
             var catchRegion = catchRegions[index]!;
             if (!SymbolicCfgProgramPointStateCollector.RegionContainsSyntax(
@@ -181,11 +171,9 @@ internal static class SymbolicCfgExceptionRegionTransfer
         ITypeSymbol? knownThrownType,
         bool hasKnownThrownType,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (route.Clause.Filter?.FilterExpression is { } filterExpression &&
-            semanticModel.GetConstantValue(filterExpression, cancellationToken) is
-                { HasValue: true, Value: false })
+            semanticModel.GetConstantValue(filterExpression, cancellationToken) is { HasValue: true, Value: false })
             return false;
         return !hasKnownThrownType || route.ExceptionType == null ||
                semanticModel.Compilation.ClassifyConversion(

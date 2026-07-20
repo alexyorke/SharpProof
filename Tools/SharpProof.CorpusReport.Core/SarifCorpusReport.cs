@@ -5,8 +5,7 @@ namespace SharpProof.Tools.CorpusReport;
 
 public sealed record SarifCorpusInput(string InputName, string SarifPath);
 
-public static class SarifCorpusReport
-{
+public static class SarifCorpusReport {
     private const string CategoryProperty = "sharpproof.impurity.category";
     private const string RuleNameProperty = "sharpproof.impurity.rule";
     private const string OperationKindProperty = "sharpproof.impurity.operation_kind";
@@ -29,16 +28,14 @@ public static class SarifCorpusReport
     public static CorpusReportSummary CreateFromSarifFiles(IEnumerable<string> sarifPaths) =>
         CreateFromSarifFiles(sarifPaths.Select(path => new SarifCorpusInput(path, path)));
 
-    public static CorpusReportSummary CreateFromSarifFiles(IEnumerable<SarifCorpusInput> inputs)
-    {
+    public static CorpusReportSummary CreateFromSarifFiles(IEnumerable<SarifCorpusInput> inputs) {
         var builder = new SummaryBuilder();
         foreach (var input in inputs) builder.AddSarifJson(input.InputName, File.ReadAllText(input.SarifPath));
 
         return builder.Build();
     }
 
-    private sealed class SummaryBuilder
-    {
+    private sealed class SummaryBuilder {
         private readonly Dictionary<(string Category, string Value), int> _catalogMisses = new();
         private readonly Dictionary<string, int> _categories = new(StringComparer.Ordinal);
 
@@ -63,16 +60,13 @@ public static class SarifCorpusReport
         private int _sp0011Count;
         private int _totalSharpProofDiagnostics;
 
-        public void AddSarifJson(string inputName, string sarifJson)
-        {
+        public void AddSarifJson(string inputName, string sarifJson) {
             _inputs.Add(inputName);
             using var document = JsonDocument.Parse(sarifJson);
             foreach (var result in EnumerateResults(document.RootElement)) AddResult(inputName, result);
         }
 
-        public CorpusReportSummary Build()
-        {
-            return new CorpusReportSummary(
+        public CorpusReportSummary Build() => new CorpusReportSummary(
                 _inputs.ToImmutable(),
                 _sp0002Count,
                 _sp0004Count,
@@ -90,10 +84,8 @@ public static class SarifCorpusReport
                 ToRankedItems(_exceptionSources),
                 ToCategorizedRankedItems(_catalogMisses),
                 ToCategorizedRankedItems(_falsePositiveCandidates));
-        }
 
-        private void AddResult(string inputName, JsonElement result)
-        {
+        private void AddResult(string inputName, JsonElement result) {
             var ruleId = GetStringProperty(result, "ruleId");
             if (ruleId is null || !ruleId.StartsWith("SP", StringComparison.Ordinal)) return;
 
@@ -110,8 +102,7 @@ public static class SarifCorpusReport
             else if (ruleId == "SP0011") _sp0011Count++;
 
             if (!result.TryGetProperty("properties", out var properties) ||
-                properties.ValueKind != JsonValueKind.Object)
-            {
+                properties.ValueKind != JsonValueKind.Object) {
                 _diagnostics.Add(new DiagnosticEvidenceItem(inputName, ruleId, message, null, null, null, null, null,
                     null, null, null, null, null));
                 return;
@@ -145,8 +136,7 @@ public static class SarifCorpusReport
                 exceptionSources,
                 exceptionEdges));
 
-            if (ruleId == "SP0010" || ruleId == "SP0011")
-            {
+            if (ruleId == "SP0010" || ruleId == "SP0011") {
                 IncrementSeparatedValues(_exceptionCategories, exceptionCategories);
                 if (!TryIncrementExceptionEdgeSources(_exceptionSources, exceptionEdges))
                     IncrementSeparatedValues(_exceptionSources, exceptionSources);
@@ -171,39 +161,30 @@ public static class SarifCorpusReport
                 Increment(_falsePositiveCandidates, (category, symbol));
         }
 
-        private static void IncrementIfPresent(Dictionary<string, int> values, string? key)
-        {
+        private static void IncrementIfPresent(Dictionary<string, int> values, string? key) {
             if (!string.IsNullOrWhiteSpace(key)) Increment(values, key);
         }
 
-        private static void Increment<TKey>(Dictionary<TKey, int> values, TKey key) where TKey : notnull
-        {
-            values[key] = values.TryGetValue(key, out var count) ? count + 1 : 1;
-        }
+        private static void Increment<TKey>(Dictionary<TKey, int> values, TKey key) where TKey : notnull => values[key] = values.TryGetValue(key, out var count) ? count + 1 : 1;
 
-        private static void IncrementSeparatedValues(Dictionary<string, int> values, string? separatedValues)
-        {
+        private static void IncrementSeparatedValues(Dictionary<string, int> values, string? separatedValues) {
             if (string.IsNullOrWhiteSpace(separatedValues)) return;
 
-            foreach (var item in separatedValues.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
-            {
+            foreach (var item in separatedValues.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)) {
                 var value = item.Trim();
                 if (value.Length > 0) Increment(values, value);
             }
         }
 
-        private static bool TryIncrementExceptionEdgeSources(Dictionary<string, int> values, string? exceptionEdges)
-        {
+        private static bool TryIncrementExceptionEdgeSources(Dictionary<string, int> values, string? exceptionEdges) {
             if (string.IsNullOrWhiteSpace(exceptionEdges)) return false;
 
-            try
-            {
+            try {
                 using var document = JsonDocument.Parse(exceptionEdges);
                 if (document.RootElement.ValueKind != JsonValueKind.Array) return false;
 
                 var uniqueSources = new HashSet<string>(StringComparer.Ordinal);
-                foreach (var edge in document.RootElement.EnumerateArray())
-                {
+                foreach (var edge in document.RootElement.EnumerateArray()) {
                     if (edge.ValueKind != JsonValueKind.Object) continue;
 
                     var exceptionType = GetStringProperty(edge, "ExceptionType");
@@ -218,36 +199,26 @@ public static class SarifCorpusReport
                 foreach (var source in uniqueSources) Increment(values, source);
                 return true;
             }
-            catch (JsonException)
-            {
+            catch (JsonException) {
                 return false;
             }
         }
 
-        private static ImmutableDictionary<string, int> ToImmutableSortedDictionary(Dictionary<string, int> values)
-        {
-            return values
+        private static ImmutableDictionary<string, int> ToImmutableSortedDictionary(Dictionary<string, int> values) => values
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .ToImmutableDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-        }
 
         private static ImmutableArray<RankedItem> ToRankedItems(Dictionary<string, int> values) =>
             Rank(values.Select(static pair => new RankedItem(pair.Key, pair.Value)));
 
         private static ImmutableArray<RankedItem> ToCategorizedRankedItems(
-            Dictionary<(string Category, string Value), int> values)
-        {
-            return Rank(values.Select(static pair =>
-                new RankedItem(pair.Key.Value, pair.Value, pair.Key.Category)));
-        }
+            Dictionary<(string Category, string Value), int> values) => Rank(values.Select(static pair =>
+                                                                                     new RankedItem(pair.Key.Value, pair.Value, pair.Key.Category)));
 
-        private static ImmutableArray<RankedItem> Rank(IEnumerable<RankedItem> items)
-        {
-            return items
+        private static ImmutableArray<RankedItem> Rank(IEnumerable<RankedItem> items) => items
                 .OrderByDescending(item => item.Count)
                 .ThenBy(item => item.Category, StringComparer.Ordinal)
                 .ThenBy(item => item.Value, StringComparer.Ordinal)
                 .ToImmutableArray();
-        }
     }
 }

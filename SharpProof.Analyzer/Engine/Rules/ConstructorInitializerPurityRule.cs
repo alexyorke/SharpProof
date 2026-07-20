@@ -1,10 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class ConstructorInitializerPurityRule
-{
+internal class ConstructorInitializerPurityRule {
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (!(operation.Syntax is ConstructorInitializerSyntax)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (!(operation is IInvocationOperation initializer) || initializer.TargetMethod == null)
@@ -12,16 +10,14 @@ internal class ConstructorInitializerPurityRule
 
         var constructorSymbol = initializer.TargetMethod;
 
-        foreach (var argument in initializer.Arguments)
-        {
+        foreach (var argument in initializer.Arguments) {
             var argumentPurity = PurityAnalysisEngine.CheckSingleOperation(argument.Value, context, currentState);
             if (!argumentPurity.IsPure) return argumentPurity;
         }
 
         var constructorPurity = PurityCalleeResolver.GetCalleePurity(constructorSymbol, context);
 
-        if (!constructorPurity.IsPure)
-        {
+        if (!constructorPurity.IsPure) {
         }
 
         return constructorPurity.IsPure

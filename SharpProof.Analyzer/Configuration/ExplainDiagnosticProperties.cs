@@ -2,27 +2,23 @@ using System.Text;
 
 namespace SharpProof.Analyzer.Configuration;
 
-internal static class ExplainDiagnosticProperties
-{
+internal static class ExplainDiagnosticProperties {
     internal static ImmutableDictionary<string, string?> Add(
         ImmutableDictionary<string, string?> properties,
         Location? location,
         string? contractText = null,
         string? proofStatus = null,
         string? unknownReason = null,
-        string? impliedConditionText = null)
-    {
+        string? impliedConditionText = null) {
         properties = SharpProofEvidenceSchema.AddDiagnosticProperties(properties);
 
-        if (location != null && location != Location.None && location.IsInSource)
-        {
+        if (location != null && location != Location.None && location.IsInSource) {
             var lineSpan = location.GetLineSpan();
             var path = string.IsNullOrWhiteSpace(lineSpan.Path)
                 ? location.SourceTree?.FilePath
                 : lineSpan.Path;
             var normalizedPath = path?.Trim();
-            if (!string.IsNullOrWhiteSpace(normalizedPath))
-            {
+            if (!string.IsNullOrWhiteSpace(normalizedPath)) {
                 var explainPath = normalizedPath!;
                 var line = lineSpan.StartLinePosition.Line + 1;
                 var column = lineSpan.StartLinePosition.Character + 1;
@@ -50,8 +46,7 @@ internal static class ExplainDiagnosticProperties
         return properties;
     }
 
-    internal static string? NormalizeToken(string? value)
-    {
+    internal static string? NormalizeToken(string? value) {
         if (string.IsNullOrWhiteSpace(value)) return null;
 
         var trimmed = value!.Trim();
@@ -59,16 +54,14 @@ internal static class ExplainDiagnosticProperties
         var lastWasSeparator = false;
         var lastWasLowerOrDigit = false;
         foreach (var character in trimmed)
-            if (char.IsLetterOrDigit(character))
-            {
+            if (char.IsLetterOrDigit(character)) {
                 if (char.IsUpper(character) && lastWasLowerOrDigit && !lastWasSeparator) builder.Append('_');
 
                 builder.Append(char.ToLowerInvariant(character));
                 lastWasSeparator = false;
                 lastWasLowerOrDigit = char.IsLower(character) || char.IsDigit(character);
             }
-            else if (!lastWasSeparator)
-            {
+            else if (!lastWasSeparator) {
                 builder.Append('_');
                 lastWasSeparator = true;
                 lastWasLowerOrDigit = false;
@@ -81,8 +74,7 @@ internal static class ExplainDiagnosticProperties
         string path,
         int line,
         int column,
-        string? contractText)
-    {
+        string? contractText) {
         var builder = new StringBuilder();
         builder.Append("SharpProof.SymbolicCli explain --file ");
         builder.Append(Quote(path));
@@ -90,8 +82,7 @@ internal static class ExplainDiagnosticProperties
         builder.Append(line.ToString(CultureInfo.InvariantCulture));
         builder.Append(" --column ");
         builder.Append(column.ToString(CultureInfo.InvariantCulture));
-        if (!string.IsNullOrWhiteSpace(contractText))
-        {
+        if (!string.IsNullOrWhiteSpace(contractText)) {
             builder.Append(" --implies ");
             builder.Append(Quote(contractText!.Trim()));
         }

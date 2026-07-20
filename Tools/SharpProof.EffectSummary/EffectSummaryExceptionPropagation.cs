@@ -1,11 +1,9 @@
-internal static class EffectSummaryExceptionPropagation
-{
+internal static class EffectSummaryExceptionPropagation {
     internal static List<MethodEffectSummary> AddTransitiveRootCandidates(
         MetadataReader reader,
         IReadOnlyList<MethodEffectSummary> summaries,
         int maxExceptionEdges,
-        Func<MetadataReader, ExceptionPropagationSite, string, bool> exceptionEscapesPropagationSite)
-    {
+        Func<MetadataReader, ExceptionPropagationSite, string, bool> exceptionEscapesPropagationSite) {
         var bySymbol = summaries
             .GroupBy(summary => summary.Identity)
             .ToDictionary(group => group.Key, group => group.First());
@@ -18,8 +16,7 @@ internal static class EffectSummaryExceptionPropagation
             IReadOnlyDictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult>>();
 
         return summaries
-            .Select(summary =>
-            {
+            .Select(summary => {
                 var transitiveExceptionResult = VisitThrownExceptionEdges(
                     reader,
                     summary.Identity,
@@ -36,8 +33,7 @@ internal static class EffectSummaryExceptionPropagation
                             edge.SourcePath,
                             edge.CallChain))
                         .DistinctBy(CreateExceptionSourcePathKey));
-                return summary with
-                {
+                return summary with {
                     TransitiveRootCandidates =
                     VisitRootCandidates(summary.Identity, bySymbol, rootMemo, rootVisiting).Result,
                     TransitiveThrownExceptionTypes = transitiveExceptionSources
@@ -57,8 +53,7 @@ internal static class EffectSummaryExceptionPropagation
         StructuralMethodIdentity identity,
         IReadOnlyDictionary<StructuralMethodIdentity, MethodEffectSummary> bySymbol,
         Dictionary<StructuralMethodIdentity, string[]> memo,
-        HashSet<StructuralMethodIdentity> visiting)
-    {
+        HashSet<StructuralMethodIdentity> visiting) {
         if (memo.TryGetValue(identity, out var cached)) return (cached, false);
 
         if (!bySymbol.TryGetValue(identity, out var summary))
@@ -69,8 +64,7 @@ internal static class EffectSummaryExceptionPropagation
 
         var dependsOnCycle = false;
         foreach (var callIdentity in summary.CallIdentities)
-            if (bySymbol.ContainsKey(callIdentity))
-            {
+            if (bySymbol.ContainsKey(callIdentity)) {
                 var nestedResult = VisitRootCandidates(callIdentity, bySymbol, memo, visiting);
                 roots.UnionWith(nestedResult.Result);
                 dependsOnCycle |= nestedResult.DependsOnCycle;
@@ -90,8 +84,7 @@ internal static class EffectSummaryExceptionPropagation
         ExceptionPropagationSccIndex sccIndex,
         Dictionary<int, IReadOnlyDictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult>> componentMemo,
         int maxExceptionEdges,
-        Func<MetadataReader, ExceptionPropagationSite, string, bool> exceptionEscapesPropagationSite)
-    {
+        Func<MetadataReader, ExceptionPropagationSite, string, bool> exceptionEscapesPropagationSite) {
         if (!sccIndex.ComponentByIdentity.TryGetValue(identity, out var componentId))
             return new ThrownExceptionTraversalResult(
                 Array.Empty<ThrownExceptionEdgeSummary>(),
@@ -116,17 +109,14 @@ internal static class EffectSummaryExceptionPropagation
         ExceptionPropagationSccIndex sccIndex,
         Dictionary<int, IReadOnlyDictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult>> componentMemo,
         int maxExceptionEdges,
-        Func<MetadataReader, ExceptionPropagationSite, string, bool> exceptionEscapesPropagationSite)
-    {
+        Func<MetadataReader, ExceptionPropagationSite, string, bool> exceptionEscapesPropagationSite) {
         var pending = new Stack<(int ComponentId, bool DependenciesVisited)>();
         pending.Push((rootComponentId, false));
-        while (pending.Count != 0)
-        {
+        while (pending.Count != 0) {
             var (componentId, dependenciesVisited) = pending.Pop();
             if (componentMemo.ContainsKey(componentId)) continue;
 
-            if (!dependenciesVisited)
-            {
+            if (!dependenciesVisited) {
                 pending.Push((componentId, true));
                 foreach (var dependency in sccIndex.Dependencies[componentId].Reverse())
                     if (!componentMemo.ContainsKey(dependency))
@@ -154,8 +144,7 @@ internal static class EffectSummaryExceptionPropagation
             IReadOnlyDictionary<int,
                 IReadOnlyDictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult>> componentMemo,
             int maxExceptionEdges,
-            Func<MetadataReader, ExceptionPropagationSite, string, bool> exceptionEscapesPropagationSite)
-    {
+            Func<MetadataReader, ExceptionPropagationSite, string, bool> exceptionEscapesPropagationSite) {
         var component = sccIndex.Components[componentId];
         var sourcesByIdentity = component.ToDictionary(
             static identity => identity,
@@ -164,11 +153,9 @@ internal static class EffectSummaryExceptionPropagation
         var dependsOnCycle = component.Length > 1 ||
                              sccIndex.Graph[component[0]].Contains(component[0]);
 
-        foreach (var identity in component)
-        {
+        foreach (var identity in component) {
             var summary = bySymbol[identity];
-            foreach (var directSource in summary.ThrownExceptionProvenance)
-            {
+            foreach (var directSource in summary.ThrownExceptionProvenance) {
                 var directEdge = new ThrownExceptionEdgeSummary(
                     directSource.ExceptionType,
                     directSource.SourcePath,
@@ -185,11 +172,9 @@ internal static class EffectSummaryExceptionPropagation
             }
         }
 
-        foreach (var identity in component)
-        {
+        foreach (var identity in component) {
             var summary = bySymbol[identity];
-            foreach (var propagationSite in summary.ExceptionPropagationSites)
-            {
+            foreach (var propagationSite in summary.ExceptionPropagationSites) {
                 if (propagationSite.CalleeIdentity == null ||
                     !sccIndex.ComponentByIdentity.TryGetValue(
                         propagationSite.CalleeIdentity,
@@ -211,14 +196,11 @@ internal static class EffectSummaryExceptionPropagation
         }
 
         var changed = true;
-        while (changed)
-        {
+        while (changed) {
             changed = false;
-            foreach (var identity in component)
-            {
+            foreach (var identity in component) {
                 var summary = bySymbol[identity];
-                foreach (var propagationSite in summary.ExceptionPropagationSites)
-                {
+                foreach (var propagationSite in summary.ExceptionPropagationSites) {
                     if (propagationSite.CalleeIdentity == null ||
                         !sccIndex.ComponentByIdentity.TryGetValue(
                             propagationSite.CalleeIdentity,
@@ -266,11 +248,9 @@ internal static class EffectSummaryExceptionPropagation
         StructuralMethodIdentity identity,
         int maxExceptionEdges,
         Func<MetadataReader, ExceptionPropagationSite, string, bool> exceptionEscapesPropagationSite,
-        bool stopAtRepeatedIdentity = false)
-    {
+        bool stopAtRepeatedIdentity = false) {
         var isTruncated = truncatedByIdentity[identity] || nestedResult.IsTruncated;
-        foreach (var nestedSource in nestedResult.Result)
-        {
+        foreach (var nestedSource in nestedResult.Result) {
             if (!exceptionEscapesPropagationSite(reader, propagationSite, nestedSource.ExceptionType) ||
                 stopAtRepeatedIdentity && nestedSource.CallChain.Contains(summary.Identity))
                 continue;
@@ -302,8 +282,7 @@ internal static class EffectSummaryExceptionPropagation
     }
 
     private static ExceptionPropagationSccIndex BuildExceptionPropagationSccIndex(
-        IReadOnlyDictionary<StructuralMethodIdentity, MethodEffectSummary> bySymbol)
-    {
+        IReadOnlyDictionary<StructuralMethodIdentity, MethodEffectSummary> bySymbol) {
         var graph = bySymbol.ToDictionary(
             static pair => pair.Key,
             pair => pair.Value.ExceptionPropagationSites
@@ -337,8 +316,7 @@ internal static class EffectSummaryExceptionPropagation
     }
 
     private static StructuralMethodIdentity[][] ComputeExceptionPropagationSccsIteratively(
-        IReadOnlyDictionary<StructuralMethodIdentity, StructuralMethodIdentity[]> graph)
-    {
+        IReadOnlyDictionary<StructuralMethodIdentity, StructuralMethodIdentity[]> graph) {
         var nextIndex = 0;
         var indexes = new Dictionary<StructuralMethodIdentity, int>();
         var lowLinks = new Dictionary<StructuralMethodIdentity, int>();
@@ -346,17 +324,14 @@ internal static class EffectSummaryExceptionPropagation
         var onComponentStack = new HashSet<StructuralMethodIdentity>();
         var components = new List<StructuralMethodIdentity[]>();
 
-        foreach (var root in graph.Keys.OrderBy(static identity => identity.ToCanonicalKey(), StringComparer.Ordinal))
-        {
+        foreach (var root in graph.Keys.OrderBy(static identity => identity.ToCanonicalKey(), StringComparer.Ordinal)) {
             if (indexes.ContainsKey(root)) continue;
 
             var traversal = new Stack<ExceptionPropagationTarjanFrame>();
             traversal.Push(new ExceptionPropagationTarjanFrame(root, null));
-            while (traversal.Count != 0)
-            {
+            while (traversal.Count != 0) {
                 var frame = traversal.Peek();
-                if (!frame.IsEntered)
-                {
+                if (!frame.IsEntered) {
                     frame.IsEntered = true;
                     indexes[frame.Identity] = nextIndex;
                     lowLinks[frame.Identity] = nextIndex;
@@ -366,11 +341,9 @@ internal static class EffectSummaryExceptionPropagation
                 }
 
                 var neighbors = graph[frame.Identity];
-                if (frame.NextNeighborIndex < neighbors.Length)
-                {
+                if (frame.NextNeighborIndex < neighbors.Length) {
                     var neighbor = neighbors[frame.NextNeighborIndex++];
-                    if (!indexes.ContainsKey(neighbor))
-                    {
+                    if (!indexes.ContainsKey(neighbor)) {
                         traversal.Push(new ExceptionPropagationTarjanFrame(neighbor, frame.Identity));
                         continue;
                     }
@@ -387,8 +360,7 @@ internal static class EffectSummaryExceptionPropagation
 
                 var component = new List<StructuralMethodIdentity>();
                 StructuralMethodIdentity member;
-                do
-                {
+                do {
                     member = componentStack.Pop();
                     onComponentStack.Remove(member);
                     component.Add(member);
@@ -407,13 +379,11 @@ internal static class EffectSummaryExceptionPropagation
         Dictionary<string, ThrownExceptionEdgeSummary> thrownSources,
         ThrownExceptionEdgeSummary edge,
         int maxExceptionEdges,
-        ref bool isTruncated)
-    {
+        ref bool isTruncated) {
         var key = CreateThrownExceptionEdgeKey(edge);
         if (thrownSources.ContainsKey(key)) return;
 
-        if (thrownSources.Count >= maxExceptionEdges)
-        {
+        if (thrownSources.Count >= maxExceptionEdges) {
             isTruncated = true;
             return;
         }
@@ -421,16 +391,11 @@ internal static class EffectSummaryExceptionPropagation
         thrownSources[key] = edge;
     }
 
-    private static string CreateExceptionSourcePathKey(ExceptionProvenance sourcePath)
-    {
-        return sourcePath.ExceptionType + "|" +
+    private static string CreateExceptionSourcePathKey(ExceptionProvenance sourcePath) => sourcePath.ExceptionType + "|" +
                (sourcePath.SourcePath ?? string.Empty) + "|" +
                string.Join(">", sourcePath.CallChain.Select(static identity => identity.ToCanonicalKey()));
-    }
 
-    private static ExceptionProvenance[] OrderExceptionSourcePaths(IEnumerable<ExceptionProvenance> sourcePaths)
-    {
-        return sourcePaths
+    private static ExceptionProvenance[] OrderExceptionSourcePaths(IEnumerable<ExceptionProvenance> sourcePaths) => sourcePaths
             .OrderBy(sourcePath => sourcePath.ExceptionType, StringComparer.Ordinal)
             .ThenBy(sourcePath => sourcePath.SourcePath, StringComparer.Ordinal)
             .ThenBy(
@@ -439,20 +404,14 @@ internal static class EffectSummaryExceptionPropagation
                     sourcePath.CallChain.Select(static identity => identity.ToCanonicalKey())),
                 StringComparer.Ordinal)
             .ToArray();
-    }
 
-    private static string CreateThrownExceptionEdgeKey(ThrownExceptionEdgeSummary edge)
-    {
-        return edge.ExceptionType + "|" +
+    private static string CreateThrownExceptionEdgeKey(ThrownExceptionEdgeSummary edge) => edge.ExceptionType + "|" +
                (edge.SourcePath ?? string.Empty) + "|" +
                string.Join(">", edge.CallChain.Select(static identity => identity.ToCanonicalKey())) + "|" +
                (edge.CalleeIdentity?.ToCanonicalKey() ?? string.Empty) + "|" +
                edge.Depth;
-    }
 
-    private static ThrownExceptionEdgeSummary[] OrderThrownExceptionEdges(IEnumerable<ThrownExceptionEdgeSummary> edges)
-    {
-        return edges
+    private static ThrownExceptionEdgeSummary[] OrderThrownExceptionEdges(IEnumerable<ThrownExceptionEdgeSummary> edges) => edges
             .OrderBy(edge => edge.ExceptionType, StringComparer.Ordinal)
             .ThenBy(edge => edge.SourcePath, StringComparer.Ordinal)
             .ThenBy(
@@ -461,5 +420,4 @@ internal static class EffectSummaryExceptionPropagation
             .ThenBy(edge => edge.CalleeIdentity?.ToCanonicalKey(), StringComparer.Ordinal)
             .ThenBy(edge => edge.Depth)
             .ToArray();
-    }
 }

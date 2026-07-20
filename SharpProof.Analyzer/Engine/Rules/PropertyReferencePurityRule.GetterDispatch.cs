@@ -1,20 +1,15 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class PropertyReferencePurityRule
-{
-    private static bool IsPotentiallyDispatchedProperty(IPropertySymbol propertySymbol, Compilation compilation)
-    {
-        return propertySymbol.ContainingType?.TypeKind == TypeKind.Interface ||
+internal partial class PropertyReferencePurityRule {
+    private static bool IsPotentiallyDispatchedProperty(IPropertySymbol propertySymbol, Compilation compilation) => propertySymbol.ContainingType?.TypeKind == TypeKind.Interface ||
                propertySymbol.IsAbstract ||
                (propertySymbol.GetMethod != null &&
                  DispatchedMemberResolution.IsPotentiallyDispatchedMethod(propertySymbol.GetMethod, compilation));
-    }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckDispatchedGetterPurity(
         IPropertyReferenceOperation propertyReferenceOperation,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         var hasExactReceiverType = PurityConcreteReceiverResolver.TryResolveKnownConcreteType(
             propertyReferenceOperation.Instance,
             currentState,
@@ -25,14 +20,12 @@ internal partial class PropertyReferencePurityRule
             ? exactReceiverType
             : MethodInvocationPurityRule.GetKnownReceiverType(propertyReferenceOperation.Instance);
 
-        if (hasExactReceiverType && knownReceiverType != null)
-        {
+        if (hasExactReceiverType && knownReceiverType != null) {
             var exactGetter = PurityConcreteReceiverResolver.ResolvePropertyAccessorTargetForConcreteReceiver(
                 propertyReferenceOperation.Property,
                 knownReceiverType,
                 false);
-            if (exactGetter != null)
-            {
+            if (exactGetter != null) {
                 return PurityCalleeResolver.GetCalleePurityAtUse(
                     exactGetter,
                     propertyReferenceOperation.Syntax,
@@ -45,8 +38,7 @@ internal partial class PropertyReferencePurityRule
             EffectSummaryCatalog.Current.TryGetSystemTypeRuntimeImplementationPurity(
                 runtimeBackedGetter.OriginalDefinition,
                 context.SemanticModel.Compilation,
-                out var runtimeImplementationPurity))
-        {
+                out var runtimeImplementationPurity)) {
             if (runtimeImplementationPurity.IsPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             if (runtimeImplementationPurity.IsNonPure)
@@ -83,8 +75,7 @@ internal partial class PropertyReferencePurityRule
     private static bool CanDispatchToUnknownGetterTarget(
         IPropertySymbol propertySymbol,
         INamedTypeSymbol? knownReceiverType,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         if (knownReceiverType == null) return true;
 
         if (knownReceiverType.TypeKind == TypeKind.Interface) return true;
@@ -101,8 +92,7 @@ internal partial class PropertyReferencePurityRule
         PurityAnalysisEngine.PurityAnalysisResult getterResult,
         IPropertySymbol propertySymbol,
         IMethodSymbol getterSymbol,
-        IPropertyReferenceOperation propertyReferenceOperation)
-    {
+        IPropertyReferenceOperation propertyReferenceOperation) {
         if (!getterResult.IsPure &&
             string.Equals(getterResult.Evidence.Category, "unknown_external_call", StringComparison.Ordinal) &&
             string.IsNullOrEmpty(getterResult.Evidence.CatalogSource) &&
@@ -118,8 +108,7 @@ internal partial class PropertyReferencePurityRule
     private static PurityAnalysisEngine.PurityAnalysisResult GetterResultOrImpure(
         IPropertySymbol propertySymbol,
         IPropertyReferenceOperation propertyReferenceOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (propertySymbol.GetMethod is not { } getter)
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
 
@@ -133,9 +122,7 @@ internal partial class PropertyReferencePurityRule
     private static PurityAnalysisEngine.PurityAnalysisResult CreateReflectionEnvironmentSourceResult(
         IPropertySymbol propertySymbol,
         IPropertyReferenceOperation propertyReferenceOperation,
-        string? catalogSource = null)
-    {
-        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+        string? catalogSource = null) => PurityAnalysisEngine.PurityAnalysisResult.Impure(
             propertyReferenceOperation.Syntax,
             PurityAnalysisEngine.PurityEvidence.Create(
                 "reflection_environment_source",
@@ -144,5 +131,4 @@ internal partial class PropertyReferencePurityRule
                 propertyReferenceOperation.Syntax,
                 propertySymbol,
                 catalogSource));
-    }
 }

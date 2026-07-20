@@ -1,14 +1,12 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class OwnedFreshMutableObjectClassifier
-{
+internal static class OwnedFreshMutableObjectClassifier {
 
     internal static bool IsOwnedFreshMutableObjectReference(
         IOperation? operation,
         SyntaxNode observationSyntax,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState? currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState? currentState) {
         context.CancellationToken.ThrowIfCancellationRequested();
         if (operation is IConversionOperation conversionOperation && conversionOperation.Operand != null)
             return IsOwnedFreshMutableObjectReference(conversionOperation.Operand, observationSyntax, context,
@@ -37,37 +35,30 @@ internal static class OwnedFreshMutableObjectClassifier
         SyntaxNode observationSyntax,
         SemanticModel semanticModel,
         PurityAnalysisEngine.PurityAnalysisState? currentState,
-        CancellationToken cancellationToken)
-    {
-        return IsOwnedFreshMutableLocal(
+        CancellationToken cancellationToken) => IsOwnedFreshMutableLocal(
             localSymbol,
             observationSyntax,
             semanticModel,
             currentState,
             new HashSet<ILocalSymbol>(SymbolEq.Default),
             cancellationToken);
-    }
 
     internal static bool IsOwnedFreshMutableReadonlyFieldReference(
         IFieldReferenceOperation fieldReferenceOperation,
         SyntaxNode observationSyntax,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return IsOwnedFreshMutableStableMemberReference(
+        CancellationToken cancellationToken) => IsOwnedFreshMutableStableMemberReference(
             fieldReferenceOperation.Instance,
             fieldReferenceOperation.Field,
             observationSyntax,
             semanticModel,
             cancellationToken);
-    }
 
     private static bool IsOwnedFreshMutableStablePropertyReference(
         IPropertyReferenceOperation propertyReferenceOperation,
         SyntaxNode observationSyntax,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         if (propertyReferenceOperation.Property.SetMethod != null &&
             !propertyReferenceOperation.Property.SetMethod.IsInitOnly)
@@ -86,8 +77,7 @@ internal static class OwnedFreshMutableObjectClassifier
         ISymbol member,
         SyntaxNode observationSyntax,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (!TryGetStableAssignedValue(
                 instance,
                 member,
@@ -112,9 +102,7 @@ internal static class OwnedFreshMutableObjectClassifier
         SemanticModel semanticModel,
         HashSet<ILocalSymbol> visitedLocals,
         CancellationToken cancellationToken,
-        out IOperation valueOperation)
-    {
-        return TryGetStableAssignedValue(
+        out IOperation valueOperation) => TryGetStableAssignedValue(
             fieldReferenceOperation.Instance,
             fieldReferenceOperation.Field,
             observationSyntax,
@@ -122,7 +110,6 @@ internal static class OwnedFreshMutableObjectClassifier
             visitedLocals,
             cancellationToken,
             out valueOperation);
-    }
 
     private static bool TryGetStableAssignedValue(
         IPropertyReferenceOperation propertyReferenceOperation,
@@ -130,9 +117,7 @@ internal static class OwnedFreshMutableObjectClassifier
         SemanticModel semanticModel,
         HashSet<ILocalSymbol> visitedLocals,
         CancellationToken cancellationToken,
-        out IOperation valueOperation)
-    {
-        return TryGetStableAssignedValue(
+        out IOperation valueOperation) => TryGetStableAssignedValue(
             propertyReferenceOperation.Instance,
             propertyReferenceOperation.Property,
             observationSyntax,
@@ -140,7 +125,6 @@ internal static class OwnedFreshMutableObjectClassifier
             visitedLocals,
             cancellationToken,
             out valueOperation);
-    }
 
     private static bool TryGetStableAssignedValue(
         IOperation? instance,
@@ -149,22 +133,19 @@ internal static class OwnedFreshMutableObjectClassifier
         SemanticModel semanticModel,
         HashSet<ILocalSymbol> visitedLocals,
         CancellationToken cancellationToken,
-        out IOperation valueOperation)
-    {
+        out IOperation valueOperation) {
         if (!TryResolveStableObjectCreationInitializer(
                 instance,
                 observationSyntax,
                 semanticModel,
                 visitedLocals,
                 cancellationToken,
-                out var objectCreationOperation))
-        {
+                out var objectCreationOperation)) {
             valueOperation = null!;
             return false;
         }
 
-        foreach (var assignment in objectCreationOperation.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
-        {
+        foreach (var assignment in objectCreationOperation.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>()) {
             cancellationToken.ThrowIfCancellationRequested();
             if (!SymbolEq.AreEqual(GetReferencedMemberSymbol(assignment.Target), member))
                 continue;
@@ -174,8 +155,7 @@ internal static class OwnedFreshMutableObjectClassifier
         }
 
         if (objectCreationOperation.Constructor != null)
-            foreach (var argument in objectCreationOperation.Arguments)
-            {
+            foreach (var argument in objectCreationOperation.Arguments) {
                 var parameter = argument.Parameter;
                 if (parameter != null &&
                     RuleAnalysisHelper.ConstructorStoresParameterMatching(
@@ -183,8 +163,7 @@ internal static class OwnedFreshMutableObjectClassifier
                         parameter,
                         semanticModel,
                         cancellationToken,
-                        target => IsThisInstanceMemberReference(target, member)))
-                {
+                        target => IsThisInstanceMemberReference(target, member))) {
                     valueOperation = argument.Value;
                     return true;
                 }
@@ -200,12 +179,10 @@ internal static class OwnedFreshMutableObjectClassifier
         SemanticModel semanticModel,
         HashSet<ILocalSymbol> visitedLocals,
         CancellationToken cancellationToken,
-        out IObjectCreationOperation objectCreationOperation)
-    {
+        out IObjectCreationOperation objectCreationOperation) {
         cancellationToken.ThrowIfCancellationRequested();
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
-        switch (unwrappedOperation)
-        {
+        switch (unwrappedOperation) {
             case IObjectCreationOperation directObjectCreation:
                 objectCreationOperation = directObjectCreation;
                 return true;
@@ -262,8 +239,7 @@ internal static class OwnedFreshMutableObjectClassifier
         SemanticModel semanticModel,
         HashSet<ILocalSymbol> visitedLocals,
         CancellationToken cancellationToken,
-        out IObjectCreationOperation objectCreationOperation)
-    {
+        out IObjectCreationOperation objectCreationOperation) {
         if (!RuleAnalysisHelper.TryGetStableLocalInitializer(
                 localSymbol,
                 observationSyntax,
@@ -271,14 +247,12 @@ internal static class OwnedFreshMutableObjectClassifier
                 visitedLocals,
                 cancellationToken,
                 out var initializerSyntax,
-                out var initializerOperation))
-        {
+                out var initializerOperation)) {
             objectCreationOperation = null!;
             return false;
         }
 
-        if (initializerOperation is IObjectCreationOperation directObjectCreation)
-        {
+        if (initializerOperation is IObjectCreationOperation directObjectCreation) {
             objectCreationOperation = directObjectCreation;
             return true;
         }
@@ -312,10 +286,8 @@ internal static class OwnedFreshMutableObjectClassifier
         return false;
     }
 
-    private static bool IsThisInstanceMemberReference(IOperation operation, ISymbol memberSymbol)
-    {
-        var (targetMember, targetInstance) = operation switch
-        {
+    private static bool IsThisInstanceMemberReference(IOperation operation, ISymbol memberSymbol) {
+        var (targetMember, targetInstance) = operation switch {
             IFieldReferenceOperation fieldReference => ((ISymbol?)fieldReference.Field, fieldReference.Instance),
             IPropertyReferenceOperation propertyReference => (propertyReference.Property, propertyReference.Instance),
             _ => (null, null)
@@ -326,11 +298,9 @@ internal static class OwnedFreshMutableObjectClassifier
                RuleAnalysisHelper.IsThisOrImplicitInstance(targetInstance);
     }
 
-    private static ISymbol? GetReferencedMemberSymbol(IOperation? operation)
-    {
+    private static ISymbol? GetReferencedMemberSymbol(IOperation? operation) {
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
-        return unwrappedOperation switch
-        {
+        return unwrappedOperation switch {
             IFieldReferenceOperation fieldReference => fieldReference.Field,
             IPropertyReferenceOperation propertyReference => propertyReference.Property,
             _ => null
@@ -342,8 +312,7 @@ internal static class OwnedFreshMutableObjectClassifier
         SyntaxNode observationSyntax,
         SemanticModel semanticModel,
         HashSet<ILocalSymbol> visitedLocals,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (!RuleAnalysisHelper.TryGetStableLocalInitializer(
                 localSymbol,
                 observationSyntax,
@@ -362,10 +331,8 @@ internal static class OwnedFreshMutableObjectClassifier
             return IsOwnedFreshMutableLocal(localReference.Local, initializerSyntax, semanticModel, null, visitedLocals,
                 cancellationToken);
 
-        if (initializerOperation is IConditionalOperation conditionalOperation)
-        {
-            if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
-            {
+        if (initializerOperation is IConditionalOperation conditionalOperation) {
+            if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue)) {
                 var selectedBranch = conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
                 if (selectedBranch == null) return false;
 
@@ -406,8 +373,7 @@ internal static class OwnedFreshMutableObjectClassifier
         SemanticModel semanticModel,
         PurityAnalysisEngine.PurityAnalysisState? currentState,
         HashSet<ILocalSymbol> visitedLocals,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         if (currentState is { } state &&
             PuritySymbolicStateFacts.HasSymbolicFreshMutableObjectFactForSymbol(localSymbol, state))
@@ -426,17 +392,14 @@ internal static class OwnedFreshMutableObjectClassifier
         SyntaxNode observationSyntax,
         SemanticModel semanticModel,
         HashSet<ILocalSymbol> visitedLocals,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
-        if (unwrappedOperation is IObjectCreationOperation objectCreationOperation)
-        {
+        if (unwrappedOperation is IObjectCreationOperation objectCreationOperation) {
             if (RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type)) return true;
 
             if (objectCreationOperation.Constructor != null)
-                foreach (var argument in objectCreationOperation.Arguments)
-                {
+                foreach (var argument in objectCreationOperation.Arguments) {
                     cancellationToken.ThrowIfCancellationRequested();
                     var parameter = argument.Parameter;
                     if (parameter == null ||
@@ -480,9 +443,7 @@ internal static class OwnedFreshMutableObjectClassifier
         IMethodSymbol constructor,
         IParameterSymbol parameter,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return RuleAnalysisHelper.ConstructorStoresParameterMatching(
+        CancellationToken cancellationToken) => RuleAnalysisHelper.ConstructorStoresParameterMatching(
             constructor,
             parameter,
             semanticModel,
@@ -494,5 +455,4 @@ internal static class OwnedFreshMutableObjectClassifier
                 (target is IPropertyReferenceOperation propertyReference &&
                  (propertyReference.Property.SetMethod == null || propertyReference.Property.SetMethod.IsInitOnly) &&
                  RuleAnalysisHelper.IsThisOrImplicitInstance(propertyReference.Instance)));
-    }
 }

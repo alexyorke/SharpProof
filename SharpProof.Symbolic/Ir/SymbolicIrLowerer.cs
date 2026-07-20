@@ -3,8 +3,7 @@ using static SharpProof.Symbolic.Ir.SymbolicLoweringValueFacts;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
-{
+internal static partial class SymbolicIrLowerer {
     internal static SymbolicTerm? LowerTerm(ExpressionSyntax expression, SymbolicLoweringContext context) =>
         TryLowerTerm(expression, context, out var term) ? term : null;
 
@@ -14,14 +13,12 @@ internal static partial class SymbolicIrLowerer
     private static bool TryLowerCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
+        out SymbolicCondition condition) {
         expression = UnwrapExpression(expression);
         context.CancellationToken.ThrowIfCancellationRequested();
 
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
-        if (constantValue.HasValue && constantValue.Value is bool booleanValue)
-        {
+        if (constantValue.HasValue && constantValue.Value is bool booleanValue) {
             condition = new SymbolicConstantCondition(booleanValue);
             return true;
         }
@@ -30,8 +27,7 @@ internal static partial class SymbolicIrLowerer
                 expression,
                 context.SemanticModel,
                 context.CancellationToken,
-                out var nullableFlowValue))
-        {
+                out var nullableFlowValue)) {
             condition = new SymbolicConstantCondition(nullableFlowValue);
             return true;
         }
@@ -43,8 +39,7 @@ internal static partial class SymbolicIrLowerer
 
         if (expression is PrefixUnaryExpressionSyntax prefixUnaryExpression &&
             prefixUnaryExpression.IsKind(SyntaxKind.LogicalNotExpression) &&
-            TryLowerCondition(prefixUnaryExpression.Operand, context, out var operand))
-        {
+            TryLowerCondition(prefixUnaryExpression.Operand, context, out var operand)) {
             condition = new SymbolicNotCondition(operand);
             return true;
         }
@@ -58,8 +53,7 @@ internal static partial class SymbolicIrLowerer
                 out condition))
             return true;
 
-        if (expression is BinaryExpressionSyntax binaryExpression)
-        {
+        if (expression is BinaryExpressionSyntax binaryExpression) {
             if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
                 binaryExpression.Right is TypeSyntax typeSyntax &&
                 TryLowerTerm(binaryExpression.Left, context, out var typeTestValue) &&
@@ -120,8 +114,7 @@ internal static partial class SymbolicIrLowerer
             if (SymbolicOperatorLowerer.TryGetRelationOperator(binaryExpression.Kind(), out var relationOperator) &&
                 TryLowerTerm(binaryExpression.Left, context, out var left) &&
                 TryLowerTerm(binaryExpression.Right, context, out var right) &&
-                SymbolicOperatorLowerer.CanCompareTerms(left, right, relationOperator))
-            {
+                SymbolicOperatorLowerer.CanCompareTerms(left, right, relationOperator)) {
                 condition = CreateFactCondition(
                     new SymbolicRelationAtom(relationOperator, left, right),
                     binaryExpression,
@@ -168,8 +161,7 @@ internal static partial class SymbolicIrLowerer
             return true;
 
         if (TryLowerTerm(expression, context, out var term) &&
-            term.Kind == SmtValueKind.Bool)
-        {
+            term.Kind == SmtValueKind.Bool) {
             condition = CreateFactCondition(new SymbolicTruthAtom(term), expression, "ir.truth");
             return true;
         }
@@ -181,18 +173,15 @@ internal static partial class SymbolicIrLowerer
     private static bool TryLowerLogicalBinaryCondition(
         BinaryExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
-        var conditionOperator = expression.Kind() switch
-        {
+        out SymbolicCondition condition) {
+        var conditionOperator = expression.Kind() switch {
             SyntaxKind.LogicalAndExpression => SymbolicConditionOperator.And,
             SyntaxKind.LogicalOrExpression => SymbolicConditionOperator.Or,
             _ => (SymbolicConditionOperator?)null
         };
         if (conditionOperator != null &&
             TryLowerCondition(expression.Left, context, out var left) &&
-            TryLowerCondition(expression.Right, context, out var right))
-        {
+            TryLowerCondition(expression.Right, context, out var right)) {
             condition = new SymbolicBinaryCondition(conditionOperator.Value, left, right);
             return true;
         }
@@ -204,42 +193,35 @@ internal static partial class SymbolicIrLowerer
     private static bool TryLowerTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         expression = UnwrapExpression(expression);
         context.CancellationToken.ThrowIfCancellationRequested();
 
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
-        if (constantValue.HasValue)
-        {
-            if (constantValue.Value is bool booleanValue)
-            {
+        if (constantValue.HasValue) {
+            if (constantValue.Value is bool booleanValue) {
                 term = new SymbolicBooleanConstantTerm(booleanValue);
                 return true;
             }
 
-            if (constantValue.Value == null)
-            {
+            if (constantValue.Value == null) {
                 term = new SymbolicNullTerm();
                 return true;
             }
 
-            if (constantValue.Value is string stringValue)
-            {
+            if (constantValue.Value is string stringValue) {
                 term = new SymbolicStringConstantTerm(stringValue);
                 return true;
             }
 
-            if (TryGetIntegralConstant(constantValue.Value, out var integralValue))
-            {
+            if (TryGetIntegralConstant(constantValue.Value, out var integralValue)) {
                 term = new SymbolicIntegerConstantTerm(integralValue);
                 return true;
             }
         }
 
         if (expression is LiteralExpressionSyntax literal &&
-            literal.IsKind(SyntaxKind.NullLiteralExpression))
-        {
+            literal.IsKind(SyntaxKind.NullLiteralExpression)) {
             term = new SymbolicNullTerm();
             return true;
         }
@@ -257,8 +239,7 @@ internal static partial class SymbolicIrLowerer
 
         if (SymbolicConversionLowerer.TryLowerSupportedConversionTerm(expression, context, out term)) return true;
 
-        if (expression is ThisExpressionSyntax)
-        {
+        if (expression is ThisExpressionSyntax) {
             term = context.ImplicitThis;
             return true;
         }
@@ -300,8 +281,7 @@ internal static partial class SymbolicIrLowerer
             TryLowerTerm(coalesceExpression.Left, context, out var coalesceLeft) &&
             TryLowerTerm(coalesceExpression.Right, context, out var coalesceRight) &&
             coalesceLeft.Kind == SmtValueKind.Reference &&
-            coalesceRight.Kind == SmtValueKind.Reference)
-        {
+            coalesceRight.Kind == SmtValueKind.Reference) {
             term = new SymbolicConditionalTerm(
                 CreateRelationCondition(
                     SymbolicRelationOperator.NotEqual,
@@ -318,8 +298,7 @@ internal static partial class SymbolicIrLowerer
             TryLowerCondition(conditionalExpression.Condition, context, out var condition) &&
             TryLowerTerm(conditionalExpression.WhenTrue, context, out var whenTrue) &&
             TryLowerTerm(conditionalExpression.WhenFalse, context, out var whenFalse) &&
-            whenTrue.Kind == whenFalse.Kind)
-        {
+            whenTrue.Kind == whenFalse.Kind) {
             term = new SymbolicConditionalTerm(condition, whenTrue, whenFalse);
             return true;
         }
@@ -331,8 +310,7 @@ internal static partial class SymbolicIrLowerer
             (unaryOperation.OperatorMethod == null ||
              unaryOperation.Type != null && SymbolicNumericLowerer.IsBigIntegerType(unaryOperation.Type)) &&
             TryLowerTerm(prefixUnary.Operand, context, out var unaryOperand) &&
-            unaryOperand.Kind == SmtValueKind.Int)
-        {
+            unaryOperand.Kind == SmtValueKind.Int) {
             var mathematicalTerm = new SymbolicBinaryTerm(
                 SymbolicBinaryTermOperator.Subtract,
                 new SymbolicIntegerConstantTerm(0),
@@ -369,8 +347,7 @@ internal static partial class SymbolicIrLowerer
             TryLowerTerm(binary.Left, context, out var left) &&
             TryLowerTerm(binary.Right, context, out var right) &&
             left.Kind == SmtValueKind.Int &&
-            right.Kind == SmtValueKind.Int)
-        {
+            right.Kind == SmtValueKind.Int) {
             var mathematicalTerm = new SymbolicBinaryTerm(
                 binaryOperator,
                 left,
@@ -398,14 +375,12 @@ internal static partial class SymbolicIrLowerer
             ITypeSymbol? operationType,
             SymbolicLoweringContext context,
             out long minimum,
-            out long maximum)
-        {
+            out long maximum) {
             if (SymbolicTypeFacts.TryGetBoundedIntegralRange(operationType, out minimum, out maximum))
                 return true;
 
             if (context.InvocationTermTypeResolver != null)
-                foreach (var invocation in expression.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>())
-                {
+                foreach (var invocation in expression.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>()) {
                     var invocationType = context.InvocationTermTypeResolver(invocation);
                     if (SymbolicTypeFacts.TryGetBoundedIntegralRange(invocationType, out minimum, out maximum))
                         return true;
@@ -418,8 +393,7 @@ internal static partial class SymbolicIrLowerer
 
         static bool IsOverflowSensitiveIntegralBinary(
             BinaryExpressionSyntax candidate,
-            Microsoft.CodeAnalysis.Operations.IBinaryOperation operation)
-        {
+            Microsoft.CodeAnalysis.Operations.IBinaryOperation operation) {
             var type = operation?.Type;
             if (candidate.Kind() is not (SyntaxKind.AddExpression or SyntaxKind.SubtractExpression or
                     SyntaxKind.MultiplyExpression or SyntaxKind.DivideExpression or
@@ -451,8 +425,7 @@ internal static partial class SymbolicIrLowerer
 
         if ((symbol is ILocalSymbol || symbol is IParameterSymbol) &&
             SymbolicTypeLowerer.TryGetSymbolType(symbol, out var symbolType) &&
-            SymbolicTypeLowerer.TryGetValueKind(symbolType, out var kind))
-        {
+            SymbolicTypeLowerer.TryGetValueKind(symbolType, out var kind)) {
             term = new SymbolicVariableTerm(context.GetVariableName(symbol), kind);
             return true;
         }
@@ -467,8 +440,7 @@ internal static partial class SymbolicIrLowerer
         long maximum,
         SyntaxNode syntax,
         string provenance,
-        bool isChecked)
-    {
+        bool isChecked) {
         // A checked expression has a value only on normal completion. On that path
         // its CLR result is the mathematical result; overflow exits by exception.
         if (isChecked) return mathematicalTerm;
@@ -506,8 +478,7 @@ internal static partial class SymbolicIrLowerer
         if ((mathematicalTerm.Operator is SymbolicBinaryTermOperator.Add or
                 SymbolicBinaryTermOperator.Subtract) &&
             modulus != 0 &&
-            modulus <= long.MaxValue)
-        {
+            modulus <= long.MaxValue) {
             var aboveMaximum = CreateRelationCondition(
                 SymbolicRelationOperator.GreaterThan,
                 mathematicalTerm,

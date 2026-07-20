@@ -1,14 +1,10 @@
-internal static class EffectSummaryProgressStore
-{
+internal static class EffectSummaryProgressStore {
     public static string ComputeShardedInputFingerprint(
         CliOptions options,
-        IReadOnlyList<string> assemblyPaths)
-    {
-        var payload = JsonSerializer.Serialize(new
-        {
+        IReadOnlyList<string> assemblyPaths) {
+        var payload = JsonSerializer.Serialize(new {
             ToolModuleVersionId = ToolModuleVersionId,
-            Assemblies = assemblyPaths.Select(path => new
-            {
+            Assemblies = assemblyPaths.Select(path => new {
                 Path = Path.GetFullPath(path),
                 Sha256 = EffectSummaryHash.FileSha256(path)
             }),
@@ -38,9 +34,7 @@ internal static class EffectSummaryProgressStore
     public static void SaveSharded(
         string progressPath,
         string inputFingerprint,
-        IEnumerable<string> completedOutputPaths)
-    {
-        SaveJson(
+        IEnumerable<string> completedOutputPaths) => SaveJson(
             progressPath,
             new ShardedEffectSummaryProgressDocument(
                 1,
@@ -49,7 +43,6 @@ internal static class EffectSummaryProgressStore
                 completedOutputPaths
                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                     .ToArray()));
-    }
 
     public static HashSet<string> LoadArtifactSpec(string progressPath, string artifactSpecSha256) =>
         LoadCompletedOutputPaths<ArtifactSpecProgressDocument>(
@@ -61,9 +54,7 @@ internal static class EffectSummaryProgressStore
     public static void SaveArtifactSpec(
         string progressPath,
         string artifactSpecSha256,
-        IEnumerable<string> completedOutputPaths)
-    {
-        SaveJson(
+        IEnumerable<string> completedOutputPaths) => SaveJson(
             progressPath,
             new ArtifactSpecProgressDocument(
                 1,
@@ -71,7 +62,6 @@ internal static class EffectSummaryProgressStore
                 completedOutputPaths
                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                     .ToArray()));
-    }
 
     private static string ToolModuleVersionId =>
         typeof(EffectSummaryProgressStore).Assembly.ManifestModule.ModuleVersionId.ToString("D");
@@ -81,8 +71,7 @@ internal static class EffectSummaryProgressStore
         string expectedFingerprint,
         string unsupportedSchemaMessage,
         string fingerprintMismatchMessage)
-        where TProgress : IEffectSummaryProgressDocument
-    {
+        where TProgress : IEffectSummaryProgressDocument {
         var progress = JsonSerializer.Deserialize<TProgress>(File.ReadAllText(progressPath));
         if (progress == null || progress.SchemaVersion != 1)
             throw new InvalidOperationException(unsupportedSchemaMessage);
@@ -96,19 +85,16 @@ internal static class EffectSummaryProgressStore
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
-    private static void SaveJson(string progressPath, object progress)
-    {
+    private static void SaveJson(string progressPath, object progress) {
         Directory.CreateDirectory(Path.GetDirectoryName(progressPath)!);
         var temporaryPath = progressPath + ".tmp-" + Guid.NewGuid().ToString("N");
-        try
-        {
+        try {
             File.WriteAllText(
                 temporaryPath,
                 JsonSerializer.Serialize(progress, new JsonSerializerOptions { WriteIndented = true }));
             File.Move(temporaryPath, progressPath, true);
         }
-        finally
-        {
+        finally {
             if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
         }
     }

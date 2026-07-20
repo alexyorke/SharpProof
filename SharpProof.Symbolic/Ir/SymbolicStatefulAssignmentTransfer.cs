@@ -4,8 +4,7 @@ using static SharpProof.Symbolic.SymbolicStateFactBuilder;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicStatefulAssignmentTransfer
-{
+internal static class SymbolicStatefulAssignmentTransfer {
     internal static bool TryApplyCoalesceAssignment(
         ref SymbolicState state,
         ICoalesceAssignmentOperation assignment,
@@ -14,13 +13,11 @@ internal static class SymbolicStatefulAssignmentTransfer
         bool allowGuardMutation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ISymbol? invalidatedGuardTarget)
-    {
+        out ISymbol? invalidatedGuardTarget) {
         invalidatedGuardTarget = null;
         if (assignment.Syntax is not AssignmentExpressionSyntax syntax)
             return false;
-        if (!TryGetDirectTarget(assignment.Target, out var target))
-        {
+        if (!TryGetDirectTarget(assignment.Target, out var target)) {
             if (guard != null)
                 return false;
             SymbolicStateInvalidator.InvalidateMutationTarget(
@@ -74,8 +71,7 @@ internal static class SymbolicStatefulAssignmentTransfer
         SymbolicCondition? guard,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ISymbol? invalidatedGuardTarget)
-    {
+        out ISymbol? invalidatedGuardTarget) {
         invalidatedGuardTarget = null;
         if (guard != null || assignment.Syntax is not AssignmentExpressionSyntax syntax ||
             !SymbolicDeconstructionPlan.TryCollectTargets(
@@ -95,14 +91,12 @@ internal static class SymbolicStatefulAssignmentTransfer
             return true;
 
         var right = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(syntax.Right);
-        if (right is TupleExpressionSyntax rightTuple)
-        {
+        if (right is TupleExpressionSyntax rightTuple) {
             if (rightTuple.Arguments.Count != targetSymbols.Length)
                 return true;
             for (var index = 0; index < targetSymbols.Length; index++)
                 if (targetSymbols[index] != null &&
-                    semanticModel.GetOperation(rightTuple.Arguments[index].Expression, cancellationToken) is
-                        { } elementValue)
+                    semanticModel.GetOperation(rightTuple.Arguments[index].Expression, cancellationToken) is { } elementValue)
                     TryApplyAssignment(
                         ref state,
                         targetSymbols[index]!,
@@ -123,8 +117,7 @@ internal static class SymbolicStatefulAssignmentTransfer
                 sourceSymbol, targetSymbols.Length, out var sourceElementNames))
             return true;
         var bindings = ImmutableArray.CreateBuilder<SymbolicAssignmentBinding>(targetSymbols.Length);
-        for (var index = 0; index < targetSymbols.Length; index++)
-        {
+        for (var index = 0; index < targetSymbols.Length; index++) {
             var target = targetSymbols[index];
             if (target == null ||
                 !TryCreateSymbolTerm(target, out var targetTerm) ||
@@ -158,24 +151,22 @@ internal static class SymbolicStatefulAssignmentTransfer
     private static ISymbol? ResolveDeconstructionTarget(
         IOperation operation,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken) => operation switch
-    {
-        ILocalReferenceOperation local => local.Local,
-        IParameterReferenceOperation parameter => parameter.Parameter,
-        _ when operation.Syntax is SingleVariableDesignationSyntax designation =>
-            semanticModel.GetDeclaredSymbol(designation, cancellationToken),
-        _ when operation.Syntax is IdentifierNameSyntax identifier =>
-            semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
-        _ => null
-    };
+        CancellationToken cancellationToken) => operation switch {
+            ILocalReferenceOperation local => local.Local,
+            IParameterReferenceOperation parameter => parameter.Parameter,
+            _ when operation.Syntax is SingleVariableDesignationSyntax designation =>
+                semanticModel.GetDeclaredSymbol(designation, cancellationToken),
+            _ when operation.Syntax is IdentifierNameSyntax identifier =>
+                semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
+            _ => null
+        };
 
     internal static bool TryApplyComputedUpdate(
         ref SymbolicState state,
         ISymbol target,
         IOperation operation,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var targetType = SymbolicFactFactory.GetTrackedSymbolType(target);
         if (targetType is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } underlying })
             targetType = underlying;
@@ -190,8 +181,7 @@ internal static class SymbolicStatefulAssignmentTransfer
         SymbolicComputedUpdateKind updateKind;
         bool isChecked;
         string provenance;
-        if (operation is IIncrementOrDecrementOperation { OperatorMethod: null } increment)
-        {
+        if (operation is IIncrementOrDecrementOperation { OperatorMethod: null } increment) {
             var isIncrement = increment.Kind == OperationKind.Increment;
             binaryOperator = isIncrement ? SymbolicBinaryTermOperator.Add : SymbolicBinaryTermOperator.Subtract;
             right = new SymbolicIntegerConstantTerm(1);
@@ -207,9 +197,7 @@ internal static class SymbolicStatefulAssignmentTransfer
                  SymbolicOperatorLowerer.TryGetBinaryTermOperator(binaryKind, out binaryOperator) &&
                  SymbolicSemanticPipeline.LowerTerm(
                      assignment.Right,
-                     new SymbolicLoweringContext(semanticModel, cancellationToken)) is
-                     { IsExact: true, Value: { Kind: SharpProof.ProofCore.Smt.SmtValueKind.Int } loweredRight })
-        {
+                     new SymbolicLoweringContext(semanticModel, cancellationToken)) is { IsExact: true, Value: { Kind: SharpProof.ProofCore.Smt.SmtValueKind.Int } loweredRight }) {
             right = loweredRight;
             updateKind = SymbolicComputedUpdateKind.CompoundAssignment;
             isChecked = compound.IsChecked;
@@ -224,8 +212,7 @@ internal static class SymbolicStatefulAssignmentTransfer
 
         SymbolicTerm updated;
         if (previous is SymbolicIntegerConstantTerm leftConstant &&
-            right is SymbolicIntegerConstantTerm rightConstant)
-        {
+            right is SymbolicIntegerConstantTerm rightConstant) {
             if (!TryEvaluateConstantUpdate(
                     leftConstant.Value,
                     rightConstant.Value,
@@ -236,8 +223,7 @@ internal static class SymbolicStatefulAssignmentTransfer
                     out updated))
                 return false;
         }
-        else
-        {
+        else {
             if (binaryOperator is SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder &&
                 right is SymbolicIntegerConstantTerm { Value: 0 })
                 return false;
@@ -246,14 +232,13 @@ internal static class SymbolicStatefulAssignmentTransfer
                 SymbolicBinaryTermOperator.Multiply)
                 updated = SymbolicIrLowerer.CreateOverflowAwareBinaryTerm(
                     mathematical, minimum, maximum, source, provenance, isChecked);
-            else if (minimum < 0)
-                updated = new SymbolicConditionalTerm(
+            else updated = minimum < 0
+                ? new SymbolicConditionalTerm(
                     SymbolicIrLowerer.CreateSignedDivisionOverflowCondition(
                         previous, right, minimum, source, provenance + ".signed-division-overflow"),
                     mathematical with { MayOverflow = true },
-                    mathematical);
-            else
-                updated = mathematical;
+                    mathematical)
+                : mathematical;
         }
 
         var transition = SymbolicOperationTransfer.ApplyComputedUpdate(
@@ -279,14 +264,12 @@ internal static class SymbolicStatefulAssignmentTransfer
         long minimum,
         long maximum,
         bool isChecked,
-        out SymbolicTerm value)
-    {
+        out SymbolicTerm value) {
         value = null!;
         if (operation is SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder &&
             (right == 0 || minimum < 0 && left == minimum && right == -1))
             return false;
-        var result = operation switch
-        {
+        var result = operation switch {
             SymbolicBinaryTermOperator.Add => (BigInteger)left + right,
             SymbolicBinaryTermOperator.Subtract => (BigInteger)left - right,
             SymbolicBinaryTermOperator.Multiply => (BigInteger)left * right,
@@ -294,8 +277,7 @@ internal static class SymbolicStatefulAssignmentTransfer
             SymbolicBinaryTermOperator.Remainder => left % (BigInteger)right,
             _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, null)
         };
-        if (result < minimum || result > maximum)
-        {
+        if (result < minimum || result > maximum) {
             if (isChecked)
                 return false;
             var modulus = (BigInteger)maximum - minimum + 1;

@@ -1,20 +1,16 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal enum SymbolicAssignmentPostconditionProfile
-{
+internal enum SymbolicAssignmentPostconditionProfile {
     Analyzer,
     Symbolic
 }
 
-internal static partial class SymbolicOperationLowerer
-{
+internal static partial class SymbolicOperationLowerer {
     internal static bool TryLowerDivideByZeroHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
-        var (site, divisor, isRemainder) = operation switch
-        {
+        out SymbolicHazardOperation hazard) {
+        var (site, divisor, isRemainder) = operation switch {
             IBinaryOperation binary when binary.OperatorKind is BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder =>
                 (binary.Syntax, binary.RightOperand.Syntax as ExpressionSyntax,
                     binary.OperatorKind == BinaryOperatorKind.Remainder),
@@ -26,8 +22,7 @@ internal static partial class SymbolicOperationLowerer
         };
         if (site == null || divisor == null ||
             !SymbolicTypeFacts.IsThrowingDivideByZeroType(
-                CSharpSyntaxFacts.GetExpressionType(divisor, context.SemanticModel, context.CancellationToken)))
-        {
+                CSharpSyntaxFacts.GetExpressionType(divisor, context.SemanticModel, context.CancellationToken))) {
             hazard = null!;
             return false;
         }
@@ -36,13 +31,11 @@ internal static partial class SymbolicOperationLowerer
         var zero = SymbolicSemanticPipeline.LowerNumericZeroCondition(divisor, context);
         SymbolicTerm? subject = null;
         SymbolicCondition? trigger = null;
-        if (zero is { IsExact: true, Value: { } zeroCondition })
-        {
+        if (zero is { IsExact: true, Value: { } zeroCondition }) {
             trigger = zeroCondition;
-            subject = zeroCondition is SymbolicFactCondition
-                {
-                    Fact.Atom: SymbolicRelationAtom { Left: var left }
-                }
+            subject = zeroCondition is SymbolicFactCondition {
+                Fact.Atom: SymbolicRelationAtom { Left: var left }
+            }
                 ? left
                 : null;
         }
@@ -62,10 +55,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerCheckedOverflowHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
-        return operation switch
-        {
+        out SymbolicHazardOperation hazard) => operation switch {
             IBinaryOperation binary => TryLowerCheckedBinaryOverflow(binary, context, out hazard),
             IUnaryOperation unary => TryLowerCheckedUnaryOverflow(unary, context, out hazard),
             IIncrementOrDecrementOperation update => TryLowerCheckedUpdateOverflow(update, context, out hazard),
@@ -74,7 +64,6 @@ internal static partial class SymbolicOperationLowerer
             IConversionOperation conversion => TryLowerCheckedConversionOverflow(conversion, context, out hazard),
             _ => NoHazard(out hazard)
         };
-    }
 
     internal static bool TryLowerReferenceNullHazard(
         ExpressionSyntax subjectExpression,
@@ -85,19 +74,17 @@ internal static partial class SymbolicOperationLowerer
         string provenance,
         SymbolicLoweringContext context,
         bool suppressDefinitelyNotNull,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (suppressDefinitelyNotNull &&
             NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
                 subjectExpression, context.SemanticModel, context.CancellationToken))
             return NoHazard(out hazard);
 
         var lowering = SymbolicSemanticPipeline.LowerTerm(subjectExpression, context);
-        var subject = lowering is
-            {
-                IsExact: true,
-                Value: { } value
-            } && (value.Kind == SmtValueKind.Reference || value is SymbolicNullTerm)
+        var subject = lowering is {
+            IsExact: true,
+            Value: { } value
+        } && (value.Kind == SmtValueKind.Reference || value is SymbolicNullTerm)
                 ? value
                 : null;
         var trigger = subject == null
@@ -121,14 +108,12 @@ internal static partial class SymbolicOperationLowerer
         string exceptionType,
         string category,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         const string provenance = "ir.runtime-hazard.nullable-value.without-value";
         var lowering = SymbolicSemanticPipeline.LowerNullableHasValueTerm(nullableExpression, context);
         SymbolicTerm? subject = null;
         SymbolicCondition? trigger = null;
-        if (lowering is { IsExact: true, Value: SymbolicNullableHasValueTerm hasValue })
-        {
+        if (lowering is { IsExact: true, Value: SymbolicNullableHasValueTerm hasValue }) {
             subject = new SymbolicVariableTerm(hasValue.NullableName, SmtValueKind.Reference);
             trigger = new SymbolicNotCondition(new SymbolicFactCondition(SymbolicFact.Exact(
                 new SymbolicTruthAtom(hasValue),
@@ -151,8 +136,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerNullableValueAccessHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not MemberAccessExpressionSyntax memberAccess ||
             !SymbolicTypeFacts.IsNullableValueAccess(
                 memberAccess,
@@ -164,8 +148,7 @@ internal static partial class SymbolicOperationLowerer
                 memberAccess.Expression,
                 memberAccess,
                 context.SemanticModel,
-                context.CancellationToken))
-        {
+                context.CancellationToken)) {
             hazard = LowerLoopCarriedNullableValueHazard(memberAccess);
             return true;
         }
@@ -181,8 +164,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerDynamicNullBindingHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (!SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
                 operation.Syntax,
                 SymbolicRuntimeHazardSyntaxFacts.UnwrapDynamicExpression,
@@ -211,28 +193,20 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerNullDereferenceHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
-        return TryLowerNullDereferenceHazardCore(operation.Syntax, context, out hazard);
-    }
+        out SymbolicHazardOperation hazard) => TryLowerNullDereferenceHazardCore(operation.Syntax, context, out hazard);
 
     internal static bool TryLowerMemberAccessNullDereferenceHazard(
         MemberAccessExpressionSyntax memberAccess,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
-        return TryLowerNullDereferenceHazardCore(memberAccess, context, out hazard);
-    }
+        out SymbolicHazardOperation hazard) => TryLowerNullDereferenceHazardCore(memberAccess, context, out hazard);
 
     private static bool TryLowerNullDereferenceHazardCore(
         SyntaxNode site,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         ExpressionSyntax? receiver = null;
         var category = ExceptionCategories.DefiniteNullDereference;
-        switch (site)
-        {
+        switch (site) {
             case MemberAccessExpressionSyntax memberAccess:
                 receiver = memberAccess.Expression;
                 break;
@@ -293,12 +267,10 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerArgumentNullHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         ExpressionSyntax? argument = null;
         var category = string.Empty;
-        switch (operation)
-        {
+        switch (operation) {
             case ILockOperation { Syntax: LockStatementSyntax lockStatement }:
                 argument = lockStatement.Expression;
                 category = ExceptionCategories.DefiniteLockNull;
@@ -335,8 +307,7 @@ internal static partial class SymbolicOperationLowerer
 
     private static bool TryGetRegexRequiredInputExpression(
         IInvocationOperation operation,
-        out ExpressionSyntax inputExpression)
-    {
+        out ExpressionSyntax inputExpression) {
         inputExpression = null!;
         if (operation.TargetMethod.Name is not ("IsMatch" or "Match" or "Matches") ||
             !string.Equals(
@@ -353,9 +324,7 @@ internal static partial class SymbolicOperationLowerer
         return false;
     }
 
-    internal static SymbolicHazardOperation LowerLoopCarriedNullableValueHazard(SyntaxNode site)
-    {
-        return CreateHazard(
+    internal static SymbolicHazardOperation LowerLoopCarriedNullableValueHazard(SyntaxNode site) => CreateHazard(
             site,
             SymbolicRuntimeHazardKind.NullableValueWithoutValue,
             SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
@@ -364,15 +333,12 @@ internal static partial class SymbolicOperationLowerer
             ExceptionTypes.InvalidOperationException,
             ExceptionCategories.DefiniteNullableValueWithoutValue,
             "ir.runtime-hazard.nullable-value.loop-carried");
-    }
 
     internal static bool TryLowerNegativeLengthHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
-        var shape = operation.Syntax switch
-        {
+        out SymbolicHazardOperation hazard) {
+        var shape = operation.Syntax switch {
             ArrayCreationExpressionSyntax array => (
                 Lengths: CSharpSyntaxFacts.GetExplicitArraySizeExpressions(array),
                 Precondition: SymbolicExceptionPreconditionKind.NegativeLength,
@@ -408,18 +374,15 @@ internal static partial class SymbolicOperationLowerer
         string provenance,
         string category,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         SymbolicTerm? subject = null;
         SymbolicCondition? trigger = null;
         var hasExpression = false;
         var allExact = true;
-        foreach (var expression in lengthExpressions)
-        {
+        foreach (var expression in lengthExpressions) {
             hasExpression = true;
             var length = LowerIntegerTerm(expression, context);
-            if (length == null)
-            {
+            if (length == null) {
                 allExact = false;
                 continue;
             }
@@ -453,8 +416,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerInvalidCollectionCardinalityHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation is not IInvocationOperation invocationOperation ||
             operation.Syntax is not InvocationExpressionSyntax invocation ||
             invocationOperation.TargetMethod is not
@@ -490,17 +452,13 @@ internal static partial class SymbolicOperationLowerer
         return true;
     }
 
-    private static bool IsKnownCardinalityCheckedCollection(INamedTypeSymbol type)
-    {
-        return type.ContainingNamespace.ToDisplayString() == "System.Collections.Generic" &&
+    private static bool IsKnownCardinalityCheckedCollection(INamedTypeSymbol type) => type.ContainingNamespace.ToDisplayString() == "System.Collections.Generic" &&
                type.OriginalDefinition.MetadataName is "Queue`1" or "Stack`1" or "PriorityQueue`2";
-    }
 
     internal static bool TryLowerElementAccessBoundsHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not ElementAccessExpressionSyntax elementAccess ||
             !SymbolicRuntimeHazardSyntaxFacts.TryGetIndexOrRangeHazardMetadata(
                 elementAccess,
@@ -514,8 +472,7 @@ internal static partial class SymbolicOperationLowerer
         SymbolicTerm? subject = null;
         SymbolicCondition? trigger = null;
         var provenance = "ir.runtime-hazard.index.out-of-range";
-        if (elementAccess.ArgumentList.Arguments.Count == 1)
-        {
+        if (elementAccess.ArgumentList.Arguments.Count == 1) {
             var indexExpression = SymbolicRuntimeHazardSyntaxFacts.UnwrapExpression(
                 elementAccess.ArgumentList.Arguments[0].Expression);
             if (indexExpression is InvocationExpressionSyntax absInvocation &&
@@ -524,15 +481,13 @@ internal static partial class SymbolicOperationLowerer
                     context.SemanticModel,
                     context.CancellationToken,
                     out _,
-                    out var divisorExpression))
-            {
+                    out var divisorExpression)) {
                 var sourceLength = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(
                     elementAccess.Expression, context);
                 var divisorLength = SymbolicSemanticPipeline.LowerTerm(divisorExpression, context);
                 if (sourceLength is { IsExact: true, Value: { Kind: SmtValueKind.Int } source } &&
                     divisorLength is { IsExact: true, Value: { Kind: SmtValueKind.Int } divisor } &&
-                    Equals(source, divisor))
-                {
+                    Equals(source, divisor)) {
                     trigger = new SymbolicConstantCondition(false);
                     provenance = "ir.runtime-hazard.index.abs-modulo.same-length-unreachable";
                 }
@@ -543,35 +498,30 @@ internal static partial class SymbolicOperationLowerer
             CSharpSyntaxFacts.GetExpressionType(
                 elementAccess.Expression, context.SemanticModel, context.CancellationToken) is
                 IArrayTypeSymbol { Rank: > 1 } arrayType &&
-            elementAccess.ArgumentList.Arguments.Count == arrayType.Rank)
-        {
+            elementAccess.ArgumentList.Arguments.Count == arrayType.Rank) {
             var receiver = SymbolicSemanticPipeline.LowerTerm(elementAccess.Expression, context);
             var bounds = SymbolicSemanticPipeline.LowerArrayElementBoundsCondition(
                 elementAccess.Expression,
                 elementAccess.ArgumentList.Arguments.Select(static argument => argument.Expression).ToArray(),
                 elementAccess,
                 context);
-            if (bounds is { IsExact: true, Value: { } inRange })
-            {
+            if (bounds is { IsExact: true, Value: { } inRange }) {
                 if (receiver is { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiverTerm })
                     subject = receiverTerm;
                 trigger = new SymbolicNotCondition(inRange);
                 provenance = "ir.runtime-hazard.index.multidimensional-out-of-range";
             }
         }
-        else if (trigger == null && elementAccess.ArgumentList.Arguments.Count == 1)
-        {
+        else if (trigger == null && elementAccess.ArgumentList.Arguments.Count == 1) {
             var bounds = SymbolicSemanticPipeline.LowerBuiltInElementAccessOutOfRangeCondition(
                 elementAccess, context);
-            if (bounds is { IsExact: true, Value: { } outOfRange })
-            {
+            if (bounds is { IsExact: true, Value: { } outOfRange }) {
                 trigger = outOfRange;
                 var index = SymbolicSemanticPipeline.LowerTerm(
                     elementAccess.ArgumentList.Arguments[0].Expression, context);
                 if (index is { IsExact: true, Value: { } indexTerm })
                     subject = indexTerm;
-                else if (SymbolicSemanticPipeline.LowerTerm(elementAccess.Expression, context) is
-                         { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiver })
+                else if (SymbolicSemanticPipeline.LowerTerm(elementAccess.Expression, context) is { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiver })
                     subject = receiver;
             }
         }
@@ -591,8 +541,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerArrayGetValueBoundsHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation is not IInvocationOperation invocationOperation ||
             operation.Syntax is not InvocationExpressionSyntax invocation ||
             !SymbolicRuntimeHazardSyntaxFacts.IsArrayGetValueInvocation(invocationOperation.TargetMethod) ||
@@ -611,14 +560,12 @@ internal static partial class SymbolicOperationLowerer
             indexExpressions.All(expression =>
                 CSharpSyntaxFacts.GetExpressionType(
                     expression, context.SemanticModel, context.CancellationToken)?.SpecialType ==
-                SpecialType.System_Int32))
-        {
+                SpecialType.System_Int32)) {
             var receiver = SymbolicSemanticPipeline.LowerTerm(receiverExpression, context);
             var bounds = SymbolicSemanticPipeline.LowerArrayElementBoundsCondition(
                 receiverExpression, indexExpressions, invocation, context);
             if (receiver is { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiverTerm } &&
-                bounds is { IsExact: true, Value: { } inRange })
-            {
+                bounds is { IsExact: true, Value: { } inRange }) {
                 subject = receiverTerm;
                 trigger = new SymbolicNotCondition(inRange);
                 if (arrayType.Rank > 1)
@@ -641,8 +588,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerIndexConstructionBoundsHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not ExpressionSyntax expression)
             return NoHazard(out hazard);
 
@@ -666,8 +612,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerSlicingBoundsHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation is not IInvocationOperation invocationOperation ||
             operation.Syntax is not InvocationExpressionSyntax invocation ||
             !SymbolicRuntimeHazardSyntaxFacts.TryGetSlicingInvocationShape(
@@ -701,8 +646,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerNullableValueCastHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (!TryGetBuiltInNonIdentityCast(operation, out var castExpression, out var targetType) ||
             !SymbolicRuntimeHazardSyntaxFacts.IsNullableValueCastShape(
                 castExpression,
@@ -722,8 +666,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerUnboxNullCastHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation is not IConversionOperation { Conversion.IsUserDefined: false } conversion ||
             operation.Syntax is not CastExpressionSyntax castExpression ||
             !SymbolicRuntimeHazardSyntaxFacts.IsUnboxingCastShape(
@@ -748,8 +691,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerInvalidCastHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (!TryGetBuiltInNonIdentityCast(operation, out var castExpression, out var targetType))
             return NoHazard(out hazard);
 
@@ -758,8 +700,7 @@ internal static partial class SymbolicOperationLowerer
             targetType,
             context.SemanticModel,
             context.CancellationToken);
-        if (!isUnboxing)
-        {
+        if (!isUnboxing) {
             var operandType = CSharpSyntaxFacts.GetExpressionType(
                 castExpression.Expression,
                 context.SemanticModel,
@@ -774,8 +715,7 @@ internal static partial class SymbolicOperationLowerer
         if (operandLowering is { IsExact: true, Value: SymbolicNullTerm })
             return NoHazard(out hazard);
 
-        SymbolicTerm? subject = operandLowering is
-            { IsExact: true, Value: { Kind: SmtValueKind.Reference } reference }
+        SymbolicTerm? subject = operandLowering is { IsExact: true, Value: { Kind: SmtValueKind.Reference } reference }
             ? reference
             : null;
         SymbolicCondition? trigger = null;
@@ -785,29 +725,25 @@ internal static partial class SymbolicOperationLowerer
                 castExpression,
                 context.SemanticModel,
                 context.CancellationToken,
-                out var exactRuntimeType))
-        {
+                out var exactRuntimeType)) {
             var valid = isUnboxing
                 ? SymbolicRuntimeTypeFacts.CanUnboxExactRuntimeTypeToValueType(exactRuntimeType, targetType)
                 : SymbolicRuntimeTypeFacts.CanCastExactRuntimeTypeToReferenceType(
                     exactRuntimeType, targetType, context.SemanticModel.Compilation);
             if (valid) return NoHazard(out hazard);
 
-            if (subject != null)
-            {
+            if (subject != null) {
                 trigger = SymbolicIrLowerer.CreateReferenceNullCondition(
                     subject, false, operand, "ir.runtime-hazard.reference.non-null.guard");
                 provenance = "ir.runtime-hazard.invalid-cast.exact-mismatch";
             }
-            else
-            {
+            else {
                 provenance = "ir.runtime-hazard.invalid-cast.exact-mismatch.unsupported";
             }
         }
         else if (!isUnboxing &&
                  subject != null &&
-                 SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey))
-        {
+                 SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey)) {
             var nonNull = SymbolicIrLowerer.CreateReferenceNullCondition(
                 subject, false, operand, "ir.runtime-hazard.invalid-cast.non-null");
             var isTargetType = new SymbolicFactCondition(SymbolicFact.Exact(
@@ -841,8 +777,7 @@ internal static partial class SymbolicOperationLowerer
     private static bool TryGetBuiltInNonIdentityCast(
         IOperation operation,
         out CastExpressionSyntax castExpression,
-        out ITypeSymbol targetType)
-    {
+        out ITypeSymbol targetType) {
         castExpression = null!;
         targetType = null!;
         if (operation is not IConversionOperation conversion ||
@@ -860,8 +795,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerArrayStoreMismatchHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not AssignmentExpressionSyntax assignment ||
             !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
             SymbolicRuntimeHazardSyntaxFacts.UnwrapExpression(assignment.Left) is not
@@ -882,13 +816,9 @@ internal static partial class SymbolicOperationLowerer
         if (declaredArrayType.Rank == 1 &&
             elementAccess.ArgumentList.Arguments.Count == 1 &&
             subject != null &&
-            SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(elementAccess, context) is
-                { IsExact: true, Value: { } inRange })
-        {
+            SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(elementAccess, context) is { IsExact: true, Value: { } inRange }) {
             SymbolicCondition? mismatch = null;
-            if (SymbolicSemanticPipeline.LowerTerm(assignment.Right, context) is
-                { IsExact: true, Value: SymbolicNullTerm })
-            {
+            if (SymbolicSemanticPipeline.LowerTerm(assignment.Right, context) is { IsExact: true, Value: SymbolicNullTerm }) {
                 mismatch = new SymbolicConstantCondition(false);
             }
             else if (SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
@@ -904,8 +834,7 @@ internal static partial class SymbolicOperationLowerer
                          assignment,
                          context.SemanticModel,
                          context.CancellationToken,
-                         out var exactAssignedType))
-            {
+                         out var exactAssignedType)) {
                 mismatch = new SymbolicConstantCondition(
                     !SymbolicRuntimeTypeFacts.CanStoreExactRuntimeTypeInArrayElement(
                         exactAssignedType,
@@ -913,8 +842,7 @@ internal static partial class SymbolicOperationLowerer
                         context.SemanticModel.Compilation));
             }
 
-            if (mismatch != null)
-            {
+            if (mismatch != null) {
                 var receiverNotNull = SymbolicIrLowerer.CreateReferenceNullCondition(
                     subject,
                     false,
@@ -943,21 +871,18 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerSwitchNoMatchHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not SwitchExpressionSyntax switchExpression)
             return NoHazard(out hazard);
 
         SymbolicCondition? selected = null;
-        foreach (var arm in switchExpression.Arms)
-        {
+        foreach (var arm in switchExpression.Arms) {
             if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmSymbolicCondition(
                     switchExpression.GoverningExpression,
                     arm,
                     context.SemanticModel,
                     context.CancellationToken,
-                    out var armCondition))
-            {
+                    out var armCondition)) {
                 hazard = CreateHazard(
                     switchExpression,
                     SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
@@ -992,19 +917,16 @@ internal static partial class SymbolicOperationLowerer
         SyntaxNode throwNode,
         bool isRethrow,
         string exceptionType,
-        SymbolicLoweringContext context)
-    {
+        SymbolicLoweringContext context) {
         var hazards = ImmutableArray.CreateBuilder<SymbolicHazardOperation>(2);
         SymbolicTerm? subject = null;
         SymbolicCondition? nullCondition = null;
         if (!isRethrow &&
-            SymbolicRuntimeExceptionFacts.TryGetThrowExpression(throwNode, out var expression))
-        {
+            SymbolicRuntimeExceptionFacts.TryGetThrowExpression(throwNode, out var expression)) {
             var operand = SymbolicSemanticPipeline.LowerTerm(expression, context);
             if (operand is { IsExact: true, Value: SymbolicNullTerm })
                 nullCondition = new SymbolicConstantCondition(true);
-            else if (operand is { IsExact: true, Value: { Kind: SmtValueKind.Reference } reference })
-            {
+            else if (operand is { IsExact: true, Value: { Kind: SmtValueKind.Reference } reference }) {
                 subject = reference;
                 nullCondition = SymbolicIrLowerer.CreateReferenceNullCondition(
                     reference, true, expression, "ir.runtime-hazard.throw-null.trigger");
@@ -1012,8 +934,7 @@ internal static partial class SymbolicOperationLowerer
         }
 
         SymbolicCondition directTrigger = new SymbolicConstantCondition(true);
-        if (nullCondition != null)
-        {
+        if (nullCondition != null) {
             hazards.Add(CreateHazard(
                 throwNode,
                 SymbolicRuntimeHazardKind.DirectThrow,
@@ -1043,8 +964,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerMathAbsOverflowHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation is not IInvocationOperation invocationOperation ||
             operation.Syntax is not InvocationExpressionSyntax invocation ||
             !invocationOperation.TargetMethod.IsStatic ||
@@ -1077,8 +997,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerMathClampBoundsHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation is not IInvocationOperation invocationOperation ||
             operation.Syntax is not InvocationExpressionSyntax invocation ||
             !invocationOperation.TargetMethod.IsStatic ||
@@ -1109,8 +1028,7 @@ internal static partial class SymbolicOperationLowerer
     internal static bool TryLowerKnownArgumentGuardHazard(
         IOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not InvocationExpressionSyntax invocation ||
             !SymbolicKnownGuardFacts.TryCreateArgumentOutOfRangeGuardConditions(
                 invocation,
@@ -1137,16 +1055,14 @@ internal static partial class SymbolicOperationLowerer
     private static bool TryLowerCheckedBinaryOverflow(
         IBinaryOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not BinaryExpressionSyntax expression ||
             operation.OperatorMethod != null ||
             !TryGetCheckedIntegralRange(expression, context, out var minValue, out var maxValue) ||
             !TryGetOverflowOperator(expression.Kind(), operation.IsChecked, minValue, out var smtOperator))
             return NoHazard(out hazard);
 
-        if (smtOperator is SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder)
-        {
+        if (smtOperator is SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder) {
             const string provenance = "ir.runtime-hazard.checked-integral.signed-division-overflow";
             var left = LowerIntegerTerm(expression.Left, context);
             var right = LowerIntegerTerm(expression.Right, context);
@@ -1180,8 +1096,7 @@ internal static partial class SymbolicOperationLowerer
     private static bool TryLowerCheckedUnaryOverflow(
         IUnaryOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not PrefixUnaryExpressionSyntax expression ||
             operation.OperatorKind != UnaryOperatorKind.Minus ||
             operation.OperatorMethod != null ||
@@ -1203,8 +1118,7 @@ internal static partial class SymbolicOperationLowerer
     private static bool TryLowerCheckedUpdateOverflow(
         IIncrementOrDecrementOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not ExpressionSyntax expression ||
             operation.Target.Syntax is not ExpressionSyntax operand ||
             operation.OperatorMethod != null ||
@@ -1231,8 +1145,7 @@ internal static partial class SymbolicOperationLowerer
     private static bool TryLowerCheckedCompoundOverflow(
         ICompoundAssignmentOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not AssignmentExpressionSyntax assignment ||
             operation.Target.Syntax is not ExpressionSyntax leftExpression ||
             operation.Value.Syntax is not ExpressionSyntax rightExpression ||
@@ -1243,8 +1156,7 @@ internal static partial class SymbolicOperationLowerer
             return NoHazard(out hazard);
 
         var left = LowerIntegerTerm(leftExpression, context);
-        if (smtOperator is SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder)
-        {
+        if (smtOperator is SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder) {
             const string provenance = "ir.runtime-hazard.checked-integral.compound-signed-division-overflow";
             var right = LowerIntegerTerm(rightExpression, context);
             var trigger = left != null && right != null
@@ -1277,8 +1189,7 @@ internal static partial class SymbolicOperationLowerer
     private static bool TryLowerCheckedConversionOverflow(
         IConversionOperation operation,
         SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard)
-    {
+        out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not CastExpressionSyntax cast ||
             operation.Operand.Syntax is not ExpressionSyntax operand ||
             !operation.IsChecked ||
@@ -1346,11 +1257,9 @@ internal static partial class SymbolicOperationLowerer
         string exceptionType,
         string category,
         string provenance,
-        bool preserveUnsupportedSubject = false)
-    {
+        bool preserveUnsupportedSubject = false) {
         var confidence = trigger == null ? SymbolicFactConfidence.Unsupported : SymbolicFactConfidence.Exact;
-        if (trigger == null)
-        {
+        if (trigger == null) {
             provenance += ".unsupported";
             if (!preserveUnsupportedSubject) subject = null;
             trigger = CreateUnsupportedHazardCondition(site, provenance);
@@ -1379,8 +1288,7 @@ internal static partial class SymbolicOperationLowerer
             source,
             provenance);
 
-    private static SymbolicTerm? LowerIntegerTerm(ExpressionSyntax expression, SymbolicLoweringContext context)
-    {
+    private static SymbolicTerm? LowerIntegerTerm(ExpressionSyntax expression, SymbolicLoweringContext context) {
         var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
         return lowering is { IsExact: true, Value: { Kind: SmtValueKind.Int } value } ? value : null;
     }
@@ -1395,8 +1303,7 @@ internal static partial class SymbolicOperationLowerer
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out long minValue,
-        out long maxValue)
-    {
+        out long maxValue) {
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
         return SymbolicTypeFacts.TryGetCheckedIntegralRange(
             typeInfo.ConvertedType ?? typeInfo.Type, out minValue, out maxValue);
@@ -1406,8 +1313,7 @@ internal static partial class SymbolicOperationLowerer
         SyntaxKind syntaxKind,
         bool isChecked,
         long minimum,
-        out SmtIntegerBinaryOperator smtOperator)
-    {
+        out SmtIntegerBinaryOperator smtOperator) {
         smtOperator = default;
         if (!SymbolicOperatorLowerer.TryGetBinaryTermOperator(syntaxKind, out var binaryOperator) ||
             (binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Subtract or
@@ -1420,14 +1326,12 @@ internal static partial class SymbolicOperationLowerer
         return true;
     }
 
-    private static bool NoHazard(out SymbolicHazardOperation hazard)
-    {
+    private static bool NoHazard(out SymbolicHazardOperation hazard) {
         hazard = null!;
         return false;
     }
 
-    private static SymbolicCondition CreateUnsupportedHazardCondition(SyntaxNode site, string provenance)
-    {
+    private static SymbolicCondition CreateUnsupportedHazardCondition(SyntaxNode site, string provenance) {
         var name = "unsupported_typed_projection#" + site.SpanStart.ToString(CultureInfo.InvariantCulture) +
                    "_" + site.Span.End.ToString(CultureInfo.InvariantCulture);
         return new SymbolicFactCondition(new SymbolicFact(

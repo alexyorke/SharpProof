@@ -6,12 +6,10 @@ return await ToolCommandHost.RunAsync(
     static exception => !SymbolicErrorClassifier.IsFatal(exception),
     exception => SymbolicCliErrorWriter.Write(exception, args));
 
-static async Task<int> RunAsync(string[] args)
-{
+static async Task<int> RunAsync(string[] args) {
     var expandedArguments = await SymbolicCliJsonRequest.ExpandArgumentsAsync(args, Console.In);
     var options = SymbolicCliOptions.Parse(expandedArguments);
-    if (options.ShowHelp || !options.HasSource)
-    {
+    if (options.ShowHelp || !options.HasSource) {
         Console.Error.WriteLine(SymbolicCliOptions.Usage);
         return options.ShowHelp ? 0 : 64;
     }
@@ -23,10 +21,8 @@ static async Task<int> RunAsync(string[] args)
         ? new SmtAnalysisService(options.CreateSmtOptions())
         : null;
 
-    if (options.Explain)
-    {
-        if (options.Json || options.Sarif || options.Markdown)
-        {
+    if (options.Explain) {
+        if (options.Json || options.Sarif || options.Markdown) {
             var report = await SymbolicCliExplainReport.CreateAsync(options, inputContext, smtAnalysis!);
             if (options.Sarif)
                 Console.WriteLine(JsonSerializer.Serialize(
@@ -39,8 +35,7 @@ static async Task<int> RunAsync(string[] args)
                     report,
                     SymbolicCliOutputPolicy.JsonOptions));
         }
-        else
-        {
+        else {
             await PrintExplainResultAsync(options, inputContext, smtAnalysis!);
         }
 
@@ -67,29 +62,23 @@ static async Task<int> RunAsync(string[] args)
     else if (result is SymbolicQueryResult queryResult)
         result = options.FilterResult(queryResult);
 
-    if (options.Json)
-    {
+    if (options.Json) {
         Console.WriteLine(JsonSerializer.Serialize(
             result,
             result.GetType(),
             SymbolicCliOutputPolicy.JsonOptions));
     }
-    else if (result is SymbolicRuntimeHazardQueryResult hazardResult)
-    {
+    else if (result is SymbolicRuntimeHazardQueryResult hazardResult) {
         PrintRuntimeHazardResult(hazardResult);
     }
-    else if (result is SymbolicComplexityResult complexityResult)
-    {
+    else if (result is SymbolicComplexityResult complexityResult) {
         PrintComplexityResult(complexityResult);
     }
-    else if (result is SymbolicCapabilityResult capabilityResult)
-    {
+    else if (result is SymbolicCapabilityResult capabilityResult) {
         PrintCapabilityResult(capabilityResult);
     }
-    else if (result is SymbolicQueryResult queryResult)
-    {
-        switch (queryResult.Scope.Kind)
-        {
+    else if (result is SymbolicQueryResult queryResult) {
+        switch (queryResult.Scope.Kind) {
             case SymbolicQueryScopeKind.File:
                 PrintFileResult(queryResult, options);
                 break;

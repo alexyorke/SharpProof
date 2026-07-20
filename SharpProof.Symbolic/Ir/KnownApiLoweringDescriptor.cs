@@ -6,13 +6,11 @@ internal delegate bool KnownApiLoweringHandler<TValue>(
     SymbolicLoweringContext context,
     out TValue value);
 
-internal sealed class KnownApiLoweringDescriptor<TValue>
-{
+internal sealed class KnownApiLoweringDescriptor<TValue> {
     public KnownApiLoweringDescriptor(
         SpecialType containingTypeSpecialType,
         string methodName,
-        KnownApiLoweringHandler<TValue> handler)
-    {
+        KnownApiLoweringHandler<TValue> handler) {
         ContainingTypeSpecialType = containingTypeSpecialType;
         MethodName = methodName;
         Handler = handler;
@@ -21,8 +19,7 @@ internal sealed class KnownApiLoweringDescriptor<TValue>
     public KnownApiLoweringDescriptor(
         string containingTypeMetadataName,
         string methodName,
-        KnownApiLoweringHandler<TValue> handler)
-    {
+        KnownApiLoweringHandler<TValue> handler) {
         ContainingTypeMetadataName = containingTypeMetadataName;
         MethodName = methodName;
         Handler = handler;
@@ -36,8 +33,7 @@ internal sealed class KnownApiLoweringDescriptor<TValue>
 
     public KnownApiLoweringHandler<TValue> Handler { get; }
 
-    public bool Matches(IMethodSymbol method)
-    {
+    public bool Matches(IMethodSymbol method) {
         if (!string.Equals(method.Name, MethodName, StringComparison.Ordinal)) return false;
 
         return ContainingTypeMetadataName == null

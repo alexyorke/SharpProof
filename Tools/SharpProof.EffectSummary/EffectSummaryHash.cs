@@ -1,7 +1,5 @@
-internal static class EffectSummaryHash
-{
-    internal static string FileSha256(string path)
-    {
+internal static class EffectSummaryHash {
+    internal static string FileSha256(string path) {
         using var stream = File.OpenRead(path);
         return LowerHex(SHA256.HashData(stream));
     }

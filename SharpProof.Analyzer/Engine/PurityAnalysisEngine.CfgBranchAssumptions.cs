@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
-{
-    private static bool ShouldAnalyzeExplicitConditionBranchValue(SyntaxNode branchValueSyntax)
-    {
+internal partial class PurityAnalysisEngine {
+    private static bool ShouldAnalyzeExplicitConditionBranchValue(SyntaxNode branchValueSyntax) {
         foreach (var ancestor in branchValueSyntax.AncestorsAndSelf())
             if (ancestor is IfStatementSyntax ||
                 ancestor is ConditionalExpressionSyntax ||
@@ -16,14 +14,10 @@ internal partial class PurityAnalysisEngine
         return false;
     }
 
-    private static bool ShouldAnalyzeStateSensitiveBranchValue(SyntaxNode branchValueSyntax)
-    {
-        return ShouldAnalyzeExplicitConditionBranchValue(branchValueSyntax) ||
+    private static bool ShouldAnalyzeStateSensitiveBranchValue(SyntaxNode branchValueSyntax) => ShouldAnalyzeExplicitConditionBranchValue(branchValueSyntax) ||
                IsReturnExpressionBranchValue(branchValueSyntax);
-    }
 
-    private static bool IsReturnExpressionBranchValue(SyntaxNode branchValueSyntax)
-    {
+    private static bool IsReturnExpressionBranchValue(SyntaxNode branchValueSyntax) {
         foreach (var ancestor in branchValueSyntax.AncestorsAndSelf())
             if (ancestor is ReturnStatementSyntax or ArrowExpressionClauseSyntax)
                 return true;
@@ -36,29 +30,24 @@ internal partial class PurityAnalysisEngine
         SemanticModel semanticModel,
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken,
-        out bool takeConditionalSuccessor)
-    {
+        out bool takeConditionalSuccessor) {
         takeConditionalSuccessor = false;
 
         if (branchValue?.ConstantValue.HasValue == true &&
-            branchValue.ConstantValue.Value is bool constantBool)
-        {
+            branchValue.ConstantValue.Value is bool constantBool) {
             takeConditionalSuccessor = constantBool;
             return true;
         }
 
-        if (branchValue?.Syntax is ExpressionSyntax expressionSyntax)
-        {
+        if (branchValue?.Syntax is ExpressionSyntax expressionSyntax) {
             if (ExecutionVisibility.IsConditionAlwaysTrueUsingSmt(expressionSyntax, semanticModel, cancellationToken,
-                    smtAnalysis))
-            {
+                    smtAnalysis)) {
                 takeConditionalSuccessor = true;
                 return true;
             }
 
             if (ExecutionVisibility.IsConditionAlwaysFalseUsingSmt(expressionSyntax, semanticModel, cancellationToken,
-                    smtAnalysis))
-            {
+                    smtAnalysis)) {
                 takeConditionalSuccessor = false;
                 return true;
             }
@@ -77,8 +66,7 @@ internal partial class PurityAnalysisEngine
         bool takeConditionalSuccessor,
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken,
-        out PurityAnalysisState successorState)
-    {
+        out PurityAnalysisState successorState) {
         successorState = currentState;
 
         if (branchValue is IIsNullOperation isNullOperation)
@@ -112,8 +100,7 @@ internal partial class PurityAnalysisEngine
         PurityAnalysisState currentState,
         SymbolicState nextPathState,
         SmtAnalysisService smtAnalysis,
-        out PurityAnalysisState successorState)
-    {
+        out PurityAnalysisState successorState) {
         successorState = currentState;
         if (IsPathStateUnsatisfiable(nextPathState, smtAnalysis))
             return false;
@@ -129,9 +116,7 @@ internal partial class PurityAnalysisEngine
         bool branchWhenTrue,
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken,
-        out PurityAnalysisState branchState)
-    {
-        return TryCreateSuccessorState(
+        out PurityAnalysisState branchState) => TryCreateSuccessorState(
             currentState,
             condition,
             semanticModel,
@@ -139,7 +124,6 @@ internal partial class PurityAnalysisEngine
             smtAnalysis,
             cancellationToken,
             out branchState);
-    }
 
     internal static bool TryGetKnownConditionValueFromPathFacts(
         PurityAnalysisState currentState,
@@ -147,13 +131,11 @@ internal partial class PurityAnalysisEngine
         SemanticModel semanticModel,
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken,
-        out bool value)
-    {
+        out bool value) {
         value = false;
 
         if (condition?.ConstantValue.HasValue == true &&
-            condition.ConstantValue.Value is bool constantBool)
-        {
+            condition.ConstantValue.Value is bool constantBool) {
             value = constantBool;
             return true;
         }
@@ -162,15 +144,13 @@ internal partial class PurityAnalysisEngine
         if (condition?.Syntax is not ExpressionSyntax expressionSyntax) return false;
 
         if (IsBranchAssumptionUnsatisfiable(currentState, expressionSyntax, true, semanticModel, smtAnalysis,
-                cancellationToken))
-        {
+                cancellationToken)) {
             value = false;
             return true;
         }
 
         if (IsBranchAssumptionUnsatisfiable(currentState, expressionSyntax, false, semanticModel, smtAnalysis,
-                cancellationToken))
-        {
+                cancellationToken)) {
             value = true;
             return true;
         }
@@ -183,8 +163,7 @@ internal partial class PurityAnalysisEngine
         IOperation? value,
         bool isNull,
         SmtAnalysisService smtAnalysis,
-        out PurityAnalysisState branchState)
-    {
+        out PurityAnalysisState branchState) {
         branchState = currentState;
 
         value = SkipImplicitConversions(value);
@@ -226,8 +205,7 @@ internal partial class PurityAnalysisEngine
         bool branchWhenTrue,
         SemanticModel semanticModel,
         SmtAnalysisService smtAnalysis,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var transition = SymbolicReachabilityLowerer.ApplyCondition(
                 currentState.PathState,
                 expressionSyntax,
@@ -244,14 +222,10 @@ internal partial class PurityAnalysisEngine
 
     private static bool IsPathStateUnsatisfiable(
         SymbolicState pathState,
-        SmtAnalysisService smtAnalysis)
-    {
-        return new SymbolicProofService(smtAnalysis).ClassifyReachability(pathState).Status ==
+        SmtAnalysisService smtAnalysis) => new SymbolicProofService(smtAnalysis).ClassifyReachability(pathState).Status ==
                SymbolicProofStatus.Unreachable;
-    }
 
-    internal static string GetSmtVariableName(ISymbol symbol, Func<ISymbol, int>? getSymbolVersion = null)
-    {
+    internal static string GetSmtVariableName(ISymbol symbol, Func<ISymbol, int>? getSymbolVersion = null) {
         var name = SymbolicFactFactory.GetSmtVariableName(symbol);
         var version = getSymbolVersion?.Invoke(symbol.OriginalDefinition) ?? 0;
         return version > 0

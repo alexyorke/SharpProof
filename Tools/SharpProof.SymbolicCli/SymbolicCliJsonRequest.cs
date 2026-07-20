@@ -1,5 +1,4 @@
-internal sealed class SymbolicCliJsonRequest
-{
+internal sealed class SymbolicCliJsonRequest {
     public int SchemaVersion { get; init; }
 
     public string[]? Arguments { get; init; }
@@ -7,8 +6,7 @@ internal sealed class SymbolicCliJsonRequest
     public static async Task<string[]> ExpandArgumentsAsync(
         string[] arguments,
         TextReader standardInput,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default) {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(standardInput);
 
@@ -22,8 +20,7 @@ internal sealed class SymbolicCliJsonRequest
             throw new ArgumentException(
                 "--request-json or --request-json-stdin must be the sole request selector and appear first.");
 
-        var json = arguments[0] switch
-        {
+        var json = arguments[0] switch {
             "--request-json" when arguments.Length == 2 => arguments[1],
             "--request-json" => throw new ArgumentException(
                 "--request-json requires exactly one JSON value and no other options."),
@@ -33,13 +30,11 @@ internal sealed class SymbolicCliJsonRequest
         };
 
         SymbolicCliJsonRequest request;
-        try
-        {
+        try {
             request = JsonSerializer.Deserialize<SymbolicCliJsonRequest>(json, SerializerOptions) ??
                       throw new ArgumentException("The JSON request envelope cannot be null.");
         }
-        catch (JsonException exception)
-        {
+        catch (JsonException exception) {
             throw SymbolicCliErrorWriter.CreateException(
                 SymbolicErrorCodes.ParseFailed,
                 SharpProofErrorCategory.Parse,
@@ -65,8 +60,7 @@ internal sealed class SymbolicCliJsonRequest
     private static bool IsRequestSelector(string? argument) =>
         argument is "--request-json" or "--request-json-stdin";
 
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
+    private static readonly JsonSerializerOptions SerializerOptions = new() {
         PropertyNameCaseInsensitive = true,
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };

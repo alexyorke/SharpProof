@@ -2,8 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace SharpProof.Symbolic.Smt;
 
-internal static class SmtNativeLibraryBootstrap
-{
+internal static class SmtNativeLibraryBootstrap {
     internal const string AnalyzerLocatorFileName = "SharpProof.NativeSmtLocator.txt";
 
     private const int RtldNow = 0x2;
@@ -13,27 +12,21 @@ internal static class SmtNativeLibraryBootstrap
     private static readonly HashSet<string> AttemptedLibraryPaths = new(StringComparer.OrdinalIgnoreCase);
     private static IntPtr s_libraryHandle;
 
-    internal static void TryLoadAdjacentLibrary()
-    {
-        try
-        {
+    internal static void TryLoadAdjacentLibrary() {
+        try {
             var assemblyDirectory = Path.GetDirectoryName(typeof(SmtAnalysisService).Assembly.Location);
             if (!string.IsNullOrWhiteSpace(assemblyDirectory)) TryLoadFromDirectories(new[] { assemblyDirectory });
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
+        catch (Exception ex) when (ex is not OperationCanceledException) {
         }
     }
 
-    internal static void TryLoadFromAnalyzerLocatorPaths(IEnumerable<string> paths)
-    {
+    internal static void TryLoadFromAnalyzerLocatorPaths(IEnumerable<string> paths) {
         if (paths == null) throw new ArgumentNullException(nameof(paths));
 
         var directories = new List<string>();
-        foreach (var path in paths)
-        {
-            try
-            {
+        foreach (var path in paths) {
+            try {
                 if (!string.Equals(
                         Path.GetFileName(path),
                         AnalyzerLocatorFileName,
@@ -43,46 +36,38 @@ internal static class SmtNativeLibraryBootstrap
                 var directory = Path.GetDirectoryName(path);
                 if (!string.IsNullOrWhiteSpace(directory)) directories.Add(directory);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
+            catch (Exception ex) when (ex is not OperationCanceledException) {
             }
         }
 
         TryLoadFromDirectories(directories);
     }
 
-    private static void TryLoadFromDirectories(IEnumerable<string> directories)
-    {
+    private static void TryLoadFromDirectories(IEnumerable<string> directories) {
         var fileName = GetNativeLibraryFileName();
         if (fileName == null) return;
 
-        foreach (var directory in directories)
-        {
+        foreach (var directory in directories) {
             string libraryPath;
-            try
-            {
+            try {
                 libraryPath = Path.GetFullPath(Path.Combine(directory, fileName));
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
+            catch (Exception ex) when (ex is not OperationCanceledException) {
                 continue;
             }
 
-            lock (Sync)
-            {
+            lock (Sync) {
                 if (s_libraryHandle != IntPtr.Zero) return;
                 if (!AttemptedLibraryPaths.Add(libraryPath) || !File.Exists(libraryPath)) continue;
 
-                try
-                {
+                try {
                     s_libraryHandle = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                         ? LoadLibraryWindows(libraryPath)
                         : RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
                             ? LoadLibraryMac(libraryPath, RtldNow | RtldGlobal)
                             : LoadLibraryLinux(libraryPath, RtldNow | RtldGlobal);
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
+                catch (Exception ex) when (ex is not OperationCanceledException) {
                     s_libraryHandle = IntPtr.Zero;
                 }
 
@@ -91,8 +76,7 @@ internal static class SmtNativeLibraryBootstrap
         }
     }
 
-    private static string? GetNativeLibraryFileName()
-    {
+    private static string? GetNativeLibraryFileName() {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return GetNativeLibraryFileName(OSPlatform.Windows, RuntimeInformation.ProcessArchitecture);
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -103,8 +87,7 @@ internal static class SmtNativeLibraryBootstrap
         return null;
     }
 
-    internal static string? GetNativeLibraryFileName(OSPlatform platform, Architecture architecture)
-    {
+    internal static string? GetNativeLibraryFileName(OSPlatform platform, Architecture architecture) {
         if (architecture != Architecture.X64) return null;
 
         if (platform == OSPlatform.Windows) return "libz3.dll";

@@ -1,15 +1,13 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class ReturnStatementPurityRule
-{
+internal partial class ReturnStatementPurityRule {
     private static bool TryGetDeconstructionElementInitializer(
         ILocalSymbol localSymbol,
         SyntaxNode observationSyntax,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out ExpressionSyntax initializerSyntax,
-        out SyntaxNode declarationSyntax)
-    {
+        out SyntaxNode declarationSyntax) {
         if (TryGetPriorDeconstructionAssignmentElementInitializer(
                 localSymbol,
                 observationSyntax,
@@ -28,8 +26,7 @@ internal partial class ReturnStatementPurityRule
             designation.FirstAncestorOrSelf<AssignmentExpressionSyntax>() is not { } assignment ||
             !TryGetTupleElementExpression(assignment.Right, path, out initializerSyntax) ||
             semanticModel.GetDeclaredSymbol(designation, cancellationToken) is not ILocalSymbol declaredSymbol ||
-            !SymbolEq.AreEqual(declaredSymbol, localSymbol))
-        {
+            !SymbolEq.AreEqual(declaredSymbol, localSymbol)) {
             initializerSyntax = null!;
             declarationSyntax = null!;
             return false;
@@ -45,8 +42,7 @@ internal partial class ReturnStatementPurityRule
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out ExpressionSyntax initializerSyntax,
-        out SyntaxNode declarationSyntax)
-    {
+        out SyntaxNode declarationSyntax) {
         initializerSyntax = null!;
         declarationSyntax = null!;
         var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();
@@ -57,8 +53,7 @@ internal partial class ReturnStatementPurityRule
             .DefaultIfEmpty(int.MinValue)
             .Min();
 
-        foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
-        {
+        foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>()) {
             cancellationToken.ThrowIfCancellationRequested();
             if (assignment.SpanStart <= localDeclarationStart ||
                 assignment.SpanStart >= observationSyntax.SpanStart ||
@@ -83,16 +78,14 @@ internal partial class ReturnStatementPurityRule
         ILocalSymbol localSymbol,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ImmutableArray<int> path)
-    {
+        out ImmutableArray<int> path) {
         var builder = ImmutableArray.CreateBuilder<int>();
         if (TryGetDeconstructionAssignmentTargetPathCore(
                 CSharpSyntaxFacts.UnwrapParentheses(target),
                 localSymbol,
                 semanticModel,
                 cancellationToken,
-                builder))
-        {
+                builder)) {
             path = builder.ToImmutable();
             return path.Length > 0;
         }
@@ -106,8 +99,7 @@ internal partial class ReturnStatementPurityRule
         ILocalSymbol localSymbol,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        ImmutableArray<int>.Builder path)
-    {
+        ImmutableArray<int>.Builder path) {
         target = CSharpSyntaxFacts.UnwrapParentheses(target);
         if (target is DeclarationExpressionSyntax declarationExpression)
             return TryGetDeconstructionDesignationPathForLocal(
@@ -123,8 +115,7 @@ internal partial class ReturnStatementPurityRule
             return true;
 
         if (target is TupleExpressionSyntax tuple)
-            for (var i = 0; i < tuple.Arguments.Count; i++)
-            {
+            for (var i = 0; i < tuple.Arguments.Count; i++) {
                 var count = path.Count;
                 path.Add(i);
                 if (TryGetDeconstructionAssignmentTargetPathCore(
@@ -146,16 +137,14 @@ internal partial class ReturnStatementPurityRule
         ILocalSymbol localSymbol,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        ImmutableArray<int>.Builder path)
-    {
+        ImmutableArray<int>.Builder path) {
         if (designation is SingleVariableDesignationSyntax singleVariable &&
             semanticModel.GetDeclaredSymbol(singleVariable, cancellationToken) is ILocalSymbol declaredLocal &&
             SymbolEq.AreEqual(declaredLocal, localSymbol))
             return true;
 
         if (designation is ParenthesizedVariableDesignationSyntax parenthesized)
-            for (var i = 0; i < parenthesized.Variables.Count; i++)
-            {
+            for (var i = 0; i < parenthesized.Variables.Count; i++) {
                 var count = path.Count;
                 path.Add(i);
                 if (TryGetDeconstructionDesignationPathForLocal(
@@ -174,15 +163,12 @@ internal partial class ReturnStatementPurityRule
 
     private static bool TryGetDeconstructionDesignationPath(
         SingleVariableDesignationSyntax designation,
-        out ImmutableArray<int> path)
-    {
+        out ImmutableArray<int> path) {
         var builder = ImmutableArray.CreateBuilder<int>();
         VariableDesignationSyntax current = designation;
-        while (current.Parent is ParenthesizedVariableDesignationSyntax parenthesized)
-        {
+        while (current.Parent is ParenthesizedVariableDesignationSyntax parenthesized) {
             var index = IndexOfDesignation(parenthesized, current);
-            if (index < 0)
-            {
+            if (index < 0) {
                 path = default;
                 return false;
             }
@@ -197,8 +183,7 @@ internal partial class ReturnStatementPurityRule
 
     private static int IndexOfDesignation(
         ParenthesizedVariableDesignationSyntax parenthesized,
-        VariableDesignationSyntax designation)
-    {
+        VariableDesignationSyntax designation) {
         for (var i = 0; i < parenthesized.Variables.Count; i++)
             if (ReferenceEquals(parenthesized.Variables[i], designation))
                 return i;
@@ -209,16 +194,13 @@ internal partial class ReturnStatementPurityRule
     private static bool TryGetTupleElementExpression(
         ExpressionSyntax tupleExpression,
         ImmutableArray<int> path,
-        out ExpressionSyntax elementExpression)
-    {
+        out ExpressionSyntax elementExpression) {
         elementExpression = tupleExpression;
-        foreach (var index in path)
-        {
+        foreach (var index in path) {
             elementExpression = CSharpSyntaxFacts.UnwrapParentheses(elementExpression);
             if (elementExpression is not TupleExpressionSyntax tuple ||
                 index < 0 ||
-                index >= tuple.Arguments.Count)
-            {
+                index >= tuple.Arguments.Count) {
                 elementExpression = null!;
                 return false;
             }

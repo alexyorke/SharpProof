@@ -3,28 +3,24 @@ using PurityAnalysisResult = SharpProof.Analyzer.Engine.PurityAnalysisEngine.Pur
 
 namespace SharpProof.Analyzer.Engine;
 
-internal static class PurityAnalysisStateMerger
-{
+internal static class PurityAnalysisStateMerger {
     internal static PurityAnalysisState MergeStates(
         PurityAnalysisState first, PurityAnalysisState second, int phiScope) =>
         MergeStatesAcrossAll(new[] { first, second }, phiScope);
 
     internal static PurityAnalysisState MergeStatesAcrossAll(
         IReadOnlyList<PurityAnalysisState> states,
-        int phiScope)
-    {
+        int phiScope) {
         if (states.Count == 0) return PurityAnalysisState.Pure;
 
         var hasImpurity = false;
         SyntaxNode? impurityNode = null;
         var impurityEvidence = PurityEvidence.None;
         var captures = ImmutableDictionary<CaptureId, PurityAnalysisResult>.Empty;
-        foreach (var state in states)
-        {
+        foreach (var state in states) {
             if (state.HasPotentialImpurity &&
                 (!hasImpurity || state.FirstImpureSyntaxNode != null &&
-                    (impurityNode == null || state.FirstImpureSyntaxNode.SpanStart < impurityNode.SpanStart)))
-            {
+                    (impurityNode == null || state.FirstImpureSyntaxNode.SpanStart < impurityNode.SpanStart))) {
                 hasImpurity = true;
                 impurityNode = state.FirstImpureSyntaxNode;
                 impurityEvidence = state.FirstImpurityEvidence;
@@ -68,19 +64,15 @@ internal static class PurityAnalysisStateMerger
         Func<PurityAnalysisState, ImmutableDictionary<TKey, TValue>> select,
         IEqualityComparer<TKey>? comparer,
         Func<TValue, TValue, (bool Keep, TValue Value)> merge)
-        where TKey : notnull
-    {
+        where TKey : notnull {
         var result = comparer == null
             ? ImmutableDictionary.CreateBuilder<TKey, TValue>()
             : ImmutableDictionary.CreateBuilder<TKey, TValue>(comparer);
         foreach (var pair in select(states[0])) result[pair.Key] = pair.Value;
-        for (var index = 1; index < states.Count; index++)
-        {
+        for (var index = 1; index < states.Count; index++) {
             var current = select(states[index]);
-            foreach (var key in result.Keys.ToArray())
-            {
-                if (!current.TryGetValue(key, out var other))
-                {
+            foreach (var key in result.Keys.ToArray()) {
+                if (!current.TryGetValue(key, out var other)) {
                     result.Remove(key);
                     continue;
                 }

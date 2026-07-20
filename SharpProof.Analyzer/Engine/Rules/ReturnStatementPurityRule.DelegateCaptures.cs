@@ -1,22 +1,19 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class ReturnStatementPurityRule
-{
+internal partial class ReturnStatementPurityRule {
     private static bool TryFindReturnedDelegateCapture(
         IOperation? returnedValue,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
         ReturnedDelegateCaptureKind captureKind,
         out SyntaxNode captureSyntax,
-        out ILocalSymbol capturedLocal)
-    {
+        out ILocalSymbol capturedLocal) {
         var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
         var delegateTarget = unwrappedReturnedValue is IDelegateCreationOperation delegateCreation
             ? PurityAnalysisEngine.SkipImplicitConversions(delegateCreation.Target)
             : unwrappedReturnedValue;
 
-        switch (delegateTarget)
-        {
+        switch (delegateTarget) {
             case IAnonymousFunctionOperation anonymousFunction:
                 return captureKind == ReturnedDelegateCaptureKind.FreshMutableObject
                     ? DelegateCreationPurityRule.TryFindCapturedFreshMutableObject(
@@ -77,8 +74,7 @@ internal partial class ReturnStatementPurityRule
         }
     }
 
-    private enum ReturnedDelegateCaptureKind
-    {
+    private enum ReturnedDelegateCaptureKind {
         FreshMutableObject,
         OwnedLocalArray
     }

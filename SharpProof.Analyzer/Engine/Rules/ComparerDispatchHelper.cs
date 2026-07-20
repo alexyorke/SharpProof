@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class ComparerDispatchHelper
-{
-    internal static IMethodSymbol? ResolveDefaultComparisonImplementation(ITypeSymbol keyType)
-    {
+internal static class ComparerDispatchHelper {
+    internal static IMethodSymbol? ResolveDefaultComparisonImplementation(ITypeSymbol keyType) {
         if (DispatchedMemberResolution.TryGetIComparableCompareToImplementation(
                 keyType,
                 out var genericImplementation))
@@ -20,8 +18,7 @@ internal static class ComparerDispatchHelper
         ITypeSymbol keyType,
         SyntaxNode useSyntax,
         PurityAnalysisContext context,
-        Func<PurityAnalysisEngine.PurityAnalysisResult> createUnknownResult)
-    {
+        Func<PurityAnalysisEngine.PurityAnalysisResult> createUnknownResult) {
         if (IsBuiltinValueComparerKey(keyType))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
@@ -34,28 +31,24 @@ internal static class ComparerDispatchHelper
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckSubtypeConstructorComparerPurity(
         INamedTypeSymbol receiverType,
         PurityAnalysisContext context,
-        Func<IOperation, PurityAnalysisEngine.PurityAnalysisResult> checkComparerValuePurity)
-    {
+        Func<IOperation, PurityAnalysisEngine.PurityAnalysisResult> checkComparerValuePurity) {
         foreach (var constructor in receiverType.InstanceConstructors)
-        foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
-        {
-            if (syntaxReference.GetSyntax(context.CancellationToken) is not ConstructorDeclarationSyntax
-                { Initializer: { } initializer })
-                continue;
+            foreach (var syntaxReference in constructor.DeclaringSyntaxReferences) {
+                if (syntaxReference.GetSyntax(context.CancellationToken) is not ConstructorDeclarationSyntax { Initializer: { } initializer })
+                    continue;
 
-            foreach (var argument in initializer.ArgumentList.Arguments)
-            {
-                var argumentOperation = CompilationSyntaxAccess.GetOperation(
-                    context.SemanticModel,
-                    argument.Expression,
-                    context.CancellationToken);
-                var value = PurityAnalysisEngine.SkipImplicitConversions(argumentOperation) ?? argumentOperation;
-                if (value?.Type == null || !IsComparerOrDerivedInterface(value.Type)) continue;
+                foreach (var argument in initializer.ArgumentList.Arguments) {
+                    var argumentOperation = CompilationSyntaxAccess.GetOperation(
+                        context.SemanticModel,
+                        argument.Expression,
+                        context.CancellationToken);
+                    var value = PurityAnalysisEngine.SkipImplicitConversions(argumentOperation) ?? argumentOperation;
+                    if (value?.Type == null || !IsComparerOrDerivedInterface(value.Type)) continue;
 
-                var comparerResult = checkComparerValuePurity(value);
-                if (!comparerResult.IsPure) return comparerResult;
+                    var comparerResult = checkComparerValuePurity(value);
+                    if (!comparerResult.IsPure) return comparerResult;
+                }
             }
-        }
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
@@ -65,8 +58,7 @@ internal static class ComparerDispatchHelper
         PurityAnalysisContext context,
         Func<ITypeSymbol?, bool> isCollectionType,
         Func<ITypeSymbol, bool> isComparerParameterType,
-        Func<IOperation, PurityAnalysisEngine.PurityAnalysisResult> checkComparerValuePurity)
-    {
+        Func<IOperation, PurityAnalysisEngine.PurityAnalysisResult> checkComparerValuePurity) {
         var unwrappedReceiver = PurityAnalysisEngine.SkipImplicitConversions(receiverOperation) ?? receiverOperation;
         if (unwrappedReceiver is IObjectCreationOperation objectCreationOperation)
             return CheckObjectCreationComparerPurity(
@@ -97,12 +89,10 @@ internal static class ComparerDispatchHelper
         PurityAnalysisContext context,
         Func<ITypeSymbol?, bool> isCollectionType,
         Func<ITypeSymbol, bool> isComparerParameterType,
-        Func<IOperation, PurityAnalysisEngine.PurityAnalysisResult> checkComparerValuePurity)
-    {
+        Func<IOperation, PurityAnalysisEngine.PurityAnalysisResult> checkComparerValuePurity) {
         if (!isCollectionType(objectCreationOperation.Type)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        foreach (var argument in objectCreationOperation.Arguments)
-        {
+        foreach (var argument in objectCreationOperation.Arguments) {
             var value = PurityAnalysisEngine.SkipImplicitConversions(argument.Value) ?? argument.Value;
             if (!IsComparerArgument(value, argument.Parameter?.Type, isComparerParameterType)) continue;
 
@@ -121,12 +111,9 @@ internal static class ComparerDispatchHelper
     private static bool IsComparerArgument(
         IOperation? value,
         ITypeSymbol? parameterType,
-        Func<ITypeSymbol, bool> isComparerParameterType)
-    {
-        return value?.Type != null &&
+        Func<ITypeSymbol, bool> isComparerParameterType) => value?.Type != null &&
                parameterType is INamedTypeSymbol namedParameterType &&
                (isComparerParameterType(namedParameterType) || IsComparerOrDerivedInterface(value.Type));
-    }
 
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckComparerValuePurity(
         IOperation value,
@@ -134,8 +121,7 @@ internal static class ComparerDispatchHelper
         SyntaxNode impureCalleeSyntax,
         IOperation unresolvedDispatchOperation,
         string ruleName,
-        ISymbol? unresolvedDispatchSymbol)
-    {
+        ISymbol? unresolvedDispatchSymbol) {
         value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
         var comparerType = value.Type;
         if (comparerType == null || IsNullOrDefaultComparerValue(value))
@@ -146,8 +132,7 @@ internal static class ComparerDispatchHelper
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var foundImplementation = false;
-        foreach (var comparisonMethod in EnumerateComparerImplementations(comparerType))
-        {
+        foreach (var comparisonMethod in EnumerateComparerImplementations(comparerType)) {
             foundImplementation = true;
             var comparisonPurity = PurityCalleeResolver.GetCalleePurityAtUse(comparisonMethod, impureCalleeSyntax, context);
             if (!comparisonPurity.IsPure) return comparisonPurity;
@@ -163,16 +148,14 @@ internal static class ComparerDispatchHelper
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
 
-    internal static bool IsNullOrDefaultComparerArgument(IArgumentOperation argument)
-    {
+    internal static bool IsNullOrDefaultComparerArgument(IArgumentOperation argument) {
         var value = PurityAnalysisEngine.SkipImplicitConversions(argument.Value) ?? argument.Value;
         return IsNullOrDefaultComparerValue(value) || IsDefaultComparerSingleton(value);
     }
 
     internal static bool IsTrustedGeneratedPureStringComparerSingleton(
         IOperation value,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (!TryGetStaticMetadataPropertyGetter(value, null, out var containingType, out var getterSymbol))
             return false;
 
@@ -181,17 +164,14 @@ internal static class ComparerDispatchHelper
         return IsTrustedGeneratedPureMetadataGetter(getterSymbol, context);
     }
 
-    internal static IEnumerable<IMethodSymbol> EnumerateComparerImplementations(ITypeSymbol comparerType)
-    {
+    internal static IEnumerable<IMethodSymbol> EnumerateComparerImplementations(ITypeSymbol comparerType) {
         if (comparerType is not INamedTypeSymbol namedComparerType) yield break;
 
         var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
-        foreach (var interfaceType in namedComparerType.AllInterfaces)
-        {
+        foreach (var interfaceType in namedComparerType.AllInterfaces) {
             if (!IsComparerInterface(interfaceType)) continue;
 
-            foreach (var interfaceMethod in interfaceType.GetMembers().OfType<IMethodSymbol>())
-            {
+            foreach (var interfaceMethod in interfaceType.GetMembers().OfType<IMethodSymbol>()) {
                 var implementation =
                     namedComparerType.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol;
                 if (implementation == null || implementation.DeclaringSyntaxReferences.Length == 0) continue;
@@ -201,8 +181,7 @@ internal static class ComparerDispatchHelper
         }
     }
 
-    internal static bool IsUnresolvedComparerDispatch(ITypeSymbol comparerType)
-    {
+    internal static bool IsUnresolvedComparerDispatch(ITypeSymbol comparerType) {
         if (comparerType is ITypeParameterSymbol typeParameter)
             return typeParameter.ConstraintTypes
                 .OfType<INamedTypeSymbol>()
@@ -217,14 +196,10 @@ internal static class ComparerDispatchHelper
         return IsComparerOrDerivedInterface(namedComparerType);
     }
 
-    internal static bool IsComparerOrDerivedInterface(ITypeSymbol typeSymbol)
-    {
-        return typeSymbol is INamedTypeSymbol namedType &&
+    internal static bool IsComparerOrDerivedInterface(ITypeSymbol typeSymbol) => typeSymbol is INamedTypeSymbol namedType &&
                (IsComparerInterface(namedType) || namedType.AllInterfaces.Any(IsComparerInterface));
-    }
 
-    internal static bool IsBuiltinValueComparerKey(ITypeSymbol keyType)
-    {
+    internal static bool IsBuiltinValueComparerKey(ITypeSymbol keyType) {
         if (keyType.TypeKind == TypeKind.Enum) return true;
 
         return keyType.SpecialType is
@@ -244,15 +219,13 @@ internal static class ComparerDispatchHelper
             SpecialType.System_String;
     }
 
-    private static bool IsComparerInterface(INamedTypeSymbol typeSymbol)
-    {
+    private static bool IsComparerInterface(INamedTypeSymbol typeSymbol) {
         var displayString = typeSymbol.OriginalDefinition.ToDisplayString();
         return displayString == "System.Collections.Generic.IEqualityComparer<T>" ||
                displayString == "System.Collections.Generic.IComparer<T>";
     }
 
-    private static bool IsNullOrDefaultComparerValue(IOperation value)
-    {
+    private static bool IsNullOrDefaultComparerValue(IOperation value) {
         value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
 
         if (value.ConstantValue.HasValue && value.ConstantValue.Value == null) return true;
@@ -260,20 +233,16 @@ internal static class ComparerDispatchHelper
         return value is IDefaultValueOperation;
     }
 
-    private static bool IsDefaultComparerSingleton(IOperation value)
-    {
-        return value is IPropertyReferenceOperation propertyReference &&
+    private static bool IsDefaultComparerSingleton(IOperation value) => value is IPropertyReferenceOperation propertyReference &&
                propertyReference.Property.Name == "Default" &&
                propertyReference.Property.ContainingType is INamedTypeSymbol containingType &&
                containingType.OriginalDefinition.ToDisplayString() is
                    "System.Collections.Generic.EqualityComparer<T>" or
                    "System.Collections.Generic.Comparer<T>";
-    }
 
     private static bool IsTrustedGeneratedPureDefaultComparerSingleton(
         IOperation value,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (!TryGetStaticMetadataPropertyGetter(value, "Default", out var containingType, out var getterSymbol))
             return false;
 
@@ -289,22 +258,18 @@ internal static class ComparerDispatchHelper
         IOperation value,
         string? propertyName,
         out INamedTypeSymbol containingType,
-        out IMethodSymbol getterSymbol)
-    {
+        out IMethodSymbol getterSymbol) {
         value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
-        if (value is IPropertyReferenceOperation
-            {
-                Property:
-                {
-                    IsStatic: true,
-                    Name: var candidatePropertyName,
-                    ContainingType: { } candidateContainingType,
-                    GetMethod: { } candidateGetterSymbol
-                }
-            } &&
+        if (value is IPropertyReferenceOperation {
+            Property: {
+                IsStatic: true,
+                Name: var candidatePropertyName,
+                ContainingType: { } candidateContainingType,
+                GetMethod: { } candidateGetterSymbol
+            }
+        } &&
             (propertyName == null || candidatePropertyName == propertyName) &&
-            PurityAnalysisEngine.IsMetadataSymbol(candidateGetterSymbol))
-        {
+            PurityAnalysisEngine.IsMetadataSymbol(candidateGetterSymbol)) {
             containingType = candidateContainingType;
             getterSymbol = candidateGetterSymbol;
             return true;
@@ -317,12 +282,9 @@ internal static class ComparerDispatchHelper
 
     private static bool IsTrustedGeneratedPureMetadataGetter(
         IMethodSymbol getterSymbol,
-        PurityAnalysisContext context)
-    {
-        return PurityAnalysisEngine.TryGetTrustedDefinitiveGeneratedPurity(
+        PurityAnalysisContext context) => PurityAnalysisEngine.TryGetTrustedDefinitiveGeneratedPurity(
                    getterSymbol,
                    context.SemanticModel.Compilation,
                    out var generatedPurity) &&
                generatedPurity.IsPure;
-    }
 }

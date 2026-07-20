@@ -1,14 +1,12 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class ExecutionVisibility
-{
+internal static partial class ExecutionVisibility {
     private static bool IsInUnreachableSwitchExpressionArm(
         SyntaxNode syntaxNode,
         SwitchExpressionSyntax switchExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis)
-    {
+        SmtAnalysisService? smtAnalysis) {
         var arm = switchExpression.Arms.FirstOrDefault(candidate =>
             candidate.Expression.Span.Contains(syntaxNode.SpanStart));
         if (arm == null ||

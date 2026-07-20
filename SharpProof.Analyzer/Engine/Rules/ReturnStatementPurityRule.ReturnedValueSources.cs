@@ -1,14 +1,11 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class ReturnStatementPurityRule
-{
+internal partial class ReturnStatementPurityRule {
     private static IOperation? GetSourceReturnedValueOperation(
         IReturnOperation returnOperation,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var expressionSyntax = returnOperation.Syntax switch
-        {
+        CancellationToken cancellationToken) {
+        var expressionSyntax = returnOperation.Syntax switch {
             ReturnStatementSyntax returnStatementSyntax => returnStatementSyntax.Expression,
             ArrowExpressionClauseSyntax arrowExpressionClauseSyntax => arrowExpressionClauseSyntax.Expression,
             _ => null
@@ -22,8 +19,7 @@ internal partial class ReturnStatementPurityRule
     private static bool IsAwaiterFactoryReturn(
         IMethodSymbol containingMethodSymbol,
         IOperation? returnedValue,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         if (containingMethodSymbol.Name != "GetAwaiter" ||
             containingMethodSymbol.Parameters.Length != 0)
             return false;
@@ -38,8 +34,7 @@ internal partial class ReturnStatementPurityRule
         return HasAwaiterPattern(awaiterType, compilation);
     }
 
-    private static bool HasAwaiterPattern(INamedTypeSymbol awaiterType, Compilation compilation)
-    {
+    private static bool HasAwaiterPattern(INamedTypeSymbol awaiterType, Compilation compilation) {
         var hasIsCompleted = awaiterType.GetMembers("IsCompleted")
             .OfType<IPropertySymbol>()
             .Any(property => property.Type.SpecialType == SpecialType.System_Boolean);
@@ -63,40 +58,33 @@ internal partial class ReturnStatementPurityRule
     private static bool IsKnownPureArrayFactoryReturn(
         IOperation? returnedValue,
         Compilation compilation,
-        out IMethodSymbol factoryMethod)
-    {
+        out IMethodSymbol factoryMethod) {
         return TryMatchReturnedValueAlternative(
             returnedValue,
             PurityKnownBclSemantics.UnwrapArrayOwnershipPreservingConversions,
             IsKnownPureArrayFactory,
             out factoryMethod);
 
-        bool IsKnownPureArrayFactory(IOperation? operation, out IMethodSymbol methodSymbol)
-        {
-            return PurityConcreteReceiverResolver.IsTrustedFreshArrayFactoryOperation(operation, compilation, out methodSymbol);
-        }
+        bool IsKnownPureArrayFactory(IOperation? operation, out IMethodSymbol methodSymbol) => PurityConcreteReceiverResolver.IsTrustedFreshArrayFactoryOperation(operation, compilation, out methodSymbol);
     }
 
     private static bool IsSpanToArrayReturn(
         IOperation? returnedValue,
-        out IMethodSymbol methodSymbol)
-    {
+        out IMethodSymbol methodSymbol) {
         return TryMatchReturnedValueAlternative(
             returnedValue,
             PurityKnownBclSemantics.UnwrapArrayOwnershipPreservingConversions,
             IsSpanToArray,
             out methodSymbol);
 
-        static bool IsSpanToArray(IOperation? operation, out IMethodSymbol methodSymbol)
-        {
+        static bool IsSpanToArray(IOperation? operation, out IMethodSymbol methodSymbol) {
             if (operation is IInvocationOperation invocationOperation &&
                 invocationOperation.Type is IArrayTypeSymbol &&
                 invocationOperation.TargetMethod?.OriginalDefinition is { } targetMethod &&
                 targetMethod.Name == "ToArray" &&
                 !targetMethod.IsStatic &&
                 targetMethod.ContainingType?.OriginalDefinition.ToDisplayString() is "System.Span<T>"
-                    or "System.ReadOnlySpan<T>")
-            {
+                    or "System.ReadOnlySpan<T>") {
                 methodSymbol = targetMethod;
                 return true;
             }
@@ -110,8 +98,7 @@ internal partial class ReturnStatementPurityRule
         IOperation? returnedValue,
         Func<IOperation?, IOperation?> normalize,
         ReturnedValueMatcher<TResult> match,
-        out TResult result)
-    {
+        out TResult result) {
         var normalizedReturnedValue = normalize(returnedValue);
         if (match(normalizedReturnedValue, out result)) return true;
 

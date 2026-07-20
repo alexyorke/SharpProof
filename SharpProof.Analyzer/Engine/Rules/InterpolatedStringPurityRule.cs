@@ -1,15 +1,12 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class InterpolatedStringPurityRule
-{
+internal class InterpolatedStringPurityRule {
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (operation is IInterpolatedStringHandlerArgumentPlaceholderOperation)
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (operation is IInterpolatedStringHandlerCreationOperation handlerCreation)
-        {
+        if (operation is IInterpolatedStringHandlerCreationOperation handlerCreation) {
             var handlerCreationResult = PurityAnalysisEngine.CheckSingleOperation(
                 handlerCreation.HandlerCreation,
                 context,
@@ -28,16 +25,13 @@ internal class InterpolatedStringPurityRule
 
         var isFormattableStringInvariantArgument = IsFormattableStringInvariantArgument(interpolatedString);
 
-        foreach (var part in interpolatedString.Parts)
-        {
+        foreach (var part in interpolatedString.Parts) {
             PurityAnalysisEngine.PurityAnalysisResult partResult;
 
-            if (part is IInterpolatedStringTextOperation)
-            {
+            if (part is IInterpolatedStringTextOperation) {
                 partResult = PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
-            else if (part is IInterpolationOperation interpolation)
-            {
+            else if (part is IInterpolationOperation interpolation) {
                 partResult = PurityAnalysisEngine.CheckSingleOperation(interpolation.Expression, context, currentState);
 
                 if (partResult.IsPure) partResult = CheckImplicitFormattingPurity(interpolation, context);
@@ -49,8 +43,7 @@ internal class InterpolatedStringPurityRule
                     partResult = CheckExplicitFormattingPurity(
                         interpolation.FormatString, interpolation, isFormattableStringInvariantArgument, context, currentState);
             }
-            else
-            {
+            else {
                 partResult = PurityAnalysisEngine.CheckSingleOperation(part, context, currentState);
             }
 
@@ -66,8 +59,7 @@ internal class InterpolatedStringPurityRule
     private static PurityAnalysisEngine.PurityAnalysisResult CheckExplicitFormattingPurity(
         IOperation? component, IInterpolationOperation interpolation, bool isFormattableStringInvariantArgument,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (component == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var result = PurityAnalysisEngine.CheckSingleOperation(component, context, currentState);
@@ -85,8 +77,7 @@ internal class InterpolatedStringPurityRule
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckImplicitFormattingPurity(
         IInterpolationOperation interpolation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         var expression = PurityAnalysisEngine.SkipImplicitConversions(interpolation.Expression);
         if (expression == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
@@ -148,11 +139,9 @@ internal class InterpolatedStringPurityRule
         return PurityCalleeResolver.GetCanonicalCalleePurityAtUse(originalDefinition, interpolation.Syntax, context);
     }
 
-    private static IMethodSymbol? FindParameterlessToString(INamedTypeSymbol type)
-    {
+    private static IMethodSymbol? FindParameterlessToString(INamedTypeSymbol type) {
         var current = type;
-        while (current != null)
-        {
+        while (current != null) {
             foreach (var member in current.GetMembers(nameof(ToString)))
                 if (member is IMethodSymbol method &&
                     !method.IsStatic &&
@@ -166,8 +155,7 @@ internal class InterpolatedStringPurityRule
         return null;
     }
 
-    private static bool IsPrimitiveOrEnumInterpolationValue(ITypeSymbol type)
-    {
+    private static bool IsPrimitiveOrEnumInterpolationValue(ITypeSymbol type) {
         if (type.TypeKind == TypeKind.Enum) return true;
 
         return SymbolicTypeFacts.IsBuiltInIntegralType(type) ||
@@ -178,8 +166,7 @@ internal class InterpolatedStringPurityRule
             SpecialType.System_Double;
     }
 
-    private static bool IsFormattableStringInvariantArgument(IInterpolatedStringOperation interpolatedString)
-    {
+    private static bool IsFormattableStringInvariantArgument(IInterpolatedStringOperation interpolatedString) {
         IOperation current = interpolatedString;
         while (current.Parent is IConversionOperation conversion &&
                ReferenceEquals(conversion.Operand, current))

@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class PropertyReferencePurityRule
-{
-    private static bool IsTrustedGeneratedMetadataGetter(IMethodSymbol getterSymbol)
-    {
+internal partial class PropertyReferencePurityRule {
+    private static bool IsTrustedGeneratedMetadataGetter(IMethodSymbol getterSymbol) {
         var containingType = getterSymbol.ContainingType?.OriginalDefinition.ToDisplayString();
         if (containingType == "System.Type")
             return getterSymbol.Name is

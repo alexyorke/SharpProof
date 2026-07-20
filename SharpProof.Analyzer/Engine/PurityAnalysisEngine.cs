@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
-{
+internal partial class PurityAnalysisEngine {
     private static readonly SymbolDisplayFormat _signatureFormat = new(
         SymbolDisplayGlobalNamespaceStyle.Omitted,
         SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
@@ -31,15 +30,13 @@ internal partial class PurityAnalysisEngine
 
 
     internal PurityAnalysisEngine(SmtAnalysisService smtAnalysis, SharpProofAttributeIdentityPolicy attributePolicy)
-        : this(smtAnalysis, attributePolicy, null)
-    {
+        : this(smtAnalysis, attributePolicy, null) {
     }
 
     internal PurityAnalysisEngine(
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        Func<IMethodSymbol, SemanticModel?>? semanticModelResolver)
-    {
+        Func<IMethodSymbol, SemanticModel?>? semanticModelResolver) {
         _smtAnalysis = smtAnalysis ?? throw new ArgumentNullException(nameof(smtAnalysis));
         _attributePolicy = attributePolicy ?? throw new ArgumentNullException(nameof(attributePolicy));
         _semanticModelResolver = semanticModelResolver;
@@ -47,16 +44,11 @@ internal partial class PurityAnalysisEngine
 
     private static SyntaxNode? GetDeclaringSyntax(
         IMethodSymbol methodSymbol,
-        CancellationToken cancellationToken)
-    {
-        return methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
-    }
+        CancellationToken cancellationToken) => methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
 
-    private static SyntaxNode? GetBodySyntaxNode(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
-    {
+    private static SyntaxNode? GetBodySyntaxNode(IMethodSymbol methodSymbol, CancellationToken cancellationToken) {
         var declaringSyntaxes = methodSymbol.DeclaringSyntaxReferences;
-        foreach (var syntaxRef in declaringSyntaxes)
-        {
+        foreach (var syntaxRef in declaringSyntaxes) {
             var syntaxNode = syntaxRef.GetSyntax(cancellationToken);
 
 
@@ -84,8 +76,7 @@ internal partial class PurityAnalysisEngine
         INamedTypeSymbol enforcePureAttributeSymbol,
         INamedTypeSymbol? allowSynchronizationAttributeSymbol,
         CancellationToken cancellationToken,
-        IReadOnlyDictionary<IMethodSymbol, PurityAnalysisResult>? initialPurityCache = null)
-    {
+        IReadOnlyDictionary<IMethodSymbol, PurityAnalysisResult>? initialPurityCache = null) {
         cancellationToken.ThrowIfCancellationRequested();
         var sourceNode = GetDeclaringSyntax(methodSymbol, cancellationToken);
         var limits = SymbolicAnalysisLimitContext.Limits;
@@ -123,8 +114,7 @@ internal partial class PurityAnalysisEngine
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var pathState = RequiresEntryStateBuilder.Create(
             methodSymbol,
             methodNode,
@@ -149,8 +139,7 @@ internal partial class PurityAnalysisEngine
         SyntaxNode? syntaxNode,
         SemanticModel semanticModel,
         SmtAnalysisService smtAnalysis,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (syntaxNode == null) return false;
         return GetOperationVisibilitySyntaxCandidates(syntaxNode).Any(syntax =>
             ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
@@ -160,23 +149,19 @@ internal partial class PurityAnalysisEngine
                 smtAnalysis));
     }
 
-    private static IEnumerable<SyntaxNode> GetOperationVisibilitySyntaxCandidates(SyntaxNode syntax)
-    {
+    private static IEnumerable<SyntaxNode> GetOperationVisibilitySyntaxCandidates(SyntaxNode syntax) {
         yield return syntax;
 
-        foreach (var ancestor in syntax.Ancestors())
-        {
+        foreach (var ancestor in syntax.Ancestors()) {
             if (ancestor is ConditionalAccessExpressionSyntax conditionalAccess &&
-                conditionalAccess.WhenNotNull.Span.Contains(syntax.SpanStart))
-            {
+                conditionalAccess.WhenNotNull.Span.Contains(syntax.SpanStart)) {
                 yield return conditionalAccess.WhenNotNull;
                 continue;
             }
 
             if (ancestor is BinaryExpressionSyntax binaryExpression &&
                 binaryExpression.IsKind(SyntaxKind.CoalesceExpression) &&
-                binaryExpression.Right.Span.Contains(syntax.SpanStart))
-            {
+                binaryExpression.Right.Span.Contains(syntax.SpanStart)) {
                 yield return binaryExpression.Right;
                 continue;
             }
@@ -185,8 +170,7 @@ internal partial class PurityAnalysisEngine
         }
     }
 
-    internal readonly struct PurityAnalysisState : IEquatable<PurityAnalysisState>
-    {
+    internal readonly struct PurityAnalysisState : IEquatable<PurityAnalysisState> {
         public bool HasPotentialImpurity { get; private init; }
         public SyntaxNode? FirstImpureSyntaxNode { get; private init; }
         public PurityEvidence FirstImpurityEvidence { get; private init; }
@@ -208,8 +192,7 @@ internal partial class PurityAnalysisEngine
             ImmutableDictionary<CaptureId, PotentialTargets>? flowCaptureTargets = null,
             PurityEvidence firstImpurityEvidence = default,
             SymbolicState? pathState = null,
-            ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null)
-        {
+            ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null) {
             HasPotentialImpurity = hasPotentialImpurity;
             FirstImpureSyntaxNode = firstImpureSyntaxNode;
             FirstImpurityEvidence = firstImpurityEvidence;
@@ -230,8 +213,7 @@ internal partial class PurityAnalysisEngine
             PurityAnalysisStateMerger.MergeStatesAcrossAll(states.ToList(), 0);
 
 
-        public bool Equals(PurityAnalysisState other)
-        {
+        public bool Equals(PurityAnalysisState other) {
             if (HasPotentialImpurity != other.HasPotentialImpurity ||
                 !Equals(FirstImpureSyntaxNode, other.FirstImpureSyntaxNode) ||
                 !FirstImpurityEvidence.Equals(other.FirstImpurityEvidence))
@@ -251,8 +233,7 @@ internal partial class PurityAnalysisEngine
             ImmutableDictionary<TKey, TValue> first,
             ImmutableDictionary<TKey, TValue> second,
             Func<TValue, TValue, bool> valuesEqual)
-            where TKey : notnull
-        {
+            where TKey : notnull {
             if (first.Count != second.Count) return false;
 
             foreach (var kvp in first)
@@ -267,34 +248,29 @@ internal partial class PurityAnalysisEngine
             obj is PurityAnalysisState other && Equals(other);
 
 
-        public override int GetHashCode()
-        {
+        public override int GetHashCode() {
             var hash = 17;
             hash = hash * 23 + HasPotentialImpurity.GetHashCode();
             hash = hash * 23 + (FirstImpureSyntaxNode?.GetHashCode() ?? 0);
             hash = hash * 23 + FirstImpurityEvidence.GetHashCode();
 
-            foreach (var kvp in DelegateTargetMap.OrderBy(kv => kv.Key.Name))
-            {
+            foreach (var kvp in DelegateTargetMap.OrderBy(kv => kv.Key.Name)) {
                 hash = hash * 23 + SymbolEq.Default.GetHashCode(kvp.Key);
                 hash = hash * 23 + kvp.Value.GetHashCode();
             }
 
-            foreach (var kvp in FlowCaptures.OrderBy(kv => kv.Key.GetHashCode()))
-            {
+            foreach (var kvp in FlowCaptures.OrderBy(kv => kv.Key.GetHashCode())) {
                 hash = hash * 23 + kvp.Key.GetHashCode();
                 hash = hash * 23 + (kvp.Value.IsPure ? 1 : 0);
                 hash = hash * 23 + (kvp.Value.ImpureSyntaxNode?.GetHashCode() ?? 0);
             }
 
-            foreach (var kvp in FlowCaptureTargets.OrderBy(kv => kv.Key.GetHashCode()))
-            {
+            foreach (var kvp in FlowCaptureTargets.OrderBy(kv => kv.Key.GetHashCode())) {
                 hash = hash * 23 + kvp.Key.GetHashCode();
                 hash = hash * 23 + kvp.Value.GetHashCode();
             }
 
-            foreach (var kvp in FlowCaptureSymbols.OrderBy(kv => kv.Key.GetHashCode()))
-            {
+            foreach (var kvp in FlowCaptureSymbols.OrderBy(kv => kv.Key.GetHashCode())) {
                 hash = hash * 23 + kvp.Key.GetHashCode();
                 hash = hash * 23 + SymbolEq.Default.GetHashCode(kvp.Value);
             }
@@ -309,8 +285,7 @@ internal partial class PurityAnalysisEngine
             return hash;
         }
 
-        private static bool SymbolicStatesEqual(SymbolicState first, SymbolicState second)
-        {
+        private static bool SymbolicStatesEqual(SymbolicState first, SymbolicState second) {
             if (first.Facts.Length != second.Facts.Length ||
                 first.PathConditions.Length != second.PathConditions.Length ||
                 first.IsContradictory != second.IsContradictory ||
@@ -331,23 +306,20 @@ internal partial class PurityAnalysisEngine
 
 
 
-        public PurityAnalysisState WithImpurity(PurityAnalysisResult result, SyntaxNode fallbackNode)
-        {
+        public PurityAnalysisState WithImpurity(PurityAnalysisResult result, SyntaxNode fallbackNode) {
             if (HasPotentialImpurity) return this;
             var node = result.ImpureSyntaxNode ?? fallbackNode;
             var evidence = result.Evidence.IsEmpty
                 ? PurityEvidence.Create("unsupported_operation", "UnsupportedOperation", syntaxNode: node)
                 : result.Evidence.WithSyntax(node);
-            return this with
-            {
+            return this with {
                 HasPotentialImpurity = true,
                 FirstImpureSyntaxNode = node,
                 FirstImpurityEvidence = evidence
             };
         }
 
-        public PurityAnalysisState WithDelegateTarget(ISymbol delegateSymbol, PotentialTargets targets)
-        {
+        public PurityAnalysisState WithDelegateTarget(ISymbol delegateSymbol, PotentialTargets targets) {
             var newMap = DelegateTargetMap.SetItem(delegateSymbol, targets);
             return this with { DelegateTargetMap = newMap };
         }
@@ -361,11 +333,9 @@ internal partial class PurityAnalysisEngine
         public PurityAnalysisState WithFlowCaptureConcreteType(
             CaptureId id,
             INamedTypeSymbol concreteType,
-            SyntaxNode source)
-        {
+            SyntaxNode source) {
             var term = CreateFlowCaptureReferenceTerm(id);
-            return this with
-            {
+            return this with {
                 PathState = SymbolicRuntimeTypeFacts.WithExactRuntimeType(
                     PathState,
                     term,
@@ -378,11 +348,9 @@ internal partial class PurityAnalysisEngine
         public PurityAnalysisState WithFlowCaptureSymbol(CaptureId id, ISymbol symbol) =>
             this with { FlowCaptureSymbols = FlowCaptureSymbols.SetItem(id, symbol) };
 
-        public PurityAnalysisState ResetFlowCaptureFacts(CaptureId id, SyntaxNode source)
-        {
+        public PurityAnalysisState ResetFlowCaptureFacts(CaptureId id, SyntaxNode source) {
             var term = CreateFlowCaptureReferenceTerm(id);
-            return this with
-            {
+            return this with {
                 PathState = SymbolicOperationTransferKernel.Invalidate(
                     PathState,
                     ImmutableArray.Create(new SymbolicInvalidationTarget(term.Name)),
@@ -391,15 +359,13 @@ internal partial class PurityAnalysisEngine
             };
         }
 
-        public PurityAnalysisState WithOwnedArrayFlowCapture(CaptureId id, SyntaxNode source)
-        {
+        public PurityAnalysisState WithOwnedArrayFlowCapture(CaptureId id, SyntaxNode source) {
             if (IsOwnedArrayFlowCapture(id)) return this;
 
             return this with { PathState = AddOwnedArrayFlowCaptureFacts(PathState, id, source) };
         }
 
-        public bool IsOwnedArrayFlowCapture(CaptureId id)
-        {
+        public bool IsOwnedArrayFlowCapture(CaptureId id) {
             var term = CreateFlowCaptureReferenceTerm(id);
             return PathState.Facts.Any(fact => IsOwnedArrayFlowCaptureFact(fact, term));
         }
@@ -407,8 +373,7 @@ internal partial class PurityAnalysisEngine
         private static SymbolicState AddOwnedArrayFlowCaptureFacts(
             SymbolicState pathState,
             CaptureId id,
-            SyntaxNode source)
-        {
+            SyntaxNode source) {
             var term = CreateFlowCaptureReferenceTerm(id);
             return SymbolicOperationTransferKernel.TransitionLifetime(
                 pathState,
@@ -419,27 +384,19 @@ internal partial class PurityAnalysisEngine
                 evidenceKey: "evidence.owned-array-flow-capture").State;
         }
 
-        private static SymbolicVariableTerm CreateFlowCaptureReferenceTerm(CaptureId id)
-        {
-            return new SymbolicVariableTerm(
+        private static SymbolicVariableTerm CreateFlowCaptureReferenceTerm(CaptureId id) => new SymbolicVariableTerm(
                 "flowCapture#" + id.GetHashCode().ToString(CultureInfo.InvariantCulture),
                 SmtValueKind.Reference);
-        }
 
-        private static bool IsOwnedArrayFlowCaptureFact(SymbolicFact fact, SymbolicTerm term)
-        {
-            return fact.Provenance.StartsWith("analyzer.owned-array-flow-capture.", StringComparison.Ordinal) &&
-                   fact.Atom switch
-                   {
+        private static bool IsOwnedArrayFlowCaptureFact(SymbolicFact fact, SymbolicTerm term) => fact.Provenance.StartsWith("analyzer.owned-array-flow-capture.", StringComparison.Ordinal) &&
+                   fact.Atom switch {
                        SymbolicFreshnessAtom freshness => Equals(freshness.Value, term),
                        SymbolicOwnershipAtom ownership => Equals(ownership.Value, term),
                        SymbolicResourceLifetimeAtom lifetime => Equals(lifetime.Resource, term),
                        _ => false
                    };
-        }
 
-        public bool IsOwnedLocalArraySymbol(ISymbol localSymbol)
-        {
+        public bool IsOwnedLocalArraySymbol(ISymbol localSymbol) {
             var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, this);
             return PathState.Facts.Any(fact =>
                 fact.Polarity &&
@@ -450,21 +407,16 @@ internal partial class PurityAnalysisEngine
                 fact.Provenance.StartsWith("analyzer.array.acquire.", StringComparison.Ordinal));
         }
 
-        public bool IsDefinitelyNullLocalSymbol(ISymbol localSymbol)
-        {
-            return SymbolicStateValueFacts.IsKnownNullReference(
+        public bool IsDefinitelyNullLocalSymbol(ISymbol localSymbol) => SymbolicStateValueFacts.IsKnownNullReference(
                 PathState,
                 PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, this));
-        }
 
         public PurityAnalysisState WithLocalConcreteType(
             ISymbol localSymbol,
             INamedTypeSymbol concreteType,
-            SyntaxNode source)
-        {
+            SyntaxNode source) {
             var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, this);
-            return this with
-            {
+            return this with {
                 PathState = SymbolicRuntimeTypeFacts.WithExactRuntimeType(
                     PathState,
                     term,
@@ -474,25 +426,20 @@ internal partial class PurityAnalysisEngine
             };
         }
 
-        public PurityAnalysisState WithoutLocalConcreteType(ISymbol localSymbol)
-        {
+        public PurityAnalysisState WithoutLocalConcreteType(ISymbol localSymbol) {
             var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, this);
             return this with { PathState = SymbolicRuntimeTypeFacts.WithoutExactRuntimeType(PathState, term) };
         }
 
-        public bool TryGetLocalConcreteType(ISymbol localSymbol, out INamedTypeSymbol concreteType)
-        {
+        public bool TryGetLocalConcreteType(ISymbol localSymbol, out INamedTypeSymbol concreteType) {
             var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, this);
             return SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(PathState, term, out concreteType);
         }
 
-        public bool TryGetFlowCaptureConcreteType(CaptureId id, out INamedTypeSymbol concreteType)
-        {
-            return SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+        public bool TryGetFlowCaptureConcreteType(CaptureId id, out INamedTypeSymbol concreteType) => SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
                 PathState,
                 CreateFlowCaptureReferenceTerm(id),
                 out concreteType);
-        }
 
         public bool TryGetFlowCaptureSymbol(CaptureId id, out ISymbol symbol) =>
             FlowCaptureSymbols.TryGetValue(id, out symbol!);
@@ -500,16 +447,14 @@ internal partial class PurityAnalysisEngine
         public PurityAnalysisState WithPathState(SymbolicState pathState) =>
             this with { PathState = pathState ?? new SymbolicState() };
 
-        public int GetSmtSymbolVersion(ISymbol symbol)
-        {
+        public int GetSmtSymbolVersion(ISymbol symbol) {
             var key = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
             return PathState.SymbolVersions.TryGetValue(key, out var version)
                 ? version
                 : 0;
         }
 
-        public PurityAnalysisState WithSmtSymbolDefinitionVersion(ISymbol symbol, SyntaxNode definitionSyntax)
-        {
+        public PurityAnalysisState WithSmtSymbolDefinitionVersion(ISymbol symbol, SyntaxNode definitionSyntax) {
             var originalDefinition = symbol.OriginalDefinition;
             var symbolKey = SymbolicFactFactory.GetSmtVariableName(originalDefinition);
             var nextVersion = SymbolicOperationTransferKernel.GetDefinitionVersion(definitionSyntax.Span);
@@ -523,8 +468,7 @@ internal partial class PurityAnalysisEngine
             return this with { PathState = pathState };
         }
 
-        private static bool PurityResultsEqual(PurityAnalysisResult a, PurityAnalysisResult b)
-        {
+        private static bool PurityResultsEqual(PurityAnalysisResult a, PurityAnalysisResult b) {
             if (a.IsPure != b.IsPure) return false;
             if (a.IsPure) return true;
             return Equals(a.ImpureSyntaxNode, b.ImpureSyntaxNode);
@@ -533,19 +477,16 @@ internal partial class PurityAnalysisEngine
     }
 
 
-    internal readonly struct PotentialTargets : IEquatable<PotentialTargets>
-    {
+    internal readonly struct PotentialTargets : IEquatable<PotentialTargets> {
         public ImmutableHashSet<IMethodSymbol> MethodSymbols { get; }
         public bool IsUnresolved { get; }
 
 
         public PotentialTargets(ImmutableHashSet<IMethodSymbol>? methodSymbols)
-            : this(methodSymbols, false)
-        {
+            : this(methodSymbols, false) {
         }
 
-        private PotentialTargets(ImmutableHashSet<IMethodSymbol>? methodSymbols, bool isUnresolved)
-        {
+        private PotentialTargets(ImmutableHashSet<IMethodSymbol>? methodSymbols, bool isUnresolved) {
             MethodSymbols = methodSymbols ?? ImmutableHashSet.Create<IMethodSymbol>(SymbolEq.Default);
             IsUnresolved = isUnresolved;
         }
@@ -553,32 +494,26 @@ internal partial class PurityAnalysisEngine
         public static PotentialTargets Empty => new(null);
         public static PotentialTargets Unresolved => new(null, true);
 
-        public static PotentialTargets FromSingle(IMethodSymbol methodSymbol)
-        {
+        public static PotentialTargets FromSingle(IMethodSymbol methodSymbol) {
             if (methodSymbol == null) return Empty;
             return new PotentialTargets(
                 ImmutableHashSet.Create<IMethodSymbol>(SymbolEq.Default, methodSymbol));
         }
 
 
-        public static PotentialTargets Merge(PotentialTargets first, PotentialTargets second)
-        {
+        public static PotentialTargets Merge(PotentialTargets first, PotentialTargets second) {
             if (first.IsUnresolved || second.IsUnresolved) return Unresolved;
 
             return new PotentialTargets(first.MethodSymbols.Union(second.MethodSymbols));
         }
 
-        public bool Equals(PotentialTargets other)
-        {
-            return IsUnresolved == other.IsUnresolved &&
+        public bool Equals(PotentialTargets other) => IsUnresolved == other.IsUnresolved &&
                    MethodSymbols.SetEquals(other.MethodSymbols);
-        }
 
         public override bool Equals(object obj) =>
             obj is PotentialTargets other && Equals(other);
 
-        public override int GetHashCode()
-        {
+        public override int GetHashCode() {
             var hash = IsUnresolved ? 31 : 17;
             foreach (var symbol in MethodSymbols.OrderBy(s => s.Name))
                 hash = hash * 23 + SymbolEq.Default.GetHashCode(symbol);
@@ -586,8 +521,7 @@ internal partial class PurityAnalysisEngine
         }
     }
 
-    public readonly struct PurityAnalysisResult
-    {
+    public readonly struct PurityAnalysisResult {
         public bool IsPure { get; }
 
 
@@ -601,8 +535,7 @@ internal partial class PurityAnalysisEngine
             bool isPure,
             SyntaxNode? impureSyntaxNode,
             PurityEvidence evidence,
-            SymbolicAnalysisTruncationInfo? analysisTruncation = null)
-        {
+            SymbolicAnalysisTruncationInfo? analysisTruncation = null) {
             IsPure = isPure;
             ImpureSyntaxNode = impureSyntaxNode;
             Evidence = evidence;
@@ -613,8 +546,7 @@ internal partial class PurityAnalysisEngine
         public static PurityAnalysisResult Pure => new(true, null, PurityEvidence.None);
 
 
-        public static PurityAnalysisResult Impure(SyntaxNode impureSyntaxNode)
-        {
+        public static PurityAnalysisResult Impure(SyntaxNode impureSyntaxNode) {
             if (impureSyntaxNode == null)
                 throw new ArgumentNullException(nameof(impureSyntaxNode),
                     "Use ImpureUnknownLocation for impurity without a specific node.");
@@ -622,8 +554,7 @@ internal partial class PurityAnalysisEngine
                 PurityEvidence.Create("unsupported_operation", "UnsupportedOperation", syntaxNode: impureSyntaxNode));
         }
 
-        public static PurityAnalysisResult Impure(SyntaxNode impureSyntaxNode, PurityEvidence evidence)
-        {
+        public static PurityAnalysisResult Impure(SyntaxNode impureSyntaxNode, PurityEvidence evidence) {
             if (impureSyntaxNode == null)
                 throw new ArgumentNullException(nameof(impureSyntaxNode),
                     "Use ImpureUnknownLocation for impurity without a specific node.");
@@ -638,15 +569,11 @@ internal partial class PurityAnalysisEngine
 
         public static PurityAnalysisResult ImpureUnknownLocation => new(false, null, PurityEvidence.Create("unknown"));
 
-        public PurityAnalysisResult WithEvidence(PurityEvidence evidence)
-        {
-            return IsPure
+        public PurityAnalysisResult WithEvidence(PurityEvidence evidence) => IsPure
                 ? this
                 : new PurityAnalysisResult(false, ImpureSyntaxNode, evidence, AnalysisTruncation);
-        }
 
-        public PurityAnalysisResult WithCallee(IMethodSymbol calleeSymbol, SyntaxNode? callSite)
-        {
+        public PurityAnalysisResult WithCallee(IMethodSymbol calleeSymbol, SyntaxNode? callSite) {
             if (IsPure) return this;
 
             var evidence = Evidence.IsEmpty
@@ -655,8 +582,7 @@ internal partial class PurityAnalysisEngine
             return new PurityAnalysisResult(false, callSite ?? ImpureSyntaxNode, evidence, AnalysisTruncation);
         }
 
-        public PurityAnalysisResult WithAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation)
-        {
+        public PurityAnalysisResult WithAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation) {
             if (truncation == null) throw new ArgumentNullException(nameof(truncation));
 
             return new PurityAnalysisResult(
@@ -676,8 +602,7 @@ internal partial class PurityAnalysisEngine
         string CalleeChain,
         string BclFallbackGuess,
         string BclFallbackConfidence,
-        string BclFallbackReason)
-    {
+        string BclFallbackReason) {
         public SymbolicUnknownReasonInfo UnknownReasonInfo =>
             SymbolicUnknownReasonTaxonomy.ForPurity(Category, BclFallbackReason);
 
@@ -696,8 +621,7 @@ internal partial class PurityAnalysisEngine
             string? operationKindOverride = null,
             string? bclFallbackGuess = null,
             string? bclFallbackConfidence = null,
-            string? bclFallbackReason = null)
-        {
+            string? bclFallbackReason = null) {
             var operationKind = operationKindOverride ??
                                 operation?.Kind.ToString() ?? syntaxNode?.Kind().ToString() ?? string.Empty;
             return new PurityEvidence(
@@ -712,15 +636,13 @@ internal partial class PurityAnalysisEngine
                 bclFallbackReason ?? string.Empty);
         }
 
-        public PurityEvidence WithSyntax(SyntaxNode syntaxNode)
-        {
+        public PurityEvidence WithSyntax(SyntaxNode syntaxNode) {
             if (!string.IsNullOrEmpty(OperationKind)) return this;
 
             return this with { OperationKind = syntaxNode.Kind().ToString() };
         }
 
-        public PurityEvidence WithCallee(string calleeSymbol, SyntaxNode? callSite)
-        {
+        public PurityEvidence WithCallee(string calleeSymbol, SyntaxNode? callSite) {
             var chain = string.IsNullOrEmpty(CalleeChain)
                 ? calleeSymbol
                 : calleeSymbol + " -> " + CalleeChain;
@@ -728,8 +650,7 @@ internal partial class PurityAnalysisEngine
                 ? OperationKind
                 : callSite?.Kind().ToString() ?? string.Empty;
 
-            return this with
-            {
+            return this with {
                 Category = string.IsNullOrEmpty(Category) ? "impure_callee" : Category,
                 OperationKind = operationKind,
                 Symbol = string.IsNullOrEmpty(Symbol) ? calleeSymbol : Symbol,
@@ -740,8 +661,7 @@ internal partial class PurityAnalysisEngine
         public PurityEvidence WithSymbol(string symbol) =>
             this with { Symbol = symbol };
 
-        public ImmutableDictionary<string, string?> ToDiagnosticProperties()
-        {
+        public ImmutableDictionary<string, string?> ToDiagnosticProperties() {
             var builder = ImmutableDictionary.CreateBuilder<string, string?>(StringComparer.Ordinal);
             AddIfPresent(builder, DiagnosticPropertyNames.ImpurityCategoryProperty, Category);
             AddIfPresent(builder, DiagnosticPropertyNames.ImpurityRuleProperty, RuleName);
@@ -758,11 +678,9 @@ internal partial class PurityAnalysisEngine
                 : properties;
         }
 
-        public string ToSummary()
-        {
+        public string ToSummary() {
             var category = GetSummaryCategoryText(Category);
-            if (!string.IsNullOrEmpty(Symbol))
-            {
+            if (!string.IsNullOrEmpty(Symbol)) {
                 var summary = category + " at " + Symbol;
                 return string.IsNullOrEmpty(BclFallbackGuess)
                     ? summary
@@ -774,12 +692,10 @@ internal partial class PurityAnalysisEngine
                 : category + " with non-authoritative BCL fallback guess " + BclFallbackGuess;
         }
 
-        private static string GetSummaryCategoryText(string category)
-        {
+        private static string GetSummaryCategoryText(string category) {
             if (string.IsNullOrEmpty(category)) return "unknown";
 
-            return category switch
-            {
+            return category switch {
                 "unknown_external_call" => "unverified external call",
                 "bcl_fallback_probably_pure" => "unverified framework metadata member",
                 "bcl_fallback_probably_impure" => "unverified framework metadata member",
@@ -788,21 +704,16 @@ internal partial class PurityAnalysisEngine
             };
         }
 
-        private static void AddIfPresent(ImmutableDictionary<string, string?>.Builder builder, string key, string value)
-        {
+        private static void AddIfPresent(ImmutableDictionary<string, string?>.Builder builder, string key, string value) {
             if (!string.IsNullOrWhiteSpace(value)) builder[key] = value;
         }
     }
 
-    private static PurityEvidence CreateUnsupportedOperationEvidence(IOperation operation)
-    {
-        return IsUnsafePointerOperation(operation)
+    private static PurityEvidence CreateUnsupportedOperationEvidence(IOperation operation) => IsUnsafePointerOperation(operation)
             ? PurityEvidence.Create("unsafe_pointer", "UnsupportedOperation", operation)
             : PurityEvidence.Create("unsupported_operation", "UnsupportedOperation", operation);
-    }
 
-    private static bool IsUnsafePointerOperation(IOperation operation)
-    {
+    private static bool IsUnsafePointerOperation(IOperation operation) {
         var operationKind = operation.Kind.ToString();
         var typeKind = operation.Type?.TypeKind.ToString() ?? string.Empty;
 
@@ -814,8 +725,7 @@ internal partial class PurityAnalysisEngine
                typeKind.IndexOf("Pointer", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
-    internal static PurityAnalysisResult ImpureResult(SyntaxNode? syntaxNode, PurityEvidence evidence = default)
-    {
+    internal static PurityAnalysisResult ImpureResult(SyntaxNode? syntaxNode, PurityEvidence evidence = default) {
         if (syntaxNode != null)
             return evidence.IsEmpty
                 ? PurityAnalysisResult.Impure(syntaxNode)
@@ -828,8 +738,7 @@ internal partial class PurityAnalysisEngine
 
     internal static PurityAnalysisResult CheckStaticConstructorPurity(
         ITypeSymbol? typeSymbol,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (typeSymbol == null) return PurityAnalysisResult.Pure;
 
 

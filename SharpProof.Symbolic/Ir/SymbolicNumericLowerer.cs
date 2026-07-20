@@ -1,12 +1,10 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicNumericLowerer
-{
+internal static class SymbolicNumericLowerer {
     internal static bool TryLowerDefaultValueTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         term = null!;
         if (!expression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression) &&
             expression is not DefaultExpressionSyntax)
@@ -16,20 +14,17 @@ internal static class SymbolicNumericLowerer
         var type = typeInfo.ConvertedType ?? typeInfo.Type;
         if (type == null) return false;
 
-        if (type.SpecialType == SpecialType.System_Boolean)
-        {
+        if (type.SpecialType == SpecialType.System_Boolean) {
             term = new SymbolicBooleanConstantTerm(false);
             return true;
         }
 
-        if (SymbolicTypeLowerer.IsIntegerSmtType(type))
-        {
+        if (SymbolicTypeLowerer.IsIntegerSmtType(type)) {
             term = new SymbolicIntegerConstantTerm(0);
             return true;
         }
 
-        if (type.IsReferenceType)
-        {
+        if (type.IsReferenceType) {
             term = new SymbolicNullTerm();
             return true;
         }
@@ -41,8 +36,7 @@ internal static class SymbolicNumericLowerer
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         term = null!;
         if (!TryGetIntegralMathInvocation(invocation, method, 3, context, out var operation) ||
             !TryLowerIntegralMathArgument(operation, 0, context, out var value) ||
@@ -76,8 +70,7 @@ internal static class SymbolicNumericLowerer
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         term = null!;
         if (!TryGetIntegralMathInvocation(invocation, method, 1, context, out var operation) ||
             !TryLowerIntegralMathArgument(operation, 0, context, out var value))
@@ -103,8 +96,7 @@ internal static class SymbolicNumericLowerer
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         term = null!;
         if (!TryGetIntegralMathInvocation(invocation, method, 2, context, out var operation) ||
             !TryLowerIntegralMathArgument(operation, 0, context, out var left) ||
@@ -128,8 +120,7 @@ internal static class SymbolicNumericLowerer
         IInvocationOperation operation,
         int parameterIndex,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         term = null!;
         return parameterIndex >= 0 &&
                parameterIndex < operation.TargetMethod.Parameters.Length &&
@@ -147,15 +138,13 @@ internal static class SymbolicNumericLowerer
         IMethodSymbol method,
         int expectedArity,
         SymbolicLoweringContext context,
-        out IInvocationOperation operation)
-    {
+        out IInvocationOperation operation) {
         if (method.IsStatic &&
             method.Parameters.Length == expectedArity &&
             SymbolicTypeLowerer.IsIntegerSmtType(method.ReturnType) &&
             method.Parameters.All(static parameter => SymbolicTypeLowerer.IsIntegerSmtType(parameter.Type)) &&
             context.SemanticModel.GetOperation(invocation, context.CancellationToken) is
-                IInvocationOperation invocationOperation)
-        {
+                IInvocationOperation invocationOperation) {
             operation = invocationOperation;
             return true;
         }
@@ -164,25 +153,20 @@ internal static class SymbolicNumericLowerer
         return false;
     }
 
-    internal static bool TryLowerBigIntegerStaticValueMember(ISymbol? memberSymbol, out SymbolicTerm term)
-    {
+    internal static bool TryLowerBigIntegerStaticValueMember(ISymbol? memberSymbol, out SymbolicTerm term) {
         if (memberSymbol is IPropertySymbol property &&
-            IsBigIntegerType(property.Type))
-        {
-            if (string.Equals(property.Name, "Zero", StringComparison.Ordinal))
-            {
+            IsBigIntegerType(property.Type)) {
+            if (string.Equals(property.Name, "Zero", StringComparison.Ordinal)) {
                 term = new SymbolicIntegerConstantTerm(0);
                 return true;
             }
 
-            if (string.Equals(property.Name, "One", StringComparison.Ordinal))
-            {
+            if (string.Equals(property.Name, "One", StringComparison.Ordinal)) {
                 term = new SymbolicIntegerConstantTerm(1);
                 return true;
             }
 
-            if (string.Equals(property.Name, "MinusOne", StringComparison.Ordinal))
-            {
+            if (string.Equals(property.Name, "MinusOne", StringComparison.Ordinal)) {
                 term = new SymbolicIntegerConstantTerm(-1);
                 return true;
             }
@@ -192,10 +176,7 @@ internal static class SymbolicNumericLowerer
         return false;
     }
 
-    internal static bool IsBigIntegerType(ITypeSymbol type)
-    {
-        return string.Equals(type.ContainingNamespace?.ToDisplayString(), "System.Numerics",
+    internal static bool IsBigIntegerType(ITypeSymbol type) => string.Equals(type.ContainingNamespace?.ToDisplayString(), "System.Numerics",
                    StringComparison.Ordinal) &&
                string.Equals(type.Name, "BigInteger", StringComparison.Ordinal);
-    }
 }

@@ -1,5 +1,4 @@
-internal static class EffectSummarySemanticWrapperRules
-{
+internal static class EffectSummarySemanticWrapperRules {
     private static readonly SemanticPureWrapperRule[] SemanticPureWrapperRules =
     [
         new(HasPureInvariantTextInfoStringWrapperPattern, "internal_only"),
@@ -15,8 +14,7 @@ internal static class EffectSummarySemanticWrapperRules
 
     internal static bool TryClassifySemanticPureWrapper(
         MethodEffectSummary summary,
-        out MethodPurityClassification classification)
-    {
+        out MethodPurityClassification classification) {
         classification = default!;
 
         var rule = SemanticPureWrapperRules.FirstOrDefault(candidate => candidate.Predicate(summary));
@@ -38,13 +36,10 @@ internal static class EffectSummarySemanticWrapperRules
         return true;
     }
 
-    private static string GetGuardedRewriteVisibility(MethodEffectSummary summary)
-    {
-        return summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
+    private static string GetGuardedRewriteVisibility(MethodEffectSummary summary) => summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
                summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal)
             ? "internal_only"
             : "none";
-    }
 
     private sealed record SemanticPureWrapperRule(
         Func<MethodEffectSummary, bool> Predicate,
@@ -52,9 +47,7 @@ internal static class EffectSummarySemanticWrapperRules
         Func<MethodEffectSummary, string>? VisibilitySelector = null,
         bool TreatsByRefLikeViewWrapperAsPure = false);
 
-    internal static bool IsPureRuntimeIntrinsicStub(string symbol)
-    {
-        return string.Equals(symbol, "object..ctor()", StringComparison.Ordinal) ||
+    internal static bool IsPureRuntimeIntrinsicStub(string symbol) => string.Equals(symbol, "object..ctor()", StringComparison.Ordinal) ||
                string.Equals(symbol, "System.Object..ctor()", StringComparison.Ordinal) ||
                symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
                symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsPointer(", StringComparison.Ordinal) ||
@@ -62,35 +55,23 @@ internal static class EffectSummarySemanticWrapperRules
                symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
                string.Equals(symbol, "System.Runtime.CompilerServices.Unsafe.SizeOf()", StringComparison.Ordinal) ||
                IsFastAllocateString(symbol);
-    }
 
-    internal static bool IsFastAllocateString(string symbol)
-    {
-        return string.Equals(symbol, "string.FastAllocateString(int)", StringComparison.Ordinal) ||
+    internal static bool IsFastAllocateString(string symbol) => string.Equals(symbol, "string.FastAllocateString(int)", StringComparison.Ordinal) ||
                string.Equals(symbol, "System.String.FastAllocateString(int)", StringComparison.Ordinal);
-    }
 
-    internal static bool HasPureInvariantTextInfoStringWrapperPattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "calls_method", "reads_static_field") &&
+    internal static bool HasPureInvariantTextInfoStringWrapperPattern(MethodEffectSummary summary) => CallsOnly(summary, "calls_method", "reads_static_field") &&
                RootsAreSemanticallyPureWrapperCompatible(summary) &&
                summary.Fields.Length == 1 &&
                string.Equals(summary.Fields[0], "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) &&
                summary.Calls.Any(IsInvariantTextInfoStringWrapperCall) &&
                summary.Calls.All(IsInvariantTextInfoStringWrapperCall);
-    }
 
-    internal static bool HasPureTypeIdentityWrapperPattern(MethodEffectSummary summary)
-    {
-        return HasFieldlessDynamicDispatchWrapperShape(summary) &&
+    internal static bool HasPureTypeIdentityWrapperPattern(MethodEffectSummary summary) => HasFieldlessDynamicDispatchWrapperShape(summary) &&
                IsTypeIdentityWrapperMethod(summary.Symbol) &&
                summary.Calls.Any(IsTypeIdentityWrapperAnchorCall) &&
                summary.Calls.All(IsTypeIdentityWrapperCall);
-    }
 
-    internal static bool HasPureStringHashWrapperPattern(MethodEffectSummary summary)
-    {
-        return HasReturnType(summary.Identity, "named:System.Int32") &&
+    internal static bool HasPureStringHashWrapperPattern(MethodEffectSummary summary) => HasReturnType(summary.Identity, "named:System.Int32") &&
                CallsOnly(summary, "calls_method", "reads_instance_field") &&
                summary.RootCandidates.Length == 0 &&
                summary.Calls.Any(static call =>
@@ -102,11 +83,8 @@ internal static class EffectSummarySemanticWrapperRules
                summary.Fields.All(static field =>
                    string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
                    string.Equals(field, "System.String._stringLength", StringComparison.Ordinal));
-    }
 
-    internal static bool HasPureCharReplaceStringWrapperPattern(MethodEffectSummary summary)
-    {
-        return string.Equals(summary.Symbol, "System.String.Replace(char, char)", StringComparison.Ordinal) &&
+    internal static bool HasPureCharReplaceStringWrapperPattern(MethodEffectSummary summary) => string.Equals(summary.Symbol, "System.String.Replace(char, char)", StringComparison.Ordinal) &&
                CallsOnly(summary, "calls_method", "reads_instance_field") &&
                summary.RootCandidates.Length == 0 &&
                summary.Calls.Any(IsFastAllocateStringCall) &&
@@ -117,42 +95,30 @@ internal static class EffectSummarySemanticWrapperRules
                summary.Calls.All(IsCharReplaceStringWrapperCall) &&
                summary.Fields.All(static field =>
                    string.Equals(field, "System.String._firstChar", StringComparison.Ordinal));
-    }
 
-    internal static bool HasPureFreshAllocatedStringCopyCorePattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "calls_method", "reads_instance_field") &&
+    internal static bool HasPureFreshAllocatedStringCopyCorePattern(MethodEffectSummary summary) => CallsOnly(summary, "calls_method", "reads_instance_field") &&
                RootsAreSemanticallyPureWrapperCompatible(summary) &&
                summary.Calls.Any(IsFastAllocateStringCall) &&
                summary.Calls.Any(IsBufferMemmoveCall) &&
                summary.Calls.All(IsFreshAllocatedStringCopyCoreCall) &&
                summary.Fields.All(static field =>
                    string.Equals(field, "System.String._firstChar", StringComparison.Ordinal));
-    }
 
-    internal static bool HasPureStringLengthCheckedConcatWrapperPattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "calls_method", "reads_static_field") &&
+    internal static bool HasPureStringLengthCheckedConcatWrapperPattern(MethodEffectSummary summary) => CallsOnly(summary, "calls_method", "reads_static_field") &&
                RootsAreSemanticallyPureWrapperCompatible(summary) &&
                summary.Calls.Any(IsFastAllocateStringCall) &&
                summary.Calls.Any(static call => string.Equals(call,
                    "string.CopyStringContent(string, int, string)->void", StringComparison.Ordinal)) &&
                summary.Calls.All(IsStringLengthCheckedConcatWrapperCall);
-    }
 
-    internal static bool HasPureStringArrayConcatWrapperPattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "calls_method", "reads_static_field") &&
+    internal static bool HasPureStringArrayConcatWrapperPattern(MethodEffectSummary summary) => CallsOnly(summary, "calls_method", "reads_static_field") &&
                RootsAreSemanticallyPureWrapperCompatible(summary) &&
                summary.Calls.Any(IsFastAllocateStringCall) &&
                summary.Calls.Any(static call =>
                    string.Equals(call, "System.Array.Clone()->object", StringComparison.Ordinal)) &&
                summary.Calls.All(IsStringArrayConcatWrapperCall);
-    }
 
-    internal static bool HasPureGuardedImmutableStringRewriteWrapperPattern(MethodEffectSummary summary)
-    {
-        return HasReturnType(summary.Identity, "named:System.String") &&
+    internal static bool HasPureGuardedImmutableStringRewriteWrapperPattern(MethodEffectSummary summary) => HasReturnType(summary.Identity, "named:System.String") &&
                CallsOnly(summary, "allocates_object", "calls_method", "reads_instance_field", "reads_static_field") &&
                RootsAreSemanticallyPureWrapperCompatible(summary) &&
                summary.Calls.Any(IsFastAllocateStringCall) &&
@@ -163,11 +129,8 @@ internal static class EffectSummarySemanticWrapperRules
                summary.Fields.All(static field =>
                    string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
                    string.Equals(field, "System.String.Empty", StringComparison.Ordinal));
-    }
 
-    internal static bool HasPureIndexedStringReplaceWrapperPattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "allocates_object", "calls_method", "reads_instance_field", "reads_static_field") &&
+    internal static bool HasPureIndexedStringReplaceWrapperPattern(MethodEffectSummary summary) => CallsOnly(summary, "allocates_object", "calls_method", "reads_instance_field", "reads_static_field") &&
                RootsAreSemanticallyPureWrapperCompatible(summary) &&
                summary.Calls.Any(static call =>
                    call.StartsWith("string.ReplaceHelper(int, string, System.ReadOnlySpan`1<int>)",
@@ -177,25 +140,18 @@ internal static class EffectSummarySemanticWrapperRules
                summary.Fields.All(static field =>
                    string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
                    string.Equals(field, "System.String._firstChar", StringComparison.Ordinal));
-    }
 
-    internal static bool RootsAreSemanticallyPureWrapperCompatible(MethodEffectSummary summary)
-    {
-        return summary.RootCandidates.All(static root =>
-            string.Equals(root, "safe_static_cache_read", StringComparison.Ordinal) ||
-            string.Equals(root, "safe_static_constant_read", StringComparison.Ordinal));
-    }
+    internal static bool RootsAreSemanticallyPureWrapperCompatible(MethodEffectSummary summary) => summary.RootCandidates.All(static root =>
+                                                                                                            string.Equals(root, "safe_static_cache_read", StringComparison.Ordinal) ||
+                                                                                                            string.Equals(root, "safe_static_constant_read", StringComparison.Ordinal));
 
     internal static bool CallsOnly(MethodEffectSummary summary, params string[] allowedEffects) =>
         summary.Effects.All(effect => allowedEffects.Contains(effect, StringComparer.Ordinal));
 
-    private static bool HasFieldlessDynamicDispatchWrapperShape(MethodEffectSummary summary)
-    {
-        return summary.Fields.Length == 0 &&
+    private static bool HasFieldlessDynamicDispatchWrapperShape(MethodEffectSummary summary) => summary.Fields.Length == 0 &&
                CallsOnly(summary, "calls_method", "virtual_call") &&
                summary.RootCandidates.All(static root =>
                    string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal));
-    }
 
     private static readonly SemanticCallRule[] SemanticCallRules =
     [
@@ -249,8 +205,7 @@ internal static class EffectSummarySemanticWrapperRules
     ];
 
     [Flags]
-    private enum SemanticCallFamily
-    {
+    private enum SemanticCallFamily {
         InvariantTextInfo = 1 << 6,
         TypeIdentity = 1 << 7,
         TypeIdentityAnchor = 1 << 8,
@@ -268,8 +223,7 @@ internal static class EffectSummarySemanticWrapperRules
     private readonly record struct SemanticCallRule(
         SemanticCallFamily Families,
         string Pattern,
-        bool IsPrefix)
-    {
+        bool IsPrefix) {
         internal bool Matches(string call) => IsPrefix
             ? call.StartsWith(Pattern, StringComparison.Ordinal)
             : string.Equals(call, Pattern, StringComparison.Ordinal);
@@ -287,13 +241,10 @@ internal static class EffectSummarySemanticWrapperRules
     internal static bool IsInvariantTextInfoStringWrapperCall(string callSymbol) =>
         MatchesSemanticCall(callSymbol, SemanticCallFamily.InvariantTextInfo);
 
-    internal static bool IsTypeIdentityWrapperMethod(string symbol)
-    {
-        return symbol is
+    internal static bool IsTypeIdentityWrapperMethod(string symbol) => symbol is
             "System.Type.Equals(System.Type)" or
             "System.Type.Equals(object)" or
             "System.Type.GetHashCode()";
-    }
 
     internal static bool IsTypeIdentityWrapperAnchorCall(string callSymbol) =>
         MatchesSemanticCall(callSymbol, SemanticCallFamily.TypeIdentityAnchor);
@@ -328,15 +279,12 @@ internal static class EffectSummarySemanticWrapperRules
         IsPureArgumentGuardWrapper(callSymbol) ||
         MatchesSemanticCall(callSymbol, SemanticCallFamily.GuardedImmutableStringRewrite);
 
-    internal static bool IsLocalScratchIndexBuilderCall(string callSymbol)
-    {
-        return callSymbol.StartsWith("System.Collections.Generic.ValueListBuilder`1<", StringComparison.Ordinal) &&
+    internal static bool IsLocalScratchIndexBuilderCall(string callSymbol) => callSymbol.StartsWith("System.Collections.Generic.ValueListBuilder`1<", StringComparison.Ordinal) &&
                (callSymbol.Contains("..ctor(System.Span`1<!0>)", StringComparison.Ordinal) ||
                 callSymbol.Contains(".Append(!0)", StringComparison.Ordinal) ||
                 callSymbol.Contains(".AsSpan()", StringComparison.Ordinal) ||
                 callSymbol.Contains(".Dispose()", StringComparison.Ordinal) ||
                 callSymbol.Contains(".get_Length()", StringComparison.Ordinal));
-    }
 
     internal static bool IsIndexedStringReplaceWrapperCall(string callSymbol) =>
         IsLocalScratchIndexBuilderCall(callSymbol) ||
@@ -349,8 +297,7 @@ internal static class EffectSummarySemanticWrapperRules
     internal static bool IsBufferMemmoveCall(string callSymbol) =>
         MatchesSemanticCall(callSymbol, SemanticCallFamily.BufferMemmove);
 
-    internal static bool HasOnlyDeterministicStringComparisonDispatch(MethodEffectSummary summary)
-    {
+    internal static bool HasOnlyDeterministicStringComparisonDispatch(MethodEffectSummary summary) {
         if (!summary.Effects.Contains("virtual_call", StringComparer.Ordinal)) return false;
 
         var dynamicDispatchCallSites = EnumerateCallSites(summary)
@@ -361,24 +308,16 @@ internal static class EffectSummarySemanticWrapperRules
         return dynamicDispatchCallSites.All(IsDeterministicStringComparisonDispatch);
     }
 
-    internal static bool IsDeterministicStringComparisonDispatch(CallSiteSummary callSite)
-    {
-        return callSite.UsesDynamicDispatch &&
+    internal static bool IsDeterministicStringComparisonDispatch(CallSiteSummary callSite) => callSite.UsesDynamicDispatch &&
                HasDeterministicStringComparisonEvidence(callSite) &&
                IsContextSensitiveStringComparisonMethod(callSite);
-    }
 
-    internal static bool IsContextSensitiveStringComparisonMethod(CallSiteSummary callSite)
-    {
-        return callSite.Identity is { } identity
+    internal static bool IsContextSensitiveStringComparisonMethod(CallSiteSummary callSite) => callSite.Identity is { } identity
             ? IsContextSensitiveStringComparisonMethod(identity.ContainingMetadataType, identity.Name)
             : IsContextSensitiveStringComparisonMethod(callSite.DisplayName);
-    }
 
-    internal static bool HasDeterministicStringComparisonEvidence(CallSiteSummary callSite)
-    {
-        foreach (var argumentEvidence in callSite.ArgumentEvidence)
-        {
+    internal static bool HasDeterministicStringComparisonEvidence(CallSiteSummary callSite) {
+        foreach (var argumentEvidence in callSite.ArgumentEvidence) {
             if (EffectSummaryKnownFrameworkCalls.IsDeterministicStringComparison(
                     argumentEvidence.Type,
                     argumentEvidence.Value))
@@ -388,8 +327,7 @@ internal static class EffectSummarySemanticWrapperRules
         return false;
     }
 
-    internal static bool IsContextSensitiveStringComparisonMethod(string displayName)
-    {
+    internal static bool IsContextSensitiveStringComparisonMethod(string displayName) {
         var methodBaseSymbol = GetMethodBaseSymbol(displayName);
         var lastDotIndex = methodBaseSymbol.LastIndexOf('.');
         if (lastDotIndex <= 0 || lastDotIndex == methodBaseSymbol.Length - 1) return false;
@@ -401,10 +339,7 @@ internal static class EffectSummarySemanticWrapperRules
 
     private static bool IsContextSensitiveStringComparisonMethod(
         string containingType,
-        string methodName)
-    {
-        return containingType switch
-        {
+        string methodName) => containingType switch {
             "string" or "System.String" => methodName is
                 "Compare" or
                 "Contains" or
@@ -431,5 +366,4 @@ internal static class EffectSummarySemanticWrapperRules
                     "GetHashCode",
             _ => false
         };
-    }
 }

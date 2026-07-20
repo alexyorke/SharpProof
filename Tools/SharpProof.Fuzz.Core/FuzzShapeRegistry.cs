@@ -2,13 +2,11 @@ using System.Text.Json;
 
 namespace SharpProof.Tools.Fuzz;
 
-internal static class FuzzShapeRegistry
-{
+internal static class FuzzShapeRegistry {
     private const string ClassNamePlaceholder = "__CLASS__";
 
     internal static ImmutableArray<ShapeRegistryEntry> Load(
-        IReadOnlyDictionary<string, Func<int, Random, string, string>> generators)
-    {
+        IReadOnlyDictionary<string, Func<int, Random, string, string>> generators) {
         var json = ToolEmbeddedText.Load(
             typeof(FuzzShapeRegistry).Assembly,
             "SharpProof.Fuzz.ShapeRegistry.json");
@@ -17,8 +15,7 @@ internal static class FuzzShapeRegistry
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
         var usedGenerators = new HashSet<string>(StringComparer.Ordinal);
         var entries = ImmutableArray.CreateBuilder<ShapeRegistryEntry>(definitions.Length);
-        foreach (var definition in definitions)
-        {
+        foreach (var definition in definitions) {
             if (string.IsNullOrWhiteSpace(definition.Id) || !seenIds.Add(definition.Id))
                 throw new InvalidOperationException("The fuzz shape registry contains a missing or duplicate id.");
             var hasGenerator = !string.IsNullOrWhiteSpace(definition.Generator);
@@ -27,15 +24,13 @@ internal static class FuzzShapeRegistry
                     $"Fuzz shape '{definition.Id}' must define exactly one generator or source template.");
 
             Func<int, Random, string, string> build;
-            if (hasGenerator)
-            {
+            if (hasGenerator) {
                 if (!generators.TryGetValue(definition.Generator!, out build!))
                     throw new InvalidOperationException(
                         $"Fuzz shape '{definition.Id}' references unknown generator '{definition.Generator}'.");
                 usedGenerators.Add(definition.Generator!);
             }
-            else
-            {
+            else {
                 var template = definition.SourceTemplate!;
                 if (!template.Contains(ClassNamePlaceholder, StringComparison.Ordinal))
                     throw new InvalidOperationException(
@@ -62,8 +57,7 @@ internal static class FuzzShapeRegistry
         return entries.MoveToImmutable();
     }
 
-    private static FuzzExpectation CreateExpectation(RegistryDefinition definition)
-    {
+    private static FuzzExpectation CreateExpectation(RegistryDefinition definition) {
         if (!Enum.TryParse<Sp0002ExpectationKind>(definition.Sp0002, out var sp0002) ||
             !Enum.IsDefined(sp0002) ||
             !Enum.TryParse<Sp0010ExpectationKind>(definition.Sp0010, out var sp0010) ||

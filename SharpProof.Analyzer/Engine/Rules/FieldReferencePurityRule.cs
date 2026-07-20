@@ -1,10 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class FieldReferencePurityRule
-{
+internal class FieldReferencePurityRule {
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (!(operation is IFieldReferenceOperation fieldReferenceOperation))
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(operation.Syntax);
 
@@ -26,8 +24,7 @@ internal class FieldReferencePurityRule
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
 
-        if (!fieldSymbol.IsStatic && fieldReferenceOperation.Instance != null)
-        {
+        if (!fieldSymbol.IsStatic && fieldReferenceOperation.Instance != null) {
             var instanceResult =
                 PurityAnalysisEngine.CheckSingleOperation(fieldReferenceOperation.Instance, context, currentState);
             if (!instanceResult.IsPure)
@@ -49,8 +46,7 @@ internal class FieldReferencePurityRule
         }
 
 
-        if (fieldSymbol.IsStatic)
-        {
+        if (fieldSymbol.IsStatic) {
             var hasTrustedGeneratedFieldPurity = PurityAnalysisEngine.TryGetTrustedDefinitiveGeneratedFieldPurity(
                 fieldSymbol,
                 context.SemanticModel.Compilation,
@@ -66,8 +62,7 @@ internal class FieldReferencePurityRule
                     staticCtorResult.ImpureSyntaxNode ?? fieldReferenceOperation.Syntax,
                     staticCtorResult.Evidence);
 
-            if (fieldSymbol.IsReadOnly)
-            {
+            if (fieldSymbol.IsReadOnly) {
                 var knownImpureMemberSource = PurityCalleeResolver.GetKnownImpureMemberSource(fieldSymbol);
                 var hasConfiguredKnownImpureMember = string.Equals(
                     knownImpureMemberSource,
@@ -102,12 +97,10 @@ internal class FieldReferencePurityRule
         }
 
 
-        if (fieldReferenceOperation.Instance != null)
-        {
+        if (fieldReferenceOperation.Instance != null) {
             var instanceOperation = fieldReferenceOperation.Instance;
 
-            if (instanceOperation is IParameterReferenceOperation paramRef)
-            {
+            if (instanceOperation is IParameterReferenceOperation paramRef) {
                 var isReadOnlyRef = paramRef.Parameter.RefKind == RefKind.In ||
                                     paramRef.Parameter.RefKind == RefKind.RefReadOnly ||
                                     paramRef.Parameter.RefKind == RefKind.RefReadOnlyParameter;
@@ -127,8 +120,7 @@ internal class FieldReferencePurityRule
             }
 
             if (instanceOperation is IInstanceReferenceOperation instanceRef &&
-                instanceRef.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance)
-            {
+                instanceRef.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance) {
                 var isReadonlyStruct = context.ContainingMethodSymbol.ContainingType.IsReadOnly &&
                                        context.ContainingMethodSymbol.ContainingType.IsValueType;
 
@@ -183,15 +175,13 @@ internal class FieldReferencePurityRule
         return PurityAnalysisEngine.PurityAnalysisResult.Impure(fieldReferenceOperation.Syntax);
     }
 
-    private static bool IsStableStaticBclValueField(IFieldSymbol fieldSymbol)
-    {
+    private static bool IsStableStaticBclValueField(IFieldSymbol fieldSymbol) {
         if (!fieldSymbol.IsStatic || !fieldSymbol.IsReadOnly) return false;
 
         var containingType = fieldSymbol.ContainingType?.OriginalDefinition.ToDisplayString();
         var name = fieldSymbol.Name;
 
-        return containingType switch
-        {
+        return containingType switch {
             "System.Guid" => name is "Empty",
             "System.TimeSpan" => name is "Zero" or "MinValue" or "MaxValue",
             "System.DateTime" => name is "MinValue" or "MaxValue" or "UnixEpoch",
@@ -208,9 +198,7 @@ internal class FieldReferencePurityRule
 
     private static PurityAnalysisEngine.PurityAnalysisResult ImpureFieldRead(
         IFieldReferenceOperation fieldReferenceOperation,
-        string? catalogSource = null)
-    {
-        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+        string? catalogSource = null) => PurityAnalysisEngine.PurityAnalysisResult.Impure(
             fieldReferenceOperation.Syntax,
             PurityAnalysisEngine.PurityEvidence.Create(
                 "mutable_state_read",
@@ -219,14 +207,11 @@ internal class FieldReferencePurityRule
                 fieldReferenceOperation.Syntax,
                 fieldReferenceOperation.Field,
                 catalogSource));
-    }
 
     private static PurityAnalysisEngine.PurityAnalysisResult ImpureFieldRead(
         IFieldReferenceOperation fieldReferenceOperation,
         string category,
-        string? catalogSource)
-    {
-        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+        string? catalogSource) => PurityAnalysisEngine.PurityAnalysisResult.Impure(
             fieldReferenceOperation.Syntax,
             PurityAnalysisEngine.PurityEvidence.Create(
                 category,
@@ -235,13 +220,10 @@ internal class FieldReferencePurityRule
                 fieldReferenceOperation.Syntax,
                 fieldReferenceOperation.Field,
                 catalogSource));
-    }
-    private static bool IsByValueValueTypeReceiver(IOperation operation)
-    {
+    private static bool IsByValueValueTypeReceiver(IOperation operation) {
         if (operation.Type == null || !operation.Type.IsValueType) return false;
 
-        return operation switch
-        {
+        return operation switch {
             IObjectCreationOperation => true,
             IDefaultValueOperation => true,
             ILocalReferenceOperation localReference => localReference.Local.RefKind == RefKind.None,

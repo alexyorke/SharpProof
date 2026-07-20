@@ -3,8 +3,7 @@ using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 namespace SharpProof.Analyzer.Engine;
 
 [Flags]
-internal enum PurityAssignmentTargetEffects
-{
+internal enum PurityAssignmentTargetEffects {
     None = 0,
     AssignValue = 1,
     AdvanceVersion = 2,
@@ -13,8 +12,7 @@ internal enum PurityAssignmentTargetEffects
     DeclaredBorrow = 16
 }
 
-internal enum PurityDelegateUpdateKind
-{
+internal enum PurityDelegateUpdateKind {
     None, Assign, AssignIfResolved, Add, UnresolvedTarget, UnresolvedWrittenLocals
 }
 
@@ -25,12 +23,10 @@ internal sealed record PurityAssignmentTarget(
     bool UseCurrentValueState);
 
 internal sealed record PurityAssignmentEnvelope(
-    PurityAnalysisState SourceState, ImmutableArray<PurityAssignmentTarget> Targets)
-{
+    PurityAnalysisState SourceState, ImmutableArray<PurityAssignmentTarget> Targets) {
     internal static bool TryCreate(
         IOperation operation, PurityAnalysisState state, PurityAnalysisContext context,
-        out PurityAssignmentEnvelope envelope)
-    {
+        out PurityAssignmentEnvelope envelope) {
         var targets = ImmutableArray.CreateBuilder<PurityAssignmentTarget>();
         void Add(
             IOperation target, ISymbol? symbol, IOperation? value,
@@ -50,29 +46,26 @@ internal sealed record PurityAssignmentEnvelope(
                     ? PurityDelegateUpdateKind.Assign : PurityDelegateUpdateKind.None,
                 definition);
 
-        switch (operation)
-        {
-            case ICompoundAssignmentOperation compound:
-            {
-                var symbol = TryResolveTrackedSymbol(compound.Target, state);
-                var delegates = symbol != null && compound.Target.Type?.TypeKind == TypeKind.Delegate
-                    ? compound.OperatorKind == BinaryOperatorKind.Add
-                        ? PurityDelegateUpdateKind.Add : PurityDelegateUpdateKind.UnresolvedTarget
-                    : PurityDelegateUpdateKind.None;
-                Add(compound.Target, symbol, compound.Value,
-                    PurityAssignmentTargetEffects.AdvanceVersion |
-                    PurityAssignmentTargetEffects.CallerVisibleMutation, delegates);
-                break;
-            }
-            case ICoalesceAssignmentOperation coalesce:
-            {
-                var symbol = TryResolveTrackedSymbol(coalesce.Target, state);
-                if (symbol is IParameterSymbol)
-                    Add(coalesce.Target, symbol, coalesce.Value, PurityAssignmentTargetEffects.AdvanceVersion);
-                else if (symbol is ILocalSymbol local && state.IsDefinitelyNullLocalSymbol(local))
-                    AddValue(coalesce.Target, symbol, coalesce.Value);
-                break;
-            }
+        switch (operation) {
+            case ICompoundAssignmentOperation compound: {
+                    var symbol = TryResolveTrackedSymbol(compound.Target, state);
+                    var delegates = symbol != null && compound.Target.Type?.TypeKind == TypeKind.Delegate
+                        ? compound.OperatorKind == BinaryOperatorKind.Add
+                            ? PurityDelegateUpdateKind.Add : PurityDelegateUpdateKind.UnresolvedTarget
+                        : PurityDelegateUpdateKind.None;
+                    Add(compound.Target, symbol, compound.Value,
+                        PurityAssignmentTargetEffects.AdvanceVersion |
+                        PurityAssignmentTargetEffects.CallerVisibleMutation, delegates);
+                    break;
+                }
+            case ICoalesceAssignmentOperation coalesce: {
+                    var symbol = TryResolveTrackedSymbol(coalesce.Target, state);
+                    if (symbol is IParameterSymbol)
+                        Add(coalesce.Target, symbol, coalesce.Value, PurityAssignmentTargetEffects.AdvanceVersion);
+                    else if (symbol is ILocalSymbol local && state.IsDefinitelyNullLocalSymbol(local))
+                        AddValue(coalesce.Target, symbol, coalesce.Value);
+                    break;
+                }
             case IDeconstructionAssignmentOperation deconstruction:
                 if (SymbolicDeconstructionPlan.TryPair(
                         deconstruction.Target, deconstruction.Value,
@@ -98,28 +91,27 @@ internal sealed record PurityAssignmentEnvelope(
                 break;
             case IVariableDeclarationGroupOperation group:
                 foreach (var declaration in group.Declarations)
-                foreach (var declarator in declaration.Declarators)
-                    if (declarator.Initializer?.Value is { } value)
-                        Add(declarator, declarator.Symbol, value,
-                            PurityAssignmentTargetEffects.AssignValue |
-                            PurityAssignmentTargetEffects.DeclaredBorrow,
-                            declarator.Symbol.Type?.TypeKind == TypeKind.Delegate
-                                ? PurityDelegateUpdateKind.AssignIfResolved : PurityDelegateUpdateKind.None,
-                            expandClosure: false, currentValueState: true);
+                    foreach (var declarator in declaration.Declarators)
+                        if (declarator.Initializer?.Value is { } value)
+                            Add(declarator, declarator.Symbol, value,
+                                PurityAssignmentTargetEffects.AssignValue |
+                                PurityAssignmentTargetEffects.DeclaredBorrow,
+                                declarator.Symbol.Type?.TypeKind == TypeKind.Delegate
+                                    ? PurityDelegateUpdateKind.AssignIfResolved : PurityDelegateUpdateKind.None,
+                                expandClosure: false, currentValueState: true);
                 break;
-            case IInvocationOperation invocation:
-            {
-                var arguments = invocation.Arguments
-                    .Where(static argument => argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out).ToArray();
-                if (arguments.Length == 0) return Fail(out envelope);
-                foreach (var argument in arguments)
-                    Add(argument,
-                        TryResolveTrackedSymbol(SkipImplicitConversions(argument.Value), state), null,
-                        PurityAssignmentTargetEffects.AdvanceVersion |
-                        PurityAssignmentTargetEffects.ClearConcreteType,
-                        PurityDelegateUpdateKind.UnresolvedWrittenLocals);
-                break;
-            }
+            case IInvocationOperation invocation: {
+                    var arguments = invocation.Arguments
+                        .Where(static argument => argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out).ToArray();
+                    if (arguments.Length == 0) return Fail(out envelope);
+                    foreach (var argument in arguments)
+                        Add(argument,
+                            TryResolveTrackedSymbol(SkipImplicitConversions(argument.Value), state), null,
+                            PurityAssignmentTargetEffects.AdvanceVersion |
+                            PurityAssignmentTargetEffects.ClearConcreteType,
+                            PurityDelegateUpdateKind.UnresolvedWrittenLocals);
+                    break;
+                }
             default:
                 return Fail(out envelope);
         }
@@ -128,8 +120,7 @@ internal sealed record PurityAssignmentEnvelope(
         return true;
     }
 
-    private static bool Fail(out PurityAssignmentEnvelope envelope)
-    {
+    private static bool Fail(out PurityAssignmentEnvelope envelope) {
         envelope = null!;
         return false;
     }
@@ -138,8 +129,7 @@ internal sealed record PurityAssignmentEnvelope(
         IOperation operation, ISymbol? symbol, IOperation? value,
         SyntaxNode definition, SyntaxNode mutation, PurityAssignmentTargetEffects effects,
         PurityDelegateUpdateKind delegates, PurityAnalysisContext context,
-        bool expandClosure, bool currentValueState)
-    {
+        bool expandClosure, bool currentValueState) {
         var locals = symbol is not ILocalSymbol local
             ? ImmutableArray<ILocalSymbol>.Empty
             : expandClosure ? CollectWrittenLocals(local, context) : ImmutableArray.Create(local);
@@ -147,8 +137,7 @@ internal sealed record PurityAssignmentEnvelope(
     }
 
     private static ImmutableArray<ILocalSymbol> CollectWrittenLocals(
-        ILocalSymbol local, PurityAnalysisContext context)
-    {
+        ILocalSymbol local, PurityAnalysisContext context) {
         var result = ImmutableArray.CreateBuilder<ILocalSymbol>();
         AddWrittenLocals(local, context, result, new HashSet<ISymbol>(SymbolEq.Default));
         return result.ToImmutable();
@@ -156,8 +145,7 @@ internal sealed record PurityAssignmentEnvelope(
 
     private static void AddWrittenLocals(
         ILocalSymbol local, PurityAnalysisContext context,
-        ImmutableArray<ILocalSymbol>.Builder result, HashSet<ISymbol> visited)
-    {
+        ImmutableArray<ILocalSymbol>.Builder result, HashSet<ISymbol> visited) {
         context.CancellationToken.ThrowIfCancellationRequested();
         if (!visited.Add(local)) return;
         result.Add(local);
@@ -168,15 +156,12 @@ internal sealed record PurityAssignmentEnvelope(
     }
 
     private static ISymbol? ResolveDeconstructionTarget(
-        IOperation operation, PurityAnalysisState state, PurityAnalysisContext context)
-    {
+        IOperation operation, PurityAnalysisState state, PurityAnalysisContext context) {
         operation = SkipImplicitConversions(operation) ?? operation;
         if (TryResolveTrackedSymbol(operation, state) is { } tracked) return tracked;
-        if (operation is IDeclarationExpressionOperation declaration)
-        {
+        if (operation is IDeclarationExpressionOperation declaration) {
             if (TryResolveTrackedSymbol(declaration.Expression, state) is { } declared) return declared;
-            if (declaration.Syntax is DeclarationExpressionSyntax
-                { Designation: SingleVariableDesignationSyntax designation })
+            if (declaration.Syntax is DeclarationExpressionSyntax { Designation: SingleVariableDesignationSyntax designation })
                 return context.SemanticModel.GetDeclaredSymbol(designation, context.CancellationToken);
         }
         if (operation.Syntax is SingleVariableDesignationSyntax single)
@@ -187,19 +172,16 @@ internal sealed record PurityAssignmentEnvelope(
 
 }
 
-internal static class PurityAssignmentTransition
-{
+internal static class PurityAssignmentTransition {
     internal static PurityAnalysisState Apply(
-        PurityAssignmentEnvelope envelope, PurityAnalysisState state, PurityAnalysisContext context)
-    {
+        PurityAssignmentEnvelope envelope, PurityAnalysisState state, PurityAnalysisContext context) {
         foreach (var target in envelope.Targets) state = ApplyTarget(envelope, target, state, context);
         return state;
     }
 
     private static PurityAnalysisState ApplyTarget(
         PurityAssignmentEnvelope envelope, PurityAssignmentTarget target,
-        PurityAnalysisState state, PurityAnalysisContext context)
-    {
+        PurityAnalysisState state, PurityAnalysisContext context) {
         var valueState = target.UseCurrentValueState ? state : envelope.SourceState;
         if (Has(target, PurityAssignmentTargetEffects.AssignValue) && target.Value != null)
             state = ApplyValue(target, state, valueState, context);
@@ -222,10 +204,8 @@ internal static class PurityAssignmentTransition
         (target.Effects & effect) != 0;
 
     private static PurityAnalysisState ApplyVersionEffects(
-        PurityAssignmentTarget target, PurityAnalysisState state)
-    {
-        foreach (var local in target.WrittenLocals)
-        {
+        PurityAssignmentTarget target, PurityAnalysisState state) {
+        foreach (var local in target.WrittenLocals) {
             if (Has(target, PurityAssignmentTargetEffects.ClearConcreteType))
                 state = state.WithoutLocalConcreteType(local);
             state = state.WithSmtSymbolDefinitionVersion(local, target.DefinitionSyntax);
@@ -236,10 +216,8 @@ internal static class PurityAssignmentTransition
 
     private static PurityAnalysisState ApplyValue(
         PurityAssignmentTarget target, PurityAnalysisState state,
-        PurityAnalysisState valueState, PurityAnalysisContext context)
-    {
-        if (target.Symbol is IParameterSymbol parameter)
-        {
+        PurityAnalysisState valueState, PurityAnalysisContext context) {
+        if (target.Symbol is IParameterSymbol parameter) {
             if (Has(target, PurityAssignmentTargetEffects.AdvanceVersion))
                 state = state.WithSmtSymbolDefinitionVersion(parameter, target.DefinitionSyntax);
             state = ApplyCanonicalAssignment(state, parameter, target.Value!, valueState, context);
@@ -248,8 +226,7 @@ internal static class PurityAssignmentTransition
         var localAliases = target.WrittenLocals
             .Select(local => (Local: local, Aliases: CaptureAliases(local, incomingState)))
             .ToArray();
-        foreach (var (local, aliases) in localAliases)
-        {
+        foreach (var (local, aliases) in localAliases) {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (Has(target, PurityAssignmentTargetEffects.AdvanceVersion))
                 state = state.WithSmtSymbolDefinitionVersion(local, target.Value!.Syntax);
@@ -263,11 +240,9 @@ internal static class PurityAssignmentTransition
 
     private static PurityAnalysisState ApplyCanonicalAssignment(
         PurityAnalysisState state, ISymbol target, IOperation value,
-        PurityAnalysisState valueState, PurityAnalysisContext context)
-    {
+        PurityAnalysisState valueState, PurityAnalysisContext context) {
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (value.Syntax is ExpressionSyntax)
-        {
+        if (value.Syntax is ExpressionSyntax) {
             var transition = SymbolicOperationTransfer.ApplyAssignment(
                 state.PathState, target, value.Syntax, context.SemanticModel, context.CancellationToken,
                 state.GetSmtSymbolVersion, valueState.GetSmtSymbolVersion,
@@ -295,8 +270,7 @@ internal static class PurityAssignmentTransition
 
     private static PurityAnalysisState ApplyAcquisitions(
         PurityAnalysisState state, ILocalSymbol local, IOperation value,
-        PurityAnalysisState valueState, Compilation compilation)
-    {
+        PurityAnalysisState valueState, Compilation compilation) {
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(local, state);
         if (PurityKnownBclSemantics.IsOwnedLocalArrayValue(value, valueState, compilation))
             state = ApplyLifetime(state, term, local, value, SymbolicLifetimeOperationKind.CreateOwnedValue,
@@ -320,11 +294,9 @@ internal static class PurityAssignmentTransition
 
     private static PurityAnalysisState ApplyDelegateUpdate(
         PurityAssignmentTarget target, PurityAnalysisState state,
-        PurityAnalysisState valueState, CancellationToken cancellationToken)
-    {
+        PurityAnalysisState valueState, CancellationToken cancellationToken) {
         if (target.DelegateUpdate == PurityDelegateUpdateKind.None) return state;
-        if (target.DelegateUpdate == PurityDelegateUpdateKind.UnresolvedWrittenLocals)
-        {
+        if (target.DelegateUpdate == PurityDelegateUpdateKind.UnresolvedWrittenLocals) {
             foreach (var local in target.WrittenLocals)
                 if (local.Type?.TypeKind == TypeKind.Delegate)
                     state = state.WithDelegateTarget(local, PotentialTargets.Unresolved);
@@ -358,8 +330,7 @@ internal static class PurityAssignmentTransition
         new(GetAliases(symbol, state, owned: true), GetAliases(symbol, state, owned: false));
 
     private static ImmutableArray<ISymbol> GetAliases(
-        ISymbol reassigned, PurityAnalysisState state, bool owned)
-    {
+        ISymbol reassigned, PurityAnalysisState state, bool owned) {
         var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(reassigned, state);
         var preserve = owned
             ? HasUnreleasedOwnedResourceObligation(term, state)
@@ -368,8 +339,10 @@ internal static class PurityAssignmentTransition
         var result = ImmutableArray.CreateBuilder<ISymbol>();
         var seen = new HashSet<ISymbol>(SymbolEq.Default);
         foreach (var fact in state.PathState.Facts)
-            if (fact is { Polarity: true, Confidence: SymbolicFactConfidence.Exact,
-                    Atom: SymbolicAliasAtom { MayAlias: true } alias, Symbol: { } symbol } &&
+            if (fact is {
+                Polarity: true, Confidence: SymbolicFactConfidence.Exact,
+                Atom: SymbolicAliasAtom { MayAlias: true } alias, Symbol: { } symbol
+            } &&
                 Equals(alias.Source, term) && !SymbolEq.AreEqual(symbol, reassigned) &&
                 seen.Add(symbol))
                 result.Add(symbol);
@@ -377,8 +350,7 @@ internal static class PurityAssignmentTransition
     }
 
     private static PurityAnalysisState ReplayAliases(
-        PurityAnalysisState state, PreservedAliases aliases, SyntaxNode source)
-    {
+        PurityAnalysisState state, PreservedAliases aliases, SyntaxNode source) {
         foreach (var alias in aliases.Owned) state = ReplayAlias(state, alias, source, owned: true);
         foreach (var alias in aliases.Disposed) state = ReplayAlias(state, alias, source, owned: false);
         return state;
@@ -392,14 +364,11 @@ internal static class PurityAssignmentTransition
             source, owned ? "analyzer.resource.alias-preserve" : "analyzer.resource.alias-preserve.disposed",
             alias, owned ? "evidence.resource.alias-preserve" : "evidence.resource.alias-preserve.disposed");
 
-    private static bool HasUnreleasedOwnedResourceObligation(SymbolicTerm term, PurityAnalysisState state)
-    {
+    private static bool HasUnreleasedOwnedResourceObligation(SymbolicTerm term, PurityAnalysisState state) {
         var owned = state.PathState.Facts.Any(fact =>
             fact.Polarity && fact.Confidence == SymbolicFactConfidence.Exact &&
-            (fact.Atom is SymbolicResourceLifetimeAtom
-                { State: SymbolicResourceLifetimeState.Owned } lifetime && Equals(lifetime.Resource, term) ||
-             fact.Atom is SymbolicDisposalAtom
-                { State: SymbolicDisposalState.NotDisposed } disposal && Equals(disposal.Resource, term)));
+            (fact.Atom is SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime && Equals(lifetime.Resource, term) ||
+             fact.Atom is SymbolicDisposalAtom { State: SymbolicDisposalState.NotDisposed } disposal && Equals(disposal.Resource, term)));
         return owned && !SymbolicStateMerger.HasExactResourceRelease(state.PathState, term);
     }
 }

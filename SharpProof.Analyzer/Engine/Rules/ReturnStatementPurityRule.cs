@@ -1,18 +1,15 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class ReturnStatementPurityRule
-{
+internal partial class ReturnStatementPurityRule {
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (!(operation is IReturnOperation returnOperation)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
 
         if (returnOperation.ReturnedValue == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
 
-        if (returnOperation.ReturnedValue != null)
-        {
+        if (returnOperation.ReturnedValue != null) {
             var sourceReturnedValue =
                 GetSourceReturnedValueOperation(returnOperation, context.SemanticModel, context.CancellationToken) ??
                 returnOperation.ReturnedValue;
@@ -198,9 +195,7 @@ internal partial class ReturnStatementPurityRule
         IReturnOperation returnOperation,
         SyntaxNode escapeSyntax,
         ISymbol escapeSymbol,
-        string catalogSource)
-    {
-        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+        string catalogSource) => PurityAnalysisEngine.PurityAnalysisResult.Impure(
             escapeSyntax,
             PurityResourceStateFacts.CreateReturnEscapeEvidence(
                 returnOperation,
@@ -208,13 +203,11 @@ internal partial class ReturnStatementPurityRule
                 escapeSymbol,
                 nameof(ReturnStatementPurityRule),
                 catalogSource));
-    }
 
     private static bool NoReturnEscape(
         out SyntaxNode escapeSyntax,
         out ISymbol escapeSymbol,
-        out string catalogSource)
-    {
+        out string catalogSource) {
         escapeSyntax = null!;
         escapeSymbol = null!;
         catalogSource = string.Empty;

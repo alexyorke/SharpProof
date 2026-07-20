@@ -1,12 +1,10 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class AssignmentPurityRule
-{
+internal partial class AssignmentPurityRule {
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckPropertySetterPurity(
         IOperation targetOperation,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (targetOperation is not IPropertyReferenceOperation propertyReference ||
             propertyReference.Property.SetMethod is not { } setter)
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -26,20 +24,15 @@ internal partial class AssignmentPurityRule
         return PurityCalleeResolver.GetCanonicalCalleePurityAtUse(setter, targetOperation.Syntax, context);
     }
 
-    private static bool IsPotentiallyDispatchedSetter(IMethodSymbol setterSymbol)
-    {
-        return setterSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
+    private static bool IsPotentiallyDispatchedSetter(IMethodSymbol setterSymbol) => setterSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
                setterSymbol.IsVirtual ||
                setterSymbol.IsAbstract ||
                setterSymbol.IsOverride;
-    }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckDispatchedSetterPurity(
         IPropertyReferenceOperation propertyReferenceOperation,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
-        return PropertyAccessorDispatchTargetResolver.CheckPotentialTargetPurity(
+        PurityAnalysisEngine.PurityAnalysisState currentState) => PropertyAccessorDispatchTargetResolver.CheckPotentialTargetPurity(
             propertyReferenceOperation,
             context,
             GetTrackedLocalReceiverType(propertyReferenceOperation.Instance, currentState,
@@ -48,17 +41,13 @@ internal partial class AssignmentPurityRule
             false,
             true,
             nameof(AssignmentPurityRule));
-    }
 
     private static INamedTypeSymbol? GetTrackedLocalReceiverType(
         IOperation? instanceOperation,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        Compilation compilation)
-    {
-        return PurityConcreteReceiverResolver.TryResolveKnownConcreteType(instanceOperation, currentState, compilation,
+        Compilation compilation) => PurityConcreteReceiverResolver.TryResolveKnownConcreteType(instanceOperation, currentState, compilation,
             out var concreteType)
             ? concreteType
             : null;
-    }
 
 }

@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal enum PurityPolicyDecision
-{
+internal enum PurityPolicyDecision {
     Unknown,
     Pure,
     Impure
@@ -17,30 +16,24 @@ internal sealed record PurityPolicyCandidate(
 internal sealed record PurityPolicyResolution(
     PurityPolicyDecision Decision,
     PurityPolicyCandidate? Winner,
-    ImmutableArray<PurityPolicyCandidate> Candidates)
-{
+    ImmutableArray<PurityPolicyCandidate> Candidates) {
     internal ImmutableArray<PurityPolicyCandidate> OverriddenCandidates =>
         Winner == null
             ? ImmutableArray<PurityPolicyCandidate>.Empty
             : Candidates.Remove(Winner);
 }
 
-internal static class PurityPolicyResolver
-{
+internal static class PurityPolicyResolver {
     internal static PurityPolicyResolution Resolve(
         IMethodSymbol method,
         Compilation compilation,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
-        return ResolveCore(method, compilation, attributePolicy, null);
-    }
+        SharpProofAttributeIdentityPolicy attributePolicy) => ResolveCore(method, compilation, attributePolicy, null);
 
     internal static PurityPolicyResolution ResolveInvocation(
         IMethodSymbol method,
         IInvocationOperation invocation,
         Compilation compilation,
-        SharpProofAttributeIdentityPolicy attributePolicy)
-    {
+        SharpProofAttributeIdentityPolicy attributePolicy) {
         if (invocation == null) throw new ArgumentNullException(nameof(invocation));
         return ResolveCore(method, compilation, attributePolicy, invocation);
     }
@@ -49,8 +42,7 @@ internal static class PurityPolicyResolver
         IMethodSymbol method,
         Compilation compilation,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        IInvocationOperation? invocation)
-    {
+        IInvocationOperation? invocation) {
         if (method == null) throw new ArgumentNullException(nameof(method));
         if (compilation == null) throw new ArgumentNullException(nameof(compilation));
         if (attributePolicy == null) throw new ArgumentNullException(nameof(attributePolicy));
@@ -135,9 +127,7 @@ internal static class PurityPolicyResolver
             ordered);
     }
 
-    internal static bool IsAuthoritativeDeclaration(PurityPolicyCandidate? candidate)
-    {
-        return candidate?.Source is
+    internal static bool IsAuthoritativeDeclaration(PurityPolicyCandidate? candidate) => candidate?.Source is
             "member_impure_attribute" or
             "member_pure_external_attribute" or
             "recognized_external_pure_attribute" or
@@ -146,23 +136,18 @@ internal static class PurityPolicyResolver
             "configured_impure_namespace_or_type" or
             "configured_impure_member" or
             "configured_pure_member";
-    }
 
-    private static bool ShouldPreferSemanticImpurityEvidence(string source)
-    {
-        return source is
+    private static bool ShouldPreferSemanticImpurityEvidence(string source) => source is
             "array_mutation_semantic_rule" or
             "assembly_load_context_semantic_rule" or
             "random_semantic_rule" or
             "string_builder_semantic_rule" or
             "threading_semantic_rule";
-    }
 
     private static void AddDirectAttributeCandidates(
         IMethodSymbol method,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        ICollection<PurityPolicyCandidate> candidates)
-    {
+        ICollection<PurityPolicyCandidate> candidates) {
         if (attributePolicy.HasAttribute(method, "ImpureAttribute"))
             candidates.Add(Impure("member_impure_attribute", 10, "impure_boundary_attribute", "attribute"));
 
@@ -183,8 +168,7 @@ internal static class PurityPolicyResolver
     private static void AddAssemblyAttributeCandidates(
         IMethodSymbol method,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        ICollection<PurityPolicyCandidate> candidates)
-    {
+        ICollection<PurityPolicyCandidate> candidates) {
         var attributes = method.ContainingAssembly?.GetAttributes() ?? ImmutableArray<AttributeData>.Empty;
         if (attributes.Any(attribute => attributePolicy.IsAccepted(attribute, "ImpureAttribute")))
             candidates.Add(Impure("assembly_impure_attribute", 20, "impure_boundary_attribute", "attribute"));

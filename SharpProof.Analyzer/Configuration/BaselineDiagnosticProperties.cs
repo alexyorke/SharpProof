@@ -1,15 +1,13 @@
 namespace SharpProof.Analyzer.Configuration;
 
-internal static class BaselineDiagnosticProperties
-{
+internal static class BaselineDiagnosticProperties {
     internal static ImmutableDictionary<string, string?> Add(
         ImmutableDictionary<string, string?> properties,
         ISymbol symbol,
         SyntaxTree syntaxTree,
         string? operationKind = null,
         string? contractText = null,
-        string? evidenceKey = null)
-    {
+        string? evidenceKey = null) {
         properties = Add(
             properties,
             DiagnosticBaseline.GetPreferredSymbolId(symbol),
@@ -32,8 +30,7 @@ internal static class BaselineDiagnosticProperties
         string path,
         string? operationKind = null,
         string? contractText = null,
-        string? evidenceKey = null)
-    {
+        string? evidenceKey = null) {
         properties = SharpProofEvidenceSchema.AddDiagnosticProperties(properties);
 
         if (!string.IsNullOrWhiteSpace(symbolId))

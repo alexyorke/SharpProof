@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicOperationTransfer
-{
+internal static class SymbolicOperationTransfer {
     internal static SymbolicOperationTransitionResult ApplyAssignment(
         SymbolicState state,
         ISymbol targetSymbol,
@@ -16,8 +15,7 @@ internal static class SymbolicOperationTransfer
         string? evidenceKey = null,
         string? asExpressionProvenanceRoot = null,
         SymbolicAssignmentPostconditionProfile postconditionProfile = SymbolicAssignmentPostconditionProfile.Analyzer,
-        SymbolicTerm? preInvalidationTargetValue = null)
-    {
+        SymbolicTerm? preInvalidationTargetValue = null) {
         var targetContext = new SymbolicLoweringContext(
             semanticModel,
             cancellationToken,
@@ -28,8 +26,7 @@ internal static class SymbolicOperationTransfer
             getValueVersion,
             symbolSubstitutions: preInvalidationTargetValue == null
                 ? null
-                : new Dictionary<ISymbol, SymbolicTerm>(1, SymbolEqualityComparer.Default)
-                    { [targetSymbol.OriginalDefinition] = preInvalidationTargetValue });
+                : new Dictionary<ISymbol, SymbolicTerm>(1, SymbolEqualityComparer.Default) { [targetSymbol.OriginalDefinition] = preInvalidationTargetValue });
         var lowering = SymbolicOperationLowerer.LowerSimpleAssignment(
             targetSymbol,
             valueSyntax,
@@ -53,8 +50,7 @@ internal static class SymbolicOperationTransfer
         CancellationToken cancellationToken,
         SymbolicComputedUpdateKind updateKind,
         bool isChecked,
-        string provenance)
-    {
+        string provenance) {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var lowering = SymbolicOperationLowerer.LowerComputedUpdate(
             targetSymbol,
@@ -74,8 +70,7 @@ internal static class SymbolicOperationTransfer
         Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax rightExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        string provenance)
-    {
+        string provenance) {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         return ApplyLowering(
             state,
@@ -92,8 +87,7 @@ internal static class SymbolicOperationTransfer
         System.Collections.Immutable.ImmutableArray<SymbolicAssignmentBinding> bindings,
         SyntaxNode source,
         SymbolicAssignmentOperationKind assignmentKind,
-        string provenance)
-    {
+        string provenance) {
         var operation = new SymbolicAssignmentOperation(
             bindings,
             System.Collections.Immutable.ImmutableArray<SymbolicCondition>.Empty,
@@ -107,9 +101,7 @@ internal static class SymbolicOperationTransfer
 
     internal static SymbolicOperationTransitionResult ApplyLowering(
         SymbolicState state,
-        SymbolicLoweringResult<SymbolicOperationSequence> lowering)
-    {
-        return lowering is { IsExact: true, Value: { } operations }
+        SymbolicLoweringResult<SymbolicOperationSequence> lowering) => lowering is { IsExact: true, Value: { } operations }
             ? SymbolicOperationTransferKernel.Apply(state, operations)
             : SymbolicOperationTransitionResult.Unsupported(
                 state,
@@ -117,5 +109,4 @@ internal static class SymbolicOperationTransfer
                     ? SymbolicUnknownReason.UnsupportedIrEncoding
                     : lowering.UnknownReason,
                 lowering.Provenance);
-    }
 }

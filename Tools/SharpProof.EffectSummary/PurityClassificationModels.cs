@@ -48,8 +48,7 @@ internal sealed record GeneratedPurityCatalogEntry(
     bool HasFreshObjectAllocationEvidence,
     bool HasUnsupportedEffects,
     string FreshnessClassification,
-    string EffectVisibilityClassification)
-{
+    string EffectVisibilityClassification) {
     [JsonIgnore] public string Symbol => DisplayName;
 
     [JsonPropertyOrder(2)]

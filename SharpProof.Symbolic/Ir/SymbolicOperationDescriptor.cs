@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal enum SymbolicAssignmentOperationKind
-{
+internal enum SymbolicAssignmentOperationKind {
     Simple,
     Compound,
     Coalesce,
@@ -10,23 +9,20 @@ internal enum SymbolicAssignmentOperationKind
     Out
 }
 
-internal enum SymbolicMutationOperationKind
-{
+internal enum SymbolicMutationOperationKind {
     Increment,
     Decrement,
     Invalidate,
     CallerVisible
 }
 
-internal enum SymbolicComputedUpdateKind
-{
+internal enum SymbolicComputedUpdateKind {
     CompoundAssignment,
     Increment,
     Decrement
 }
 
-internal enum SymbolicInvalidationMatchKind
-{
+internal enum SymbolicInvalidationMatchKind {
     VariablePrefix,
     VariableOrMember
 }
@@ -36,16 +32,14 @@ internal readonly record struct SymbolicInvalidationTarget(
     SymbolicInvalidationMatchKind MatchKind = SymbolicInvalidationMatchKind.VariablePrefix,
     int? DefinitionVersion = null);
 
-internal enum SymbolicLoopEdgeKind
-{
+internal enum SymbolicLoopEdgeKind {
     Entry,
     Body,
     BackEdge,
     Exit
 }
 
-internal enum SymbolicCompletionKind
-{
+internal enum SymbolicCompletionKind {
     Normal,
     NoFallthrough,
     Return,
@@ -54,8 +48,7 @@ internal enum SymbolicCompletionKind
     Continue
 }
 
-internal enum SymbolicLifetimeOperationKind
-{
+internal enum SymbolicLifetimeOperationKind {
     Alias,
     CreateOwnedValue,
     CreateOwned,
@@ -88,8 +81,7 @@ internal sealed record SymbolicAssignmentBinding(
 internal readonly record struct SymbolicTermPropagation(SymbolicTerm Source, SymbolicTerm Target);
 
 internal sealed record SymbolicOperationSequence(
-    ImmutableArray<SymbolicOperationDescriptor> Operations)
-{
+    ImmutableArray<SymbolicOperationDescriptor> Operations) {
     internal static SymbolicOperationSequence Single(SymbolicOperationDescriptor operation) =>
         new SymbolicOperationSequence(ImmutableArray.Create(operation));
 }
@@ -151,11 +143,8 @@ internal sealed record SymbolicHazardOperation(
     SymbolicFactConfidence Confidence,
     string ExceptionType,
     string Category,
-    SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin)
-{
-    internal SymbolicFact ToPreconditionFact()
-    {
-        return new SymbolicFact(
+    SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin) {
+    internal SymbolicFact ToPreconditionFact() => new SymbolicFact(
             new SymbolicExceptionPreconditionAtom(PreconditionKind, Subject, Trigger),
             true,
             Confidence,
@@ -163,5 +152,4 @@ internal sealed record SymbolicHazardOperation(
             Origin.SourceSpan,
             null,
             Confidence == SymbolicFactConfidence.Unsupported ? Origin.Provenance : null);
-    }
 }

@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class AwaitableRuntimeMemberClassifier
-{
-    internal static bool IsKnownPureAwaitInfrastructureMethod(IMethodSymbol method)
-    {
+internal static class AwaitableRuntimeMemberClassifier {
+    internal static bool IsKnownPureAwaitInfrastructureMethod(IMethodSymbol method) {
         method = method.OriginalDefinition;
         if (method.IsStatic) return false;
 
@@ -19,15 +17,11 @@ internal static class AwaitableRuntimeMemberClassifier
         return IsContinuationSchedulingMethod(method);
     }
 
-    internal static bool IsContinuationSchedulingMethod(IMethodSymbol method)
-    {
-        return method.Name is "OnCompleted" or "UnsafeOnCompleted" &&
+    internal static bool IsContinuationSchedulingMethod(IMethodSymbol method) => method.Name is "OnCompleted" or "UnsafeOnCompleted" &&
                method.Parameters.Length == 1 &&
                IsSystemAction(method.Parameters[0].Type);
-    }
 
-    private static bool IsKnownAwaitableType(INamedTypeSymbol? type)
-    {
+    private static bool IsKnownAwaitableType(INamedTypeSymbol? type) {
         if (type == null) return false;
 
         if (TypeHierarchyEnumeration.IsNamespace(type.ContainingNamespace, "System.Threading.Tasks") &&
@@ -43,8 +37,7 @@ internal static class AwaitableRuntimeMemberClassifier
                    "YieldAwaitable";
     }
 
-    private static bool IsKnownAwaiterType(INamedTypeSymbol? type)
-    {
+    private static bool IsKnownAwaiterType(INamedTypeSymbol? type) {
         if (type == null ||
             !TypeHierarchyEnumeration.IsNamespace(type.ContainingNamespace, "System.Runtime.CompilerServices"))
             return false;
@@ -63,9 +56,6 @@ internal static class AwaitableRuntimeMemberClassifier
             "YieldAwaitable";
     }
 
-    private static bool IsSystemAction(ITypeSymbol type)
-    {
-        return type is INamedTypeSymbol namedType &&
+    private static bool IsSystemAction(ITypeSymbol type) => type is INamedTypeSymbol namedType &&
                TypeHierarchyEnumeration.IsTypeNamed(namedType, "System", "Action", 0);
-    }
 }

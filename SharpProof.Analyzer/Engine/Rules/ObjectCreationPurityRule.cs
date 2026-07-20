@@ -2,15 +2,11 @@ using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class ObjectCreationPurityRule
-{
+internal class ObjectCreationPurityRule {
     public PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisState currentState)
-    {
-        if (operation is ITypeParameterObjectCreationOperation typeParameterObjectCreationOperation)
-        {
-            if (typeParameterObjectCreationOperation.Initializer != null)
-            {
+        PurityAnalysisState currentState) {
+        if (operation is ITypeParameterObjectCreationOperation typeParameterObjectCreationOperation) {
+            if (typeParameterObjectCreationOperation.Initializer != null) {
                 var initializerResult = CheckSingleOperation(typeParameterObjectCreationOperation.Initializer, context,
                     currentState);
                 if (!initializerResult.IsPure) return initializerResult;
@@ -36,24 +32,20 @@ internal class ObjectCreationPurityRule
         var isReadOnlyCollectionConstructor = false;
         var isReadOnlyMemoryOrMemoryConstructor = false;
         var isSpanOrReadOnlySpanArrayConstructor = false;
-        if (objectCreationOperation.Arguments.Length > 0)
-        {
+        if (objectCreationOperation.Arguments.Length > 0) {
             isReadOnlyCollectionConstructor = IsReadOnlyCollectionConstructor(objectCreationOperation);
             isReadOnlyMemoryOrMemoryConstructor = IsReadOnlyMemoryOrMemoryConstructor(objectCreationOperation);
             isSpanOrReadOnlySpanArrayConstructor = IsSpanOrReadOnlySpanArrayConstructor(objectCreationOperation);
-            for (var argumentIndex = 0; argumentIndex < objectCreationOperation.Arguments.Length; argumentIndex++)
-            {
+            for (var argumentIndex = 0; argumentIndex < objectCreationOperation.Arguments.Length; argumentIndex++) {
                 var argument = objectCreationOperation.Arguments[argumentIndex];
                 if (argument.Value == null) return PurityAnalysisResult.Impure(objectCreationOperation.Syntax);
 
                 if (IsPureTransientCharArrayForStringConstructor(objectCreationOperation, argument, context,
                         currentState)) continue;
 
-                if (isReadOnlyCollectionConstructor)
-                {
+                if (isReadOnlyCollectionConstructor) {
                     if (IsPureReadOnlyCollectionArrayConstructorArgument(objectCreationOperation, argument,
-                            currentState))
-                    {
+                            currentState)) {
                         freshArrayForImmutableWrapper = true;
                         continue;
                     }
@@ -72,8 +64,7 @@ internal class ObjectCreationPurityRule
                             "read_only_collection_external_source"));
                 }
 
-                if (isReadOnlyMemoryOrMemoryConstructor)
-                {
+                if (isReadOnlyMemoryOrMemoryConstructor) {
                     var readOnlyMemoryArgumentResult = CheckSingleOperation(argument.Value, context, currentState);
                     if (!readOnlyMemoryArgumentResult.IsPure) return readOnlyMemoryArgumentResult;
 
@@ -82,8 +73,7 @@ internal class ObjectCreationPurityRule
                     continue;
                 }
 
-                if (isSpanOrReadOnlySpanArrayConstructor && argumentIndex == 0)
-                {
+                if (isSpanOrReadOnlySpanArrayConstructor && argumentIndex == 0) {
                     var spanArgumentResult = CheckSingleOperation(argument.Value, context, currentState);
                     if (!spanArgumentResult.IsPure) return spanArgumentResult;
 
@@ -97,8 +87,7 @@ internal class ObjectCreationPurityRule
         }
 
 
-        if (objectCreationOperation.Initializer != null)
-        {
+        if (objectCreationOperation.Initializer != null) {
             var initializerResult = CheckSingleOperation(objectCreationOperation.Initializer, context, currentState);
             if (!initializerResult.IsPure) return initializerResult;
         }
@@ -108,8 +97,7 @@ internal class ObjectCreationPurityRule
 
         var constructorSymbol = objectCreationOperation.Constructor;
         var constructorWasProvenPure = false;
-        if (constructorSymbol != null)
-        {
+        if (constructorSymbol != null) {
             var cctorResult = CheckStaticConstructorPurity(constructorSymbol.ContainingType, context);
             if (!cctorResult.IsPure) return cctorResult;
 
@@ -150,8 +138,7 @@ internal class ObjectCreationPurityRule
 
             constructorWasProvenPure = true;
         }
-        else
-        {
+        else {
             if (objectCreationOperation.Type?.TypeKind == TypeKind.TypeParameter)
                 return PurityAnalysisResult.Impure(
                     objectCreationOperation.Syntax,
@@ -178,8 +165,7 @@ internal class ObjectCreationPurityRule
 
 
         if (objectCreationOperation.Type != null &&
-            ImpurityCatalog.IsInImpureNamespaceOrType(objectCreationOperation.Type))
-        {
+            ImpurityCatalog.IsInImpureNamespaceOrType(objectCreationOperation.Type)) {
             if (constructorWasProvenPure) return PurityAnalysisResult.Pure;
 
             return PurityAnalysisResult.Impure(
@@ -201,8 +187,7 @@ internal class ObjectCreationPurityRule
         IObjectCreationOperation objectCreationOperation,
         IArgumentOperation argument,
         PurityAnalysisContext context,
-        PurityAnalysisState currentState)
-    {
+        PurityAnalysisState currentState) {
         var constructorSymbol = objectCreationOperation.Constructor;
         if (constructorSymbol?.ContainingType?.SpecialType != SpecialType.System_String ||
             objectCreationOperation.Arguments.Length != 1)
@@ -236,30 +221,26 @@ internal class ObjectCreationPurityRule
     private static bool IsPureReadOnlyCollectionArrayConstructorArgument(
         IObjectCreationOperation objectCreationOperation,
         IArgumentOperation argument,
-        PurityAnalysisState currentState)
-    {
+        PurityAnalysisState currentState) {
         if (!IsReadOnlyCollectionConstructor(objectCreationOperation)) return false;
 
         return PurityKnownBclSemantics.IsTrackedOwnedArrayValue(argument.Value, currentState);
     }
 
-    private static bool IsReadOnlyCollectionConstructor(IObjectCreationOperation objectCreationOperation)
-    {
+    private static bool IsReadOnlyCollectionConstructor(IObjectCreationOperation objectCreationOperation) {
         var constructorSymbol = objectCreationOperation.Constructor?.OriginalDefinition;
         return constructorSymbol?.ContainingType?.OriginalDefinition.ToDisplayString() ==
                "System.Collections.ObjectModel.ReadOnlyCollection<T>" &&
                constructorSymbol.Parameters.Length == 1;
     }
 
-    private static bool IsReadOnlyMemoryOrMemoryConstructor(IObjectCreationOperation objectCreationOperation)
-    {
+    private static bool IsReadOnlyMemoryOrMemoryConstructor(IObjectCreationOperation objectCreationOperation) {
         var typeName = objectCreationOperation.Constructor?.ContainingType?.OriginalDefinition.ToDisplayString();
         return (typeName == "System.ReadOnlyMemory<T>" || typeName == "System.Memory<T>") &&
                (objectCreationOperation.Arguments.Length == 1 || objectCreationOperation.Arguments.Length == 3);
     }
 
-    private static bool IsSpanOrReadOnlySpanArrayConstructor(IObjectCreationOperation objectCreationOperation)
-    {
+    private static bool IsSpanOrReadOnlySpanArrayConstructor(IObjectCreationOperation objectCreationOperation) {
         var constructorSymbol = objectCreationOperation.Constructor?.OriginalDefinition;
         if (constructorSymbol == null ||
             constructorSymbol.MethodKind != MethodKind.Constructor ||
@@ -271,8 +252,7 @@ internal class ObjectCreationPurityRule
         return typeName == "System.Span<T>" || typeName == "System.ReadOnlySpan<T>";
     }
 
-    private static bool IsImplicitExhaustiveSwitchExpressionFallback(IObjectCreationOperation objectCreationOperation)
-    {
+    private static bool IsImplicitExhaustiveSwitchExpressionFallback(IObjectCreationOperation objectCreationOperation) {
         if (!objectCreationOperation.IsImplicit ||
             objectCreationOperation.Constructor?.ContainingType?.ToDisplayString() !=
             "System.Runtime.CompilerServices.SwitchExpressionException")
@@ -284,10 +264,7 @@ internal class ObjectCreationPurityRule
             .Any(HasUnconditionalDiscardArm);
     }
 
-    private static bool HasUnconditionalDiscardArm(SwitchExpressionSyntax switchExpression)
-    {
-        return switchExpression.Arms.Any(static arm =>
-            arm.WhenClause == null &&
-            arm.Pattern.IsKind(SyntaxKind.DiscardPattern));
-    }
+    private static bool HasUnconditionalDiscardArm(SwitchExpressionSyntax switchExpression) => switchExpression.Arms.Any(static arm =>
+                                                                                                        arm.WhenClause == null &&
+                                                                                                        arm.Pattern.IsKind(SyntaxKind.DiscardPattern));
 }

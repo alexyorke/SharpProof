@@ -1,32 +1,26 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class LoopPurityRule
-{
+internal class LoopPurityRule {
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (!(operation is ILoopOperation loopOperation))
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(operation.Syntax);
 
 
-        if (loopOperation is IForLoopOperation forLoopOperation)
-        {
-            foreach (var beforeOperation in forLoopOperation.Before)
-            {
+        if (loopOperation is IForLoopOperation forLoopOperation) {
+            foreach (var beforeOperation in forLoopOperation.Before) {
                 var beforeResult = PurityAnalysisEngine.CheckSingleOperation(beforeOperation, context, currentState);
                 if (!beforeResult.IsPure) return beforeResult;
             }
 
-            if (forLoopOperation.Condition != null)
-            {
+            if (forLoopOperation.Condition != null) {
                 var conditionResult =
                     PurityAnalysisEngine.CheckSingleOperation(forLoopOperation.Condition, context, currentState);
                 if (!conditionResult.IsPure) return conditionResult;
             }
         }
         else if (loopOperation is IWhileLoopOperation whileLoopOperation &&
-                 whileLoopOperation.Condition != null)
-        {
+                 whileLoopOperation.Condition != null) {
             var conditionResult =
                 PurityAnalysisEngine.CheckSingleOperation(whileLoopOperation.Condition, context, currentState);
             if (!conditionResult.IsPure) return conditionResult;
@@ -34,8 +28,7 @@ internal class LoopPurityRule
 
         if (HasStaticallyUnreachableBody(loopOperation)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (loopOperation is IForEachLoopOperation forEachLoopOperation)
-        {
+        if (loopOperation is IForEachLoopOperation forEachLoopOperation) {
             var collectionResult =
                 PurityAnalysisEngine.CheckSingleOperation(forEachLoopOperation.Collection, context, currentState);
             if (!collectionResult.IsPure) return collectionResult;
@@ -46,15 +39,13 @@ internal class LoopPurityRule
 
 
         if (loopOperation.Body != null)
-            foreach (var bodyOp in loopOperation.Body.DescendantsAndSelf())
-            {
+            foreach (var bodyOp in loopOperation.Body.DescendantsAndSelf()) {
                 var opResult = PurityAnalysisEngine.CheckSingleOperation(bodyOp, context, currentState);
                 if (!opResult.IsPure) return opResult;
             }
 
         if (loopOperation is IForLoopOperation reachableForLoopOperation)
-            foreach (var atLoopBottomOperation in reachableForLoopOperation.AtLoopBottom)
-            {
+            foreach (var atLoopBottomOperation in reachableForLoopOperation.AtLoopBottom) {
                 var atLoopBottomResult =
                     PurityAnalysisEngine.CheckSingleOperation(atLoopBottomOperation, context, currentState);
                 if (!atLoopBottomResult.IsPure) return atLoopBottomResult;
@@ -64,18 +55,13 @@ internal class LoopPurityRule
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
 
-    private static bool HasStaticallyUnreachableBody(ILoopOperation loopOperation)
-    {
-        return loopOperation switch
-        {
-            IWhileLoopOperation whileLoop => whileLoop.ConditionIsTop && IsCompileTimeFalse(whileLoop.Condition),
-            IForLoopOperation forLoop => IsCompileTimeFalse(forLoop.Condition),
-            _ => false
-        };
-    }
+    private static bool HasStaticallyUnreachableBody(ILoopOperation loopOperation) => loopOperation switch {
+        IWhileLoopOperation whileLoop => whileLoop.ConditionIsTop && IsCompileTimeFalse(whileLoop.Condition),
+        IForLoopOperation forLoop => IsCompileTimeFalse(forLoop.Condition),
+        _ => false
+    };
 
-    private static bool IsCompileTimeFalse(IOperation? conditionOperation)
-    {
+    private static bool IsCompileTimeFalse(IOperation? conditionOperation) {
         if (conditionOperation == null) return false;
 
         var constantValue = conditionOperation.ConstantValue;
@@ -86,23 +72,16 @@ internal class LoopPurityRule
 
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckForEachEnumeratorPurity(
         IOperation collectionOperation,
-        PurityAnalysisContext context)
-    {
-        return CheckForEachEnumeratorPurity(collectionOperation, context, false);
-    }
+        PurityAnalysisContext context) => CheckForEachEnumeratorPurity(collectionOperation, context, false);
 
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckForEachAsyncEnumeratorPurity(
         IOperation collectionOperation,
-        PurityAnalysisContext context)
-    {
-        return CheckForEachEnumeratorPurity(collectionOperation, context, true);
-    }
+        PurityAnalysisContext context) => CheckForEachEnumeratorPurity(collectionOperation, context, true);
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckForEachEnumeratorPurity(
         IOperation collectionOperation,
         PurityAnalysisContext context,
-        bool isAsync)
-    {
+        bool isAsync) {
         var unwrappedCollection =
             PurityAnalysisEngine.SkipImplicitConversions(collectionOperation) ?? collectionOperation;
         if (unwrappedCollection.Type == null)
@@ -123,8 +102,7 @@ internal class LoopPurityRule
                 unwrappedCollection.Type,
                 isAsync ? "missing_get_async_enumerator" : "missing_get_enumerator");
 
-        foreach (var getEnumerator in getEnumerators)
-        {
+        foreach (var getEnumerator in getEnumerators) {
             var enumeratorPurity =
                 PurityCalleeResolver.GetCalleePurityAtUse(getEnumerator, unwrappedCollection.Syntax, context);
             if (!enumeratorPurity.IsPure) return enumeratorPurity;
@@ -143,17 +121,13 @@ internal class LoopPurityRule
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckForEachEnumeratorRuntimeMemberPurity(
         ITypeSymbol enumeratorType,
         SyntaxNode foreachSyntax,
-        PurityAnalysisContext context)
-    {
-        return CheckForEachEnumeratorRuntimeMemberPurity(enumeratorType, foreachSyntax, context, false);
-    }
+        PurityAnalysisContext context) => CheckForEachEnumeratorRuntimeMemberPurity(enumeratorType, foreachSyntax, context, false);
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckForEachEnumeratorRuntimeMemberPurity(
         ITypeSymbol enumeratorType,
         SyntaxNode foreachSyntax,
         PurityAnalysisContext context,
-        bool isAsync)
-    {
+        bool isAsync) {
         var runtimeMembers = (isAsync
                 ? EnumeratorRuntimeMemberClassifier.EnumerateAsyncRuntimeMembers(enumeratorType)
                 : EnumeratorRuntimeMemberClassifier.EnumerateRuntimeMembers(enumeratorType))
@@ -164,8 +138,7 @@ internal class LoopPurityRule
                 enumeratorType,
                 isAsync ? "missing_async_enumerator_runtime_member" : "missing_enumerator_runtime_member");
 
-        foreach (var runtimeMember in runtimeMembers)
-        {
+        foreach (var runtimeMember in runtimeMembers) {
             var memberPurity =
                 PurityCalleeResolver.GetCalleePurityAtUse(runtimeMember, foreachSyntax, context);
             if (!memberPurity.IsPure &&
@@ -175,8 +148,7 @@ internal class LoopPurityRule
                     context.SemanticModel.Compilation))
                 return memberPurity;
 
-            if (isAsync && runtimeMember.Name is ("MoveNextAsync" or "DisposeAsync"))
-            {
+            if (isAsync && runtimeMember.Name is ("MoveNextAsync" or "DisposeAsync")) {
                 var awaitablePurity = AwaitPurityRule.CheckAwaitablePatternMembers(
                     runtimeMember.ReturnType,
                     foreachSyntax,
@@ -191,14 +163,11 @@ internal class LoopPurityRule
     private static PurityAnalysisEngine.PurityAnalysisResult MissingEnumeratorEvidence(
         SyntaxNode syntax,
         ISymbol? symbol,
-        string reason)
-    {
-        return PurityAnalysisEngine.ImpureResult(
+        string reason) => PurityAnalysisEngine.ImpureResult(
             syntax,
             "unknown_external_call",
             nameof(LoopPurityRule),
             symbol,
             reason);
-    }
 
 }

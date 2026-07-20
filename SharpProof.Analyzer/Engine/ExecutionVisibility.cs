@@ -1,15 +1,12 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class ExecutionVisibility
-{
+internal static partial class ExecutionVisibility {
     public static bool IsInStaticallyUnreachableBranchUsingSmt(
         SyntaxNode syntaxNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis = null)
-    {
-        foreach (var ancestor in syntaxNode.Ancestors())
-        {
+        SmtAnalysisService? smtAnalysis = null) {
+        foreach (var ancestor in syntaxNode.Ancestors()) {
             if (CSharpSyntaxFacts.IsNestedLocalCallableBoundary(ancestor)) break;
 
             if (ancestor is not ForStatementSyntax &&
@@ -28,8 +25,7 @@ internal static partial class ExecutionVisibility
                     smtAnalysis))
                 return true;
 
-            if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpression)
-            {
+            if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpression) {
                 if (conditionalAccessExpression.WhenNotNull.Span.Contains(syntaxNode.SpanStart) &&
                     IsReferenceKnownNullStateAt(
                         conditionalAccessExpression.Expression,
@@ -40,8 +36,7 @@ internal static partial class ExecutionVisibility
                         smtAnalysis))
                     return true;
             }
-            else if (ancestor is BinaryExpressionSyntax binaryExpression)
-            {
+            else if (ancestor is BinaryExpressionSyntax binaryExpression) {
                 if (binaryExpression.IsKind(SyntaxKind.CoalesceExpression) &&
                     binaryExpression.Right.Span.Contains(syntaxNode.SpanStart))
                     if (IsReferenceKnownNullStateAt(
@@ -53,8 +48,7 @@ internal static partial class ExecutionVisibility
                             smtAnalysis))
                         return true;
             }
-            else if (ancestor is ForStatementSyntax forStatement)
-            {
+            else if (ancestor is ForStatementSyntax forStatement) {
                 if (forStatement.Condition != null &&
                     forStatement.Statement.Span.Contains(syntaxNode.SpanStart) &&
                     SymbolicReachabilityService.IsForInitialEntryConditionAlwaysFalse(
@@ -66,14 +60,12 @@ internal static partial class ExecutionVisibility
             }
             else if (ancestor is SwitchStatementSyntax switchStatement &&
                      IsInUnreachableSwitchStatementSection(syntaxNode, switchStatement, semanticModel,
-                         cancellationToken, smtAnalysis))
-            {
+                         cancellationToken, smtAnalysis)) {
                 return true;
             }
             else if (ancestor is SwitchExpressionSyntax switchExpression &&
                      IsInUnreachableSwitchExpressionArm(syntaxNode, switchExpression, semanticModel, cancellationToken,
-                         smtAnalysis))
-            {
+                         smtAnalysis)) {
                 return true;
             }
         }
@@ -88,11 +80,9 @@ internal static partial class ExecutionVisibility
         CancellationToken cancellationToken,
         SymbolicState basePathState,
         Func<ISymbol, int>? getSymbolVersion,
-        SmtAnalysisService smtAnalysis)
-    {
+        SmtAnalysisService smtAnalysis) {
         var pathState = basePathState;
-        foreach (var ancestor in syntaxNode.Ancestors())
-        {
+        foreach (var ancestor in syntaxNode.Ancestors()) {
             var nextState = AddEvaluationPathState(
                 pathState,
                 syntaxNode,

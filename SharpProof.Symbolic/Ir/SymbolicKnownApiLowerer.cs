@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicKnownApiLowerer
-{
+internal static class SymbolicKnownApiLowerer {
     private static readonly KnownApiLoweringDescriptor<SymbolicTerm> MathAbsLowering = new(
         "System.Math",
         nameof(Math.Abs),
@@ -65,25 +64,18 @@ internal static class SymbolicKnownApiLowerer
     internal static bool TryLowerKnownApiInvocation(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
-        return TryLowerKnownApiInvocation(invocation, context, KnownApiLowerings, out condition);
-    }
+        out SymbolicCondition condition) => TryLowerKnownApiInvocation(invocation, context, KnownApiLowerings, out condition);
 
     internal static bool TryLowerKnownApiInvocationTerm(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
-        return TryLowerKnownApiInvocation(invocation, context, KnownApiTermLowerings, out term);
-    }
+        out SymbolicTerm term) => TryLowerKnownApiInvocation(invocation, context, KnownApiTermLowerings, out term);
 
     private static bool TryLowerKnownApiInvocation<TValue>(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,
         ImmutableArray<KnownApiLoweringDescriptor<TValue>> descriptors,
-        out TValue value)
-    {
+        out TValue value) {
         value = default!;
         if (context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not IInvocationOperation
             operation) return false;
@@ -99,8 +91,7 @@ internal static class SymbolicKnownApiLowerer
     internal static bool TryLowerKnownStaticValueMember(
         MemberAccessExpressionSyntax memberAccess,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         var memberSymbol = context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol ??
                            context.SemanticModel.GetSymbolInfo(memberAccess.Name, context.CancellationToken).Symbol;
 

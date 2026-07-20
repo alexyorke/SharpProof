@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class PropertyReferencePurityRule
-{
-    private static bool IsArrayLengthProperty(IPropertyReferenceOperation propertyReferenceOperation)
-    {
+internal partial class PropertyReferencePurityRule {
+    private static bool IsArrayLengthProperty(IPropertyReferenceOperation propertyReferenceOperation) {
         var propertySymbol = propertyReferenceOperation.Property;
         return propertySymbol.Name == "Length" &&
                propertySymbol.IsReadOnly &&
@@ -13,8 +11,7 @@ internal partial class PropertyReferencePurityRule
     private static bool TryCheckFormattableStringFormatPurity(
         IPropertyReferenceOperation propertyReferenceOperation,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var propertySymbol = propertyReferenceOperation.Property;
@@ -33,8 +30,7 @@ internal partial class PropertyReferencePurityRule
 
     private static bool IsCompilerGeneratedArrayForeachCurrent(
         IPropertyReferenceOperation propertyReferenceOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (propertyReferenceOperation.Property.Name != "Current" ||
             propertyReferenceOperation.Property.ContainingType?.ToDisplayString() != "System.Collections.IEnumerator" ||
             propertyReferenceOperation.Syntax.Parent is not ForEachStatementSyntax forEachStatement)

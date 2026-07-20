@@ -1,10 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal class UsingStatementPurityRule
-{
+internal class UsingStatementPurityRule {
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (operation is not (IUsingOperation or IUsingDeclarationOperation))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
@@ -15,8 +13,7 @@ internal class UsingStatementPurityRule
 
         var declaredLocals = FindDeclaredLocals(resourceOperation);
 
-        foreach (var local in declaredLocals)
-        {
+        foreach (var local in declaredLocals) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var disposeReceiverType = ResolveDisposeReceiverType(local, operation, context.SemanticModel, currentState,
                 isAwaitUsing, context.CancellationToken);
@@ -40,8 +37,7 @@ internal class UsingStatementPurityRule
         ITypeSymbol receiverType,
         bool isAwaitUsing,
         bool isUnstable,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         var disposeMethod = DisposalMemberClassifier.FindDisposalMethod(
             receiverType, context.SemanticModel.Compilation, isAwaitUsing);
         if (disposeMethod == null)
@@ -65,8 +61,7 @@ internal class UsingStatementPurityRule
         IMethodSymbol disposeMethod,
         SyntaxNode syntaxNode,
         PurityAnalysisContext context,
-        bool isAwaitUsing)
-    {
+        bool isAwaitUsing) {
         var disposeResult = PurityCalleeResolver.GetCalleePurityAtUse(disposeMethod, syntaxNode, context);
         if (!disposeResult.IsPure) return disposeResult;
 
@@ -74,8 +69,7 @@ internal class UsingStatementPurityRule
             PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
 
-    private List<ILocalSymbol> FindDeclaredLocals(IOperation? resourceOperation)
-    {
+    private List<ILocalSymbol> FindDeclaredLocals(IOperation? resourceOperation) {
         var locals = new List<ILocalSymbol>();
         if (resourceOperation is IVariableDeclarationGroupOperation declarationGroup)
             foreach (var declaration in declarationGroup.Declarations)
@@ -92,8 +86,7 @@ internal class UsingStatementPurityRule
 
     private ITypeSymbol? ResolveDisposeReceiverType(ILocalSymbol local, IOperation usingOperation,
         SemanticModel semanticModel, PurityAnalysisEngine.PurityAnalysisState currentState, bool isAwaitUsing,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         if (!HasDeclaratorInitializer(local, cancellationToken) &&
             currentState.TryGetLocalConcreteType(local, out var concreteType) &&
@@ -109,19 +102,16 @@ internal class UsingStatementPurityRule
         return local.Type;
     }
 
-    private ITypeSymbol? ResolveExpressionDisposeReceiverType(IOperation? resourceOperation)
-    {
+    private ITypeSymbol? ResolveExpressionDisposeReceiverType(IOperation? resourceOperation) {
         var unwrappedResource = UnwrapConversionsForDisposeReceiver(resourceOperation);
         return unwrappedResource is IObjectCreationOperation objectCreationOperation
             ? objectCreationOperation.Type
             : unwrappedResource?.Type ?? resourceOperation?.Type;
     }
 
-    private IOperation? UnwrapConversionsForDisposeReceiver(IOperation? operation)
-    {
+    private IOperation? UnwrapConversionsForDisposeReceiver(IOperation? operation) {
         var current = PurityAnalysisEngine.SkipImplicitConversions(operation);
-        while (current is IConversionOperation conversion)
-        {
+        while (current is IConversionOperation conversion) {
             var operand = PurityAnalysisEngine.SkipImplicitConversions(conversion.Operand);
             if (operand == null || ReferenceEquals(operand, current)) break;
 
@@ -132,8 +122,7 @@ internal class UsingStatementPurityRule
     }
 
     private ITypeSymbol? TryGetStableObjectCreationInitializerType(ILocalSymbol local, IOperation usingOperation,
-        SemanticModel semanticModel, CancellationToken cancellationToken)
-    {
+        SemanticModel semanticModel, CancellationToken cancellationToken) {
         var declaratorSyntax = RuleAnalysisHelper.GetVariableDeclaratorSyntax(local, cancellationToken);
         var initializerSyntax = declaratorSyntax?.Initializer?.Value;
         if (initializerSyntax == null) return null;
@@ -158,8 +147,7 @@ internal class UsingStatementPurityRule
                    declaratorSyntax, semanticModel, cancellationToken);
 
     private static bool IsAwaitUsingOperation(IOperation operation) =>
-        operation.Syntax switch
-        {
+        operation.Syntax switch {
             UsingStatementSyntax usingStatementSyntax => usingStatementSyntax.AwaitKeyword.RawKind != 0,
             LocalDeclarationStatementSyntax localDeclarationStatementSyntax => localDeclarationStatementSyntax
                 .AwaitKeyword.RawKind != 0,

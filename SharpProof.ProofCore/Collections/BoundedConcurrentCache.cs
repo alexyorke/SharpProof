@@ -1,7 +1,6 @@
 namespace SharpProof.ProofCore.Collections;
 
-internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull
-{
+internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull {
     private readonly int _capacity;
     private readonly Dictionary<TKey, TValue> _entries;
     private readonly object _gate = new();
@@ -10,8 +9,7 @@ internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull
     private long _hits;
     private long _misses;
 
-    internal BoundedConcurrentCache(int capacity, IEqualityComparer<TKey>? comparer = null)
-    {
+    internal BoundedConcurrentCache(int capacity, IEqualityComparer<TKey>? comparer = null) {
         if (capacity <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
 
         _capacity = capacity;
@@ -20,48 +18,37 @@ internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull
 
     internal int Capacity => _capacity;
 
-    internal int Count
-    {
-        get
-        {
+    internal int Count {
+        get {
             lock (_gate)
                 return _entries.Count;
         }
     }
 
-    internal long HitCount
-    {
-        get
-        {
+    internal long HitCount {
+        get {
             lock (_gate)
                 return _hits;
         }
     }
 
-    internal long MissCount
-    {
-        get
-        {
+    internal long MissCount {
+        get {
             lock (_gate)
                 return _misses;
         }
     }
 
-    internal long EvictionCount
-    {
-        get
-        {
+    internal long EvictionCount {
+        get {
             lock (_gate)
                 return _evictions;
         }
     }
 
-    internal bool TryGetValue(TKey key, out TValue value)
-    {
-        lock (_gate)
-        {
-            if (_entries.TryGetValue(key, out value!))
-            {
+    internal bool TryGetValue(TKey key, out TValue value) {
+        lock (_gate) {
+            if (_entries.TryGetValue(key, out value!)) {
                 _hits++;
                 return true;
             }
@@ -72,14 +59,11 @@ internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull
         }
     }
 
-    internal TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
-    {
+    internal TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory) {
         if (valueFactory == null) throw new ArgumentNullException(nameof(valueFactory));
 
-        lock (_gate)
-        {
-            if (_entries.TryGetValue(key, out var value))
-            {
+        lock (_gate) {
+            if (_entries.TryGetValue(key, out var value)) {
                 _hits++;
                 return value;
             }
@@ -91,10 +75,8 @@ internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull
         }
     }
 
-    internal bool TryAdd(TKey key, TValue value)
-    {
-        lock (_gate)
-        {
+    internal bool TryAdd(TKey key, TValue value) {
+        lock (_gate) {
             if (_entries.ContainsKey(key)) return false;
 
             AddMissingValue(key, value);
@@ -102,10 +84,8 @@ internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull
         }
     }
 
-    private void AddMissingValue(TKey key, TValue value)
-    {
-        while (_entries.Count >= _capacity)
-        {
+    private void AddMissingValue(TKey key, TValue value) {
+        while (_entries.Count >= _capacity) {
             if (_insertionOrder.Count == 0)
                 throw new InvalidOperationException("Cache insertion order is inconsistent with its entries.");
 

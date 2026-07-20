@@ -1,5 +1,4 @@
-internal sealed class SymbolicCliOptions
-{
+internal sealed class SymbolicCliOptions {
     public static string Usage { get; } = ToolEmbeddedText.Load(
         typeof(SymbolicCliOptions).Assembly,
         "SharpProof.SymbolicCli.Usage.txt");
@@ -261,8 +260,7 @@ internal sealed class SymbolicCliOptions
         ProofConditions.Count != 0 ||
         ProofConditionContains.Count != 0;
 
-    private static void NormalizeStringList(List<string> values)
-    {
+    private static void NormalizeStringList(List<string> values) {
         if (values.Count == 0) return;
 
         var normalized = values
@@ -369,13 +367,11 @@ internal sealed class SymbolicCliOptions
         .Add(static (o, _, _) => { o.SmtDisposeContextOnExit = true; o.SmtDisposeContextOnExitSpecified = true; }, "--smt-dispose-context-on-exit")
         .Add(static (o, c, a) => o.AddAnalysisLimitOverride(c.RequiredValue(a), a), "--analysis-limit");
 
-    public static SymbolicCliOptions Parse(string[] args)
-    {
+    public static SymbolicCliOptions Parse(string[] args) {
         var options = new SymbolicCliOptions();
         OptionHandlers.Parse(args, options);
 
-        if (!options.ShowHelp)
-        {
+        if (!options.ShowHelp) {
             NormalizeStringList(options.InvariantTargets);
             NormalizeStringList(options.PreprocessorSymbols);
             NormalizeStringList(options.NodeKinds);
@@ -545,8 +541,7 @@ internal sealed class SymbolicCliOptions
             Reject(!options.AllLines && !options.Position.HasValue && !options.IsAnySpanQuery && options.Line == 0,
                 "--line, --position, --span-start/--span-end, or --all-lines is required.");
 
-            if (options.Explain)
-            {
+            if (options.Explain) {
                 options.CheckReachability = true;
                 Reject(options.RuntimeHazards || options.Complexity || options.Capabilities,
                     "explain cannot be combined with --runtime-hazards, --complexity, or --capabilities.");
@@ -584,8 +579,7 @@ internal sealed class SymbolicCliOptions
         return options;
     }
 
-    private void ValidateFocusedAnalysisCompatibility(string optionName)
-    {
+    private void ValidateFocusedAnalysisCompatibility(string optionName) {
         Reject(HasInvariantTargetFilter, $"--invariant-target cannot be combined with {optionName}.");
         Reject(AllLines || IsAnySpanQuery || LineInvariants,
             $"{optionName} supports --line, --line with --column, or --position only.");
@@ -595,14 +589,11 @@ internal sealed class SymbolicCliOptions
             $"{optionName} cannot be combined with implied-condition proofs or reachability checks.");
     }
 
-    private static void Reject(bool invalid, string message)
-    {
+    private static void Reject(bool invalid, string message) {
         if (invalid) throw new ArgumentException(message);
     }
 
-    public SymbolicSourceCompilationProfile CreateCompilationProfile()
-    {
-        return new SymbolicSourceCompilationProfile(
+    public SymbolicSourceCompilationProfile CreateCompilationProfile() => new SymbolicSourceCompilationProfile(
             LanguageVersion,
             PreprocessorSymbols,
             NullableContext,
@@ -611,10 +602,8 @@ internal sealed class SymbolicCliOptions
             Platform,
             OptimizationLevel,
             AssemblyName);
-    }
 
-    public SymbolicSourceInput CreateSourceInput(string? standardInput = null)
-    {
+    public SymbolicSourceInput CreateSourceInput(string? standardInput = null) {
         if (IsProjectAware)
             throw new InvalidOperationException("Project-aware source input must be loaded through MSBuild.");
 
@@ -636,20 +625,17 @@ internal sealed class SymbolicCliOptions
                 SourceMapOriginalColumn));
     }
 
-    public void ApplyProjectConfiguration(SymbolicProjectQueryContext? context)
-    {
+    public void ApplyProjectConfiguration(SymbolicProjectQueryContext? context) {
         ProjectSmtOptions = context?.Configuration.SmtOptions;
         ProjectAnalysisLimits = context?.Configuration.AnalysisLimits;
     }
 
-    public SymbolicQueryResult FilterResult(SymbolicQueryResult result)
-    {
+    public SymbolicQueryResult FilterResult(SymbolicQueryResult result) {
         ArgumentNullException.ThrowIfNull(result);
         return HasResultFilter ? result.Filter(MatchesResult) : result;
     }
 
-    private bool MatchesResult(SymbolicProgramPointResult result)
-    {
+    private bool MatchesResult(SymbolicProgramPointResult result) {
         if (WithFacts && result.Facts.Count == 0 ||
             WithConditions && result.PathConditionCount == 0 ||
             WithProofs && result.ConditionProofs.Count == 0 ||
@@ -686,8 +672,7 @@ internal sealed class SymbolicCliOptions
             candidate != null && values.Any(value => candidate.IndexOf(value, comparison) >= 0);
     }
 
-    public SmtAnalysisOptions CreateSmtOptions()
-    {
+    public SmtAnalysisOptions CreateSmtOptions() {
         var projectOptions = ProjectSmtOptions;
         var mode = SmtModeSpecified ? SmtMode : projectOptions?.Mode ?? SmtMode;
         var defaults = projectOptions != null && projectOptions.Mode == mode
@@ -712,26 +697,19 @@ internal sealed class SymbolicCliOptions
                     : lifecycleDefaults.DisposeCurrentThreadContextOnServiceDispose));
     }
 
-    public SymbolicQueryOptions CreateQueryOptions(SmtAnalysisService? smtAnalysis)
-    {
-        return new SymbolicQueryOptions(
+    public SymbolicQueryOptions CreateQueryOptions(SmtAnalysisService? smtAnalysis) => new SymbolicQueryOptions(
                 CreateReferences(),
                 smtAnalysis,
                 ImpliedConditions,
                 LineExpressions,
                 PostLineInvariants)
             .WithAnalysisLimits(CreateAnalysisLimits());
-    }
 
-    public SharpProofAnalysisBudget CreateAnalysisLimits()
-    {
-        return SharpProofAnalysisBudget.FromNamedValues(
+    public SharpProofAnalysisBudget CreateAnalysisLimits() => SharpProofAnalysisBudget.FromNamedValues(
             ProjectAnalysisLimits ?? SharpProofAnalysisBudget.Default,
             GetAnalysisLimit);
-    }
 
-    public SharpProofTarget CreateQueryTarget()
-    {
+    public SharpProofTarget CreateQueryTarget() {
         if (AllLines) return new SharpProofTarget(SharpProofTargetKind.AllLines);
 
         if (LineInvariants)
@@ -757,8 +735,7 @@ internal sealed class SymbolicCliOptions
             : new SharpProofTarget(SharpProofTargetKind.Point, Line: Line, Column: Column);
     }
 
-    public SharpProofTarget CreateRuntimeHazardTarget()
-    {
+    public SharpProofTarget CreateRuntimeHazardTarget() {
         if (AllLines) return new SharpProofTarget(SharpProofTargetKind.AllLines);
 
         return IsSpanQuery
@@ -766,33 +743,23 @@ internal sealed class SymbolicCliOptions
             : new SharpProofTarget(SharpProofTargetKind.Line, Line: Line);
     }
 
-    public SharpProofTarget CreateComplexityTarget()
-    {
-        return Position.HasValue
+    public SharpProofTarget CreateComplexityTarget() => Position.HasValue
             ? new SharpProofTarget(SharpProofTargetKind.Position, Position: Position.Value)
             : HasColumn
                 ? new SharpProofTarget(SharpProofTargetKind.Point, Line: Line, Column: Column)
                 : new SharpProofTarget(SharpProofTargetKind.Line, Line: Line);
-    }
 
-    public SharpProofTarget CreateCapabilityTarget()
-    {
-        return Position.HasValue
+    public SharpProofTarget CreateCapabilityTarget() => Position.HasValue
             ? new SharpProofTarget(SharpProofTargetKind.Position, Position: Position.Value)
             : HasColumn
                 ? new SharpProofTarget(SharpProofTargetKind.Point, Line: Line, Column: Column)
                 : new SharpProofTarget(SharpProofTargetKind.Line, Line: Line);
-    }
 
-    public SymbolicRuntimeHazardQueryOptions CreateRuntimeHazardOptions()
-    {
-        return new SymbolicRuntimeHazardQueryOptions(
+    public SymbolicRuntimeHazardQueryOptions CreateRuntimeHazardOptions() => new SymbolicRuntimeHazardQueryOptions(
             IncludeUnprovenHazards,
             HazardKinds);
-    }
 
-    public SymbolicRuntimeHazardQueryResult FilterRuntimeHazards(SymbolicRuntimeHazardQueryResult result)
-    {
+    public SymbolicRuntimeHazardQueryResult FilterRuntimeHazards(SymbolicRuntimeHazardQueryResult result) {
         if (!HasRuntimeHazardFilter) return result;
 
         var hazards = result.Hazards
@@ -814,8 +781,7 @@ internal sealed class SymbolicCliOptions
             result.SmtDiagnostics);
     }
 
-    private void ValidateThresholds()
-    {
+    private void ValidateThresholds() {
         if (Thresholds.Count == 0) return;
 
         string[] allowedMetrics;
@@ -823,16 +789,15 @@ internal sealed class SymbolicCliOptions
             allowedMetrics = new[] { "hazards" };
         else if (Capabilities)
             allowedMetrics = new[] { "capability-sites", "capability-unknowns" };
-        else if (Complexity)
-            allowedMetrics = new[] { "complexity-drivers", "complexity-unknowns" };
-        else
-            allowedMetrics = new[]
+        else allowedMetrics = Complexity
+            ? (new[] { "complexity-drivers", "complexity-unknowns" })
+            : (new[]
             {
                 "program-points",
                 "conservative-unknowns",
                 "proof-unknowns",
                 "reachability-unknowns"
-            };
+            });
 
         var unsupported = Thresholds.Keys
             .Where(metric => !allowedMetrics.Contains(metric, StringComparer.Ordinal))
@@ -847,8 +812,7 @@ internal sealed class SymbolicCliOptions
             string.Join(", ", allowedMetrics) + ".");
     }
 
-    public IEnumerable<MetadataReference>? CreateReferences()
-    {
+    public IEnumerable<MetadataReference>? CreateReferences() {
         if (ReferencePaths.Count == 0) return null;
 
         return ReferencePaths.Select(static path => MetadataReference.CreateFromFile(Path.GetFullPath(path)));
@@ -871,8 +835,7 @@ internal sealed class SymbolicCliOptions
         Func<string, bool> isKnownName,
         string requirement,
         string nameDescription,
-        int minimum)
-    {
+        int minimum) {
         var separator = value.IndexOf('=');
         if (separator <= 0 || separator == value.Length - 1)
             throw new ArgumentException(optionName + " requires " + requirement + ".");
@@ -892,8 +855,7 @@ internal sealed class SymbolicCliOptions
         destination[name] = parsed;
     }
 
-    private void AddMSBuildProperty(string value, string optionName)
-    {
+    private void AddMSBuildProperty(string value, string optionName) {
         var separator = value.IndexOf('=');
         if (separator <= 0)
             throw new ArgumentException(optionName + " requires <name>=<value>.");
@@ -911,9 +873,7 @@ internal sealed class SymbolicCliOptions
 
     private static bool IsAnalysisLimitName(string name) => SharpProofAnalysisBudget.IsNamedLimit(name);
 
-    private static bool IsThresholdName(string name)
-    {
-        return name is "program-points" or
+    private static bool IsThresholdName(string name) => name is "program-points" or
             "conservative-unknowns" or
             "proof-unknowns" or
             "reachability-unknowns" or
@@ -922,21 +882,17 @@ internal sealed class SymbolicCliOptions
             "capability-unknowns" or
             "complexity-drivers" or
             "complexity-unknowns";
-    }
 
-    private static LanguageVersion ReadLanguageVersion(ToolArgumentReader reader, string optionName)
-    {
+    private static LanguageVersion ReadLanguageVersion(ToolArgumentReader reader, string optionName) {
         var value = reader.RequiredValue(optionName).Trim();
         if (LanguageVersionFacts.TryParse(value, out var languageVersion)) return languageVersion;
 
         throw new ArgumentException(optionName + " requires a recognized C# language version.");
     }
 
-    private static NullableContextOptions ReadNullableContext(ToolArgumentReader reader, string optionName)
-    {
+    private static NullableContextOptions ReadNullableContext(ToolArgumentReader reader, string optionName) {
         var value = reader.RequiredValue(optionName).Trim().ToLowerInvariant();
-        return value switch
-        {
+        return value switch {
             "disable" or "disabled" => NullableContextOptions.Disable,
             "enable" or "enabled" => NullableContextOptions.Enable,
             "warnings" => NullableContextOptions.Warnings,
@@ -946,11 +902,9 @@ internal sealed class SymbolicCliOptions
         };
     }
 
-    private static SmtAnalysisMode ReadSmtMode(ToolArgumentReader reader, string optionName)
-    {
+    private static SmtAnalysisMode ReadSmtMode(ToolArgumentReader reader, string optionName) {
         var value = reader.RequiredValue(optionName).Trim().ToLowerInvariant();
-        return value switch
-        {
+        return value switch {
             "disabled" => SmtAnalysisMode.Off,
             "bounded" => SmtAnalysisMode.Bounded,
             "deep" => SmtAnalysisMode.Deep,
@@ -958,8 +912,7 @@ internal sealed class SymbolicCliOptions
         };
     }
 
-    private static string ReadProgramPointKind(ToolArgumentReader reader, string optionName)
-    {
+    private static string ReadProgramPointKind(ToolArgumentReader reader, string optionName) {
         var value = reader.RequiredValue(optionName).Trim();
         if (SymbolicProgramPointKinds.TryNormalizeKnownKind(value, out var normalizedKind)) return normalizedKind;
 

@@ -444,8 +444,9 @@ public sealed class RepositoryArchitectureTests
             "SharpProof.CodeFixes",
             "Tools"
         };
+        var stylePolicy = File.ReadAllText(Path.Combine(root, ".editorconfig"));
         var trivialReturn = new Regex(
-            @"(?m)^([ \t]+)(?:public|private|internal|protected)[^\r\n]+\)\r?\n\1\{\r?\n\1    return [^\r\n]+;\r?\n\1\}",
+            @"(?m)^([ \t]+)(?:public|private|internal|protected)[^\r\n]+\)\s*\{\r?\n\1    return [^\r\n]+;\r?\n\1\}",
             RegexOptions.CultureInvariant);
         var offenders = productionRoots
             .SelectMany(path => Directory.EnumerateFiles(
@@ -456,8 +457,14 @@ public sealed class RepositoryArchitectureTests
             .Select(path => Path.GetRelativePath(root, path))
             .ToArray();
 
-        Assert.That(offenders, Is.Empty,
-            "Single-return methods should use the canonical expression-body form.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(stylePolicy, Does.Contain("csharp_style_expression_bodied_methods = true:warning"));
+            Assert.That(stylePolicy, Does.Contain("csharp_new_line_before_open_brace = none"));
+            Assert.That(stylePolicy, Does.Contain("dotnet_diagnostic.IDE0055.severity = warning"));
+            Assert.That(offenders, Is.Empty,
+                "Single-return methods should use the canonical expression-body form.");
+        });
     }
 
     [Test]

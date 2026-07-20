@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer.Configuration;
 
-internal static class AnalyzerConfigurationOptionRegistry
-{
+internal static class AnalyzerConfigurationOptionRegistry {
     private static ImmutableDictionary<string, AnalyzerConfigurationOption>? _optionsByKey;
 
     // Computed lazily so it never reads All during static initialization: static initializers run
@@ -19,15 +18,13 @@ internal static class AnalyzerConfigurationOptionRegistry
 
     public static AnalyzerConfigurationOption Get(string key) => OptionsByKey[key];
 
-    private static ImmutableArray<AnalyzerConfigurationOption> Load()
-    {
+    private static ImmutableArray<AnalyzerConfigurationOption> Load() {
         using var stream = typeof(AnalyzerConfigurationOptionRegistry).Assembly.GetManifestResourceStream(ResourceName)
             ?? throw new InvalidOperationException($"Missing embedded configuration catalog '{ResourceName}'.");
         var definitions = JsonSerializer.Deserialize<ConfigurationOptionDefinition[]>(stream)
             ?? throw new InvalidOperationException("The embedded configuration catalog is empty.");
         var keys = new HashSet<string>(StringComparer.Ordinal);
-        return definitions.Select(definition =>
-        {
+        return definitions.Select(definition => {
             if (!keys.Add(definition.Key))
                 throw new InvalidOperationException($"Duplicate configuration key '{definition.Key}'.");
             if (!Enum.TryParse<AnalyzerConfigurationScope>(definition.Scope, out var scope) ||
@@ -53,8 +50,7 @@ internal static class AnalyzerConfigurationOptionRegistry
         }).ToImmutableArray();
     }
 
-    private sealed class ConfigurationOptionDefinition
-    {
+    private sealed class ConfigurationOptionDefinition {
         public string Key { get; set; } = string.Empty;
         public string Scope { get; set; } = string.Empty;
         public string ValueKind { get; set; } = string.Empty;
@@ -70,10 +66,8 @@ internal static class AnalyzerConfigurationOptionRegistry
         public string RelatedDiagnostics { get; set; } = string.Empty;
         public string SampleValue { get; set; } = string.Empty;
     }
-    internal static bool TryParseRuntimeHazardMode(string? value, out RuntimeHazardMode mode)
-    {
-        mode = value?.Trim().ToLowerInvariant() switch
-        {
+    internal static bool TryParseRuntimeHazardMode(string? value, out RuntimeHazardMode mode) {
+        mode = value?.Trim().ToLowerInvariant() switch {
             "none" => RuntimeHazardMode.Off,
             "sites" => RuntimeHazardMode.Sites,
             "summaries" => RuntimeHazardMode.Summaries,
@@ -86,15 +80,13 @@ internal static class AnalyzerConfigurationOptionRegistry
         return mode != (RuntimeHazardMode)(-1);
     }
 
-    internal static bool IsCanonicalAllowedValue(AnalyzerConfigurationOption option, string? value)
-    {
+    internal static bool IsCanonicalAllowedValue(AnalyzerConfigurationOption option, string? value) {
         if (option == null) throw new ArgumentNullException(nameof(option));
         if (string.IsNullOrWhiteSpace(value)) return false;
         return option.AllowedValues.Contains(value!.Trim().ToLowerInvariant(), StringComparer.Ordinal);
     }
 
-    internal static bool IsAcceptedValue(AnalyzerConfigurationOption option, string? value)
-    {
+    internal static bool IsAcceptedValue(AnalyzerConfigurationOption option, string? value) {
         if (IsCanonicalAllowedValue(option, value)) return true;
         return !string.IsNullOrWhiteSpace(value) &&
                option.AcceptedAliases.Contains(value!.Trim().ToLowerInvariant(), StringComparer.Ordinal);
@@ -115,8 +107,7 @@ internal sealed record AnalyzerConfigurationOption(
     ImmutableArray<string> AcceptedAliases = default,
     string ValueDescription = "",
     string RelatedDiagnostics = "",
-    string SampleValue = "")
-{
+    string SampleValue = "") {
     public string DefaultValue => Default.DocumentationValue;
 
     public bool IsGlobal =>
@@ -132,32 +123,26 @@ internal readonly record struct AnalyzerConfigurationDefault(
     string? ConstantValue,
     int BoundedValue,
     int DeepValue,
-    string Unit)
-{
+    string Unit) {
     internal bool IsModeDependent => ConstantValue == null;
 
     internal string DocumentationValue => IsModeDependent
         ? Format(BoundedValue) + " (disabled/bounded), " + Format(DeepValue) + " (deep)"
         : ConstantValue ?? string.Empty;
 
-    internal string Resolve(SmtAnalysisMode mode)
-    {
+    internal string Resolve(SmtAnalysisMode mode) {
         if (!IsModeDependent) return ConstantValue ?? string.Empty;
         return (mode == SmtAnalysisMode.Deep ? DeepValue : BoundedValue)
             .ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    public static implicit operator AnalyzerConfigurationDefault(string value)
-    {
-        return new AnalyzerConfigurationDefault(
+    public static implicit operator AnalyzerConfigurationDefault(string value) => new AnalyzerConfigurationDefault(
             value ?? throw new ArgumentNullException(nameof(value)),
             0,
             0,
             string.Empty);
-    }
 
-    private string Format(int value)
-    {
+    private string Format(int value) {
         var formatted = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
         return Unit.Length == 0 ? formatted : formatted + " " + Unit;
     }
@@ -165,8 +150,7 @@ internal readonly record struct AnalyzerConfigurationDefault(
 }
 
 [Flags]
-internal enum PurityPolicyImpact
-{
+internal enum PurityPolicyImpact {
     None = 0,
     TrustsPure = 1,
     ForcesImpure = 2,
@@ -175,15 +159,13 @@ internal enum PurityPolicyImpact
     EnablesGeneratedOverrides = 16
 }
 
-internal enum AnalyzerConfigurationScope
-{
+internal enum AnalyzerConfigurationScope {
     GlobalOnly,
     TreeOnly,
     GlobalAndTree
 }
 
-internal enum AnalyzerConfigurationValueKind
-{
+internal enum AnalyzerConfigurationValueKind {
     Bool,
     StringList,
     StructuralMemberKeyList,

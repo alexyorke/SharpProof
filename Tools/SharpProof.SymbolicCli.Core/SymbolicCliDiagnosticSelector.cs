@@ -6,15 +6,12 @@ internal readonly record struct SymbolicCliSelectedDiagnostic(
     Diagnostic Diagnostic,
     bool IsTarget);
 
-internal static class SymbolicCliDiagnosticSelector
-{
+internal static class SymbolicCliDiagnosticSelector {
     internal static SymbolicCliSelectedDiagnostic[] SelectRelevant(
         IEnumerable<Diagnostic> diagnostics,
         SyntaxTree syntaxTree,
         int? position,
-        int line)
-    {
-        return diagnostics
+        int line) => diagnostics
             .Where(diagnostic =>
                 diagnostic.Location == Location.None ||
                 ReferenceEquals(diagnostic.Location.SourceTree, syntaxTree))
@@ -27,14 +24,12 @@ internal static class SymbolicCliDiagnosticSelector
                 : item.Diagnostic.Location.SourceSpan.Start)
             .ThenBy(static item => item.Diagnostic.Id, StringComparer.Ordinal)
             .ToArray();
-    }
 
     private static bool IsTarget(
         Diagnostic diagnostic,
         SyntaxTree syntaxTree,
         int? position,
-        int line)
-    {
+        int line) {
         if (!ReferenceEquals(diagnostic.Location.SourceTree, syntaxTree)) return false;
 
         var span = diagnostic.Location.SourceSpan;

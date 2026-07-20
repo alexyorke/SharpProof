@@ -1,10 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class BinaryOperationPurityRule
-{
+internal static class BinaryOperationPurityRule {
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IBinaryOperation binaryOperation,
-        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState) {
 
 
         var leftResult = PurityAnalysisEngine.CheckSingleOperation(binaryOperation.LeftOperand, context, currentState);
@@ -35,8 +33,7 @@ internal static class BinaryOperationPurityRule
 
 
         var rightState = currentState;
-        if (binaryOperation.OperatorKind == BinaryOperatorKind.ConditionalAnd)
-        {
+        if (binaryOperation.OperatorKind == BinaryOperatorKind.ConditionalAnd) {
             if (!PurityAnalysisEngine.TryCreateBranchAssumptionState(
                     currentState,
                     binaryOperation.LeftOperand,
@@ -47,8 +44,7 @@ internal static class BinaryOperationPurityRule
                     out rightState))
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
-        else if (binaryOperation.OperatorKind == BinaryOperatorKind.ConditionalOr)
-        {
+        else if (binaryOperation.OperatorKind == BinaryOperatorKind.ConditionalOr) {
             if (!PurityAnalysisEngine.TryCreateBranchAssumptionState(
                     currentState,
                     binaryOperation.LeftOperand,
@@ -73,8 +69,7 @@ internal static class BinaryOperationPurityRule
                 nameof(BinaryOperationPurityRule));
 
 
-        if (binaryOperation.OperatorMethod != null)
-        {
+        if (binaryOperation.OperatorMethod != null) {
             var operatorMethod = binaryOperation.OperatorMethod;
             if (RuleAnalysisHelper.IsStaticAbstractInterfaceMethod(operatorMethod, MethodKind.UserDefinedOperator))
                 return PurityAnalysisEngine.ImpureResult(

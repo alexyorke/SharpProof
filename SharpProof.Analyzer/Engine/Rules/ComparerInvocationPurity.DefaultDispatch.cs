@@ -1,23 +1,18 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static partial class ComparerInvocationPurity
-{
+internal static partial class ComparerInvocationPurity {
     private static PurityAnalysisEngine.PurityAnalysisResult CreateUnknownExternalCallImpurity(
         IInvocationOperation invocationOperation,
-        ISymbol? symbol = null)
-    {
-        return PurityAnalysisEngine.ImpureResult(
+        ISymbol? symbol = null) => PurityAnalysisEngine.ImpureResult(
             invocationOperation,
             "unknown_external_call",
             nameof(MethodInvocationPurityRule),
             symbol ?? invocationOperation.TargetMethod);
-    }
 
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultHashDispatchPurity(
         ITypeSymbol elementType,
         IInvocationOperation invocationOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (ComparerDispatchHelper.IsBuiltinValueComparerKey(elementType))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
@@ -28,13 +23,11 @@ internal static partial class ComparerInvocationPurity
         ITypeSymbol elementType,
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
-        bool requiresHashCode = false)
-    {
+        bool requiresHashCode = false) {
         if (ComparerDispatchHelper.IsBuiltinValueComparerKey(elementType))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (requiresHashCode)
-        {
+        if (requiresHashCode) {
             var hashPurity = CheckDefaultGetHashCodeDispatchPurity(elementType, invocationOperation, context);
             if (!hashPurity.IsPure) return hashPurity;
         }
@@ -59,24 +52,18 @@ internal static partial class ComparerInvocationPurity
     }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultGetHashCodeDispatchPurity(
-        ITypeSymbol elementType, IInvocationOperation invocationOperation, PurityAnalysisContext context)
-    {
-        return DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(GetHashCode), 0,
+        ITypeSymbol elementType, IInvocationOperation invocationOperation, PurityAnalysisContext context) => DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(GetHashCode), 0,
             out var getHashCodeOverride)
             ? PurityCalleeResolver.GetCanonicalCalleePurityAtUse(
                 getHashCodeOverride, invocationOperation.Syntax, context)
             : CreateUnknownExternalCallImpurity(invocationOperation);
-    }
 
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultComparisonDispatchPurity(
         ITypeSymbol keyType,
         IInvocationOperation invocationOperation,
-        PurityAnalysisContext context)
-    {
-        return ComparerDispatchHelper.CheckDefaultComparisonPurity(
+        PurityAnalysisContext context) => ComparerDispatchHelper.CheckDefaultComparisonPurity(
             keyType,
             invocationOperation.Syntax,
             context,
             () => CreateUnknownExternalCallImpurity(invocationOperation));
-    }
 }

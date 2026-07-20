@@ -1,13 +1,11 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class ExecutionVisibility
-{
+internal static partial class ExecutionVisibility {
     private static bool IsProgramPointUnreachableUsingSharedFacts(
         SyntaxNode syntaxNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis)
-    {
+        SmtAnalysisService? smtAnalysis) {
         if (IsInReachableConstantSwitchGotoSection(syntaxNode, semanticModel, cancellationToken)) return false;
 
         var pathState = SymbolicReachabilityService.CollectPathStateAt(

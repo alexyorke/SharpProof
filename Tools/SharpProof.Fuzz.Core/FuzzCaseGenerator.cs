@@ -1,7 +1,6 @@
 namespace SharpProof.Tools.Fuzz;
 
-public sealed class FuzzCaseGenerator
-{
+public sealed class FuzzCaseGenerator(int seed) {
     private static readonly Lazy<ImmutableSortedDictionary<string, ImmutableArray<ShapeRegistryEntry>>>
         RegistryByPrimaryShape =
             new(() => RegistryEntries
@@ -20,16 +19,9 @@ public sealed class FuzzCaseGenerator
     private static readonly Lazy<ImmutableArray<string>> OrderedGeneratorBackedShapeIds =
         new(() => RegistryByPrimaryShape.Value.Keys.ToImmutableArray());
 
-    private readonly int _seed;
-
-    public FuzzCaseGenerator(int seed)
-    {
-        _seed = seed;
-    }
-
+    private readonly int _seed = seed;
     private static readonly IReadOnlyDictionary<string, Func<int, Random, string, string>> RegistryGenerators =
-        new Dictionary<string, Func<int, Random, string, string>>(StringComparer.Ordinal)
-        {
+        new Dictionary<string, Func<int, Random, string, string>>(StringComparer.Ordinal) {
             ["PureArithmetic"] = CreateExpressionGenerator(
                 "int x", "x + 1", "(x * 3) - 7", "(x / 2) + 9", "unchecked((x << 1) ^ 17)"),
             ["PureStringConcat"] = BuildPureStringConcat,
@@ -46,24 +38,21 @@ public sealed class FuzzCaseGenerator
     private static Func<int, Random, string, string> CreateExpressionGenerator(
         string parameters,
         params string[] expressions) =>
-        (_, random, className) =>
-        {
+        (_, random, className) => {
             var expression = expressions.Length == 1
                 ? expressions[0]
                 : expressions[random.Next(expressions.Length)];
             return BuildClass(className, BuildIntMethodFromExpression(expression, random, parameters));
         };
 
-    public FuzzCase Next(int index)
-    {
+    public FuzzCase Next(int index) {
         var shapeIds = OrderedGeneratorBackedShapeIds.Value;
         var shapeId = shapeIds[index % shapeIds.Length];
         var variant = index / shapeIds.Length;
         return GenerateForShapeCore(shapeId, variant, index);
     }
 
-    private FuzzCase GenerateForShapeCore(string shapeId, int variant, int index)
-    {
+    private FuzzCase GenerateForShapeCore(string shapeId, int variant, int index) {
         if (!RegistryByPrimaryShape.Value.TryGetValue(shapeId, out var entries))
             throw new ArgumentException($"Unknown generator-backed shape '{shapeId}'.", nameof(shapeId));
 
@@ -72,8 +61,7 @@ public sealed class FuzzCaseGenerator
         return GenerateForRegistryEntry(entry, index, entryVariant);
     }
 
-    public FuzzCase GenerateForRegistryEntry(ShapeRegistryEntry registryEntry, int index, int variant = 0)
-    {
+    public FuzzCase GenerateForRegistryEntry(ShapeRegistryEntry registryEntry, int index, int variant = 0) {
         var random = CreateRandom(StableHash(index, variant, registryEntry.Id));
         var className = $"FuzzCase{index}_{registryEntry.Id}_V{variant}";
         var source = registryEntry.Build(index, random, className);
@@ -90,8 +78,7 @@ public sealed class FuzzCaseGenerator
             registryEntry.ExpectedSyntaxKinds);
     }
 
-    private static string BuildPureStringConcat(int index, Random random, string className)
-    {
+    private static string BuildPureStringConcat(int index, Random random, string className) {
         const string expression = "(left + right).Length";
         return BuildClass(
             className,
@@ -155,8 +142,7 @@ public sealed class FuzzCaseGenerator
     private static int StableHash(int first, int second, int third) =>
         Mix(Mix(Mix(unchecked((int)2166136261), first), second), third);
 
-    private static int StableHash(int first, int second, string third)
-    {
+    private static int StableHash(int first, int second, string third) {
         var hash = Mix(Mix(unchecked((int)2166136261), first), second);
         foreach (var character in third)
             hash = Mix(hash, character);
@@ -166,32 +152,23 @@ public sealed class FuzzCaseGenerator
 
     private static int Mix(int hash, int value) => unchecked((hash ^ value) * 16777619);
 
-    private static string BuildIntMethodFromExpression(string expression, Random random, string parameterList = "int x")
-    {
-        return $$"""
+    private static string BuildIntMethodFromExpression(string expression, Random random, string parameterList = "int x") => $$"""
                              [EnforcePure]
                              public int TestMethod({{parameterList}})
                              {
                  {{Indent(BuildReturnBody(expression, random), 8)}}
                              }
                  """;
-    }
 
-    private static string BuildReturnBody(string expression, Random random)
-    {
-        return random.Next(5) switch
-        {
-            0 => $"return {expression};",
-            1 => $"var value = {expression};\nreturn value;",
-            2 => $"if (true)\n{{\n    return {expression};\n}}\nreturn 0;",
-            3 => $"return true ? {expression} : 0;",
-            _ => $"int Local() => {expression};\nreturn Local();"
-        };
-    }
+    private static string BuildReturnBody(string expression, Random random) => random.Next(5) switch {
+        0 => $"return {expression};",
+        1 => $"var value = {expression};\nreturn value;",
+        2 => $"if (true)\n{{\n    return {expression};\n}}\nreturn 0;",
+        3 => $"return true ? {expression} : 0;",
+        _ => $"int Local() => {expression};\nreturn Local();"
+    };
 
-    private static string BuildClass(string className, string members)
-    {
-        return $$"""
+    private static string BuildClass(string className, string members) => $$"""
                  {{BuildUsings("System")}}
 
                  public class {{className}}
@@ -199,15 +176,13 @@ public sealed class FuzzCaseGenerator
                  {{Indent(members, 4)}}
                  }
                  """;
-    }
 
     private static string BuildUsings(params string[] namespaces) =>
         string.Join("\n", namespaces
             .Append("SharpProof.Attributes")
             .Select(static value => $"using {value};"));
 
-    private static string Indent(string text, int spaces, string? newline = null)
-    {
+    private static string Indent(string text, int spaces, string? newline = null) {
         var padding = new string(' ', spaces);
         return string.Join(
             newline ?? Environment.NewLine,

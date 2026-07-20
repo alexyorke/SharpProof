@@ -1,11 +1,8 @@
-internal static class EffectSummaryCallPurityRules
-{
-    internal static IEnumerable<CallSiteSummary> EnumerateCallSites(MethodEffectSummary summary)
-    {
+internal static class EffectSummaryCallPurityRules {
+    internal static IEnumerable<CallSiteSummary> EnumerateCallSites(MethodEffectSummary summary) {
         if (summary.CallSites.Length != 0) return summary.CallSites;
 
-        return summary.CallIdentities.Select(static identity => new CallSiteSummary(identity.ToCanonicalKey())
-        {
+        return summary.CallIdentities.Select(static identity => new CallSiteSummary(identity.ToCanonicalKey()) {
             Identity = identity
         });
     }
@@ -14,8 +11,7 @@ internal static class EffectSummaryCallPurityRules
         MethodEffectSummary callerSummary,
         CallSiteSummary callSite,
         string calleeSymbol,
-        MethodPurityClassification calleeClassification)
-    {
+        MethodPurityClassification calleeClassification) {
         if (IsInteropLastErrorBookkeepingCall(callerSummary, calleeSymbol)) return true;
         if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal)) return false;
 
@@ -32,39 +28,26 @@ internal static class EffectSummaryCallPurityRules
                IsDateTimeConstructorHelperCall(callerSummary.Symbol, calleeSymbol);
     }
 
-    internal static bool IsDateTimeArithmeticHelperCall(string callerSymbol, string calleeSymbol)
-    {
-        return string.Equals(callerSymbol, "System.DateTime.AddUnits(double, long, long)", StringComparison.Ordinal) &&
+    internal static bool IsDateTimeArithmeticHelperCall(string callerSymbol, string calleeSymbol) => string.Equals(callerSymbol, "System.DateTime.AddUnits(double, long, long)", StringComparison.Ordinal) &&
                (string.Equals(calleeSymbol, "System.Math.Abs(double)", StringComparison.Ordinal) ||
                 string.Equals(calleeSymbol, "System.Math.Truncate(double)", StringComparison.Ordinal));
-    }
 
-    internal static bool IsDateTimeToBinaryHelperCall(string callerSymbol, string calleeSymbol)
-    {
-        return string.Equals(callerSymbol, "System.DateTime.ToBinary()", StringComparison.Ordinal) &&
+    internal static bool IsDateTimeToBinaryHelperCall(string callerSymbol, string calleeSymbol) => string.Equals(callerSymbol, "System.DateTime.ToBinary()", StringComparison.Ordinal) &&
                string.Equals(calleeSymbol,
                    "System.TimeZoneInfo.GetLocalUtcOffset(System.DateTime, System.TimeZoneInfoOptions)",
                    StringComparison.Ordinal);
-    }
 
-    internal static bool IsDateTimeConstructorHelperCall(string callerSymbol, string calleeSymbol)
-    {
-        return string.Equals(callerSymbol, "System.DateTime..ctor(int, int, int)", StringComparison.Ordinal) &&
+    internal static bool IsDateTimeConstructorHelperCall(string callerSymbol, string calleeSymbol) => string.Equals(callerSymbol, "System.DateTime..ctor(int, int, int)", StringComparison.Ordinal) &&
                string.Equals(calleeSymbol, "System.DateTime.DateToTicks(int, int, int)", StringComparison.Ordinal);
-    }
 
-    internal static bool IsDateTimeOffsetArithmeticHelperCall(string callerSymbol, string calleeSymbol)
-    {
-        return IsDateTimeArithmeticMember(callerSymbol, "System.DateTimeOffset") &&
+    internal static bool IsDateTimeOffsetArithmeticHelperCall(string callerSymbol, string calleeSymbol) => IsDateTimeArithmeticMember(callerSymbol, "System.DateTimeOffset") &&
                (IsDateTimeArithmeticMember(calleeSymbol, "System.DateTime") ||
                 string.Equals(calleeSymbol, "System.DateTimeOffset..ctor(System.DateTime, System.TimeSpan)",
                     StringComparison.Ordinal) ||
                 string.Equals(calleeSymbol, "System.DateTimeOffset.get_ClockDateTime()", StringComparison.Ordinal) ||
                 string.Equals(calleeSymbol, "System.DateTimeOffset.get_Offset()", StringComparison.Ordinal));
-    }
 
-    internal static bool IsDateTimeArithmeticMember(string symbol, string containingType)
-    {
+    internal static bool IsDateTimeArithmeticMember(string symbol, string containingType) {
         var prefix = containingType + ".";
         if (!symbol.StartsWith(prefix, StringComparison.Ordinal)) return false;
 
@@ -83,8 +66,7 @@ internal static class EffectSummaryCallPurityRules
     internal static bool IsFreshArrayInitializationHelperCall(
         MethodEffectSummary callerSummary,
         string calleeSymbol,
-        MethodPurityClassification calleeClassification)
-    {
+        MethodPurityClassification calleeClassification) {
         if (!IsFreshArrayInitializationContext(callerSummary)) return false;
 
         return (IsFreshArrayCopyHelperCall(calleeSymbol) &&
@@ -93,27 +75,22 @@ internal static class EffectSummaryCallPurityRules
                 HasFreshArraySpanWriteValidationBlockingChain(calleeClassification.FirstBlockingCallChain));
     }
 
-    internal static bool IsFreshArrayInitializationContext(MethodEffectSummary summary)
-    {
-        return IsFreshAllocationInitializationContext(
+    internal static bool IsFreshArrayInitializationContext(MethodEffectSummary summary) => IsFreshAllocationInitializationContext(
             summary,
             "allocates_array",
             "allocates_object");
-    }
 
     internal static bool IsFreshStringInitializationHelperCall(
         MethodEffectSummary callerSummary,
         string calleeSymbol,
-        MethodPurityClassification calleeClassification)
-    {
+        MethodPurityClassification calleeClassification) {
         if (!IsFreshStringInitializationContext(callerSummary)) return false;
 
         return IsFreshStringCopyHelperCall(calleeSymbol) &&
                HasFreshStringCopyBlockingChain(calleeClassification.FirstBlockingCallChain);
     }
 
-    internal static bool IsFreshStringInitializationContext(MethodEffectSummary summary)
-    {
+    internal static bool IsFreshStringInitializationContext(MethodEffectSummary summary) {
         if (!IsFreshAllocationInitializationContext(
                 summary,
                 "allocates_object",
@@ -128,8 +105,7 @@ internal static class EffectSummaryCallPurityRules
     internal static bool IsFreshAllocationInitializationContext(
         MethodEffectSummary summary,
         string requiredAllocationEffect,
-        string excludedAllocationEffect)
-    {
+        string excludedAllocationEffect) {
         if (!summary.Effects.Contains(requiredAllocationEffect, StringComparer.Ordinal) ||
             summary.Effects.Contains(excludedAllocationEffect, StringComparer.Ordinal) ||
             summary.Effects.Contains("writes_static_field", StringComparer.Ordinal) ||
@@ -142,37 +118,24 @@ internal static class EffectSummaryCallPurityRules
         return HasOnlySafeStaticReads(summary);
     }
 
-    internal static bool IsFreshStringCopyHelperCall(string calleeSymbol)
-    {
-        return calleeSymbol.StartsWith("System.ReadOnlySpan`1", StringComparison.Ordinal) &&
+    internal static bool IsFreshStringCopyHelperCall(string calleeSymbol) => calleeSymbol.StartsWith("System.ReadOnlySpan`1", StringComparison.Ordinal) &&
                calleeSymbol.Contains(".CopyTo(System.Span`1<!0>)", StringComparison.Ordinal);
-    }
 
-    internal static bool IsFreshArrayCopyHelperCall(string calleeSymbol)
-    {
-        return IsBufferMemmoveCall(calleeSymbol) ||
+    internal static bool IsFreshArrayCopyHelperCall(string calleeSymbol) => IsBufferMemmoveCall(calleeSymbol) ||
                IsBufferMemmoveHelper(calleeSymbol);
-    }
 
-    internal static bool IsFreshArraySpanWriteHelperCall(string calleeSymbol)
-    {
-        return calleeSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.TryWrite(",
+    internal static bool IsFreshArraySpanWriteHelperCall(string calleeSymbol) => calleeSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.TryWrite(",
             StringComparison.Ordinal);
-    }
 
     internal static bool IsFreshArrayTemporaryInitializationHelperCall(
         MethodEffectSummary callerSummary,
         string calleeSymbol,
-        MethodPurityClassification calleeClassification)
-    {
-        return IsFreshArrayInitializationContext(callerSummary) &&
+        MethodPurityClassification calleeClassification) => IsFreshArrayInitializationContext(callerSummary) &&
                calleeSymbol.Contains("..ctor(", StringComparison.Ordinal) &&
                calleeClassification.Categories.All(IsTemporaryInitializationCategory) &&
                HasValidationOnlyBlockingChain(calleeClassification.FirstBlockingCallChain);
-    }
 
-    internal static bool HasFreshStringCopyBlockingChain(string[] blockingCallChain)
-    {
+    internal static bool HasFreshStringCopyBlockingChain(string[] blockingCallChain) {
         if (blockingCallChain.Length == 0) return false;
 
         if (blockingCallChain.All(IsBufferMemmoveHelper)) return true;
@@ -182,23 +145,16 @@ internal static class EffectSummaryCallPurityRules
                blockingCallChain.Skip(1).All(IsBufferMemmoveHelper);
     }
 
-    internal static bool HasFreshArrayCopyBlockingChain(string[] blockingCallChain)
-    {
-        return blockingCallChain.Length != 0 &&
+    internal static bool HasFreshArrayCopyBlockingChain(string[] blockingCallChain) => blockingCallChain.Length != 0 &&
                blockingCallChain.All(IsBufferMemmoveHelper);
-    }
 
-    internal static bool HasFreshArraySpanWriteValidationBlockingChain(string[] blockingCallChain)
-    {
-        return blockingCallChain.Length >= 1 &&
+    internal static bool HasFreshArraySpanWriteValidationBlockingChain(string[] blockingCallChain) => blockingCallChain.Length >= 1 &&
                string.Equals(
                    blockingCallChain[0],
                    "System.ThrowHelper.ThrowInvalidTypeWithPointersNotSupported(System.Type)",
                    StringComparison.Ordinal);
-    }
 
-    internal static bool HasValidationOnlyBlockingChain(string[] blockingCallChain)
-    {
+    internal static bool HasValidationOnlyBlockingChain(string[] blockingCallChain) {
         if (blockingCallChain.Length == 0) return false;
 
         var first = blockingCallChain[0];
@@ -207,18 +163,13 @@ internal static class EffectSummaryCallPurityRules
                 first.StartsWith("System.ThrowHelper.Throw", StringComparison.Ordinal));
     }
 
-    internal static bool IsTemporaryInitializationCategory(string category)
-    {
-        return string.Equals(category, "caller_visible_memory_write", StringComparison.Ordinal) ||
+    internal static bool IsTemporaryInitializationCategory(string category) => string.Equals(category, "caller_visible_memory_write", StringComparison.Ordinal) ||
                string.Equals(category, "global_state_read", StringComparison.Ordinal) ||
                string.Equals(category, "global_state_write", StringComparison.Ordinal) ||
                string.Equals(category, "impure_callee", StringComparison.Ordinal) ||
                string.Equals(category, "object_state_write", StringComparison.Ordinal);
-    }
 
-    internal static bool IsBufferMemmoveHelper(string symbol)
-    {
-        return string.Equals(symbol, "System.Buffer.Memmove(ref !!0, ref !!0, nuint)", StringComparison.Ordinal) ||
+    internal static bool IsBufferMemmoveHelper(string symbol) => string.Equals(symbol, "System.Buffer.Memmove(ref !!0, ref !!0, nuint)", StringComparison.Ordinal) ||
                string.Equals(symbol, "System.Buffer.Memmove(ref byte, ref byte, nuint)", StringComparison.Ordinal) ||
                string.Equals(symbol, "System.Buffer._Memmove(ref byte, ref byte, nuint)", StringComparison.Ordinal) ||
                string.Equals(symbol, "System.Buffer.__Memmove(byte*, byte*, nuint)", StringComparison.Ordinal) ||
@@ -228,24 +179,19 @@ internal static class EffectSummaryCallPurityRules
                    StringComparison.Ordinal) ||
                string.Equals(symbol, "System.Buffer.__BulkMoveWithWriteBarrier(ref byte, ref byte, nuint)",
                    StringComparison.Ordinal);
-    }
 
     internal static bool IsSemanticallyPureCharSpanSearchHelperCall(
         MethodEffectSummary callerSummary,
         string calleeSymbol,
-        MethodPurityClassification calleeClassification)
-    {
-        return HasCharSpanSearchContext(callerSummary) &&
+        MethodPurityClassification calleeClassification) => HasCharSpanSearchContext(callerSummary) &&
                IsEqualityBasedSpanSearchHelper(calleeSymbol) &&
                HasEqualityBasedSpanSearchBlockingChain(calleeClassification.FirstBlockingCallChain);
-    }
 
     internal static bool IsCharSpanToStringWrapperCall(
         MethodEffectSummary callerSummary,
         CallSiteSummary callSite,
         string calleeSymbol,
-        MethodPurityClassification calleeClassification)
-    {
+        MethodPurityClassification calleeClassification) {
         if (callSite.UsesDynamicDispatch ||
             !HasCharSpanToStringWrapperContext(callerSummary) ||
             !IsObjectToStringCall(calleeSymbol))
@@ -254,42 +200,28 @@ internal static class EffectSummaryCallPurityRules
         return HasObjectToStringBlockingChain(calleeClassification.FirstBlockingCallChain);
     }
 
-    internal static bool HasCharSpanToStringWrapperContext(MethodEffectSummary summary)
-    {
+    internal static bool HasCharSpanToStringWrapperContext(MethodEffectSummary summary) {
         if (!HasReturnType(summary.Identity, "named:System.String")) return false;
 
         return summary.Calls.Any(IsCharSpanReturningCall);
     }
 
-    internal static bool IsCharSpanReturningCall(string callSymbol)
-    {
-        return callSymbol.EndsWith(")->System.ReadOnlySpan`1<char>", StringComparison.Ordinal) ||
+    internal static bool IsCharSpanReturningCall(string callSymbol) => callSymbol.EndsWith(")->System.ReadOnlySpan`1<char>", StringComparison.Ordinal) ||
                callSymbol.EndsWith(")->System.Span`1<char>", StringComparison.Ordinal);
-    }
 
-    internal static bool IsObjectToStringCall(string calleeSymbol)
-    {
-        return string.Equals(calleeSymbol, "object.ToString()", StringComparison.Ordinal) ||
+    internal static bool IsObjectToStringCall(string calleeSymbol) => string.Equals(calleeSymbol, "object.ToString()", StringComparison.Ordinal) ||
                string.Equals(calleeSymbol, "System.Object.ToString()", StringComparison.Ordinal);
-    }
 
-    internal static bool HasObjectToStringBlockingChain(string[] blockingCallChain)
-    {
-        return (blockingCallChain.Length == 1 &&
+    internal static bool HasObjectToStringBlockingChain(string[] blockingCallChain) => (blockingCallChain.Length == 1 &&
                 string.Equals(blockingCallChain[0], "System.Object.GetType()", StringComparison.Ordinal)) ||
                (blockingCallChain.Length == 2 &&
                 string.Equals(blockingCallChain[0], "System.Object.ToString()", StringComparison.Ordinal) &&
                 string.Equals(blockingCallChain[1], "System.Object.GetType()", StringComparison.Ordinal));
-    }
 
-    internal static bool HasCharSpanSearchContext(MethodEffectSummary summary)
-    {
-        return summary.Symbol.Contains("System.ReadOnlySpan`1<char>", StringComparison.Ordinal) ||
+    internal static bool HasCharSpanSearchContext(MethodEffectSummary summary) => summary.Symbol.Contains("System.ReadOnlySpan`1<char>", StringComparison.Ordinal) ||
                summary.Symbol.Contains("System.Span`1<char>", StringComparison.Ordinal);
-    }
 
-    internal static bool IsEqualityBasedSpanSearchHelper(string calleeSymbol)
-    {
+    internal static bool IsEqualityBasedSpanSearchHelper(string calleeSymbol) {
         var methodBaseSymbol = GetMethodBaseSymbol(calleeSymbol);
         return string.Equals(methodBaseSymbol, "System.MemoryExtensions.Contains", StringComparison.Ordinal) ||
                string.Equals(methodBaseSymbol, "System.MemoryExtensions.IndexOf", StringComparison.Ordinal) ||
@@ -298,16 +230,13 @@ internal static class EffectSummaryCallPurityRules
                string.Equals(methodBaseSymbol, "System.MemoryExtensions.LastIndexOfAny", StringComparison.Ordinal);
     }
 
-    internal static bool HasEqualityBasedSpanSearchBlockingChain(string[] blockingCallChain)
-    {
-        return blockingCallChain.Length >= 2 &&
+    internal static bool HasEqualityBasedSpanSearchBlockingChain(string[] blockingCallChain) => blockingCallChain.Length >= 2 &&
                (blockingCallChain[0].StartsWith("System.SpanHelpers.Contains(", StringComparison.Ordinal) ||
                 blockingCallChain[0].StartsWith("System.SpanHelpers.IndexOf(", StringComparison.Ordinal) ||
                 blockingCallChain[0].StartsWith("System.SpanHelpers.IndexOfAny(", StringComparison.Ordinal) ||
                 blockingCallChain[0].StartsWith("System.SpanHelpers.LastIndexOf(", StringComparison.Ordinal) ||
                 blockingCallChain[0].StartsWith("System.SpanHelpers.LastIndexOfAny(", StringComparison.Ordinal)) &&
                string.Equals(blockingCallChain[1], "System.IEquatable`1.Equals(!0)", StringComparison.Ordinal);
-    }
 
     internal static bool ShouldIgnoreUnknownCall(
         MethodEffectSummary callerSummary,
@@ -317,21 +246,17 @@ internal static class EffectSummaryCallPurityRules
         string calleeKey,
         PurityClassificationContext context,
         bool treatsArgumentGuardThrowHelpersAsPure,
-        bool treatsDelegateDispatchAsSemantic)
-    {
-        return IsPureArgumentGuardWrapper(calleeSymbol) ||
+        bool treatsDelegateDispatchAsSemantic) => IsPureArgumentGuardWrapper(calleeSymbol) ||
                (treatsArgumentGuardThrowHelpersAsPure &&
                 IsArgumentGuardThrowHelper(calleeSymbol)) ||
                (treatsDelegateDispatchAsSemantic &&
                 IsSemanticallyNeutralValidationThrowHelper(calleeSymbol)) ||
                IsValidationThrowHelperCompatible(calleeKey, context) ||
                ShouldTreatCallAsSemanticallyPure(callerSummary, callSite, calleeSymbol, calleeClassification);
-    }
 
     internal static void AddImpureCalleeCategories(
         SortedSet<string> impureCategories,
-        MethodPurityClassification calleeClassification)
-    {
+        MethodPurityClassification calleeClassification) {
         foreach (var category in calleeClassification.Categories)
             if (string.Equals(category, "global_state_read", StringComparison.Ordinal) ||
                 string.Equals(category, "global_state_write", StringComparison.Ordinal))
@@ -342,13 +267,11 @@ internal static class EffectSummaryCallPurityRules
 
     internal static bool TryClassifyRuntimeIntrinsicStub(
         MethodEffectSummary summary,
-        out MethodPurityClassification classification)
-    {
+        out MethodPurityClassification classification) {
         classification = default!;
         if (string.IsNullOrWhiteSpace(summary.Symbol)) return false;
 
-        if (IsPureRuntimeIntrinsicStub(summary.Symbol))
-        {
+        if (IsPureRuntimeIntrinsicStub(summary.Symbol)) {
             var freshnessClassification = IsFastAllocateString(summary.Symbol)
                 ? "fresh_owned_object_write"
                 : "none";
@@ -367,8 +290,7 @@ internal static class EffectSummaryCallPurityRules
         }
 
         if (summary.Symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(",
-                StringComparison.Ordinal))
-        {
+                StringComparison.Ordinal)) {
             classification = new MethodPurityClassification(
                 "impure",
                 new[] { "caller_visible_memory_write" },
@@ -386,8 +308,7 @@ internal static class EffectSummaryCallPurityRules
 
     internal static bool TryClassifyKnownBclSummary(
         MethodEffectSummary summary,
-        out MethodPurityClassification classification)
-    {
+        out MethodPurityClassification classification) {
         classification = default!;
         var symbol = summary.Symbol;
         if (string.IsNullOrWhiteSpace(symbol)) return false;
@@ -395,8 +316,7 @@ internal static class EffectSummaryCallPurityRules
         if (string.Equals(
                 symbol,
                 "System.Collections.ObjectModel.KeyedCollection`2.Contains(!0)",
-                StringComparison.Ordinal))
-        {
+                StringComparison.Ordinal)) {
             classification = new MethodPurityClassification(
                 "conservative_unknown",
                 new[] { "dynamic_dispatch" },
@@ -409,14 +329,12 @@ internal static class EffectSummaryCallPurityRules
             return true;
         }
 
-        if (TryGetKnownGeneratedPureVisibility(symbol, out var pureVisibility))
-        {
+        if (TryGetKnownGeneratedPureVisibility(symbol, out var pureVisibility)) {
             classification = CreateGeneratedPureClassification(summary, pureVisibility);
             return true;
         }
 
-        if (TryGetKnownGeneratedImpureCategories(symbol, out var impureCategories))
-        {
+        if (TryGetKnownGeneratedImpureCategories(symbol, out var impureCategories)) {
             classification = CreateGeneratedImpureClassification(summary, impureCategories);
             return true;
         }
@@ -427,19 +345,16 @@ internal static class EffectSummaryCallPurityRules
     internal static bool TryClassifyKnownUnresolvedBclCall(
         string exactSymbol,
         out bool isPure,
-        out string[] categories)
-    {
+        out string[] categories) {
         var displaySymbol = RemoveReturnTypeSuffix(exactSymbol);
         if (IsPureRuntimeIntrinsicStub(displaySymbol) ||
-            TryGetKnownGeneratedPureVisibility(displaySymbol, out _))
-        {
+            TryGetKnownGeneratedPureVisibility(displaySymbol, out _)) {
             isPure = true;
             categories = Array.Empty<string>();
             return true;
         }
 
-        if (TryGetKnownGeneratedImpureCategories(displaySymbol, out categories))
-        {
+        if (TryGetKnownGeneratedImpureCategories(displaySymbol, out categories)) {
             isPure = false;
             return true;
         }
@@ -449,16 +364,14 @@ internal static class EffectSummaryCallPurityRules
         return false;
     }
 
-    internal static string RemoveReturnTypeSuffix(string exactSymbol)
-    {
+    internal static string RemoveReturnTypeSuffix(string exactSymbol) {
         var returnSeparator = exactSymbol.IndexOf("->", StringComparison.Ordinal);
         return returnSeparator < 0 ? exactSymbol : exactSymbol.Substring(0, returnSeparator);
     }
 
     internal static MethodPurityClassification CreateGeneratedPureClassification(
         MethodEffectSummary summary,
-        string effectVisibilityClassification)
-    {
+        string effectVisibilityClassification) {
         var freshnessClassification = GetFreshnessClassification(summary, "pure");
         if (string.Equals(effectVisibilityClassification, "none", StringComparison.Ordinal) &&
             !string.Equals(freshnessClassification, "none", StringComparison.Ordinal))
@@ -477,9 +390,7 @@ internal static class EffectSummaryCallPurityRules
 
     internal static MethodPurityClassification CreateGeneratedImpureClassification(
         MethodEffectSummary summary,
-        string[] categories)
-    {
-        return new MethodPurityClassification(
+        string[] categories) => new MethodPurityClassification(
             "impure",
             categories,
             Array.Empty<string>(),
@@ -488,5 +399,4 @@ internal static class EffectSummaryCallPurityRules
             false,
             "none",
             "caller_visible");
-    }
 }

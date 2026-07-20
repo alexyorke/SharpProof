@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class ReturnStatementPurityRule
-{
+internal partial class ReturnStatementPurityRule {
     private static bool TryFindReturnedInitializerArrayEscape(
         IOperation returnedValue,
         PurityAnalysisEngine.PurityAnalysisState currentState,
@@ -9,23 +8,19 @@ internal partial class ReturnStatementPurityRule
         CancellationToken cancellationToken,
         out SyntaxNode escapeSyntax,
         out ISymbol escapeSymbol,
-        out string catalogSource)
-    {
+        out string catalogSource) {
         foreach (var (value, site) in EnumerateReturnedInitializerEscapeValues(
                      returnedValue,
                      semanticModel,
-                     cancellationToken))
-        {
-            if (IsOwnedLocalArrayReturn(value, currentState, out var localSymbol))
-            {
+                     cancellationToken)) {
+            if (IsOwnedLocalArrayReturn(value, currentState, out var localSymbol)) {
                 escapeSyntax = value.Syntax;
                 escapeSymbol = localSymbol;
                 catalogSource = "owned_local_array_" + site + "_escape";
                 return true;
             }
 
-            if (IsKnownPureArrayFactoryReturn(value, semanticModel.Compilation, out var factoryMethod))
-            {
+            if (IsKnownPureArrayFactoryReturn(value, semanticModel.Compilation, out var factoryMethod)) {
                 escapeSyntax = value.Syntax;
                 escapeSymbol = factoryMethod;
                 catalogSource = "array_factory_" + site + "_escape";
@@ -42,13 +37,11 @@ internal partial class ReturnStatementPurityRule
         CancellationToken cancellationToken,
         out SyntaxNode escapeSyntax,
         out ISymbol escapeSymbol,
-        out string catalogSource)
-    {
+        out string catalogSource) {
         cancellationToken.ThrowIfCancellationRequested();
         var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
         if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
-            PurityCalleeResolver.IsKnownMutableCollectionBoundaryType(invocationOperation.Type))
-        {
+            PurityCalleeResolver.IsKnownMutableCollectionBoundaryType(invocationOperation.Type)) {
             escapeSyntax = invocationOperation.Syntax;
             escapeSymbol = invocationOperation.TargetMethod.OriginalDefinition;
             catalogSource = "returned_mutable_collection_invocation";
@@ -66,8 +59,7 @@ internal partial class ReturnStatementPurityRule
                 out catalogSource))
             return true;
 
-        if (unwrappedReturnedValue is IConditionalOperation or ICoalesceOperation)
-        {
+        if (unwrappedReturnedValue is IConditionalOperation or ICoalesceOperation) {
             foreach (var alternative in RuleAnalysisHelper.EnumerateReachableAlternatives(
                          unwrappedReturnedValue,
                          cancellationToken))
@@ -92,13 +84,11 @@ internal partial class ReturnStatementPurityRule
         CancellationToken cancellationToken,
         out SyntaxNode escapeSyntax,
         out ISymbol escapeSymbol,
-        out string catalogSource)
-    {
+        out string catalogSource) {
         foreach (var (value, site) in EnumerateReturnedInitializerEscapeValues(
                      returnedValue,
                      semanticModel,
-                     cancellationToken))
-        {
+                     cancellationToken)) {
             if (TryFindFreshMutableObjectReturnEscape(
                     value,
                     semanticModel,
@@ -106,8 +96,7 @@ internal partial class ReturnStatementPurityRule
                     cancellationToken,
                     out escapeSyntax,
                     out escapeSymbol,
-                    out _))
-            {
+                    out _)) {
                 catalogSource = "fresh_mutable_object_" + site + "_escape";
                 return true;
             }
@@ -119,17 +108,14 @@ internal partial class ReturnStatementPurityRule
     private static IEnumerable<(IOperation Value, string Site)> EnumerateReturnedInitializerEscapeValues(
         IOperation returnedValue,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
-        foreach (var assignment in returnedValue.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
-        {
+        foreach (var assignment in returnedValue.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>()) {
             cancellationToken.ThrowIfCancellationRequested();
             yield return (assignment.Value, "initializer");
         }
 
-        foreach (var objectCreation in returnedValue.DescendantsAndSelf().OfType<IObjectCreationOperation>())
-        {
+        foreach (var objectCreation in returnedValue.DescendantsAndSelf().OfType<IObjectCreationOperation>()) {
             cancellationToken.ThrowIfCancellationRequested();
             if (!IsConstructionWithEscapingParameters(objectCreation, semanticModel, cancellationToken)) continue;
 
@@ -145,13 +131,11 @@ internal partial class ReturnStatementPurityRule
         CancellationToken cancellationToken,
         out SyntaxNode escapeSyntax,
         out ISymbol escapeSymbol,
-        out string catalogSource)
-    {
+        out string catalogSource) {
         cancellationToken.ThrowIfCancellationRequested();
         var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
         if (unwrappedReturnedValue is IObjectCreationOperation objectCreationOperation &&
-            RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
-        {
+            RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type)) {
             escapeSyntax = objectCreationOperation.Syntax;
             escapeSymbol = objectCreationOperation.Constructor ?? (ISymbol)objectCreationOperation.Type!;
             catalogSource = "fresh_mutable_object_return";
@@ -168,15 +152,13 @@ internal partial class ReturnStatementPurityRule
                 out catalogSource))
             return true;
 
-        if (unwrappedReturnedValue is ILocalReferenceOperation localReference)
-        {
+        if (unwrappedReturnedValue is ILocalReferenceOperation localReference) {
             if (OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableLocal(
                     localReference.Local,
                     returnedValue.Syntax,
                     semanticModel,
                     currentState,
-                    cancellationToken))
-            {
+                    cancellationToken)) {
                 escapeSyntax = returnedValue.Syntax;
                 escapeSymbol = localReference.Local;
                 catalogSource = "symbolic_fresh_mutable_object_return";
@@ -195,8 +177,7 @@ internal partial class ReturnStatementPurityRule
         }
 
         if (unwrappedReturnedValue is ITupleOperation tupleOperation)
-            foreach (var element in tupleOperation.Elements)
-            {
+            foreach (var element in tupleOperation.Elements) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (TryFindFreshMutableObjectReturnEscape(
                         element,
@@ -205,10 +186,8 @@ internal partial class ReturnStatementPurityRule
                         cancellationToken,
                         out escapeSyntax,
                         out escapeSymbol,
-                        out catalogSource))
-                {
-                    catalogSource = catalogSource switch
-                    {
+                        out catalogSource)) {
+                    catalogSource = catalogSource switch {
                         "fresh_mutable_object_return" => "fresh_mutable_object_tuple_return",
                         "symbolic_fresh_mutable_object_return" => "symbolic_fresh_mutable_object_tuple_return",
                         _ => catalogSource
@@ -217,8 +196,7 @@ internal partial class ReturnStatementPurityRule
                 }
             }
 
-        if (unwrappedReturnedValue is IConditionalOperation or ICoalesceOperation)
-        {
+        if (unwrappedReturnedValue is IConditionalOperation or ICoalesceOperation) {
             foreach (var alternative in RuleAnalysisHelper.EnumerateReachableAlternatives(
                          unwrappedReturnedValue,
                          cancellationToken))
@@ -244,8 +222,7 @@ internal partial class ReturnStatementPurityRule
         CancellationToken cancellationToken,
         out SyntaxNode escapeSyntax,
         out ISymbol escapeSymbol,
-        out string catalogSource)
-    {
+        out string catalogSource) {
         if (!PurityAnalysisEngine.TryGetSingleReturnedValueFromInvocation(
                 invocationOperation,
                 semanticModel,
@@ -277,9 +254,7 @@ internal partial class ReturnStatementPurityRule
         CancellationToken cancellationToken,
         out SyntaxNode escapeSyntax,
         out ISymbol escapeSymbol,
-        out string catalogSource)
-    {
-        return TryGetStableMutableObjectLocalEscape(
+        out string catalogSource) => TryGetStableMutableObjectLocalEscape(
             localSymbol,
             returnedValue,
             semanticModel,
@@ -288,7 +263,6 @@ internal partial class ReturnStatementPurityRule
             out escapeSyntax,
             out escapeSymbol,
             out catalogSource);
-    }
 
     private static bool TryGetStableMutableCollectionLocalEscape(
         ILocalSymbol localSymbol,
@@ -297,8 +271,7 @@ internal partial class ReturnStatementPurityRule
         CancellationToken cancellationToken,
         out SyntaxNode escapeSyntax,
         out ISymbol escapeSymbol,
-        out string catalogSource)
-    {
+        out string catalogSource) {
         if (!RuleAnalysisHelper.TryGetStableLocalInitializer(
                 localSymbol,
                 returnedValue.Syntax,
@@ -317,8 +290,7 @@ internal partial class ReturnStatementPurityRule
                 cancellationToken,
                 out escapeSyntax,
                 out escapeSymbol,
-                out var nestedCatalogSource))
-        {
+                out var nestedCatalogSource)) {
             catalogSource = nestedCatalogSource == "returned_mutable_collection_invocation"
                 ? "returned_mutable_collection_local"
                 : nestedCatalogSource;
@@ -336,8 +308,7 @@ internal partial class ReturnStatementPurityRule
         CancellationToken cancellationToken,
         out SyntaxNode escapeSyntax,
         out ISymbol escapeSymbol,
-        out string catalogSource)
-    {
+        out string catalogSource) {
         if (visitedLocals.Contains(localSymbol))
             return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
 
@@ -349,8 +320,7 @@ internal partial class ReturnStatementPurityRule
                 visitedLocals,
                 cancellationToken,
                 out _,
-                out initializerOperation))
-        {
+                out initializerOperation)) {
             var declaratorSyntax = RuleAnalysisHelper.GetVariableDeclaratorSyntax(localSymbol, cancellationToken);
             if (declaratorSyntax?.Initializer?.Value != null ||
                 !TryGetDeconstructionElementInitializer(
@@ -374,8 +344,7 @@ internal partial class ReturnStatementPurityRule
 
         initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(initializerOperation)!;
         if (initializerOperation is IObjectCreationOperation objectCreationOperation &&
-            RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
-        {
+            RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type)) {
             escapeSyntax = returnedValue.Syntax;
             escapeSymbol = objectCreationOperation.Constructor ?? (ISymbol)objectCreationOperation.Type!;
             catalogSource = "fresh_mutable_object_local_return";
@@ -389,10 +358,8 @@ internal partial class ReturnStatementPurityRule
                 cancellationToken,
                 out escapeSyntax,
                 out escapeSymbol,
-                out var nestedCatalogSource))
-        {
-            catalogSource = nestedCatalogSource switch
-            {
+                out var nestedCatalogSource)) {
+            catalogSource = nestedCatalogSource switch {
                 "fresh_mutable_object_constructor_escape" => "fresh_mutable_object_local_constructor_escape",
                 "fresh_mutable_object_initializer_escape" => "fresh_mutable_object_local_initializer_escape",
                 _ => "fresh_mutable_object_local_escape"

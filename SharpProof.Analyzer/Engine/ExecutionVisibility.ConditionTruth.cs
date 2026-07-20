@@ -2,8 +2,7 @@ using SharpProof.ProofCore.Collections;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class ExecutionVisibility
-{
+internal static partial class ExecutionVisibility {
     private static readonly ConditionalWeakTable<SemanticModel,
         BoundedConcurrentCache<ConditionTruthCacheKey, bool?>> s_conditionTruthCache = new();
 
@@ -13,8 +12,7 @@ internal static partial class ExecutionVisibility
         SyntaxNode site,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis)
-    {
+        SmtAnalysisService? smtAnalysis) {
         var constant = semanticModel.GetConstantValue(expression, cancellationToken);
         if (constant.HasValue) return (constant.Value == null) == expectedNull;
 
@@ -44,8 +42,7 @@ internal static partial class ExecutionVisibility
         SyntaxNode site,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis)
-    {
+        SmtAnalysisService? smtAnalysis) {
         var pathState = SymbolicReachabilityService.CollectPathStateAt(
             site,
             semanticModel,
@@ -69,8 +66,7 @@ internal static partial class ExecutionVisibility
         SyntaxNode site,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis)
-    {
+        SmtAnalysisService? smtAnalysis) {
         var key = new ConditionTruthCacheKey(
             expression.SpanStart,
             expression.Span.Length,
@@ -120,8 +116,7 @@ internal static partial class ExecutionVisibility
         SymbolicState pathState,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis)
-    {
+        SmtAnalysisService? smtAnalysis) {
         var constant = semanticModel.GetConstantValue(expression, cancellationToken);
         if (constant is { HasValue: true, Value: bool constantValue }) return constantValue;
 
@@ -131,8 +126,7 @@ internal static partial class ExecutionVisibility
         if (lowering is not { IsExact: true, Value: { } condition }) return null;
 
         return new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(pathState, condition).Status
-            switch
-            {
+            switch {
                 SymbolicProofStatus.ProvenTrue => true,
                 SymbolicProofStatus.ProvenFalse => false,
                 _ => null

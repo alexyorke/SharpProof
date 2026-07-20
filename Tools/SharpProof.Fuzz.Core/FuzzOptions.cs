@@ -1,7 +1,6 @@
 namespace SharpProof.Tools.Fuzz;
 
-public sealed record FuzzOptions
-{
+public sealed record FuzzOptions {
     public static string Usage { get; } = ToolEmbeddedText.Load(
         typeof(FuzzOptions).Assembly,
         "SharpProof.Fuzz.Usage.txt");
@@ -45,8 +44,7 @@ public sealed record FuzzOptions
         .Add(static (o, _, _) => o.FailOnFindings = true, "--fail-on-findings")
         .Add(static (o, _, _) => o.RepeatAnalyzer = false, "--no-repeat");
 
-    public static FuzzOptions Parse(string[] args)
-    {
+    public static FuzzOptions Parse(string[] args) {
         var options = new FuzzOptions();
         OptionSet.Parse(args, options);
 
@@ -82,15 +80,12 @@ public sealed record FuzzOptions
     private static TimeSpan ReadDuration(
         ToolArgumentReader reader,
         string option,
-        Func<double, TimeSpan> createDuration)
-    {
+        Func<double, TimeSpan> createDuration) {
         var value = ReadDouble(reader, option);
-        try
-        {
+        try {
             return createDuration(value);
         }
-        catch (OverflowException ex)
-        {
+        catch (OverflowException ex) {
             throw new ArgumentException($"{option} expects a duration within TimeSpan range.", ex);
         }
     }

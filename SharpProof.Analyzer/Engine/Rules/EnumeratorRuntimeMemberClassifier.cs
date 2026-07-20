@@ -1,12 +1,10 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class EnumeratorRuntimeMemberClassifier
-{
+internal static class EnumeratorRuntimeMemberClassifier {
     internal static bool IsLocalEnumeratorStateMutation(
         IMethodSymbol method,
         ITypeSymbol enumeratorType,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         if (!enumeratorType.IsValueType ||
             method.IsStatic ||
             method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
@@ -24,24 +22,17 @@ internal static class EnumeratorRuntimeMemberClassifier
             category is "caller_visible_memory_write" or "object_state_write");
     }
 
-    internal static IEnumerable<IMethodSymbol> EnumerateRuntimeMembers(ITypeSymbol enumeratorType)
-    {
-        return EnumerateInstanceMethods(enumeratorType, "MoveNext", 0)
+    internal static IEnumerable<IMethodSymbol> EnumerateRuntimeMembers(ITypeSymbol enumeratorType) => EnumerateInstanceMethods(enumeratorType, "MoveNext", 0)
             .Concat(EnumerateCurrentGetters(enumeratorType))
             .Concat(DisposalMemberClassifier.EnumerateRuntimeDisposalMembers(enumeratorType, false))
             .DistinctByOriginalDefinition();
-    }
 
-    internal static IEnumerable<IMethodSymbol> EnumerateAsyncRuntimeMembers(ITypeSymbol enumeratorType)
-    {
-        return EnumerateInstanceMethods(enumeratorType, "MoveNextAsync", 0)
+    internal static IEnumerable<IMethodSymbol> EnumerateAsyncRuntimeMembers(ITypeSymbol enumeratorType) => EnumerateInstanceMethods(enumeratorType, "MoveNextAsync", 0)
             .Concat(EnumerateCurrentGetters(enumeratorType))
             .Concat(DisposalMemberClassifier.EnumerateRuntimeDisposalMembers(enumeratorType, true))
             .DistinctByOriginalDefinition();
-    }
 
-    internal static IEnumerable<IMethodSymbol> EnumerateGetEnumeratorImplementations(ITypeSymbol collectionType)
-    {
+    internal static IEnumerable<IMethodSymbol> EnumerateGetEnumeratorImplementations(ITypeSymbol collectionType) {
         var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
         var hasPatternMethod = false;
 
@@ -49,8 +40,7 @@ internal static class EnumeratorRuntimeMemberClassifier
                      .GetMembers("GetEnumerator")
                      .OfType<IMethodSymbol>()
                      .Where(static method => !method.IsStatic && method.Parameters.Length == 0))
-            if (seen.Add(getEnumerator.OriginalDefinition))
-            {
+            if (seen.Add(getEnumerator.OriginalDefinition)) {
                 hasPatternMethod = true;
                 yield return getEnumerator;
             }
@@ -69,8 +59,7 @@ internal static class EnumeratorRuntimeMemberClassifier
     }
 
     internal static IEnumerable<IMethodSymbol> EnumerateGenericGetEnumeratorImplementations(
-        ITypeSymbol collectionType)
-    {
+        ITypeSymbol collectionType) {
         if (collectionType is not INamedTypeSymbol namedCollectionType) yield break;
 
         foreach (var implementation in TypeHierarchyEnumeration.EnumerateInterfaceMethodImplementations(
@@ -82,8 +71,7 @@ internal static class EnumeratorRuntimeMemberClassifier
             yield return implementation;
     }
 
-    internal static IEnumerable<IMethodSymbol> EnumerateGetAsyncEnumeratorImplementations(ITypeSymbol collectionType)
-    {
+    internal static IEnumerable<IMethodSymbol> EnumerateGetAsyncEnumeratorImplementations(ITypeSymbol collectionType) {
         var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
 
         foreach (var getAsyncEnumerator in collectionType
@@ -107,37 +95,26 @@ internal static class EnumeratorRuntimeMemberClassifier
     private static IEnumerable<IMethodSymbol> EnumerateInstanceMethods(
         ITypeSymbol type,
         string methodName,
-        int parameterCount)
-    {
-        return TypeHierarchyEnumeration
+        int parameterCount) => TypeHierarchyEnumeration
             .EnumerateBaseTypeMembers<IMethodSymbol>(type, methodName)
             .Where(method => !method.IsStatic && method.Parameters.Length == parameterCount);
-    }
 
-    private static IEnumerable<IMethodSymbol> EnumerateCurrentGetters(ITypeSymbol type)
-    {
+    private static IEnumerable<IMethodSymbol> EnumerateCurrentGetters(ITypeSymbol type) {
         foreach (var property in TypeHierarchyEnumeration.EnumerateBaseTypeMembers<IPropertySymbol>(type, "Current"))
             if (property.GetMethod is { } getter)
                 yield return getter;
     }
 
-    private static bool IsGetAsyncEnumeratorPatternMethod(IMethodSymbol method)
-    {
-        return !method.IsStatic &&
+    private static bool IsGetAsyncEnumeratorPatternMethod(IMethodSymbol method) => !method.IsStatic &&
                (method.Parameters.Length == 0 ||
                 (method.Parameters.Length == 1 && method.Parameters[0].IsOptional));
-    }
 
-    private static bool IsEnumerableInterface(INamedTypeSymbol typeSymbol)
-    {
+    private static bool IsEnumerableInterface(INamedTypeSymbol typeSymbol) {
         var originalDefinition = typeSymbol.OriginalDefinition;
         return originalDefinition.SpecialType == SpecialType.System_Collections_IEnumerable ||
                originalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T;
     }
 
-    private static bool IsAsyncEnumerableInterface(INamedTypeSymbol typeSymbol)
-    {
-        return TypeHierarchyEnumeration.IsTypeNamed(
+    private static bool IsAsyncEnumerableInterface(INamedTypeSymbol typeSymbol) => TypeHierarchyEnumeration.IsTypeNamed(
             typeSymbol.OriginalDefinition, "System.Collections.Generic", "IAsyncEnumerable`1", 1);
-    }
 }

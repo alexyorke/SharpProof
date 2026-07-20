@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class ImpurityCatalog
-{
-    internal static string GetKnownImpureCatalogHitCategory(ISymbol symbol, bool includeSynchronizationCategory = false)
-    {
+internal static partial class ImpurityCatalog {
+    internal static string GetKnownImpureCatalogHitCategory(ISymbol symbol, bool includeSynchronizationCategory = false) {
         var containingType = symbol.ContainingType?.ToDisplayString() ?? string.Empty;
         var containingNamespace = symbol.ContainingNamespace?.ToDisplayString() ?? string.Empty;
 
@@ -31,8 +29,7 @@ internal static partial class ImpurityCatalog
         return "catalog_hit";
     }
 
-    private static bool IsAssemblyLoadContextTypeOrDerived(INamedTypeSymbol? type)
-    {
+    private static bool IsAssemblyLoadContextTypeOrDerived(INamedTypeSymbol? type) {
         for (var current = type; current != null; current = current.BaseType)
             if (string.Equals(
                     current.OriginalDefinition.ToDisplayString(),

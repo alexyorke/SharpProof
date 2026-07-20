@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
-{
+internal partial class PurityAnalysisEngine {
     internal static PurityAnalysisResult DeterminePurityRecursiveInternal(
         IMethodSymbol methodSymbol,
         SemanticModel semanticModel,
@@ -12,8 +11,7 @@ internal partial class PurityAnalysisEngine
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken,
-        Func<IMethodSymbol, SemanticModel?>? semanticModelResolver = null)
-    {
+        Func<IMethodSymbol, SemanticModel?>? semanticModelResolver = null) {
         cancellationToken.ThrowIfCancellationRequested();
         var activeSmtAnalysis = smtAnalysis ?? throw new ArgumentNullException(nameof(smtAnalysis));
         var indent = new string(' ', visited.Count * 2);
@@ -22,8 +20,7 @@ internal partial class PurityAnalysisEngine
         if (purityCache.TryGetValue(methodSymbol, out var cachedResult)) return cachedResult;
 
 
-        if (!visited.Add(methodSymbol))
-        {
+        if (!visited.Add(methodSymbol)) {
             var recursiveResult = PurityAnalysisResult.ImpureUnknownLocation.WithEvidence(
                 PurityEvidence.Create(
                     "unsupported_operation",
@@ -34,13 +31,11 @@ internal partial class PurityAnalysisEngine
             return recursiveResult;
         }
 
-        try
-        {
+        try {
             var declaringSyntax = GetDeclaringSyntax(methodSymbol, cancellationToken);
 
             var policy = PurityPolicyResolver.Resolve(methodSymbol, semanticModel.Compilation, attributePolicy);
-            if (policy.Decision == PurityPolicyDecision.Impure && policy.Winner != null)
-            {
+            if (policy.Decision == PurityPolicyDecision.Impure && policy.Winner != null) {
                 var winner = policy.Winner;
                 var policyResult = ImpureResult(
                     declaringSyntax,
@@ -54,8 +49,7 @@ internal partial class PurityAnalysisEngine
                 return policyResult;
             }
 
-            if (policy.Decision == PurityPolicyDecision.Pure)
-            {
+            if (policy.Decision == PurityPolicyDecision.Pure) {
                 purityCache[methodSymbol] = PurityAnalysisResult.Pure;
                 return PurityAnalysisResult.Pure;
             }
@@ -68,8 +62,7 @@ internal partial class PurityAnalysisEngine
             var bodySyntaxNode = GetBodySyntaxNode(methodSymbol, cancellationToken);
 
 
-            if (methodSymbol.ReturnsByRef)
-            {
+            if (methodSymbol.ReturnsByRef) {
                 SyntaxNode? locationSyntax = declaringSyntax?.DescendantNodesAndSelf()
                     .OfType<RefTypeSyntax>()
                     .FirstOrDefault();
@@ -88,8 +81,7 @@ internal partial class PurityAnalysisEngine
             }
 
 
-            if (methodSymbol.IsExtern)
-            {
+            if (methodSymbol.IsExtern) {
                 var externResult = ImpureResult(
                     declaringSyntax,
                     "unknown_external_call",
@@ -100,16 +92,13 @@ internal partial class PurityAnalysisEngine
                 return externResult;
             }
 
-            if (methodSymbol.IsAbstract || bodySyntaxNode == null)
-            {
-                if (IsBodylessSourceMemberAssumedPure(methodSymbol))
-                {
+            if (methodSymbol.IsAbstract || bodySyntaxNode == null) {
+                if (IsBodylessSourceMemberAssumedPure(methodSymbol)) {
                     purityCache[methodSymbol] = PurityAnalysisResult.Pure;
                     return PurityAnalysisResult.Pure;
                 }
 
-                if (hasTrustedGeneratedPurity && !generatedPurity.IsPure)
-                {
+                if (hasTrustedGeneratedPurity && !generatedPurity.IsPure) {
                     var generatedNoBodyResult = ImpureResult(
                         declaringSyntax,
                         generatedPurity.PrimaryCategory,
@@ -125,8 +114,7 @@ internal partial class PurityAnalysisEngine
                         declaringSyntax,
                         null,
                         "MethodInvocationPurityRule",
-                        out var bclFallbackNoBodyResult))
-                {
+                        out var bclFallbackNoBodyResult)) {
                     purityCache[methodSymbol] = bclFallbackNoBodyResult;
                     return bclFallbackNoBodyResult;
                 }
@@ -144,12 +132,10 @@ internal partial class PurityAnalysisEngine
 
             IOperation? methodBodyIOperation = null;
             if (bodySyntaxNode != null)
-                try
-                {
+                try {
                     methodBodyIOperation = semanticModel.GetOperation(bodySyntaxNode, cancellationToken);
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
+                catch (Exception ex) when (ex is not OperationCanceledException) {
                     methodBodyIOperation = null;
                 }
 
@@ -167,15 +153,13 @@ internal partial class PurityAnalysisEngine
                 semanticModelResolver);
             var result = PurityAnalysisResult.Pure;
             var mergedNormalExitStateFromCfg = PurityAnalysisState.Pure;
-            if (bodySyntaxNode != null)
-            {
+            if (bodySyntaxNode != null) {
                 var requiresNestedBodyFallback = methodBodyIOperation?.Parent != null;
-                if (requiresNestedBodyFallback && methodBodyIOperation != null)
-                    result = AnalyzeOperationSubtreePurity(
+                result = requiresNestedBodyFallback && methodBodyIOperation != null
+                    ? AnalyzeOperationSubtreePurity(
                         methodBodyIOperation,
-                        analysisContext);
-                else
-                    result = AnalyzePurityUsingCFGInternal(
+                        analysisContext)
+                    : AnalyzePurityUsingCFGInternal(
                         bodySyntaxNode,
                         analysisContext,
                         out mergedNormalExitStateFromCfg);
@@ -183,8 +167,7 @@ internal partial class PurityAnalysisEngine
 
 
             PurityAnalysisState? postCfgExitResourceState = null;
-            if (result.IsPure && methodBodyIOperation != null)
-            {
+            if (result.IsPure && methodBodyIOperation != null) {
                 postCfgExitResourceState = ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
                     .OfType<IUsingDeclarationOperation>().Aggregate(
                     mergedNormalExitStateFromCfg,
@@ -206,19 +189,16 @@ internal partial class PurityAnalysisEngine
             purityCache[methodSymbol] = result;
             return result;
         }
-        finally
-        {
+        finally {
             visited.Remove(methodSymbol);
         }
     }
 
-    private static bool IsBodylessSourceMemberAssumedPure(IMethodSymbol methodSymbol)
-    {
+    private static bool IsBodylessSourceMemberAssumedPure(IMethodSymbol methodSymbol) {
         if (methodSymbol.ContainingType?.Locations.Any(static location => !location.IsInMetadata) != true)
             return false;
 
-        return methodSymbol.MethodKind switch
-        {
+        return methodSymbol.MethodKind switch {
             MethodKind.PropertyGet =>
                 methodSymbol.DeclaringSyntaxReferences.Length > 0 &&
                 !methodSymbol.IsAbstract &&

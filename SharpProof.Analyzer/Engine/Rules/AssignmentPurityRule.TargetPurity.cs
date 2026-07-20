@@ -1,12 +1,9 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class AssignmentPurityRule
-{
+internal partial class AssignmentPurityRule {
     private static bool IsAssignmentTargetPure(IOperation targetOperation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
-        switch (targetOperation.Kind)
-        {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
+        switch (targetOperation.Kind) {
             case OperationKind.Discard:
                 return true;
 
@@ -18,8 +15,7 @@ internal partial class AssignmentPurityRule
                 return true;
 
             case OperationKind.ParameterReference:
-                if (targetOperation is IParameterReferenceOperation paramRef)
-                {
+                if (targetOperation is IParameterReferenceOperation paramRef) {
                     if (paramRef.Parameter.RefKind == RefKind.Ref || paramRef.Parameter.RefKind == RefKind.Out ||
                         paramRef.Parameter.RefKind == RefKind.In || paramRef.Parameter.RefKind == RefKind.RefReadOnly)
                         return false;
@@ -53,8 +49,7 @@ internal partial class AssignmentPurityRule
 
 
                 if (propRefOp.Instance is IInstanceReferenceOperation instanceRefKind &&
-                    instanceRefKind.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance)
-                {
+                    instanceRefKind.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance) {
                     if (context.ContainingMethodSymbol.MethodKind == MethodKind.Constructor) return true;
 
                     return false;
@@ -85,8 +80,7 @@ internal partial class AssignmentPurityRule
         }
     }
 
-    private static bool IsPureInlineArrayTarget(IInlineArrayAccessOperation inlineArrayAccessOperation)
-    {
+    private static bool IsPureInlineArrayTarget(IInlineArrayAccessOperation inlineArrayAccessOperation) {
         var instance = inlineArrayAccessOperation.Instance;
         if (instance == null) return false;
 
@@ -101,8 +95,7 @@ internal partial class AssignmentPurityRule
     }
 
     private static bool IsOwnedLocalArrayReference(IOperation operation,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (operation is IConversionOperation conversionOperation && conversionOperation.Operand != null)
             return IsOwnedLocalArrayReference(conversionOperation.Operand, currentState);
 
@@ -112,8 +105,7 @@ internal partial class AssignmentPurityRule
     private static bool IsRefLocalAliasToExternallyVisibleStorage(
         ILocalSymbol local,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (local.RefKind != RefKind.Ref && local.RefKind != RefKind.Out) return false;
 
         var visited = new HashSet<ISymbol>(SymbolEq.Default);
@@ -128,15 +120,13 @@ internal partial class AssignmentPurityRule
         ILocalSymbol local,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        HashSet<ISymbol> visited)
-    {
+        HashSet<ISymbol> visited) {
         if ((local.RefKind != RefKind.Ref && local.RefKind != RefKind.Out) || !visited.Add(local)) return false;
 
         foreach (var initializerOperation in RuleAnalysisHelper.EnumerateRefLocalInitializerOperations(
                      local,
                      context.SemanticModel,
-                     context.CancellationToken))
-        {
+                     context.CancellationToken)) {
             if (IsExternallyVisibleRefTarget(initializerOperation, context, currentState, visited)) return true;
         }
 
@@ -147,12 +137,10 @@ internal partial class AssignmentPurityRule
         IOperation? operation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        HashSet<ISymbol> visited)
-    {
+        HashSet<ISymbol> visited) {
         operation = PurityAnalysisEngine.SkipImplicitConversions(operation);
 
-        return operation switch
-        {
+        return operation switch {
             IParameterReferenceOperation parameterReference =>
                 parameterReference.Parameter.RefKind == RefKind.Ref ||
                 parameterReference.Parameter.RefKind == RefKind.Out ||
@@ -174,11 +162,9 @@ internal partial class AssignmentPurityRule
         };
     }
 
-    private static bool IsPureLocalValueTypeFieldRefTarget(IFieldReferenceOperation fieldReference)
-    {
+    private static bool IsPureLocalValueTypeFieldRefTarget(IFieldReferenceOperation fieldReference) {
         var instance = PurityAnalysisEngine.SkipImplicitConversions(fieldReference.Instance);
-        return instance switch
-        {
+        return instance switch {
             ILocalReferenceOperation localReference =>
                 localReference.Local.RefKind == RefKind.None &&
                 localReference.Local.Type.IsValueType,
@@ -193,8 +179,7 @@ internal partial class AssignmentPurityRule
 
     private static bool IsFreshObjectInitializerFieldAssignment(
         IFieldReferenceOperation fieldReferenceOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (fieldReferenceOperation.Parent is not ISimpleAssignmentOperation assignment ||
             assignment.Target != fieldReferenceOperation)
             return false;
@@ -212,8 +197,7 @@ internal partial class AssignmentPurityRule
 
     private static bool IsValueTypeWithInitializerAssignment(
         IOperation targetOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (targetOperation.Parent is not ISimpleAssignmentOperation assignment ||
             assignment.Target != targetOperation)
             return false;
@@ -228,8 +212,7 @@ internal partial class AssignmentPurityRule
 
     private static IOperation NormalizeAssignmentTargetOperation(
         IOperation targetOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (targetOperation is not IFlowCaptureReferenceOperation ||
             targetOperation.Syntax == null)
             return targetOperation;

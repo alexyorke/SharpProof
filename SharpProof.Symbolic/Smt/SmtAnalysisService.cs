@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic.Smt;
 
-internal sealed class SmtAnalysisService : IDisposable
-{
+internal sealed class SmtAnalysisService : IDisposable {
     private const int PreNormalizationFormulaDepthLimit = 1024;
     private static readonly Func<IPurityProofSearchSession> s_defaultProofSearchFactory =
         static () => new PurityProofSearch();
@@ -21,14 +20,12 @@ internal sealed class SmtAnalysisService : IDisposable
     private int _transientRetryCount;
 
     public SmtAnalysisService(SmtAnalysisOptions options)
-        : this(options, s_defaultProofSearchFactory)
-    {
+        : this(options, s_defaultProofSearchFactory) {
     }
 
     internal SmtAnalysisService(
         SmtAnalysisOptions options,
-        Func<IPurityProofSearchSession> proofSearchFactory)
-    {
+        Func<IPurityProofSearchSession> proofSearchFactory) {
         SmtNativeLibraryBootstrap.TryLoadAdjacentLibrary();
         Options = options ?? throw new ArgumentNullException(nameof(options));
         _budget = new SmtAnalysisBudget(Options.MethodBudget);
@@ -61,10 +58,8 @@ internal sealed class SmtAnalysisService : IDisposable
     public bool IsPermanentlyUnavailable =>
         GetHealthState() == SmtAnalysisHealthState.PermanentlyUnavailable;
 
-    public SmtAnalysisHealth Health
-    {
-        get
-        {
+    public SmtAnalysisHealth Health {
+        get {
             lock (_healthLock)
                 return new SmtAnalysisHealth(
                     GetHealthState(),
@@ -77,10 +72,8 @@ internal sealed class SmtAnalysisService : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        lock (_solverLock)
-        {
+    public void Dispose() {
+        lock (_solverLock) {
             if (_disposed) return;
 
             _disposed = true;
@@ -92,19 +85,15 @@ internal sealed class SmtAnalysisService : IDisposable
         }
     }
 
-    internal PurityProofResult ClassifyPathFeasibility(IEnumerable<SmtFormula> pathConditions)
-    {
-        return Classify(new PurityProofQuery(
+    internal PurityProofResult ClassifyPathFeasibility(IEnumerable<SmtFormula> pathConditions) => Classify(new PurityProofQuery(
             pathConditions.ToArray(),
             new PurityHazard(
                 PurityHazardKind.BranchReachability,
                 new SmtBooleanConstant(true))));
-    }
 
     internal PurityProofResult ClassifyImplication(
         IEnumerable<SmtFormula> pathConditions,
-        SmtFormula factFormula)
-    {
+        SmtFormula factFormula) {
         if (factFormula == null) throw new ArgumentNullException(nameof(factFormula));
 
         return Classify(new PurityProofQuery(
@@ -114,8 +103,7 @@ internal sealed class SmtAnalysisService : IDisposable
                 new SmtUnaryFormula(SmtUnaryOperator.Not, factFormula))));
     }
 
-    internal PurityProofResult Classify(PurityProofQuery query)
-    {
+    internal PurityProofResult Classify(PurityProofQuery query) {
         if (_disposed) return Unknown("smt_disposed");
 
         if (!Options.IsEnabled) return Unknown("smt_disabled");
@@ -145,8 +133,7 @@ internal sealed class SmtAnalysisService : IDisposable
         var key = CreateQueryKey(normalizedQuery);
         if (_proofResults.TryGetLocal(key, out var cached)) return cached;
 
-        if (_proofResults.TryGetShared(Options, key, out var sharedResult))
-        {
+        if (_proofResults.TryGetShared(Options, key, out var sharedResult)) {
             _proofResults.AddLocal(key, sharedResult);
             return sharedResult;
         }
@@ -158,10 +145,8 @@ internal sealed class SmtAnalysisService : IDisposable
 
     private PurityProofResult ClassifyWithSharedQueryFlight(
         PurityProofQuery query,
-        string queryKey)
-    {
-        var flight = _proofResults.AcquireSharedFlight(Options, queryKey, () =>
-        {
+        string queryKey) {
+        var flight = _proofResults.AcquireSharedFlight(Options, queryKey, () => {
             if (_proofResults.TryGetShared(Options, queryKey, out var racedSharedResult))
                 return racedSharedResult;
 
@@ -170,21 +155,17 @@ internal sealed class SmtAnalysisService : IDisposable
                 : ClassifyCore(query);
         });
         PurityProofResult result;
-        try
-        {
+        try {
             result = flight.Result.Value;
-            if (flight.OwnsFlight)
-            {
+            if (flight.OwnsFlight) {
                 _proofResults.AddLocalIfCacheable(queryKey, result);
                 _proofResults.AddSharedIfCacheable(Options, queryKey, result);
             }
-            else if (SmtProofResultCache.IsShareable(result))
-            {
+            else if (SmtProofResultCache.IsShareable(result)) {
                 _proofResults.AddLocal(queryKey, result);
             }
         }
-        finally
-        {
+        finally {
             _proofResults.ReleaseSharedFlight(flight);
         }
 
@@ -195,10 +176,8 @@ internal sealed class SmtAnalysisService : IDisposable
 
     private PurityProofResult ClassifyLocally(
         PurityProofQuery query,
-        string queryKey)
-    {
-        if (_proofResults.TryGetShared(Options, queryKey, out var sharedResult))
-        {
+        string queryKey) {
+        if (_proofResults.TryGetShared(Options, queryKey, out var sharedResult)) {
             _proofResults.AddLocal(queryKey, sharedResult);
             return sharedResult;
         }
@@ -211,50 +190,39 @@ internal sealed class SmtAnalysisService : IDisposable
         return result;
     }
 
-    private PurityProofResult ClassifyCore(PurityProofQuery query)
-    {
+    private PurityProofResult ClassifyCore(PurityProofQuery query) {
         var queryClock = Stopwatch.StartNew();
-        try
-        {
-            lock (_solverLock)
-            {
+        try {
+            lock (_solverLock) {
                 if (_disposed) return Unknown("smt_disposed");
                 if (IsPermanentlyUnavailable) return Unknown("smt_unavailable");
 
-                for (var attempt = 0;; attempt++)
-                {
+                for (var attempt = 0; ; attempt++) {
                     PurityProofResult result;
-                    try
-                    {
+                    try {
                         Interlocked.Increment(ref _executedQueryCount);
                         var search = _proofSearchSessions.GetOrCreate();
                         var resourcesBefore = search.ConsumedResourceCount;
-                        try
-                        {
+                        try {
                             result = search.Classify(query, Options.QueryTimeout);
                         }
-                        finally
-                        {
+                        finally {
                             _budget.RecordConsumedResources(
                                 search.ConsumedResourceCount - resourcesBefore);
                         }
                     }
-                    catch (InvalidOperationException)
-                    {
+                    catch (InvalidOperationException) {
                         RecordFailure("smt_encoding_failure", SmtAnalysisHealthState.Ready);
                         return Unknown("smt_encoding_failure");
                     }
-                    catch (RegexMatchTimeoutException)
-                    {
+                    catch (RegexMatchTimeoutException) {
                         RecordFailure("smt_timeout", SmtAnalysisHealthState.Ready);
                         return Unknown("smt_timeout");
                     }
-                    catch (Exception ex) when (IsTransientSolverFailure(ex))
-                    {
+                    catch (Exception ex) when (IsTransientSolverFailure(ex)) {
                         result = Unknown("smt_transient_failure");
                     }
-                    catch (Exception ex) when (IsPermanentSolverFailure(ex))
-                    {
+                    catch (Exception ex) when (IsPermanentSolverFailure(ex)) {
                         MarkPermanentlyUnavailable(GetPermanentFailureCode(ex));
                         if (_proofSearchSessions.RecycleCurrentThread())
                             Interlocked.Increment(ref _contextRecycleCount);
@@ -262,8 +230,7 @@ internal sealed class SmtAnalysisService : IDisposable
                         return Unknown("smt_unavailable");
                     }
 
-                    if (!SmtProofResultCache.IsTransientFailure(result))
-                    {
+                    if (!SmtProofResultCache.IsTransientFailure(result)) {
                         RecordSolverSuccess();
                         return result;
                     }
@@ -280,44 +247,32 @@ internal sealed class SmtAnalysisService : IDisposable
                 }
             }
         }
-        finally
-        {
+        finally {
             queryClock.Stop();
             _budget.RecordQueryDuration(queryClock.ElapsedTicks);
         }
     }
 
-    private static PurityProofResult Unknown(string reason)
-    {
-        return new PurityProofResult(
+    private static PurityProofResult Unknown(string reason) => new PurityProofResult(
             PurityProofOutcome.Unknown,
             new ProofCheckInfo(false, Feasibility.Unknown),
             new ProofCheckInfo(false, Feasibility.Unknown),
             reason);
-    }
 
-    private static bool IsTransientSolverFailure(Exception ex)
-    {
-        return string.Equals(ex.GetType().FullName, "Microsoft.Z3.Z3Exception", StringComparison.Ordinal) ||
+    private static bool IsTransientSolverFailure(Exception ex) => string.Equals(ex.GetType().FullName, "Microsoft.Z3.Z3Exception", StringComparison.Ordinal) ||
                string.Equals(ex.GetType().Name, "Z3Exception", StringComparison.Ordinal);
-    }
 
     private static bool IsPermanentSolverFailure(Exception ex) =>
         FindPermanentSolverFailure(ex) != null;
 
-    private static string GetPermanentFailureCode(Exception ex)
-    {
-        return FindPermanentSolverFailure(ex) switch
-        {
-            DllNotFoundException or FileNotFoundException => "smt_native_library_missing",
-            BadImageFormatException or EntryPointNotFoundException => "smt_native_library_incompatible",
-            PlatformNotSupportedException => "smt_platform_unsupported",
-            _ => "smt_initialization_failure"
-        };
-    }
+    private static string GetPermanentFailureCode(Exception ex) => FindPermanentSolverFailure(ex) switch {
+        DllNotFoundException or FileNotFoundException => "smt_native_library_missing",
+        BadImageFormatException or EntryPointNotFoundException => "smt_native_library_incompatible",
+        PlatformNotSupportedException => "smt_platform_unsupported",
+        _ => "smt_initialization_failure"
+    };
 
-    private static Exception? FindPermanentSolverFailure(Exception exception, int depth = 0)
-    {
+    private static Exception? FindPermanentSolverFailure(Exception exception, int depth = 0) {
         if (depth >= 16) return null;
 
         if (exception is DllNotFoundException or
@@ -327,16 +282,13 @@ internal sealed class SmtAnalysisService : IDisposable
             PlatformNotSupportedException)
             return exception;
 
-        if (exception is AggregateException aggregateException)
-        {
-            foreach (var innerException in aggregateException.Flatten().InnerExceptions)
-            {
+        if (exception is AggregateException aggregateException) {
+            foreach (var innerException in aggregateException.Flatten().InnerExceptions) {
                 var nestedFailure = FindPermanentSolverFailure(innerException, depth + 1);
                 if (nestedFailure != null) return nestedFailure;
             }
         }
-        else if (exception.InnerException != null)
-        {
+        else if (exception.InnerException != null) {
             var nestedFailure = FindPermanentSolverFailure(exception.InnerException, depth + 1);
             if (nestedFailure != null) return nestedFailure;
         }
@@ -347,25 +299,18 @@ internal sealed class SmtAnalysisService : IDisposable
     private SmtAnalysisHealthState GetHealthState() =>
         (SmtAnalysisHealthState)Volatile.Read(ref _healthState);
 
-    private void SetHealthState(SmtAnalysisHealthState state)
-    {
-        Volatile.Write(ref _healthState, (int)state);
-    }
+    private void SetHealthState(SmtAnalysisHealthState state) => Volatile.Write(ref _healthState, (int)state);
 
-    private void RecordFailure(string failureCode, SmtAnalysisHealthState state)
-    {
-        lock (_healthLock)
-        {
+    private void RecordFailure(string failureCode, SmtAnalysisHealthState state) {
+        lock (_healthLock) {
             _lastFailureCode = failureCode;
             if (!_disposed && GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable)
                 SetHealthState(state);
         }
     }
 
-    private void RecordTransientFailure()
-    {
-        lock (_healthLock)
-        {
+    private void RecordTransientFailure() {
+        lock (_healthLock) {
             _lastFailureCode = "smt_transient_failure";
             _consecutiveTransientFailureCount++;
             if (!_disposed && GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable)
@@ -373,10 +318,8 @@ internal sealed class SmtAnalysisService : IDisposable
         }
     }
 
-    private void RecordSolverSuccess()
-    {
-        lock (_healthLock)
-        {
+    private void RecordSolverSuccess() {
+        lock (_healthLock) {
             if (GetHealthState() == SmtAnalysisHealthState.Degraded)
                 _recoveredTransientFailureCount++;
 
@@ -387,29 +330,22 @@ internal sealed class SmtAnalysisService : IDisposable
         }
     }
 
-    private void MarkPermanentlyUnavailable(string failureCode)
-    {
-        lock (_healthLock)
-        {
+    private void MarkPermanentlyUnavailable(string failureCode) {
+        lock (_healthLock) {
             _lastFailureCode = failureCode;
             SetHealthState(SmtAnalysisHealthState.PermanentlyUnavailable);
         }
     }
 
-    private static string CreateQueryKey(PurityProofQuery query)
-    {
-        return CreateFormulaSequenceKey(query.PathConditions) +
+    private static string CreateQueryKey(PurityProofQuery query) => CreateFormulaSequenceKey(query.PathConditions) +
                "|hazard=" + (int)query.Hazard.Kind +
                "|visibility=" + (int)query.Hazard.Visibility +
                "|trigger=" + SmtFormulaStructuralKey.Create(query.Hazard.TriggerCondition);
-    }
 
-    private static ImmutableArray<SmtFormula> NormalizePathConditions(IEnumerable<SmtFormula> pathConditions)
-    {
+    private static ImmutableArray<SmtFormula> NormalizePathConditions(IEnumerable<SmtFormula> pathConditions) {
         var builder = ImmutableArray.CreateBuilder<SmtFormula>();
         var seen = new HashSet<SmtFormula>();
-        foreach (var pathCondition in pathConditions)
-        {
+        foreach (var pathCondition in pathConditions) {
             if (pathCondition is SmtBooleanConstant { Value: true }) continue;
 
             if (seen.Add(pathCondition)) builder.Add(pathCondition);
@@ -420,8 +356,7 @@ internal sealed class SmtAnalysisService : IDisposable
             .ToImmutableArray();
     }
 
-    private static string CreateFormulaSequenceKey(IEnumerable<SmtFormula> formulas)
-    {
+    private static string CreateFormulaSequenceKey(IEnumerable<SmtFormula> formulas) {
         var keys = formulas.Select(SmtFormulaStructuralKey.Create).ToArray();
         return string.Join(
             string.Empty,
@@ -432,12 +367,10 @@ internal sealed class SmtAnalysisService : IDisposable
     private static bool TryClassifyConcreteFacts(
         PurityProofQuery query,
         ImmutableArray<SmtFormula> pathConditions,
-        out PurityProofResult result)
-    {
+        out PurityProofResult result) {
         var preprocessor = new SmtConcreteFactPreprocessor();
         var pathStatus = preprocessor.Prepare(pathConditions.ToArray(), out _);
-        if (pathStatus == SmtConcreteFactPreparationStatus.Unsatisfiable)
-        {
+        if (pathStatus == SmtConcreteFactPreparationStatus.Unsatisfiable) {
             result = new PurityProofResult(
                 PurityProofOutcome.ProvablyPure,
                 new ProofCheckInfo(true, Feasibility.Unsatisfiable),
@@ -447,13 +380,11 @@ internal sealed class SmtAnalysisService : IDisposable
         }
 
         var pureReason = GetConcreteTriggerPureReason(query.Hazard);
-        if (pureReason.Length != 0)
-        {
+        if (pureReason.Length != 0) {
             var combined = new SmtFormula[pathConditions.Length + 1];
             pathConditions.CopyTo(combined);
             combined[combined.Length - 1] = query.Hazard.TriggerCondition;
-            if (preprocessor.Prepare(combined, out _) == SmtConcreteFactPreparationStatus.Unsatisfiable)
-            {
+            if (preprocessor.Prepare(combined, out _) == SmtConcreteFactPreparationStatus.Unsatisfiable) {
                 result = new PurityProofResult(
                     PurityProofOutcome.ProvablyPure,
                     new ProofCheckInfo(false, Feasibility.Unknown),
@@ -470,8 +401,7 @@ internal sealed class SmtAnalysisService : IDisposable
     private static string GetConcreteTriggerPureReason(PurityHazard hazard) =>
         hazard.Visibility == PurityEffectVisibility.InternalOnly
             ? string.Empty
-            : hazard.Kind switch
-            {
+            : hazard.Kind switch {
                 PurityHazardKind.BranchReachability => "branch_unreachable",
                 PurityHazardKind.ImpureCallReachability => "impure_call_unreachable",
                 PurityHazardKind.CallerVisibleMemoryWrite => "memory_write_unreachable",
@@ -483,8 +413,7 @@ internal sealed class SmtAnalysisService : IDisposable
     private static bool IsWithinFormulaNodeBudget(
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula triggerCondition,
-        int maxNodes)
-    {
+        int maxNodes) {
         var remaining = maxNodes;
         foreach (var formula in pathConditions)
             if (!TryConsumeFormulaNodeBudget(formula, ref remaining))
@@ -496,8 +425,7 @@ internal sealed class SmtAnalysisService : IDisposable
     private static bool IsWithinFormulaDepthBudget(
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula triggerCondition,
-        int maxDepth)
-    {
+        int maxDepth) {
         foreach (var formula in pathConditions)
             if (!SmtFormulaTraversal.IsWithinDepth(formula, maxDepth))
                 return false;
@@ -505,10 +433,8 @@ internal sealed class SmtAnalysisService : IDisposable
         return SmtFormulaTraversal.IsWithinDepth(triggerCondition, maxDepth);
     }
 
-    private static bool TryConsumeFormulaNodeBudget(SmtFormula root, ref int remaining)
-    {
-        foreach (var formula in SmtFormulaTraversal.Enumerate(root))
-        {
+    private static bool TryConsumeFormulaNodeBudget(SmtFormula root, ref int remaining) {
+        foreach (var formula in SmtFormulaTraversal.Enumerate(root)) {
             remaining -= formula is SmtRegexMatchFormula regexMatch
                 ? 1 + Math.Max(1, regexMatch.Pattern.Length / 8)
                 : 1;

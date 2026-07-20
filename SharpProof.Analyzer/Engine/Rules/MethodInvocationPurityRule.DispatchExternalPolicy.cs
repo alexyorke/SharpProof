@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class MethodInvocationPurityRule
-{
-    private static bool CanHaveExternalOverrides(IMethodSymbol methodSymbol, INamedTypeSymbol? knownReceiverType)
-    {
+internal partial class MethodInvocationPurityRule {
+    private static bool CanHaveExternalOverrides(IMethodSymbol methodSymbol, INamedTypeSymbol? knownReceiverType) {
         if (methodSymbol.IsSealed) return false;
 
         if (!methodSymbol.IsVirtual) return false;
@@ -31,8 +29,7 @@ internal partial class MethodInvocationPurityRule
         IMethodSymbol methodSymbol,
         IInvocationOperation invocationOperation,
         INamedTypeSymbol? knownReceiverType,
-        bool hasExactReceiverType)
-    {
+        bool hasExactReceiverType) {
         if (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface)
             return CanHaveExternalInterfaceImplementations(
                 methodSymbol.ContainingType,
@@ -55,8 +52,7 @@ internal partial class MethodInvocationPurityRule
         INamedTypeSymbol interfaceSymbol,
         IOperation? invocationInstance,
         INamedTypeSymbol? knownReceiverType,
-        bool hasExactReceiverType)
-    {
+        bool hasExactReceiverType) {
         if (!CanInterfaceHaveExternalImplementations(interfaceSymbol)) return false;
 
         var concreteReceiverType = GetKnownReceiverType(invocationInstance) ?? knownReceiverType;
@@ -81,8 +77,7 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool CanInterfaceHaveExternalImplementations(INamedTypeSymbol interfaceSymbol)
-    {
+    private static bool CanInterfaceHaveExternalImplementations(INamedTypeSymbol interfaceSymbol) {
         if (!IsTypeEffectivelyExternallyAccessible(interfaceSymbol)) return false;
 
         foreach (var baseInterface in interfaceSymbol.AllInterfaces)

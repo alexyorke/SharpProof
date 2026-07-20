@@ -1,11 +1,9 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static class PurityKnownBclSemantics
-{
+internal static class PurityKnownBclSemantics {
     internal static bool IsTrackedOwnedArrayValue(
         IOperation? valueOperation,
-        PurityAnalysisState currentState)
-    {
+        PurityAnalysisState currentState) {
         var unwrappedValue = UnwrapArrayOwnershipPreservingConversions(valueOperation);
         if (unwrappedValue == null) return false;
 
@@ -25,8 +23,7 @@ internal static class PurityKnownBclSemantics
     internal static bool IsOwnedLocalArrayValue(
         IOperation? valueOperation,
         PurityAnalysisState currentState,
-        Compilation compilation)
-    {
+        Compilation compilation) {
         var unwrappedValue = UnwrapArrayOwnershipPreservingConversions(valueOperation);
         if (unwrappedValue == null) return false;
 
@@ -47,13 +44,9 @@ internal static class PurityKnownBclSemantics
     internal static bool IsOwnedArrayValueOrTrustedFactory(
         IOperation? valueOperation,
         PurityAnalysisState currentState,
-        Compilation compilation)
-    {
-        return IsOwnedLocalArrayValue(valueOperation, currentState, compilation);
-    }
+        Compilation compilation) => IsOwnedLocalArrayValue(valueOperation, currentState, compilation);
 
-    internal static IOperation? UnwrapArrayOwnershipPreservingConversions(IOperation? operation)
-    {
+    internal static IOperation? UnwrapArrayOwnershipPreservingConversions(IOperation? operation) {
         while (operation is IConversionOperation conversion &&
                (conversion.IsImplicit ||
                 (!conversion.Conversion.IsUserDefined &&
@@ -64,8 +57,7 @@ internal static class PurityKnownBclSemantics
         return operation;
     }
 
-    internal static bool IsArrayAsReadOnlyInvocation(IInvocationOperation invocationOperation)
-    {
+    internal static bool IsArrayAsReadOnlyInvocation(IInvocationOperation invocationOperation) {
         var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
         if (targetMethod == null ||
             targetMethod.Name != "AsReadOnly" ||
@@ -80,8 +72,7 @@ internal static class PurityKnownBclSemantics
         IInvocationOperation invocationOperation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out IArrayTypeSymbol arrayType)
-    {
+        out IArrayTypeSymbol arrayType) {
         arrayType = null!;
         var invocationSyntax = invocationOperation.Syntax as InvocationExpressionSyntax ??
                                invocationOperation.Syntax.FirstAncestorOrSelf<InvocationExpressionSyntax>();
@@ -99,15 +90,13 @@ internal static class PurityKnownBclSemantics
         return true;
     }
 
-    private static bool IsArrayEmptyInvocation(IOperation? operation)
-    {
+    private static bool IsArrayEmptyInvocation(IOperation? operation) {
         var unwrappedOperation = UnwrapArrayOwnershipPreservingConversions(operation);
         return unwrappedOperation is IInvocationOperation invocation &&
                PurityConcreteReceiverResolver.IsArrayEmptyFactory(invocation.TargetMethod.OriginalDefinition);
     }
 
-    internal static bool IsTimeSpanInvariantCultureParseInvocation(IInvocationOperation invocationOperation)
-    {
+    internal static bool IsTimeSpanInvariantCultureParseInvocation(IInvocationOperation invocationOperation) {
         var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
         if (targetMethod == null ||
             targetMethod.ContainingType?.ToDisplayString() != "System.TimeSpan" ||
@@ -138,22 +127,17 @@ internal static class PurityKnownBclSemantics
         return false;
     }
 
-    internal static bool IsInvariantCultureDeterministicParseInvocation(IInvocationOperation invocationOperation)
-    {
-        return IsInvariantCultureNumericParseInvocation(invocationOperation) ||
+    internal static bool IsInvariantCultureDeterministicParseInvocation(IInvocationOperation invocationOperation) => IsInvariantCultureNumericParseInvocation(invocationOperation) ||
                IsTimeSpanInvariantCultureParseInvocation(invocationOperation) ||
                IsDateOnlyInvariantCultureParseInvocation(invocationOperation) ||
                IsTimeOnlyInvariantCultureParseInvocation(invocationOperation) ||
                IsDateTimeOffsetInvariantCultureParseExactInvocation(invocationOperation);
-    }
 
     internal static bool TryGetSemanticKnownImpureCatalogSource(
         IInvocationOperation invocationOperation,
-        out string catalogSource)
-    {
+        out string catalogSource) {
         if (IsCurrentCultureSensitiveNumericParseOrFormatInvocation(invocationOperation) ||
-            IsCurrentCultureSensitiveDateLikeParseOrFormatInvocation(invocationOperation))
-        {
+            IsCurrentCultureSensitiveDateLikeParseOrFormatInvocation(invocationOperation)) {
             catalogSource = "current_culture_semantic_rule";
             return true;
         }
@@ -162,8 +146,7 @@ internal static class PurityKnownBclSemantics
         return false;
     }
 
-    private static bool IsInvariantCultureNumericParseInvocation(IInvocationOperation invocationOperation)
-    {
+    private static bool IsInvariantCultureNumericParseInvocation(IInvocationOperation invocationOperation) {
         var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
         if (targetMethod == null ||
             targetMethod.Name != "Parse" ||
@@ -185,8 +168,7 @@ internal static class PurityKnownBclSemantics
     }
 
     private static bool IsCurrentCultureSensitiveNumericParseOrFormatInvocation(
-        IInvocationOperation invocationOperation)
-    {
+        IInvocationOperation invocationOperation) {
         var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
         if (targetMethod == null ||
             !IsCultureSensitiveNumericType(targetMethod.ContainingType))
@@ -209,8 +191,7 @@ internal static class PurityKnownBclSemantics
         return false;
     }
 
-    private static bool IsCurrentCultureSensitiveConvertNumericInvocation(IInvocationOperation invocationOperation)
-    {
+    private static bool IsCurrentCultureSensitiveConvertNumericInvocation(IInvocationOperation invocationOperation) {
         var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
         if (targetMethod == null ||
             targetMethod.ContainingType?.ToDisplayString() != "System.Convert" ||
@@ -222,9 +203,7 @@ internal static class PurityKnownBclSemantics
         return targetMethod.Parameters[0].Type.SpecialType == SpecialType.System_String;
     }
 
-    private static bool IsCurrentCultureSensitiveConvertNumericMethodName(string methodName)
-    {
-        return methodName is
+    private static bool IsCurrentCultureSensitiveConvertNumericMethodName(string methodName) => methodName is
             "ToByte" or
             "ToDecimal" or
             "ToDouble" or
@@ -236,11 +215,9 @@ internal static class PurityKnownBclSemantics
             "ToUInt16" or
             "ToUInt32" or
             "ToUInt64";
-    }
 
     private static bool IsCurrentCultureSensitiveDateLikeParseOrFormatInvocation(
-        IInvocationOperation invocationOperation)
-    {
+        IInvocationOperation invocationOperation) {
         var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
         if (targetMethod == null ||
             !IsCultureSensitiveDateLikeType(targetMethod.ContainingType))
@@ -276,8 +253,7 @@ internal static class PurityKnownBclSemantics
         return false;
     }
 
-    private static bool IsCurrentCultureSensitiveConvertDateLikeInvocation(IInvocationOperation invocationOperation)
-    {
+    private static bool IsCurrentCultureSensitiveConvertDateLikeInvocation(IInvocationOperation invocationOperation) {
         var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
         if (targetMethod == null ||
             targetMethod.ContainingType?.ToDisplayString() != "System.Convert" ||
@@ -291,19 +267,14 @@ internal static class PurityKnownBclSemantics
 
     private static bool IsCurrentCultureSensitiveToStringInvocation(
         IMethodSymbol targetMethod,
-        IInvocationOperation invocationOperation)
-    {
-        return targetMethod.Name == "ToString" &&
+        IInvocationOperation invocationOperation) => targetMethod.Name == "ToString" &&
                ((targetMethod.Parameters.Length == 0 &&
                  invocationOperation.Arguments.Length == 0) ||
                 (targetMethod.Parameters.Length == 1 &&
                  invocationOperation.Arguments.Length == 1 &&
                  targetMethod.Parameters[0].Type.SpecialType == SpecialType.System_String));
-    }
 
-    private static bool IsCultureSensitiveNumericType(ITypeSymbol? containingType)
-    {
-        return containingType?.SpecialType is SpecialType.System_Byte or
+    private static bool IsCultureSensitiveNumericType(ITypeSymbol? containingType) => containingType?.SpecialType is SpecialType.System_Byte or
                    SpecialType.System_Decimal or
                    SpecialType.System_Double or
                    SpecialType.System_Int16 or
@@ -315,30 +286,22 @@ internal static class PurityKnownBclSemantics
                    SpecialType.System_UInt32 or
                    SpecialType.System_UInt64 ||
                containingType?.ToDisplayString() is "System.Half" or "System.Numerics.BigInteger";
-    }
 
-    private static bool IsCultureSensitiveDateLikeType(ITypeSymbol? containingType)
-    {
-        return containingType?.ToDisplayString() is "System.DateOnly" or
+    private static bool IsCultureSensitiveDateLikeType(ITypeSymbol? containingType) => containingType?.ToDisplayString() is "System.DateOnly" or
             "System.DateTime" or
             "System.DateTimeOffset" or
             "System.TimeOnly" or
             "System.TimeSpan";
-    }
 
     private static bool IsDateOnlyOrTimeOnlyType(ITypeSymbol? containingType) =>
         containingType?.ToDisplayString() is "System.DateOnly" or "System.TimeOnly";
 
-    private static bool IsFormatSpecifierType(ITypeSymbol typeSymbol)
-    {
-        return typeSymbol.SpecialType == SpecialType.System_String ||
+    private static bool IsFormatSpecifierType(ITypeSymbol typeSymbol) => typeSymbol.SpecialType == SpecialType.System_String ||
                SymbolicTypeFacts.IsReadOnlySpanOfCharType(typeSymbol) ||
                (typeSymbol is IArrayTypeSymbol arrayType &&
                 arrayType.ElementType.SpecialType == SpecialType.System_String);
-    }
 
-    private static bool HasFormatProviderParameter(IMethodSymbol methodSymbol)
-    {
+    private static bool HasFormatProviderParameter(IMethodSymbol methodSymbol) {
         foreach (var parameter in methodSymbol.Parameters)
             if (parameter.Type.Name == "IFormatProvider" &&
                 parameter.Type.ContainingNamespace?.ToDisplayString() == "System")
@@ -347,27 +310,20 @@ internal static class PurityKnownBclSemantics
         return false;
     }
 
-    private static bool IsTimeOnlyInvariantCultureParseInvocation(IInvocationOperation invocationOperation)
-    {
-        return IsDateOrTimeOnlyInvariantCultureParseInvocation(
+    private static bool IsTimeOnlyInvariantCultureParseInvocation(IInvocationOperation invocationOperation) => IsDateOrTimeOnlyInvariantCultureParseInvocation(
             invocationOperation,
             "System.TimeOnly",
             IsSingleTimeOnlyInvariantFormat);
-    }
 
-    private static bool IsDateOnlyInvariantCultureParseInvocation(IInvocationOperation invocationOperation)
-    {
-        return IsDateOrTimeOnlyInvariantCultureParseInvocation(
+    private static bool IsDateOnlyInvariantCultureParseInvocation(IInvocationOperation invocationOperation) => IsDateOrTimeOnlyInvariantCultureParseInvocation(
             invocationOperation,
             "System.DateOnly",
             IsSingleDateOnlyInvariantFormat);
-    }
 
     private static bool IsDateOrTimeOnlyInvariantCultureParseInvocation(
         IInvocationOperation invocationOperation,
         string containingTypeName,
-        Func<IOperation, bool> isSingleInvariantFormat)
-    {
+        Func<IOperation, bool> isSingleInvariantFormat) {
         var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
         if (targetMethod == null ||
             targetMethod.ContainingType?.ToDisplayString() != containingTypeName ||
@@ -405,8 +361,7 @@ internal static class PurityKnownBclSemantics
         return false;
     }
 
-    private static bool IsDateTimeOffsetInvariantCultureParseExactInvocation(IInvocationOperation invocationOperation)
-    {
+    private static bool IsDateTimeOffsetInvariantCultureParseExactInvocation(IInvocationOperation invocationOperation) {
         var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
         if (targetMethod == null ||
             targetMethod.ContainingType?.ToDisplayString() != "System.DateTimeOffset" ||
@@ -441,16 +396,14 @@ internal static class PurityKnownBclSemantics
     private static bool IsSingleDateTimeOffsetRoundtripFormat(IOperation? operation) =>
         IsSingleStringConstant(operation, static format => format is "O" or "o");
 
-    private static bool IsSingleStringConstant(IOperation? operation, Func<string, bool> matchesFormat)
-    {
+    private static bool IsSingleStringConstant(IOperation? operation, Func<string, bool> matchesFormat) {
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         return unwrappedOperation?.ConstantValue.HasValue == true &&
                unwrappedOperation.ConstantValue.Value is string format &&
                matchesFormat(format);
     }
 
-    private static bool IsZeroStyle(IOperation? operation)
-    {
+    private static bool IsZeroStyle(IOperation? operation) {
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         return unwrappedOperation?.ConstantValue.HasValue == true &&
                unwrappedOperation.ConstantValue.Value is int styles &&
@@ -463,8 +416,7 @@ internal static class PurityKnownBclSemantics
     private static bool IsDateTimeStylesNone(IOperation? operation) =>
         IsZeroStyle(operation);
 
-    private static bool IsCultureInfoInvariantCulture(IOperation? operation)
-    {
+    private static bool IsCultureInfoInvariantCulture(IOperation? operation) {
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         return unwrappedOperation is IPropertyReferenceOperation propertyReference &&
                propertyReference.Property.Name == "InvariantCulture" &&

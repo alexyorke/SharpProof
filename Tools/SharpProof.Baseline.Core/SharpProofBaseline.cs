@@ -16,8 +16,7 @@ public sealed record BaselinePruneResult(
     int Kept,
     int Pruned);
 
-public static class SharpProofBaseline
-{
+public static class SharpProofBaseline {
     public const string BaselineSymbolProperty = "sharpproof.baseline.symbol";
     public const string BaselinePathProperty = "sharpproof.baseline.path";
     public const string BaselineOperationKindProperty = "sharpproof.baseline.operation_kind";
@@ -25,26 +24,22 @@ public static class SharpProofBaseline
     public const string BaselineEvidenceKeyProperty = "sharpproof.baseline.evidence_key";
     public const string EvidenceSchemaVersionProperty = SharpProofEvidenceSchema.DiagnosticVersionProperty;
 
-    private static readonly JsonSerializerOptions OutputJsonOptions = new()
-    {
+    private static readonly JsonSerializerOptions OutputJsonOptions = new() {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         WriteIndented = true
     };
 
-    private static readonly JsonSerializerOptions InputJsonOptions = new()
-    {
+    private static readonly JsonSerializerOptions InputJsonOptions = new() {
         AllowTrailingCommas = true,
         ReadCommentHandling = JsonCommentHandling.Skip
     };
 
-    public static BaselineDocument GenerateFromSarifJson(string sarifJson)
-    {
+    public static BaselineDocument GenerateFromSarifJson(string sarifJson) {
         ArgumentNullException.ThrowIfNull(sarifJson);
 
         var entries = ImmutableArray.CreateBuilder<BaselineEntry>();
         using var document = JsonDocument.Parse(sarifJson, BaselineSchemaContract.DocumentOptions);
-        foreach (var result in EnumerateResults(document.RootElement))
-        {
+        foreach (var result in EnumerateResults(document.RootElement)) {
             var entry = TryCreateEntry(result);
             if (entry != null) entries.Add(entry);
         }
@@ -52,8 +47,7 @@ public static class SharpProofBaseline
         return new BaselineDocument(BaselineSchemaContract.Deduplicate(entries));
     }
 
-    public static BaselineDocument ParseBaselineJson(string json)
-    {
+    public static BaselineDocument ParseBaselineJson(string json) {
         ArgumentNullException.ThrowIfNull(json);
 
         using var document = JsonDocument.Parse(json, BaselineSchemaContract.DocumentOptions);
@@ -66,8 +60,7 @@ public static class SharpProofBaseline
                 : baseline.Diagnostics));
     }
 
-    public static BaselineDocument Merge(IEnumerable<BaselineDocument> documents)
-    {
+    public static BaselineDocument Merge(IEnumerable<BaselineDocument> documents) {
         ArgumentNullException.ThrowIfNull(documents);
 
         return new BaselineDocument(BaselineSchemaContract.Deduplicate(
@@ -76,15 +69,12 @@ public static class SharpProofBaseline
 
     public static ImmutableArray<BaselineExplanation> Explain(
         BaselineDocument baseline,
-        BaselineDocument current)
-    {
+        BaselineDocument current) {
         var explanations = ImmutableArray.CreateBuilder<BaselineExplanation>(baseline.Diagnostics.Length);
-        foreach (var entry in baseline.Diagnostics)
-        {
+        foreach (var entry in baseline.Diagnostics) {
             var normalizedPath = BaselineSchemaContract.NormalizePath(entry.Path);
             var matchLevel = 0;
-            foreach (var currentEntry in current.Diagnostics)
-            {
+            foreach (var currentEntry in current.Diagnostics) {
                 if (!string.Equals(currentEntry.Id, entry.Id, StringComparison.Ordinal)) continue;
                 matchLevel = Math.Max(matchLevel, 1);
                 if (!string.Equals(currentEntry.Symbol, entry.Symbol, StringComparison.Ordinal)) continue;
@@ -95,15 +85,13 @@ public static class SharpProofBaseline
                         StringComparison.OrdinalIgnoreCase))
                     continue;
                 matchLevel = Math.Max(matchLevel, 3);
-                if (BaselineSchemaContract.MatchesOptionalIdentity(entry, currentEntry))
-                {
+                if (BaselineSchemaContract.MatchesOptionalIdentity(entry, currentEntry)) {
                     matchLevel = 4;
                     break;
                 }
             }
 
-            var reason = matchLevel switch
-            {
+            var reason = matchLevel switch {
                 0 => "no current diagnostic with id '" + entry.Id + "'",
                 1 => "diagnostic id matched but symbol did not",
                 2 => "diagnostic id and symbol matched but path did not",
@@ -120,8 +108,7 @@ public static class SharpProofBaseline
 
     public static BaselinePruneResult Prune(
         BaselineDocument baseline,
-        BaselineDocument current)
-    {
+        BaselineDocument current) {
         var explanations = Explain(baseline, current);
         var kept = explanations
             .Where(explanation => explanation.Matched)
@@ -137,8 +124,7 @@ public static class SharpProofBaseline
     public static string ToJson(BaselineDocument baseline) =>
         JsonSerializer.Serialize(baseline, OutputJsonOptions) + Environment.NewLine;
 
-    private static BaselineEntry? TryCreateEntry(JsonElement result)
-    {
+    private static BaselineEntry? TryCreateEntry(JsonElement result) {
         var id = GetStringProperty(result, "ruleId");
         if (id == null && result.TryGetProperty("rule", out var rule) && rule.ValueKind == JsonValueKind.Object)
             id = GetStringProperty(rule, "id");
@@ -174,8 +160,7 @@ public static class SharpProofBaseline
             GetEvidenceProperty(properties, BaselineEvidenceKeyProperty, includeCustomProperties: true));
     }
 
-    private static (string? Path, int? Line, int? Column) GetPhysicalLocation(JsonElement result)
-    {
+    private static (string? Path, int? Line, int? Column) GetPhysicalLocation(JsonElement result) {
         if (!result.TryGetProperty("locations", out var locations) ||
             locations.ValueKind != JsonValueKind.Array)
             return default;
@@ -183,8 +168,7 @@ public static class SharpProofBaseline
         foreach (var location in locations.EnumerateArray())
             if (location.ValueKind == JsonValueKind.Object &&
                 location.TryGetProperty("physicalLocation", out var physicalLocation) &&
-                physicalLocation.ValueKind == JsonValueKind.Object)
-            {
+                physicalLocation.ValueKind == JsonValueKind.Object) {
                 var path = physicalLocation.TryGetProperty("artifactLocation", out var artifactLocation) &&
                            artifactLocation.ValueKind == JsonValueKind.Object
                     ? GetStringProperty(artifactLocation, "uri")

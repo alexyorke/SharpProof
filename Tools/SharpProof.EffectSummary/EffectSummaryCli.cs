@@ -1,10 +1,7 @@
-internal static class EffectSummaryCli
-{
-    public static int Run(string[] args)
-    {
+internal static class EffectSummaryCli {
+    public static int Run(string[] args) {
         var options = CliOptions.Parse(args);
-        if (options.ShowHelp)
-        {
+        if (options.ShowHelp) {
             PrintHelp();
             return 0;
         }
@@ -35,8 +32,7 @@ internal static class EffectSummaryCli
         return 0;
     }
 
-    private static int WriteArtifactSpecDependencyManifests(CliOptions options)
-    {
+    private static int WriteArtifactSpecDependencyManifests(CliOptions options) {
         var artifactSpecPath = Path.GetFullPath(options.ArtifactSpecPath!);
         var artifactSpecDirectory = Path.GetDirectoryName(artifactSpecPath)
                                     ?? throw new InvalidOperationException(
@@ -50,8 +46,7 @@ internal static class EffectSummaryCli
         };
         var outputs = new HashSet<string>(pathComparer);
 
-        foreach (var artifact in document.Artifacts)
-        {
+        foreach (var artifact in document.Artifacts) {
             var artifactOptions = CliOptions.FromArtifactSpec(document.Defaults, artifact, artifactSpecDirectory);
             foreach (var assemblyPath in EffectSummaryInputResolver.ResolveAssemblies(artifactOptions))
                 inputs.Add(Path.GetFullPath(assemblyPath));
@@ -73,8 +68,7 @@ internal static class EffectSummaryCli
         return 0;
     }
 
-    private static int RunArtifactSpec(string artifactSpecPath, string? progressPath, bool resume)
-    {
+    private static int RunArtifactSpec(string artifactSpecPath, string? progressPath, bool resume) {
         var artifactSpecDirectory = Path.GetDirectoryName(Path.GetFullPath(artifactSpecPath))
                                     ?? throw new InvalidOperationException(
                                         $"Unable to resolve artifact spec directory for '{artifactSpecPath}'.");
@@ -89,15 +83,13 @@ internal static class EffectSummaryCli
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> resolvedPurityEntries =
             new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
 
-        foreach (var artifact in document.Artifacts)
-        {
+        foreach (var artifact in document.Artifacts) {
             var options = CliOptions.FromArtifactSpec(document.Defaults, artifact, artifactSpecDirectory);
             if (string.IsNullOrWhiteSpace(options.OutputPath))
                 throw new ArgumentException("Artifact spec entries require OutputPath.");
 
             var outputPath = Path.GetFullPath(options.OutputPath!);
-            if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath))
-            {
+            if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath)) {
                 resolvedPurityEntries = EffectSummaryCatalogReporting.MergeGeneratedPurityEntries(
                     resolvedPurityEntries.Values.Concat(GeneratedPurityCatalogReader.ReadEntries(outputPath)));
                 continue;
@@ -124,8 +116,7 @@ internal static class EffectSummaryCli
         return 0;
     }
 
-    private static int RunSharded(CliOptions options)
-    {
+    private static int RunSharded(CliOptions options) {
         var assemblyPaths = EffectSummaryInputResolver.ResolveAssemblies(options);
         var outputDirectory = Path.GetFullPath(options.ShardOutputPath!);
         Directory.CreateDirectory(outputDirectory);
@@ -138,8 +129,7 @@ internal static class EffectSummaryCli
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             : EffectSummaryProgressStore.LoadSharded(normalizedProgressPath, inputFingerprint);
 
-        foreach (var assemblyPath in assemblyPaths)
-        {
+        foreach (var assemblyPath in assemblyPaths) {
             var outputPath = EffectSummaryInputResolver.GetShardOutputPath(outputDirectory, assemblyPath);
             if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath)) continue;
 

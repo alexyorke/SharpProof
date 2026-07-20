@@ -2,14 +2,12 @@ using static SharpProof.Symbolic.Ir.SymbolicIrLowerer;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicObjectLowerer
-{
+internal static class SymbolicObjectLowerer {
     internal static bool TryLowerObjectReferenceEqualsInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
+        out SymbolicCondition condition) {
         condition = null!;
         if (!method.IsStatic ||
             invocation.ArgumentList.Arguments.Count != 2 ||

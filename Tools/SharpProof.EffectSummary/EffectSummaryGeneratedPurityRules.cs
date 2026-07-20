@@ -1,16 +1,13 @@
-internal static class EffectSummaryGeneratedPurityRules
-{
+internal static class EffectSummaryGeneratedPurityRules {
     private const string ResourceName = "SharpProof.EffectSummary.GeneratedPurityRules.json";
 
     private static readonly GeneratedRuleRegistry Registry = LoadRegistry();
     private static readonly GeneratedImpureRule[] GeneratedImpureRules = Registry.Impure;
     private static readonly GeneratedPureRule[] GeneratedPureRules = Registry.Pure;
 
-    internal static bool TryGetKnownGeneratedPureVisibility(string symbol, out string effectVisibilityClassification)
-    {
+    internal static bool TryGetKnownGeneratedPureVisibility(string symbol, out string effectVisibilityClassification) {
         effectVisibilityClassification = "none";
-        foreach (var rule in GeneratedPureRules)
-        {
+        foreach (var rule in GeneratedPureRules) {
             if (!rule.Matches(symbol)) continue;
 
             effectVisibilityClassification = rule.Visibility;
@@ -20,11 +17,9 @@ internal static class EffectSummaryGeneratedPurityRules
         return false;
     }
 
-    internal static bool TryGetKnownGeneratedImpureCategories(string symbol, out string[] categories)
-    {
+    internal static bool TryGetKnownGeneratedImpureCategories(string symbol, out string[] categories) {
         categories = ["impure_callee"];
-        foreach (var rule in GeneratedImpureRules)
-        {
+        foreach (var rule in GeneratedImpureRules) {
             if (!rule.Matches(symbol)) continue;
 
             categories = [.. rule.Categories];
@@ -34,8 +29,7 @@ internal static class EffectSummaryGeneratedPurityRules
         return false;
     }
 
-    private static GeneratedRuleRegistry LoadRegistry()
-    {
+    private static GeneratedRuleRegistry LoadRegistry() {
         var json = ToolEmbeddedText.Load(typeof(EffectSummaryGeneratedPurityRules).Assembly, ResourceName);
         var definitions = JsonSerializer.Deserialize<GeneratedRuleDefinitions>(json) ??
                           throw new InvalidOperationException("The generated-purity rule registry is empty.");
@@ -60,8 +54,7 @@ internal static class EffectSummaryGeneratedPurityRules
         return new GeneratedRuleRegistry(impure, pure);
     }
 
-    private static string[] ValidateValues(string[]? values, string description, bool requireValue = false)
-    {
+    private static string[] ValidateValues(string[]? values, string description, bool requireValue = false) {
         if (values is null || requireValue && values.Length == 0 ||
             values.Any(string.IsNullOrWhiteSpace) ||
             values.Distinct(StringComparer.Ordinal).Count() != values.Length)
@@ -69,8 +62,7 @@ internal static class EffectSummaryGeneratedPurityRules
         return values;
     }
 
-    private static string ValidateVisibility(string? visibility, int index)
-    {
+    private static string ValidateVisibility(string? visibility, int index) {
         if (visibility is not ("none" or "internal_only"))
             throw new InvalidOperationException($"Generated pure rule {index} has invalid visibility.");
         return visibility;
@@ -79,13 +71,11 @@ internal static class EffectSummaryGeneratedPurityRules
     private static Func<string, bool>? ResolveImpurePredicate(
         string? name,
         HashSet<string> usedPredicates,
-        int index)
-    {
+        int index) {
         if (name is null) return null;
         if (!usedPredicates.Add(name))
             throw new InvalidOperationException($"Generated impure rule {index} repeats predicate '{name}'.");
-        return name switch
-        {
+        return name switch {
             nameof(IsGeneratedArrayComparerSort) => IsGeneratedArrayComparerSort,
             _ => throw new InvalidOperationException($"Generated impure rule {index} references unknown predicate '{name}'.")
         };
@@ -94,20 +84,17 @@ internal static class EffectSummaryGeneratedPurityRules
     private static Func<string, bool>? ResolvePurePredicate(
         string? name,
         HashSet<string> usedPredicates,
-        int index)
-    {
+        int index) {
         if (name is null) return null;
         if (!usedPredicates.Add(name))
             throw new InvalidOperationException($"Generated pure rule {index} repeats predicate '{name}'.");
-        return name switch
-        {
+        return name switch {
             nameof(IsImmutableHashSetEnumeratorMethod) => IsImmutableHashSetEnumeratorMethod,
             _ => throw new InvalidOperationException($"Generated pure rule {index} references unknown predicate '{name}'.")
         };
     }
 
-    private static void ValidateMatchers(GeneratedImpureRule[] impure, GeneratedPureRule[] pure)
-    {
+    private static void ValidateMatchers(GeneratedImpureRule[] impure, GeneratedPureRule[] pure) {
         if (impure.Any(rule => !rule.HasMatcher) || pure.Any(rule => !rule.HasMatcher))
             throw new InvalidOperationException("Every generated-purity rule must define a matcher.");
     }
@@ -116,8 +103,7 @@ internal static class EffectSummaryGeneratedPurityRules
         string[] ExactSymbols,
         string[] SymbolPrefixes,
         string[] Categories,
-        Func<string, bool>? Predicate)
-    {
+        Func<string, bool>? Predicate) {
         internal bool HasMatcher => ExactSymbols.Length != 0 || SymbolPrefixes.Length != 0 || Predicate != null;
 
         internal bool Matches(string symbol) =>
@@ -130,8 +116,7 @@ internal static class EffectSummaryGeneratedPurityRules
         string Visibility,
         string[] ExactSymbols,
         string[] SymbolPrefixes,
-        Func<string, bool>? Predicate)
-    {
+        Func<string, bool>? Predicate) {
         internal bool HasMatcher => ExactSymbols.Length != 0 || SymbolPrefixes.Length != 0 || Predicate != null;
 
         internal bool Matches(string symbol) =>

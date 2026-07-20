@@ -1,10 +1,8 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class ConditionalOperationPurityRule
-{
+internal static class ConditionalOperationPurityRule {
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckTyped(IConditionalOperation conditionalOperation,
-        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState) {
 
 
         var conditionResult =
@@ -17,13 +15,11 @@ internal static class ConditionalOperationPurityRule
                 context.SemanticModel,
                 context.SmtAnalysis,
                 context.CancellationToken,
-                out var constantCondition))
-        {
+                out var constantCondition)) {
             var reachableBranch = constantCondition ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
             var reachableBranchName = constantCondition ? "WhenTrue" : "WhenFalse";
 
-            if (reachableBranch != null)
-            {
+            if (reachableBranch != null) {
                 var reachableBranchState = currentState;
                 PurityAnalysisEngine.TryCreateBranchAssumptionState(
                     currentState,
@@ -49,8 +45,7 @@ internal static class ConditionalOperationPurityRule
                     true,
                     context.SmtAnalysis,
                     context.CancellationToken,
-                    out var whenTrueState))
-            {
+                    out var whenTrueState)) {
                 var whenTrueResult =
                     PurityAnalysisEngine.CheckSingleOperation(conditionalOperation.WhenTrue, context, whenTrueState);
                 if (!whenTrueResult.IsPure) return whenTrueResult;
@@ -65,8 +60,7 @@ internal static class ConditionalOperationPurityRule
                     false,
                     context.SmtAnalysis,
                     context.CancellationToken,
-                    out var whenFalseState))
-            {
+                    out var whenFalseState)) {
                 var whenFalseResult =
                     PurityAnalysisEngine.CheckSingleOperation(conditionalOperation.WhenFalse, context, whenFalseState);
                 if (!whenFalseResult.IsPure) return whenFalseResult;

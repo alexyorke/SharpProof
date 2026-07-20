@@ -1,12 +1,10 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal sealed class ListPatternPurityRule
-{
+internal sealed class ListPatternPurityRule {
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(
         IOperation operation,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         var matchedInputOperation = GetMatchedInputOperation(operation);
         if (matchedInputOperation == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
@@ -17,10 +15,8 @@ internal sealed class ListPatternPurityRule
             out var hasStableConcreteReceiver);
         var hasBuiltInPureReceiver = IsBuiltInPureListPatternReceiver(matchedInputOperation.Type);
 
-        if (operation is IListPatternOperation listPattern)
-        {
-            if (!hasBuiltInPureReceiver)
-            {
+        if (operation is IListPatternOperation listPattern) {
+            if (!hasBuiltInPureReceiver) {
                 var lengthResult = CheckMemberPurity(
                     listPattern.LengthSymbol,
                     receiverType,
@@ -38,8 +34,7 @@ internal sealed class ListPatternPurityRule
                 if (!indexerResult.IsPure) return indexerResult;
             }
 
-            foreach (var pattern in listPattern.Patterns)
-            {
+            foreach (var pattern in listPattern.Patterns) {
                 var patternResult = pattern is ISlicePatternOperation slicePattern
                     ? CheckSlicePatternPurity(
                         slicePattern,
@@ -64,10 +59,8 @@ internal sealed class ListPatternPurityRule
         bool hasStableConcreteReceiver,
         bool hasBuiltInPureReceiver,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
-        if (!hasBuiltInPureReceiver)
-        {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
+        if (!hasBuiltInPureReceiver) {
             var sliceResult = CheckMemberPurity(
                 slicePattern.SliceSymbol,
                 receiverType,
@@ -87,12 +80,10 @@ internal sealed class ListPatternPurityRule
         INamedTypeSymbol? receiverType,
         bool hasStableConcreteReceiver,
         IOperation operation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (member == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (member is IPropertySymbol property)
-        {
+        if (member is IPropertySymbol property) {
             var knownImpureMemberSource = PurityCalleeResolver.GetKnownImpureMemberSource(property);
             if (string.Equals(
                     knownImpureMemberSource,
@@ -140,10 +131,8 @@ internal sealed class ListPatternPurityRule
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
 
-    private static IOperation? GetMatchedInputOperation(IOperation operation)
-    {
-        for (var current = operation; current != null; current = current.Parent)
-        {
+    private static IOperation? GetMatchedInputOperation(IOperation operation) {
+        for (var current = operation; current != null; current = current.Parent) {
             if (current is IIsPatternOperation isPatternOperation)
                 return isPatternOperation.Value;
             if (current is ISwitchOperation switchOperation)
@@ -155,9 +144,6 @@ internal sealed class ListPatternPurityRule
         return null;
     }
 
-    private static bool IsBuiltInPureListPatternReceiver(ITypeSymbol? receiverType)
-    {
-        return receiverType is IArrayTypeSymbol { Rank: 1 } ||
+    private static bool IsBuiltInPureListPatternReceiver(ITypeSymbol? receiverType) => receiverType is IArrayTypeSymbol { Rank: 1 } ||
                receiverType?.SpecialType == SpecialType.System_String;
-    }
 }

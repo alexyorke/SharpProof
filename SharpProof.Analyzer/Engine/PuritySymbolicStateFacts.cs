@@ -2,16 +2,12 @@ using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal static class PuritySymbolicStateFacts
-{
+internal static class PuritySymbolicStateFacts {
     internal static SymbolicVariableTerm CreateSymbolicReferenceTerm(
         ISymbol symbol,
-        PurityAnalysisState currentState)
-    {
-        return new SymbolicVariableTerm(
+        PurityAnalysisState currentState) => new SymbolicVariableTerm(
             GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion),
             SmtValueKind.Reference);
-    }
 
     internal static bool HasSymbolicBorrowFactForLocal(
         ILocalSymbol localSymbol,
@@ -35,8 +31,7 @@ internal static class PuritySymbolicStateFacts
         ISymbol? targetSymbol,
         PurityAnalysisState currentState,
         string ruleName,
-        out PurityEvidence evidence)
-    {
+        out PurityEvidence evidence) {
         evidence = PurityEvidence.None;
         if (targetSymbol == null ||
             !HasSymbolicBorrowerFactForSymbol(targetSymbol, currentState))
@@ -59,8 +54,7 @@ internal static class PuritySymbolicStateFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         string ruleName,
-        out PurityEvidence evidence)
-    {
+        out PurityEvidence evidence) {
         if (TryCreateMutableBorrowConflictEvidence(
                 operation,
                 targetSymbol,
@@ -74,8 +68,7 @@ internal static class PuritySymbolicStateFacts
                 targetLocal,
                 operation.Syntax,
                 semanticModel,
-                cancellationToken))
-        {
+                cancellationToken)) {
             evidence = PurityEvidence.Create(
                 "mutable_state_write",
                 ruleName,
@@ -94,18 +87,15 @@ internal static class PuritySymbolicStateFacts
         ILocalSymbol targetLocal,
         SyntaxNode writeSyntax,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var containingBlock = writeSyntax.FirstAncestorOrSelf<BlockSyntax>();
         if (containingBlock == null) return false;
 
         var borrowedLocals = new HashSet<ISymbol>(SymbolEq.Default);
         var changed = true;
-        while (changed)
-        {
+        while (changed) {
             changed = false;
-            foreach (var declarator in containingBlock.DescendantNodes().OfType<VariableDeclaratorSyntax>())
-            {
+            foreach (var declarator in containingBlock.DescendantNodes().OfType<VariableDeclaratorSyntax>()) {
                 if (declarator.SpanStart >= writeSyntax.SpanStart ||
                     declarator.Initializer?.Value is not RefExpressionSyntax refExpression ||
                     semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol refLocal ||
@@ -132,10 +122,8 @@ internal static class PuritySymbolicStateFacts
         SyntaxNode writeSyntax,
         BlockSyntax containingBlock,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var identifierName in containingBlock.DescendantNodes().OfType<IdentifierNameSyntax>())
-        {
+        CancellationToken cancellationToken) {
+        foreach (var identifierName in containingBlock.DescendantNodes().OfType<IdentifierNameSyntax>()) {
             if (identifierName.SpanStart <= writeSyntax.SpanStart) continue;
 
             if (semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol usedLocal &&
@@ -154,8 +142,7 @@ internal static class PuritySymbolicStateFacts
             static (fact, term) =>
                 fact.Atom is SymbolicOwnershipAtom { Escaped: false } ownership &&
                 Equals(ownership.Value, term) ||
-                fact.Atom is SymbolicResourceLifetimeAtom
-                    { State: SymbolicResourceLifetimeState.Owned } lifetime &&
+                fact.Atom is SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime &&
                 Equals(lifetime.Resource, term));
 
     internal static bool HasSymbolicFreshMutableObjectFactForSymbol(

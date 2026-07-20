@@ -1,12 +1,10 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class ImplicitIndexerReferencePurityRule
-{
+internal static class ImplicitIndexerReferencePurityRule {
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckTyped(
         IImplicitIndexerReferenceOperation implicitIndexerReferenceOperation,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         var instanceResult = PurityAnalysisEngine.CheckSingleOperation(
             implicitIndexerReferenceOperation.Instance,
             context,
@@ -28,8 +26,7 @@ internal static class ImplicitIndexerReferencePurityRule
             context.SemanticModel.Compilation,
             out var hasStableConcreteReceiver);
 
-        if (implicitIndexerReferenceOperation.LengthSymbol is IPropertySymbol lengthProperty)
-        {
+        if (implicitIndexerReferenceOperation.LengthSymbol is IPropertySymbol lengthProperty) {
             var lengthResult = DispatchedMemberResolution.CheckGetterPurity(
                 lengthProperty,
                 receiverType,
@@ -53,10 +50,7 @@ internal static class ImplicitIndexerReferencePurityRule
         INamedTypeSymbol? receiverType,
         bool hasStableConcreteReceiver,
         IImplicitIndexerReferenceOperation implicitIndexerReferenceOperation,
-        PurityAnalysisContext context)
-    {
-        return indexerSymbol switch
-        {
+        PurityAnalysisContext context) => indexerSymbol switch {
             IPropertySymbol propertySymbol => DispatchedMemberResolution.CheckGetterPurity(
                 propertySymbol,
                 receiverType,
@@ -79,6 +73,5 @@ internal static class ImplicitIndexerReferencePurityRule
                     implicitIndexerReferenceOperation,
                     symbol: indexerSymbol))
         };
-    }
 
 }

@@ -1,13 +1,11 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static class BclPurityFallbackClassifier
-{
+internal static class BclPurityFallbackClassifier {
     public const string CatalogSource = BclPurityFallbackHeuristics.CatalogSource;
 
     public static bool TryClassify(
         ISymbol? symbol,
-        out BclPurityFallbackHeuristics.Classification classification)
-    {
+        out BclPurityFallbackHeuristics.Classification classification) {
         classification = default;
         if (symbol == null) return false;
 
@@ -22,8 +20,7 @@ internal static class BclPurityFallbackClassifier
 
         if (original is IFieldSymbol fieldSymbol) return TryClassifyField(fieldSymbol, out classification);
 
-        if (original is IMethodSymbol method)
-        {
+        if (original is IMethodSymbol method) {
             var shape = CreateMethodShape(method);
             return TryClassifyShape(shape, out classification);
         }
@@ -33,14 +30,12 @@ internal static class BclPurityFallbackClassifier
 
     private static bool TryClassifyProperty(
         IPropertySymbol property,
-        out BclPurityFallbackHeuristics.Classification classification)
-    {
+        out BclPurityFallbackHeuristics.Classification classification) {
         var shape = CreatePropertyShape(property);
         return TryClassifyShape(shape, out classification);
     }
 
-    private static bool IsFrameworkMetadataSymbol(ISymbol symbol)
-    {
+    private static bool IsFrameworkMetadataSymbol(ISymbol symbol) {
         if (!PurityAnalysisEngine.IsMetadataSymbol(symbol)) return false;
 
         var namespaceName = symbol.ContainingNamespace?.ToDisplayString() ?? string.Empty;
@@ -50,9 +45,7 @@ internal static class BclPurityFallbackClassifier
         return BclPurityFallbackHeuristics.IsFrameworkSystemAssemblyName(assemblyName);
     }
 
-    private static BclPurityFallbackHeuristics.Shape CreateMethodShape(IMethodSymbol method)
-    {
-        return new BclPurityFallbackHeuristics.Shape(
+    private static BclPurityFallbackHeuristics.Shape CreateMethodShape(IMethodSymbol method) => new BclPurityFallbackHeuristics.Shape(
             method.ContainingNamespace?.ToDisplayString() ?? string.Empty,
             method.ContainingType?.OriginalDefinition.ToDisplayString() ?? string.Empty,
             method.Name,
@@ -70,11 +63,8 @@ internal static class BclPurityFallbackClassifier
             method.Parameters.All(static parameter =>
                 IsValueLikeType(parameter.Type) || IsReadOnlyViewType(parameter.Type)),
             false);
-    }
 
-    private static BclPurityFallbackHeuristics.Shape CreatePropertyShape(IPropertySymbol property)
-    {
-        return new BclPurityFallbackHeuristics.Shape(
+    private static BclPurityFallbackHeuristics.Shape CreatePropertyShape(IPropertySymbol property) => new BclPurityFallbackHeuristics.Shape(
             property.ContainingNamespace?.ToDisplayString() ?? string.Empty,
             property.ContainingType?.OriginalDefinition.ToDisplayString() ?? string.Empty,
             property.Name,
@@ -92,11 +82,8 @@ internal static class BclPurityFallbackClassifier
             property.Parameters.All(static parameter =>
                 IsValueLikeType(parameter.Type) || IsReadOnlyViewType(parameter.Type)),
             property.SetMethod != null && property.GetMethod == null);
-    }
 
-    private static BclPurityFallbackHeuristics.Shape CreateFieldShape(IFieldSymbol field)
-    {
-        return new BclPurityFallbackHeuristics.Shape(
+    private static BclPurityFallbackHeuristics.Shape CreateFieldShape(IFieldSymbol field) => new BclPurityFallbackHeuristics.Shape(
             field.ContainingNamespace?.ToDisplayString() ?? string.Empty,
             field.ContainingType?.OriginalDefinition.ToDisplayString() ?? string.Empty,
             field.Name,
@@ -113,18 +100,15 @@ internal static class BclPurityFallbackClassifier
             true,
             false,
             field.IsReadOnly || field.IsConst);
-    }
 
     private static bool TryClassifyField(
         IFieldSymbol field,
-        out BclPurityFallbackHeuristics.Classification classification)
-    {
+        out BclPurityFallbackHeuristics.Classification classification) {
         var shape = CreateFieldShape(field);
         return TryClassifyShape(shape, out classification);
     }
 
-    private static bool IsValueLikeType(ITypeSymbol type)
-    {
+    private static bool IsValueLikeType(ITypeSymbol type) {
         if (type.TypeKind == TypeKind.Enum ||
             type.IsValueType)
             return true;
@@ -137,16 +121,12 @@ internal static class BclPurityFallbackClassifier
         return BclPurityFallbackHeuristics.IsValueLikeTypeName(displayName);
     }
 
-    private static bool IsReadOnlyViewType(ITypeSymbol type)
-    {
+    private static bool IsReadOnlyViewType(ITypeSymbol type) {
         var displayName = type.OriginalDefinition.ToDisplayString();
         return BclPurityFallbackHeuristics.IsReadOnlyViewTypeName(displayName);
     }
 
     private static bool TryClassifyShape(
         BclPurityFallbackHeuristics.Shape shape,
-        out BclPurityFallbackHeuristics.Classification classification)
-    {
-        return BclPurityFallbackHeuristics.TryClassify(shape, out classification);
-    }
+        out BclPurityFallbackHeuristics.Classification classification) => BclPurityFallbackHeuristics.TryClassify(shape, out classification);
 }

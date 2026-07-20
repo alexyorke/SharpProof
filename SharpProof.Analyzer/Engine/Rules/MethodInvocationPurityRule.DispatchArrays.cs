@@ -1,12 +1,10 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class MethodInvocationPurityRule
-{
+internal partial class MethodInvocationPurityRule {
     internal static bool TryCheckArrayInterfaceGetEnumeratorPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
@@ -36,8 +34,7 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool IsEnumerableGetEnumeratorDispatchTarget(IMethodSymbol methodSymbol)
-    {
+    private static bool IsEnumerableGetEnumeratorDispatchTarget(IMethodSymbol methodSymbol) {
         var containingType = methodSymbol.ContainingType;
         if (containingType == null) return false;
 
@@ -50,33 +47,25 @@ internal partial class MethodInvocationPurityRule
                     "System.Collections.Generic.IEnumerable<T>", StringComparison.Ordinal));
     }
 
-    private static bool IsGetEnumeratorMethodName(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.Name == "GetEnumerator" ||
+    private static bool IsGetEnumeratorMethodName(IMethodSymbol methodSymbol) => methodSymbol.Name == "GetEnumerator" ||
                methodSymbol.ToDisplayString().IndexOf(".GetEnumerator(", StringComparison.Ordinal) >= 0;
-    }
 
     private static bool TryGetKnownArrayReceiverType(
         IOperation? invocationInstance,
-        out IArrayTypeSymbol arrayType)
-    {
+        out IArrayTypeSymbol arrayType) {
         var current = invocationInstance;
 
-        while (true)
-        {
+        while (true) {
             current = NormalizeReceiverOperation(current);
-            if (current == null)
-            {
+            if (current == null) {
                 arrayType = null!;
                 return false;
             }
 
-            if (current is IConditionalOperation conditional)
-            {
+            if (current is IConditionalOperation conditional) {
                 if (TryGetKnownArrayReceiverType(conditional.WhenTrue, out var whenTrueType) &&
                     TryGetKnownArrayReceiverType(conditional.WhenFalse, out var whenFalseType) &&
-                    SymbolEq.AreEqual(whenTrueType, whenFalseType))
-                {
+                    SymbolEq.AreEqual(whenTrueType, whenFalseType)) {
                     arrayType = whenTrueType;
                     return true;
                 }
@@ -85,14 +74,12 @@ internal partial class MethodInvocationPurityRule
                 return false;
             }
 
-            if (TryUnwrapReceiverOperation(current, out var unwrapped))
-            {
+            if (TryUnwrapReceiverOperation(current, out var unwrapped)) {
                 current = unwrapped;
                 continue;
             }
 
-            if (current.Type is IArrayTypeSymbol resolvedArrayType)
-            {
+            if (current.Type is IArrayTypeSymbol resolvedArrayType) {
                 arrayType = resolvedArrayType;
                 return true;
             }

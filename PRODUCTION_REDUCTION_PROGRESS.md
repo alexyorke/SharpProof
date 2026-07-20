@@ -758,13 +758,21 @@ Tests are excluded from the metric and must not be deleted.
   old-value-aware proof dispatch as well; duplicate completion DTOs, traversal,
   result-shape helpers, and proof branching are deleted while diagnostic policy
   and evidence remain feature-owned.
+- [x] Canonicalized production C# with a repository-enforced Roslyn style
+  policy. The formatter replaced remaining single-expression member shells,
+  eligible constructors, switch statements, using blocks, and initializer
+  scaffolding with native language forms, then normalized production code to
+  same-line opening braces. The policy is scoped away from tests and enforced
+  by warning-as-error builds plus an architecture assertion; the transformation
+  changes no diagnostics, proof outcomes, serialized bytes, or package content.
 
 ## Current evidence
 
-- Maintained production: 89,651 lines (85,907 C#, 3,014 scripts, and 730
-  specifications); net reduction: 17,975 lines; remaining reduction: 2,025.
-  This migration removes 446 maintained-production lines by replacing 223
-  trivial block-bodied return shells with their idiomatic expression-body form.
+- Maintained production: 84,430 lines (80,686 C#, 3,014 scripts, and 730
+  specifications); net reduction: 23,196 lines; remaining reduction: zero.
+  This migration removes 5,221 maintained-production lines through compiler-
+  backed member/control-flow canonicalization and production layout
+  normalization.
   Diagnostics, proof outcomes, conservative unknowns, CLI bytes, serialization,
   and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
@@ -778,11 +786,13 @@ Tests are excluded from the metric and must not be deleted.
 - [x] 7,000 lines removed: manual semantic catalogs substantially migrated.
 - [x] 12,000 lines removed: canonical symbolic traversal owns all transfer paths.
 - [x] 16,000 lines removed: query, analyzer policy, and EffectSummary duplication removed.
-- [ ] 20,000 lines removed: CLI/ProofCore cleanup and final dead-code deletion complete.
+- [x] 20,000 lines removed: canonical semantic migrations and production style
+  normalization complete.
 
 ## Current tranche
 
-Replace the next complete duplicated semantic owner, preferring cuts that repay
+The 20,000-line reduction target is complete. Future work should replace only a
+complete duplicated semantic owner, preferring cuts that repay
 at least 200 maintained-production lines and especially 350-line or larger
 cuts in Symbolic, Analyzer, ProofCore, or EffectSummary. Prefer inferred or
 canonical analysis over manual catalogs when characterization proves it is

@@ -1,19 +1,16 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal static class SymbolicOperatorLowerer
-{
+internal static class SymbolicOperatorLowerer {
     internal static bool TryLowerBuiltInBooleanBitwiseCondition(
         BinaryExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
+        out SymbolicCondition condition) {
         condition = null!;
         if (expression.Kind() is not (SyntaxKind.BitwiseAndExpression or
             SyntaxKind.BitwiseOrExpression or
             SyntaxKind.ExclusiveOrExpression) ||
             context.SemanticModel.GetOperation(expression, context.CancellationToken) is not
-                Microsoft.CodeAnalysis.Operations.IBinaryOperation
-                {
+                Microsoft.CodeAnalysis.Operations.IBinaryOperation {
                     OperatorMethod: null,
                     Type.SpecialType: SpecialType.System_Boolean
                 } ||
@@ -21,8 +18,7 @@ internal static class SymbolicOperatorLowerer
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(expression.Right, context), out var right))
             return false;
 
-        condition = expression.Kind() switch
-        {
+        condition = expression.Kind() switch {
             SyntaxKind.BitwiseAndExpression =>
                 new SymbolicBinaryCondition(SymbolicConditionOperator.And, left, right),
             SyntaxKind.BitwiseOrExpression =>
@@ -41,8 +37,7 @@ internal static class SymbolicOperatorLowerer
         return true;
     }
 
-    internal static bool CanCompareTerms(SymbolicTerm left, SymbolicTerm right, SymbolicRelationOperator op)
-    {
+    internal static bool CanCompareTerms(SymbolicTerm left, SymbolicTerm right, SymbolicRelationOperator op) {
         if (op is not SymbolicRelationOperator.Equal and not SymbolicRelationOperator.NotEqual &&
             left.Kind != SmtValueKind.Int)
             return false;
@@ -52,16 +47,11 @@ internal static class SymbolicOperatorLowerer
                (right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference);
     }
 
-    internal static bool IsEqualityExpression(BinaryExpressionSyntax binaryExpression)
-    {
-        return binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
+    internal static bool IsEqualityExpression(BinaryExpressionSyntax binaryExpression) => binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
                binaryExpression.IsKind(SyntaxKind.NotEqualsExpression);
-    }
 
-    internal static bool TryGetRelationOperator(SyntaxKind kind, out SymbolicRelationOperator op)
-    {
-        switch (kind)
-        {
+    internal static bool TryGetRelationOperator(SyntaxKind kind, out SymbolicRelationOperator op) {
+        switch (kind) {
             case SyntaxKind.EqualsExpression:
                 op = SymbolicRelationOperator.Equal;
                 return true;
@@ -89,10 +79,8 @@ internal static class SymbolicOperatorLowerer
     internal static bool TryGetRelationalPatternOperator(
         SyntaxKind tokenKind,
         bool negate,
-        out SymbolicRelationOperator op)
-    {
-        op = tokenKind switch
-        {
+        out SymbolicRelationOperator op) {
+        op = tokenKind switch {
             SyntaxKind.GreaterThanToken => negate
                 ? SymbolicRelationOperator.LessThanOrEqual
                 : SymbolicRelationOperator.GreaterThan,
@@ -113,10 +101,8 @@ internal static class SymbolicOperatorLowerer
             SyntaxKind.LessThanEqualsToken;
     }
 
-    internal static bool TryGetBinaryTermOperator(SyntaxKind kind, out SymbolicBinaryTermOperator op)
-    {
-        switch (kind)
-        {
+    internal static bool TryGetBinaryTermOperator(SyntaxKind kind, out SymbolicBinaryTermOperator op) {
+        switch (kind) {
             case SyntaxKind.AddExpression:
                 op = SymbolicBinaryTermOperator.Add;
                 return true;
@@ -138,10 +124,8 @@ internal static class SymbolicOperatorLowerer
         }
     }
 
-    internal static bool TryGetBinaryTermOperator(SmtIntegerBinaryOperator smtOperator, out SymbolicBinaryTermOperator op)
-    {
-        switch (smtOperator)
-        {
+    internal static bool TryGetBinaryTermOperator(SmtIntegerBinaryOperator smtOperator, out SymbolicBinaryTermOperator op) {
+        switch (smtOperator) {
             case SmtIntegerBinaryOperator.Add:
                 op = SymbolicBinaryTermOperator.Add;
                 return true;
@@ -163,16 +147,12 @@ internal static class SymbolicOperatorLowerer
         }
     }
 
-    internal static SmtIntegerBinaryOperator GetSmtIntegerBinaryOperator(SymbolicBinaryTermOperator op)
-    {
-        return op switch
-        {
-            SymbolicBinaryTermOperator.Add => SmtIntegerBinaryOperator.Add,
-            SymbolicBinaryTermOperator.Subtract => SmtIntegerBinaryOperator.Subtract,
-            SymbolicBinaryTermOperator.Multiply => SmtIntegerBinaryOperator.Multiply,
-            SymbolicBinaryTermOperator.Divide => SmtIntegerBinaryOperator.Divide,
-            SymbolicBinaryTermOperator.Remainder => SmtIntegerBinaryOperator.Remainder,
-            _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
-        };
-    }
+    internal static SmtIntegerBinaryOperator GetSmtIntegerBinaryOperator(SymbolicBinaryTermOperator op) => op switch {
+        SymbolicBinaryTermOperator.Add => SmtIntegerBinaryOperator.Add,
+        SymbolicBinaryTermOperator.Subtract => SmtIntegerBinaryOperator.Subtract,
+        SymbolicBinaryTermOperator.Multiply => SmtIntegerBinaryOperator.Multiply,
+        SymbolicBinaryTermOperator.Divide => SmtIntegerBinaryOperator.Divide,
+        SymbolicBinaryTermOperator.Remainder => SmtIntegerBinaryOperator.Remainder,
+        _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
+    };
 }

@@ -1,5 +1,4 @@
-internal static class EffectSummaryIlAnalyzer
-{
+internal static class EffectSummaryIlAnalyzer {
     internal static readonly IReadOnlyDictionary<int, StaticFieldFact> EmptyStaticFieldFacts =
         new Dictionary<int, StaticFieldFact>();
 
@@ -22,29 +21,25 @@ internal static class EffectSummaryIlAnalyzer
         SortedSet<string> staticReadFields,
         SortedSet<int> sameAssemblyStaticReadFieldTokens,
         SortedSet<string> thrownExceptionTypes,
-        List<ExceptionPropagationSite> exceptionPropagationSites)
-    {
+        List<ExceptionPropagationSite> exceptionPropagationSites) {
         var peReader = context.PeReader;
         var reader = context.Reader;
         var knownThrownExceptionSites = new List<KnownThrownExceptionSite>();
         var trackedLocals = new Dictionary<int, TrackedStackValue>();
         var trackedStack = new List<TrackedStackValue>();
         var suppressDynamicDispatchForNextCallvirt = false;
-        foreach (var instruction in EnumerateInstructions(il))
-        {
+        foreach (var instruction in EnumerateInstructions(il)) {
             var instructionOffset = instruction.Offset;
             var opCode = instruction.OpCode;
             var operandOffset = instruction.OperandOffset;
             var operandToken = instruction.MetadataToken;
 
-            if (opCode == OpCodes.Constrained)
-            {
+            if (opCode == OpCodes.Constrained) {
                 suppressDynamicDispatchForNextCallvirt = true;
                 continue;
             }
 
-            if (opCode == OpCodes.Call || opCode == OpCodes.Callvirt || opCode == OpCodes.Newobj)
-            {
+            if (opCode == OpCodes.Call || opCode == OpCodes.Callvirt || opCode == OpCodes.Newobj) {
                 string? calledSymbol;
                 if (opCode == OpCodes.Newobj)
                     effects.Add("allocates_object");
@@ -57,8 +52,7 @@ internal static class EffectSummaryIlAnalyzer
                                           ShouldTreatCallvirtAsDynamicDispatch(reader, operandToken.Value);
                 if (usesDynamicDispatch) effects.Add("virtual_call");
 
-                if (operandToken is not null)
-                {
+                if (operandToken is not null) {
                     calledSymbol = ResolveMethodExactKey(reader, operandToken.Value);
                     calls.Add(calledSymbol);
                     var calledIdentity = TryResolveStructuralMethodIdentity(
@@ -73,8 +67,7 @@ internal static class EffectSummaryIlAnalyzer
                         instructionOffset,
                         calledIdentity));
                     if (TryGetCallTargetSignature(reader, operandToken.Value, opCode == OpCodes.Newobj,
-                            out var signature))
-                    {
+                            out var signature)) {
                         var argumentValues = PopTrackedStackValues(trackedStack, signature.ParameterTypes.Length);
                         var receiverValue = signature.HasReceiver
                             ? PopTrackedStackValue(trackedStack)
@@ -95,10 +88,8 @@ internal static class EffectSummaryIlAnalyzer
                             argumentValues,
                             opCode == OpCodes.Newobj);
                     }
-                    else
-                    {
-                        callSites.Add(new CallSiteSummary(calledSymbol)
-                        {
+                    else {
+                        callSites.Add(new CallSiteSummary(calledSymbol) {
                             Identity = calledIdentity,
                             UsesDynamicDispatch = usesDynamicDispatch
                         });
@@ -108,26 +99,21 @@ internal static class EffectSummaryIlAnalyzer
                     }
                 }
             }
-            else if (opCode == OpCodes.Calli)
-            {
+            else if (opCode == OpCodes.Calli) {
                 effects.Add("indirect_call");
             }
-            else if (opCode == OpCodes.Newarr)
-            {
+            else if (opCode == OpCodes.Newarr) {
                 effects.Add("allocates_array");
             }
-            else if (opCode == OpCodes.Box)
-            {
+            else if (opCode == OpCodes.Box) {
                 effects.Add("allocates_box");
             }
-            else if (opCode == OpCodes.Ldfld || opCode == OpCodes.Ldflda)
-            {
+            else if (opCode == OpCodes.Ldfld || opCode == OpCodes.Ldflda) {
                 effects.Add("reads_instance_field");
                 AddField(reader, operandToken, context.FieldsBySymbol, context.FieldsByExactKey,
                     fields);
             }
-            else if (opCode == OpCodes.Ldsfld || opCode == OpCodes.Ldsflda)
-            {
+            else if (opCode == OpCodes.Ldsfld || opCode == OpCodes.Ldsflda) {
                 effects.Add("reads_static_field");
                 AddField(reader, operandToken, context.FieldsBySymbol, context.FieldsByExactKey,
                     fields);
@@ -140,20 +126,17 @@ internal static class EffectSummaryIlAnalyzer
                     context.FieldsByExactKey,
                     sameAssemblyStaticReadFieldTokens);
             }
-            else if (opCode == OpCodes.Stfld)
-            {
+            else if (opCode == OpCodes.Stfld) {
                 effects.Add("writes_instance_field");
                 AddField(reader, operandToken, context.FieldsBySymbol, context.FieldsByExactKey,
                     fields);
             }
-            else if (opCode == OpCodes.Stsfld)
-            {
+            else if (opCode == OpCodes.Stsfld) {
                 effects.Add("writes_static_field");
                 AddField(reader, operandToken, context.FieldsBySymbol, context.FieldsByExactKey,
                     fields);
             }
-            else if (opCode == OpCodes.Throw || opCode == OpCodes.Rethrow)
-            {
+            else if (opCode == OpCodes.Throw || opCode == OpCodes.Rethrow) {
                 effects.Add("throws");
                 var thrownExceptionType = opCode == OpCodes.Rethrow
                     ? TryResolveRethrowExceptionType(reader, exceptionRegions, instructionOffset,
@@ -166,20 +149,16 @@ internal static class EffectSummaryIlAnalyzer
                     IsEscapingThrow(il, reader, exceptionRegions, instructionOffset, thrownExceptionType))
                     thrownExceptionTypes.Add(thrownExceptionType);
             }
-            else if (IsIndirectWrite(opCode))
-            {
+            else if (IsIndirectWrite(opCode)) {
                 effects.Add("writes_indirect_memory");
             }
-            else if (opCode == OpCodes.Cpblk || opCode == OpCodes.Initblk)
-            {
+            else if (opCode == OpCodes.Cpblk || opCode == OpCodes.Initblk) {
                 effects.Add("writes_indirect_memory");
                 effects.Add("block_memory_write");
             }
-            else if (opCode == OpCodes.Ldftn || opCode == OpCodes.Ldvirtftn)
-            {
+            else if (opCode == OpCodes.Ldftn || opCode == OpCodes.Ldvirtftn) {
                 effects.Add("loads_method_pointer");
-                if (operandToken is not null)
-                {
+                if (operandToken is not null) {
                     var calledSymbol = ResolveMethodExactKey(reader, operandToken.Value);
                     calls.Add(calledSymbol);
                     var calledIdentity = TryResolveStructuralMethodIdentity(
@@ -189,8 +168,7 @@ internal static class EffectSummaryIlAnalyzer
                     if (calledIdentity != null) callIdentities[calledSymbol] = calledIdentity;
                 }
             }
-            else if (opCode.Size == 0)
-            {
+            else if (opCode.Size == 0) {
                 effects.Add($"unknown_opcode_at_{instructionOffset}");
                 trackedStack.Clear();
                 trackedLocals.Clear();
@@ -211,8 +189,7 @@ internal static class EffectSummaryIlAnalyzer
         }
     }
 
-    internal static string GetCallSiteDeduplicationKey(CallSiteSummary callSite)
-    {
+    internal static string GetCallSiteDeduplicationKey(CallSiteSummary callSite) {
         var argumentEvidenceKey = string.Join(
             ";",
             callSite.ArgumentEvidence.Select(static evidence =>
@@ -226,8 +203,7 @@ internal static class EffectSummaryIlAnalyzer
         bool usesDynamicDispatch,
         CallTargetSignature signature,
         TrackedStackValue receiverValue,
-        IReadOnlyList<TrackedStackValue> argumentValues)
-    {
+        IReadOnlyList<TrackedStackValue> argumentValues) {
         var argumentEvidence = new List<CallSiteArgumentEvidence>();
         if (signature.HasReceiver &&
             receiverValue.KnownStringComparer is { Length: > 0 } knownReceiverComparer)
@@ -237,8 +213,7 @@ internal static class EffectSummaryIlAnalyzer
                 "System.StringComparer",
                 knownReceiverComparer));
 
-        for (var parameterIndex = 0; parameterIndex < signature.ParameterTypes.Length; parameterIndex++)
-        {
+        for (var parameterIndex = 0; parameterIndex < signature.ParameterTypes.Length; parameterIndex++) {
             var argumentValue = parameterIndex < argumentValues.Count
                 ? argumentValues[parameterIndex]
                 : TrackedStackValue.Unknown;
@@ -262,8 +237,7 @@ internal static class EffectSummaryIlAnalyzer
                     stringComparisonValueName));
         }
 
-        return new CallSiteSummary(calledSymbol)
-        {
+        return new CallSiteSummary(calledSymbol) {
             Identity = calledIdentity,
             UsesDynamicDispatch = usesDynamicDispatch,
             ArgumentEvidence = argumentEvidence.ToArray()
@@ -277,10 +251,8 @@ internal static class EffectSummaryIlAnalyzer
         string calledSymbol,
         CallTargetSignature signature,
         IReadOnlyList<TrackedStackValue> argumentValues,
-        bool isObjectConstruction)
-    {
-        if (isObjectConstruction)
-        {
+        bool isObjectConstruction) {
+        if (isObjectConstruction) {
             var exceptionType = TryGetConstructedExceptionType(calledSymbol);
             trackedStack.Add(exceptionType == null
                 ? TrackedStackValue.Unknown
@@ -307,36 +279,30 @@ internal static class EffectSummaryIlAnalyzer
         int operandOffset,
         int? operandToken,
         List<TrackedStackValue> trackedStack,
-        Dictionary<int, TrackedStackValue> trackedLocals)
-    {
-        if (TryGetPushedInt32Constant(opCode, il, operandOffset, out var pushedInt32Constant))
-        {
+        Dictionary<int, TrackedStackValue> trackedLocals) {
+        if (TryGetPushedInt32Constant(opCode, il, operandOffset, out var pushedInt32Constant)) {
             trackedStack.Add(TrackedStackValue.FromInt32(pushedInt32Constant));
             return;
         }
 
-        if (TryGetStoreLocalIndex(opCode, il, operandOffset, out var storeLocalIndex))
-        {
+        if (TryGetStoreLocalIndex(opCode, il, operandOffset, out var storeLocalIndex)) {
             trackedLocals[storeLocalIndex] = PopTrackedStackValue(trackedStack);
             return;
         }
 
-        if (TryGetLoadLocalIndex(opCode, il, operandOffset, out var loadLocalIndex))
-        {
+        if (TryGetLoadLocalIndex(opCode, il, operandOffset, out var loadLocalIndex)) {
             trackedStack.Add(trackedLocals.TryGetValue(loadLocalIndex, out var trackedLocalValue)
                 ? trackedLocalValue
                 : TrackedStackValue.Unknown);
             return;
         }
 
-        if (opCode == OpCodes.Dup)
-        {
+        if (opCode == OpCodes.Dup) {
             trackedStack.Add(trackedStack.Count == 0 ? TrackedStackValue.Unknown : trackedStack[^1]);
             return;
         }
 
-        if (opCode == OpCodes.Ldsfld)
-        {
+        if (opCode == OpCodes.Ldsfld) {
             trackedStack.Add(TryGetKnownTrackedStaticFieldValue(
                 context,
                 operandToken,
@@ -346,29 +312,25 @@ internal static class EffectSummaryIlAnalyzer
             return;
         }
 
-        if (opCode == OpCodes.Ldfld || opCode == OpCodes.Ldflda)
-        {
+        if (opCode == OpCodes.Ldfld || opCode == OpCodes.Ldflda) {
             PopTrackedStackValue(trackedStack);
             trackedStack.Add(TrackedStackValue.Unknown);
             return;
         }
 
-        if (opCode == OpCodes.Stfld)
-        {
+        if (opCode == OpCodes.Stfld) {
             PopTrackedStackValue(trackedStack);
             PopTrackedStackValue(trackedStack);
             return;
         }
 
-        if (opCode == OpCodes.Stsfld)
-        {
+        if (opCode == OpCodes.Stsfld) {
             PopTrackedStackValue(trackedStack);
             return;
         }
 
         if (!TryGetStackPopCount(opCode.StackBehaviourPop, out var popCount) ||
-            !TryGetStackPushCount(opCode.StackBehaviourPush, out var pushCount))
-        {
+            !TryGetStackPushCount(opCode.StackBehaviourPush, out var pushCount)) {
             trackedStack.Clear();
             trackedLocals.Clear();
             return;
@@ -377,8 +339,7 @@ internal static class EffectSummaryIlAnalyzer
         PopTrackedStackValues(trackedStack, popCount);
         for (var i = 0; i < pushCount; i++) trackedStack.Add(TrackedStackValue.Unknown);
 
-        if (ShouldResetTrackedState(opCode))
-        {
+        if (ShouldResetTrackedState(opCode)) {
             trackedStack.Clear();
             trackedLocals.Clear();
         }
@@ -387,8 +348,7 @@ internal static class EffectSummaryIlAnalyzer
     internal static bool TryGetKnownTrackedStaticFieldValue(
         EffectSummaryIlAnalysisContext context,
         int? operandToken,
-        out TrackedStackValue trackedValue)
-    {
+        out TrackedStackValue trackedValue) {
         trackedValue = TrackedStackValue.Unknown;
         if (operandToken is null) return false;
 
@@ -399,8 +359,7 @@ internal static class EffectSummaryIlAnalyzer
                 context.FieldsByExactKey,
                 out var fieldHandle) &&
             context.StaticFields.TryGetValue(MetadataTokens.GetToken(fieldHandle), out var staticFieldFact) &&
-            !staticFieldFact.TrackedValue.IsUnknown)
-        {
+            !staticFieldFact.TrackedValue.IsUnknown) {
             trackedValue = staticFieldFact.TrackedValue;
             return true;
         }
@@ -415,8 +374,7 @@ internal static class EffectSummaryIlAnalyzer
         int? operandToken,
         string calledSymbol,
         IReadOnlyList<TrackedStackValue> argumentValues,
-        out TrackedStackValue trackedValue)
-    {
+        out TrackedStackValue trackedValue) {
         if (TryGetKnownStringComparerIdentity(calledSymbol, out trackedValue)) return true;
 
         if (string.Equals(
@@ -446,35 +404,30 @@ internal static class EffectSummaryIlAnalyzer
     internal static bool TryGetKnownMethodReturnValue(
         EffectSummaryIlAnalysisContext context,
         MethodDefinitionHandle handle,
-        out TrackedStackValue trackedValue)
-    {
+        out TrackedStackValue trackedValue) {
         var metadataToken = MetadataTokens.GetToken(handle);
         if (context.KnownMethodReturns.TryGetValue(metadataToken, out trackedValue)) return !trackedValue.IsUnknown;
 
-        if (!context.ReturnValueVisiting.Add(metadataToken))
-        {
+        if (!context.ReturnValueVisiting.Add(metadataToken)) {
             trackedValue = TrackedStackValue.Unknown;
             return false;
         }
 
-        try
-        {
+        try {
             trackedValue = AnalyzeKnownMethodReturnValue(
                 context,
                 handle);
             context.KnownMethodReturns[metadataToken] = trackedValue;
             return !trackedValue.IsUnknown;
         }
-        finally
-        {
+        finally {
             context.ReturnValueVisiting.Remove(metadataToken);
         }
     }
 
     internal static TrackedStackValue AnalyzeKnownMethodReturnValue(
         EffectSummaryIlAnalysisContext context,
-        MethodDefinitionHandle handle)
-    {
+        MethodDefinitionHandle handle) {
         var peReader = context.PeReader;
         var reader = context.Reader;
         var definition = reader.GetMethodDefinition(handle);
@@ -483,16 +436,13 @@ internal static class EffectSummaryIlAnalyzer
             return TrackedStackValue.Unknown;
 
         CallTargetSignature signature;
-        try
-        {
+        try {
             signature = GetMethodDefinitionCallTargetSignature(reader, handle, false);
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return TrackedStackValue.Unknown;
         }
-        catch (InvalidOperationException)
-        {
+        catch (InvalidOperationException) {
             return TrackedStackValue.Unknown;
         }
 
@@ -506,11 +456,9 @@ internal static class EffectSummaryIlAnalyzer
         var trackedStack = new List<TrackedStackValue>();
         var pendingBranchStates = new Dictionary<int, BranchTrackedState>();
         TrackedStackValue? knownReturnValue = null;
-        foreach (var instruction in EnumerateInstructions(il))
-        {
+        foreach (var instruction in EnumerateInstructions(il)) {
             var instructionOffset = instruction.Offset;
-            if (pendingBranchStates.TryGetValue(instructionOffset, out var pendingBranchState))
-            {
+            if (pendingBranchStates.TryGetValue(instructionOffset, out var pendingBranchState)) {
                 if ((trackedStack.Count != 0 || trackedLocals.Count != 0) &&
                     !TrackedStatesEqual(trackedStack, trackedLocals, pendingBranchState))
                     return TrackedStackValue.Unknown;
@@ -524,8 +472,7 @@ internal static class EffectSummaryIlAnalyzer
 
             if (opCode == OpCodes.Constrained) continue;
 
-            if (opCode == OpCodes.Ret)
-            {
+            if (opCode == OpCodes.Ret) {
                 var returnValue = PopTrackedStackValue(trackedStack);
                 if (returnValue.IsUnknown) return TrackedStackValue.Unknown;
 
@@ -538,12 +485,10 @@ internal static class EffectSummaryIlAnalyzer
                 continue;
             }
 
-            if (opCode == OpCodes.Call || opCode == OpCodes.Callvirt || opCode == OpCodes.Newobj)
-            {
+            if (opCode == OpCodes.Call || opCode == OpCodes.Callvirt || opCode == OpCodes.Newobj) {
                 if (operandToken is not null &&
                     TryGetCallTargetSignature(reader, operandToken.Value, opCode == OpCodes.Newobj,
-                        out var calledSignature))
-                {
+                        out var calledSignature)) {
                     var argumentValues = PopTrackedStackValues(trackedStack, calledSignature.ParameterTypes.Length);
                     if (calledSignature.HasReceiver) PopTrackedStackValue(trackedStack);
 
@@ -556,8 +501,7 @@ internal static class EffectSummaryIlAnalyzer
                         argumentValues,
                         opCode == OpCodes.Newobj);
                 }
-                else
-                {
+                else {
                     trackedStack.Clear();
                     trackedLocals.Clear();
                     if (opCode == OpCodes.Newobj) trackedStack.Add(TrackedStackValue.Unknown);
@@ -567,8 +511,7 @@ internal static class EffectSummaryIlAnalyzer
             }
 
             if (opCode.FlowControl == FlowControl.Branch &&
-                TryGetBranchTargetOffset(opCode, il, operandOffset, instructionOffset, out var branchTargetOffset))
-            {
+                TryGetBranchTargetOffset(opCode, il, operandOffset, instructionOffset, out var branchTargetOffset)) {
                 var branchState = CaptureTrackedState(trackedStack, trackedLocals);
                 if (pendingBranchStates.TryGetValue(branchTargetOffset, out var existingBranchState) &&
                     !TrackedStatesEqual(branchState.Stack, branchState.Locals, existingBranchState))
@@ -590,8 +533,7 @@ internal static class EffectSummaryIlAnalyzer
         return knownReturnValue ?? TrackedStackValue.Unknown;
     }
 
-    internal static bool TryGetKnownStringComparerIdentity(string symbol, out TrackedStackValue trackedValue)
-    {
+    internal static bool TryGetKnownStringComparerIdentity(string symbol, out TrackedStackValue trackedValue) {
         var found = EffectSummaryKnownFrameworkCalls.TryGetStringComparerName(symbol, out var comparerName);
         trackedValue = found
             ? TrackedStackValue.FromKnownStringComparer(comparerName)
@@ -600,8 +542,7 @@ internal static class EffectSummaryIlAnalyzer
     }
 
     internal static bool TryGetStringComparerIdentityFromComparison(int comparisonValue,
-        out TrackedStackValue trackedValue)
-    {
+        out TrackedStackValue trackedValue) {
         var found = EffectSummaryKnownFrameworkCalls.TryGetStringComparerName(
             comparisonValue,
             out var comparerName);
@@ -615,13 +556,10 @@ internal static class EffectSummaryIlAnalyzer
         MetadataReader reader,
         int metadataToken,
         bool isObjectConstruction,
-        out CallTargetSignature signature)
-    {
+        out CallTargetSignature signature) {
         var handle = MetadataTokens.Handle(metadataToken);
-        try
-        {
-            signature = handle.Kind switch
-            {
+        try {
+            signature = handle.Kind switch {
                 HandleKind.MethodDefinition => GetMethodDefinitionCallTargetSignature(
                     reader,
                     (MethodDefinitionHandle)handle,
@@ -640,13 +578,11 @@ internal static class EffectSummaryIlAnalyzer
                 or HandleKind.MemberReference
                 or HandleKind.MethodSpecification;
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             signature = default;
             return false;
         }
-        catch (InvalidOperationException)
-        {
+        catch (InvalidOperationException) {
             signature = default;
             return false;
         }
@@ -655,8 +591,7 @@ internal static class EffectSummaryIlAnalyzer
     internal static CallTargetSignature GetMethodDefinitionCallTargetSignature(
         MetadataReader reader,
         MethodDefinitionHandle handle,
-        bool isObjectConstruction)
-    {
+        bool isObjectConstruction) {
         var definition = reader.GetMethodDefinition(handle);
         var decodedSignature = definition.DecodeSignature(new TypeNameProvider(), null);
         return new CallTargetSignature(
@@ -668,8 +603,7 @@ internal static class EffectSummaryIlAnalyzer
     internal static CallTargetSignature GetMemberReferenceCallTargetSignature(
         MetadataReader reader,
         MemberReferenceHandle handle,
-        bool isObjectConstruction)
-    {
+        bool isObjectConstruction) {
         var memberReference = reader.GetMemberReference(handle);
         var decodedSignature = memberReference.DecodeMethodSignature(new TypeNameProvider(), null);
         return new CallTargetSignature(
@@ -681,11 +615,9 @@ internal static class EffectSummaryIlAnalyzer
     internal static CallTargetSignature GetMethodSpecificationCallTargetSignature(
         MetadataReader reader,
         MethodSpecificationHandle handle,
-        bool isObjectConstruction)
-    {
+        bool isObjectConstruction) {
         var specification = reader.GetMethodSpecification(handle);
-        return specification.Method.Kind switch
-        {
+        return specification.Method.Kind switch {
             HandleKind.MethodDefinition => GetMethodDefinitionCallTargetSignature(
                 reader,
                 (MethodDefinitionHandle)specification.Method,
@@ -698,16 +630,14 @@ internal static class EffectSummaryIlAnalyzer
         };
     }
 
-    internal static TrackedStackValue[] PopTrackedStackValues(List<TrackedStackValue> trackedStack, int count)
-    {
+    internal static TrackedStackValue[] PopTrackedStackValues(List<TrackedStackValue> trackedStack, int count) {
         var values = new TrackedStackValue[count];
         for (var index = count - 1; index >= 0; index--) values[index] = PopTrackedStackValue(trackedStack);
 
         return values;
     }
 
-    internal static TrackedStackValue PopTrackedStackValue(List<TrackedStackValue> trackedStack)
-    {
+    internal static TrackedStackValue PopTrackedStackValue(List<TrackedStackValue> trackedStack) {
         if (trackedStack.Count == 0) return TrackedStackValue.Unknown;
 
         var lastIndex = trackedStack.Count - 1;
@@ -716,17 +646,12 @@ internal static class EffectSummaryIlAnalyzer
         return value;
     }
 
-    internal static string? PeekTrackedExceptionType(List<TrackedStackValue> trackedStack)
-    {
-        return trackedStack.Count == 0 || string.IsNullOrWhiteSpace(trackedStack[^1].KnownExceptionType)
+    internal static string? PeekTrackedExceptionType(List<TrackedStackValue> trackedStack) => trackedStack.Count == 0 || string.IsNullOrWhiteSpace(trackedStack[^1].KnownExceptionType)
             ? null
             : trackedStack[^1].KnownExceptionType;
-    }
 
-    internal static bool TryGetStackPopCount(StackBehaviour behavior, out int count)
-    {
-        count = behavior switch
-        {
+    internal static bool TryGetStackPopCount(StackBehaviour behavior, out int count) {
+        count = behavior switch {
             StackBehaviour.Pop0 => 0,
             StackBehaviour.Pop1 or
                 StackBehaviour.Popi or
@@ -751,10 +676,8 @@ internal static class EffectSummaryIlAnalyzer
         return count >= 0;
     }
 
-    internal static bool TryGetStackPushCount(StackBehaviour behavior, out int count)
-    {
-        count = behavior switch
-        {
+    internal static bool TryGetStackPushCount(StackBehaviour behavior, out int count) {
+        count = behavior switch {
             StackBehaviour.Push0 => 0,
             StackBehaviour.Push1 or
                 StackBehaviour.Pushi or
@@ -769,28 +692,21 @@ internal static class EffectSummaryIlAnalyzer
         return count >= 0;
     }
 
-    internal static bool ShouldResetTrackedState(OpCode opCode)
-    {
-        return opCode.FlowControl is FlowControl.Branch
+    internal static bool ShouldResetTrackedState(OpCode opCode) => opCode.FlowControl is FlowControl.Branch
             or FlowControl.Cond_Branch
             or FlowControl.Return
             or FlowControl.Throw;
-    }
 
     internal static BranchTrackedState CaptureTrackedState(
         List<TrackedStackValue> trackedStack,
-        Dictionary<int, TrackedStackValue> trackedLocals)
-    {
-        return new BranchTrackedState(
+        Dictionary<int, TrackedStackValue> trackedLocals) => new BranchTrackedState(
             new List<TrackedStackValue>(trackedStack),
             new Dictionary<int, TrackedStackValue>(trackedLocals));
-    }
 
     internal static void RestoreTrackedState(
         List<TrackedStackValue> trackedStack,
         Dictionary<int, TrackedStackValue> trackedLocals,
-        BranchTrackedState branchState)
-    {
+        BranchTrackedState branchState) {
         trackedStack.Clear();
         trackedStack.AddRange(branchState.Stack);
 
@@ -801,8 +717,7 @@ internal static class EffectSummaryIlAnalyzer
     internal static bool TrackedStatesEqual(
         List<TrackedStackValue> trackedStack,
         Dictionary<int, TrackedStackValue> trackedLocals,
-        BranchTrackedState branchState)
-    {
+        BranchTrackedState branchState) {
         if (trackedStack.Count != branchState.Stack.Count || trackedLocals.Count != branchState.Locals.Count)
             return false;
 
@@ -822,8 +737,7 @@ internal static class EffectSummaryIlAnalyzer
 
     internal static StaticFieldInitializerValue[] PopStaticFieldInitializerValues(
         List<StaticFieldInitializerValue> trackedStack,
-        int count)
-    {
+        int count) {
         var values = new StaticFieldInitializerValue[count];
         for (var index = count - 1; index >= 0; index--) values[index] = PopStaticFieldInitializerValue(trackedStack);
 
@@ -831,8 +745,7 @@ internal static class EffectSummaryIlAnalyzer
     }
 
     internal static StaticFieldInitializerValue PopStaticFieldInitializerValue(
-        List<StaticFieldInitializerValue> trackedStack)
-    {
+        List<StaticFieldInitializerValue> trackedStack) {
         if (trackedStack.Count == 0) return StaticFieldInitializerValue.Unknown;
 
         var lastIndex = trackedStack.Count - 1;
@@ -843,16 +756,13 @@ internal static class EffectSummaryIlAnalyzer
 
     internal static bool TryCreateStaticFieldInitializerValue(
         TrackedStackValue trackedValue,
-        out StaticFieldInitializerValue value)
-    {
-        if (trackedValue.Int32Constant is not null)
-        {
+        out StaticFieldInitializerValue value) {
+        if (trackedValue.Int32Constant is not null) {
             value = StaticFieldInitializerValue.FromConstantTracked(trackedValue);
             return true;
         }
 
-        if (!string.IsNullOrWhiteSpace(trackedValue.KnownStringComparer))
-        {
+        if (!string.IsNullOrWhiteSpace(trackedValue.KnownStringComparer)) {
             value = StaticFieldInitializerValue.FromStableIdentityTracked(trackedValue);
             return true;
         }
@@ -867,8 +777,7 @@ internal static class EffectSummaryIlAnalyzer
         IReadOnlyDictionary<int, StaticFieldInitializerValue> assignmentsByFieldToken,
         IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
         IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        out StaticFieldInitializerValue value)
-    {
+        out StaticFieldInitializerValue value) {
         value = StaticFieldInitializerValue.Unknown;
         if (metadataToken is null) return false;
 
@@ -894,17 +803,14 @@ internal static class EffectSummaryIlAnalyzer
         byte[] il,
         int operandOffset,
         int instructionOffset,
-        out int targetOffset)
-    {
+        out int targetOffset) {
         targetOffset = 0;
-        if (opCode.OperandType == OperandType.ShortInlineBrTarget)
-        {
+        if (opCode.OperandType == OperandType.ShortInlineBrTarget) {
             targetOffset = instructionOffset + opCode.Size + 1 + unchecked((sbyte)il[operandOffset]);
             return true;
         }
 
-        if (opCode.OperandType == OperandType.InlineBrTarget)
-        {
+        if (opCode.OperandType == OperandType.InlineBrTarget) {
             targetOffset = instructionOffset + opCode.Size + 4 + BitConverter.ToInt32(il, operandOffset);
             return true;
         }
@@ -912,9 +818,7 @@ internal static class EffectSummaryIlAnalyzer
         return false;
     }
 
-    internal static bool TryGetStoreLocalIndex(OpCode opCode, byte[] il, int operandOffset, out int localIndex)
-    {
-        return TryGetLocalIndex(
+    internal static bool TryGetStoreLocalIndex(OpCode opCode, byte[] il, int operandOffset, out int localIndex) => TryGetLocalIndex(
             opCode,
             il,
             operandOffset,
@@ -925,26 +829,21 @@ internal static class EffectSummaryIlAnalyzer
             OpCodes.Stloc_S,
             OpCodes.Stloc,
             out localIndex);
-    }
 
-    internal static bool TryGetPushedInt32Constant(OpCode opCode, byte[] il, int operandOffset, out int value)
-    {
+    internal static bool TryGetPushedInt32Constant(OpCode opCode, byte[] il, int operandOffset, out int value) {
         value = 0;
         var shortFormValue = opCode.Value - OpCodes.Ldc_I4_0.Value;
-        if (shortFormValue is >= -1 and <= 8)
-        {
+        if (shortFormValue is >= -1 and <= 8) {
             value = shortFormValue;
             return true;
         }
 
-        if (opCode == OpCodes.Ldc_I4_S)
-        {
+        if (opCode == OpCodes.Ldc_I4_S) {
             value = unchecked((sbyte)il[operandOffset]);
             return true;
         }
 
-        if (opCode == OpCodes.Ldc_I4)
-        {
+        if (opCode == OpCodes.Ldc_I4) {
             value = BitConverter.ToInt32(il, operandOffset);
             return true;
         }
@@ -952,9 +851,7 @@ internal static class EffectSummaryIlAnalyzer
         return false;
     }
 
-    internal static bool TryGetLoadLocalIndex(OpCode opCode, byte[] il, int operandOffset, out int localIndex)
-    {
-        return TryGetLocalIndex(
+    internal static bool TryGetLoadLocalIndex(OpCode opCode, byte[] il, int operandOffset, out int localIndex) => TryGetLocalIndex(
             opCode,
             il,
             operandOffset,
@@ -965,7 +862,6 @@ internal static class EffectSummaryIlAnalyzer
             OpCodes.Ldloc_S,
             OpCodes.Ldloc,
             out localIndex);
-    }
 
     internal static bool TryGetLocalIndex(
         OpCode opCode,
@@ -977,26 +873,22 @@ internal static class EffectSummaryIlAnalyzer
         OpCode index3,
         OpCode shortForm,
         OpCode wideForm,
-        out int localIndex)
-    {
+        out int localIndex) {
         var shortFormIndex = opCode.Value - index0.Value;
         if (shortFormIndex is >= 0 and <= 3 &&
             index1.Value == index0.Value + 1 &&
             index2.Value == index0.Value + 2 &&
-            index3.Value == index0.Value + 3)
-        {
+            index3.Value == index0.Value + 3) {
             localIndex = shortFormIndex;
             return true;
         }
 
-        if (opCode == shortForm)
-        {
+        if (opCode == shortForm) {
             localIndex = il[operandOffset];
             return true;
         }
 
-        if (opCode == wideForm)
-        {
+        if (opCode == wideForm) {
             localIndex = BitConverter.ToUInt16(il, operandOffset);
             return true;
         }
@@ -1005,8 +897,7 @@ internal static class EffectSummaryIlAnalyzer
         return false;
     }
 
-    internal static string? TryGetConstructedExceptionType(string? constructorSymbol)
-    {
+    internal static string? TryGetConstructedExceptionType(string? constructorSymbol) {
         if (string.IsNullOrWhiteSpace(constructorSymbol)) return null;
 
         var ctorIndex = constructorSymbol.IndexOf("..ctor(", StringComparison.Ordinal);
@@ -1020,13 +911,10 @@ internal static class EffectSummaryIlAnalyzer
         MetadataReader reader,
         ImmutableArray<ExceptionRegion> exceptionRegions,
         int instructionOffset,
-        IReadOnlyList<KnownThrownExceptionSite> knownThrownExceptionSites)
-    {
-        if (TryGetEnclosingCatchRegion(exceptionRegions, instructionOffset, out var catchRegion))
-        {
+        IReadOnlyList<KnownThrownExceptionSite> knownThrownExceptionSites) {
+        if (TryGetEnclosingCatchRegion(exceptionRegions, instructionOffset, out var catchRegion)) {
             var catchExceptionType = GetCatchExceptionType(reader, catchRegion);
-            if (!string.IsNullOrWhiteSpace(catchExceptionType))
-            {
+            if (!string.IsNullOrWhiteSpace(catchExceptionType)) {
                 var protectedTryExceptionTypes = knownThrownExceptionSites
                     .Where(site =>
                         ContainsOffset(catchRegion.TryOffset, catchRegion.TryLength, site.InstructionOffset) &&
@@ -1047,24 +935,19 @@ internal static class EffectSummaryIlAnalyzer
         MetadataReader reader,
         ImmutableArray<ExceptionRegion> exceptionRegions,
         int instructionOffset,
-        StructuralMethodIdentity? calleeIdentity)
-    {
-        return new ExceptionPropagationSite(
+        StructuralMethodIdentity? calleeIdentity) => new ExceptionPropagationSite(
             calleeIdentity,
             instructionOffset,
             GetHandlingCatchExceptionTypes(reader, exceptionRegions, instructionOffset),
             IsShadowedByDefinitelyThrowingFinally(il, exceptionRegions, instructionOffset));
-    }
 
     internal static bool ExceptionEscapesPropagationSite(
         MetadataReader reader,
         ExceptionPropagationSite propagationSite,
-        string thrownExceptionType)
-    {
+        string thrownExceptionType) {
         if (propagationSite.IsShadowedByDefinitelyThrowingFinally) return false;
 
-        foreach (var catchExceptionType in propagationSite.HandlingCatchExceptionTypes)
-        {
+        foreach (var catchExceptionType in propagationSite.HandlingCatchExceptionTypes) {
             if (CatchHandlesException(reader, thrownExceptionType, catchExceptionType)) return false;
         }
 
@@ -1076,12 +959,10 @@ internal static class EffectSummaryIlAnalyzer
         MetadataReader reader,
         ImmutableArray<ExceptionRegion> exceptionRegions,
         int instructionOffset,
-        string thrownExceptionType)
-    {
+        string thrownExceptionType) {
         if (IsShadowedByDefinitelyThrowingFinally(il, exceptionRegions, instructionOffset)) return false;
 
-        foreach (var exceptionRegion in exceptionRegions)
-        {
+        foreach (var exceptionRegion in exceptionRegions) {
             if (exceptionRegion.Kind != ExceptionRegionKind.Catch ||
                 !ContainsOffset(exceptionRegion.TryOffset, exceptionRegion.TryLength, instructionOffset))
                 continue;
@@ -1096,9 +977,7 @@ internal static class EffectSummaryIlAnalyzer
     internal static string[] GetHandlingCatchExceptionTypes(
         MetadataReader reader,
         ImmutableArray<ExceptionRegion> exceptionRegions,
-        int instructionOffset)
-    {
-        return exceptionRegions
+        int instructionOffset) => exceptionRegions
             .Where(exceptionRegion =>
                 exceptionRegion.Kind == ExceptionRegionKind.Catch &&
                 ContainsOffset(exceptionRegion.TryOffset, exceptionRegion.TryLength, instructionOffset))
@@ -1106,15 +985,12 @@ internal static class EffectSummaryIlAnalyzer
             .Where(exceptionType => !string.IsNullOrWhiteSpace(exceptionType))
             .Distinct(StringComparer.Ordinal)
             .ToArray()!;
-    }
 
     internal static bool IsShadowedByDefinitelyThrowingFinally(
         byte[] il,
         ImmutableArray<ExceptionRegion> exceptionRegions,
-        int instructionOffset)
-    {
-        foreach (var exceptionRegion in exceptionRegions)
-        {
+        int instructionOffset) {
+        foreach (var exceptionRegion in exceptionRegions) {
             if (exceptionRegion.Kind != ExceptionRegionKind.Finally ||
                 !ContainsOffset(exceptionRegion.TryOffset, exceptionRegion.TryLength, instructionOffset) ||
                 ContainsOffset(exceptionRegion.HandlerOffset, exceptionRegion.HandlerLength, instructionOffset))
@@ -1127,13 +1003,11 @@ internal static class EffectSummaryIlAnalyzer
         return false;
     }
 
-    internal static bool FinallyHandlerDefinitelyThrows(byte[] il, int handlerOffset, int handlerLength)
-    {
+    internal static bool FinallyHandlerDefinitelyThrows(byte[] il, int handlerOffset, int handlerLength) {
         var endOffset = handlerOffset + handlerLength;
         OpCode lastMeaningfulOpCode = default;
         var foundMeaningfulInstruction = false;
-        foreach (var instruction in EnumerateInstructions(il, handlerOffset, endOffset))
-        {
+        foreach (var instruction in EnumerateInstructions(il, handlerOffset, endOffset)) {
             var opCode = instruction.OpCode;
 
             if (opCode.FlowControl is FlowControl.Branch or FlowControl.Cond_Branch or FlowControl.Return ||
@@ -1143,8 +1017,7 @@ internal static class EffectSummaryIlAnalyzer
                 opCode == OpCodes.Leave_S)
                 return false;
 
-            if (opCode != OpCodes.Nop)
-            {
+            if (opCode != OpCodes.Nop) {
                 lastMeaningfulOpCode = opCode;
                 foundMeaningfulInstruction = true;
             }
@@ -1157,13 +1030,11 @@ internal static class EffectSummaryIlAnalyzer
     internal static bool TryGetEnclosingCatchRegion(
         ImmutableArray<ExceptionRegion> exceptionRegions,
         int instructionOffset,
-        out ExceptionRegion catchRegion)
-    {
+        out ExceptionRegion catchRegion) {
         catchRegion = default;
         var smallestHandlerLength = int.MaxValue;
         var found = false;
-        foreach (var exceptionRegion in exceptionRegions)
-        {
+        foreach (var exceptionRegion in exceptionRegions) {
             if (exceptionRegion.Kind != ExceptionRegionKind.Catch ||
                 !ContainsOffset(exceptionRegion.HandlerOffset, exceptionRegion.HandlerLength, instructionOffset) ||
                 exceptionRegion.HandlerLength >= smallestHandlerLength)
@@ -1180,18 +1051,14 @@ internal static class EffectSummaryIlAnalyzer
     internal static string? GetEnclosingCatchExceptionType(
         MetadataReader reader,
         ImmutableArray<ExceptionRegion> exceptionRegions,
-        int instructionOffset)
-    {
-        return TryGetEnclosingCatchRegion(exceptionRegions, instructionOffset, out var catchRegion)
+        int instructionOffset) => TryGetEnclosingCatchRegion(exceptionRegions, instructionOffset, out var catchRegion)
             ? GetCatchExceptionType(reader, catchRegion)
             : null;
-    }
 
     internal static bool ContainsOffset(int startOffset, int length, int instructionOffset) =>
         instructionOffset >= startOffset && instructionOffset < startOffset + length;
 
-    internal static string? GetCatchExceptionType(MetadataReader reader, ExceptionRegion exceptionRegion)
-    {
+    internal static string? GetCatchExceptionType(MetadataReader reader, ExceptionRegion exceptionRegion) {
         if (exceptionRegion.Kind != ExceptionRegionKind.Catch) return null;
 
         if (exceptionRegion.CatchType.IsNil) return "System.Exception";
@@ -1199,51 +1066,41 @@ internal static class EffectSummaryIlAnalyzer
         return GetEntityTypeName(reader, exceptionRegion.CatchType);
     }
 
-    internal static string? GetEntityTypeName(MetadataReader reader, EntityHandle handle)
-    {
-        try
-        {
-            return handle.Kind switch
-            {
+    internal static string? GetEntityTypeName(MetadataReader reader, EntityHandle handle) {
+        try {
+            return handle.Kind switch {
                 HandleKind.TypeDefinition => GetExceptionTypeDefinitionName(reader, (TypeDefinitionHandle)handle),
                 HandleKind.TypeReference => GetExceptionTypeReferenceName(reader, (TypeReferenceHandle)handle),
                 _ => null
             };
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return null;
         }
     }
 
-    internal static string GetExceptionTypeDefinitionName(MetadataReader reader, TypeDefinitionHandle handle)
-    {
+    internal static string GetExceptionTypeDefinitionName(MetadataReader reader, TypeDefinitionHandle handle) {
         var definition = reader.GetTypeDefinition(handle);
         return GetQualifiedTypeName(
             reader.GetString(definition.Namespace),
             reader.GetString(definition.Name));
     }
 
-    internal static string GetExceptionTypeReferenceName(MetadataReader reader, TypeReferenceHandle handle)
-    {
+    internal static string GetExceptionTypeReferenceName(MetadataReader reader, TypeReferenceHandle handle) {
         var reference = reader.GetTypeReference(handle);
         return GetQualifiedTypeName(
             reader.GetString(reference.Namespace),
             reader.GetString(reference.Name));
     }
 
-    internal static string GetQualifiedTypeName(string typeNamespace, string typeName)
-    {
-        return string.IsNullOrWhiteSpace(typeNamespace)
+    internal static string GetQualifiedTypeName(string typeNamespace, string typeName) => string.IsNullOrWhiteSpace(typeNamespace)
             ? typeName
             : typeNamespace + "." + typeName;
-    }
 
     internal static bool CatchHandlesException(
         MetadataReader reader,
         string thrownExceptionType,
-        string? catchExceptionType)
-    {
+        string? catchExceptionType) {
         if (string.IsNullOrWhiteSpace(catchExceptionType)) return false;
 
         if (string.Equals(catchExceptionType, "System.Exception", StringComparison.Ordinal) ||
@@ -1258,14 +1115,11 @@ internal static class EffectSummaryIlAnalyzer
     internal static bool IsDefinedTypeDerivedFrom(
         MetadataReader reader,
         string thrownExceptionType,
-        string catchExceptionType)
-    {
-        try
-        {
+        string catchExceptionType) {
+        try {
             var currentType = thrownExceptionType;
             var visitedTypes = new HashSet<string>(StringComparer.Ordinal);
-            while (visitedTypes.Add(currentType))
-            {
+            while (visitedTypes.Add(currentType)) {
                 var definitionHandle = reader.TypeDefinitions
                     .FirstOrDefault(handle => string.Equals(
                         GetExceptionTypeDefinitionName(reader, handle),
@@ -1282,35 +1136,26 @@ internal static class EffectSummaryIlAnalyzer
                 currentType = baseType;
             }
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return false;
         }
 
         return false;
     }
 
-    internal static OpCode ReadOpCode(byte[] il, ref int offset)
-    {
+    internal static OpCode ReadOpCode(byte[] il, ref int offset) {
         var value = il[offset++];
-        short key;
-        if (value == 0xFE)
-            key = unchecked((short)(0xFE00 | il[offset++]));
-        else
-            key = value;
-
+        short key = value == 0xFE ? (short)(0xFE00 | il[offset++]) : value;
         return OpCodesByValue.TryGetValue(key, out var opCode) ? opCode : default;
     }
 
     internal static IEnumerable<IlInstruction> EnumerateInstructions(
         byte[] il,
         int startOffset = 0,
-        int? endOffset = null)
-    {
+        int? endOffset = null) {
         var offset = startOffset;
         var end = endOffset ?? il.Length;
-        while (offset < end)
-        {
+        while (offset < end) {
             var instructionOffset = offset;
             var opCode = ReadOpCode(il, ref offset);
             var operandOffset = offset;
@@ -1323,32 +1168,24 @@ internal static class EffectSummaryIlAnalyzer
         }
     }
 
-    internal static int GetOperandSize(OperandType operandType, byte[] il, int operandOffset)
-    {
-        return operandType switch
-        {
-            OperandType.InlineNone => 0,
-            OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
-            OperandType.InlineVar => 2,
-            OperandType.InlineBrTarget or OperandType.InlineField or OperandType.InlineI or
-                OperandType.InlineMethod or OperandType.InlineSig or OperandType.InlineString or
-                OperandType.InlineTok or OperandType.InlineType or OperandType.ShortInlineR => 4,
-            OperandType.InlineI8 or OperandType.InlineR => 8,
-            OperandType.InlineSwitch => 4 + BitConverter.ToInt32(il, operandOffset) * 4,
-            _ => 0
-        };
-    }
+    internal static int GetOperandSize(OperandType operandType, byte[] il, int operandOffset) => operandType switch {
+        OperandType.InlineNone => 0,
+        OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
+        OperandType.InlineVar => 2,
+        OperandType.InlineBrTarget or OperandType.InlineField or OperandType.InlineI or
+            OperandType.InlineMethod or OperandType.InlineSig or OperandType.InlineString or
+            OperandType.InlineTok or OperandType.InlineType or OperandType.ShortInlineR => 4,
+        OperandType.InlineI8 or OperandType.InlineR => 8,
+        OperandType.InlineSwitch => 4 + BitConverter.ToInt32(il, operandOffset) * 4,
+        _ => 0
+    };
 
-    internal static bool IsMetadataTokenOperand(OperandType operandType)
-    {
-        return operandType is OperandType.InlineField
+    internal static bool IsMetadataTokenOperand(OperandType operandType) => operandType is OperandType.InlineField
             or OperandType.InlineMethod
             or OperandType.InlineTok
             or OperandType.InlineType;
-    }
 
-    internal static bool IsIndirectWrite(OpCode opCode)
-    {
+    internal static bool IsIndirectWrite(OpCode opCode) {
         var name = opCode.Name;
         return opCode == OpCodes.Stobj ||
                opCode == OpCodes.Initobj ||
@@ -1362,8 +1199,7 @@ internal static class EffectSummaryIlAnalyzer
         int? operandToken,
         IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
         IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        SortedSet<int> sameAssemblyStaticReadFieldTokens)
-    {
+        SortedSet<int> sameAssemblyStaticReadFieldTokens) {
         if (operandToken is not null &&
             TryResolveSameAssemblyFieldDefinitionHandle(
                 reader,
@@ -1379,8 +1215,7 @@ internal static class EffectSummaryIlAnalyzer
         int? operandToken,
         IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
         IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        SortedSet<string> fields)
-    {
+        SortedSet<string> fields) {
         if (operandToken is null) return;
 
         if (TryResolveSameAssemblyFieldDefinitionHandle(
@@ -1388,8 +1223,7 @@ internal static class EffectSummaryIlAnalyzer
                 operandToken.Value,
                 fieldDefinitionHandlesBySymbol,
                 fieldDefinitionHandlesByExactKey,
-                out var fieldHandle))
-        {
+                out var fieldHandle)) {
             fields.Add(GetFieldDefinitionSymbol(reader, fieldHandle));
             return;
         }
@@ -1402,12 +1236,10 @@ internal static class EffectSummaryIlAnalyzer
         int metadataToken,
         IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
         IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        out FieldDefinitionHandle handle)
-    {
+        out FieldDefinitionHandle handle) {
         handle = default;
         var resolvedHandle = MetadataTokens.Handle(metadataToken);
-        switch (resolvedHandle.Kind)
-        {
+        switch (resolvedHandle.Kind) {
             case HandleKind.FieldDefinition:
                 handle = (FieldDefinitionHandle)resolvedHandle;
                 return true;

@@ -1,7 +1,6 @@
 using SharpProof.Symbolic;
 
-internal enum SymbolicInvariantQueryStatus
-{
+internal enum SymbolicInvariantQueryStatus {
     Exact,
     Conservative,
     Unresolved,
@@ -12,8 +11,7 @@ internal sealed record SymbolicInvariantTargetSummary(
     string Target,
     IReadOnlyList<string> MustFacts,
     IReadOnlyList<string> MaybeFacts,
-    IReadOnlyList<string> UnknownFacts)
-{
+    IReadOnlyList<string> UnknownFacts) {
     internal int MustFactCount => MustFacts.Count;
     internal int MaybeFactCount => MaybeFacts.Count;
     internal int UnknownFactCount => UnknownFacts.Count;
@@ -47,8 +45,7 @@ internal sealed record SymbolicInvariantTargetPathSummary(
     int ProofProvenFalseCount,
     int ProofUnreachableCount,
     IReadOnlyList<string> Conditions,
-    bool ConditionsTruncated)
-{
+    bool ConditionsTruncated) {
     internal string StatusReason => ProofUnknownCount != 0
         ? "target_has_unknown_proofs"
         : PathConditionCount != 0 ? "target_has_path_conditions" : "target_has_no_path_conditions";
@@ -69,20 +66,17 @@ internal sealed record SymbolicInvariantQueryDiagnostic(
     int Count,
     IReadOnlyList<string> Evidence,
     int EvidenceTotalCount,
-    bool EvidenceTruncated)
-{
+    bool EvidenceTruncated) {
     internal const int DefaultMaxEvidence = 8;
 }
 
-internal sealed class SymbolicInvariantQueryView
-{
+internal sealed class SymbolicInvariantQueryView {
     private SymbolicInvariantQueryView(
         SymbolicInvariantResult invariant,
         SymbolicMergedPathFacts facts,
         SymbolicQueryMetrics metrics,
         SymbolicSmtDiagnostics smt,
-        IReadOnlyList<SymbolicProgramPointResult> points)
-    {
+        IReadOnlyList<SymbolicProgramPointResult> points) {
         Text = facts.MergedInvariantText;
         MergeKind = invariant.MergeKind;
         MustFacts = facts.AlwaysFacts;
@@ -99,8 +93,7 @@ internal sealed class SymbolicInvariantQueryView
         Diagnostics = BuildDiagnostics();
         Status = ResolveStatus();
         StatusReason = ResolveStatusReason();
-        Summary = Status switch
-        {
+        Summary = Status switch {
             SymbolicInvariantQueryStatus.Unreachable => "All candidate program points are unreachable.",
             SymbolicInvariantQueryStatus.Unresolved => "Invariant analysis has unresolved outcomes.",
             SymbolicInvariantQueryStatus.Conservative => "Invariant analysis contains path-specific facts.",
@@ -143,8 +136,7 @@ internal sealed class SymbolicInvariantQueryView
         result.SmtDiagnostics,
         result.ProgramPoints);
 
-    internal static SymbolicInvariantQueryView From(SymbolicProgramPointResult point)
-    {
+    internal static SymbolicInvariantQueryView From(SymbolicProgramPointResult point) {
         var points = new[] { point };
         return new SymbolicInvariantQueryView(
             point.Invariant,
@@ -162,8 +154,7 @@ internal sealed class SymbolicInvariantQueryView
         ? facts
         : targets.SelectMany(selector).Distinct(StringComparer.Ordinal).ToArray();
 
-    internal IReadOnlyList<string> GetMatchedTargets(IReadOnlyList<string> filters)
-    {
+    internal IReadOnlyList<string> GetMatchedTargets(IReadOnlyList<string> filters) {
         var available = TargetSummaries.Select(static value => value.Target)
             .Concat(TargetPathSummaries.Select(static value => value.Target))
             .Select(SymbolicInvariantTargetFilter.NormalizeTarget)
@@ -172,8 +163,7 @@ internal sealed class SymbolicInvariantQueryView
             .Where(available.Contains).Distinct(StringComparer.Ordinal).ToArray();
     }
 
-    private SymbolicInvariantQueryStatus ResolveStatus()
-    {
+    private SymbolicInvariantQueryStatus ResolveStatus() {
         if (IsUnreachable) return SymbolicInvariantQueryStatus.Unreachable;
         if (Metrics.ReachabilityUnknownCount != 0 || Metrics.ReachabilityNotCheckedCount != 0 ||
             Metrics.ProofUnknownCount != 0 || SmtDiagnostics.IsConfigured && !SmtDiagnostics.IsEnabled)
@@ -183,8 +173,7 @@ internal sealed class SymbolicInvariantQueryView
             : SymbolicInvariantQueryStatus.Exact;
     }
 
-    private string ResolveStatusReason() => Status switch
-    {
+    private string ResolveStatusReason() => Status switch {
         SymbolicInvariantQueryStatus.Unreachable => "all_candidate_program_points_unreachable",
         SymbolicInvariantQueryStatus.Unresolved => "analysis_not_fully_resolved",
         SymbolicInvariantQueryStatus.Conservative => HasUnknowns
@@ -193,8 +182,7 @@ internal sealed class SymbolicInvariantQueryView
         _ => "all_candidate_program_points_exact"
     };
 
-    private IReadOnlyList<SymbolicInvariantQueryDiagnostic> BuildDiagnostics()
-    {
+    private IReadOnlyList<SymbolicInvariantQueryDiagnostic> BuildDiagnostics() {
         var diagnostics = new List<SymbolicInvariantQueryDiagnostic>();
         if (IsUnreachable)
             diagnostics.Add(Diagnostic("SP-SYM-UNREACHABLE", "Info",
@@ -229,8 +217,7 @@ internal sealed class SymbolicInvariantQueryView
     }
 
     private static SymbolicInvariantQueryDiagnostic Diagnostic(
-        string code, string severity, string message, int count, IEnumerable<string> evidence)
-    {
+        string code, string severity, string message, int count, IEnumerable<string> evidence) {
         var all = evidence.Where(static value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.Ordinal).ToArray();
         var shown = all.Take(SymbolicInvariantQueryDiagnostic.DefaultMaxEvidence).ToArray();
@@ -240,17 +227,14 @@ internal sealed class SymbolicInvariantQueryView
 
     private static IReadOnlyList<SymbolicInvariantTargetSummary> BuildTargetSummaries(
         SymbolicInvariantResult invariant,
-        SymbolicMergedPathFacts facts)
-    {
+        SymbolicMergedPathFacts facts) {
         var values = new Dictionary<string, TargetFacts>(StringComparer.Ordinal);
-        foreach (var condition in invariant.Conditions)
-        {
+        foreach (var condition in invariant.Conditions) {
             var target = SymbolicInvariantTargetFilter.NormalizeTarget(condition.Target);
             var item = Get(values, target);
             (condition.IsConservativeUnknown ? item.Unknown : item.Must).Add(condition.Text);
         }
-        foreach (var diagnostic in facts.ConservativeUnknownDiagnostics)
-        {
+        foreach (var diagnostic in facts.ConservativeUnknownDiagnostics) {
             var item = Get(values, SymbolicInvariantTargetFilter.NormalizeTarget(diagnostic.Target));
             item.Unknown.Add(diagnostic.UnknownText);
             item.Maybe.AddRange(diagnostic.MaybeFacts);
@@ -265,21 +249,17 @@ internal sealed class SymbolicInvariantQueryView
     }
 
     private static IReadOnlyList<SymbolicInvariantTargetPathSummary> BuildTargetPaths(
-        IReadOnlyList<SymbolicProgramPointResult> points)
-    {
+        IReadOnlyList<SymbolicProgramPointResult> points) {
         var values = new Dictionary<string, TargetPath>(StringComparer.Ordinal);
-        foreach (var point in points)
-        {
+        foreach (var point in points) {
             var pointTargets = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var condition in point.Invariant.Conditions)
-            {
+            foreach (var condition in point.Invariant.Conditions) {
                 var target = SymbolicInvariantTargetFilter.NormalizeTarget(condition.Target);
                 var item = Get(values, target);
                 item.Add(condition);
                 pointTargets.Add(target);
             }
-            foreach (var proof in point.ConditionProofs)
-            {
+            foreach (var proof in point.ConditionProofs) {
                 var target = SymbolicInvariantTargetFilter.NormalizeTarget(proof.Target);
                 Get(values, target).Add(proof);
                 pointTargets.Add(target);
@@ -291,8 +271,7 @@ internal sealed class SymbolicInvariantQueryView
     }
 
     private static TValue Get<TValue>(IDictionary<string, TValue> values, string key)
-        where TValue : new()
-    {
+        where TValue : new() {
         if (!values.TryGetValue(key, out var value)) values.Add(key, value = new TValue());
         return value;
     }
@@ -301,22 +280,19 @@ internal sealed class SymbolicInvariantQueryView
         values.Where(static value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.Ordinal).ToArray();
 
-    private sealed class TargetFacts
-    {
+    private sealed class TargetFacts {
         internal List<string> Must { get; } = new();
         internal List<string> Maybe { get; } = new();
         internal List<string> Unknown { get; } = new();
     }
 
-    private sealed class TargetPath
-    {
+    private sealed class TargetPath {
         private const int MaxConditions = 8;
         private readonly List<string> _conditions = new();
         private int _pathCount, _smtCount, _unknownConditions, _points, _reachable;
         private int _proofs, _proofUnknown, _proofTrue, _proofFalse, _proofUnreachable;
 
-        internal void Add(SymbolicInvariantCondition condition)
-        {
+        internal void Add(SymbolicInvariantCondition condition) {
             _pathCount++;
             if (condition.IsSolverBacked) _smtCount++;
             if (condition.IsConservativeUnknown) _unknownConditions++;
@@ -324,11 +300,9 @@ internal sealed class SymbolicInvariantQueryView
                 _conditions.Add(condition.Text);
         }
 
-        internal void Add(SymbolicConditionProofResult proof)
-        {
+        internal void Add(SymbolicConditionProofResult proof) {
             _proofs++;
-            switch (proof.TruthValue)
-            {
+            switch (proof.TruthValue) {
                 case SymbolicTruthValue.Unknown: _proofUnknown++; break;
                 case SymbolicTruthValue.ProvenTrue: _proofTrue++; break;
                 case SymbolicTruthValue.ProvenFalse: _proofFalse++; break;
@@ -336,8 +310,7 @@ internal sealed class SymbolicInvariantQueryView
             }
         }
 
-        internal void Add(SymbolicReachability reachability)
-        {
+        internal void Add(SymbolicReachability reachability) {
             _points++;
             if (reachability == SymbolicReachability.Reachable) _reachable++;
         }

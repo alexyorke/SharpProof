@@ -5,16 +5,14 @@ namespace SharpProof.Symbolic.Ir;
 internal sealed record SymbolicSourceCompletionPlan(
     ImmutableArray<SymbolicCondition> Conditions);
 
-internal static class SymbolicSourceCompletionLowerer
-{
+internal static class SymbolicSourceCompletionLowerer {
     internal static SymbolicOperationTransitionResult ApplyNormalCompletion(
         SymbolicState state,
         ExpressionSyntax expression,
         StatementSyntax statement,
         bool includeThrowGuardFacts,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var provenance = ImmutableArray.CreateBuilder<SymbolicLoweringProvenance>();
         if (includeThrowGuardFacts)
             AdoptExact(
@@ -47,8 +45,7 @@ internal static class SymbolicSourceCompletionLowerer
                  SymbolicFrameworkPostconditionLowerer.EnumerateExplicitInvocationArguments(
                      expression,
                      semanticModel,
-                     cancellationToken))
-        {
+                     cancellationToken)) {
             if (parameter.RefKind != RefKind.None ||
                 !NullableFlowFacts.TryGetDoesNotReturnIfValue(parameter, out var doesNotReturnWhen) ||
                 !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None) ||
@@ -113,8 +110,7 @@ internal static class SymbolicSourceCompletionLowerer
         StatementSyntax guardedStatement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        string nonNullProvenance)
-    {
+        string nonNullProvenance) {
         var guardedValue = SymbolicAssignmentStateTransfer.GetThrowGuardedValue(expression);
         if (!guardedValue.HasGuard)
             return Exact(state, expression, "no-throw-guard");
@@ -173,8 +169,7 @@ internal static class SymbolicSourceCompletionLowerer
         ExpressionSyntax expression,
         StatementSyntax statement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var conditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
         AddArrayBounds(conditions, expression, statement, semanticModel, cancellationToken);
         AddDereferenceSuccess(conditions, expression, statement, semanticModel, cancellationToken);
@@ -188,8 +183,7 @@ internal static class SymbolicSourceCompletionLowerer
         ExpressionSyntax expression,
         StatementSyntax statement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         expression = SymbolicFrameworkPostconditionLowerer.UnwrapAwaited(expression);
         if (expression is not ArrayCreationExpressionSyntax arrayCreation)
             return;
@@ -201,8 +195,7 @@ internal static class SymbolicSourceCompletionLowerer
                     statement,
                     semanticModel,
                     cancellationToken) &&
-                SymbolicSemanticPipeline.LowerTerm(sizeExpression, context) is
-                    { IsExact: true, Value: { Kind: SmtValueKind.Int } size })
+                SymbolicSemanticPipeline.LowerTerm(sizeExpression, context) is { IsExact: true, Value: { Kind: SmtValueKind.Int } size })
                 conditions.Add(SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.GreaterThanOrEqual,
                     size,
@@ -216,11 +209,9 @@ internal static class SymbolicSourceCompletionLowerer
         ExpressionSyntax expression,
         StatementSyntax statement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        if (expression is AwaitExpressionSyntax awaited)
-        {
+        if (expression is AwaitExpressionSyntax awaited) {
             var awaitable = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(awaited.Expression);
             AddStableNonNull(
                 conditions,
@@ -241,8 +232,7 @@ internal static class SymbolicSourceCompletionLowerer
                 cancellationToken) &&
             SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(
                 elementAccess,
-                new SymbolicLoweringContext(semanticModel, cancellationToken)) is
-                { IsExact: true, Value: { } inRange })
+                new SymbolicLoweringContext(semanticModel, cancellationToken)) is { IsExact: true, Value: { } inRange })
             conditions.Add(inRange);
 
         if (TryGetDereferenceReceiver(expression, semanticModel, cancellationToken, out var receiver))
@@ -261,8 +251,7 @@ internal static class SymbolicSourceCompletionLowerer
         StatementSyntax statement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        string provenance)
-    {
+        string provenance) {
         if (NullableFlowFacts.TryGetArgumentTargetSymbol(
                 expression,
                 semanticModel,
@@ -287,11 +276,9 @@ internal static class SymbolicSourceCompletionLowerer
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ExpressionSyntax receiver)
-    {
+        out ExpressionSyntax receiver) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        switch (expression)
-        {
+        switch (expression) {
             case InvocationExpressionSyntax invocation
                 when CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(invocation.Expression) is
                          MemberAccessExpressionSyntax memberAccess &&
@@ -314,14 +301,12 @@ internal static class SymbolicSourceCompletionLowerer
         InvocationExpressionSyntax invocation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) =>
-        semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation
-            { TargetMethod.ReducedFrom: not null };
+        semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation { TargetMethod.ReducedFrom: not null };
 
     private static void AdoptExact(
         ref SymbolicState state,
         ImmutableArray<SymbolicLoweringProvenance>.Builder provenance,
-        SymbolicOperationTransitionResult transition)
-    {
+        SymbolicOperationTransitionResult transition) {
         if (!transition.IsExact)
             return;
         state = transition.State;

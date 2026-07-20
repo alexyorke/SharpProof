@@ -5,8 +5,7 @@ internal sealed record SymbolicOperationTransitionResult(
     SymbolicLoweringSupport Support,
     SymbolicUnknownReason UnknownReason,
     ImmutableArray<SymbolicLoweringProvenance> Provenance,
-    SymbolicAnalysisTruncationInfo Truncation)
-{
+    SymbolicAnalysisTruncationInfo Truncation) {
     internal bool IsExact => Support == SymbolicLoweringSupport.Exact;
 
     internal bool IsApproximate => Support == SymbolicLoweringSupport.Approximate;
@@ -16,23 +15,19 @@ internal sealed record SymbolicOperationTransitionResult(
     internal static SymbolicOperationTransitionResult Exact(
         SymbolicState state,
         IEnumerable<SymbolicLoweringProvenance> provenance,
-        SymbolicAnalysisTruncationInfo? truncation = null)
-    {
-        return Create(
+        SymbolicAnalysisTruncationInfo? truncation = null) => Create(
             state.Normalize(),
             SymbolicLoweringSupport.Exact,
             SymbolicUnknownReason.None,
             provenance,
             truncation);
-    }
 
 
     internal static SymbolicOperationTransitionResult Unsupported(
         SymbolicState unchangedState,
         SymbolicUnknownReason unknownReason,
         IEnumerable<SymbolicLoweringProvenance> provenance,
-        SymbolicAnalysisTruncationInfo? truncation = null)
-    {
+        SymbolicAnalysisTruncationInfo? truncation = null) {
         if (unknownReason == SymbolicUnknownReason.None)
             throw new ArgumentException("Unsupported transitions require an unknown reason.", nameof(unknownReason));
 
@@ -49,8 +44,7 @@ internal sealed record SymbolicOperationTransitionResult(
         SymbolicLoweringSupport support,
         SymbolicUnknownReason unknownReason,
         IEnumerable<SymbolicLoweringProvenance> provenance,
-        SymbolicAnalysisTruncationInfo? truncation)
-    {
+        SymbolicAnalysisTruncationInfo? truncation) {
         if (state == null) throw new ArgumentNullException(nameof(state));
         if (provenance == null) throw new ArgumentNullException(nameof(provenance));
 

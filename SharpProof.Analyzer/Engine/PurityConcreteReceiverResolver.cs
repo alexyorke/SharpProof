@@ -1,14 +1,12 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static class PurityConcreteReceiverResolver
-{
+internal static class PurityConcreteReceiverResolver {
     internal static bool TryResolveExactConcreteType(
         IOperation? operation,
         SyntaxNode useNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out INamedTypeSymbol concreteType)
-    {
+        out INamedTypeSymbol concreteType) {
         operation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         if (operation != null &&
             TryResolveKnownSystemTypeRuntimeReceiver(operation, semanticModel.Compilation, out concreteType))
@@ -17,8 +15,7 @@ internal static class PurityConcreteReceiverResolver
         if (operation?.Syntax is ExpressionSyntax expression &&
             SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
                 expression, useNode, semanticModel, cancellationToken, out var exactType) &&
-            exactType is INamedTypeSymbol namedType)
-        {
+            exactType is INamedTypeSymbol namedType) {
             concreteType = namedType;
             return true;
         }
@@ -30,38 +27,30 @@ internal static class PurityConcreteReceiverResolver
     internal static bool IsTrustedFreshArrayFactoryOperation(
         IOperation? operation,
         Compilation compilation,
-        out IMethodSymbol factoryMethod)
-    {
-        return IsTrustedArrayFactoryOperation(
+        out IMethodSymbol factoryMethod) => IsTrustedArrayFactoryOperation(
             operation,
             compilation,
             PurityAnalysisEngine.IsTrustedGeneratedFreshOwnedArrayReturningMember,
             out factoryMethod);
-    }
 
     internal static bool IsTrustedNonEscapingArrayFactoryOperation(
         IOperation? operation,
         Compilation compilation,
-        out IMethodSymbol factoryMethod)
-    {
-        return IsTrustedArrayFactoryOperation(
+        out IMethodSymbol factoryMethod) => IsTrustedArrayFactoryOperation(
             operation,
             compilation,
             PurityAnalysisEngine.IsTrustedGeneratedNonEscapingArrayReturningMember,
             out factoryMethod);
-    }
 
     private static bool IsTrustedArrayFactoryOperation(
         IOperation? operation,
         Compilation compilation,
         Func<IMethodSymbol, Compilation, bool> isTrustedFactory,
-        out IMethodSymbol factoryMethod)
-    {
+        out IMethodSymbol factoryMethod) {
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         if (unwrappedOperation is IInvocationOperation invocation &&
             invocation.Type is IArrayTypeSymbol &&
-            isTrustedFactory(invocation.TargetMethod.OriginalDefinition, compilation))
-        {
+            isTrustedFactory(invocation.TargetMethod.OriginalDefinition, compilation)) {
             factoryMethod = invocation.TargetMethod;
             return true;
         }
@@ -70,8 +59,7 @@ internal static class PurityConcreteReceiverResolver
         return false;
     }
 
-    internal static bool IsArrayCollectionExpressionOperation(IOperation? operation)
-    {
+    internal static bool IsArrayCollectionExpressionOperation(IOperation? operation) {
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         return unwrappedOperation is ICollectionExpressionOperation collectionExpression &&
                collectionExpression.Type is IArrayTypeSymbol;
@@ -81,8 +69,7 @@ internal static class PurityConcreteReceiverResolver
         IOperation? operation,
         PurityAnalysisState currentState,
         Compilation? compilation,
-        out INamedTypeSymbol concreteType)
-    {
+        out INamedTypeSymbol concreteType) {
         operation = UnwrapConversionsAndParentheses(operation);
 
         if (operation != null &&
@@ -91,8 +78,7 @@ internal static class PurityConcreteReceiverResolver
 
         if (operation is IObjectCreationOperation objectCreationOperation &&
             objectCreationOperation.Type is INamedTypeSymbol createdType &&
-            createdType.TypeKind is TypeKind.Class or TypeKind.Struct)
-        {
+            createdType.TypeKind is TypeKind.Class or TypeKind.Struct) {
             concreteType = createdType;
             return true;
         }
@@ -136,12 +122,10 @@ internal static class PurityConcreteReceiverResolver
         IOperation? second,
         PurityAnalysisState currentState,
         Compilation? compilation,
-        out INamedTypeSymbol concreteType)
-    {
+        out INamedTypeSymbol concreteType) {
         if (TryResolveKnownConcreteType(first, currentState, compilation, out var firstType) &&
             TryResolveKnownConcreteType(second, currentState, compilation, out var secondType) &&
-            SymbolEq.AreEqual(firstType, secondType))
-        {
+            SymbolEq.AreEqual(firstType, secondType)) {
             concreteType = firstType;
             return true;
         }
@@ -153,8 +137,7 @@ internal static class PurityConcreteReceiverResolver
     internal static bool TryResolveKnownSystemTypeRuntimeReceiver(
         IOperation operation,
         Compilation? compilation,
-        out INamedTypeSymbol concreteType)
-    {
+        out INamedTypeSymbol concreteType) {
         concreteType = null!;
 
         if (operation is ITypeOfOperation)
@@ -170,8 +153,7 @@ internal static class PurityConcreteReceiverResolver
         return false;
     }
 
-    internal static bool IsKnownSystemTypeRuntimeReceiver(IOperation? operation)
-    {
+    internal static bool IsKnownSystemTypeRuntimeReceiver(IOperation? operation) {
         operation = UnwrapConversionsAndParentheses(operation);
 
         if (operation == null) return false;
@@ -185,14 +167,12 @@ internal static class PurityConcreteReceiverResolver
     internal static bool TryGetRuntimeTypeSymbol(
         ITypeSymbol? typeSymbol,
         Compilation? compilation,
-        out INamedTypeSymbol concreteType)
-    {
+        out INamedTypeSymbol concreteType) {
         concreteType = null!;
 
         if (typeSymbol == null || !IsSystemTypeSymbol(typeSymbol)) return false;
 
-        if (compilation?.GetTypeByMetadataName("System.RuntimeType") is INamedTypeSymbol runtimeTypeFromCompilation)
-        {
+        if (compilation?.GetTypeByMetadataName("System.RuntimeType") is INamedTypeSymbol runtimeTypeFromCompilation) {
             concreteType = runtimeTypeFromCompilation;
             return true;
         }
@@ -208,11 +188,9 @@ internal static class PurityConcreteReceiverResolver
 
     internal static IMethodSymbol? ResolveMethodTargetForConcreteReceiver(
         IMethodSymbol targetMethod,
-        INamedTypeSymbol exactReceiverType)
-    {
+        INamedTypeSymbol exactReceiverType) {
         var originalTarget = targetMethod.OriginalDefinition;
-        if (targetMethod.ContainingType?.TypeKind == TypeKind.Interface)
-        {
+        if (targetMethod.ContainingType?.TypeKind == TypeKind.Interface) {
             var interfaceImplementation =
                 exactReceiverType.FindImplementationForInterfaceMember(targetMethod) as IMethodSymbol
                 ?? exactReceiverType.FindImplementationForInterfaceMember(originalTarget) as IMethodSymbol;
@@ -243,10 +221,8 @@ internal static class PurityConcreteReceiverResolver
     internal static IMethodSymbol? ResolvePropertyAccessorTargetForConcreteReceiver(
         IPropertySymbol propertySymbol,
         INamedTypeSymbol exactReceiverType,
-        bool preferSetter)
-    {
-        if (propertySymbol.ContainingType?.TypeKind == TypeKind.Interface)
-        {
+        bool preferSetter) {
+        if (propertySymbol.ContainingType?.TypeKind == TypeKind.Interface) {
             var implementation = exactReceiverType.FindImplementationForInterfaceMember(propertySymbol) ??
                                  (preferSetter
                                      ? propertySymbol.SetMethod == null
@@ -260,8 +236,7 @@ internal static class PurityConcreteReceiverResolver
             return GetAccessorFromImplementation(implementation, preferSetter);
         }
 
-        for (var current = exactReceiverType; current != null; current = current.BaseType)
-        {
+        for (var current = exactReceiverType; current != null; current = current.BaseType) {
             var implementation = current
                 .GetMembers(propertySymbol.Name)
                 .OfType<IPropertySymbol>()
@@ -277,44 +252,31 @@ internal static class PurityConcreteReceiverResolver
         return preferSetter ? propertySymbol.SetMethod : propertySymbol.GetMethod;
     }
 
-    private static bool IsObjectGetTypeMethod(IMethodSymbol methodSymbol)
-    {
-        return !methodSymbol.IsStatic &&
+    private static bool IsObjectGetTypeMethod(IMethodSymbol methodSymbol) => !methodSymbol.IsStatic &&
                methodSymbol.Parameters.Length == 0 &&
                methodSymbol.Name == nameof(GetType) &&
                methodSymbol.ContainingType?.SpecialType == SpecialType.System_Object;
-    }
 
-    private static bool IsTypeGetTypeFromHandleMethod(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.IsStatic &&
+    private static bool IsTypeGetTypeFromHandleMethod(IMethodSymbol methodSymbol) => methodSymbol.IsStatic &&
                methodSymbol.Parameters.Length == 1 &&
                methodSymbol.Name == nameof(Type.GetTypeFromHandle) &&
                IsSystemTypeSymbol(methodSymbol.ContainingType) &&
                methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_RuntimeTypeHandle;
-    }
 
-    private static bool IsSystemTypeSymbol(ITypeSymbol? typeSymbol)
-    {
-        return typeSymbol != null &&
+    private static bool IsSystemTypeSymbol(ITypeSymbol? typeSymbol) => typeSymbol != null &&
                string.Equals(typeSymbol.ToDisplayString(), "System.Type", StringComparison.Ordinal);
-    }
 
-    private static IMethodSymbol? GetAccessorFromImplementation(ISymbol? implementation, bool preferSetter)
-    {
+    private static IMethodSymbol? GetAccessorFromImplementation(ISymbol? implementation, bool preferSetter) {
         if (implementation is IPropertySymbol propertyImplementation)
             return preferSetter ? propertyImplementation.SetMethod : propertyImplementation.GetMethod;
 
         return implementation as IMethodSymbol;
     }
 
-    private static IOperation? UnwrapConversionsAndParentheses(IOperation? operation)
-    {
-        while (true)
-        {
+    private static IOperation? UnwrapConversionsAndParentheses(IOperation? operation) {
+        while (true) {
             operation = PurityAnalysisEngine.SkipImplicitConversions(operation);
-            switch (operation)
-            {
+            switch (operation) {
                 case IParenthesizedOperation parenthesized:
                     operation = parenthesized.Operand;
                     continue;
@@ -327,10 +289,7 @@ internal static class PurityConcreteReceiverResolver
         }
     }
 
-    internal static bool IsArrayEmptyFactory(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.Name == "Empty" &&
+    internal static bool IsArrayEmptyFactory(IMethodSymbol methodSymbol) => methodSymbol.Name == "Empty" &&
                methodSymbol.Parameters.Length == 0 &&
                methodSymbol.ContainingType?.SpecialType == SpecialType.System_Array;
-    }
 }

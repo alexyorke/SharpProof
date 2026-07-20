@@ -1,17 +1,13 @@
-internal static class EffectSummaryOutputWriter
-{
-    public static void WriteDocument(EffectSummaryDocument document, string? outputPath)
-    {
+internal static class EffectSummaryOutputWriter {
+    public static void WriteDocument(EffectSummaryDocument document, string? outputPath) {
         var json = JsonSerializer.Serialize(
             document,
-            new JsonSerializerOptions
-            {
+            new JsonSerializerOptions {
                 DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
                 WriteIndented = true
             });
 
-        if (string.IsNullOrWhiteSpace(outputPath))
-        {
+        if (string.IsNullOrWhiteSpace(outputPath)) {
             Console.WriteLine(json);
             return;
         }
@@ -20,8 +16,7 @@ internal static class EffectSummaryOutputWriter
         File.WriteAllText(outputPath, json);
     }
 
-    public static void WriteManifestIfChanged(string manifestPath, IEnumerable<string> paths)
-    {
+    public static void WriteManifestIfChanged(string manifestPath, IEnumerable<string> paths) {
         var normalizedPath = Path.GetFullPath(manifestPath);
         var content = string.Join(
                           "\n",

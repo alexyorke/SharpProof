@@ -1,14 +1,11 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class ExecutionVisibility
-{
+internal static partial class ExecutionVisibility {
     private static bool IsInReachableConstantSwitchGotoSection(
         SyntaxNode syntaxNode,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var switchStatement in syntaxNode.Ancestors().OfType<SwitchStatementSyntax>())
-        {
+        CancellationToken cancellationToken) {
+        foreach (var switchStatement in syntaxNode.Ancestors().OfType<SwitchStatementSyntax>()) {
             var section =
                 switchStatement.Sections.FirstOrDefault(candidate => candidate.Span.Contains(syntaxNode.SpanStart));
             if (section != null &&
@@ -24,8 +21,7 @@ internal static partial class ExecutionVisibility
         SwitchStatementSyntax switchStatement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis)
-    {
+        SmtAnalysisService? smtAnalysis) {
         var section =
             switchStatement.Sections.FirstOrDefault(candidate => candidate.Span.Contains(syntaxNode.SpanStart));
         if (section == null ||
@@ -53,8 +49,7 @@ internal static partial class ExecutionVisibility
         SwitchSectionSyntax section,
         SwitchStatementSyntax switchStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var governingValue = semanticModel.GetConstantValue(switchStatement.Expression, cancellationToken);
         if (!governingValue.HasValue) return false;
 
@@ -69,8 +64,7 @@ internal static partial class ExecutionVisibility
         for (var index = 0; index < reachableSections.Count; index++)
             foreach (var gotoStatement in reachableSections[index]
                          .DescendantNodes()
-                         .OfType<GotoStatementSyntax>())
-            {
+                         .OfType<GotoStatementSyntax>()) {
                 if (!ReferenceEquals(
                         gotoStatement.Ancestors().OfType<SwitchStatementSyntax>().FirstOrDefault(),
                         switchStatement))
@@ -95,21 +89,17 @@ internal static partial class ExecutionVisibility
         SwitchStatementSyntax switchStatement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        object? governingValue)
-    {
+        object? governingValue) {
         SwitchSectionSyntax? defaultSection = null;
 
         foreach (var section in switchStatement.Sections)
-            foreach (var label in section.Labels)
-            {
-                if (label is DefaultSwitchLabelSyntax)
-                {
+            foreach (var label in section.Labels) {
+                if (label is DefaultSwitchLabelSyntax) {
                     defaultSection ??= section;
                     continue;
                 }
 
-                if (label is CaseSwitchLabelSyntax caseLabel)
-                {
+                if (label is CaseSwitchLabelSyntax caseLabel) {
                     var labelValue = semanticModel.GetConstantValue(caseLabel.Value, cancellationToken);
                     if (labelValue.HasValue && Equals(labelValue.Value, governingValue)) return section;
 
@@ -129,8 +119,7 @@ internal static partial class ExecutionVisibility
         GotoStatementSyntax gotoStatement,
         SwitchStatementSyntax switchStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (gotoStatement.IsKind(SyntaxKind.GotoDefaultStatement))
             return switchStatement.Sections.FirstOrDefault(section =>
                 section.Labels.Any(label => label is DefaultSwitchLabelSyntax));
@@ -155,27 +144,18 @@ internal static partial class ExecutionVisibility
         PatternSyntax pattern,
         object? governingValue,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return pattern switch
-        {
+        CancellationToken cancellationToken) => pattern switch {
             DiscardPatternSyntax => true,
             ParenthesizedPatternSyntax parenthesized => PatternMatchesConstant(
                 parenthesized.Pattern, governingValue, semanticModel, cancellationToken),
             ConstantPatternSyntax constant =>
-                semanticModel.GetConstantValue(constant.Expression, cancellationToken) is
-                    { HasValue: true } value && Equals(value.Value, governingValue),
+                semanticModel.GetConstantValue(constant.Expression, cancellationToken) is { HasValue: true } value && Equals(value.Value, governingValue),
             _ => false
         };
-    }
 
     private static bool WhenClauseCanMatch(
         WhenClauseSyntax? whenClause,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return whenClause == null ||
-               semanticModel.GetConstantValue(whenClause.Condition, cancellationToken) is
-                   { HasValue: true, Value: true };
-    }
+        CancellationToken cancellationToken) => whenClause == null ||
+               semanticModel.GetConstantValue(whenClause.Condition, cancellationToken) is { HasValue: true, Value: true };
 }

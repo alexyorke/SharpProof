@@ -1,87 +1,75 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal abstract class SymbolicIrRewriter
-{
-    internal SymbolicFact Rewrite(SymbolicFact fact)
-    {
+internal abstract class SymbolicIrRewriter {
+    internal SymbolicFact Rewrite(SymbolicFact fact) {
         var atom = Rewrite(fact.Atom);
         return ReferenceEquals(atom, fact.Atom) ? fact : fact with { Atom = atom };
     }
 
-    internal SymbolicCondition Rewrite(SymbolicCondition condition)
-    {
-        return condition switch
-        {
-            SymbolicConstantCondition => condition,
-            SymbolicFactCondition factCondition => RewriteFactCondition(factCondition),
-            SymbolicNotCondition notCondition => RewriteNotCondition(notCondition),
-            SymbolicBinaryCondition binaryCondition => RewriteBinaryCondition(binaryCondition),
-            _ => condition
-        };
-    }
+    internal SymbolicCondition Rewrite(SymbolicCondition condition) => condition switch {
+        SymbolicConstantCondition => condition,
+        SymbolicFactCondition factCondition => RewriteFactCondition(factCondition),
+        SymbolicNotCondition notCondition => RewriteNotCondition(notCondition),
+        SymbolicBinaryCondition binaryCondition => RewriteBinaryCondition(binaryCondition),
+        _ => condition
+    };
 
-    internal SymbolicAtom Rewrite(SymbolicAtom atom)
-    {
-        return atom switch
-        {
-            SymbolicTruthAtom truth => new SymbolicTruthAtom(Rewrite(truth.Condition)),
-            SymbolicRelationAtom relation => new SymbolicRelationAtom(
-                relation.Operator,
-                Rewrite(relation.Left),
-                Rewrite(relation.Right)),
-            SymbolicStringPredicateAtom predicate => new SymbolicStringPredicateAtom(
-                predicate.Predicate,
-                Rewrite(predicate.Value),
-                Rewrite(predicate.Argument),
-                predicate.RegexOptions),
-            SymbolicBoundsAtom bounds => new SymbolicBoundsAtom(
-                Rewrite(bounds.Index),
-                Rewrite(bounds.Length),
-                bounds.IncludeLowerBound,
-                bounds.IncludeUpperBound),
-            SymbolicFreshnessAtom freshness => new SymbolicFreshnessAtom(Rewrite(freshness.Value)),
-            SymbolicOwnershipAtom ownership => new SymbolicOwnershipAtom(
-                Rewrite(ownership.Value),
-                ownership.Escaped),
-            SymbolicAliasAtom alias => new SymbolicAliasAtom(
-                Rewrite(alias.Source),
-                Rewrite(alias.Target),
-                alias.MayAlias),
-            SymbolicBorrowAtom borrow => new SymbolicBorrowAtom(
-                Rewrite(borrow.Owner),
-                Rewrite(borrow.Borrow),
-                borrow.Kind),
-            SymbolicEscapeAtom escape => new SymbolicEscapeAtom(Rewrite(escape.Value), escape.Kind),
-            SymbolicReturnedOwnershipAtom returned => new SymbolicReturnedOwnershipAtom(Rewrite(returned.Value)),
-            SymbolicMutationAtom mutation => new SymbolicMutationAtom(
-                Rewrite(mutation.Target),
-                mutation.CallerVisible),
-            SymbolicDisposalAtom disposal => new SymbolicDisposalAtom(
-                Rewrite(disposal.Resource),
-                disposal.State),
-            SymbolicResourceLifetimeAtom lifetime => new SymbolicResourceLifetimeAtom(
-                Rewrite(lifetime.Resource),
-                lifetime.State),
-            SymbolicExactRuntimeTypeAtom exactRuntimeType => new SymbolicExactRuntimeTypeAtom(
-                Rewrite(exactRuntimeType.Value),
-                exactRuntimeType.TypeKey),
-            SymbolicTypeTestAtom typeTest => new SymbolicTypeTestAtom(
-                Rewrite(typeTest.Value),
-                typeTest.TypeKey),
-            SymbolicExceptionPreconditionAtom precondition => new SymbolicExceptionPreconditionAtom(
-                precondition.Kind,
-                precondition.Subject == null ? null : Rewrite(precondition.Subject),
-                Rewrite(precondition.Trigger)),
-            _ => atom
-        };
-    }
+    internal SymbolicAtom Rewrite(SymbolicAtom atom) => atom switch {
+        SymbolicTruthAtom truth => new SymbolicTruthAtom(Rewrite(truth.Condition)),
+        SymbolicRelationAtom relation => new SymbolicRelationAtom(
+            relation.Operator,
+            Rewrite(relation.Left),
+            Rewrite(relation.Right)),
+        SymbolicStringPredicateAtom predicate => new SymbolicStringPredicateAtom(
+            predicate.Predicate,
+            Rewrite(predicate.Value),
+            Rewrite(predicate.Argument),
+            predicate.RegexOptions),
+        SymbolicBoundsAtom bounds => new SymbolicBoundsAtom(
+            Rewrite(bounds.Index),
+            Rewrite(bounds.Length),
+            bounds.IncludeLowerBound,
+            bounds.IncludeUpperBound),
+        SymbolicFreshnessAtom freshness => new SymbolicFreshnessAtom(Rewrite(freshness.Value)),
+        SymbolicOwnershipAtom ownership => new SymbolicOwnershipAtom(
+            Rewrite(ownership.Value),
+            ownership.Escaped),
+        SymbolicAliasAtom alias => new SymbolicAliasAtom(
+            Rewrite(alias.Source),
+            Rewrite(alias.Target),
+            alias.MayAlias),
+        SymbolicBorrowAtom borrow => new SymbolicBorrowAtom(
+            Rewrite(borrow.Owner),
+            Rewrite(borrow.Borrow),
+            borrow.Kind),
+        SymbolicEscapeAtom escape => new SymbolicEscapeAtom(Rewrite(escape.Value), escape.Kind),
+        SymbolicReturnedOwnershipAtom returned => new SymbolicReturnedOwnershipAtom(Rewrite(returned.Value)),
+        SymbolicMutationAtom mutation => new SymbolicMutationAtom(
+            Rewrite(mutation.Target),
+            mutation.CallerVisible),
+        SymbolicDisposalAtom disposal => new SymbolicDisposalAtom(
+            Rewrite(disposal.Resource),
+            disposal.State),
+        SymbolicResourceLifetimeAtom lifetime => new SymbolicResourceLifetimeAtom(
+            Rewrite(lifetime.Resource),
+            lifetime.State),
+        SymbolicExactRuntimeTypeAtom exactRuntimeType => new SymbolicExactRuntimeTypeAtom(
+            Rewrite(exactRuntimeType.Value),
+            exactRuntimeType.TypeKey),
+        SymbolicTypeTestAtom typeTest => new SymbolicTypeTestAtom(
+            Rewrite(typeTest.Value),
+            typeTest.TypeKey),
+        SymbolicExceptionPreconditionAtom precondition => new SymbolicExceptionPreconditionAtom(
+            precondition.Kind,
+            precondition.Subject == null ? null : Rewrite(precondition.Subject),
+            Rewrite(precondition.Trigger)),
+        _ => atom
+    };
 
-    internal SymbolicTerm Rewrite(SymbolicTerm term)
-    {
+    internal SymbolicTerm Rewrite(SymbolicTerm term) {
         if (TryRewriteTerm(term, out var rewritten)) return rewritten;
 
-        return term switch
-        {
+        return term switch {
             SymbolicBooleanConstantTerm or
                 SymbolicIntegerConstantTerm or
                 SymbolicStringConstantTerm or
@@ -125,26 +113,22 @@ internal abstract class SymbolicIrRewriter
         };
     }
 
-    protected virtual bool TryRewriteTerm(SymbolicTerm term, out SymbolicTerm rewritten)
-    {
+    protected virtual bool TryRewriteTerm(SymbolicTerm term, out SymbolicTerm rewritten) {
         rewritten = null!;
         return false;
     }
 
-    private SymbolicCondition RewriteFactCondition(SymbolicFactCondition condition)
-    {
+    private SymbolicCondition RewriteFactCondition(SymbolicFactCondition condition) {
         var fact = Rewrite(condition.Fact);
         return ReferenceEquals(fact, condition.Fact) ? condition : new SymbolicFactCondition(fact);
     }
 
-    private SymbolicCondition RewriteNotCondition(SymbolicNotCondition condition)
-    {
+    private SymbolicCondition RewriteNotCondition(SymbolicNotCondition condition) {
         var operand = Rewrite(condition.Operand);
         return ReferenceEquals(operand, condition.Operand) ? condition : new SymbolicNotCondition(operand);
     }
 
-    private SymbolicCondition RewriteBinaryCondition(SymbolicBinaryCondition condition)
-    {
+    private SymbolicCondition RewriteBinaryCondition(SymbolicBinaryCondition condition) {
         var left = Rewrite(condition.Left);
         var right = Rewrite(condition.Right);
         return ReferenceEquals(left, condition.Left) && ReferenceEquals(right, condition.Right)
@@ -153,17 +137,11 @@ internal abstract class SymbolicIrRewriter
     }
 }
 
-internal abstract class SymbolicIrVisitor
-{
-    internal void Visit(SymbolicFact fact)
-    {
-        Visit(fact.Atom);
-    }
+internal abstract class SymbolicIrVisitor {
+    internal void Visit(SymbolicFact fact) => Visit(fact.Atom);
 
-    internal void Visit(SymbolicCondition condition)
-    {
-        switch (condition)
-        {
+    internal void Visit(SymbolicCondition condition) {
+        switch (condition) {
             case SymbolicFactCondition factCondition:
                 Visit(factCondition.Fact);
                 break;
@@ -177,10 +155,8 @@ internal abstract class SymbolicIrVisitor
         }
     }
 
-    internal void Visit(SymbolicAtom atom)
-    {
-        switch (atom)
-        {
+    internal void Visit(SymbolicAtom atom) {
+        switch (atom) {
             case SymbolicTruthAtom truth:
                 Visit(truth.Condition);
                 break;
@@ -235,11 +211,9 @@ internal abstract class SymbolicIrVisitor
         }
     }
 
-    internal void Visit(SymbolicTerm term)
-    {
+    internal void Visit(SymbolicTerm term) {
         OnTerm(term);
-        switch (term)
-        {
+        switch (term) {
             case SymbolicVariableTerm variable:
                 OnVariableLikeName(variable.Name);
                 break;
@@ -291,11 +265,9 @@ internal abstract class SymbolicIrVisitor
         }
     }
 
-    protected virtual void OnTerm(SymbolicTerm term)
-    {
+    protected virtual void OnTerm(SymbolicTerm term) {
     }
 
-    protected virtual void OnVariableLikeName(string name)
-    {
+    protected virtual void OnVariableLikeName(string name) {
     }
 }

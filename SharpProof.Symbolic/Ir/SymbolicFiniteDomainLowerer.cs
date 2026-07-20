@@ -8,14 +8,11 @@ internal sealed record SymbolicForeachDomainPlan(
 internal sealed record SymbolicFiniteElements(
     ImmutableArray<ExpressionSyntax> Expressions);
 
-internal static class SymbolicFiniteDomainLowerer
-{
+internal static class SymbolicFiniteDomainLowerer {
     internal static SymbolicLoweringResult<SymbolicFiniteElements> LowerElements(
-        ExpressionSyntax expression)
-    {
+        ExpressionSyntax expression) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        switch (expression)
-        {
+        switch (expression) {
             case ArrayCreationExpressionSyntax { Initializer: { } initializer }:
                 return BoundElements(
                     expression,
@@ -30,8 +27,7 @@ internal static class SymbolicFiniteDomainLowerer
                 if (collection.Elements.Count == 0)
                     return UnsupportedElements(collection, "empty");
                 var limit = SymbolicAnalysisLimitContext.Limits.MaxFiniteForeachElementFacts;
-                if (collection.Elements.Count > limit)
-                {
+                if (collection.Elements.Count > limit) {
                     SymbolicAnalysisLimitContext.Record(
                         SymbolicAnalysisLimitKind.ForeachElementFacts,
                         limit,
@@ -56,8 +52,7 @@ internal static class SymbolicFiniteDomainLowerer
         ExpressionSyntax expression,
         StatementSyntax foreachStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (foreachStatement is not ForEachStatementSyntax forEach ||
             semanticModel.GetDeclaredSymbol(forEach, cancellationToken) is not ILocalSymbol iterationSymbol ||
             !TryCreateSymbolTerm(iterationSymbol.OriginalDefinition, out var iterationTerm))
@@ -78,8 +73,7 @@ internal static class SymbolicFiniteDomainLowerer
         SymbolicCondition? finiteDomain = null;
         var allReferencesNonNull =
             SymbolicFactFactory.GetTrackedSymbolType(iterationSymbol.OriginalDefinition)?.IsReferenceType == true;
-        foreach (var element in finiteElements.Expressions)
-        {
+        foreach (var element in finiteElements.Expressions) {
             if (SymbolMutationFacts.ExpressionReferencesSymbol(
                     element,
                     iterationSymbol.OriginalDefinition,
@@ -89,8 +83,7 @@ internal static class SymbolicFiniteDomainLowerer
 
             var lowering = SymbolicSemanticPipeline.LowerTerm(element, context);
             if (lowering is { IsExact: true, Value: { } elementTerm } &&
-                CanCompareIrTerms(iterationTerm, elementTerm))
-            {
+                CanCompareIrTerms(iterationTerm, elementTerm)) {
                 var equality = SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.Equal,
                     iterationTerm,
@@ -104,8 +97,7 @@ internal static class SymbolicFiniteDomainLowerer
                         finiteDomain,
                         equality);
             }
-            else if (!allReferencesNonNull)
-            {
+            else if (!allReferencesNonNull) {
                 return Unsupported(element, "element");
             }
 
@@ -138,8 +130,7 @@ internal static class SymbolicFiniteDomainLowerer
         ExpressionSyntax expression,
         StatementSyntax foreachStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (foreachStatement.Parent is not BlockSyntax containingBlock ||
             semanticModel.GetSymbolInfo(
                 CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression),
@@ -147,8 +138,7 @@ internal static class SymbolicFiniteDomainLowerer
             receiverSymbol is not ILocalSymbol and not IParameterSymbol)
             return UnsupportedElements(expression, "receiver");
 
-        for (var index = containingBlock.Statements.Count - 1; index >= 0; index--)
-        {
+        for (var index = containingBlock.Statements.Count - 1; index >= 0; index--) {
             var statement = containingBlock.Statements[index];
             if (statement.SpanStart >= foreachStatement.SpanStart)
                 continue;
@@ -158,8 +148,7 @@ internal static class SymbolicFiniteDomainLowerer
                     receiverSymbol,
                     semanticModel,
                     cancellationToken,
-                    out var assignedValue))
-            {
+                    out var assignedValue)) {
                 var lowering = LowerElements(assignedValue);
                 if (lowering is not { IsExact: true, Value: { } elements } ||
                     AnyStatementInvalidates(
@@ -195,10 +184,8 @@ internal static class SymbolicFiniteDomainLowerer
         int beforeSpanStart,
         ISymbol symbol,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        for (var index = firstIndex; index < block.Statements.Count; index++)
-        {
+        CancellationToken cancellationToken) {
+        for (var index = firstIndex; index < block.Statements.Count; index++) {
             var statement = block.Statements[index];
             if (statement.SpanStart >= beforeSpanStart)
                 break;
@@ -216,15 +203,13 @@ internal static class SymbolicFiniteDomainLowerer
         int beforeSpanStart,
         ISymbol receiverSymbol,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var referencedSymbols = ImmutableArray.CreateBuilder<ISymbol>();
         foreach (var element in elements)
             foreach (var symbol in SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
                          element,
                          semanticModel,
-                         cancellationToken))
-            {
+                         cancellationToken)) {
                 if (SymbolEqualityComparer.Default.Equals(symbol, receiverSymbol))
                     return true;
                 if (referencedSymbols.All(candidate =>
@@ -246,28 +231,22 @@ internal static class SymbolicFiniteDomainLowerer
         ISymbol receiverSymbol,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ExpressionSyntax value)
-    {
+        out ExpressionSyntax value) {
         if (statement is LocalDeclarationStatementSyntax localDeclaration)
             foreach (var declarator in localDeclaration.Declaration.Variables)
                 if (declarator.Initializer is { } initializer &&
-                    semanticModel.GetDeclaredSymbol(declarator, cancellationToken)?.OriginalDefinition is
-                        { } declaredSymbol &&
-                    SymbolEqualityComparer.Default.Equals(declaredSymbol, receiverSymbol))
-                {
+                    semanticModel.GetDeclaredSymbol(declarator, cancellationToken)?.OriginalDefinition is { } declaredSymbol &&
+                    SymbolEqualityComparer.Default.Equals(declaredSymbol, receiverSymbol)) {
                     value = initializer.Value;
                     return true;
                 }
 
-        if (statement is ExpressionStatementSyntax
-            {
-                Expression: AssignmentExpressionSyntax assignment
-            } &&
+        if (statement is ExpressionStatementSyntax {
+            Expression: AssignmentExpressionSyntax assignment
+        } &&
             assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
-            semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol?.OriginalDefinition is
-                { } assignedSymbol &&
-            SymbolEqualityComparer.Default.Equals(assignedSymbol, receiverSymbol))
-        {
+            semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol?.OriginalDefinition is { } assignedSymbol &&
+            SymbolEqualityComparer.Default.Equals(assignedSymbol, receiverSymbol)) {
             value = assignment.Right;
             return true;
         }
@@ -290,14 +269,12 @@ internal static class SymbolicFiniteDomainLowerer
     private static SymbolicLoweringResult<SymbolicFiniteElements> BoundElements(
         SyntaxNode source,
         ImmutableArray<ExpressionSyntax> elements,
-        string eventDetail)
-    {
+        string eventDetail) {
         if (elements.IsEmpty)
             return UnsupportedElements(source, "empty");
 
         var limit = SymbolicAnalysisLimitContext.Limits.MaxFiniteForeachElementFacts;
-        if (elements.Length > limit)
-        {
+        if (elements.Length > limit) {
             SymbolicAnalysisLimitContext.Record(
                 SymbolicAnalysisLimitKind.ForeachElementFacts,
                 limit,

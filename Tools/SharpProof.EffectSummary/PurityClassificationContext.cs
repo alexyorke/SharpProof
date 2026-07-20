@@ -2,8 +2,7 @@ internal sealed record PurityClassificationContext(
     AssemblyEffectReport Assembly,
     IReadOnlyDictionary<string, MethodEffectSummary> BySymbol,
     IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> ExternalGeneratedPurityEntries,
-    IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> ReviewedGeneratedPurityEntries)
-{
+    IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> ReviewedGeneratedPurityEntries) {
     internal Dictionary<string, MethodPurityClassification> Memo { get; } =
         new(StringComparer.Ordinal);
 

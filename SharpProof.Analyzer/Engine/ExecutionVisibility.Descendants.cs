@@ -1,17 +1,14 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class ExecutionVisibility
-{
-    public static IEnumerable<IOperation> VisibleDescendants(IOperation rootOperation)
-    {
+internal static partial class ExecutionVisibility {
+    public static IEnumerable<IOperation> VisibleDescendants(IOperation rootOperation) {
         foreach (var operation in rootOperation.DescendantsAndSelf())
             if (!IsNestedFunctionDescendant(operation, rootOperation))
                 yield return operation;
     }
 
 
-    private static bool IsNestedFunctionDescendant(IOperation operation, IOperation rootOperation)
-    {
+    private static bool IsNestedFunctionDescendant(IOperation operation, IOperation rootOperation) {
         if (ReferenceEquals(operation, rootOperation)) return false;
 
         for (var parent = operation.Parent;

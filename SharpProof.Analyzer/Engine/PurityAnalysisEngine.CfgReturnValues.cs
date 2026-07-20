@@ -1,15 +1,13 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
-{
+internal partial class PurityAnalysisEngine {
     internal static bool TryGetSingleReturnedValueFromNestedCallable(
         IMethodSymbol methodSymbol,
         SemanticModel semanticModel,
         out IOperation returnedOperation,
         out SyntaxNode returnedExpressionSyntax,
         out SemanticModel returnedSemanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         returnedOperation = null!;
         returnedExpressionSyntax = null!;
@@ -35,14 +33,11 @@ internal partial class PurityAnalysisEngine
         return true;
     }
 
-    private static bool CanExtractSingleReturnedValue(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.MethodKind == MethodKind.LocalFunction ||
+    private static bool CanExtractSingleReturnedValue(IMethodSymbol methodSymbol) => methodSymbol.MethodKind == MethodKind.LocalFunction ||
                methodSymbol.MethodKind == MethodKind.AnonymousFunction ||
                methodSymbol.MethodKind == MethodKind.Ordinary ||
                methodSymbol.MethodKind == MethodKind.StaticConstructor ||
                methodSymbol.MethodKind == MethodKind.Constructor;
-    }
 
     internal static bool TryGetSingleReturnedValueFromInvocation(
         IInvocationOperation invocationOperation,
@@ -51,8 +46,7 @@ internal partial class PurityAnalysisEngine
         out SyntaxNode returnedExpressionSyntax,
         out SemanticModel returnedSemanticModel,
         CancellationToken cancellationToken,
-        PurityAnalysisState? currentState = null)
-    {
+        PurityAnalysisState? currentState = null) {
         if (TryGetSingleReturnedValueFromNestedCallable(
                 invocationOperation.TargetMethod,
                 semanticModel,
@@ -64,8 +58,7 @@ internal partial class PurityAnalysisEngine
 
         if (invocationOperation.TargetMethod.Name == "Invoke" &&
             invocationOperation.TargetMethod.ContainingType?.TypeKind == TypeKind.Delegate &&
-            invocationOperation.Instance != null)
-        {
+            invocationOperation.Instance != null) {
             var potentialTargets = ResolvePotentialTargets(
                 invocationOperation.Instance,
                 currentState ?? PurityAnalysisState.Pure,
@@ -90,10 +83,8 @@ internal partial class PurityAnalysisEngine
 
     private static bool TryGetSingleReturnedExpressionSyntax(
         SyntaxNode callableSyntax,
-        out SyntaxNode returnedExpressionSyntax)
-    {
-        switch (callableSyntax)
-        {
+        out SyntaxNode returnedExpressionSyntax) {
+        switch (callableSyntax) {
             case LocalFunctionStatementSyntax localFunctionStatementSyntax
                 when localFunctionStatementSyntax.ExpressionBody?.Expression != null:
                 returnedExpressionSyntax = localFunctionStatementSyntax.ExpressionBody.Expression;
@@ -128,16 +119,13 @@ internal partial class PurityAnalysisEngine
 
     private static bool TryGetSingleReturnedExpressionSyntaxFromBody(
         SyntaxNode bodySyntax,
-        out SyntaxNode returnedExpressionSyntax)
-    {
-        if (bodySyntax is ExpressionSyntax expressionSyntax)
-        {
+        out SyntaxNode returnedExpressionSyntax) {
+        if (bodySyntax is ExpressionSyntax expressionSyntax) {
             returnedExpressionSyntax = expressionSyntax;
             return true;
         }
 
-        if (bodySyntax is not BlockSyntax blockSyntax)
-        {
+        if (bodySyntax is not BlockSyntax blockSyntax) {
             returnedExpressionSyntax = null!;
             return false;
         }
@@ -149,8 +137,7 @@ internal partial class PurityAnalysisEngine
             .OfType<ReturnStatementSyntax>()
             .Where(returnStatement => returnStatement.Expression != null)
             .ToArray();
-        if (directReturns.Length != 1)
-        {
+        if (directReturns.Length != 1) {
             returnedExpressionSyntax = null!;
             return false;
         }

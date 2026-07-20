@@ -1,18 +1,15 @@
-internal sealed class ArtifactSpecDocument
-{
+internal sealed class ArtifactSpecDocument {
     public int SchemaVersion { get; set; }
 
     public ArtifactSpecDefaults? Defaults { get; set; }
 
     public ArtifactSpecEntry[] Artifacts { get; set; } = Array.Empty<ArtifactSpecEntry>();
 
-    public static ArtifactSpecDocument Load(string path)
-    {
+    public static ArtifactSpecDocument Load(string path) {
         var json = File.ReadAllText(path);
         var document = JsonSerializer.Deserialize<ArtifactSpecDocument>(
             json,
-            new JsonSerializerOptions
-            {
+            new JsonSerializerOptions {
                 PropertyNameCaseInsensitive = true
             }) ?? throw new InvalidOperationException($"Failed to deserialize artifact spec '{path}'.");
 
@@ -27,8 +24,7 @@ internal sealed class ArtifactSpecDocument
     }
 }
 
-internal interface IEffectSummaryProgressDocument
-{
+internal interface IEffectSummaryProgressDocument {
     int SchemaVersion { get; }
     string Fingerprint { get; }
     string[] CompletedOutputPaths { get; }
@@ -37,8 +33,7 @@ internal interface IEffectSummaryProgressDocument
 internal sealed record ArtifactSpecProgressDocument(
     int SchemaVersion,
     string ArtifactSpecSha256,
-    string[] CompletedOutputPaths) : IEffectSummaryProgressDocument
-{
+    string[] CompletedOutputPaths) : IEffectSummaryProgressDocument {
     [JsonIgnore] public string Fingerprint => ArtifactSpecSha256;
 }
 
@@ -46,13 +41,11 @@ internal sealed record ShardedEffectSummaryProgressDocument(
     int SchemaVersion,
     string ToolModuleVersionId,
     string InputFingerprint,
-    string[] CompletedOutputPaths) : IEffectSummaryProgressDocument
-{
+    string[] CompletedOutputPaths) : IEffectSummaryProgressDocument {
     [JsonIgnore] public string Fingerprint => InputFingerprint;
 }
 
-internal class ArtifactSpecDefaults
-{
+internal class ArtifactSpecDefaults {
     public string? Framework { get; set; }
 
     public string? RuntimeAssemblyName { get; set; }
@@ -78,8 +71,7 @@ internal class ArtifactSpecDefaults
     public string[]? ExcludedSymbolPrefixes { get; set; }
 }
 
-internal sealed class ArtifactSpecEntry : ArtifactSpecDefaults
-{
+internal sealed class ArtifactSpecEntry : ArtifactSpecDefaults {
     public string? OutputPath { get; set; }
 
     public string? SourceSummaryPath { get; set; }
@@ -95,13 +87,11 @@ internal sealed class ArtifactSpecEntry : ArtifactSpecDefaults
     public string[]? SymbolPrefixes { get; set; }
 }
 
-internal static class ArtifactSpecSymbolSource
-{
+internal static class ArtifactSpecSymbolSource {
     public static ArtifactSpecSymbolSet LoadSymbols(
         string path,
         IReadOnlyList<string>? excludedSymbolPrefixes = null,
-        IReadOnlyList<string>? includedSymbolPrefixes = null)
-    {
+        IReadOnlyList<string>? includedSymbolPrefixes = null) {
         var document = JsonSerializer.Deserialize<EffectSummaryDocument>(File.ReadAllText(path)) ??
                        throw new InvalidOperationException($"Failed to deserialize artifact source summary '{path}'.");
         if (document.SchemaVersion != EffectSummarySchemaContract.CurrentVersion)
@@ -164,8 +154,7 @@ internal static class ArtifactSpecSymbolSource
         IReadOnlyList<string> includedSymbolPrefixes,
         IReadOnlyList<string> excludedSymbolPrefixes,
         ISet<string> symbols,
-        ISet<string> canonicalKeys)
-    {
+        ISet<string> canonicalKeys) {
         var included = MatchesIncludedPrefix(symbol, includedSymbolPrefixes);
         if (!string.IsNullOrWhiteSpace(symbol) &&
             included &&
@@ -175,8 +164,7 @@ internal static class ArtifactSpecSymbolSource
         if (included && !string.IsNullOrWhiteSpace(canonicalKey)) canonicalKeys.Add(canonicalKey.Trim());
     }
 
-    private static bool MatchesIncludedPrefix(string? symbol, IReadOnlyList<string> includedSymbolPrefixes)
-    {
+    private static bool MatchesIncludedPrefix(string? symbol, IReadOnlyList<string> includedSymbolPrefixes) {
         if (includedSymbolPrefixes.Count == 0) return true;
 
         if (string.IsNullOrWhiteSpace(symbol)) return false;
@@ -189,8 +177,7 @@ internal static class ArtifactSpecSymbolSource
         IReadOnlyList<string> includedSymbolPrefixes,
         IReadOnlyList<string> excludedSymbolPrefixes,
         HashSet<string> symbols,
-        HashSet<string> canonicalKeys)
-    {
+        HashSet<string> canonicalKeys) {
         if (includedSymbolPrefixes.Count == 0 || methods.Count == 0) return false;
 
         var includedMemberTokens = includedSymbolPrefixes
@@ -222,11 +209,9 @@ internal static class ArtifactSpecSymbolSource
 
         if (queue.Count == 0) return false;
 
-        while (queue.Count > 0)
-        {
+        while (queue.Count > 0) {
             var entry = queue.Dequeue();
-            if (!ArtifactSpecSymbolFilter.MatchesExcludedPrefix(entry.DisplayName, excludedSymbolPrefixes))
-            {
+            if (!ArtifactSpecSymbolFilter.MatchesExcludedPrefix(entry.DisplayName, excludedSymbolPrefixes)) {
                 symbols.Add(entry.DisplayName);
                 canonicalKeys.Add(entry.CanonicalKey);
             }
@@ -239,8 +224,7 @@ internal static class ArtifactSpecSymbolSource
         return symbols.Count > 0;
     }
 
-    private static string? TryGetMemberToken(string? symbol)
-    {
+    private static string? TryGetMemberToken(string? symbol) {
         if (string.IsNullOrWhiteSpace(symbol)) return null;
 
         var parameterIndex = symbol.IndexOf('(', StringComparison.Ordinal);
@@ -272,25 +256,21 @@ internal sealed record SourceSummaryMethodEntry(
     string CanonicalKey,
     string[] Calls);
 
-internal static class ArtifactSpecSymbolFilter
-{
+internal static class ArtifactSpecSymbolFilter {
     public static AssemblyEffectReport Exclude(
         AssemblyEffectReport report,
-        IReadOnlyList<string> excludedSymbolPrefixes)
-    {
+        IReadOnlyList<string> excludedSymbolPrefixes) {
         var filteredMethods = report.Methods
             .Where(method => !MatchesExcludedPrefix(method.Symbol, excludedSymbolPrefixes))
             .ToArray();
 
-        return report with
-        {
+        return report with {
             EmittedMethodCount = filteredMethods.Length,
             Methods = filteredMethods
         };
     }
 
-    public static bool MatchesExcludedPrefix(string symbol, IReadOnlyList<string> excludedSymbolPrefixes)
-    {
+    public static bool MatchesExcludedPrefix(string symbol, IReadOnlyList<string> excludedSymbolPrefixes) {
         if (string.IsNullOrWhiteSpace(symbol) || excludedSymbolPrefixes.Count == 0) return false;
 
         return excludedSymbolPrefixes.Any(prefix => symbol.StartsWith(prefix, StringComparison.Ordinal));

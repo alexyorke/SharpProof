@@ -10,14 +10,12 @@ internal sealed record SymbolicLoopTransferPlan(
 internal sealed record SymbolicLoopInvariantPlan(
     ImmutableArray<SymbolicCondition> Conditions);
 
-internal static class SymbolicLoopTransferLowerer
-{
+internal static class SymbolicLoopTransferLowerer {
     internal static SymbolicLoweringResult<SymbolicLoopTransferPlan> Lower(
         StatementSyntax loop,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        bool allowAbruptCompletion = false)
-    {
+        bool allowAbruptCompletion = false) {
         cancellationToken.ThrowIfCancellationRequested();
         if (!TryGetCondition(loop, out var condition))
             return Unsupported(loop, "loop-kind");
@@ -27,13 +25,11 @@ internal static class SymbolicLoopTransferLowerer
             return Unsupported(loop, "abrupt-completion");
         SymbolicCondition entryCondition;
         SymbolicCondition exitCondition;
-        if (condition == null)
-        {
+        if (condition == null) {
             entryCondition = new SymbolicConstantCondition(true);
             exitCondition = new SymbolicConstantCondition(false);
         }
-        else
-        {
+        else {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
             var entry = SymbolicSemanticPipeline.LowerBranchCondition(condition, true, context);
             var exit = SymbolicSemanticPipeline.LowerBranchCondition(condition, false, context);
@@ -73,10 +69,8 @@ internal static class SymbolicLoopTransferLowerer
 
     private static bool TryGetCondition(
         StatementSyntax loop,
-        out ExpressionSyntax? condition)
-    {
-        condition = loop switch
-        {
+        out ExpressionSyntax? condition) {
+        condition = loop switch {
             WhileStatementSyntax whileStatement => whileStatement.Condition,
             DoStatementSyntax doStatement => doStatement.Condition,
             ForStatementSyntax forStatement => forStatement.Condition,
@@ -89,14 +83,12 @@ internal static class SymbolicLoopTransferLowerer
         StatementSyntax loop,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ImmutableArray<SymbolicInvalidationTarget> invalidations)
-    {
+        out ImmutableArray<SymbolicInvalidationTarget> invalidations) {
         var targets = ImmutableArray.CreateBuilder<SymbolicInvalidationTarget>();
         var keys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var root in EnumerateBackEdgeMutationRoots(loop))
             if (!SymbolicMutationInventory.Create(root, semanticModel, cancellationToken)
-                    .TryCollectLocalOrParameterInvalidations(keys, targets))
-            {
+                    .TryCollectLocalOrParameterInvalidations(keys, targets)) {
                 invalidations = default;
                 return false;
             }
@@ -105,10 +97,8 @@ internal static class SymbolicLoopTransferLowerer
         return true;
     }
 
-    private static IEnumerable<SyntaxNode> EnumerateBackEdgeMutationRoots(StatementSyntax loop)
-    {
-        switch (loop)
-        {
+    private static IEnumerable<SyntaxNode> EnumerateBackEdgeMutationRoots(StatementSyntax loop) {
+        switch (loop) {
             case WhileStatementSyntax whileStatement:
                 yield return whileStatement.Condition;
                 yield return whileStatement.Statement;

@@ -6,8 +6,7 @@ internal sealed class SymbolicCliInputContext(
     SymbolicSourceInput sourceInput,
     MSBuildWorkspace? workspace = null,
     SymbolicProjectQueryContext? projectContext = null,
-    ImmutableArray<string> workspaceDiagnostics = default) : IDisposable
-{
+    ImmutableArray<string> workspaceDiagnostics = default) : IDisposable {
     private readonly MSBuildWorkspace? _workspace = workspace;
 
     public SymbolicSourceInput SourceInput { get; } = sourceInput;
@@ -26,12 +25,10 @@ internal sealed class SymbolicCliInputContext(
 
     public static async Task<SymbolicCliInputContext> CreateAsync(
         SymbolicCliOptions options,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default) {
         if (options == null) throw new ArgumentNullException(nameof(options));
 
-        if (!options.IsProjectAware)
-        {
+        if (!options.IsProjectAware) {
             var standardInput = options.ReadSourceFromStdin
                 ? await Console.In.ReadToEndAsync(cancellationToken).ConfigureAwait(false)
                 : null;
@@ -45,8 +42,7 @@ internal sealed class SymbolicCliInputContext(
         workspace.WorkspaceFailed += (_, eventArgs) =>
             workspaceDiagnostics.Add(eventArgs.Diagnostic.Kind + ": " + eventArgs.Diagnostic.Message);
 
-        try
-        {
+        try {
             var containerPath = Path.GetFullPath(options.ProjectPath ?? options.SolutionPath!);
             var sourcePath = ResolveSourcePath(options.FilePath!, Path.GetDirectoryName(containerPath)!);
             var (project, solutionPath) = options.ProjectPath != null
@@ -109,13 +105,11 @@ internal sealed class SymbolicCliInputContext(
                 workspaceDiagnostics.ToImmutable());
         }
         catch (Exception exception) when (
-            exception is OperationCanceledException or SymbolicQueryException or ArgumentException)
-        {
+            exception is OperationCanceledException or SymbolicQueryException or ArgumentException) {
             workspace.Dispose();
             throw;
         }
-        catch (Exception exception)
-        {
+        catch (Exception exception) {
             workspace.Dispose();
             throw SymbolicCliErrorWriter.CreateException(
                 SymbolicErrorCodes.ProjectLoadFailed,
@@ -126,14 +120,10 @@ internal sealed class SymbolicCliInputContext(
         }
     }
 
-    public void Dispose()
-    {
-        _workspace?.Dispose();
-    }
+    public void Dispose() => _workspace?.Dispose();
 
     internal async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         if (ProjectContext == null) return ImmutableArray<Diagnostic>.Empty;
         var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new SharpProofAnalyzer());
         return await ProjectContext.Compilation
@@ -145,14 +135,12 @@ internal sealed class SymbolicCliInputContext(
     private static Project SelectSolutionProject(
         Solution solution,
         string sourcePath,
-        string? projectName)
-    {
+        string? projectName) {
         var candidates = solution.Projects
             .Where(project => projectName == null || MatchesProject(project, projectName))
             .Where(project => FindDocument(project, sourcePath) != null)
             .ToArray();
-        return candidates.Length switch
-        {
+        return candidates.Length switch {
             1 => candidates[0],
             0 when projectName != null => throw new ArgumentException(
                 $"Solution has no project named '{projectName}' that compiles '{sourcePath}'."),
@@ -162,26 +150,18 @@ internal sealed class SymbolicCliInputContext(
         };
     }
 
-    private static bool MatchesProject(Project project, string requestedName)
-    {
-        return string.Equals(project.Name, requestedName, StringComparison.OrdinalIgnoreCase) ||
+    private static bool MatchesProject(Project project, string requestedName) => string.Equals(project.Name, requestedName, StringComparison.OrdinalIgnoreCase) ||
                string.Equals(project.AssemblyName, requestedName, StringComparison.OrdinalIgnoreCase) ||
                string.Equals(
                    Path.GetFileNameWithoutExtension(project.FilePath),
                    requestedName,
                    StringComparison.OrdinalIgnoreCase);
-    }
 
-    private static Document? FindDocument(Project project, string sourcePath)
-    {
-        return project.Documents.FirstOrDefault(document =>
-            document.FilePath != null && PathEquals(document.FilePath, sourcePath));
-    }
+    private static Document? FindDocument(Project project, string sourcePath) => project.Documents.FirstOrDefault(document =>
+                                                                                          document.FilePath != null && PathEquals(document.FilePath, sourcePath));
 
-    private static string ResolveSourcePath(string sourcePath, string containerDirectory)
-    {
-        if (Path.IsPathRooted(sourcePath))
-        {
+    private static string ResolveSourcePath(string sourcePath, string containerDirectory) {
+        if (Path.IsPathRooted(sourcePath)) {
             var rootedPath = Path.GetFullPath(sourcePath);
             if (File.Exists(rootedPath)) return rootedPath;
 
@@ -209,8 +189,7 @@ internal sealed class SymbolicCliInputContext(
             sourcePath);
     }
 
-    private static bool PathEquals(string left, string right)
-    {
+    private static bool PathEquals(string left, string right) {
         var comparison = Path.DirectorySeparatorChar == '\\'
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;

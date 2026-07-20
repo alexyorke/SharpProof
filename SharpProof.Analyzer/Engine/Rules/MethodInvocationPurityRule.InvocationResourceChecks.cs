@@ -1,14 +1,12 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class MethodInvocationPurityRule
-{
+internal partial class MethodInvocationPurityRule {
     private static bool TryCheckDoubleDispose(
         IInvocationOperation invocationOperation,
         IMethodSymbol invokedMethodSymbol,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
         if (!PurityResourceStateFacts.TryCreateDoubleDisposeEvidence(
             invocationOperation,
@@ -30,8 +28,7 @@ internal partial class MethodInvocationPurityRule
         IMethodSymbol invokedMethodSymbol,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
         if (PurityResourceStateFacts.IsParameterlessDisposeInvocation(invocationOperation) ||
             invokedMethodSymbol.IsStatic ||
@@ -57,11 +54,9 @@ internal partial class MethodInvocationPurityRule
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
+        out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        foreach (var argument in invocationOperation.Arguments)
-        {
+        foreach (var argument in invocationOperation.Arguments) {
             if (!IsRefOrOutArgument(argument)) continue;
 
             if (!PuritySymbolicStateFacts.TryCreateMutableBorrowConflictEvidence(
@@ -83,31 +78,24 @@ internal partial class MethodInvocationPurityRule
         return false;
     }
 
-    private static bool IsRefOrOutArgument(IArgumentOperation argument)
-    {
-        return argument.Parameter?.RefKind is RefKind.Out or RefKind.Ref ||
+    private static bool IsRefOrOutArgument(IArgumentOperation argument) => argument.Parameter?.RefKind is RefKind.Out or RefKind.Ref ||
                (argument.Syntax is ArgumentSyntax argumentSyntax &&
                 argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.RefKeyword)) ||
                (argument.Syntax is ArgumentSyntax outArgumentSyntax &&
                 outArgumentSyntax.RefKindKeyword.IsKind(SyntaxKind.OutKeyword));
-    }
 
     private static INamedTypeSymbol? GetTrackedLocalReceiverType(
         IOperation? invocationInstance,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        Compilation compilation)
-    {
-        return PurityConcreteReceiverResolver.TryResolveKnownConcreteType(invocationInstance, currentState, compilation,
+        Compilation compilation) => PurityConcreteReceiverResolver.TryResolveKnownConcreteType(invocationInstance, currentState, compilation,
             out var concreteType)
             ? concreteType
             : null;
-    }
 
     private static INamedTypeSymbol? GetStableInitializerReceiverType(
         IOperation? invocationInstance,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         var normalizedInstance = NormalizeReceiverOperation(invocationInstance);
         if (normalizedInstance is not IFieldReferenceOperation fieldReference ||
             !fieldReference.Field.IsReadOnly ||

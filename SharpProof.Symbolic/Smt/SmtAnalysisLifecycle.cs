@@ -2,8 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Symbolic.Smt;
 
-internal enum SmtAnalysisHealthState
-{
+internal enum SmtAnalysisHealthState {
     Disabled,
     Ready,
     Degraded,
@@ -14,8 +13,7 @@ internal enum SmtAnalysisHealthState
 internal sealed class SmtSolverLifecycleOptions(
     int maxTransientRetries = 1,
     bool recycleContextOnTransientFailure = true,
-    bool disposeCurrentThreadContextOnServiceDispose = true)
-{
+    bool disposeCurrentThreadContextOnServiceDispose = true) {
     public static readonly SmtSolverLifecycleOptions Default = new();
 
     public int MaxTransientRetries { get; } = maxTransientRetries >= 0
@@ -34,8 +32,7 @@ internal sealed record SmtAnalysisHealth(
     [property: JsonPropertyOrder(5)] int TransientRetryCount,
     [property: JsonPropertyOrder(6)] int RecoveredTransientFailureCount,
     [property: JsonPropertyOrder(7)] int ContextRecycleCount,
-    [property: JsonPropertyOrder(8)] long ContextGeneration)
-{
+    [property: JsonPropertyOrder(8)] long ContextGeneration) {
     [JsonPropertyOrder(1)]
     public bool IsAvailable => State == SmtAnalysisHealthState.Ready;
 

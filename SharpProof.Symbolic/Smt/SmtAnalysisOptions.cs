@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic.Smt;
 
-internal enum SmtAnalysisMode
-{
+internal enum SmtAnalysisMode {
     Off,
     Bounded,
     Deep
@@ -14,8 +13,7 @@ internal sealed record SmtAnalysisOptions(
     int MaxPathConditions,
     int MaxExpressionNodes,
     bool UseSharedResultCache,
-    SmtSolverLifecycleOptions Lifecycle)
-{
+    SmtSolverLifecycleOptions Lifecycle) {
     public static readonly SmtAnalysisOptions Default = ForMode(SmtAnalysisMode.Bounded);
 
     public SmtAnalysisOptions(
@@ -32,56 +30,41 @@ internal sealed record SmtAnalysisOptions(
             maxPathConditions,
             maxExpressionNodes,
             useSharedResultCache,
-            SmtSolverLifecycleOptions.Default)
-    {
+            SmtSolverLifecycleOptions.Default) {
     }
 
     public bool IsEnabled => Mode != SmtAnalysisMode.Off;
 
-    public static SmtAnalysisOptions ForMode(SmtAnalysisMode mode)
-    {
-        switch (mode)
-        {
-            case SmtAnalysisMode.Off:
-                return CreateBoundedDefaults(SmtAnalysisMode.Off);
-            case SmtAnalysisMode.Deep:
-                return new SmtAnalysisOptions(
-                    SmtAnalysisMode.Deep,
-                    TimeSpan.FromMilliseconds(2000),
-                    TimeSpan.FromMilliseconds(15000),
-                    512,
-                    8192,
-                    false);
-            default:
-                return CreateBoundedDefaults(SmtAnalysisMode.Bounded);
-        }
-    }
+    public static SmtAnalysisOptions ForMode(SmtAnalysisMode mode) => mode switch {
+        SmtAnalysisMode.Off => CreateBoundedDefaults(SmtAnalysisMode.Off),
+        SmtAnalysisMode.Deep => new SmtAnalysisOptions(
+                            SmtAnalysisMode.Deep,
+                            TimeSpan.FromMilliseconds(2000),
+                            TimeSpan.FromMilliseconds(15000),
+                            512,
+                            8192,
+                            false),
+        _ => CreateBoundedDefaults(SmtAnalysisMode.Bounded),
+    };
 
-    private static SmtAnalysisOptions CreateBoundedDefaults(SmtAnalysisMode mode)
-    {
-        return new SmtAnalysisOptions(
+    private static SmtAnalysisOptions CreateBoundedDefaults(SmtAnalysisMode mode) => new SmtAnalysisOptions(
             mode,
             TimeSpan.FromMilliseconds(750),
             TimeSpan.FromMilliseconds(5000),
             192,
             2048,
             false);
-    }
 
     public SmtAnalysisOptions WithOverrides(
         TimeSpan? queryTimeout = null,
         TimeSpan? methodBudget = null,
         int? maxPathConditions = null,
-        int? maxExpressionNodes = null)
-    {
-        return this with
-        {
+        int? maxExpressionNodes = null) => this with {
             QueryTimeout = queryTimeout ?? QueryTimeout,
             MethodBudget = methodBudget ?? MethodBudget,
             MaxPathConditions = maxPathConditions ?? MaxPathConditions,
             MaxExpressionNodes = maxExpressionNodes ?? MaxExpressionNodes
         };
-    }
 
     public SmtAnalysisOptions WithLifecycle(SmtSolverLifecycleOptions lifecycle) =>
         this with { Lifecycle = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle)) };

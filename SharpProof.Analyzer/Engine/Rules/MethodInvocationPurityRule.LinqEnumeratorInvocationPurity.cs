@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class MethodInvocationPurityRule
-{
-    private static bool IsLinqEnumerableParameter(IParameterSymbol? parameter)
-    {
+internal partial class MethodInvocationPurityRule {
+    private static bool IsLinqEnumerableParameter(IParameterSymbol? parameter) {
         if (parameter?.Type is not INamedTypeSymbol parameterType) return false;
 
         return parameterType.AllInterfaces.Prepend(parameterType).Any(static interfaceType =>
@@ -14,8 +12,7 @@ internal partial class MethodInvocationPurityRule
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckLinqSourceEnumeratorPurity(
         IOperation sourceOperation,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         var unwrappedSource = PurityAnalysisEngine.SkipImplicitConversions(sourceOperation) ?? sourceOperation;
         if (IsValidatedLinqIteratorSource(unwrappedSource, context))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -38,8 +35,7 @@ internal partial class MethodInvocationPurityRule
                 sourceType,
                 "missing_generic_get_enumerator");
 
-        foreach (var getEnumerator in getEnumerators)
-        {
+        foreach (var getEnumerator in getEnumerators) {
             var enumeratorPurity =
                 PurityCalleeResolver.GetCalleePurityAtUse(getEnumerator, unwrappedSource.Syntax, context);
             if (!enumeratorPurity.IsPure) return enumeratorPurity;
@@ -48,8 +44,7 @@ internal partial class MethodInvocationPurityRule
                          getEnumerator,
                          sourceType,
                          context.SemanticModel,
-                         context.CancellationToken))
-            {
+                         context.CancellationToken)) {
                 var runtimePurity = LoopPurityRule.CheckForEachEnumeratorRuntimeMemberPurity(
                     enumeratorType,
                     unwrappedSource.Syntax,
@@ -63,8 +58,7 @@ internal partial class MethodInvocationPurityRule
 
     private static bool IsValidatedLinqIteratorSource(
         IOperation sourceOperation,
-        PurityAnalysisContext context)
-    {
+        PurityAnalysisContext context) {
         if (sourceOperation is IInvocationOperation sourceInvocation)
             return IsLinqEnumerableInvocation(
                 sourceInvocation.TargetMethod,
@@ -89,29 +83,24 @@ internal partial class MethodInvocationPurityRule
     private static PurityAnalysisEngine.PurityAnalysisResult CreateMissingLinqEnumeratorEvidence(
         SyntaxNode syntax,
         ISymbol? symbol,
-        string reason)
-    {
-        return PurityAnalysisEngine.ImpureResult(
+        string reason) => PurityAnalysisEngine.ImpureResult(
             syntax,
             "unknown_external_call",
             nameof(MethodInvocationPurityRule),
             symbol,
             reason);
-    }
 
     private static IEnumerable<INamedTypeSymbol> EnumerateLinqReturnedEnumeratorTypes(
         IMethodSymbol getEnumerator,
         ITypeSymbol sourceType,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var seen = new HashSet<INamedTypeSymbol>(SymbolEq.Default);
 
         AddConcreteLinqEnumeratorType(getEnumerator.ReturnType, seen);
         AddNestedLinqEnumeratorTypes(sourceType, seen);
 
-        foreach (var syntaxReference in getEnumerator.DeclaringSyntaxReferences)
-        {
+        foreach (var syntaxReference in getEnumerator.DeclaringSyntaxReferences) {
             cancellationToken.ThrowIfCancellationRequested();
             if (syntaxReference.GetSyntax(cancellationToken) is not MethodDeclarationSyntax methodDeclaration) continue;
 
@@ -123,8 +112,7 @@ internal partial class MethodInvocationPurityRule
 
             if (methodDeclaration.Body == null) continue;
 
-            foreach (var returnStatement in methodDeclaration.Body.DescendantNodes().OfType<ReturnStatementSyntax>())
-            {
+            foreach (var returnStatement in methodDeclaration.Body.DescendantNodes().OfType<ReturnStatementSyntax>()) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (returnStatement.Expression == null) continue;
 
@@ -139,8 +127,7 @@ internal partial class MethodInvocationPurityRule
 
     private static void AddConcreteLinqEnumeratorType(
         ITypeSymbol? type,
-        HashSet<INamedTypeSymbol> enumeratorTypes)
-    {
+        HashSet<INamedTypeSymbol> enumeratorTypes) {
         if (type is INamedTypeSymbol namedType &&
             namedType.TypeKind != TypeKind.Interface &&
             namedType.DeclaringSyntaxReferences.Length > 0)
@@ -149,12 +136,10 @@ internal partial class MethodInvocationPurityRule
 
     private static void AddNestedLinqEnumeratorTypes(
         ITypeSymbol sourceType,
-        HashSet<INamedTypeSymbol> enumeratorTypes)
-    {
+        HashSet<INamedTypeSymbol> enumeratorTypes) {
         if (sourceType is not INamedTypeSymbol namedSourceType) return;
 
-        foreach (var nestedType in EnumerateLinqNestedTypes(namedSourceType))
-        {
+        foreach (var nestedType in EnumerateLinqNestedTypes(namedSourceType)) {
             if (nestedType.DeclaringSyntaxReferences.Length == 0 ||
                 !IsLinqEnumeratorType(nestedType))
                 continue;
@@ -163,30 +148,23 @@ internal partial class MethodInvocationPurityRule
         }
     }
 
-    private static IEnumerable<INamedTypeSymbol> EnumerateLinqNestedTypes(INamedTypeSymbol typeSymbol)
-    {
-        foreach (var nestedType in typeSymbol.GetTypeMembers())
-        {
+    private static IEnumerable<INamedTypeSymbol> EnumerateLinqNestedTypes(INamedTypeSymbol typeSymbol) {
+        foreach (var nestedType in typeSymbol.GetTypeMembers()) {
             yield return nestedType;
             foreach (var descendant in EnumerateLinqNestedTypes(nestedType)) yield return descendant;
         }
     }
 
-    private static bool IsLinqEnumeratorType(INamedTypeSymbol typeSymbol)
-    {
-        return typeSymbol.AllInterfaces.Any(interfaceType =>
-            interfaceType.OriginalDefinition.SpecialType == SpecialType.System_Collections_IEnumerator ||
-            interfaceType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerator_T);
-    }
+    private static bool IsLinqEnumeratorType(INamedTypeSymbol typeSymbol) => typeSymbol.AllInterfaces.Any(interfaceType =>
+                                                                                      interfaceType.OriginalDefinition.SpecialType == SpecialType.System_Collections_IEnumerator ||
+                                                                                      interfaceType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerator_T);
 
     private static ITypeSymbol? GetLinqExpressionType(ExpressionSyntax expression, SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         var expressionModel = CompilationSyntaxAccess.GetSemanticModel(semanticModel, expression);
         var operation = expressionModel.GetOperation(expression, cancellationToken);
-        while (operation is IConversionOperation conversion)
-        {
+        while (operation is IConversionOperation conversion) {
             cancellationToken.ThrowIfCancellationRequested();
             operation = conversion.Operand;
         }

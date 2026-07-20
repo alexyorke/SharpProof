@@ -1,14 +1,12 @@
 namespace SharpProof.Symbolic.Smt;
 
-internal static class CSharpMathPatternRecognizer
-{
+internal static class CSharpMathPatternRecognizer {
     internal static bool TryGetMathAbsRemainderOperands(
         InvocationExpressionSyntax invocationExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out ExpressionSyntax dividendExpression,
-        out ExpressionSyntax divisorExpression)
-    {
+        out ExpressionSyntax divisorExpression) {
         dividendExpression = null!;
         divisorExpression = null!;
         if (semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation
@@ -35,8 +33,7 @@ internal static class CSharpMathPatternRecognizer
     private static bool HasSupportedIntegralType(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
         return type != null &&
                (SymbolicTypeFacts.IsBuiltInIntegralOrEnumType(type) ||

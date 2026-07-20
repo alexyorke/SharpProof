@@ -1,24 +1,20 @@
-internal static class EffectSummaryMetadataReader
-{
+internal static class EffectSummaryMetadataReader {
     private static readonly ConcurrentDictionary<string, Type?> RuntimeTypeCache = new(StringComparer.Ordinal);
 
     internal static bool TryResolveSameAssemblyMethodDefinitionHandle(
         MetadataReader reader,
         int metadataToken,
         IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
-        out MethodDefinitionHandle handle)
-    {
+        out MethodDefinitionHandle handle) {
         handle = default;
         var resolvedHandle = MetadataTokens.Handle(metadataToken);
-        switch (resolvedHandle.Kind)
-        {
+        switch (resolvedHandle.Kind) {
             case HandleKind.MethodDefinition:
                 handle = (MethodDefinitionHandle)resolvedHandle;
                 return true;
             case HandleKind.MethodSpecification:
                 var specification = reader.GetMethodSpecification((MethodSpecificationHandle)resolvedHandle);
-                if (specification.Method.Kind == HandleKind.MethodDefinition)
-                {
+                if (specification.Method.Kind == HandleKind.MethodDefinition) {
                     handle = (MethodDefinitionHandle)specification.Method;
                     return true;
                 }
@@ -46,8 +42,7 @@ internal static class EffectSummaryMetadataReader
         MetadataReader reader,
         MemberReferenceHandle handle,
         IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
-        out MethodDefinitionHandle resolvedHandle)
-    {
+        out MethodDefinitionHandle resolvedHandle) {
         var exactKey = GetMemberReferenceExactKey(reader, handle);
         if (methodDefinitionHandlesByExactKey.TryGetValue(exactKey, out resolvedHandle)) return true;
 
@@ -56,11 +51,9 @@ internal static class EffectSummaryMetadataReader
                methodDefinitionHandlesByExactKey.TryGetValue(lookupKey, out resolvedHandle);
     }
 
-    internal static string ResolveMethodExactKey(MetadataReader reader, int token)
-    {
+    internal static string ResolveMethodExactKey(MetadataReader reader, int token) {
         var handle = MetadataTokens.Handle(token);
-        return handle.Kind switch
-        {
+        return handle.Kind switch {
             HandleKind.MethodDefinition => GetMethodExactKey(reader, (MethodDefinitionHandle)handle),
             HandleKind.MemberReference => GetMemberReferenceExactKey(reader, (MemberReferenceHandle)handle),
             HandleKind.MethodSpecification => ResolveMethodSpecificationExactKey(reader,
@@ -72,10 +65,8 @@ internal static class EffectSummaryMetadataReader
     internal static StructuralMethodIdentity? TryResolveStructuralMethodIdentity(
         MetadataReader reader,
         int token,
-        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByDisplaySignature)
-    {
-        try
-        {
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByDisplaySignature) {
+        try {
             if (TryResolveSameAssemblyMethodDefinitionHandle(
                     reader,
                     token,
@@ -87,8 +78,7 @@ internal static class EffectSummaryMetadataReader
             if (handle.Kind == HandleKind.MethodSpecification)
                 handle = reader.GetMethodSpecification((MethodSpecificationHandle)handle).Method;
 
-            return handle.Kind switch
-            {
+            return handle.Kind switch {
                 HandleKind.MethodDefinition =>
                     EcmaStructuralMethodIdentity.Create(reader, (MethodDefinitionHandle)handle),
                 HandleKind.MemberReference =>
@@ -96,45 +86,37 @@ internal static class EffectSummaryMetadataReader
                 _ => null
             };
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return null;
         }
-        catch (InvalidOperationException)
-        {
+        catch (InvalidOperationException) {
             return null;
         }
-        catch (ArgumentException)
-        {
+        catch (ArgumentException) {
             return null;
         }
     }
 
-    internal static string ResolveMethodSpecificationExactKey(MetadataReader reader, MethodSpecificationHandle handle)
-    {
+    internal static string ResolveMethodSpecificationExactKey(MetadataReader reader, MethodSpecificationHandle handle) {
         var specification = reader.GetMethodSpecification(handle);
         var method = specification.Method;
-        return method.Kind switch
-        {
+        return method.Kind switch {
             HandleKind.MethodDefinition => GetMethodExactKey(reader, (MethodDefinitionHandle)method),
             HandleKind.MemberReference => GetMemberReferenceExactKey(reader, (MemberReferenceHandle)method),
             _ => $"method-spec:0x{MetadataTokens.GetToken(handle):X8}"
         };
     }
 
-    internal static string ResolveFieldToken(MetadataReader reader, int token)
-    {
+    internal static string ResolveFieldToken(MetadataReader reader, int token) {
         var handle = MetadataTokens.Handle(token);
-        return handle.Kind switch
-        {
+        return handle.Kind switch {
             HandleKind.FieldDefinition => GetFieldDefinitionSymbol(reader, (FieldDefinitionHandle)handle),
             HandleKind.MemberReference => GetMemberReferenceSymbol(reader, (MemberReferenceHandle)handle),
             _ => $"metadata-token:0x{token:X8}"
         };
     }
 
-    internal static string GetFieldExactKey(MetadataReader reader, FieldDefinitionHandle handle)
-    {
+    internal static string GetFieldExactKey(MetadataReader reader, FieldDefinitionHandle handle) {
         var definition = reader.GetFieldDefinition(handle);
         var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
         var fieldName = reader.GetString(definition.Name);
@@ -142,8 +124,7 @@ internal static class EffectSummaryMetadataReader
         return $"{typeName}.{fieldName}:{fieldType}";
     }
 
-    internal static string GetMemberReferenceFieldExactKey(MetadataReader reader, MemberReferenceHandle handle)
-    {
+    internal static string GetMemberReferenceFieldExactKey(MetadataReader reader, MemberReferenceHandle handle) {
         var memberReference = reader.GetMemberReference(handle);
         var parentName = NormalizeExactTypeName(GetMemberReferenceParentName(reader, memberReference.Parent));
         var fieldName = reader.GetString(memberReference.Name);
@@ -151,15 +132,13 @@ internal static class EffectSummaryMetadataReader
         return $"{parentName}.{fieldName}:{fieldType}";
     }
 
-    internal static string GetMemberReferenceFieldLookupSymbol(MetadataReader reader, MemberReferenceHandle handle)
-    {
+    internal static string GetMemberReferenceFieldLookupSymbol(MetadataReader reader, MemberReferenceHandle handle) {
         var memberReference = reader.GetMemberReference(handle);
         var parentName = GetMemberReferenceLookupParentName(reader, memberReference.Parent);
         return $"{parentName}.{reader.GetString(memberReference.Name)}";
     }
 
-    internal static string GetMemberReferenceFieldLookupExactKey(MetadataReader reader, MemberReferenceHandle handle)
-    {
+    internal static string GetMemberReferenceFieldLookupExactKey(MetadataReader reader, MemberReferenceHandle handle) {
         var memberReference = reader.GetMemberReference(handle);
         var parentName =
             NormalizeExactTypeName(GetMemberReferenceLookupParentName(reader, memberReference.Parent));
@@ -168,8 +147,7 @@ internal static class EffectSummaryMetadataReader
         return $"{parentName}.{fieldName}:{fieldType}";
     }
 
-    internal static string GetMethodDisplaySymbol(MetadataReader reader, MethodDefinitionHandle handle)
-    {
+    internal static string GetMethodDisplaySymbol(MetadataReader reader, MethodDefinitionHandle handle) {
         var definition = reader.GetMethodDefinition(handle);
         var typeName = GetTypeName(reader, definition.GetDeclaringType());
         var methodName = reader.GetString(definition.Name);
@@ -177,8 +155,7 @@ internal static class EffectSummaryMetadataReader
         return $"{typeName}.{methodName}{signature}";
     }
 
-    internal static string GetMethodExactKey(MetadataReader reader, MethodDefinitionHandle handle)
-    {
+    internal static string GetMethodExactKey(MetadataReader reader, MethodDefinitionHandle handle) {
         var definition = reader.GetMethodDefinition(handle);
         var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
         var methodName = reader.GetString(definition.Name);
@@ -186,50 +163,39 @@ internal static class EffectSummaryMetadataReader
         return $"{typeName}.{methodName}{signature}";
     }
 
-    internal static string GetFieldDefinitionSymbol(MetadataReader reader, FieldDefinitionHandle handle)
-    {
+    internal static string GetFieldDefinitionSymbol(MetadataReader reader, FieldDefinitionHandle handle) {
         var definition = reader.GetFieldDefinition(handle);
         var typeName = GetTypeName(reader, definition.GetDeclaringType());
         return $"{typeName}.{reader.GetString(definition.Name)}";
     }
 
-    internal static string DecodeFieldDefinitionExactType(FieldDefinition definition)
-    {
-        try
-        {
+    internal static string DecodeFieldDefinitionExactType(FieldDefinition definition) {
+        try {
             return definition.DecodeSignature(new TypeNameProvider(), null);
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return "?";
         }
-        catch (InvalidOperationException)
-        {
+        catch (InvalidOperationException) {
             return "?";
         }
     }
 
-    internal static string DecodeMemberReferenceFieldExactType(MemberReference memberReference)
-    {
-        try
-        {
+    internal static string DecodeMemberReferenceFieldExactType(MemberReference memberReference) {
+        try {
             return memberReference.DecodeFieldSignature(new TypeNameProvider(), null);
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return "?";
         }
-        catch (InvalidOperationException)
-        {
+        catch (InvalidOperationException) {
             return "?";
         }
     }
 
-    internal static bool ShouldTreatCallvirtAsDynamicDispatch(MetadataReader reader, int token)
-    {
+    internal static bool ShouldTreatCallvirtAsDynamicDispatch(MetadataReader reader, int token) {
         var handle = MetadataTokens.Handle(token);
-        return handle.Kind switch
-        {
+        return handle.Kind switch {
             HandleKind.MethodDefinition => IsVirtualDispatchCandidate(reader, (MethodDefinitionHandle)handle),
             HandleKind.MethodSpecification => IsVirtualDispatchCandidate(reader, (MethodSpecificationHandle)handle),
             HandleKind.MemberReference => IsVirtualDispatchCandidate(reader, (MemberReferenceHandle)handle),
@@ -237,19 +203,16 @@ internal static class EffectSummaryMetadataReader
         };
     }
 
-    internal static bool IsVirtualDispatchCandidate(MetadataReader reader, MethodSpecificationHandle handle)
-    {
+    internal static bool IsVirtualDispatchCandidate(MetadataReader reader, MethodSpecificationHandle handle) {
         var specification = reader.GetMethodSpecification(handle);
-        return specification.Method.Kind switch
-        {
+        return specification.Method.Kind switch {
             HandleKind.MethodDefinition => IsVirtualDispatchCandidate(reader,
                 (MethodDefinitionHandle)specification.Method),
             _ => true
         };
     }
 
-    internal static bool IsVirtualDispatchCandidate(MetadataReader reader, MethodDefinitionHandle handle)
-    {
+    internal static bool IsVirtualDispatchCandidate(MetadataReader reader, MethodDefinitionHandle handle) {
         var definition = reader.GetMethodDefinition(handle);
         var attributes = definition.Attributes;
         if ((attributes & MethodAttributes.Virtual) == 0) return false;
@@ -260,8 +223,7 @@ internal static class EffectSummaryMetadataReader
         return (declaringType.Attributes & TypeAttributes.Sealed) == 0;
     }
 
-    internal static bool IsVirtualDispatchCandidate(MetadataReader reader, MemberReferenceHandle handle)
-    {
+    internal static bool IsVirtualDispatchCandidate(MetadataReader reader, MemberReferenceHandle handle) {
         var memberReference = reader.GetMemberReference(handle);
         var runtimeType = TryResolveRuntimeType(reader, memberReference.Parent);
         if (runtimeType == null) return true;
@@ -284,26 +246,20 @@ internal static class EffectSummaryMetadataReader
             method.IsVirtual && !method.IsFinal && method.DeclaringType?.IsSealed != true);
     }
 
-    internal static int? TryGetMemberReferenceParameterCount(MemberReference memberReference)
-    {
-        try
-        {
+    internal static int? TryGetMemberReferenceParameterCount(MemberReference memberReference) {
+        try {
             return memberReference.DecodeMethodSignature(new TypeNameProvider(), null).ParameterTypes.Length;
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return null;
         }
-        catch (InvalidOperationException)
-        {
+        catch (InvalidOperationException) {
             return null;
         }
     }
 
-    internal static Type? TryResolveRuntimeType(MetadataReader reader, EntityHandle handle)
-    {
-        var typeName = handle.Kind switch
-        {
+    internal static Type? TryResolveRuntimeType(MetadataReader reader, EntityHandle handle) {
+        var typeName = handle.Kind switch {
             HandleKind.TypeDefinition => GetTypeName(reader, (TypeDefinitionHandle)handle),
             HandleKind.TypeReference => GetTypeReferenceName(reader, (TypeReferenceHandle)handle),
             HandleKind.TypeSpecification => DecodeTypeSpecificationForMemberLookup(
@@ -315,35 +271,26 @@ internal static class EffectSummaryMetadataReader
         return TryResolveRuntimeType(typeName);
     }
 
-    internal static Type? TryResolveRuntimeType(string typeName)
-    {
-        return RuntimeTypeCache.GetOrAdd(typeName, static fullName =>
-        {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                var resolved = assembly.GetType(fullName, false);
-                if (resolved != null) return resolved;
-            }
+    internal static Type? TryResolveRuntimeType(string typeName) => RuntimeTypeCache.GetOrAdd(typeName, static fullName => {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
+            var resolved = assembly.GetType(fullName, false);
+            if (resolved != null) return resolved;
+        }
 
-            if (fullName.IndexOfAny(new[] { '<', '>', ',', '!', '*' }) >= 0) return null;
+        if (fullName.IndexOfAny(new[] { '<', '>', ',', '!', '*' }) >= 0) return null;
 
-            try
-            {
-                return Type.GetType(fullName, false);
-            }
-            catch (ArgumentException)
-            {
-                return null;
-            }
-            catch (FileLoadException)
-            {
-                return null;
-            }
-        });
-    }
+        try {
+            return Type.GetType(fullName, false);
+        }
+        catch (ArgumentException) {
+            return null;
+        }
+        catch (FileLoadException) {
+            return null;
+        }
+    });
 
-    internal static string GetMemberReferenceSymbol(MetadataReader reader, MemberReferenceHandle handle)
-    {
+    internal static string GetMemberReferenceSymbol(MetadataReader reader, MemberReferenceHandle handle) {
         var memberReference = reader.GetMemberReference(handle);
         var parentName = GetMemberReferenceParentName(reader, memberReference.Parent);
         var name = reader.GetString(memberReference.Name);
@@ -351,8 +298,7 @@ internal static class EffectSummaryMetadataReader
         return $"{parentName}.{name}{signature}";
     }
 
-    internal static string GetMemberReferenceExactKey(MetadataReader reader, MemberReferenceHandle handle)
-    {
+    internal static string GetMemberReferenceExactKey(MetadataReader reader, MemberReferenceHandle handle) {
         var memberReference = reader.GetMemberReference(handle);
         var parentName = NormalizeExactTypeName(GetMemberReferenceParentName(reader, memberReference.Parent));
         var name = reader.GetString(memberReference.Name);
@@ -360,8 +306,7 @@ internal static class EffectSummaryMetadataReader
         return $"{parentName}.{name}{signature}";
     }
 
-    internal static string GetMemberReferenceMethodLookupExactKey(MetadataReader reader, MemberReferenceHandle handle)
-    {
+    internal static string GetMemberReferenceMethodLookupExactKey(MetadataReader reader, MemberReferenceHandle handle) {
         var memberReference = reader.GetMemberReference(handle);
         var parentName =
             NormalizeExactTypeName(GetMemberReferenceLookupParentName(reader, memberReference.Parent));
@@ -370,32 +315,23 @@ internal static class EffectSummaryMetadataReader
         return $"{parentName}.{name}{signature}";
     }
 
-    internal static string GetMemberReferenceParentName(MetadataReader reader, EntityHandle handle)
-    {
-        return handle.Kind switch
-        {
-            HandleKind.TypeDefinition => GetTypeName(reader, (TypeDefinitionHandle)handle),
-            HandleKind.TypeReference => GetTypeReferenceName(reader, (TypeReferenceHandle)handle),
-            HandleKind.TypeSpecification => DecodeTypeSpecification(reader, (TypeSpecificationHandle)handle),
-            HandleKind.MethodDefinition => GetMethodDisplaySymbol(reader, (MethodDefinitionHandle)handle),
-            HandleKind.ModuleReference => reader.GetString(
-                reader.GetModuleReference((ModuleReferenceHandle)handle).Name),
-            _ => $"metadata-parent:0x{MetadataTokens.GetToken(handle):X8}"
-        };
-    }
+    internal static string GetMemberReferenceParentName(MetadataReader reader, EntityHandle handle) => handle.Kind switch {
+        HandleKind.TypeDefinition => GetTypeName(reader, (TypeDefinitionHandle)handle),
+        HandleKind.TypeReference => GetTypeReferenceName(reader, (TypeReferenceHandle)handle),
+        HandleKind.TypeSpecification => DecodeTypeSpecification(reader, (TypeSpecificationHandle)handle),
+        HandleKind.MethodDefinition => GetMethodDisplaySymbol(reader, (MethodDefinitionHandle)handle),
+        HandleKind.ModuleReference => reader.GetString(
+            reader.GetModuleReference((ModuleReferenceHandle)handle).Name),
+        _ => $"metadata-parent:0x{MetadataTokens.GetToken(handle):X8}"
+    };
 
-    internal static string GetMemberReferenceLookupParentName(MetadataReader reader, EntityHandle handle)
-    {
-        return handle.Kind switch
-        {
-            HandleKind.TypeSpecification => DecodeTypeSpecificationForMemberLookup(reader,
-                (TypeSpecificationHandle)handle),
-            _ => GetMemberReferenceParentName(reader, handle)
-        };
-    }
+    internal static string GetMemberReferenceLookupParentName(MetadataReader reader, EntityHandle handle) => handle.Kind switch {
+        HandleKind.TypeSpecification => DecodeTypeSpecificationForMemberLookup(reader,
+            (TypeSpecificationHandle)handle),
+        _ => GetMemberReferenceParentName(reader, handle)
+    };
 
-    public static string GetTypeName(MetadataReader reader, TypeDefinitionHandle handle)
-    {
+    public static string GetTypeName(MetadataReader reader, TypeDefinitionHandle handle) {
         if (handle.IsNil) return "<module>";
 
         var definition = reader.GetTypeDefinition(handle);
@@ -407,8 +343,7 @@ internal static class EffectSummaryMetadataReader
         return string.IsNullOrEmpty(ns) ? name : $"{ns}.{name}";
     }
 
-    public static string GetTypeReferenceName(MetadataReader reader, TypeReferenceHandle handle)
-    {
+    public static string GetTypeReferenceName(MetadataReader reader, TypeReferenceHandle handle) {
         var reference = reader.GetTypeReference(handle);
         var name = reader.GetString(reference.Name);
         var ns = reader.GetString(reference.Namespace);
@@ -417,34 +352,27 @@ internal static class EffectSummaryMetadataReader
 
     internal static string DecodeMethodSignature(
         MethodDefinition definition,
-        bool includeReturnType)
-    {
-        try
-        {
+        bool includeReturnType) {
+        try {
             var signature = definition.DecodeSignature(new TypeNameProvider(), null);
             return FormatMethodSignature(signature.ParameterTypes, signature.ReturnType, includeReturnType);
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return includeReturnType ? "(?)->?" : "(?)";
         }
     }
 
     internal static string DecodeMethodSignature(
         MemberReference memberReference,
-        bool includeReturnType)
-    {
-        try
-        {
+        bool includeReturnType) {
+        try {
             var signature = memberReference.DecodeMethodSignature(new TypeNameProvider(), null);
             return FormatMethodSignature(signature.ParameterTypes, signature.ReturnType, includeReturnType);
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return includeReturnType ? "(?)->?" : string.Empty;
         }
-        catch (InvalidOperationException)
-        {
+        catch (InvalidOperationException) {
             return includeReturnType ? "(?)->?" : string.Empty;
         }
     }
@@ -452,64 +380,52 @@ internal static class EffectSummaryMetadataReader
     internal static string FormatMethodSignature(
         IReadOnlyList<string> parameterTypes,
         string returnType,
-        bool includeReturnType)
-    {
+        bool includeReturnType) {
         var parameters = $"({string.Join(", ", parameterTypes)})";
         return includeReturnType ? $"{parameters}->{returnType}" : parameters;
     }
 
-    internal static string NormalizeExactTypeName(string typeName)
-    {
-        return typeName switch
-        {
-            "System.Boolean" => "bool",
-            "System.Byte" => "byte",
-            "System.Char" => "char",
-            "System.Decimal" => "decimal",
-            "System.Double" => "double",
-            "System.Int16" => "short",
-            "System.Int32" => "int",
-            "System.Int64" => "long",
-            "System.IntPtr" => "nint",
-            "System.Object" => "object",
-            "System.SByte" => "sbyte",
-            "System.Single" => "float",
-            "System.String" => "string",
-            "System.UInt16" => "ushort",
-            "System.UInt32" => "uint",
-            "System.UInt64" => "ulong",
-            "System.UIntPtr" => "nuint",
-            "System.Void" => "void",
-            _ => typeName
-        };
-    }
+    internal static string NormalizeExactTypeName(string typeName) => typeName switch {
+        "System.Boolean" => "bool",
+        "System.Byte" => "byte",
+        "System.Char" => "char",
+        "System.Decimal" => "decimal",
+        "System.Double" => "double",
+        "System.Int16" => "short",
+        "System.Int32" => "int",
+        "System.Int64" => "long",
+        "System.IntPtr" => "nint",
+        "System.Object" => "object",
+        "System.SByte" => "sbyte",
+        "System.Single" => "float",
+        "System.String" => "string",
+        "System.UInt16" => "ushort",
+        "System.UInt32" => "uint",
+        "System.UInt64" => "ulong",
+        "System.UIntPtr" => "nuint",
+        "System.Void" => "void",
+        _ => typeName
+    };
 
-    internal static string DecodeTypeSpecification(MetadataReader reader, TypeSpecificationHandle handle)
-    {
-        try
-        {
+    internal static string DecodeTypeSpecification(MetadataReader reader, TypeSpecificationHandle handle) {
+        try {
             return reader.GetTypeSpecification(handle).DecodeSignature(new TypeNameProvider(), null);
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return "type-spec";
         }
     }
 
-    internal static string DecodeTypeSpecificationForMemberLookup(MetadataReader reader, TypeSpecificationHandle handle)
-    {
-        try
-        {
+    internal static string DecodeTypeSpecificationForMemberLookup(MetadataReader reader, TypeSpecificationHandle handle) {
+        try {
             return reader.GetTypeSpecification(handle).DecodeSignature(
                 new TypeNameProvider(true),
                 null);
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return DecodeTypeSpecification(reader, handle);
         }
-        catch (InvalidOperationException)
-        {
+        catch (InvalidOperationException) {
             return DecodeTypeSpecification(reader, handle);
         }
     }

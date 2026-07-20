@@ -19,8 +19,7 @@ public sealed record CorpusReportSummary(
     ImmutableArray<RankedItem> TopImpureApis,
     ImmutableArray<RankedItem> ExceptionSources,
     ImmutableArray<RankedItem> CatalogMisses,
-    ImmutableArray<RankedItem> FalsePositiveCandidates)
-{
+    ImmutableArray<RankedItem> FalsePositiveCandidates) {
     public const string CurrentSchemaVersion = "1.4";
 
     public string SchemaVersion { get; init; } = CurrentSchemaVersion;

@@ -1,11 +1,8 @@
-internal static class ConfigurationReferenceCommand
-{
+internal static class ConfigurationReferenceCommand {
     private const string Command = "--generate-configuration-reference";
 
-    public static bool TryRun(string[] args, out int exitCode)
-    {
-        if (args.Length != 2 || !string.Equals(args[0], Command, StringComparison.Ordinal))
-        {
+    public static bool TryRun(string[] args, out int exitCode) {
+        if (args.Length != 2 || !string.Equals(args[0], Command, StringComparison.Ordinal)) {
             exitCode = 0;
             return false;
         }
@@ -15,8 +12,7 @@ internal static class ConfigurationReferenceCommand
         return true;
     }
 
-    internal static string Render()
-    {
+    internal static string Render() {
         var options = AnalyzerConfigurationOptionRegistry.All.OrderBy(static option => option.Key);
         var builder = new StringBuilder()
             .AppendLine("# Analyzer configuration reference")
@@ -55,8 +51,7 @@ internal static class ConfigurationReferenceCommand
         string heading,
         string description,
         string preamble,
-        IEnumerable<AnalyzerConfigurationOption> options)
-    {
+        IEnumerable<AnalyzerConfigurationOption> options) {
         builder.AppendLine().Append("## ").AppendLine(heading).AppendLine()
             .AppendLine(description).AppendLine().AppendLine("```ini").AppendLine(preamble);
         foreach (var option in options)
@@ -64,8 +59,7 @@ internal static class ConfigurationReferenceCommand
         builder.AppendLine("```");
     }
 
-    private static string GetScope(AnalyzerConfigurationScope scope) => scope switch
-    {
+    private static string GetScope(AnalyzerConfigurationScope scope) => scope switch {
         AnalyzerConfigurationScope.GlobalOnly => "Global-only",
         AnalyzerConfigurationScope.GlobalAndTree => "Global and per-tree",
         AnalyzerConfigurationScope.TreeOnly => "Per-tree",

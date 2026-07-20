@@ -1,22 +1,17 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class PurityResourceStateFacts
-{
+internal static partial class PurityResourceStateFacts {
     internal static PurityAnalysisState AddReturnedOwnedResourceFacts(
         PurityAnalysisState nextState,
         IReturnOperation returnOperation,
-        PurityAnalysisState currentState)
-    {
-        return returnOperation.ReturnedValue == null
+        PurityAnalysisState currentState) => returnOperation.ReturnedValue == null
             ? nextState
             : AddReturnedOwnedResourceFacts(nextState, returnOperation.ReturnedValue, currentState);
-    }
 
     internal static PurityAnalysisState AddReturnedOwnedResourceFacts(
         PurityAnalysisState nextState,
         IOperation returnedValue,
-        PurityAnalysisState currentState)
-    {
+        PurityAnalysisState currentState) {
         if (PurityAnalysisEngine.TryResolveTrackedSymbol(returnedValue, currentState) is not { } resourceSymbol ||
             !PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(resourceSymbol, currentState))
             return nextState;
@@ -35,8 +30,7 @@ internal static partial class PurityResourceStateFacts
     internal static PurityAnalysisState AddDisposeInvocationFacts(
         PurityAnalysisState nextState,
         IInvocationOperation invocationOperation,
-        PurityAnalysisState currentState)
-    {
+        PurityAnalysisState currentState) {
         if (!IsParameterlessDisposeInvocation(invocationOperation) ||
             invocationOperation.Instance == null ||
             PurityAnalysisEngine.TryResolveTrackedSymbol(invocationOperation.Instance, currentState) is not { } resourceSymbol)
@@ -55,10 +49,8 @@ internal static partial class PurityResourceStateFacts
     internal static PurityAnalysisState AddUsingStatementDisposeFacts(
         PurityAnalysisState nextState,
         IUsingOperation usingOperation,
-        PurityAnalysisState currentState)
-    {
-        foreach (var resourceSymbol in EnumerateUsingStatementDisposedSymbols(usingOperation, currentState))
-        {
+        PurityAnalysisState currentState) {
+        foreach (var resourceSymbol in EnumerateUsingStatementDisposedSymbols(usingOperation, currentState)) {
             var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(resourceSymbol, nextState);
             nextState = AddResourceDisposedFacts(
                 nextState,
@@ -74,10 +66,8 @@ internal static partial class PurityResourceStateFacts
 
     internal static PurityAnalysisState AddUsingDeclarationDisposeFacts(
         PurityAnalysisState nextState,
-        IUsingDeclarationOperation usingDeclaration)
-    {
-        foreach (var resourceSymbol in EnumerateUsingDeclarationDisposedSymbols(usingDeclaration))
-        {
+        IUsingDeclarationOperation usingDeclaration) {
+        foreach (var resourceSymbol in EnumerateUsingDeclarationDisposedSymbols(usingDeclaration)) {
             var term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(resourceSymbol, nextState);
             nextState = AddResourceDisposedFacts(
                 nextState,
@@ -92,8 +82,7 @@ internal static partial class PurityResourceStateFacts
     }
 
     private static IEnumerable<ISymbol> EnumerateUsingDeclarationDisposedSymbols(
-        IUsingDeclarationOperation usingDeclaration)
-    {
+        IUsingDeclarationOperation usingDeclaration) {
         foreach (var declaration in usingDeclaration.DeclarationGroup.Declarations)
             foreach (var declarator in declaration.Declarators)
                 yield return declarator.Symbol;
@@ -101,11 +90,9 @@ internal static partial class PurityResourceStateFacts
 
     private static IEnumerable<ISymbol> EnumerateUsingStatementDisposedSymbols(
         IUsingOperation usingOperation,
-        PurityAnalysisState currentState)
-    {
+        PurityAnalysisState currentState) {
         var resourceOperation = usingOperation.Resources;
-        if (PurityAnalysisEngine.TryResolveTrackedSymbol(resourceOperation, currentState) is { } resourceSymbol)
-        {
+        if (PurityAnalysisEngine.TryResolveTrackedSymbol(resourceOperation, currentState) is { } resourceSymbol) {
             yield return resourceSymbol;
             yield break;
         }
@@ -125,9 +112,7 @@ internal static partial class PurityResourceStateFacts
         ISymbol resourceSymbol,
         SyntaxNode syntax,
         string provenance,
-        string evidenceKey)
-    {
-        return PurityOperationTransfer.ApplyLifetime(
+        string evidenceKey) => PurityOperationTransfer.ApplyLifetime(
             nextState,
             term,
             SymbolicLifetimeOperationKind.Dispose,
@@ -135,14 +120,12 @@ internal static partial class PurityResourceStateFacts
             provenance,
             resourceSymbol,
             evidenceKey);
-    }
 
     internal static PurityAnalysisState AddCallerVisibleMutationFact(
         PurityAnalysisState nextState,
         IOperation targetOperation,
         PurityAnalysisState currentState,
-        SyntaxNode syntax)
-    {
+        SyntaxNode syntax) {
         if (!TryCreateCallerVisibleMutationTerm(targetOperation, currentState, out var term, out var symbol))
             return nextState;
 
@@ -160,10 +143,8 @@ internal static partial class PurityResourceStateFacts
         IOperation targetOperation,
         PurityAnalysisState currentState,
         string ruleName,
-        out PurityEvidence evidence)
-    {
-        if (!TryCreateCallerVisibleMutationTerm(targetOperation, currentState, out var term, out var symbol))
-        {
+        out PurityEvidence evidence) {
+        if (!TryCreateCallerVisibleMutationTerm(targetOperation, currentState, out var term, out var symbol)) {
             evidence = default;
             return false;
         }
@@ -183,9 +164,7 @@ internal static partial class PurityResourceStateFacts
         SyntaxNode escapeSyntax,
         ISymbol escapeSymbol,
         string ruleName,
-        string fallbackCatalogSource)
-    {
-        return PurityEvidence.Create(
+        string fallbackCatalogSource) => PurityEvidence.Create(
             "mutable_state_escape",
             ruleName,
             returnOperation,
@@ -194,37 +173,30 @@ internal static partial class PurityResourceStateFacts
             string.IsNullOrEmpty(fallbackCatalogSource)
                 ? "analyzer.escape.return"
                 : fallbackCatalogSource);
-    }
 
     internal static PurityEvidence CreateByRefReturnEscapeEvidence(
         IMethodSymbol methodSymbol,
-        SyntaxNode escapeSyntax)
-    {
-        return PurityEvidence.Create(
+        SyntaxNode escapeSyntax) => PurityEvidence.Create(
             "mutable_state_escape",
             "ReturnByRefAnalysis",
             syntaxNode: escapeSyntax,
             symbol: methodSymbol,
             catalogSource: "analyzer.escape.return.byref");
-    }
 
     internal static bool TryCreateCallerVisibleMutationTerm(
         IOperation targetOperation,
         PurityAnalysisState currentState,
         out SymbolicTerm term,
-        out ISymbol? symbol)
-    {
+        out ISymbol? symbol) {
         var unwrappedTargetOperation = PurityAnalysisEngine.SkipImplicitConversions(targetOperation);
-        if (unwrappedTargetOperation == null)
-        {
+        if (unwrappedTargetOperation == null) {
             symbol = null;
             term = null!;
             return false;
         }
 
         targetOperation = unwrappedTargetOperation;
-        switch (targetOperation)
-        {
+        switch (targetOperation) {
             case IParameterReferenceOperation parameterReference:
                 symbol = parameterReference.Parameter;
                 term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(parameterReference.Parameter, currentState);
@@ -257,16 +229,14 @@ internal static partial class PurityResourceStateFacts
     internal static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)
         => SymbolicStateMerger.HasExactResourceRelease(state.PathState, term);
 
-    internal static bool IsOwnedDisposableObjectCreationValue(IOperation valueOperation)
-    {
+    internal static bool IsOwnedDisposableObjectCreationValue(IOperation valueOperation) {
         var unwrappedValue = PurityAnalysisEngine.SkipImplicitConversions(valueOperation);
         return unwrappedValue is IObjectCreationOperation objectCreationOperation &&
                objectCreationOperation.Type is { } createdType &&
                IsDisposableResourceType(createdType);
     }
 
-    private static bool IsDisposableResourceType(ITypeSymbol type)
-    {
+    private static bool IsDisposableResourceType(ITypeSymbol type) {
         if (type.SpecialType == SpecialType.System_IDisposable ||
             type.ToDisplayString() == "System.IAsyncDisposable")
             return true;

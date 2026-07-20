@@ -1,14 +1,12 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static class PurityOperationTransfer
-{
+internal static class PurityOperationTransfer {
     internal static PurityAnalysisState ApplyDeclaredBorrow(
         PurityAnalysisState state,
         ILocalSymbol declaredSymbol,
         IOperation initializerValue,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         var isRefInitializer = initializerValue.Syntax.Parent is RefExpressionSyntax ||
                                initializerValue.Syntax.Ancestors().OfType<RefExpressionSyntax>().Any();
@@ -45,8 +43,7 @@ internal static class PurityOperationTransfer
         SymbolicLifetimeOperationKind kind,
         SyntaxNode source,
         string provenance,
-        string evidenceKey)
-    {
+        string evidenceKey) {
         var transition = SymbolicOperationTransferKernel.TransitionLifetime(
             state.PathState,
             PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(sourceSymbol, sourceState),
@@ -67,9 +64,7 @@ internal static class PurityOperationTransfer
         SyntaxNode source,
         string provenance,
         ISymbol? symbol,
-        string? evidenceKey)
-    {
-        return state.WithPathState(SymbolicOperationTransferKernel.TransitionLifetime(
+        string? evidenceKey) => state.WithPathState(SymbolicOperationTransferKernel.TransitionLifetime(
             state.PathState,
             subject,
             kind,
@@ -77,14 +72,12 @@ internal static class PurityOperationTransfer
             provenance,
             symbol,
             evidenceKey).State);
-    }
 
     private static ISymbol? TryResolveRefInitializerSymbol(
         SyntaxNode initializerSyntax,
         SemanticModel semanticModel,
         PurityAnalysisState state,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var refExpression = initializerSyntax.AncestorsAndSelf().OfType<RefExpressionSyntax>().FirstOrDefault();
         if (refExpression == null) return null;
         return semanticModel.GetOperation(refExpression.Expression, cancellationToken) is { } operation &&

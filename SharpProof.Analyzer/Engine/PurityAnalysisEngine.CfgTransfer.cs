@@ -1,33 +1,26 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
-{
+internal partial class PurityAnalysisEngine {
     private static PurityAnalysisResult CheckCfgImplicitSemantics(
         SyntaxNode bodyNode,
         PurityAnalysisContext context,
-        PurityAnalysisState returnState)
-    {
+        PurityAnalysisState returnState) {
         var root = context.SemanticModel.GetOperation(bodyNode, context.CancellationToken);
         if (root == null) return PurityAnalysisResult.Pure;
 
         var probeState = returnState.WithPathState(SymbolicRuntimeTypeFacts.RetainExactRuntimeTypes(returnState.PathState));
-        foreach (var operation in ExecutionVisibility.VisibleDescendants(root))
-        {
-            if (operation is ITryOperation tryOperation)
-            {
-                foreach (var catchClause in tryOperation.Catches)
-                {
+        foreach (var operation in ExecutionVisibility.VisibleDescendants(root)) {
+            if (operation is ITryOperation tryOperation) {
+                foreach (var catchClause in tryOperation.Catches) {
                     var result = AnalyzeOperationSubtreePurity(catchClause, context);
                     if (!result.IsPure) return result;
                 }
-                if (tryOperation.Finally is { } finallyClause)
-                {
+                if (tryOperation.Finally is { } finallyClause) {
                     var result = AnalyzeOperationSubtreePurity(finallyClause, context);
                     if (!result.IsPure) return result;
                 }
             }
-            else if (operation.Kind is OperationKind.Using or OperationKind.UsingDeclaration)
-            {
+            else if (operation.Kind is OperationKind.Using or OperationKind.UsingDeclaration) {
                 var result = CheckSingleOperation(operation, context, probeState);
                 if (!result.IsPure) return result;
             }
@@ -36,8 +29,7 @@ internal partial class PurityAnalysisEngine
                          operation.Syntax,
                          context.SemanticModel,
                          context.SmtAnalysis,
-                         context.CancellationToken))
-            {
+                         context.CancellationToken)) {
                 var result = forEach.IsAsynchronous
                     ? LoopPurityRule.CheckForEachAsyncEnumeratorPurity(forEach.Collection, context)
                     : LoopPurityRule.CheckForEachEnumeratorPurity(forEach.Collection, context);
@@ -57,8 +49,7 @@ internal partial class PurityAnalysisEngine
     }
 
     internal static PurityAnalysisResult CheckSingleOperation(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisState currentState)
-    {
+        PurityAnalysisState currentState) {
         if ((!currentState.PathState.Facts.IsDefaultOrEmpty ||
              !currentState.PathState.PathConditions.IsDefaultOrEmpty) &&
             IsPathStateUnsatisfiable(currentState.PathState, context.SmtAnalysis))
@@ -82,8 +73,7 @@ internal partial class PurityAnalysisEngine
                 context.SmtAnalysis))
             return PurityAnalysisResult.Pure;
 
-        if (operation is IFlowCaptureReferenceOperation flowRef)
-        {
+        if (operation is IFlowCaptureReferenceOperation flowRef) {
             if (currentState.FlowCaptures.TryGetValue(flowRef.Id, out var capturedPurity)) return capturedPurity;
 
             return PurityAnalysisResult.Pure;
@@ -95,26 +85,21 @@ internal partial class PurityAnalysisEngine
 
         var isChecked = TryGetOperatorMethodForDirectPurityCheck(operation, out var operatorMethod);
 
-        if (isChecked && operation is IBinaryOperation binaryOp)
-        {
+        if (isChecked && operation is IBinaryOperation binaryOp) {
             var leftResult = CheckSingleOperation(binaryOp.LeftOperand, context, currentState);
             if (!leftResult.IsPure) return leftResult;
 
             var rightResult = CheckSingleOperation(binaryOp.RightOperand, context, currentState);
             if (!rightResult.IsPure) return rightResult;
         }
-        else if (isChecked && operation is IUnaryOperation unaryOp)
-        {
+        else if (isChecked && operation is IUnaryOperation unaryOp) {
             var operandResult = CheckSingleOperation(unaryOp.Operand, context, currentState);
             if (!operandResult.IsPure) return operandResult;
         }
 
-        if (isChecked)
-        {
-            if (operatorMethod != null)
-            {
-                if (context.PurityCache.TryGetValue(operatorMethod.OriginalDefinition, out var cachedResult))
-                {
+        if (isChecked) {
+            if (operatorMethod != null) {
+                if (context.PurityCache.TryGetValue(operatorMethod.OriginalDefinition, out var cachedResult)) {
                     if (!cachedResult.IsPure) return PurityAnalysisResult.Impure(operation.Syntax);
                     return PurityAnalysisResult.Pure;
                 }
@@ -125,8 +110,7 @@ internal partial class PurityAnalysisEngine
                     context.SemanticModel.Compilation,
                     out var generatedPurity);
 
-                if (hasTrustedGeneratedPurity)
-                {
+                if (hasTrustedGeneratedPurity) {
                     if (generatedPurity.IsPure) return PurityAnalysisResult.Pure;
 
                     if (!generatedPurity.IsPure)
@@ -163,12 +147,10 @@ internal partial class PurityAnalysisEngine
 
         _firstRuleByOperationKind.TryGetValue(operation.Kind, out var applicableRule);
 
-        if (applicableRule != null)
-        {
+        if (applicableRule != null) {
             var ruleResult = applicableRule(operation, context, currentState);
 
-            if (!ruleResult.IsPure)
-            {
+            if (!ruleResult.IsPure) {
                 if (ruleResult.ImpureSyntaxNode == null)
                     return operation.Syntax != null
                         ? PurityAnalysisResult.Impure(operation.Syntax)
@@ -184,10 +166,8 @@ internal partial class PurityAnalysisEngine
 
     private static bool TryGetOperatorMethodForDirectPurityCheck(
         IOperation operation,
-        out IMethodSymbol? operatorMethod)
-    {
-        switch (operation)
-        {
+        out IMethodSymbol? operatorMethod) {
+        switch (operation) {
             case IBinaryOperation { IsChecked: true } binary:
                 operatorMethod = binary.OperatorMethod;
                 return true;

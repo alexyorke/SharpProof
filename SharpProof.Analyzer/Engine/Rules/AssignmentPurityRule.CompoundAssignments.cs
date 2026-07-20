@@ -1,23 +1,17 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class AssignmentPurityRule
-{
+internal partial class AssignmentPurityRule {
     private static PurityAnalysisEngine.PurityAnalysisResult CheckCompoundAssignmentOperatorPurity(
         IMethodSymbol operatorMethod,
         IOperation operation,
-        PurityAnalysisContext context)
-    {
-        return PurityCalleeResolver.GetCalleePurityAtUse(operatorMethod, operation.Syntax, context);
-    }
+        PurityAnalysisContext context) => PurityCalleeResolver.GetCalleePurityAtUse(operatorMethod, operation.Syntax, context);
 
     private static bool TryCreateMutableBorrowConflictEvidence(
         IOperation operation,
         ISymbol? targetSymbol,
         PurityAnalysisEngine.PurityAnalysisState currentState,
         PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityEvidence evidence)
-    {
-        return PuritySymbolicStateFacts.TryCreateMutableBorrowConflictEvidence(
+        out PurityAnalysisEngine.PurityEvidence evidence) => PuritySymbolicStateFacts.TryCreateMutableBorrowConflictEvidence(
             operation,
             targetSymbol,
             currentState,
@@ -25,5 +19,4 @@ internal partial class AssignmentPurityRule
             context.CancellationToken,
             nameof(AssignmentPurityRule),
             out evidence);
-    }
 }

@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic.Smt;
 
-internal sealed class SmtProofResultCache
-{
+internal sealed class SmtProofResultCache {
     private const int LocalEntryLimit = 2048;
     private const int SharedEntryLimit = 4096;
 
@@ -36,8 +35,7 @@ internal sealed class SmtProofResultCache
     public bool TryGetShared(
         SmtAnalysisOptions options,
         string queryKey,
-        out PurityProofResult result)
-    {
+        out PurityProofResult result) {
         if (options.UseSharedResultCache)
             return s_sharedResults.TryGetValue(CreateSharedKey(options, queryKey), out result);
 
@@ -45,21 +43,16 @@ internal sealed class SmtProofResultCache
         return false;
     }
 
-    public void AddLocalIfCacheable(string queryKey, PurityProofResult result)
-    {
+    public void AddLocalIfCacheable(string queryKey, PurityProofResult result) {
         if (!IsTransientFailure(result)) _localResults.TryAdd(queryKey, result);
     }
 
-    public void AddLocal(string queryKey, PurityProofResult result)
-    {
-        _localResults.TryAdd(queryKey, result);
-    }
+    public void AddLocal(string queryKey, PurityProofResult result) => _localResults.TryAdd(queryKey, result);
 
     public void AddSharedIfCacheable(
         SmtAnalysisOptions options,
         string queryKey,
-        PurityProofResult result)
-    {
+        PurityProofResult result) {
         if (!options.UseSharedResultCache || !IsShareable(result)) return;
 
         s_sharedResults.TryAdd(CreateSharedKey(options, queryKey), result);
@@ -68,8 +61,7 @@ internal sealed class SmtProofResultCache
     public SharedFlightLease AcquireSharedFlight(
         SmtAnalysisOptions options,
         string queryKey,
-        Func<PurityProofResult> classify)
-    {
+        Func<PurityProofResult> classify) {
         var sharedKey = CreateSharedKey(options, queryKey);
         var candidate = new Lazy<PurityProofResult>(
             classify,
@@ -81,24 +73,18 @@ internal sealed class SmtProofResultCache
             ReferenceEquals(flight, candidate));
     }
 
-    public void ReleaseSharedFlight(SharedFlightLease lease)
-    {
+    public void ReleaseSharedFlight(SharedFlightLease lease) {
         if (lease.OwnsFlight) s_sharedFlights.TryRemove(lease.Key, out _);
     }
 
     public static bool IsShareable(PurityProofResult result) =>
         result.Outcome is PurityProofOutcome.ProvablyPure or PurityProofOutcome.ProvablyImpure;
 
-    public static bool IsTransientFailure(PurityProofResult result)
-    {
-        return string.Equals(result.Reason, "smt_transient_failure", StringComparison.Ordinal) ||
+    public static bool IsTransientFailure(PurityProofResult result) => string.Equals(result.Reason, "smt_transient_failure", StringComparison.Ordinal) ||
                string.Equals(result.PathCheck.Witness?.Reason, "z3_transient_failure", StringComparison.Ordinal) ||
                string.Equals(result.ImpurityCheck.Witness?.Reason, "z3_transient_failure", StringComparison.Ordinal);
-    }
 
-    private static string CreateSharedKey(SmtAnalysisOptions options, string queryKey)
-    {
-        return options.Mode +
+    private static string CreateSharedKey(SmtAnalysisOptions options, string queryKey) => options.Mode +
                "|timeout_ms=" +
                (long)options.QueryTimeout.TotalMilliseconds +
                "|max_path=" +
@@ -107,7 +93,6 @@ internal sealed class SmtProofResultCache
                options.MaxExpressionNodes +
                "|" +
                queryKey;
-    }
 
     internal sealed record SharedFlightLease(
         string Key,

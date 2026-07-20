@@ -2,8 +2,7 @@ using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json.Serialization;
 
-internal static class PurityClassificationEngine
-{
+internal static class PurityClassificationEngine {
     private const int MaxCrossAssemblyClassificationPasses = 8;
 
     internal static readonly ImmutableHashSet<string> SafeEffects = ImmutableHashSet.Create(
@@ -53,16 +52,14 @@ internal static class PurityClassificationEngine
     public static PurityClassificationOutput Classify(
         AssemblyEffectReport[] assemblies,
         bool includeCatalogComparison,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry>? externalGeneratedPurityEntries = null)
-    {
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry>? externalGeneratedPurityEntries = null) {
         var seedEntries = externalGeneratedPurityEntries ?? EmptyExternalGeneratedPurityEntries;
         var resolvedExternalEntries = seedEntries;
         Dictionary<string, GeneratedPurityCatalogEntry>? previousResolvedEntries = null;
         var classifiedAssemblies = assemblies;
         GeneratedPurityCatalogDocument? generatedPurityCatalog = null;
 
-        for (var pass = 0; pass < MaxCrossAssemblyClassificationPasses; pass++)
-        {
+        for (var pass = 0; pass < MaxCrossAssemblyClassificationPasses; pass++) {
             classifiedAssemblies = assemblies
                 .Select(assembly => ClassifyAssembly(assembly, resolvedExternalEntries, seedEntries))
                 .ToArray();
@@ -91,8 +88,7 @@ internal static class PurityClassificationEngine
     private static AssemblyEffectReport ClassifyAssembly(
         AssemblyEffectReport assembly,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries)
-    {
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries) {
         var classificationMethods = assembly.ClassificationMethods.Length == 0
             ? assembly.Methods
             : assembly.ClassificationMethods;
@@ -105,11 +101,9 @@ internal static class PurityClassificationEngine
             externalGeneratedPurityEntries,
             reviewedGeneratedPurityEntries);
 
-        return assembly with
-        {
+        return assembly with {
             Methods = assembly.Methods
-                .Select(method => method with
-                {
+                .Select(method => method with {
                     PurityClassification = ClassifyMethod(method.CanonicalKey, context)
                 })
                 .ToArray()
@@ -118,8 +112,7 @@ internal static class PurityClassificationEngine
 
     internal static MethodPurityClassification ClassifyMethod(
         string symbol,
-        PurityClassificationContext context)
-    {
+        PurityClassificationContext context) {
         var assembly = context.Assembly;
         var bySymbol = context.BySymbol;
         var externalGeneratedPurityEntries = context.ExternalGeneratedPurityEntries;
@@ -128,12 +121,10 @@ internal static class PurityClassificationEngine
         var freshOwnedInitializationMemo = context.FreshOwnedInitializationMemo;
         var validationThrowHelperMemo = context.ValidationThrowHelperMemo;
         var visiting = context.Visiting;
-        if (memo.TryGetValue(symbol, out var cached))
-        {
+        if (memo.TryGetValue(symbol, out var cached)) {
             if (bySymbol.TryGetValue(symbol, out var cachedSummary) &&
                 TryResolveReviewedUpgrade(assembly, symbol, cachedSummary, reviewedGeneratedPurityEntries,
-                    out var reviewedUpgrade))
-            {
+                    out var reviewedUpgrade)) {
                 memo[symbol] = reviewedUpgrade;
                 return reviewedUpgrade;
             }
@@ -153,22 +144,19 @@ internal static class PurityClassificationEngine
                 new[] { summary.Symbol },
                 summary);
 
-        if (TryClassifyRuntimeIntrinsicStub(summary, out var intrinsicStubClassification))
-        {
+        if (TryClassifyRuntimeIntrinsicStub(summary, out var intrinsicStubClassification)) {
             visiting.Remove(symbol);
             memo[symbol] = intrinsicStubClassification;
             return intrinsicStubClassification;
         }
 
-        if (TryClassifyKnownBclSummary(summary, out var knownBclClassification))
-        {
+        if (TryClassifyKnownBclSummary(summary, out var knownBclClassification)) {
             visiting.Remove(symbol);
             memo[symbol] = knownBclClassification;
             return knownBclClassification;
         }
 
-        if (TryClassifySemanticPureWrapper(summary, out var semanticWrapperClassification))
-        {
+        if (TryClassifySemanticPureWrapper(summary, out var semanticWrapperClassification)) {
             visiting.Remove(symbol);
             memo[symbol] = semanticWrapperClassification;
             return semanticWrapperClassification;
@@ -189,8 +177,7 @@ internal static class PurityClassificationEngine
         var treatsDynamicDispatchAsSemantic = treatsVirtualDispatchAsResolved ||
                                               treatsDeterministicStringComparisonDispatchAsSemantic ||
                                               treatsDelegateDispatchAsSemantic;
-        foreach (var root in summary.RootCandidates)
-        {
+        foreach (var root in summary.RootCandidates) {
             if (treatsDynamicDispatchAsSemantic &&
                 string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal))
                 continue;
@@ -211,21 +198,17 @@ internal static class PurityClassificationEngine
                 string.Equals(root, "object_state_write", StringComparison.Ordinal))
                 continue;
 
-            if (ImpureRoots.Contains(root))
-            {
+            if (ImpureRoots.Contains(root)) {
                 impureCategories.Add(root);
             }
-            else if (InternalOnlyRoots.Contains(root))
-            {
+            else if (InternalOnlyRoots.Contains(root)) {
             }
-            else if (ConservativeRoots.Contains(root))
-            {
+            else if (ConservativeRoots.Contains(root)) {
                 conservativeCategories.Add(root);
             }
         }
 
-        foreach (var effect in summary.Effects)
-        {
+        foreach (var effect in summary.Effects) {
             if (treatsDynamicDispatchAsSemantic &&
                 string.Equals(effect, "virtual_call", StringComparison.Ordinal))
                 continue;
@@ -260,8 +243,7 @@ internal static class PurityClassificationEngine
             if (SafeEffects.Contains(effect)) continue;
 
             if (ConservativeEffects.Contains(effect) ||
-                effect.StartsWith("unknown_opcode_at_", StringComparison.Ordinal))
-            {
+                effect.StartsWith("unknown_opcode_at_", StringComparison.Ordinal)) {
                 conservativeCategories.Add(effect.StartsWith("unknown_opcode_at_", StringComparison.Ordinal)
                     ? "unknown_opcode"
                     : effect);
@@ -274,27 +256,23 @@ internal static class PurityClassificationEngine
         var blockingCallChain = Array.Empty<string>();
         var freshOwnedArrayCalleeSeen = false;
         var freshOwnedObjectCalleeSeen = false;
-        foreach (var callSite in EnumerateCallSites(summary))
-        {
+        foreach (var callSite in EnumerateCallSites(summary)) {
             var call = callSite.DisplayName;
             var callKey = callSite.CanonicalKey;
             if (IsDeterministicStringComparisonDispatch(callSite)) continue;
             if (IsPurityNeutralIntrinsicHelperCall(call)) continue;
 
             if (callKey == null ||
-                !TryResolveCallSummary(callKey, bySymbol, out var resolvedCallKey, out var resolvedCallSummary))
-            {
+                !TryResolveCallSummary(callKey, bySymbol, out var resolvedCallKey, out var resolvedCallSummary)) {
                 if (callKey != null && TryResolveExternalCallClassification(
                         callKey,
                         externalGeneratedPurityEntries,
                         out var externalCallKey,
                         out var externalEntry,
-                        out var externalClassification))
-                {
+                        out var externalClassification)) {
                     if (callSite.UsesDynamicDispatch &&
                         !treatsVirtualDispatchAsResolved &&
-                        !string.Equals(externalClassification.Classification, "pure", StringComparison.Ordinal))
-                    {
+                        !string.Equals(externalClassification.Classification, "pure", StringComparison.Ordinal)) {
                         conservativeCategories.Add("dynamic_dispatch");
                         if (blockingCallChain.Length == 0)
                             blockingCallChain = JoinCallChain(externalEntry.Symbol,
@@ -302,8 +280,7 @@ internal static class PurityClassificationEngine
                         continue;
                     }
 
-                    if (string.Equals(externalClassification.Classification, "impure", StringComparison.Ordinal))
-                    {
+                    if (string.Equals(externalClassification.Classification, "impure", StringComparison.Ordinal)) {
                         if (IsPureArgumentGuardWrapper(externalEntry.Symbol) ||
                             (treatsArgumentGuardThrowHelpersAsPure &&
                              IsArgumentGuardThrowHelper(externalEntry.Symbol)) ||
@@ -320,8 +297,7 @@ internal static class PurityClassificationEngine
                                 externalClassification.FirstBlockingCallChain);
                     }
                     else if (string.Equals(externalClassification.Classification, "conservative_unknown",
-                                 StringComparison.Ordinal))
-                    {
+                                 StringComparison.Ordinal)) {
                         if (ShouldIgnoreUnknownCall(
                                 summary,
                                 callSite,
@@ -338,8 +314,7 @@ internal static class PurityClassificationEngine
                             blockingCallChain = JoinCallChain(externalEntry.Symbol,
                                 externalClassification.FirstBlockingCallChain);
                     }
-                    else if (string.Equals(externalClassification.Classification, "pure", StringComparison.Ordinal))
-                    {
+                    else if (string.Equals(externalClassification.Classification, "pure", StringComparison.Ordinal)) {
                         if (string.Equals(externalClassification.FreshnessClassification, "fresh_owned_array_write",
                                 StringComparison.Ordinal)) freshOwnedArrayCalleeSeen = true;
 
@@ -351,10 +326,8 @@ internal static class PurityClassificationEngine
                 }
 
                 if (TryClassifyKnownUnresolvedBclCall(call, out var knownCallIsPure,
-                        out var knownCallCategories))
-                {
-                    if (!knownCallIsPure)
-                    {
+                        out var knownCallCategories)) {
+                    if (!knownCallIsPure) {
                         foreach (var category in knownCallCategories)
                             if (string.Equals(category, "global_state_read", StringComparison.Ordinal) ||
                                 string.Equals(category, "global_state_write", StringComparison.Ordinal))
@@ -368,13 +341,11 @@ internal static class PurityClassificationEngine
                     continue;
                 }
 
-                if (TryClassifyUnresolvedInteropBoundaryCall(summary, call, out var unresolvedInteropCategory))
-                {
+                if (TryClassifyUnresolvedInteropBoundaryCall(summary, call, out var unresolvedInteropCategory)) {
                     impureCategories.Add(unresolvedInteropCategory);
                     if (blockingCallChain.Length == 0) blockingCallChain = new[] { call };
                 }
-                else
-                {
+                else {
                     conservativeCategories.Add("unknown_callee");
                     if (blockingCallChain.Length == 0) blockingCallChain = new[] { call };
                 }
@@ -400,8 +371,7 @@ internal static class PurityClassificationEngine
 
             if (callSite.UsesDynamicDispatch &&
                 !treatsVirtualDispatchAsResolved &&
-                !string.Equals(effectiveCalleeClassification.Classification, "pure", StringComparison.Ordinal))
-            {
+                !string.Equals(effectiveCalleeClassification.Classification, "pure", StringComparison.Ordinal)) {
                 conservativeCategories.Add("dynamic_dispatch");
                 if (blockingCallChain.Length == 0)
                     blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol,
@@ -409,8 +379,7 @@ internal static class PurityClassificationEngine
                 continue;
             }
 
-            if (string.Equals(effectiveCalleeClassification.Classification, "impure", StringComparison.Ordinal))
-            {
+            if (string.Equals(effectiveCalleeClassification.Classification, "impure", StringComparison.Ordinal)) {
                 if (IsPureArgumentGuardWrapper(resolvedCallSummary.Symbol) ||
                     (treatsArgumentGuardThrowHelpersAsPure &&
                      IsArgumentGuardThrowHelper(resolvedCallSummary.Symbol)) ||
@@ -427,8 +396,7 @@ internal static class PurityClassificationEngine
                         effectiveCalleeClassification.FirstBlockingCallChain);
             }
             else if (string.Equals(effectiveCalleeClassification.Classification, "conservative_unknown",
-                         StringComparison.Ordinal))
-            {
+                         StringComparison.Ordinal)) {
                 if (ShouldIgnoreUnknownCall(
                         summary,
                         callSite,
@@ -445,8 +413,7 @@ internal static class PurityClassificationEngine
                     blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol,
                         effectiveCalleeClassification.FirstBlockingCallChain);
             }
-            else if (string.Equals(effectiveCalleeClassification.Classification, "pure", StringComparison.Ordinal))
-            {
+            else if (string.Equals(effectiveCalleeClassification.Classification, "pure", StringComparison.Ordinal)) {
                 if (string.Equals(effectiveCalleeClassification.FreshnessClassification, "fresh_owned_array_write",
                         StringComparison.Ordinal)) freshOwnedArrayCalleeSeen = true;
 
@@ -458,8 +425,7 @@ internal static class PurityClassificationEngine
         visiting.Remove(symbol);
         MethodPurityClassification result;
 
-        if (HasAllocateUninitializedArrayWrapperPattern(summary))
-        {
+        if (HasAllocateUninitializedArrayWrapperPattern(summary)) {
             result = new MethodPurityClassification(
                 "pure",
                 Array.Empty<string>(),
@@ -478,8 +444,7 @@ internal static class PurityClassificationEngine
             treatsObjectStateAsFreshOwned ||
             freshOwnedObjectCalleeSeen;
 
-        if (impureCategories.Count > 0)
-        {
+        if (impureCategories.Count > 0) {
             result = new MethodPurityClassification(
                 "impure",
                 impureCategories.ToArray(),
@@ -490,8 +455,7 @@ internal static class PurityClassificationEngine
                 GetFreshnessClassification(summary, "impure"),
                 GetEffectVisibilityClassification(summary, "impure"));
         }
-        else if (conservativeCategories.Count > 0)
-        {
+        else if (conservativeCategories.Count > 0) {
             result = new MethodPurityClassification(
                 "conservative_unknown",
                 conservativeCategories.ToArray(),
@@ -502,12 +466,10 @@ internal static class PurityClassificationEngine
                 GetFreshnessClassification(summary, "conservative_unknown"),
                 GetEffectVisibilityClassification(summary, "conservative_unknown"));
         }
-        else
-        {
+        else {
             var treatsByRefLikeViewAsPure = HasByRefLikeViewConstructionPattern(summary);
             var freshnessClassification = GetFreshnessClassification(summary, "pure");
-            if (string.Equals(freshnessClassification, "none", StringComparison.Ordinal))
-            {
+            if (string.Equals(freshnessClassification, "none", StringComparison.Ordinal)) {
                 if (freshOwnedArrayCalleeSeen)
                     freshnessClassification = "fresh_owned_array_write";
                 else if (freshOwnedObjectCalleeSeen || treatsObjectStateAsFreshOwned)
@@ -515,8 +477,7 @@ internal static class PurityClassificationEngine
             }
 
             var effectVisibilityClassification = GetEffectVisibilityClassification(summary, "pure");
-            if (treatsByRefLikeViewAsPure)
-            {
+            if (treatsByRefLikeViewAsPure) {
                 freshnessClassification = "none";
                 effectVisibilityClassification = "none";
             }
@@ -548,8 +509,7 @@ internal static class PurityClassificationEngine
         return result;
     }
 
-    private static string[] JoinCallChain(string callee, IReadOnlyList<string> nested)
-    {
+    private static string[] JoinCallChain(string callee, IReadOnlyList<string> nested) {
         if (nested.Count == 0) return new[] { callee };
 
         var chain = new string[nested.Count + 1];
@@ -562,9 +522,7 @@ internal static class PurityClassificationEngine
     internal static MethodPurityClassification CreateUnknown(
         IEnumerable<string> categories,
         string[] callChain,
-        MethodEffectSummary? summary)
-    {
-        return new MethodPurityClassification(
+        MethodEffectSummary? summary) => new MethodPurityClassification(
             "conservative_unknown",
             categories.ToArray(),
             callChain,
@@ -573,6 +531,5 @@ internal static class PurityClassificationEngine
             true,
             GetFreshnessClassification(summary, "conservative_unknown"),
             GetEffectVisibilityClassification(summary, "conservative_unknown"));
-    }
 
 }

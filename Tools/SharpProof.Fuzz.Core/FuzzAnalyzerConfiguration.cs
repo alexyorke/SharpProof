@@ -4,17 +4,11 @@ internal sealed record AnalyzerRunResult(
     ImmutableArray<Diagnostic> Diagnostics,
     ImmutableArray<string> Exceptions);
 
-internal sealed class FixedAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
-{
+internal sealed class FixedAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string> globalOptions) : AnalyzerConfigOptionsProvider {
     private readonly AnalyzerConfigOptions _emptyOptions =
         new FixedAnalyzerConfigOptions(ImmutableDictionary<string, string>.Empty);
 
-    public FixedAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string> globalOptions)
-    {
-        GlobalOptions = new FixedAnalyzerConfigOptions(globalOptions);
-    }
-
-    public override AnalyzerConfigOptions GlobalOptions { get; }
+    public override AnalyzerConfigOptions GlobalOptions { get; } = new FixedAnalyzerConfigOptions(globalOptions);
 
     public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) =>
         _emptyOptions;
@@ -23,14 +17,8 @@ internal sealed class FixedAnalyzerConfigOptionsProvider : AnalyzerConfigOptions
         _emptyOptions;
 }
 
-internal sealed class FixedAnalyzerConfigOptions : AnalyzerConfigOptions
-{
-    private readonly ImmutableDictionary<string, string> _values;
-
-    public FixedAnalyzerConfigOptions(ImmutableDictionary<string, string> values)
-    {
-        _values = values;
-    }
+internal sealed class FixedAnalyzerConfigOptions(ImmutableDictionary<string, string> values) : AnalyzerConfigOptions {
+    private readonly ImmutableDictionary<string, string> _values = values;
 
     public override bool TryGetValue(string key, out string value) =>
         _values.TryGetValue(key, out value!);

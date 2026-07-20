@@ -1,7 +1,6 @@
 namespace SharpProof.Analyzer.Engine;
 
-internal static partial class ImpurityCatalog
-{
+internal static partial class ImpurityCatalog {
     private static readonly AsyncLocal<AnalyzerConfiguration?> _configuredOverrides = new();
 
     private static ImmutableHashSet<string> ExtraImpureMethods =>
@@ -19,15 +18,13 @@ internal static partial class ImpurityCatalog
     internal static bool IsStrictPurityProfile =>
         string.Equals(_configuredOverrides.Value?.PurityProfile, "strict", StringComparison.OrdinalIgnoreCase);
 
-    internal static IDisposable UseConfiguredOverrides(AnalyzerConfiguration config)
-    {
+    internal static IDisposable UseConfiguredOverrides(AnalyzerConfiguration config) {
         var previous = _configuredOverrides.Value;
         _configuredOverrides.Value = config;
         return new ConfiguredOverrideScope(previous);
     }
 
-    public static bool IsKnownPureBCLMember(ISymbol symbol, Compilation? compilation)
-    {
+    public static bool IsKnownPureBCLMember(ISymbol symbol, Compilation? compilation) {
         if (symbol == null) return false;
 
         if (IsInConfiguredImpureNamespaceOrType(symbol) && !IsConfiguredKnownPureMember(symbol)) return false;
@@ -50,8 +47,7 @@ internal static partial class ImpurityCatalog
     }
 
     private static bool IsTriviallyPureObjectConstructor(ISymbol symbol) =>
-        symbol is IMethodSymbol
-        {
+        symbol is IMethodSymbol {
             MethodKind: MethodKind.Constructor,
             Parameters.Length: 0,
             ContainingType.SpecialType: SpecialType.System_Object
@@ -66,16 +62,12 @@ internal static partial class ImpurityCatalog
     internal static bool TryGetConfiguredKnownPureMember(
         ISymbol symbol,
         AnalyzerConfiguration configuration,
-        out string configuredValue)
-    {
-        return TryGetConfiguredMember(symbol, configuration.ExtraKnownPureMethods, out configuredValue);
-    }
+        out string configuredValue) => TryGetConfiguredMember(symbol, configuration.ExtraKnownPureMethods, out configuredValue);
 
     private static bool TryGetConfiguredMember(
         ISymbol symbol,
         ImmutableHashSet<string> configuredMembers,
-        out string configuredValue)
-    {
+        out string configuredValue) {
         configuredValue = string.Empty;
         if (!ConfiguredMemberKey.TryCreate(symbol, out var key) || !configuredMembers.Contains(key)) return false;
 
@@ -86,16 +78,14 @@ internal static partial class ImpurityCatalog
     private static bool TryGetGeneratedMethodPurity(
         IMethodSymbol? methodSymbol,
         Compilation? compilation,
-        out EffectSummaryCatalog.PurityEntry classification)
-    {
+        out EffectSummaryCatalog.PurityEntry classification) {
         classification = default;
         if (compilation == null || methodSymbol == null) return false;
 
         return EffectSummaryCatalog.Current.TryGetPurity(methodSymbol, compilation, out classification);
     }
 
-    public static bool IsKnownImpure(ISymbol symbol)
-    {
+    public static bool IsKnownImpure(ISymbol symbol) {
         if (symbol == null) return false;
 
         if (GetKnownImpureMemberSource(symbol) != null) return true;
@@ -106,8 +96,7 @@ internal static partial class ImpurityCatalog
         return false;
     }
 
-    public static string? GetKnownImpureMemberSource(ISymbol symbol)
-    {
+    public static string? GetKnownImpureMemberSource(ISymbol symbol) {
         if (symbol == null) return null;
 
         if (IsMutableImmutableBuilderMember(symbol)) return "known_impure";
@@ -125,54 +114,43 @@ internal static partial class ImpurityCatalog
     internal static bool TryGetConfiguredKnownImpureMember(
         ISymbol symbol,
         AnalyzerConfiguration configuration,
-        out string configuredValue)
-    {
-        return TryGetConfiguredMember(symbol, configuration.ExtraKnownImpureMethods, out configuredValue);
-    }
+        out string configuredValue) => TryGetConfiguredMember(symbol, configuration.ExtraKnownImpureMethods, out configuredValue);
 
 
     internal static bool TryGetConfiguredImpureBoundary(
         ISymbol symbol,
         AnalyzerConfiguration configuration,
         out string source,
-        out string configuredValue)
-    {
-        return TryGetConfiguredImpureBoundary(
+        out string configuredValue) => TryGetConfiguredImpureBoundary(
             symbol,
             configuration.ExtraKnownImpureTypes,
             configuration.ExtraKnownImpureNamespaces,
             out source,
             out configuredValue);
-    }
 
     private static bool TryGetConfiguredImpureBoundary(
         ISymbol symbol,
         ImmutableHashSet<string> configuredTypes,
         ImmutableHashSet<string> configuredNamespaces,
         out string source,
-        out string configuredValue)
-    {
+        out string configuredValue) {
         source = string.Empty;
         configuredValue = string.Empty;
         if (symbol == null) return false;
 
         var containingType = symbol as INamedTypeSymbol ?? symbol.ContainingType;
-        while (containingType != null)
-        {
+        while (containingType != null) {
             var typeName = containingType.OriginalDefinition.ToDisplayString();
-            if (configuredTypes.Contains(typeName))
-            {
+            if (configuredTypes.Contains(typeName)) {
                 source = "config_known_impure_type";
                 configuredValue = typeName;
                 return true;
             }
 
             var ns = containingType.ContainingNamespace;
-            while (ns != null && !ns.IsGlobalNamespace)
-            {
+            while (ns != null && !ns.IsGlobalNamespace) {
                 var namespaceName = ns.ToDisplayString();
-                if (configuredNamespaces.Contains(namespaceName))
-                {
+                if (configuredNamespaces.Contains(namespaceName)) {
                     source = "config_known_impure_namespace";
                     configuredValue = namespaceName;
                     return true;
@@ -187,8 +165,7 @@ internal static partial class ImpurityCatalog
         return false;
     }
 
-    internal static bool TryGetBuiltInKnownPureMember(ISymbol symbol, out string catalogValue)
-    {
+    internal static bool TryGetBuiltInKnownPureMember(ISymbol symbol, out string catalogValue) {
         catalogValue = string.Empty;
         if (!IsSemanticallyPureMathMember(symbol)) return false;
 
@@ -199,20 +176,17 @@ internal static partial class ImpurityCatalog
     public static bool IsInImpureNamespaceOrType(ISymbol symbol) =>
         IsInConfiguredImpureNamespaceOrType(symbol);
 
-    public static bool IsInConfiguredImpureNamespaceOrType(ISymbol symbol)
-    {
+    public static bool IsInConfiguredImpureNamespaceOrType(ISymbol symbol) {
         if (symbol == null) return false;
 
         var containingType = symbol as INamedTypeSymbol ?? symbol.ContainingType;
-        while (containingType != null)
-        {
+        while (containingType != null) {
             var typeName = containingType.OriginalDefinition.ToDisplayString();
             if (ExtraImpureTypes.Contains(typeName))
                 return true;
 
             var ns = containingType.ContainingNamespace;
-            while (ns != null && !ns.IsGlobalNamespace)
-            {
+            while (ns != null && !ns.IsGlobalNamespace) {
                 var namespaceName = ns.ToDisplayString();
                 if (ExtraImpureNamespaces.Contains(namespaceName))
                     return true;
@@ -226,12 +200,10 @@ internal static partial class ImpurityCatalog
         return false;
     }
 
-    private static bool IsMutableImmutableBuilderMember(ISymbol symbol)
-    {
+    private static bool IsMutableImmutableBuilderMember(ISymbol symbol) {
         if (!IsImmutableBuilderType(symbol.ContainingType)) return false;
 
-        if (symbol is IMethodSymbol methodSymbol)
-        {
+        if (symbol is IMethodSymbol methodSymbol) {
             if (methodSymbol.MethodKind == MethodKind.PropertySet ||
                 methodSymbol.MethodKind == MethodKind.EventAdd ||
                 methodSymbol.MethodKind == MethodKind.EventRemove)
@@ -259,32 +231,21 @@ internal static partial class ImpurityCatalog
         return false;
     }
 
-    private static bool IsImmutableBuilderType(INamedTypeSymbol? typeSymbol)
-    {
+    private static bool IsImmutableBuilderType(INamedTypeSymbol? typeSymbol) {
         if (typeSymbol == null || !string.Equals(typeSymbol.Name, "Builder", StringComparison.Ordinal)) return false;
 
         return typeSymbol.ContainingNamespace?.ToString()
             .StartsWith("System.Collections.Immutable", StringComparison.Ordinal) == true;
     }
 
-    private static bool IsImmutableInterlockedMember(ISymbol symbol)
-    {
-        return string.Equals(symbol.ContainingType?.ToDisplayString(),
+    private static bool IsImmutableInterlockedMember(ISymbol symbol) => string.Equals(symbol.ContainingType?.ToDisplayString(),
             "System.Collections.Immutable.ImmutableInterlocked", StringComparison.Ordinal);
-    }
 
-    private sealed class ConfiguredOverrideScope : IDisposable
-    {
-        private readonly AnalyzerConfiguration? _previous;
+    private sealed class ConfiguredOverrideScope(AnalyzerConfiguration? previous) : IDisposable {
+        private readonly AnalyzerConfiguration? _previous = previous;
         private bool _disposed;
 
-        public ConfiguredOverrideScope(AnalyzerConfiguration? previous)
-        {
-            _previous = previous;
-        }
-
-        public void Dispose()
-        {
+        public void Dispose() {
             if (_disposed) return;
 
             _configuredOverrides.Value = _previous;

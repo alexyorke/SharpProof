@@ -9,8 +9,7 @@ internal sealed record SymbolicCliExplainReport(
     SymbolicCapabilityResult Capabilities,
     SymbolicComplexityResult Complexity,
     SymbolicCliExplainDiagnostics Diagnostics,
-    SymbolicCliExplainTruncation Truncation)
-{
+    SymbolicCliExplainTruncation Truncation) {
     [JsonPropertyOrder(-4)]
     public string Kind => "explain";
 
@@ -24,8 +23,7 @@ internal sealed record SymbolicCliExplainReport(
         SymbolicCliOptions options,
         SymbolicCliInputContext inputContext,
         SmtAnalysisService smtAnalysis,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default) {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(inputContext);
         ArgumentNullException.ThrowIfNull(smtAnalysis);
@@ -84,8 +82,7 @@ internal sealed record SymbolicCliExplainReport(
                 invariant.AnalysisTruncation.IsTruncated || hazardResult.AnalysisTruncation.IsTruncated));
     }
 
-    internal IReadOnlyDictionary<string, object?> ToSarif()
-    {
+    internal IReadOnlyDictionary<string, object?> ToSarif() {
         var results = Diagnostics.Items
             .Select(static diagnostic => CreateSarifResult(
                 diagnostic.Id,
@@ -117,8 +114,7 @@ internal sealed record SymbolicCliExplainReport(
                 Target.ResolvedEndLine,
                 Target.ResolvedEndColumn));
 
-        return new Dictionary<string, object?>
-        {
+        return new Dictionary<string, object?> {
             ["$schema"] = "https://json.schemastore.org/sarif-2.1.0.json",
             ["version"] = "2.1.0",
             ["runs"] = new object[]
@@ -141,8 +137,7 @@ internal sealed record SymbolicCliExplainReport(
         };
     }
 
-    internal string ToMarkdown()
-    {
+    internal string ToMarkdown() {
         var point = Invariant.ProgramPoints.Single();
         var builder = new StringBuilder()
             .AppendLine("# SharpProof explanation")
@@ -186,8 +181,7 @@ internal sealed record SymbolicCliExplainReport(
         return builder.ToString();
     }
 
-    internal string ToText()
-    {
+    internal string ToText() {
         var point = Invariant.ProgramPoints.Single();
         var builder = new StringBuilder()
             .AppendLine("SharpProof explanation")
@@ -226,8 +220,7 @@ internal sealed record SymbolicCliExplainReport(
         return builder.ToString();
     }
 
-    private static void AppendProject(StringBuilder builder, SymbolicCliExplainProject? project)
-    {
+    private static void AppendProject(StringBuilder builder, SymbolicCliExplainProject? project) {
         if (project == null) return;
         builder.AppendLine($"Project: {project.Name}")
             .AppendLine($"Project file: {project.ProjectFilePath}");
@@ -248,10 +241,8 @@ internal sealed record SymbolicCliExplainReport(
         int? startLine,
         int? startColumn,
         int? endLine,
-        int? endColumn)
-    {
-        var result = new Dictionary<string, object?>
-        {
+        int? endColumn) {
+        var result = new Dictionary<string, object?> {
             ["ruleId"] = ruleId,
             ["level"] = level,
             ["message"] = new Dictionary<string, object?> { ["text"] = message }
@@ -283,8 +274,7 @@ internal sealed record SymbolicCliExplainReport(
         return result;
     }
 
-    private static string ToSarifLevel(string severity) => severity.ToLowerInvariant() switch
-    {
+    private static string ToSarifLevel(string severity) => severity.ToLowerInvariant() switch {
         "error" => "error",
         "warning" => "warning",
         "info" => "note",
@@ -312,8 +302,7 @@ internal sealed record SymbolicCliExplainTarget(
     int ResolvedEndColumn,
     string NodeKind,
     string? MethodName,
-    string ProgramPointKind)
-{
+    string ProgramPointKind) {
     internal string DisplayText => RequestedPosition.HasValue
         ? $"position {RequestedPosition.Value}"
         : $"line {RequestedLine}, column {RequestedColumn}";
@@ -346,10 +335,8 @@ internal sealed record SymbolicCliExplainProject(
     IReadOnlyList<string> WorkspaceDiagnostics,
     int ConfigurationIssueCount,
     IReadOnlyList<SharpProofProjectConfigurationIssue> ConfigurationIssues,
-    bool IsTruncated)
-{
-    internal static SymbolicCliExplainProject? Create(SymbolicCliInputContext input, int limit)
-    {
+    bool IsTruncated) {
+    internal static SymbolicCliExplainProject? Create(SymbolicCliInputContext input, int limit) {
         var context = input.ProjectContext;
         if (context == null) return null;
         var analyzerConfigs = SymbolicCompactProjection.Project(context.AnalyzerConfigPaths, limit);
@@ -379,14 +366,12 @@ internal sealed record SymbolicCliExplainDiagnostics(
     int TotalCount,
     int TargetCount,
     IReadOnlyList<SymbolicCliExplainDiagnostic> Items,
-    bool IsTruncated)
-{
+    bool IsTruncated) {
     internal static async Task<SymbolicCliExplainDiagnostics> CreateAsync(
         SymbolicCliOptions options,
         SymbolicCliInputContext input,
         int limit,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var context = input.ProjectContext;
         if (context == null) return new SymbolicCliExplainDiagnostics(0, 0, Array.Empty<SymbolicCliExplainDiagnostic>(), false);
         var diagnostics = await input.GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
@@ -413,10 +398,8 @@ internal sealed record SymbolicCliExplainDiagnostic(
     int? StartLine,
     int? StartColumn,
     int? EndLine,
-    int? EndColumn)
-{
-    internal static SymbolicCliExplainDiagnostic Create(Diagnostic diagnostic, bool isTarget)
-    {
+    int? EndColumn) {
+    internal static SymbolicCliExplainDiagnostic Create(Diagnostic diagnostic, bool isTarget) {
         var location = diagnostic.Location;
         var hasLocation = location != Location.None && location.IsInSource;
         var span = hasLocation ? location.GetLineSpan() : default;
@@ -438,7 +421,6 @@ internal sealed record SymbolicCliExplainTruncation(
     bool RuntimeHazards,
     bool Diagnostics,
     bool Project,
-    bool Analysis)
-{
+    bool Analysis) {
     public bool IsTruncated => InvariantAnalysis || RuntimeHazards || Diagnostics || Project || Analysis;
 }

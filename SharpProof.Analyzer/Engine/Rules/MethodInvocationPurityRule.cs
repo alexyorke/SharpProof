@@ -5,11 +5,9 @@ using static SharpProof.Analyzer.Engine.Rules.InvocationEvidence;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class MethodInvocationPurityRule
-{
+internal partial class MethodInvocationPurityRule {
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         if (!(operation is IInvocationOperation invocationOperation))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
@@ -81,30 +79,26 @@ internal partial class MethodInvocationPurityRule
                 nameof(MethodInvocationPurityRule),
                 invokedMethodSymbol);
 
-        if (IsLinqEnumerableInvocation(invokedMethodSymbol, context.SemanticModel.Compilation))
-        {
+        if (IsLinqEnumerableInvocation(invokedMethodSymbol, context.SemanticModel.Compilation)) {
             var sourceOperation = invocationOperation.Instance;
             var checkSourceEnumerator = false;
             var firstRemainingArgumentIndex = 0;
             if (sourceOperation == null &&
                 invocationOperation.Arguments.Length > 0 &&
-                !IsLinqSourceLessFactory(invokedMethodSymbol))
-            {
+                !IsLinqSourceLessFactory(invokedMethodSymbol)) {
                 sourceOperation = invocationOperation.Arguments[0].Value;
                 firstRemainingArgumentIndex = 1;
             }
 
             if (sourceOperation != null &&
-                !IsImmediateFreshArrayLinqSource(sourceOperation, context.SemanticModel.Compilation))
-            {
+                !IsImmediateFreshArrayLinqSource(sourceOperation, context.SemanticModel.Compilation)) {
                 var sourceResult =
                     PurityAnalysisEngine.CheckSingleOperation(sourceOperation, context, currentState);
 
                 if (!sourceResult.IsPure) return sourceResult;
                 checkSourceEnumerator = true;
             }
-            else if (sourceOperation == null && !IsLinqSourceLessFactory(invokedMethodSymbol))
-            {
+            else if (sourceOperation == null && !IsLinqSourceLessFactory(invokedMethodSymbol)) {
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     invocationOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -117,8 +111,7 @@ internal partial class MethodInvocationPurityRule
 
             for (var argumentIndex = firstRemainingArgumentIndex;
                  argumentIndex < invocationOperation.Arguments.Length;
-                 argumentIndex++)
-            {
+                 argumentIndex++) {
                 var argument = invocationOperation.Arguments[argumentIndex];
 
                 var argumentResult = PurityAnalysisEngine.CheckSingleOperation(argument.Value, context, currentState);
@@ -135,8 +128,7 @@ internal partial class MethodInvocationPurityRule
 
             }
 
-            if (checkSourceEnumerator)
-            {
+            if (checkSourceEnumerator) {
                 var sourceEnumeratorResult =
                     CheckLinqSourceEnumeratorPurity(sourceOperation!, context, currentState);
                 if (!sourceEnumeratorResult.IsPure) return sourceEnumeratorResult;
@@ -144,8 +136,7 @@ internal partial class MethodInvocationPurityRule
 
             for (var argumentIndex = firstRemainingArgumentIndex;
                  argumentIndex < invocationOperation.Arguments.Length;
-                 argumentIndex++)
-            {
+                 argumentIndex++) {
                 var argument = invocationOperation.Arguments[argumentIndex];
                 if (!IsLinqEnumerableParameter(argument.Parameter)) continue;
 
@@ -181,8 +172,7 @@ internal partial class MethodInvocationPurityRule
             && (invokedMethodSymbol.IsStatic
                 ? invocationOperation.Instance == null
                 : invocationOperation.Instance != null
-                  && !SymbolicDispatchFacts.IsBaseReference(invocationOperation.Instance)))
-        {
+                  && !SymbolicDispatchFacts.IsBaseReference(invocationOperation.Instance))) {
             var exactReceiverType = GetTrackedLocalReceiverType(
                 invocationOperation.Instance,
                 currentState,
@@ -206,8 +196,7 @@ internal partial class MethodInvocationPurityRule
 
         if (invocationOperation.Instance != null
             && !SymbolicDispatchFacts.IsBaseReference(invocationOperation.Instance)
-            && invocationOperation.Instance is not IConditionalAccessInstanceOperation)
-        {
+            && invocationOperation.Instance is not IConditionalAccessInstanceOperation) {
             var instanceResult =
                 PurityAnalysisEngine.CheckSingleOperation(invocationOperation.Instance, context, currentState);
             if (!instanceResult.IsPure)
@@ -250,8 +239,7 @@ internal partial class MethodInvocationPurityRule
                                          && !isImmutableHashSetCreateRangeWithComparer
                                          && !ImpurityCatalog.IsKnownPureBCLMember(
                                              originalDefinitionSymbol,
-                                             context.SemanticModel.Compilation))
-        {
+                                             context.SemanticModel.Compilation)) {
             var cctorResult =
                 PurityAnalysisEngine.CheckStaticConstructorPurity(invokedMethodSymbol.ContainingType, context);
             if (!cctorResult.IsPure)
@@ -260,10 +248,8 @@ internal partial class MethodInvocationPurityRule
                     cctorResult.Evidence);
         }
 
-        foreach (var argument in invocationOperation.Arguments)
-        {
-            if (argument.Parameter?.RefKind is RefKind.Out or RefKind.Ref)
-            {
+        foreach (var argument in invocationOperation.Arguments) {
+            if (argument.Parameter?.RefKind is RefKind.Out or RefKind.Ref) {
                 var allowsTrustedPureRefRead = argument.Parameter.RefKind == RefKind.Ref &&
                                                hasTrustedGeneratedPurity &&
                                                generatedPurity.IsPure;
@@ -410,29 +396,20 @@ internal partial class MethodInvocationPurityRule
             : calleePurity.WithCallee(originalDefinitionSymbol, invocationOperation.Syntax);
     }
 
-    private static SyntaxNode GetVisibilitySyntax(IInvocationOperation invocationOperation)
-    {
-        return invocationOperation.Syntax is ConditionalAccessExpressionSyntax conditionalAccess
+    private static SyntaxNode GetVisibilitySyntax(IInvocationOperation invocationOperation) => invocationOperation.Syntax is ConditionalAccessExpressionSyntax conditionalAccess
             ? conditionalAccess.WhenNotNull
             : invocationOperation.Syntax;
-    }
 
-    private static string GetInvocationPolicyCategory(PurityPolicyCandidate candidate)
-    {
-        return candidate.Source == "configured_impure_member"
+    private static string GetInvocationPolicyCategory(PurityPolicyCandidate candidate) => candidate.Source == "configured_impure_member"
             ? "global_state_write"
             : candidate.Category;
-    }
 
     internal static bool CanTreatFreshMutableObjectReturningNestedCallableInvocationAsPure(
         IMethodSymbol targetMethod,
-        PurityAnalysisEngine.PurityAnalysisResult calleePurity)
-    {
-        return (targetMethod.MethodKind == MethodKind.LocalFunction ||
+        PurityAnalysisEngine.PurityAnalysisResult calleePurity) => (targetMethod.MethodKind == MethodKind.LocalFunction ||
                 targetMethod.MethodKind == MethodKind.AnonymousFunction ||
                 targetMethod.MethodKind == MethodKind.Ordinary) &&
                !calleePurity.IsPure &&
                string.Equals(calleePurity.Evidence.Category, "mutable_state_escape", StringComparison.Ordinal) &&
                calleePurity.Evidence.CatalogSource.StartsWith("fresh_mutable_object_", StringComparison.Ordinal);
-    }
 }

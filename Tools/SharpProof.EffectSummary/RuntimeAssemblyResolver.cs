@@ -1,7 +1,5 @@
-internal static class RuntimeAssemblyResolver
-{
-    public static string Resolve(string framework, string assemblyName)
-    {
+internal static class RuntimeAssemblyResolver {
+    public static string Resolve(string framework, string assemblyName) {
         foreach (var assemblyPath in EnumerateCandidateAssemblyPaths(framework, assemblyName))
             if (File.Exists(assemblyPath))
                 return assemblyPath;
@@ -11,8 +9,7 @@ internal static class RuntimeAssemblyResolver
             assemblyName);
     }
 
-    public static string[] ResolveSystemRuntimeAssemblies(string framework)
-    {
+    public static string[] ResolveSystemRuntimeAssemblies(string framework) {
         var coreLibPath = Resolve(framework, "System.Private.CoreLib.dll");
         var runtimeDirectory = Path.GetDirectoryName(coreLibPath)
                                ?? throw new DirectoryNotFoundException(
@@ -25,8 +22,7 @@ internal static class RuntimeAssemblyResolver
             .ToArray();
     }
 
-    private static bool IsSystemRuntimeAssemblyFile(string path)
-    {
+    private static bool IsSystemRuntimeAssemblyFile(string path) {
         var fileName = Path.GetFileName(path);
         return fileName.Equals("mscorlib.dll", StringComparison.OrdinalIgnoreCase) ||
                fileName.Equals("netstandard.dll", StringComparison.OrdinalIgnoreCase) ||
@@ -35,30 +31,24 @@ internal static class RuntimeAssemblyResolver
                fileName.StartsWith("System.", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool HasManagedMetadata(string path)
-    {
-        try
-        {
+    private static bool HasManagedMetadata(string path) {
+        try {
             using var stream = File.OpenRead(path);
             using var reader = new PEReader(stream);
             return reader.HasMetadata;
         }
-        catch (BadImageFormatException)
-        {
+        catch (BadImageFormatException) {
             return false;
         }
-        catch (IOException)
-        {
+        catch (IOException) {
             return false;
         }
-        catch (UnauthorizedAccessException)
-        {
+        catch (UnauthorizedAccessException) {
             return false;
         }
     }
 
-    private static int ParseMajorFrameworkVersion(string framework)
-    {
+    private static int ParseMajorFrameworkVersion(string framework) {
         if (!framework.StartsWith("net", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException($"Unsupported framework moniker '{framework}'. Expected netX.Y.");
 
@@ -72,8 +62,7 @@ internal static class RuntimeAssemblyResolver
     private static Version? TryParseVersion(string text) =>
         Version.TryParse(text, out var version) ? version : null;
 
-    private static IEnumerable<string> EnumerateCandidateAssemblyPaths(string framework, string assemblyName)
-    {
+    private static IEnumerable<string> EnumerateCandidateAssemblyPaths(string framework, string assemblyName) {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var candidate in EnumerateCurrentRuntimeCandidates(assemblyName))
@@ -89,8 +78,7 @@ internal static class RuntimeAssemblyResolver
                 yield return candidate;
     }
 
-    private static IEnumerable<string> EnumerateCurrentRuntimeCandidates(string assemblyName)
-    {
+    private static IEnumerable<string> EnumerateCurrentRuntimeCandidates(string assemblyName) {
         var directories = new[]
         {
             Path.GetDirectoryName(typeof(object).Assembly.Location),
@@ -103,8 +91,7 @@ internal static class RuntimeAssemblyResolver
                 yield return Path.Combine(directory, assemblyName);
     }
 
-    private static IEnumerable<string> EnumerateTrustedPlatformAssemblyCandidates(string assemblyName)
-    {
+    private static IEnumerable<string> EnumerateTrustedPlatformAssemblyCandidates(string assemblyName) {
         var trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
         if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies)) yield break;
 
@@ -113,11 +100,9 @@ internal static class RuntimeAssemblyResolver
                 yield return path;
     }
 
-    private static IEnumerable<string> EnumerateSharedRuntimeCandidates(string framework, string assemblyName)
-    {
+    private static IEnumerable<string> EnumerateSharedRuntimeCandidates(string framework, string assemblyName) {
         var major = ParseMajorFrameworkVersion(framework);
-        foreach (var runtimeRoot in EnumerateSharedRuntimeRoots())
-        {
+        foreach (var runtimeRoot in EnumerateSharedRuntimeRoots()) {
             if (!Directory.Exists(runtimeRoot)) continue;
 
             var versionDirectory = Directory
@@ -131,8 +116,7 @@ internal static class RuntimeAssemblyResolver
         }
     }
 
-    private static IEnumerable<string> EnumerateSharedRuntimeRoots()
-    {
+    private static IEnumerable<string> EnumerateSharedRuntimeRoots() {
         var sharedDirectories = new[]
         {
             CombineIfRooted(Environment.GetEnvironmentVariable("DOTNET_ROOT"), "shared"),
@@ -144,8 +128,7 @@ internal static class RuntimeAssemblyResolver
         };
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var sharedDirectory in sharedDirectories)
-        {
+        foreach (var sharedDirectory in sharedDirectories) {
             if (string.IsNullOrWhiteSpace(sharedDirectory) || !Directory.Exists(sharedDirectory)) continue;
 
             foreach (var runtimeRoot in Directory.EnumerateDirectories(sharedDirectory))
@@ -154,8 +137,7 @@ internal static class RuntimeAssemblyResolver
         }
     }
 
-    private static string? CombineIfRooted(string? root, params string[] segments)
-    {
+    private static string? CombineIfRooted(string? root, params string[] segments) {
         if (string.IsNullOrWhiteSpace(root)) return null;
 
         var combined = root;

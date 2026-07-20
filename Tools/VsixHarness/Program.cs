@@ -6,18 +6,15 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-internal sealed class SimpleAnalyzerAssemblyLoader : AssemblyLoadContext, IAnalyzerAssemblyLoader, IDisposable
-{
+internal sealed class SimpleAnalyzerAssemblyLoader : AssemblyLoadContext, IAnalyzerAssemblyLoader, IDisposable {
     private readonly Dictionary<string, string> _dependencyPaths = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _gate = new();
 
     public SimpleAnalyzerAssemblyLoader()
-        : base("SharpProof.VsixHarness.Analyzer", true)
-    {
+        : base("SharpProof.VsixHarness.Analyzer", true) {
     }
 
-    public void AddDependencyLocation(string fullPath)
-    {
+    public void AddDependencyLocation(string fullPath) {
         var resolvedPath = Path.GetFullPath(fullPath);
         var assemblyName = Path.GetFileNameWithoutExtension(resolvedPath);
         if (assemblyName.Length == 0) return;
@@ -26,8 +23,7 @@ internal sealed class SimpleAnalyzerAssemblyLoader : AssemblyLoadContext, IAnaly
             _dependencyPaths[assemblyName] = resolvedPath;
     }
 
-    public Assembly LoadFromPath(string fullPath)
-    {
+    public Assembly LoadFromPath(string fullPath) {
         var resolvedPath = Path.GetFullPath(fullPath);
         AddDependencyLocation(resolvedPath);
         var requestedName = AssemblyName.GetAssemblyName(resolvedPath);
@@ -35,13 +31,9 @@ internal sealed class SimpleAnalyzerAssemblyLoader : AssemblyLoadContext, IAnaly
         return loaded ?? LoadFromAssemblyPath(resolvedPath);
     }
 
-    public void Dispose()
-    {
-        Unload();
-    }
+    public void Dispose() => Unload();
 
-    protected override Assembly? Load(AssemblyName requestedName)
-    {
+    protected override Assembly? Load(AssemblyName requestedName) {
         if (requestedName.Name == null) return null;
 
         var loaded = FindExactLoadedAssembly(requestedName);
@@ -55,29 +47,23 @@ internal sealed class SimpleAnalyzerAssemblyLoader : AssemblyLoadContext, IAnaly
         return LoadFromAssemblyPath(dependencyPath);
     }
 
-    private Assembly? FindExactLoadedAssembly(AssemblyName requestedName)
-    {
-        return Assemblies.Concat(AssemblyLoadContext.Default.Assemblies).FirstOrDefault(candidate =>
-        {
-            var loadedName = candidate.GetName();
-            return AssemblyName.ReferenceMatchesDefinition(loadedName, requestedName) &&
-                   Equals(loadedName.Version, requestedName.Version) &&
-                   string.Equals(loadedName.CultureName, requestedName.CultureName,
-                       StringComparison.OrdinalIgnoreCase) &&
-                   PublicKeyTokensEqual(loadedName, requestedName);
-        });
-    }
+    private Assembly? FindExactLoadedAssembly(AssemblyName requestedName) => Assemblies.Concat(AssemblyLoadContext.Default.Assemblies).FirstOrDefault(candidate => {
+        var loadedName = candidate.GetName();
+        return AssemblyName.ReferenceMatchesDefinition(loadedName, requestedName) &&
+               Equals(loadedName.Version, requestedName.Version) &&
+               string.Equals(loadedName.CultureName, requestedName.CultureName,
+                   StringComparison.OrdinalIgnoreCase) &&
+               PublicKeyTokensEqual(loadedName, requestedName);
+    });
 
-    private static bool PublicKeyTokensEqual(AssemblyName left, AssemblyName right)
-    {
+    private static bool PublicKeyTokensEqual(AssemblyName left, AssemblyName right) {
         var leftToken = left.GetPublicKeyToken() ?? Array.Empty<byte>();
         var rightToken = right.GetPublicKeyToken() ?? Array.Empty<byte>();
         return leftToken.AsSpan().SequenceEqual(rightToken);
     }
 }
 
-internal static class Program
-{
+internal static class Program {
     private static readonly ImmutableHashSet<string> RequiredVsixEntries = new[]
     {
         "[Content_Types].xml",
@@ -113,21 +99,17 @@ internal static class Program
         "System.Threading.Tasks.Extensions.dll"
     }.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
 
-    private static int Main(string[] args)
-    {
-        try
-        {
+    private static int Main(string[] args) {
+        try {
             return Run(args);
         }
-        catch (Exception ex)
-        {
+        catch (Exception ex) {
             Console.Error.WriteLine("HARNESS ERROR: " + ex);
             return 1;
         }
     }
 
-    private static int Run(string[] args)
-    {
+    private static int Run(string[] args) {
         var solutionRoot = FindRepoRoot();
         var configuration = GetConfiguration(args);
         var vsixPath = args.Length > 0
@@ -135,23 +117,20 @@ internal static class Program
             : Path.Combine(solutionRoot, "SharpProof.Vsix", "bin", configuration, "SharpProof.Vsix.vsix");
 
         string? simulatedVsixDirectory = null;
-        if (!File.Exists(vsixPath))
-        {
+        if (!File.Exists(vsixPath)) {
             vsixPath = CreateSimulatedVsix(solutionRoot, configuration);
             simulatedVsixDirectory = Path.GetDirectoryName(vsixPath);
             Console.WriteLine($"Created simulated VSIX at: {vsixPath}");
         }
 
-        try
-        {
+        try {
             var payload = ExtractVsixPayload(vsixPath, simulatedVsixDirectory == null);
-            try
-            {
+            try {
                 var attributesDll = Path.Combine(solutionRoot, "SharpProof.Attributes", "bin", configuration,
                 "netstandard2.0", "SharpProof.Attributes.dll");
-            var useRealAttributes = File.Exists(attributesDll);
-            var source = useRealAttributes
-                ? """
+                var useRealAttributes = File.Exists(attributesDll);
+                var source = useRealAttributes
+                    ? """
                   using SharpProof.Attributes;
                   namespace TestNamespace;
 
@@ -161,7 +140,7 @@ internal static class Program
                       public void M() => System.Console.WriteLine("impure");
                   }
                   """
-                : """
+                    : """
                   using System;
                   namespace SharpProof.Attributes
                   {
@@ -180,69 +159,63 @@ internal static class Program
                   }
                   """;
 
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var references = GetTrustedPlatformReferences().ToList();
-            if (useRealAttributes)
-            {
-                references.Add(MetadataReference.CreateFromFile(attributesDll));
-                Console.WriteLine($"Using real attributes assembly: {attributesDll}");
-            }
-            else
-            {
-                Console.WriteLine("Using in-source attribute stubs.");
-            }
+                var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+                var references = GetTrustedPlatformReferences().ToList();
+                if (useRealAttributes) {
+                    references.Add(MetadataReference.CreateFromFile(attributesDll));
+                    Console.WriteLine($"Using real attributes assembly: {attributesDll}");
+                }
+                else {
+                    Console.WriteLine("Using in-source attribute stubs.");
+                }
 
-            var compilation = CSharpCompilation.Create(
-                "VsixHarnessCompilation",
-                new[] { syntaxTree },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var compilationErrors = compilation.GetDiagnostics().Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
-            if (!compilationErrors.IsEmpty)
-                throw new InvalidOperationException("Harness sample did not compile: " +
-                                                    string.Join(Environment.NewLine, compilationErrors));
+                var compilation = CSharpCompilation.Create(
+                    "VsixHarnessCompilation",
+                    new[] { syntaxTree },
+                    references,
+                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                var compilationErrors = compilation.GetDiagnostics().Where(static diagnostic =>
+                    diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
+                if (!compilationErrors.IsEmpty)
+                    throw new InvalidOperationException("Harness sample did not compile: " +
+                                                        string.Join(Environment.NewLine, compilationErrors));
 
-            using var loader = new SimpleAnalyzerAssemblyLoader();
-            foreach (var dependencyPath in payload.ManagedAssemblyPaths)
-                loader.AddDependencyLocation(dependencyPath);
+                using var loader = new SimpleAnalyzerAssemblyLoader();
+                foreach (var dependencyPath in payload.ManagedAssemblyPaths)
+                    loader.AddDependencyLocation(dependencyPath);
 
-            var analyzerRef = new AnalyzerFileReference(payload.AnalyzerPath, loader);
-            var analyzers = analyzerRef.GetAnalyzers(LanguageNames.CSharp);
-            if (analyzers.IsDefaultOrEmpty)
-                throw new InvalidOperationException("VSIX contained no loadable C# analyzers.");
+                var analyzerRef = new AnalyzerFileReference(payload.AnalyzerPath, loader);
+                var analyzers = analyzerRef.GetAnalyzers(LanguageNames.CSharp);
+                if (analyzers.IsDefaultOrEmpty)
+                    throw new InvalidOperationException("VSIX contained no loadable C# analyzers.");
 
-            var analyzerDiagnostics = compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter().GetResult();
-            Console.WriteLine($"Analyzer executed. Diagnostics count: {analyzerDiagnostics.Length}");
-            foreach (var diagnostic in analyzerDiagnostics)
-            {
-                var location = diagnostic.Location.GetLineSpan();
-                Console.WriteLine(
-                    $"  {diagnostic.Id}: {diagnostic.GetMessage()} @ {location.Path}({location.StartLinePosition.Line + 1},{location.StartLinePosition.Character + 1})");
-            }
+                var analyzerDiagnostics = compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync()
+                    .GetAwaiter().GetResult();
+                Console.WriteLine($"Analyzer executed. Diagnostics count: {analyzerDiagnostics.Length}");
+                foreach (var diagnostic in analyzerDiagnostics) {
+                    var location = diagnostic.Location.GetLineSpan();
+                    Console.WriteLine(
+                        $"  {diagnostic.Id}: {diagnostic.GetMessage()} @ {location.Path}({location.StartLinePosition.Line + 1},{location.StartLinePosition.Character + 1})");
+                }
 
-            if (analyzerDiagnostics.Any(static diagnostic => diagnostic.Id == "AD0001"))
-                throw new InvalidOperationException("Analyzer execution produced AD0001.");
-            if (!analyzerDiagnostics.Any(static diagnostic => diagnostic.Id == "SP0002"))
-                throw new InvalidOperationException("Analyzer did not produce the expected SP0002 diagnostic.");
+                if (analyzerDiagnostics.Any(static diagnostic => diagnostic.Id == "AD0001"))
+                    throw new InvalidOperationException("Analyzer execution produced AD0001.");
+                if (!analyzerDiagnostics.Any(static diagnostic => diagnostic.Id == "SP0002"))
+                    throw new InvalidOperationException("Analyzer did not produce the expected SP0002 diagnostic.");
 
                 return 0;
             }
-            finally
-            {
+            finally {
                 TryDeleteDirectory(payload.Directory.FullName);
             }
         }
-        finally
-        {
+        finally {
             if (simulatedVsixDirectory != null)
                 TryDeleteDirectory(simulatedVsixDirectory);
         }
     }
 
-    private static IEnumerable<MetadataReference> GetTrustedPlatformReferences()
-    {
+    private static IEnumerable<MetadataReference> GetTrustedPlatformReferences() {
         var trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
         if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
             throw new InvalidOperationException("TRUSTED_PLATFORM_ASSEMBLIES was not available.");
@@ -252,21 +225,17 @@ internal static class Program
             .Select(static path => MetadataReference.CreateFromFile(path));
     }
 
-    private static ExtractedVsixPayload ExtractVsixPayload(string vsixPath, bool validateManifest)
-    {
+    private static ExtractedVsixPayload ExtractVsixPayload(string vsixPath, bool validateManifest) {
         var directory = Directory.CreateTempSubdirectory("SharpProofVsixHarness");
-        try
-        {
+        try {
             var root = directory.FullName.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             string? analyzerPath = null;
 
-            using (var archive = ZipFile.OpenRead(vsixPath))
-            {
+            using (var archive = ZipFile.OpenRead(vsixPath)) {
                 if (validateManifest)
                     ValidateVsixManifest(archive);
 
-                foreach (var entry in archive.Entries)
-                {
+                foreach (var entry in archive.Entries) {
                     if (entry.Name.Length == 0 ||
                         entry.FullName.EndsWith("/", StringComparison.Ordinal) ||
                         entry.FullName.EndsWith("\\", StringComparison.Ordinal))
@@ -288,30 +257,25 @@ internal static class Program
                 throw new FileNotFoundException("Analyzer DLL not found inside VSIX.");
 
             var managedAssemblies = Directory.GetFiles(directory.FullName, "*.dll", SearchOption.AllDirectories)
-                .Where(static path =>
-                {
-                    try
-                    {
+                .Where(static path => {
+                    try {
                         _ = AssemblyName.GetAssemblyName(path);
                         return true;
                     }
-                    catch (BadImageFormatException)
-                    {
+                    catch (BadImageFormatException) {
                         return false;
                     }
                 })
                 .ToImmutableArray();
             return new ExtractedVsixPayload(directory, analyzerPath, managedAssemblies);
         }
-        catch
-        {
+        catch {
             TryDeleteDirectory(directory.FullName);
             throw;
         }
     }
 
-    private static void ValidateVsixManifest(ZipArchive archive)
-    {
+    private static void ValidateVsixManifest(ZipArchive archive) {
         var actualEntries = archive.Entries
             .Where(static entry => entry.Name.Length != 0)
             .Select(static entry => entry.FullName.Replace('\\', '/'))
@@ -324,11 +288,9 @@ internal static class Program
                 $"Unexpected: [{string.Join(", ", unexpected)}].");
     }
 
-    private static string FindRepoRoot()
-    {
+    private static string FindRepoRoot() {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
+        while (directory != null) {
             if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
             directory = directory.Parent;
         }
@@ -336,13 +298,11 @@ internal static class Program
         return AppContext.BaseDirectory;
     }
 
-    private static string GetConfiguration(string[] args)
-    {
+    private static string GetConfiguration(string[] args) {
         var configuration = args.Length > 1
             ? args[1]
             : Environment.GetEnvironmentVariable("SHARPPROOF_BUILD_CONFIGURATION");
-        if (string.IsNullOrWhiteSpace(configuration) && args.Length > 0)
-        {
+        if (string.IsNullOrWhiteSpace(configuration) && args.Length > 0) {
             var candidate = Directory.GetParent(Path.GetFullPath(args[0]))?.Name;
             if (string.Equals(candidate, "Debug", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(candidate, "Release", StringComparison.OrdinalIgnoreCase))
@@ -359,8 +319,7 @@ internal static class Program
         return configuration;
     }
 
-    private static string CreateSimulatedVsix(string solutionRoot, string configuration)
-    {
+    private static string CreateSimulatedVsix(string solutionRoot, string configuration) {
         var analyzerDirectory = Path.Combine(solutionRoot, "SharpProof.Analyzer", "bin", configuration,
             "netstandard2.0");
         var analyzerPath = Path.Combine(analyzerDirectory, "SharpProof.Analyzer.dll");
@@ -368,36 +327,29 @@ internal static class Program
             throw new FileNotFoundException($"Analyzer not found at {analyzerPath}. Build in {configuration} first.");
 
         var tempDirectory = Directory.CreateTempSubdirectory("SharpProofSimVsix");
-        try
-        {
+        try {
             var vsixPath = Path.Combine(tempDirectory.FullName, "SharpProof.Simulated.vsix");
             using (var archive = ZipFile.Open(vsixPath, ZipArchiveMode.Create))
-                foreach (var file in Directory.GetFiles(analyzerDirectory, "*", SearchOption.AllDirectories))
-                {
+                foreach (var file in Directory.GetFiles(analyzerDirectory, "*", SearchOption.AllDirectories)) {
                     var entryName = Path.GetRelativePath(analyzerDirectory, file).Replace('\\', '/');
                     archive.CreateEntryFromFile(file, entryName);
                 }
 
             return vsixPath;
         }
-        catch
-        {
+        catch {
             TryDeleteDirectory(tempDirectory.FullName);
             throw;
         }
     }
 
-    private static void TryDeleteDirectory(string path)
-    {
-        try
-        {
+    private static void TryDeleteDirectory(string path) {
+        try {
             Directory.Delete(path, true);
         }
-        catch (IOException)
-        {
+        catch (IOException) {
         }
-        catch (UnauthorizedAccessException)
-        {
+        catch (UnauthorizedAccessException) {
         }
     }
 

@@ -1,31 +1,25 @@
 namespace SharpProof.Symbolic.Smt;
 
-internal static class SwitchPathConditionBuilder
-{
+internal static class SwitchPathConditionBuilder {
     internal static bool TryCreateSwitchStatementSectionSymbolicCondition(
         ExpressionSyntax governingExpression,
         SwitchSectionSyntax section,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SymbolicCondition condition,
-        Func<ISymbol, int>? getSymbolVersion = null)
-    {
-        return TryCreateCanonicalSwitchStatementSectionCondition(
+        Func<ISymbol, int>? getSymbolVersion = null) => TryCreateCanonicalSwitchStatementSectionCondition(
             governingExpression,
             section,
             semanticModel,
             cancellationToken,
             out condition,
             getSymbolVersion);
-    }
 
     internal static bool TryCreateSwitchStatementSectionSymbolicCondition(
         ExpressionSyntax governingExpression,
         SwitchSectionSyntax section,
         SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
-        return TryCreateCanonicalSwitchStatementSectionCondition(
+        out SymbolicCondition condition) => TryCreateCanonicalSwitchStatementSectionCondition(
             governingExpression,
             section,
             context.SemanticModel,
@@ -33,7 +27,6 @@ internal static class SwitchPathConditionBuilder
             out condition,
             context.GetSymbolVersion,
             context);
-    }
 
     internal static bool TryCreateSwitchStatementLabelSymbolicCondition(
         ExpressionSyntax governingExpression,
@@ -41,8 +34,7 @@ internal static class SwitchPathConditionBuilder
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SymbolicCondition condition,
-        Func<ISymbol, int>? getSymbolVersion = null)
-    {
+        Func<ISymbol, int>? getSymbolVersion = null) {
         condition = null!;
         return TryLowerCanonicalSwitchGoverningValue(
                    governingExpression,
@@ -66,16 +58,13 @@ internal static class SwitchPathConditionBuilder
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SymbolicCondition condition,
-        Func<ISymbol, int>? getSymbolVersion = null)
-    {
-        return TryCreateCanonicalSwitchExpressionArmCondition(
+        Func<ISymbol, int>? getSymbolVersion = null) => TryCreateCanonicalSwitchExpressionArmCondition(
             governingExpression,
             arm,
             semanticModel,
             cancellationToken,
             out condition,
             getSymbolVersion);
-    }
 
     private static bool TryCreateCanonicalSwitchStatementSectionCondition(
         ExpressionSyntax governingExpression,
@@ -84,8 +73,7 @@ internal static class SwitchPathConditionBuilder
         CancellationToken cancellationToken,
         out SymbolicCondition condition,
         Func<ISymbol, int>? getSymbolVersion,
-        SymbolicLoweringContext? existingContext = null)
-    {
+        SymbolicLoweringContext? existingContext = null) {
         condition = null!;
         if (section.Parent is not SwitchStatementSyntax switchStatement ||
             !TryLowerCanonicalSwitchGoverningValue(
@@ -99,8 +87,7 @@ internal static class SwitchPathConditionBuilder
                 existingContext))
             return false;
 
-        if (section.Labels.Any(static label => label is DefaultSwitchLabelSyntax))
-        {
+        if (section.Labels.Any(static label => label is DefaultSwitchLabelSyntax)) {
             var explicitSelections = new List<SymbolicCondition>();
             foreach (var candidateSection in switchStatement.Sections)
                 foreach (var label in candidateSection.Labels)
@@ -135,8 +122,7 @@ internal static class SwitchPathConditionBuilder
 
         var selected = CreateCanonicalDisjunction(currentSelections);
         var priorSelections = new List<SymbolicCondition>();
-        foreach (var candidateSection in switchStatement.Sections)
-        {
+        foreach (var candidateSection in switchStatement.Sections) {
             if (ReferenceEquals(candidateSection, section)) break;
 
             foreach (var label in candidateSection.Labels)
@@ -165,8 +151,7 @@ internal static class SwitchPathConditionBuilder
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SymbolicCondition condition,
-        Func<ISymbol, int>? getSymbolVersion)
-    {
+        Func<ISymbol, int>? getSymbolVersion) {
         condition = null!;
         if (arm.Parent is not SwitchExpressionSyntax switchExpression ||
             !TryLowerCanonicalSwitchGoverningValue(
@@ -187,8 +172,7 @@ internal static class SwitchPathConditionBuilder
             return false;
 
         var priorSelections = new List<SymbolicCondition>();
-        foreach (var candidate in switchExpression.Arms)
-        {
+        foreach (var candidate in switchExpression.Arms) {
             if (ReferenceEquals(candidate, arm)) break;
 
             if (TryCreateCanonicalPatternAndGuardCondition(
@@ -218,8 +202,7 @@ internal static class SwitchPathConditionBuilder
         out SymbolicTerm governingValue,
         out ITypeSymbol? governingType,
         out SymbolicLoweringContext context,
-        SymbolicLoweringContext? existingContext = null)
-    {
+        SymbolicLoweringContext? existingContext = null) {
         context = existingContext ?? new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
         governingValue = null!;
         var typeInfo = semanticModel.GetTypeInfo(governingExpression, cancellationToken);
@@ -236,14 +219,11 @@ internal static class SwitchPathConditionBuilder
         ITypeSymbol? governingType,
         SwitchLabelSyntax label,
         SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
+        out SymbolicCondition condition) {
         condition = null!;
         if (label is CaseSwitchLabelSyntax constantLabel &&
-            SymbolicSemanticPipeline.LowerTerm(constantLabel.Value, context) is
-                { IsExact: true, Value: { } constant } &&
-            CanCompareCanonicalTerms(governingValue, constant))
-        {
+            SymbolicSemanticPipeline.LowerTerm(constantLabel.Value, context) is { IsExact: true, Value: { } constant } &&
+            CanCompareCanonicalTerms(governingValue, constant)) {
             condition = new SymbolicFactCondition(SymbolicFact.Exact(
                 new SymbolicRelationAtom(SymbolicRelationOperator.Equal, governingValue, constant),
                 constantLabel,
@@ -267,16 +247,14 @@ internal static class SwitchPathConditionBuilder
         PatternSyntax pattern,
         WhenClauseSyntax? whenClause,
         SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
+        out SymbolicCondition condition) {
         var patternLowering = SymbolicSemanticPipeline.LowerPatternCondition(
             governingValue,
             governingType,
             pattern,
             pattern,
             context);
-        if (patternLowering is not { IsExact: true, Value: { } loweredCondition })
-        {
+        if (patternLowering is not { IsExact: true, Value: { } loweredCondition }) {
             condition = null!;
             return false;
         }
@@ -294,8 +272,7 @@ internal static class SwitchPathConditionBuilder
         CollectCanonicalDesignationBindings(condition, designationNames, bindings);
         condition = RemoveCanonicalDesignationBindings(condition, designationNames);
 
-        if (whenClause?.Condition is { } guard)
-        {
+        if (whenClause?.Condition is { } guard) {
             var lowering = SymbolicSemanticPipeline.LowerCondition(guard, context);
             if (lowering is not { IsExact: true, Value: { } guardCondition }) return false;
 
@@ -312,17 +289,12 @@ internal static class SwitchPathConditionBuilder
     private static void CollectCanonicalDesignationBindings(
         SymbolicCondition condition,
         ISet<string> designationNames,
-        IDictionary<string, SymbolicTerm> bindings)
-    {
-        switch (condition)
-        {
-            case SymbolicFactCondition
-            {
-                Fact:
-                {
+        IDictionary<string, SymbolicTerm> bindings) {
+        switch (condition) {
+            case SymbolicFactCondition {
+                Fact: {
                     Polarity: true,
-                    Atom: SymbolicRelationAtom
-                    {
+                    Atom: SymbolicRelationAtom {
                         Operator: SymbolicRelationOperator.Equal,
                         Left: var left,
                         Right: var right
@@ -346,17 +318,11 @@ internal static class SwitchPathConditionBuilder
 
     private static SymbolicCondition RemoveCanonicalDesignationBindings(
         SymbolicCondition condition,
-        ISet<string> designationNames)
-    {
-        return condition switch
-        {
-            SymbolicFactCondition
-            {
-                Fact:
-                {
+        ISet<string> designationNames) => condition switch {
+            SymbolicFactCondition {
+                Fact: {
                     Polarity: true,
-                    Atom: SymbolicRelationAtom
-                    {
+                    Atom: SymbolicRelationAtom {
                         Operator: SymbolicRelationOperator.Equal,
                         Left: var left,
                         Right: var right
@@ -372,19 +338,16 @@ internal static class SwitchPathConditionBuilder
                 RemoveCanonicalDesignationBindings(binary.Right, designationNames)),
             _ => condition
         };
-    }
 
     private static bool IsCanonicalDesignationTerm(SymbolicTerm term, ISet<string> designationNames) =>
         term is SymbolicVariableTerm variable && designationNames.Contains(variable.Name);
 
     private static SymbolicCondition SubstituteCanonicalTerms(
         SymbolicCondition condition,
-        IReadOnlyDictionary<string, SymbolicTerm> bindings)
-    {
+        IReadOnlyDictionary<string, SymbolicTerm> bindings) {
         if (bindings.Count == 0) return condition;
 
-        return condition switch
-        {
+        return condition switch {
             SymbolicConstantCondition => condition,
             SymbolicFactCondition factCondition => new SymbolicFactCondition(
                 factCondition.Fact with { Atom = SubstituteCanonicalTerms(factCondition.Fact.Atom, bindings) }),
@@ -399,10 +362,7 @@ internal static class SwitchPathConditionBuilder
 
     private static SymbolicAtom SubstituteCanonicalTerms(
         SymbolicAtom atom,
-        IReadOnlyDictionary<string, SymbolicTerm> bindings)
-    {
-        return atom switch
-        {
+        IReadOnlyDictionary<string, SymbolicTerm> bindings) => atom switch {
             SymbolicTruthAtom truth => new SymbolicTruthAtom(SubstituteCanonicalTerms(truth.Condition, bindings)),
             SymbolicRelationAtom relation => new SymbolicRelationAtom(
                 relation.Operator,
@@ -426,17 +386,14 @@ internal static class SwitchPathConditionBuilder
                 typeTest.TypeKey),
             _ => atom
         };
-    }
 
     private static SymbolicTerm SubstituteCanonicalTerms(
         SymbolicTerm term,
-        IReadOnlyDictionary<string, SymbolicTerm> bindings)
-    {
+        IReadOnlyDictionary<string, SymbolicTerm> bindings) {
         if (term is SymbolicVariableTerm variable && bindings.TryGetValue(variable.Name, out var replacement))
             return replacement;
 
-        return term switch
-        {
+        return term switch {
             SymbolicMemberTerm member => new SymbolicMemberTerm(
                 SubstituteCanonicalTerms(member.Receiver, bindings),
                 member.MemberName,
@@ -473,8 +430,7 @@ internal static class SwitchPathConditionBuilder
         };
     }
 
-    private static SymbolicCondition CreateCanonicalDisjunction(IReadOnlyList<SymbolicCondition> conditions)
-    {
+    private static SymbolicCondition CreateCanonicalDisjunction(IReadOnlyList<SymbolicCondition> conditions) {
         var result = conditions[0];
         for (var index = 1; index < conditions.Count; index++)
             result = new SymbolicBinaryCondition(SymbolicConditionOperator.Or, result, conditions[index]);
@@ -482,11 +438,8 @@ internal static class SwitchPathConditionBuilder
         return result;
     }
 
-    private static bool CanCompareCanonicalTerms(SymbolicTerm left, SymbolicTerm right)
-    {
-        return left.Kind == right.Kind ||
+    private static bool CanCompareCanonicalTerms(SymbolicTerm left, SymbolicTerm right) => left.Kind == right.Kind ||
                (left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference) ||
                (right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference);
-    }
 
 }

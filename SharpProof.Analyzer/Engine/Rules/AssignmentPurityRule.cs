@@ -1,33 +1,27 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class AssignmentPurityRule
-{
+internal partial class AssignmentPurityRule {
     public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         IOperation targetOperation;
         IOperation? valueOperation = null;
         IMethodSymbol? compoundOperatorMethod = null;
         var diagnosticNode = operation.Syntax;
 
-        if (operation is IAssignmentOperation assignmentOperation)
-        {
+        if (operation is IAssignmentOperation assignmentOperation) {
             targetOperation = assignmentOperation.Target;
             valueOperation = assignmentOperation.Value;
         }
-        else if (operation is ICompoundAssignmentOperation compoundAssignmentOperation)
-        {
+        else if (operation is ICompoundAssignmentOperation compoundAssignmentOperation) {
             targetOperation = compoundAssignmentOperation.Target;
             valueOperation = compoundAssignmentOperation.Value;
             compoundOperatorMethod = compoundAssignmentOperation.OperatorMethod?.OriginalDefinition;
         }
-        else if (operation is IIncrementOrDecrementOperation incrementDecrementOperation)
-        {
+        else if (operation is IIncrementOrDecrementOperation incrementDecrementOperation) {
             targetOperation = incrementDecrementOperation.Target;
             compoundOperatorMethod = incrementDecrementOperation.OperatorMethod?.OriginalDefinition;
         }
-        else
-        {
+        else {
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 
@@ -36,8 +30,7 @@ internal partial class AssignmentPurityRule
 
         targetOperation = NormalizeAssignmentTargetOperation(targetOperation, context);
 
-        if (valueOperation != null)
-        {
+        if (valueOperation != null) {
             var valueResult = PurityAnalysisEngine.CheckSingleOperation(valueOperation, context, currentState);
             if (!valueResult.IsPure)
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -53,33 +46,28 @@ internal partial class AssignmentPurityRule
             var valueType = valueOperation.Type;
 
             if (targetType != null && valueType != null &&
-                !SymbolEq.AreEqual(targetType, valueType))
-            {
+                !SymbolEq.AreEqual(targetType, valueType)) {
                 IConversionOperation? conversionOp = null;
 
 
                 if (valueOperation is IConversionOperation topLevelConv &&
                     topLevelConv.Conversion.IsImplicit &&
-                    SymbolEq.AreEqual(topLevelConv.Type, targetType))
-                {
+                    SymbolEq.AreEqual(topLevelConv.Type, targetType)) {
                     conversionOp = topLevelConv;
                 }
-                else
-                {
+                else {
                     conversionOp = valueOperation.DescendantsAndSelf()
                         .OfType<IConversionOperation>()
                         .FirstOrDefault(conv => conv.Conversion.IsImplicit &&
                                                 SymbolEq.AreEqual(conv.Type, targetType) &&
                                                 conv.Operand != null &&
                                                 SymbolEq.AreEqual(conv.Operand.Type, valueType));
-                    if (conversionOp != null)
-                    {
+                    if (conversionOp != null) {
                     }
                 }
 
 
-                if (conversionOp != null)
-                {
+                if (conversionOp != null) {
                     var conversionResult =
                         PurityAnalysisEngine.CheckSingleOperation(conversionOp, context, currentState);
                     if (!conversionResult.IsPure)
@@ -90,8 +78,7 @@ internal partial class AssignmentPurityRule
             }
         }
 
-        if (compoundOperatorMethod != null)
-        {
+        if (compoundOperatorMethod != null) {
             var operatorResult = CheckCompoundAssignmentOperatorPurity(compoundOperatorMethod, operation, context);
             if (!operatorResult.IsPure) return operatorResult;
         }
@@ -104,12 +91,10 @@ internal partial class AssignmentPurityRule
         IOperation operation,
         IOperation targetOperation,
         PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
+        PurityAnalysisEngine.PurityAnalysisState currentState) {
         targetOperation = NormalizeAssignmentTargetOperation(targetOperation, context);
         var targetResult = PurityAnalysisEngine.CheckSingleOperation(targetOperation, context, currentState);
-        if (!targetResult.IsPure)
-        {
+        if (!targetResult.IsPure) {
             if (TryCreateMutableBorrowConflictEvidence(
                     operation,
                     PurityAnalysisEngine.TryResolveSymbol(targetOperation),
@@ -140,8 +125,7 @@ internal partial class AssignmentPurityRule
 
         var isPureAssignment = IsAssignmentTargetPure(targetOperation, context, currentState);
 
-        if (!isPureAssignment)
-        {
+        if (!isPureAssignment) {
             if (TryCreateMutableBorrowConflictEvidence(
                     operation,
                     targetSymbol,

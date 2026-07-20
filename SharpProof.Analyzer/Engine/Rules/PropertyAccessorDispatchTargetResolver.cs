@@ -1,15 +1,13 @@
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal static class PropertyAccessorDispatchTargetResolver
-{
+internal static class PropertyAccessorDispatchTargetResolver {
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckPotentialTargetPurity(
         IPropertyReferenceOperation propertyReference,
         PurityAnalysisContext context,
         INamedTypeSymbol? knownReceiverType,
         bool hasExactReceiverType,
         bool useSetter,
-        string ruleName)
-    {
+        string ruleName) {
         var accessor = useSetter ? propertyReference.Property.SetMethod : propertyReference.Property.GetMethod;
         var candidates = accessor == null
             ? Array.Empty<IMethodSymbol>()
@@ -28,8 +26,7 @@ internal static class PropertyAccessorDispatchTargetResolver
                 ruleName,
                 accessor);
 
-        foreach (var candidate in candidates)
-        {
+        foreach (var candidate in candidates) {
             var candidateResult = PurityCalleeResolver.GetCalleePurityAtUse(candidate, propertyReference.Syntax, context);
             if (!candidateResult.IsPure) return candidateResult;
         }

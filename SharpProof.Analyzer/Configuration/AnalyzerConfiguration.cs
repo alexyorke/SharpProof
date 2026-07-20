@@ -21,13 +21,11 @@ internal sealed record AnalyzerConfiguration(
     TrustedBoundaryReviewMode TrustedBoundaryReviewMode,
     SmtAnalysisOptions SmtOptions,
     SharpProofAnalysisBudget AnalysisLimits,
-    ImmutableArray<InvalidAnalyzerConfigurationValue> InvalidConfigurationValues)
-{
+    ImmutableArray<InvalidAnalyzerConfigurationValue> InvalidConfigurationValues) {
     private static readonly ImmutableHashSet<string> EmptyValues =
         ImmutableHashSet.Create<string>(StringComparer.Ordinal);
 
-    public static AnalyzerConfiguration FromOptions(AnalyzerOptions options)
-    {
+    public static AnalyzerConfiguration FromOptions(AnalyzerOptions options) {
         var optionSource = new ConfigurationOptionSource(options);
         var impureMethods = GetConfiguredMemberKeys(optionSource, ConfigKeys.KnownImpureMethods);
         var pureMethods = GetConfiguredMemberKeys(optionSource, ConfigKeys.KnownPureMethods);
@@ -92,8 +90,7 @@ internal sealed record AnalyzerConfiguration(
     internal static AnalyzerTreeConfiguration GetTreeConfiguration(
         AnalyzerOptions options,
         SyntaxTree syntaxTree,
-        AnalyzerConfiguration fallback)
-    {
+        AnalyzerConfiguration fallback) {
         var global = new AnalyzerTreeConfiguration(
             fallback.MissingPuritySuggestions,
             fallback.InferredContractSuggestions,
@@ -104,8 +101,7 @@ internal sealed record AnalyzerConfiguration(
             fallback.ReportExceptions,
             fallback.CheckedExceptions,
             fallback.ReportNullableInconclusive);
-        return GetTreeOptions(options, syntaxTree, global, treeOptions =>
-        {
+        return GetTreeOptions(options, syntaxTree, global, treeOptions => {
             var optionSource = new ConfigurationOptionSource(treeOptions);
             var suggestMissing = GetBoolOrDefault(
                 optionSource,
@@ -170,29 +166,21 @@ internal sealed record AnalyzerConfiguration(
         AnalyzerOptions options,
         SyntaxTree syntaxTree,
         T fallback,
-        Func<AnalyzerConfigOptions, T> readOptions)
-    {
-        try
-        {
+        Func<AnalyzerConfigOptions, T> readOptions) {
+        try {
             return readOptions(options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree));
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
+        catch (Exception ex) when (ex is not OperationCanceledException) {
             return fallback;
         }
     }
 
-    private static ImmutableHashSet<string> GetConfiguredMemberKeys(ConfigurationOptionSource options, string key)
-    {
-        return GetValues(options, key, EmptyValues)
+    private static ImmutableHashSet<string> GetConfiguredMemberKeys(ConfigurationOptionSource options, string key) => GetValues(options, key, EmptyValues)
             .Where(static value => ConfiguredMemberKey.TryParse(value, out _))
             .ToImmutableHashSet(StringComparer.Ordinal);
-    }
 
-    private static IEnumerable<string> SplitValues(string value)
-    {
-        foreach (var token in value.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-        {
+    private static IEnumerable<string> SplitValues(string value) {
+        foreach (var token in value.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries)) {
             var item = token.Trim();
             if (item.Length > 0) yield return item;
         }
@@ -200,20 +188,15 @@ internal sealed record AnalyzerConfiguration(
 
     private static ImmutableHashSet<string> GetSuppressionDiagnosticIds(
         ConfigurationOptionSource options,
-        ImmutableHashSet<string> fallback)
-    {
-        return options.TryGetValue(ConfigKeys.SuppressionDiagnosticIds, out var value)
+        ImmutableHashSet<string> fallback) => options.TryGetValue(ConfigKeys.SuppressionDiagnosticIds, out var value)
             ? ParseSuppressionDiagnosticIds(value)
             : fallback;
-    }
 
-    private static ImmutableHashSet<string> ParseSuppressionDiagnosticIds(string? value)
-    {
+    private static ImmutableHashSet<string> ParseSuppressionDiagnosticIds(string? value) {
         if (string.IsNullOrWhiteSpace(value)) return ImmutableHashSet<string>.Empty;
 
         var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        foreach (var token in SplitValues(value!))
-        {
+        foreach (var token in SplitValues(value!)) {
             var normalized = token.ToUpperInvariant();
             if (normalized == "NONE") return ImmutableHashSet<string>.Empty;
 
@@ -227,8 +210,7 @@ internal sealed record AnalyzerConfiguration(
     private static ImmutableHashSet<string> GetValues(
         ConfigurationOptionSource options,
         string key,
-        ImmutableHashSet<string> fallback)
-    {
+        ImmutableHashSet<string> fallback) {
         var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         if (!options.TryGetValue(key, out var value)) return fallback;
 
@@ -239,17 +221,14 @@ internal sealed record AnalyzerConfiguration(
         return builder.ToImmutable();
     }
 
-    private static bool GetBoolOrDefault(ConfigurationOptionSource options, string key, bool fallback)
-    {
+    private static bool GetBoolOrDefault(ConfigurationOptionSource options, string key, bool fallback) {
         if (!options.TryGetValue(key, out var value)) return fallback;
 
         return TryParseBool(value, out var parsed) ? parsed : fallback;
     }
 
-    internal static bool TryParseBool(string value, out bool parsed)
-    {
-        switch (value.Trim().ToLowerInvariant())
-        {
+    internal static bool TryParseBool(string value, out bool parsed) {
+        switch (value.Trim().ToLowerInvariant()) {
             case "1":
             case "true":
             case "yes":
@@ -268,16 +247,12 @@ internal sealed record AnalyzerConfiguration(
         }
     }
 
-    private static string GetPurityProfile(ConfigurationOptionSource options)
-    {
-        return options.TryGetValue(ConfigKeys.PurityProfile, out var value)
+    private static string GetPurityProfile(ConfigurationOptionSource options) => options.TryGetValue(ConfigKeys.PurityProfile, out var value)
             ? ParseNormalizedValue(value, "balanced", ("strict", "strict"), ("balanced", "balanced"),
                 ("pragmatic", "pragmatic"))
             : "balanced";
-    }
 
-    private static TrustedBoundaryReviewMode GetTrustedBoundaryReviewMode(ConfigurationOptionSource options)
-    {
+    private static TrustedBoundaryReviewMode GetTrustedBoundaryReviewMode(ConfigurationOptionSource options) {
         if (!options.TryGetValue(ConfigKeys.TrustedBoundaryReviewMode, out var value))
             return TrustedBoundaryReviewMode.Off;
 
@@ -287,57 +262,41 @@ internal sealed record AnalyzerConfiguration(
 
     private static RuntimeHazardMode GetRuntimeHazardMode(
         ConfigurationOptionSource options,
-        RuntimeHazardMode fallback)
-    {
-        return options.TryGetValue(ConfigKeys.RuntimeHazardMode, out var value)
+        RuntimeHazardMode fallback) => options.TryGetValue(ConfigKeys.RuntimeHazardMode, out var value)
             ? AnalyzerConfigurationOptionRegistry.TryParseRuntimeHazardMode(value, out var parsed)
                 ? parsed
                 : fallback
             : fallback;
-    }
 
     private static MissingPuritySuggestionScope GetSuggestionScope(
         ConfigurationOptionSource options,
         string key,
-        MissingPuritySuggestionScope fallback)
-    {
-        return options.TryGetValue(key, out var value)
+        MissingPuritySuggestionScope fallback) => options.TryGetValue(key, out var value)
             ? ParseNormalizedValue(value, fallback, ("all", MissingPuritySuggestionScope.All),
                 ("public", MissingPuritySuggestionScope.Public), ("public-only", MissingPuritySuggestionScope.Public),
                 ("internal", MissingPuritySuggestionScope.Internal),
                 ("internal-only", MissingPuritySuggestionScope.Internal), ("off", MissingPuritySuggestionScope.Off),
                 ("none", MissingPuritySuggestionScope.Off), ("false", MissingPuritySuggestionScope.Off))
             : fallback;
-    }
 
     private static ImmutableHashSet<string> GetInferredContractKinds(
         ConfigurationOptionSource options,
-        ImmutableHashSet<string> fallback)
-    {
-        return NormalizeInferredContractKinds(
+        ImmutableHashSet<string> fallback) => NormalizeInferredContractKinds(
             GetValues(options, ConfigKeys.SuggestInferredContractsKinds, fallback));
-    }
 
-    private static ImmutableHashSet<string> NormalizeInferredContractKinds(IEnumerable<string> values)
-    {
-        return values
+    private static ImmutableHashSet<string> NormalizeInferredContractKinds(IEnumerable<string> values) => values
             .Select(static value => value.Trim().ToLowerInvariant())
             .ToImmutableHashSet(StringComparer.Ordinal);
-    }
 
     private static InferredContractConfidence GetInferredContractConfidence(
         ConfigurationOptionSource options,
         string key,
-        InferredContractConfidence fallback)
-    {
-        return options.TryGetValue(key, out var value)
+        InferredContractConfidence fallback) => options.TryGetValue(key, out var value)
             ? ParseNormalizedValue(value, fallback, ("medium", InferredContractConfidence.Medium),
                 ("high", InferredContractConfidence.High))
             : fallback;
-    }
 
-    private static T ParseNormalizedValue<T>(string value, T fallback, params (string Name, T Value)[] values)
-    {
+    private static T ParseNormalizedValue<T>(string value, T fallback, params (string Name, T Value)[] values) {
         var normalized = value.Trim().ToLowerInvariant();
         foreach (var candidate in values)
             if (candidate.Name == normalized)
@@ -346,17 +305,13 @@ internal sealed record AnalyzerConfiguration(
         return fallback;
     }
 
-    private static int GetNonNegativeInt(ConfigurationOptionSource options, string key, int fallback)
-    {
-        return options.TryGetValue(key, out var value) &&
+    private static int GetNonNegativeInt(ConfigurationOptionSource options, string key, int fallback) => options.TryGetValue(key, out var value) &&
                AnalyzerConfigurationValueReader.TryParseInteger(value, 0, out var parsed)
             ? parsed
             : fallback;
-    }
 
     private static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidGlobalConfigurationValues(
-        AnalyzerOptions options)
-    {
+        AnalyzerOptions options) {
         var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
 
         foreach (var option in AnalyzerConfigurationOptionRegistry.GlobalOptions)
@@ -364,22 +319,16 @@ internal sealed record AnalyzerConfiguration(
 
         return builder.ToImmutable();
 
-        bool TryGetOption(string key, out string value)
-        {
-            return AnalyzerConfigurationValueReader.TryGetGlobalOption(options, key, out value);
-        }
+        bool TryGetOption(string key, out string value) => AnalyzerConfigurationValueReader.TryGetGlobalOption(options, key, out value);
     }
 
     internal static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidTreeConfigurationValues(
         AnalyzerConfigOptions options,
-        AnalyzerConfigOptions? globalOptions = null)
-    {
+        AnalyzerConfigOptions? globalOptions = null) {
         var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
 
-        foreach (var option in AnalyzerConfigurationOptionRegistry.All)
-        {
-            switch (option.Scope)
-            {
+        foreach (var option in AnalyzerConfigurationOptionRegistry.All) {
+            switch (option.Scope) {
                 case AnalyzerConfigurationScope.TreeOnly:
                     ValidateOption(builder, TryGetOption, option);
                     break;
@@ -396,21 +345,16 @@ internal sealed record AnalyzerConfiguration(
 
         return builder.ToImmutable();
 
-        bool TryGetOption(string key, out string value)
-        {
-            return TryGetAnalyzerConfigOption(options, key, out value);
-        }
+        bool TryGetOption(string key, out string value) => TryGetAnalyzerConfigOption(options, key, out value);
     }
 
     private static void ValidateOption(
         ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
         TryGetConfigurationOption tryGetOption,
-        AnalyzerConfigurationOption option)
-    {
+        AnalyzerConfigurationOption option) {
         if (!tryGetOption(option.Key, out var value)) return;
 
-        var reason = option.ValueKind switch
-        {
+        var reason = option.ValueKind switch {
             AnalyzerConfigurationValueKind.Bool when !TryParseBool(value, out _) =>
                 "expected a boolean value",
             AnalyzerConfigurationValueKind.StructuralMemberKeyList =>
@@ -436,10 +380,8 @@ internal sealed record AnalyzerConfiguration(
         ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
         TryGetConfigurationOption tryGetOption,
         AnalyzerConfigOptions? globalOptions,
-        AnalyzerConfigurationOption option)
-    {
-        if (tryGetOption(option.Key, out var value))
-        {
+        AnalyzerConfigurationOption option) {
+        if (tryGetOption(option.Key, out var value)) {
             if (TryGetMatchingGlobalOption(globalOptions, option.Key, value)) return;
 
             AddInvalidConfigurationValue(
@@ -453,8 +395,7 @@ internal sealed record AnalyzerConfiguration(
     private static bool TryGetMatchingGlobalOption(
         AnalyzerConfigOptions? globalOptions,
         string key,
-        string treeValue)
-    {
+        string treeValue) {
         if (globalOptions == null) return false;
 
         if (globalOptions.TryGetValue(key, out var globalValue) &&
@@ -465,8 +406,7 @@ internal sealed record AnalyzerConfiguration(
                string.Equals(globalValue, treeValue, StringComparison.Ordinal);
     }
 
-    private static string? GetAllowedValueListError(AnalyzerConfigurationOption option, string value)
-    {
+    private static string? GetAllowedValueListError(AnalyzerConfigurationOption option, string value) {
         var invalid = SplitValues(value)
             .Select(static item => item.ToLowerInvariant())
             .Where(item => !option.AllowedValues.Contains(item, StringComparer.Ordinal))
@@ -479,58 +419,43 @@ internal sealed record AnalyzerConfiguration(
               string.Join(", ", option.AllowedValues);
     }
 
-    private static string? GetStructuralMemberKeyListError(string value)
-    {
-        return SplitValues(value).Any(static item => !ConfiguredMemberKey.TryParse(item, out _))
+    private static string? GetStructuralMemberKeyListError(string value) => SplitValues(value).Any(static item => !ConfiguredMemberKey.TryParse(item, out _))
             ? "expected canonical structural method keys (spm1|...); property accessors require matching .get or .set suffixes"
             : null;
-    }
 
-    private static string? GetIntegerError(string value, int minimum, string reason)
-    {
-        return int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
+    private static string? GetIntegerError(string value, int minimum, string reason) => int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
                parsed >= minimum
             ? null
             : reason;
-    }
 
     private static void AddInvalidConfigurationValue(
         ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
         string key,
         string value,
-        string reason)
-    {
-        builder.Add(new InvalidAnalyzerConfigurationValue(key, value.Trim(), reason));
-    }
+        string reason) => builder.Add(new InvalidAnalyzerConfigurationValue(key, value.Trim(), reason));
 
     private static bool TryGetAnalyzerConfigOption(AnalyzerConfigOptions options, string key, out string value) =>
         AnalyzerConfigurationValueReader.TryGetNonEmpty(options, key, out value);
 
-    private readonly struct ConfigurationOptionSource
-    {
+    private readonly struct ConfigurationOptionSource {
         private readonly AnalyzerOptions? _globalOptions;
         private readonly AnalyzerConfigOptions? _treeOptions;
 
-        internal ConfigurationOptionSource(AnalyzerOptions options)
-        {
+        internal ConfigurationOptionSource(AnalyzerOptions options) {
             _globalOptions = options;
             _treeOptions = null;
         }
 
-        internal ConfigurationOptionSource(AnalyzerConfigOptions options)
-        {
+        internal ConfigurationOptionSource(AnalyzerConfigOptions options) {
             _globalOptions = null;
             _treeOptions = options;
         }
 
-        internal bool TryGetValue(string key, out string value)
-        {
+        internal bool TryGetValue(string key, out string value) {
             if (_globalOptions != null)
                 return AnalyzerConfigurationValueReader.TryGetGlobalOption(_globalOptions, key, out value);
-            if (_treeOptions != null)
-            {
-                if (_treeOptions.TryGetValue(key, out var treeValue))
-                {
+            if (_treeOptions != null) {
+                if (_treeOptions.TryGetValue(key, out var treeValue)) {
                     value = treeValue ?? string.Empty;
                     return true;
                 }
@@ -560,16 +485,14 @@ internal sealed record AnalyzerTreeConfiguration(
     bool CheckedExceptions,
     bool ReportNullableInconclusive);
 
-internal enum MissingPuritySuggestionScope
-{
+internal enum MissingPuritySuggestionScope {
     All,
     Public,
     Internal,
     Off
 }
 
-internal enum InferredContractConfidence
-{
+internal enum InferredContractConfidence {
     Medium = 1,
     High = 2
 }
@@ -578,8 +501,7 @@ internal sealed record InferredContractSuggestionOptions(
     bool Enabled,
     MissingPuritySuggestionScope Scope,
     ImmutableHashSet<string> Kinds,
-    InferredContractConfidence MinimumConfidence)
-{
+    InferredContractConfidence MinimumConfidence) {
     internal static readonly ImmutableHashSet<string> AllKinds =
         ImmutableHashSet.Create(
             StringComparer.Ordinal,
@@ -599,15 +521,13 @@ internal sealed record InferredContractSuggestionOptions(
 
 internal sealed record ProvenDiagnosticSuppressionOptions(
     bool Enabled,
-    ImmutableHashSet<string> DiagnosticIds)
-{
+    ImmutableHashSet<string> DiagnosticIds) {
     public bool Includes(string diagnosticId) =>
         Enabled && DiagnosticIds.Contains(diagnosticId);
 }
 
 [Flags]
-internal enum RuntimeHazardMode
-{
+internal enum RuntimeHazardMode {
     Off = 0,
     Sites = 1,
     Summaries = 2,
@@ -617,8 +537,7 @@ internal enum RuntimeHazardMode
     AllAndUnknowns = All | Unknowns
 }
 
-internal enum TrustedBoundaryReviewMode
-{
+internal enum TrustedBoundaryReviewMode {
     Off,
     Used,
     All
@@ -630,7 +549,6 @@ internal sealed record MissingPuritySuggestionOptions(
     bool ExcludeGeneratedFiles,
     bool ExcludeTestFiles,
     int MinimumComplexity,
-    ImmutableHashSet<string> NamespaceFilters)
-{
+    ImmutableHashSet<string> NamespaceFilters) {
     public bool IsEnabled => Enabled && Scope != MissingPuritySuggestionScope.Off;
 }

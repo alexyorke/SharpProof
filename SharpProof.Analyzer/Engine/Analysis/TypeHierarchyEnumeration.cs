@@ -1,29 +1,23 @@
 namespace SharpProof.Analyzer.Engine.Analysis;
 
-internal enum TypeIdentityPolicy
-{
+internal enum TypeIdentityPolicy {
     Exact,
     ExactOrOriginalDefinition
 }
 
-internal static class TypeHierarchyEnumeration
-{
+internal static class TypeHierarchyEnumeration {
     internal static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(INamespaceSymbol root) =>
         EnumerateAllNamedTypes(root, CancellationToken.None);
 
     internal static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(
         INamespaceSymbol root,
-        CancellationToken cancellationToken)
-    {
-        foreach (var member in root.GetMembers())
-        {
+        CancellationToken cancellationToken) {
+        foreach (var member in root.GetMembers()) {
             cancellationToken.ThrowIfCancellationRequested();
-            if (member is INamespaceSymbol ns)
-            {
+            if (member is INamespaceSymbol ns) {
                 foreach (var inner in EnumerateAllNamedTypes(ns, cancellationToken)) yield return inner;
             }
-            else if (member is INamedTypeSymbol type)
-            {
+            else if (member is INamedTypeSymbol type) {
                 yield return type;
                 foreach (var nested in EnumerateNestedTypes(type, cancellationToken)) yield return nested;
             }
@@ -33,24 +27,18 @@ internal static class TypeHierarchyEnumeration
 
     internal static IEnumerable<INamedTypeSymbol> EnumerateNestedTypes(
         INamedTypeSymbol type,
-        CancellationToken cancellationToken)
-    {
-        foreach (var member in type.GetTypeMembers())
-        {
+        CancellationToken cancellationToken) {
+        foreach (var member in type.GetTypeMembers()) {
             cancellationToken.ThrowIfCancellationRequested();
             yield return member;
             foreach (var nested in EnumerateNestedTypes(member, cancellationToken)) yield return nested;
         }
     }
 
-    internal static bool OverridesTargetMethod(IMethodSymbol method, IMethodSymbol target)
-    {
-        return method.OverriddenMethod is { } overridden &&
+    internal static bool OverridesTargetMethod(IMethodSymbol method, IMethodSymbol target) => method.OverriddenMethod is { } overridden &&
                IsSameOrOverridesTargetMethod(overridden, target);
-    }
 
-    internal static bool IsSameOrOverridesTargetMethod(IMethodSymbol method, IMethodSymbol target)
-    {
+    internal static bool IsSameOrOverridesTargetMethod(IMethodSymbol method, IMethodSymbol target) {
         for (var current = method; current != null; current = current.OverriddenMethod)
             if (SymbolEq.AreEqual(current.OriginalDefinition, target.OriginalDefinition))
                 return true;
@@ -60,8 +48,7 @@ internal static class TypeHierarchyEnumeration
 
     internal static IEnumerable<INamedTypeSymbol> EnumerateBaseTypes(
         ITypeSymbol type,
-        bool includeSelf = true)
-    {
+        bool includeSelf = true) {
         var namedType = type as INamedTypeSymbol;
         for (var current = includeSelf ? namedType : namedType?.BaseType;
              current != null;
@@ -72,18 +59,13 @@ internal static class TypeHierarchyEnumeration
     internal static IEnumerable<TSymbol> EnumerateBaseTypeMembers<TSymbol>(
         ITypeSymbol type,
         string memberName)
-        where TSymbol : class, ISymbol
-    {
-        return EnumerateBaseTypes(type).SelectMany(current => current.GetMembers(memberName).OfType<TSymbol>());
-    }
+        where TSymbol : class, ISymbol => EnumerateBaseTypes(type).SelectMany(current => current.GetMembers(memberName).OfType<TSymbol>());
 
     internal static bool IsSameOrDerivedFrom(
         ITypeSymbol candidate,
         ITypeSymbol expectedBase,
-        TypeIdentityPolicy identityPolicy = TypeIdentityPolicy.Exact)
-    {
-        foreach (var current in EnumerateBaseTypes(candidate))
-        {
+        TypeIdentityPolicy identityPolicy = TypeIdentityPolicy.Exact) {
+        foreach (var current in EnumerateBaseTypes(candidate)) {
             if (SymbolEq.AreEqual(current, expectedBase)) return true;
             if (identityPolicy == TypeIdentityPolicy.ExactOrOriginalDefinition &&
                 SymbolEq.AreEqual(current.OriginalDefinition, expectedBase.OriginalDefinition))
@@ -93,8 +75,7 @@ internal static class TypeHierarchyEnumeration
         return false;
     }
 
-    internal static bool IsNamespace(INamespaceSymbol? namespaceSymbol, string expected)
-    {
+    internal static bool IsNamespace(INamespaceSymbol? namespaceSymbol, string expected) {
         if (namespaceSymbol == null || namespaceSymbol.IsGlobalNamespace) return expected.Length == 0;
 
         var segments = new Stack<string>();
@@ -113,20 +94,16 @@ internal static class TypeHierarchyEnumeration
         INamedTypeSymbol type,
         string containingNamespace,
         string metadataName,
-        int arity)
-    {
-        return type.Arity == arity &&
+        int arity) => type.Arity == arity &&
                string.Equals(type.MetadataName, metadataName, StringComparison.Ordinal) &&
                IsNamespace(type.ContainingNamespace, containingNamespace);
-    }
 
     /// <summary>
     /// Yields the methods in <paramref name="methods"/>, skipping any whose
     /// <see cref="ISymbol.OriginalDefinition"/> was already yielded. Centralizes the
     /// "seen set keyed on OriginalDefinition" dedup used across the member enumerators.
     /// </summary>
-    internal static IEnumerable<IMethodSymbol> DistinctByOriginalDefinition(this IEnumerable<IMethodSymbol> methods)
-    {
+    internal static IEnumerable<IMethodSymbol> DistinctByOriginalDefinition(this IEnumerable<IMethodSymbol> methods) {
         var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
         foreach (var method in methods)
             if (seen.Add(method.OriginalDefinition))
@@ -139,22 +116,18 @@ internal static class TypeHierarchyEnumeration
         Func<INamedTypeSymbol, bool> interfaceMatches,
         Func<IMethodSymbol, bool> methodMatches,
         bool includeTypeSelf = true,
-        bool includeUnimplementedInterfaceMember = true)
-    {
+        bool includeUnimplementedInterfaceMember = true) {
         var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
         var interfaceTypes = includeTypeSelf ? type.AllInterfaces.Prepend(type) : type.AllInterfaces;
-        foreach (var interfaceType in interfaceTypes)
-        {
+        foreach (var interfaceType in interfaceTypes) {
             if (!interfaceMatches(interfaceType)) continue;
 
             foreach (var interfaceMethod in interfaceType
                          .GetMembers(memberName)
                          .OfType<IMethodSymbol>()
-                         .Where(methodMatches))
-            {
+                         .Where(methodMatches)) {
                 var implementation = type.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol;
-                if (implementation == null)
-                {
+                if (implementation == null) {
                     if (!includeUnimplementedInterfaceMember) continue;
                     implementation = interfaceMethod;
                 }
@@ -164,8 +137,7 @@ internal static class TypeHierarchyEnumeration
         }
     }
 
-    internal static bool ExplicitlyImplements(IMethodSymbol methodSymbol, IMethodSymbol interfaceMethod)
-    {
+    internal static bool ExplicitlyImplements(IMethodSymbol methodSymbol, IMethodSymbol interfaceMethod) {
         foreach (var implemented in methodSymbol.ExplicitInterfaceImplementations)
             if (SymbolEq.AreEqual(implemented.OriginalDefinition,
                     interfaceMethod.OriginalDefinition))
@@ -177,8 +149,7 @@ internal static class TypeHierarchyEnumeration
     internal static bool ImplementsInterface(
         INamedTypeSymbol type,
         INamedTypeSymbol? interfaceSymbol,
-        bool includeInterfaceSelf = false)
-    {
+        bool includeInterfaceSelf = false) {
         if (interfaceSymbol == null) return false;
 
         if (includeInterfaceSelf &&
@@ -192,8 +163,7 @@ internal static class TypeHierarchyEnumeration
     internal static bool DerivesFrom(
         INamedTypeSymbol type,
         INamedTypeSymbol potentialBase,
-        bool includeSelf = false)
-    {
+        bool includeSelf = false) {
         for (var current = includeSelf ? type : type.BaseType; current != null; current = current.BaseType)
             if (SymbolEq.AreEqual(current.OriginalDefinition, potentialBase.OriginalDefinition))
                 return true;
@@ -201,12 +171,10 @@ internal static class TypeHierarchyEnumeration
         return false;
     }
 
-    internal static bool HasMethodBody(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
-    {
+    internal static bool HasMethodBody(IMethodSymbol methodSymbol, CancellationToken cancellationToken) {
         if (methodSymbol.DeclaringSyntaxReferences.Length == 0) return false;
 
-        foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
-        {
+        foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences) {
             cancellationToken.ThrowIfCancellationRequested();
             var methodSyntax = syntaxReference.GetSyntax(cancellationToken);
             if (methodSyntax is MethodDeclarationSyntax methodDeclaration &&

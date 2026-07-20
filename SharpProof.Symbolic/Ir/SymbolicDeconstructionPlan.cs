@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal readonly record struct SymbolicDeconstructionTarget(IOperation Operation, ISymbol? Symbol)
-{
+internal readonly record struct SymbolicDeconstructionTarget(IOperation Operation, ISymbol? Symbol) {
     internal bool IsDiscard => Symbol == null;
 }
 
@@ -9,13 +8,11 @@ internal readonly record struct SymbolicDeconstructionElement(
     SymbolicDeconstructionTarget Target,
     IOperation Value);
 
-internal static class SymbolicDeconstructionPlan
-{
+internal static class SymbolicDeconstructionPlan {
     internal static bool TryCollectTargets(
         IOperation operation,
         Func<IOperation, ISymbol?> resolveTarget,
-        out ImmutableArray<SymbolicDeconstructionTarget> targets)
-    {
+        out ImmutableArray<SymbolicDeconstructionTarget> targets) {
         var builder = ImmutableArray.CreateBuilder<SymbolicDeconstructionTarget>();
         var supported = TryWalk(operation, null, resolveTarget, builder, null);
         targets = supported ? builder.ToImmutable() : ImmutableArray<SymbolicDeconstructionTarget>.Empty;
@@ -26,8 +23,7 @@ internal static class SymbolicDeconstructionPlan
         IOperation target,
         IOperation value,
         Func<IOperation, ISymbol?> resolveTarget,
-        out ImmutableArray<SymbolicDeconstructionElement> elements)
-    {
+        out ImmutableArray<SymbolicDeconstructionElement> elements) {
         var builder = ImmutableArray.CreateBuilder<SymbolicDeconstructionElement>();
         var supported = TryWalk(target, value, resolveTarget, null, builder);
         elements = supported ? builder.ToImmutable() : ImmutableArray<SymbolicDeconstructionElement>.Empty;
@@ -39,12 +35,10 @@ internal static class SymbolicDeconstructionPlan
         IOperation? value,
         Func<IOperation, ISymbol?> resolveTarget,
         ImmutableArray<SymbolicDeconstructionTarget>.Builder? targets,
-        ImmutableArray<SymbolicDeconstructionElement>.Builder? elements)
-    {
+        ImmutableArray<SymbolicDeconstructionElement>.Builder? elements) {
         target = Unwrap(target);
         value = value == null ? null : Unwrap(value);
-        if (target is ITupleOperation targetTuple)
-        {
+        if (target is ITupleOperation targetTuple) {
             if (value != null &&
                 (value is not ITupleOperation valueTuple || valueTuple.Elements.Length != targetTuple.Elements.Length))
                 return false;
@@ -68,8 +62,7 @@ internal static class SymbolicDeconstructionPlan
         return true;
     }
 
-    private static IOperation Unwrap(IOperation operation)
-    {
+    private static IOperation Unwrap(IOperation operation) {
         while (operation is IConversionOperation { IsImplicit: true } conversion ||
                operation is IDeclarationExpressionOperation)
             operation = operation is IConversionOperation current

@@ -1,10 +1,8 @@
-internal static class EffectSummaryAnalysisPipeline
-{
+internal static class EffectSummaryAnalysisPipeline {
     public static EffectSummaryDocument Analyze(
         CliOptions options,
         IReadOnlyList<string>? inputAssemblies = null,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry>? externalGeneratedPurityEntries = null)
-    {
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry>? externalGeneratedPurityEntries = null) {
         var assemblies = inputAssemblies ?? EffectSummaryInputResolver.ResolveAssemblies(options);
         var reports = assemblies
             .Select(path => AssemblyEffectSummarizer.Summarize(
@@ -16,8 +14,7 @@ internal static class EffectSummaryAnalysisPipeline
                 options.IncludeCallees,
                 options.MaxDepth,
                 options.IncludeTransitiveRoots,
-                options.MaxExceptionEdges) with
-            {
+                options.MaxExceptionEdges) with {
                 ArtifactSource = options.GetArtifactSource(path)
             })
             .ToArray();
@@ -29,8 +26,7 @@ internal static class EffectSummaryAnalysisPipeline
 
         PurityClassificationReport? purityClassificationReport = null;
         GeneratedPurityCatalogDocument? generatedPurityCatalog = null;
-        if (options.IncludePurityClassification || options.CompareManualCatalogs)
-        {
+        if (options.IncludePurityClassification || options.CompareManualCatalogs) {
             var classificationOutput = PurityClassificationEngine.Classify(
                 reports,
                 options.CompareManualCatalogs,
