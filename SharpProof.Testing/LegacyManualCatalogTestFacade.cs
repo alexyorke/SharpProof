@@ -1,5 +1,8 @@
+using System.Collections.Immutable;
+
 namespace SharpProof.Analyzer.Engine;
 
+// Test-owned absence assertions for the retired handwritten BCL catalogs.
 public static class Constants
 {
     public static readonly ImmutableHashSet<string> KnownImpureNamespaces =

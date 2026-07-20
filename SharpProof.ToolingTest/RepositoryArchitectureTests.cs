@@ -508,16 +508,15 @@ public sealed class RepositoryArchitectureTests
     public void MetadataImpurity_UsesInferenceInsteadOfBuiltInCatalogTables()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();
-        var constants = File.ReadAllText(Path.Combine(root, "SharpProof.Contracts", "Constants.cs"));
         var analyzerEngine = string.Join("\n", Directory.EnumerateFiles(
             Path.Combine(root, "SharpProof.Analyzer", "Engine"), "*.cs", SearchOption.AllDirectories)
             .Select(File.ReadAllText));
 
         Assert.Multiple(() =>
         {
-            Assert.That(constants, Does.Not.Contain("System.IO"));
-            Assert.That(constants, Does.Not.Contain("System.Timers.Timer"));
-            Assert.That(constants, Does.Not.Contain("JsonSerializer.Deserialize"));
+            Assert.That(File.Exists(Path.Combine(root, "SharpProof.Contracts", "Constants.cs")), Is.False);
+            Assert.That(File.Exists(Path.Combine(
+                root, "SharpProof.Testing", "LegacyManualCatalogTestFacade.cs")), Is.True);
             Assert.That(analyzerEngine, Does.Not.Contain("PurityCatalogSemantics"));
             Assert.That(analyzerEngine, Does.Contain("TryGetGeneratedMethodPurity"));
         });
@@ -629,6 +628,8 @@ public sealed class RepositoryArchitectureTests
             root, "SharpProof.Symbolic", "Ir", "SymbolicCfgStatementCompletion.cs"));
         var reachability = File.ReadAllText(Path.Combine(
             root, "SharpProof.Symbolic", "SymbolicReachabilityService.cs"));
+        var conditionTruth = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Analyzer", "Engine", "ExecutionVisibility.ConditionTruth.cs"));
 
         Assert.Multiple(() =>
         {
@@ -637,7 +638,10 @@ public sealed class RepositoryArchitectureTests
             Assert.That(trace, Does.Not.Contain("TraceCacheEntry"));
             Assert.That(trace, Does.Not.Contain("RecordObservation"));
             Assert.That(reachability, Does.Not.Contain("TryCollectCachedExecutionTraceState"));
+            Assert.That(reachability, Does.Not.Contain("StructuralPathStateCaches"));
             Assert.That(reachability, Does.Contain("BoundedConcurrentCache<PathStateCacheKey, SymbolicState>"));
+            Assert.That(conditionTruth, Does.Not.Contain("class ConditionTruthCache"));
+            Assert.That(conditionTruth, Does.Contain("BoundedConcurrentCache<ConditionTruthCacheKey, bool?>"));
         });
     }
 

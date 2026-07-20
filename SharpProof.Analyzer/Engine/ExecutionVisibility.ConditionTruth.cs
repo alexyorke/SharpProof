@@ -4,7 +4,8 @@ namespace SharpProof.Analyzer.Engine;
 
 internal static partial class ExecutionVisibility
 {
-    private static readonly ConditionalWeakTable<SemanticModel, ConditionTruthCache> s_conditionTruthCache = new();
+    private static readonly ConditionalWeakTable<SemanticModel,
+        BoundedConcurrentCache<ConditionTruthCacheKey, bool?>> s_conditionTruthCache = new();
 
     private static bool IsReferenceKnownNullAt(
         ExpressionSyntax expression,
@@ -194,8 +195,8 @@ internal static partial class ExecutionVisibility
             site.SpanStart,
             site.Span.Length,
             smtAnalysis);
-        var cache = s_conditionTruthCache.GetOrCreateValue(semanticModel);
-        if (cache.Values.TryGetValue(key, out var cached)) return cached;
+        var cache = s_conditionTruthCache.GetValue(semanticModel, static _ => new(512));
+        if (cache.TryGetValue(key, out var cached)) return cached;
 
         var truth = EvaluateKnownConditionTruth(
             expression,
@@ -203,7 +204,7 @@ internal static partial class ExecutionVisibility
             semanticModel,
             cancellationToken,
             smtAnalysis);
-        cache.Values.TryAdd(key, truth);
+        cache.TryAdd(key, truth);
         return truth;
     }
 
@@ -274,11 +275,6 @@ internal static partial class ExecutionVisibility
             };
     }
 
-
-    private sealed class ConditionTruthCache
-    {
-        public BoundedConcurrentCache<ConditionTruthCacheKey, bool?> Values { get; } = new(512);
-    }
 
     private readonly record struct ConditionTruthCacheKey(
         int ExpressionStart,

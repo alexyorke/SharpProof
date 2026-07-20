@@ -619,14 +619,21 @@ Tests are excluded from the metric and must not be deleted.
   from the same parsed documents used by suppression and metadata analysis.
   Exact SP0032 reason strings and reason codes remain characterized, and
   architecture coverage prevents the parallel validator from returning.
+- [x] Removed the final production facade for the retired handwritten BCL
+  catalogs. Absence assertions now use a test-owned fixture, so package and
+  production assemblies no longer expose five permanently empty catalog sets.
+  Also removed two one-property cache-holder adapters: the bounded condition-
+  truth cache and nested program-point cache now live directly in their
+  compilation-scoped weak tables. Catalog, cache, and architecture coverage
+  preserve observable behavior and prevent all three wrappers from returning.
 
 ## Current evidence
 
-- Maintained production: 91,088 lines (87,169 C#, 3,189 scripts, and 730
-  specifications); net reduction: 16,538 lines; remaining reduction: 3,462.
-  This additional-file ownership tranche removed 32 maintained-production lines
-  while deleting a 241-line duplicate traversal without deleting tests or
-  changing diagnostic output.
+- Maintained production: 91,071 lines (87,152 C#, 3,189 scripts, and 730
+  specifications); net reduction: 16,555 lines; remaining reduction: 3,445.
+  This facade/cache-holder tranche removed 17 maintained-production lines
+  without deleting tests or changing diagnostics, proof results, CLI output,
+  package contents, or cache behavior.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,214 passing tests and two documented Main skips.
 

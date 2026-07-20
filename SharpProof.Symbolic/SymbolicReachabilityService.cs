@@ -4,7 +4,8 @@ internal static class SymbolicReachabilityService
 {
     private const int StructuralPathStateCacheEntryLimit = 512;
 
-    private static readonly ConditionalWeakTable<SemanticModel, StructuralPathStateCaches>
+    private static readonly ConditionalWeakTable<SemanticModel,
+        ConditionalWeakTable<SyntaxNode, BoundedConcurrentCache<PathStateCacheKey, SymbolicState>>>
         s_structuralPathStateCache = new();
 
     internal static SymbolicState CollectPathStateAt(
@@ -28,7 +29,7 @@ internal static class SymbolicReachabilityService
             site.SpanStart, site.Span.Length, site.RawKind, includeCurrentStatementCompletionFacts);
         var methodCaches = s_structuralPathStateCache.GetOrCreateValue(semanticModel);
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(site);
-        var cache = methodCaches.ByExecutionRoot.GetValue(executionRoot, static _ =>
+        var cache = methodCaches.GetValue(executionRoot, static _ =>
             new BoundedConcurrentCache<PathStateCacheKey, SymbolicState>(StructuralPathStateCacheEntryLimit));
         if (!cache.TryGetValue(key, out var state))
         {
@@ -111,12 +112,6 @@ internal static class SymbolicReachabilityService
                 cancellationToken,
                 includeCurrentStatementCompletionFacts,
                 initialState));
-    }
-
-    private sealed class StructuralPathStateCaches
-    {
-        internal ConditionalWeakTable<SyntaxNode, BoundedConcurrentCache<PathStateCacheKey, SymbolicState>>
-            ByExecutionRoot { get; } = new();
     }
 
     private readonly record struct PathStateCacheKey(
