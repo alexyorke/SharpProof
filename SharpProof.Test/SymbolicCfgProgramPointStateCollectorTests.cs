@@ -1640,18 +1640,46 @@ static class C
     [TestCase(
         "static class C { static void M(bool condition) { int value = 0; if (condition) { System.Console.WriteLine(); value = 2; } } }")]
     [TestCase(
-        "static class C { static void M(bool condition, bool nested) { if (condition) { if (nested) condition = false; int marker = 2; } } }")]
-    [TestCase(
-        "static class C { static void M(object value, bool nested, object replacement) { if (value != null) { if (nested) value = replacement; int marker = 2; } } }")]
-    [TestCase(
         "static class C { static int M(bool condition, bool nested) { if (condition) { if (nested) return 1; throw new System.Exception(); } return 0; } }")]
     [TestCase(
         "static class C { static int M(bool condition) { if (condition) { return 1; } return 0; } }")]
-    public void ComplexNestedBlockCompletion_RemainsConservativeFallback(string source)
+    public void ComplexNestedBlockCompletion_MatchesStructuralCollector(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(ComplexNestedBlockCompletion_RemainsConservativeFallback));
+            nameof(ComplexNestedBlockCompletion_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().First().Statement;
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts: true));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
+
+    [TestCase(
+        "static class C { static void M(bool condition, bool nested) { if (condition) { if (nested) condition = false; int marker = 2; } } }")]
+    [TestCase(
+        "static class C { static void M(object value, bool nested, object replacement) { if (value != null) { if (nested) value = replacement; int marker = 2; } } }")]
+    public void NestedBlockCompletionWithMutatedEntryGuard_RemainsConservative(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(NestedBlockCompletionWithMutatedEntryGuard_RemainsConservative));
         var site = fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().First().Statement;
 
         var result = SymbolicCfgProgramPointStateCollector.CollectState(
@@ -1669,34 +1697,44 @@ static class C
         "static class C { static void M(bool condition) { int value = 0; while (condition) value = 1; } }")]
     [TestCase(
         "static class C { static int M(bool condition) { int value = 0; try { if (condition) throw new System.Exception(); value = 1; } catch { value = 2; } return value; } }")]
-    public void UnsupportedRootBlockCompletion_RemainsConservativeFallback(string source)
+    public void ComplexRootBlockCompletion_MatchesStructuralCollector(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(UnsupportedRootBlockCompletion_RemainsConservativeFallback));
+            nameof(ComplexRootBlockCompletion_MatchesStructuralCollector));
         var site = fixture.Root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single().Body!;
 
-        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
             fixture.SemanticModel,
             CancellationToken.None,
             includeCurrentStatementCompletionFacts: true);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts: true));
 
-        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
     }
 
-    [TestCase(false, "root-block-control-flow")]
-    [TestCase(true, "nested-block-completion")]
-    public void BlockCurrentCompletion_UnsupportedIdentityIsStable(
-        bool nested,
-        string expectedDetail)
+    [TestCase(false)]
+    [TestCase(true)]
+    public void BlockCurrentCompletion_ExactIdentityIsStable(bool nested)
     {
         var source = nested
             ? "static class C { static void M(bool condition) { if (condition) { System.Console.WriteLine(); } } }"
             : "static class C { static void M() { System.Console.WriteLine(); } }";
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(BlockCurrentCompletion_UnsupportedIdentityIsStable));
+            nameof(BlockCurrentCompletion_ExactIdentityIsStable));
         SyntaxNode site = nested
             ? fixture.Root.DescendantNodes().OfType<IfStatementSyntax>().Single().Statement
             : fixture.Root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single().Body!;
@@ -1709,13 +1747,13 @@ static class C
 
         Assert.Multiple(() =>
         {
-            Assert.That(result.IsUnsupported, Is.True);
-            Assert.That(result.Value, Is.Null);
-            Assert.That(result.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+            Assert.That(result.IsExact, Is.True);
+            Assert.That(result.Value, Is.Not.Null);
+            Assert.That(result.UnknownReason, Is.EqualTo(SymbolicUnknownReason.None));
             var provenance = result.Provenance.Single();
             Assert.That(provenance.Stage, Is.EqualTo("cfg-program-point"));
             Assert.That(provenance.SourceSpan, Is.EqualTo(site.Span));
-            Assert.That(provenance.Detail, Is.EqualTo(expectedDetail));
+            Assert.That(provenance.Detail, Is.EqualTo("exact"));
         });
     }
 

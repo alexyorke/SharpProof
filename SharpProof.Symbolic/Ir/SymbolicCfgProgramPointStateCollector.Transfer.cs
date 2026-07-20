@@ -1307,51 +1307,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             ControlFlowBranchSemantics.Rethrow or
             ControlFlowBranchSemantics.ProgramTermination;
 
-    private static bool SupportsRootBlockCompletion(ControlFlowGraph graph, BlockSyntax block)
-    {
-        if (EnumerateRegions(graph.Root).Any(static region =>
-                region.Kind == ControlFlowRegionKind.TryAndCatch) ||
-            CSharpSyntaxFacts.DescendantNodesInExecution(block, includeSelf: false)
-                .Any(static node => node is InvocationExpressionSyntax))
-            return false;
-        if (graph.Blocks.Count(static block =>
-                block.Operations.Length != 0 || block.BranchValue != null) <= 1)
-            return true;
-        return graph.Blocks.All(source => GetSuccessors(source).All(branch =>
-            branch.Semantics is
-                ControlFlowBranchSemantics.Regular or
-                ControlFlowBranchSemantics.StructuredExceptionHandling
-                ? branch.Destination == null || branch.Destination.Ordinal > source.Ordinal
-                : IsTerminalCompletionBranch(branch)));
-    }
-
-    private static bool SupportsCanonicalNestedBlockCompletion(
-        BlockSyntax block,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (CSharpSyntaxFacts.DescendantNodesInExecution(block, includeSelf: false)
-            .Any(static node => node is InvocationExpressionSyntax))
-            return false;
-        if (SymbolicControlFlowFacts.StatementDefinitelyExits(
-                block,
-                semanticModel,
-                cancellationToken) &&
-            (block.Statements is not { Count: 1 } ||
-             block.Statements[0] is not IfStatementSyntax { Else: not null }))
-            return false;
-        var condition = block.Ancestors().OfType<IfStatementSyntax>().FirstOrDefault()?.Condition;
-        return condition == null || SymbolicLoopStateTransfer.GetConditionDependencySymbols(
-                condition,
-                semanticModel,
-                cancellationToken)
-            .All(symbol => !SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(
-                block,
-                symbol,
-                semanticModel,
-                cancellationToken));
-    }
-
     private static bool IsWithinRegion(BasicBlock block, ControlFlowRegionKind kind)
     {
         for (var region = block.EnclosingRegion; region != null; region = region.EnclosingRegion)

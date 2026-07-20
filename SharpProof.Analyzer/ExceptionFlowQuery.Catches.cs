@@ -86,12 +86,11 @@ internal static partial class ExceptionFlowEngine
                 using var completionScope = SymbolicAnalysisLimitContext.PushIsolated(
                     SymbolicAnalysisLimitContext.Limits,
                     finallyBlock);
-                var state = pathState;
-                SymbolicStatementStateTransfer.AddCompletedBlockStateFacts(
-                    ref state,
+                var state = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
                     finallyBlock,
+                    pathState,
                     semanticModel,
-                    cancellationToken);
+                    cancellationToken).Value!;
                 if (!completionScope.Snapshot().IsTruncated && !IsReachable(state))
                     return true;
             }

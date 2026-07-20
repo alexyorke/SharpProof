@@ -1009,16 +1009,17 @@ public sealed class RepositoryArchitectureTests
         var root = ReadmeExampleFixture.GetRepositoryRoot();
         var collector = File.ReadAllText(Path.Combine(
             root, "SharpProof.Symbolic", "Ir", "SymbolicCfgProgramPointStateCollector.cs"));
-        var transfer = File.ReadAllText(Path.Combine(
-            root, "SharpProof.Symbolic", "Ir", "SymbolicCfgProgramPointStateCollector.Transfer.cs"));
+        var statementTransfer = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "SymbolicStatementStateTransfer.cs"));
         var exceptionFlow = File.ReadAllText(Path.Combine(
             root, "SharpProof.Analyzer", "ExceptionFlowAnalyzer.cs"));
 
         Assert.Multiple(() =>
         {
             Assert.That(collector, Does.Contain("TryPropagateCompletedTry"));
-            Assert.That(transfer, Does.Contain("MaxScopedBlockCompletionStatements"));
+            Assert.That(collector, Does.Contain("MaxScopedBlockCompletionStatements"));
             Assert.That(collector, Does.Not.Contain("RequiresStructuralAnalysisLimits"));
+            Assert.That(statementTransfer, Does.Not.Contain("AddCompletedBlockStateFacts"));
             Assert.That(exceptionFlow, Does.Not.Contain("AsyncLocal<"));
             Assert.That(exceptionFlow, Does.Not.Contain("UseAttributePolicy"));
         });

@@ -70,11 +70,11 @@ internal static class SymbolicProgramPointFacts
                 cancellationToken);
 
             if (includeCurrentStatementCompletionFacts)
-                SymbolicStatementStateTransfer.AddCompletedBlockStateFacts(
-                    ref state,
+                state = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
                     siteBlock,
+                    state,
                     semanticModel,
-                    cancellationToken);
+                    cancellationToken).Value!;
         }
         else if (includeCurrentStatementCompletionFacts &&
                  site is ExpressionSyntax siteExpression)

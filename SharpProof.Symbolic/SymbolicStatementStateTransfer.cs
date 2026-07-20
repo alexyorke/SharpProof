@@ -325,11 +325,11 @@ internal static class SymbolicStatementStateTransfer
 
         if (statement is BlockSyntax completedBlock)
         {
-            AddCompletedBlockStateFacts(
-                ref state,
+            state = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
                 completedBlock,
+                state,
                 semanticModel,
-                cancellationToken);
+                cancellationToken).Value!;
             return;
         }
 
@@ -389,34 +389,4 @@ internal static class SymbolicStatementStateTransfer
                 SymbolicStateInvalidator.InvalidateSymbol(ref state, symbol, completedIf);
     }
 
-    internal static void AddCompletedBlockStateFacts(
-        ref SymbolicState state,
-        BlockSyntax block,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var processedStatementCount = 0;
-        foreach (var statement in block.Statements)
-        {
-            var limit = SymbolicAnalysisLimitContext.Limits.MaxScopedBlockCompletionStatements;
-            if (processedStatementCount >= limit)
-            {
-                SymbolicAnalysisLimitContext.Record(
-                    SymbolicAnalysisLimitKind.ScopedBlockCompletionStatements,
-                    limit,
-                    block.Statements.Count,
-                    block,
-                    "program_point.completed_block_state");
-                return;
-            }
-
-            processedStatementCount++;
-            AddPriorStatementStateFacts(
-                ref state,
-                statement,
-                semanticModel,
-                cancellationToken);
-            if (SymbolicControlFlowFacts.StatementDefinitelyExits(statement, semanticModel, cancellationToken)) return;
-        }
-    }
 }

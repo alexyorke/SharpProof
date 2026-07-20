@@ -46,11 +46,11 @@ internal static class SymbolicCfgExceptionRegionTransfer
             statement).State;
         if (statement.Finally?.Block is { } finallyBlock)
         {
-            SymbolicStatementStateTransfer.AddCompletedBlockStateFacts(
-                ref state,
+            state = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
                 finallyBlock,
+                state,
                 semanticModel,
-                cancellationToken);
+                cancellationToken).Value!;
             if (SymbolicControlFlowFacts.StatementDefinitelyExits(
                     finallyBlock,
                     semanticModel,
@@ -72,11 +72,11 @@ internal static class SymbolicCfgExceptionRegionTransfer
                     semanticModel,
                     cancellationToken))
                 return;
-            SymbolicStatementStateTransfer.AddCompletedBlockStateFacts(
-                ref branchState,
+            branchState = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
                 block,
+                branchState,
                 semanticModel,
-                cancellationToken);
+                cancellationToken).Value!;
             if (!branchState.IsContradictory)
                 completionStates.Add(branchState);
         }

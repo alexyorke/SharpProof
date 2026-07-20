@@ -34,6 +34,39 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        if (statement is BlockSyntax completedBlock)
+        {
+            var state = entryState;
+            var processedStatementCount = 0;
+            foreach (var nestedStatement in completedBlock.Statements)
+            {
+                var limit = SymbolicAnalysisLimitContext.Limits.MaxScopedBlockCompletionStatements;
+                if (processedStatementCount >= limit)
+                {
+                    SymbolicAnalysisLimitContext.Record(
+                        SymbolicAnalysisLimitKind.ScopedBlockCompletionStatements,
+                        limit,
+                        completedBlock.Statements.Count,
+                        completedBlock,
+                        "program_point.completed_block_state");
+                    break;
+                }
+
+                processedStatementCount++;
+                SymbolicStatementStateTransfer.AddPriorStatementStateFacts(
+                    ref state,
+                    nestedStatement,
+                    semanticModel,
+                    cancellationToken);
+                if (SymbolicControlFlowFacts.StatementDefinitelyExits(
+                        nestedStatement,
+                        semanticModel,
+                        cancellationToken))
+                    break;
+            }
+
+            return Exact(state, statement);
+        }
         if (statement is IfStatementSyntax or SwitchStatementSyntax or
             WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax)
             return SymbolicCfgStatementCompletion.CollectCompletedStatementState(
@@ -130,22 +163,51 @@ internal static partial class SymbolicCfgProgramPointStateCollector
 
         if (graph == null || graph.Blocks.IsDefaultOrEmpty)
             return Unsupported(site, "cfg-empty");
-        if (targetIsCompletedRootBlock)
+        if (includeCurrentStatementCompletionFacts && site is BlockSyntax completedBlock)
         {
-            if (!SupportsRootBlockCompletion(graph, (BlockSyntax)site))
-                return Unsupported(site, "root-block-control-flow");
-            var completedRootState = initialState ?? new SymbolicState();
-            SymbolicStatementStateTransfer.AddMethodEntryNullableFlowStateFacts(
-                ref completedRootState,
-                site,
-                semanticModel,
-                cancellationToken);
-            SymbolicStatementStateTransfer.AddCompletedBlockStateFacts(
-                ref completedRootState,
-                (BlockSyntax)site,
-                semanticModel,
-                cancellationToken);
-            return Exact(completedRootState, site);
+            var containingCondition = targetIsCompletedNestedBlock
+                ? completedBlock.Ancestors().OfType<IfStatementSyntax>().FirstOrDefault()?.Condition
+                : null;
+            if (containingCondition != null &&
+                SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(
+                    containingCondition,
+                    completedBlock,
+                    semanticModel,
+                    cancellationToken))
+                return Unsupported(site, "block-entry-guard-mutation");
+
+            SymbolicLoweringResult<SymbolicState> entry;
+            if (targetIsCompletedRootBlock)
+            {
+                var rootEntryState = initialState ?? new SymbolicState();
+                SymbolicStatementStateTransfer.AddMethodEntryNullableFlowStateFacts(
+                    ref rootEntryState,
+                    site,
+                    semanticModel,
+                    cancellationToken);
+                entry = Exact(rootEntryState, site);
+            }
+            else if (completedBlock.Statements.FirstOrDefault() is { } firstStatement)
+            {
+                entry = CollectState(
+                    firstStatement,
+                    semanticModel,
+                    cancellationToken,
+                    initialState,
+                    CfgProgramPointTargetKind.BeforeCurrent);
+            }
+            else
+            {
+                return Unsupported(site, "empty-block-completion");
+            }
+
+            return entry is { IsExact: true, Value: { } entryState }
+                ? CollectCompletedStatementState(
+                    completedBlock,
+                    entryState,
+                    semanticModel,
+                    cancellationToken)
+                : Unsupported(site, "block-entry");
         }
         CfgFinallyLocalTargetPlan? finallyLocalTarget = null;
         if (finallyClause != null &&
@@ -162,26 +224,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         if (forInitialEntry != null &&
             !TryGetForInitialEntryHeader(graph, forInitialEntry, out forInitialEntryHeader))
             return Unsupported(site, "for-initial-entry-header");
-        if (targetIsCompletedNestedBlock &&
-            !SupportsCanonicalNestedBlockCompletion(
-                    (BlockSyntax)site,
-                    semanticModel,
-                    cancellationToken))
-            return Unsupported(site, "nested-block-completion");
-        if (targetIsCompletedNestedBlock)
-            return Exact(
-                SymbolicProgramPointFacts.MergeStates(
-                    SymbolicProgramPointFacts.CollectAncestorReachabilityState(
-                        site,
-                        semanticModel,
-                        cancellationToken),
-                    SymbolicProgramPointFacts.CollectPriorAssignmentState(
-                        site,
-                        semanticModel,
-                        cancellationToken,
-                        includeCurrentStatementCompletionFacts: true,
-                        initialState)),
-                site);
         var state = initialState ?? new SymbolicState();
         SymbolicStatementStateTransfer.AddMethodEntryNullableFlowStateFacts(
             ref state,

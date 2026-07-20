@@ -719,14 +719,21 @@ Tests are excluded from the metric and must not be deleted.
   normal-completion projection as prior-statement transfer. Removed the now-
   constant unsupported-value switch; guarded unsupported declarations remain
   explicit fallbacks because their branch facts cannot be safely detached.
+- [x] Made the canonical completion entry point own root and nested block
+  sequencing. Removed the program-point collector's direct merge of both
+  structural collectors, the parallel completed-block transfer method, and the
+  root/nested shape gates. Calls, loops, try/catch, and abrupt completion now
+  preserve differential normalized state and evidence through one completion
+  route; blocks that mutate their entry guard remain explicit conservative
+  fallbacks.
 
 ## Current evidence
 
-- Maintained production: 90,591 lines (86,847 C#, 3,014 scripts, and 730
-  specifications); net reduction: 17,035 lines; remaining reduction: 2,965.
-  This migration removes three maintained-production lines while replacing
-  unsupported declaration current-completion fallback with canonical
-  conservative transfer and deleting its superseded configuration switch.
+- Maintained production: 90,556 lines (86,812 C#, 3,014 scripts, and 730
+  specifications); net reduction: 17,070 lines; remaining reduction: 2,930.
+  This migration removes 35 maintained-production lines while replacing
+  direct structural block-completion routing with the canonical completion
+  entry point and deleting its superseded shape gates and transfer method.
   Diagnostics, proof outcomes, conservative unknowns, CLI bytes, serialization,
   and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
