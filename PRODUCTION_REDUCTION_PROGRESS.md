@@ -878,12 +878,17 @@ Tests are excluded from the metric and must not be deleted.
   produce exact current-completion state with structural parity. This adds five
   temporary production lines; loop-local coalesce completion remains the sole
   characterized assignment-current fallback.
+- [x] Removed the generic path-condition merge framework, which had exactly one
+  closed construction. The merger now operates directly on canonical
+  `SymbolicCondition` values while retaining deterministic keys, Cartesian
+  choice bounds, guard construction, and every truncation event. This deletes
+  22 maintained production lines without changing merge output.
 
 ## Current evidence
 
-- Phase-two maintained production: 81,105 lines (77,143 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,329-line reduction from the
-  84,434-line phase-two baseline. Another 16,671 lines remain to the 64,434
+- Phase-two maintained production: 81,083 lines (77,121 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,351-line reduction from the
+  84,434-line phase-two baseline. Another 16,649 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.

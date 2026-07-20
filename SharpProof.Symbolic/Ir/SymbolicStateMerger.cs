@@ -3,12 +3,6 @@ namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicStateMerger {
     internal readonly record struct GuardedState(SymbolicCondition Condition, SymbolicState State);
 
-    private static readonly PathConditionMergeStrategy<SymbolicCondition> Strategy = new(
-        SymbolicState.CreateProofConditionKey,
-        TryGetMergeTargetKey,
-        static conditions => Combine(SymbolicConditionOperator.And, conditions),
-        static conditions => Combine(SymbolicConditionOperator.Or, conditions));
-
     internal static ImmutableArray<SymbolicCondition> MergePathConditionsAcrossAll(
         IReadOnlyList<SymbolicState> states) => MergePathConditionsAcrossAll(
             states.Select(static state => (IReadOnlyList<SymbolicCondition>)state.PathConditions).ToArray());
@@ -18,7 +12,6 @@ internal static class SymbolicStateMerger {
         var limits = SymbolicAnalysisLimitContext.Limits;
         return PathConditionMergeEngine.MergeAcrossAll(
             conditionSets,
-            Strategy,
             new PathConditionMergeLimits(
                 limits.MaxMergedPathConditions,
                 limits.MaxMergeableFactsPerTargetPerState,
@@ -361,7 +354,7 @@ internal static class SymbolicStateMerger {
         }
     }
 
-    private static SymbolicCondition Combine(
+    internal static SymbolicCondition Combine(
         SymbolicConditionOperator op,
         IReadOnlyList<SymbolicCondition> conditions) {
         var result = conditions[0];
@@ -371,7 +364,7 @@ internal static class SymbolicStateMerger {
         return result;
     }
 
-    private static bool TryGetMergeTargetKey(SymbolicCondition condition, out string targetKey) {
+    internal static bool TryGetMergeTargetKey(SymbolicCondition condition, out string targetKey) {
         if (TryGetMergeTarget(condition, out var target)) {
             targetKey = SymbolicState.CreateProofTermKey(target);
             return true;

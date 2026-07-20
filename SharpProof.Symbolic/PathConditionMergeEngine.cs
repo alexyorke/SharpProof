@@ -1,16 +1,5 @@
 namespace SharpProof.Symbolic;
 
-internal delegate bool TryGetPathConditionTarget<in TCondition>(
-    TCondition condition,
-    out string targetKey);
-
-internal sealed record PathConditionMergeStrategy<TCondition>(
-    Func<TCondition, string> GetKey,
-    TryGetPathConditionTarget<TCondition> TryGetTarget,
-    Func<IReadOnlyList<TCondition>, TCondition> Conjoin,
-    Func<IReadOnlyList<TCondition>, TCondition> Disjoin)
-    where TCondition : class;
-
 internal readonly record struct PathConditionMergeLimits(
     int MaxMergedConditions,
     int MaxFactsPerTargetPerState,
@@ -18,19 +7,19 @@ internal readonly record struct PathConditionMergeLimits(
     int MaxGuardFactsPerTargetPerState);
 
 internal static class PathConditionMergeEngine {
-    internal static ImmutableArray<TCondition> MergeAcrossAll<TCondition>(
-        IReadOnlyList<IReadOnlyList<TCondition>> conditionSets,
-        PathConditionMergeStrategy<TCondition> strategy,
-        PathConditionMergeLimits limits)
-        where TCondition : class {
-        if (conditionSets.Count == 0) return ImmutableArray<TCondition>.Empty;
+    internal static ImmutableArray<SymbolicCondition> MergeAcrossAll(
+        IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets,
+        PathConditionMergeLimits limits) {
+        if (conditionSets.Count == 0) return ImmutableArray<SymbolicCondition>.Empty;
 
-        var common = GetCommonConditions(conditionSets, strategy.GetKey);
+        var common = GetCommonConditions(conditionSets);
         if (conditionSets.Count < 2) return common;
 
-        var commonKeys = new HashSet<string>(common.Select(strategy.GetKey), StringComparer.Ordinal);
+        var commonKeys = new HashSet<string>(
+            common.Select(SymbolicState.CreateProofConditionKey),
+            StringComparer.Ordinal);
         var states = conditionSets
-            .Select(conditions => new StatePathFacts<TCondition>(conditions, commonKeys, strategy, limits))
+            .Select(conditions => new StatePathFacts(conditions, commonKeys, limits))
             .ToArray();
         if (states.Any(static state => state.FactsByTarget.Count == 0)) return common;
 
@@ -39,7 +28,6 @@ internal static class PathConditionMergeEngine {
             targets.IntersectWith(states[index].FactsByTarget.Keys);
 
         var builder = common.ToBuilder();
-        var emittedKeys = commonKeys;
         var emittedCount = 0;
         foreach (var target in targets.OrderBy(static key => key, StringComparer.Ordinal)) {
             var combinationCount = 0;
@@ -54,21 +42,23 @@ internal static class PathConditionMergeEngine {
                     break;
                 }
 
-                if (choices.Select(static choice => choice.ConditionKey)
+                if (choices.Select(static choice => SymbolicState.CreateProofConditionKey(choice.Condition))
                     .Distinct(StringComparer.Ordinal)
                     .Count() == 1)
                     continue;
 
-                var branches = new TCondition[states.Length];
+                var branches = new SymbolicCondition[states.Length];
                 for (var index = 0; index < states.Length; index++) {
                     var guard = states[index].CreateGuard(target);
                     branches[index] = guard == null
                         ? choices[index].Condition
-                        : strategy.Conjoin(new[] { guard, choices[index].Condition });
+                        : SymbolicStateMerger.Combine(
+                            SymbolicConditionOperator.And,
+                            new[] { guard, choices[index].Condition });
                 }
 
-                var merged = strategy.Disjoin(branches);
-                if (!emittedKeys.Add(strategy.GetKey(merged))) continue;
+                var merged = SymbolicStateMerger.Combine(SymbolicConditionOperator.Or, branches);
+                if (!commonKeys.Add(SymbolicState.CreateProofConditionKey(merged))) continue;
                 if (emittedCount >= limits.MaxMergedConditions) {
                     RecordLimit(
                         SymbolicAnalysisLimitKind.MergedPathConditions,
@@ -86,39 +76,36 @@ internal static class PathConditionMergeEngine {
         return builder.ToImmutable();
     }
 
-    private static ImmutableArray<TCondition> GetCommonConditions<TCondition>(
-        IReadOnlyList<IReadOnlyList<TCondition>> conditionSets,
-        Func<TCondition, string> getKey) {
-        var commonKeys = new HashSet<string>(conditionSets[0].Select(getKey), StringComparer.Ordinal);
+    private static ImmutableArray<SymbolicCondition> GetCommonConditions(
+        IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets) {
+        var commonKeys = new HashSet<string>(
+            conditionSets[0].Select(SymbolicState.CreateProofConditionKey),
+            StringComparer.Ordinal);
         for (var index = 1; index < conditionSets.Count; index++)
-            commonKeys.IntersectWith(conditionSets[index].Select(getKey));
+            commonKeys.IntersectWith(conditionSets[index].Select(SymbolicState.CreateProofConditionKey));
 
-        var builder = ImmutableArray.CreateBuilder<TCondition>();
+        var builder = ImmutableArray.CreateBuilder<SymbolicCondition>();
         var emitted = new HashSet<string>(StringComparer.Ordinal);
         foreach (var condition in conditionSets[0]) {
-            var key = getKey(condition);
+            var key = SymbolicState.CreateProofConditionKey(condition);
             if (commonKeys.Contains(key) && emitted.Add(key)) builder.Add(condition);
         }
 
         return builder.ToImmutable();
     }
 
-    private static IEnumerable<PathFact<TCondition>[]> EnumerateChoices<TCondition>(
-        IReadOnlyList<StatePathFacts<TCondition>> states,
+    private static IEnumerable<PathFact[]> EnumerateChoices(
+        IReadOnlyList<StatePathFacts> states,
         string target,
-        PathConditionMergeLimits limits)
-        where TCondition : class {
-        var selected = new PathFact<TCondition>[states.Count];
-        return EnumerateChoices(states, target, 0, selected, limits);
-    }
+        PathConditionMergeLimits limits) =>
+        EnumerateChoices(states, target, 0, new PathFact[states.Count], limits);
 
-    private static IEnumerable<PathFact<TCondition>[]> EnumerateChoices<TCondition>(
-        IReadOnlyList<StatePathFacts<TCondition>> states,
+    private static IEnumerable<PathFact[]> EnumerateChoices(
+        IReadOnlyList<StatePathFacts> states,
         string target,
         int stateIndex,
-        PathFact<TCondition>[] selected,
-        PathConditionMergeLimits limits)
-        where TCondition : class {
+        PathFact[] selected,
+        PathConditionMergeLimits limits) {
         if (stateIndex == states.Count) {
             yield return selected.ToArray();
             yield break;
@@ -136,38 +123,33 @@ internal static class PathConditionMergeEngine {
         SymbolicAnalysisLimitKind kind,
         int limit,
         int observed,
-        string provenance) {
+        string provenance) =>
         SymbolicAnalysisLimitContext.Record(kind, limit, observed, null, provenance);
-    }
 
-    private sealed class StatePathFacts<TCondition>
-        where TCondition : class {
-        private readonly ImmutableArray<TCondition> branches;
-        private readonly ImmutableArray<PathFact<TCondition>> facts;
-        private readonly PathConditionMergeStrategy<TCondition> strategy;
+    private sealed class StatePathFacts {
+        private readonly ImmutableArray<SymbolicCondition> branches;
+        private readonly ImmutableArray<PathFact> facts;
         private readonly PathConditionMergeLimits limits;
 
         internal StatePathFacts(
-            IEnumerable<TCondition> conditions,
+            IEnumerable<SymbolicCondition> conditions,
             ISet<string> commonKeys,
-            PathConditionMergeStrategy<TCondition> strategy,
             PathConditionMergeLimits limits) {
-            this.strategy = strategy;
             this.limits = limits;
-            var factsByTarget = new Dictionary<string, List<PathFact<TCondition>>>(StringComparer.Ordinal);
-            var localBranches = ImmutableArray.CreateBuilder<TCondition>();
-            var localFacts = ImmutableArray.CreateBuilder<PathFact<TCondition>>();
+            var factsByTarget = new Dictionary<string, List<PathFact>>(StringComparer.Ordinal);
+            var localBranches = ImmutableArray.CreateBuilder<SymbolicCondition>();
+            var localFacts = ImmutableArray.CreateBuilder<PathFact>();
             foreach (var condition in conditions) {
-                var conditionKey = strategy.GetKey(condition);
+                var conditionKey = SymbolicState.CreateProofConditionKey(condition);
                 if (commonKeys.Contains(conditionKey)) continue;
-                if (!strategy.TryGetTarget(condition, out var targetKey)) {
+                if (!SymbolicStateMerger.TryGetMergeTargetKey(condition, out var targetKey)) {
                     localBranches.Add(condition);
                     continue;
                 }
 
-                var fact = new PathFact<TCondition>(condition, conditionKey, targetKey);
+                var fact = new PathFact(condition, targetKey);
                 if (!factsByTarget.TryGetValue(targetKey, out var targetFacts)) {
-                    targetFacts = new List<PathFact<TCondition>>();
+                    targetFacts = new List<PathFact>();
                     factsByTarget.Add(targetKey, targetFacts);
                 }
 
@@ -190,10 +172,10 @@ internal static class PathConditionMergeEngine {
                         "state_merge.facts_per_target_per_state");
         }
 
-        internal IReadOnlyDictionary<string, PathFact<TCondition>[]> FactsByTarget { get; }
+        internal IReadOnlyDictionary<string, PathFact[]> FactsByTarget { get; }
 
-        internal TCondition? CreateGuard(string targetKey) {
-            var conditions = new List<TCondition>(branches);
+        internal SymbolicCondition? CreateGuard(string targetKey) {
+            var conditions = new List<SymbolicCondition>(branches);
             var guardFactCount = 0;
             foreach (var fact in facts) {
                 if (string.Equals(fact.TargetKey, targetKey, StringComparison.Ordinal)) continue;
@@ -210,13 +192,13 @@ internal static class PathConditionMergeEngine {
                 guardFactCount++;
             }
 
-            return conditions.Count == 0 ? null : strategy.Conjoin(conditions);
+            return conditions.Count == 0
+                ? null
+                : SymbolicStateMerger.Combine(SymbolicConditionOperator.And, conditions);
         }
     }
 
-    private sealed record PathFact<TCondition>(
-        TCondition Condition,
-        string ConditionKey,
-        string TargetKey)
-        where TCondition : class;
+    private sealed record PathFact(
+        SymbolicCondition Condition,
+        string TargetKey);
 }
