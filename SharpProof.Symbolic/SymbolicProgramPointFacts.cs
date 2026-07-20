@@ -206,7 +206,7 @@ internal static class SymbolicProgramPointFacts {
             }
             else if (ancestor is CatchClauseSyntax catchClauseSyntax &&
                      catchClauseSyntax.Block.Span.Contains(syntaxNode.Span)) {
-                SymbolicStatementStateTransfer.AddCatchBodyEntryStateFacts(
+                SymbolicCfgProgramPointStateCollector.ApplyCatchEntryFacts(
                     ref state,
                     catchClauseSyntax,
                     syntaxNode.SpanStart,

@@ -196,6 +196,105 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         ControlFlowRegion Region,
         SymbolicNestedMutationInvalidationPlan ProtectedMutations);
 
+    internal sealed record CfgCatchLocalTargetPlan(
+        CatchClauseSyntax Clause,
+        ControlFlowRegion TryRegion,
+        ControlFlowRegion CatchRegion,
+        SymbolicNestedMutationInvalidationPlan ProtectedMutations);
+
+    private static bool TryCreateCatchLocalTargetPlan(
+        SyntaxNode site,
+        ControlFlowGraph graph,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out CfgCatchLocalTargetPlan? plan) {
+        plan = null;
+        var clause = site.AncestorsAndSelf().OfType<CatchClauseSyntax>().FirstOrDefault();
+        if (clause == null)
+            return true;
+        if (clause.Parent is not TryStatementSyntax tryStatement)
+            return false;
+
+        var catchRegions = EnumerateRegions(graph.Root)
+            .Where(region => region.Kind == ControlFlowRegionKind.Catch &&
+                             RegionContainsSyntax(region, graph, clause.Block))
+            .ToArray();
+        if (catchRegions.Length != 1)
+            return false;
+        var tryAndCatchRegion = catchRegions[0].EnclosingRegion;
+        while (tryAndCatchRegion?.Kind != ControlFlowRegionKind.TryAndCatch)
+            tryAndCatchRegion = tryAndCatchRegion?.EnclosingRegion;
+        var tryRegion = tryAndCatchRegion?.NestedRegions
+            .FirstOrDefault(static region => region.Kind == ControlFlowRegionKind.Try);
+        if (tryRegion == null)
+            return false;
+
+        var protectedMutations = SymbolicStateInvalidator.LowerNestedMutations(
+            tryStatement.Block,
+            semanticModel,
+            cancellationToken);
+        if (protectedMutations.HasUnsupportedMutation)
+            return false;
+        plan = new CfgCatchLocalTargetPlan(
+            clause,
+            tryRegion,
+            catchRegions[0],
+            protectedMutations);
+        return true;
+    }
+
+    private static bool IsCatchLocalInitialization(
+        IOperation operation,
+        CatchClauseSyntax clause,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) {
+        if (clause.Declaration == null ||
+            !clause.Declaration.Span.Contains(operation.Syntax.SpanStart) ||
+            operation is not ISimpleAssignmentOperation assignment ||
+            !TryGetDirectTarget(assignment.Target, out var target))
+            return false;
+        return SymbolEqualityComparer.Default.Equals(
+            target,
+            semanticModel.GetDeclaredSymbol(clause.Declaration, cancellationToken));
+    }
+
+    internal static void ApplyCatchEntryFacts(
+        ref SymbolicState state,
+        CatchClauseSyntax clause,
+        int useSpanStart,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) {
+        if (clause.Declaration != null &&
+            semanticModel.GetDeclaredSymbol(clause.Declaration, cancellationToken) is ILocalSymbol localSymbol &&
+            !SymbolicLoopStateTransfer.IsSymbolAssignedBetween(
+                clause.Block,
+                clause.Block.SpanStart - 1,
+                useSpanStart,
+                localSymbol.OriginalDefinition,
+                semanticModel,
+                cancellationToken))
+            SymbolicStateFactBuilder.AddSymbolReferenceNullCondition(
+                ref state,
+                localSymbol.OriginalDefinition,
+                clause.Declaration,
+                false,
+                "ir.path.catch-entry.exception-not-null");
+
+        if (clause.Filter?.FilterExpression is { } filterExpression &&
+            !SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
+                filterExpression,
+                clause.Block,
+                useSpanStart,
+                semanticModel,
+                cancellationToken))
+            SymbolicProgramPointFacts.AddReachabilityCondition(
+                ref state,
+                filterExpression,
+                true,
+                semanticModel,
+                cancellationToken);
+    }
+
     internal sealed record CfgFinallyContinuation(
         ControlFlowBranch OriginBranch,
         ImmutableArray<ControlFlowRegion> Regions,

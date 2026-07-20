@@ -114,38 +114,6 @@ internal static class SymbolicStatementStateTransfer {
             cancellationToken);
     }
 
-    internal static void AddCatchBodyEntryStateFacts(
-        ref SymbolicState state,
-        CatchClauseSyntax catchClause,
-        int useSpanStart,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        if (catchClause.Declaration != null &&
-            semanticModel.GetDeclaredSymbol(catchClause.Declaration, cancellationToken) is ILocalSymbol localSymbol &&
-            !SymbolicLoopStateTransfer.IsSymbolAssignedBetween(
-                catchClause.Block,
-                catchClause.Block.SpanStart - 1,
-                useSpanStart,
-                localSymbol.OriginalDefinition,
-                semanticModel,
-                cancellationToken))
-            AddSymbolReferenceNullCondition(
-                ref state,
-                localSymbol.OriginalDefinition,
-                catchClause.Declaration,
-                false,
-                "ir.path.catch-entry.exception-not-null");
-
-        if (catchClause.Filter?.FilterExpression is { } filterExpression &&
-            !SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
-                filterExpression,
-                catchClause.Block,
-                useSpanStart,
-                semanticModel,
-                cancellationToken))
-            SymbolicProgramPointFacts.AddReachabilityCondition(ref state, filterExpression, true, semanticModel, cancellationToken);
-    }
-
     internal static void AddUsingStatementExpressionStateFacts(
         ref SymbolicState state,
         ExpressionSyntax expression,

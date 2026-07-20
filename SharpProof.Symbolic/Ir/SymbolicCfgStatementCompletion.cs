@@ -85,6 +85,7 @@ internal static class SymbolicCfgStatementCompletion {
             new List<CfgPathState>(),
             loopPlans,
             null,
+            null,
             region,
             statement);
         var summarizesLoop = statement is WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax;

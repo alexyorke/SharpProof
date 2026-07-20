@@ -848,19 +848,25 @@ Tests are excluded from the metric and must not be deleted.
   read-only collections directly through the lowering result and operation
   transfer kernel. Focused finite-domain, CFG, and operation-transfer
   characterization remains green.
+- [x] Added canonical CFG exceptional-entry seeding for catch-local targets and
+  moved catch parameter/filter facts out of the structural statement-transfer
+  owner. Ordinary, filtered, nested, later-clause, and protected-mutation catch
+  targets now match structural normalized state and evidence. This migration
+  adds 115 temporary production lines; syntax fallback remains only for catch
+  shapes whose prior operations the CFG transfer cannot yet lower.
 
 ## Current evidence
 
-- Phase-two maintained production: 80,981 lines (77,019 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,453-line reduction from the
-  84,434-line phase-two baseline. Another 16,547 lines remain to the 64,434
+- Phase-two maintained production: 81,096 lines (77,134 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,338-line reduction from the
+  84,434-line phase-two baseline. Another 16,662 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.
 - Release solution build: zero warnings and errors.
-- Latest six-lane run: 6,192 passing and zero reported skipped, run sequentially
+- Latest six-lane run: 6,197 passing and zero reported skipped, run sequentially
   with one NUnit worker: Oracle 573, Analyzer 487, Flow 257, Core 258,
-  MainGeneral 4,002, and Tooling 615. The warning-as-error Release solution
+  MainGeneral 4,007, and Tooling 615. The warning-as-error Release solution
   build also completes with zero warnings and errors.
 
 ## Milestones

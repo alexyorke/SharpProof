@@ -179,6 +179,13 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
 
         if (graph == null || graph.Blocks.IsDefaultOrEmpty)
             return Unsupported(site, "cfg-empty");
+        if (!TryCreateCatchLocalTargetPlan(
+                site,
+                graph,
+                semanticModel,
+                cancellationToken,
+                out var catchLocalTarget))
+            return Unsupported(site, "catch-local-target");
         if (includeCurrentStatementCompletionFacts && site is BlockSyntax completedBlock) {
             var containingCondition = targetIsCompletedNestedBlock
                 ? completedBlock.Ancestors().OfType<IfStatementSyntax>().FirstOrDefault()?.Condition
@@ -261,6 +268,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             queued,
             completedPaths,
             loopPlans,
+            catchLocalTarget,
             finallyLocalTarget,
             null,
             site);
@@ -358,6 +366,13 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 }
                 if (forInitialEntry != null &&
                     IsForInitializerSyntax(operation.Syntax, forInitialEntry))
+                    continue;
+                if (catchLocalTarget != null &&
+                    IsCatchLocalInitialization(
+                        operation,
+                        catchLocalTarget.Clause,
+                        semanticModel,
+                        cancellationToken))
                     continue;
                 if (operation is IFlowCaptureOperation &&
                     operation.Syntax.FirstAncestorOrSelf<StatementSyntax>() is
@@ -610,6 +625,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         var statementRegion = context.RegionPlan;
         if (branch == null)
             return true;
+        if (!TrySeedCatchLocalTarget(source, branch, activeContinuation, path, context))
+            return false;
         var completedTryPropagation = TryPropagateCompletedTry(
             source,
             branch,
@@ -725,6 +742,42 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             destinationPoint,
             new CfgIncomingEdge(branch, activeContinuation, edgeKind),
             path,
+            context);
+    }
+
+    private static bool TrySeedCatchLocalTarget(
+        BasicBlock source,
+        ControlFlowBranch branch,
+        CfgFinallyContinuation? activeContinuation,
+        CfgPathState path,
+        CfgTraversalContext context) {
+        var plan = context.CatchLocalTarget;
+        if (plan == null || branch.Destination == null ||
+            (source.Ordinal >= plan.TryRegion.FirstBlockOrdinal &&
+             source.Ordinal <= plan.TryRegion.LastBlockOrdinal) ||
+            branch.Destination.Ordinal < plan.TryRegion.FirstBlockOrdinal ||
+            branch.Destination.Ordinal > plan.TryRegion.LastBlockOrdinal)
+            return true;
+
+        var catchState = SymbolicStateInvalidator.ApplyNestedMutationInvalidations(
+            path.State,
+            plan.ProtectedMutations);
+        ApplyCatchEntryFacts(
+            ref catchState,
+            plan.Clause,
+            context.TargetSite.SpanStart,
+            context.SemanticModel,
+            context.CancellationToken);
+        return TryPropagateToPoint(
+            new CfgTraversalPoint(
+                context.Graph.Blocks[plan.CatchRegion.FirstBlockOrdinal],
+                activeContinuation),
+            new CfgIncomingEdge(
+                branch,
+                activeContinuation,
+                CfgIncomingEdgeKind.History,
+                "catch-target:" + plan.CatchRegion.FirstBlockOrdinal.ToString(CultureInfo.InvariantCulture)),
+            path with { State = catchState },
             context);
     }
 
@@ -1480,6 +1533,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         ISet<CfgTraversalPoint> Queued,
         ICollection<CfgPathState> CompletedPaths,
         IReadOnlyList<SymbolicLoopTransferPlan> LoopPlans,
+        CfgCatchLocalTargetPlan? CatchLocalTarget,
         CfgFinallyLocalTargetPlan? FinallyLocalTarget,
         CfgRegionPlan? RegionPlan,
         SyntaxNode TargetSite);

@@ -2963,4 +2963,46 @@ static class C
 
         Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
     }
+
+    [TestCase(
+        "static class C { static int M() { try { throw new System.Exception(); } catch (System.Exception error) { return error.Message.Length; } } }",
+        TestName = "CatchLocalTarget")]
+    [TestCase(
+        "static class C { static int M(bool accept) { try { throw new System.Exception(); } catch (System.Exception error) when (accept) { return error.Message.Length; } } }",
+        TestName = "FilteredCatchLocalTarget")]
+    [TestCase(
+        "static class C { static int M() { int value = 1; try { value = 2; throw new System.Exception(); } catch (System.Exception error) { return error.Message.Length + value; } } }",
+        TestName = "CatchLocalTargetInvalidatesProtectedMutation")]
+    [TestCase(
+        "static class C { static int M(bool useError) { try { throw new System.Exception(); } catch (System.Exception error) { if (useError) { return error.Message.Length; } return 0; } } }",
+        TestName = "NestedCatchLocalTarget")]
+    [TestCase(
+        "static class C { static int M() { try { throw new System.Exception(); } catch (System.InvalidOperationException) { } catch (System.Exception error) { return error.Message.Length; } return 0; } }",
+        TestName = "LaterCatchLocalTarget")]
+    public void CatchEntryTarget_MatchesStructuralCollector(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CatchEntryTarget_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>()
+            .First(statement => statement.Expression?.ToString().Contains("error.Message", StringComparison.Ordinal) == true);
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        Assert.That(actual.Value!.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+        Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
+    }
 }
