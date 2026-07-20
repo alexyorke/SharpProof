@@ -59,32 +59,6 @@ internal partial class ReturnStatementPurityRule {
                     localSymbol,
                     "owned_local_array_return");
 
-            if (TryFindReturnedDelegateCapture(
-                    sourceReturnedValue,
-                    context,
-                    currentState,
-                    ReturnedDelegateCaptureKind.OwnedLocalArray,
-                    out var delegateCaptureSyntax,
-                    out var delegateCapturedArrayLocal))
-                return CreateMutableStateEscapeResult(
-                    returnOperation,
-                    delegateCaptureSyntax,
-                    delegateCapturedArrayLocal,
-                    "escaping_closure_owned_array_capture");
-
-            if (TryFindReturnedDelegateCapture(
-                    sourceReturnedValue,
-                    context,
-                    currentState,
-                    ReturnedDelegateCaptureKind.FreshMutableObject,
-                    out var objectDelegateCaptureSyntax,
-                    out var objectDelegateCapturedLocal))
-                return CreateMutableStateEscapeResult(
-                    returnOperation,
-                    objectDelegateCaptureSyntax,
-                    objectDelegateCapturedLocal,
-                    "escaping_closure_fresh_mutable_object_capture");
-
             if (TryGetCallerOwnedArrayViewReturn(
                     sourceReturnedValue,
                     currentState,

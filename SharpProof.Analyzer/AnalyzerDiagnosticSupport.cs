@@ -14,13 +14,6 @@ internal static class AnalyzerDiagnosticReporter {
     }
 
     internal static void ReportIfNotSuppressed(
-        Microsoft.CodeAnalysis.Diagnostics.OperationAnalysisContext context,
-        DiagnosticBaseline baseline,
-        Diagnostic diagnostic) {
-        ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
-    }
-
-    internal static void ReportIfNotSuppressed(
         DiagnosticBaseline baseline,
         Diagnostic diagnostic,
         Action<Diagnostic> reportDiagnostic) {

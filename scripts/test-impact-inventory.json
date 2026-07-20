@@ -3087,18 +3087,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Engine/Rules/ReturnStatementPurityRule.DelegateCaptures.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ReturnedDelegateCaptureKind",
-                                                  "ReturnStatementPurityRule"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "ReturnStatementPurityRule"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/Engine/Rules/ReturnStatementPurityRule.MutableEscapes.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -4134,7 +4122,6 @@
                             "module":  "ProofCore",
                             "declaredTypes":  [
                                                   "FormulaChildren",
-                                                  "FormulaPair",
                                                   "SmtFormulaTraversal",
                                                   "TraversalFrame"
                                               ],
@@ -8116,17 +8103,6 @@
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/Rules/ReturnStatementPurityRule.Deconstruction.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "DiagnosticEvidenceTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ReturnStatementPurityRule"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/Engine/Rules/ReturnStatementPurityRule.DelegateCaptures.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
