@@ -1291,67 +1291,17 @@ internal static class SymbolicIndexingLowerer {
         TryCreateLengthShape<TShape> tryCreateShape,
         out TShape shape)
         where TShape : struct {
+        if (SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
+                shapeSymbol,
+                useExpression,
+                context.SemanticModel,
+                context.CancellationToken,
+                out var currentValue) &&
+            tryCreateShape(currentValue, context, out shape))
+            return true;
+
         shape = default;
-        var foundAssignment = false;
-        foreach (var containingBlock in CSharpSyntaxFacts.EnumerateContainingBlocks(useExpression).Reverse())
-            foreach (var statement in containingBlock.Block.Statements) {
-                if (statement == containingBlock.ContainingStatement) break;
-
-                TryGetShapeAssignmentFromPrecedingStatement(
-                    statement,
-                    shapeSymbol,
-                    context,
-                    tryCreateShape,
-                    out var writesShapeSymbol,
-                    out var assignedShape);
-                if (!writesShapeSymbol) continue;
-
-                if (!assignedShape.HasValue) {
-                    shape = default;
-                    return false;
-                }
-
-                shape = assignedShape.GetValueOrDefault();
-                foundAssignment = true;
-            }
-
-        return foundAssignment;
-    }
-
-    private static void TryGetShapeAssignmentFromPrecedingStatement<TShape>(
-        StatementSyntax statement,
-        ISymbol shapeSymbol,
-        SymbolicLoweringContext context,
-        TryCreateLengthShape<TShape> tryCreateShape,
-        out bool writesShapeSymbol,
-        out TShape? shape)
-        where TShape : struct {
-        shape = null;
-        writesShapeSymbol = false;
-        if (statement is LocalDeclarationStatementSyntax localDeclaration) {
-            foreach (var variable in localDeclaration.Declaration.Variables) {
-                var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(variable, context.CancellationToken);
-                if (!IsSameSymbol(declaredSymbol, shapeSymbol)) continue;
-
-                if (variable.Initializer == null) return;
-
-                writesShapeSymbol = true;
-                if (localDeclaration.Declaration.Variables.Count == 1 &&
-                    tryCreateShape(variable.Initializer.Value, context, out var declaredShape))
-                    shape = declaredShape;
-                return;
-            }
-        }
-
-        if (statement is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } &&
-            assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
-            IsSymbolReference(assignment.Left, shapeSymbol, context)) {
-            writesShapeSymbol = true;
-            if (tryCreateShape(assignment.Right, context, out var assignedShape)) shape = assignedShape;
-            return;
-        }
-
-        writesShapeSymbol = ContainsSymbolWrite(statement, shapeSymbol, context);
+        return false;
     }
 
     private static bool TryCreateDirectIndexExpressionShape(
@@ -1565,36 +1515,6 @@ internal static class SymbolicIndexingLowerer {
 
         return false;
     }
-
-    private static bool ContainsSymbolWrite(
-        SyntaxNode node,
-        ISymbol symbol,
-        SymbolicLoweringContext context) {
-        foreach (var assignment in CSharpSyntaxFacts.DescendantNodesInExecution(node, includeSelf: false)
-                     .OfType<AssignmentExpressionSyntax>())
-            if (IsSymbolReference(assignment.Left, symbol, context))
-                return true;
-
-        foreach (var argument in CSharpSyntaxFacts.DescendantNodesInExecution(node, includeSelf: false)
-                     .OfType<ArgumentSyntax>())
-            if ((argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
-                 argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword)) &&
-                IsSymbolReference(argument.Expression, symbol, context))
-                return true;
-
-        return false;
-    }
-
-    private static bool IsSymbolReference(
-        ExpressionSyntax expression,
-        ISymbol target,
-        SymbolicLoweringContext context) => IsSameSymbol(
-            context.SemanticModel.GetSymbolInfo(UnwrapExpression(expression), context.CancellationToken).Symbol,
-            target);
-
-    private static bool IsSameSymbol(ISymbol? candidate, ISymbol target) => candidate != null &&
-               (SymbolEqualityComparer.Default.Equals(candidate, target) ||
-                SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, target.OriginalDefinition));
 
     private static bool IsSystemRangeExpression(ExpressionSyntax expression, SymbolicLoweringContext context) {
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);

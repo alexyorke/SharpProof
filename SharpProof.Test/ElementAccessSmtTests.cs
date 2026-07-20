@@ -674,4 +674,31 @@ public class TestClass
             "result == values.Length - 2");
     }
 
+    [Test]
+    public void SymbolicSourceQueryService_RangeMutatedAfterLoopUseRemainsUnknown()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, bool repeat)
+    {
+        Range slice = 1..^1;
+        while (repeat)
+        {
+            var result = values[slice].Length;
+            slice = 0..^0;
+        }
+
+        return 0;
+    }
+}";
+
+        AssertConditionUnknown(
+            source,
+            "var result = values[slice].Length;",
+            "values[slice].Length == values.Length - 2");
+    }
+
 }

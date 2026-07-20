@@ -829,18 +829,24 @@ Tests are excluded from the metric and must not be deleted.
   conditions, nested loops, and member targets remain typed fallbacks. This
   fixes the characterized legacy bug that ignored `index++` and `index += 1`
   and retained zero rather than one.
+- [x] Removed `SymbolicIndexingLowerer`'s parallel current-assignment and
+  mutation walker. Assigned `System.Index` and `System.Range` shapes now use the
+  shared current-value resolver also consumed by exact runtime-type inference.
+  Existing range, index, lowering, and runtime-hazard fixtures retain parity;
+  the shared loop invalidation also fixes a characterized false proof that
+  reused a range shape after a later loop-body mutation.
 
 ## Current evidence
 
-- Phase-two maintained production: 81,154 lines (77,192 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,280-line reduction from the
-  84,434-line phase-two baseline. Another 16,720 lines remain to the 64,434
+- Phase-two maintained production: 81,087 lines (77,125 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,347-line reduction from the
+  84,434-line phase-two baseline. Another 16,653 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.
 - Release solution build: zero warnings and errors.
-- Latest six-lane run: 6,191 passing and zero reported skipped, run sequentially
-  with one NUnit worker: Oracle 573, Analyzer 487, Flow 257, Core 257,
+- Latest six-lane run: 6,192 passing and zero reported skipped, run sequentially
+  with one NUnit worker: Oracle 573, Analyzer 487, Flow 257, Core 258,
   MainGeneral 4,002, and Tooling 615. The warning-as-error Release solution
   build also completes with zero warnings and errors.
 
