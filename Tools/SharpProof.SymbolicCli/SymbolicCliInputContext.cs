@@ -47,7 +47,7 @@ internal sealed class SymbolicCliInputContext(
 
         try
         {
-            var containerPath = CliHost.GetFullPath(options.ProjectPath ?? options.SolutionPath!);
+            var containerPath = Path.GetFullPath(options.ProjectPath ?? options.SolutionPath!);
             var sourcePath = ResolveSourcePath(options.FilePath!, Path.GetDirectoryName(containerPath)!);
             var (project, solutionPath) = options.ProjectPath != null
                 ? (await workspace.OpenProjectAsync(containerPath, cancellationToken: cancellationToken)
@@ -182,7 +182,7 @@ internal sealed class SymbolicCliInputContext(
     {
         if (Path.IsPathRooted(sourcePath))
         {
-            var rootedPath = CliHost.GetFullPath(sourcePath);
+            var rootedPath = Path.GetFullPath(sourcePath);
             if (File.Exists(rootedPath)) return rootedPath;
 
             throw SymbolicCliErrorWriter.CreateException(
@@ -194,7 +194,7 @@ internal sealed class SymbolicCliInputContext(
                 rootedPath);
         }
 
-        var currentDirectoryPath = CliHost.GetFullPath(sourcePath);
+        var currentDirectoryPath = Path.GetFullPath(sourcePath);
         if (File.Exists(currentDirectoryPath)) return currentDirectoryPath;
 
         var containerRelativePath = Path.GetFullPath(Path.Combine(containerDirectory, sourcePath));
@@ -214,7 +214,7 @@ internal sealed class SymbolicCliInputContext(
         var comparison = Path.DirectorySeparatorChar == '\\'
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
-        return string.Equals(CliHost.GetFullPath(left), CliHost.GetFullPath(right), comparison);
+        return string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), comparison);
     }
 }
 

@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
-using System.Reflection;
 using System.Text.Json;
 using NUnit.Framework;
 
@@ -9,14 +7,11 @@ namespace SharpProof.Test;
 internal static class SymbolicCliTestHost
 {
     private static readonly SemaphoreSlim BuildGate = new(1, 1);
-    private static readonly SemaphoreSlim InvocationGate = new(1, 1);
     private static readonly Lazy<string> RepositoryRoot = new(FindRepositoryRoot);
     private static readonly Lazy<string> BuildConfiguration = new(FindBuildConfiguration);
 
     private static readonly Lazy<Task<string>> CliAssemblyPath =
         new(() => EnsureCliAssemblyPathAsync(RepositoryRoot.Value));
-
-    private static readonly Lazy<Task<MethodInfo>> CliEntryPoint = new(LoadCliEntryPointAsync);
 
     public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
         params string[] arguments)
@@ -31,53 +26,15 @@ internal static class SymbolicCliTestHost
         string? standardInput,
         params string[] arguments)
     {
-        var entryPoint = await CliEntryPoint.Value.ConfigureAwait(false);
-        await InvocationGate.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            var standardOutput = new StringWriter();
-            var standardError = new StringWriter();
-            using var standardInputReader = standardInput == null
-                ? TextReader.Null
-                : new StringReader(standardInput);
-            using var hostScope = BeginCliHostScope(
-                entryPoint,
-                standardInputReader,
-                standardOutput,
-                standardError,
-                RepositoryRoot.Value);
-            var exitCode = await InvokeEntryPointAsync(entryPoint, arguments).ConfigureAwait(false);
-            return (exitCode, standardOutput.ToString(), standardError.ToString());
-        }
-        finally
-        {
-            InvocationGate.Release();
-        }
-    }
-
-    private static IDisposable BeginCliHostScope(
-        MethodInfo entryPoint,
-        TextReader input,
-        TextWriter output,
-        TextWriter error,
-        string baseDirectory)
-    {
-        var cliHostType = entryPoint.DeclaringType?.Assembly.GetType("CliHost") ??
-                          throw new InvalidOperationException("Could not find the symbolic CLI host abstraction.");
-        var beginScope = cliHostType.GetMethod(
-                             "BeginScope",
-                             BindingFlags.Static | BindingFlags.NonPublic) ??
-                         throw new InvalidOperationException("Could not find CliHost.BeginScope.");
-        return (IDisposable)(beginScope.Invoke(null, new object[]
-        {
-            input,
-            output,
-            error,
-            baseDirectory
-        }) ?? throw new InvalidOperationException("CliHost.BeginScope returned no scope."));
+        return await RunOutOfProcessAsync(standardInput, arguments).ConfigureAwait(false);
     }
 
     public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunOutOfProcessAsync(
+        params string[] arguments)
+        => await RunOutOfProcessAsync(null, arguments).ConfigureAwait(false);
+
+    private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunOutOfProcessAsync(
+        string? standardInput,
         params string[] arguments)
     {
         var repositoryRoot = RepositoryRoot.Value;
@@ -86,6 +43,7 @@ internal static class SymbolicCliTestHost
         {
             FileName = "dotnet",
             WorkingDirectory = repositoryRoot,
+            RedirectStandardInput = standardInput != null,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false
@@ -93,47 +51,12 @@ internal static class SymbolicCliTestHost
         startInfo.ArgumentList.Add(cliAssemblyPath);
         foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
 
-        return await RunProcessAsync(startInfo, TimeSpan.FromSeconds(90), "Failed to start symbolic CLI.")
+        return await RunProcessAsync(
+                startInfo,
+                TimeSpan.FromSeconds(90),
+                "Failed to start symbolic CLI.",
+                standardInput)
             .ConfigureAwait(false);
-    }
-
-    private static async Task<MethodInfo> LoadCliEntryPointAsync()
-    {
-        var assemblyPath = await CliAssemblyPath.Value.ConfigureAwait(false);
-        var assembly = AppDomain.CurrentDomain.GetAssemblies()
-                           .FirstOrDefault(candidate =>
-                               string.Equals(candidate.Location, assemblyPath, StringComparison.OrdinalIgnoreCase))
-                       ?? Assembly.LoadFrom(assemblyPath);
-        return assembly.EntryPoint ?? throw new InvalidOperationException("Could not find symbolic CLI entry point.");
-    }
-
-    private static async Task<int> InvokeEntryPointAsync(MethodInfo entryPoint, string[] arguments)
-    {
-        object? invocationResult;
-        try
-        {
-            invocationResult = entryPoint.GetParameters().Length == 0
-                ? entryPoint.Invoke(null, null)
-                : entryPoint.Invoke(null, new object[] { arguments });
-        }
-        catch (TargetInvocationException ex) when (ex.InnerException != null)
-        {
-            throw ex.InnerException;
-        }
-
-        if (invocationResult is Task task)
-        {
-            await task.ConfigureAwait(false);
-            var resultProperty = task.GetType().GetProperty("Result");
-            if (resultProperty != null)
-                return Convert.ToInt32(resultProperty.GetValue(task), CultureInfo.InvariantCulture);
-
-            return 0;
-        }
-
-        if (invocationResult == null) return 0;
-
-        return Convert.ToInt32(invocationResult, CultureInfo.InvariantCulture);
     }
 
     private static async Task<string> EnsureCliAssemblyPathAsync(string repositoryRoot)
@@ -221,9 +144,15 @@ internal static class SymbolicCliTestHost
     private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunProcessAsync(
         ProcessStartInfo startInfo,
         TimeSpan timeout,
-        string startFailureMessage)
+        string startFailureMessage,
+        string? standardInput = null)
     {
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException(startFailureMessage);
+        if (standardInput != null)
+        {
+            await process.StandardInput.WriteAsync(standardInput).ConfigureAwait(false);
+            process.StandardInput.Close();
+        }
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
         try

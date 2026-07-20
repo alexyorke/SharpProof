@@ -356,6 +356,23 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void SymbolicCli_HasNoAmbientTestHostFacade()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var cliRoot = Path.Combine(root, "Tools", "SharpProof.SymbolicCli");
+        var testHost = File.ReadAllText(Path.Combine(
+            root, "SharpProof.ToolingTest", "SymbolicCliTestHost.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(Path.Combine(cliRoot, "CliHost.cs")), Is.False);
+            Assert.That(testHost, Does.Not.Contain("BeginCliHostScope"));
+            Assert.That(testHost, Does.Not.Contain("LoadCliEntryPointAsync"));
+            Assert.That(testHost, Does.Contain("RunOutOfProcessAsync"));
+        });
+    }
+
+    [Test]
     public void AnalyzerEffectSummaryJson_UsesParserAndCatalogLayoutOwners()
     {
         var assembly = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly;

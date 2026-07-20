@@ -267,7 +267,7 @@ internal sealed record SymbolicCliExplainReport(
                     ["artifactLocation"] = new Dictionary<string, object?>
                     {
                         ["uri"] = Path.IsPathRooted(filePath)
-                            ? new Uri(CliHost.GetFullPath(filePath)).AbsoluteUri
+                            ? new Uri(Path.GetFullPath(filePath)).AbsoluteUri
                             : filePath.Replace('\\', '/')
                     },
                     ["region"] = new Dictionary<string, object?>

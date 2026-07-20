@@ -435,7 +435,7 @@ internal sealed class SymbolicCliOptions
             Reject(options.IsProjectAware && options.FilePath == null,
                 "--project and --solution require --file.");
 
-            if (!options.IsProjectAware && options.FilePath != null && !File.Exists(CliHost.GetFullPath(options.FilePath)))
+            if (!options.IsProjectAware && options.FilePath != null && !File.Exists(Path.GetFullPath(options.FilePath)))
                 throw SymbolicCliErrorWriter.CreateException(
                     SymbolicErrorCodes.SourceNotFound,
                     SharpProofErrorCategory.Input,
@@ -456,7 +456,7 @@ internal sealed class SymbolicCliOptions
             Reject(string.IsNullOrWhiteSpace(options.SourceMapUri) && options.SourceMapUri != null,
                 "--source-map-uri requires a non-empty URI.");
 
-            if (options.ProjectPath != null && !File.Exists(CliHost.GetFullPath(options.ProjectPath)))
+            if (options.ProjectPath != null && !File.Exists(Path.GetFullPath(options.ProjectPath)))
                 throw SymbolicCliErrorWriter.CreateException(
                     SymbolicErrorCodes.ProjectLoadFailed,
                     SharpProofErrorCategory.Project,
@@ -465,7 +465,7 @@ internal sealed class SymbolicCliOptions
                     "path",
                     options.ProjectPath);
 
-            if (options.SolutionPath != null && !File.Exists(CliHost.GetFullPath(options.SolutionPath)))
+            if (options.SolutionPath != null && !File.Exists(Path.GetFullPath(options.SolutionPath)))
                 throw SymbolicCliErrorWriter.CreateException(
                     SymbolicErrorCodes.ProjectLoadFailed,
                     SharpProofErrorCategory.Project,
@@ -571,7 +571,7 @@ internal sealed class SymbolicCliOptions
             options.ValidateThresholds();
 
             foreach (var referencePath in options.ReferencePaths)
-                if (!File.Exists(CliHost.GetFullPath(referencePath)))
+                if (!File.Exists(Path.GetFullPath(referencePath)))
                     throw SymbolicCliErrorWriter.CreateException(
                         SymbolicErrorCodes.ReferenceNotFound,
                         SharpProofErrorCategory.Input,
@@ -619,7 +619,7 @@ internal sealed class SymbolicCliOptions
             throw new InvalidOperationException("Project-aware source input must be loaded through MSBuild.");
 
         if (FilePath != null)
-            return SymbolicSourceInput.FromFile(CliHost.GetFullPath(FilePath), CreateCompilationProfile());
+            return SymbolicSourceInput.FromFile(Path.GetFullPath(FilePath), CreateCompilationProfile());
 
         var sourceText = ReadSourceFromStdin
             ? standardInput ?? throw new InvalidOperationException("Standard input was not read.")
@@ -851,7 +851,7 @@ internal sealed class SymbolicCliOptions
     {
         if (ReferencePaths.Count == 0) return null;
 
-        return ReferencePaths.Select(static path => MetadataReference.CreateFromFile(CliHost.GetFullPath(path)));
+        return ReferencePaths.Select(static path => MetadataReference.CreateFromFile(Path.GetFullPath(path)));
     }
 
     private void AddAnalysisLimitOverride(string value, string optionName) =>

@@ -63,10 +63,6 @@ public sealed record FuzzExpectation(
             DefaultSp0010Properties,
             ImmutableArray<string>.Empty);
 
-    public FuzzExpectation RequireExceptionEdgesOnAnySp0010() => this with
-    {
-        RequiredAnySp0010Properties = ImmutableArray.Create(DiagnosticPropertyNames.ExceptionEdgesProperty)
-    };
 }
 
 public sealed record ShapeRegistryEntry(

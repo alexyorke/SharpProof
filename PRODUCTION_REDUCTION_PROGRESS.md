@@ -617,6 +617,11 @@ Tests are excluded from the metric and must not be deleted.
   unreachable property-getter cache branch and inferred indirect-write and
   operand-size IL families from opcode metadata. Architecture coverage prevents
   the filter adapter from returning.
+- [x] Removed the ambient Symbolic CLI console/filesystem host that existed only
+  for reflection-based in-process tests. CLI tests now exercise the real
+  executable, including stdin and JSON requests; production uses ordinary
+  process console streams and working-directory path resolution. Also removed
+  one unused preview Fuzz expectation convenience method.
 - [x] Made the canonical baseline and EffectSummary loaders own additional-file
   validation results. Deleted the 241-line `AnalyzerAdditionalFileValidator`
   and its second JSON traversal; one session-owned issue accumulator now
@@ -746,16 +751,15 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current evidence
 
-- Maintained production: 90,239 lines (86,495 C#, 3,014 scripts, and 730
-  specifications); net reduction: 17,387 lines; remaining reduction: 2,613.
-  This migration removes 29 maintained-production lines by deleting the
-  redundant ReadOnlySpan Path semantic-wrapper allowlist after differential
-  runtime characterization, while preserving the three wrapper families whose
-  removal still changes behavior.
+- Maintained production: 90,183 lines (86,439 C#, 3,014 scripts, and 730
+  specifications); net reduction: 17,443 lines; remaining reduction: 2,557.
+  This migration removes 56 maintained-production lines by deleting the
+  test-only ambient Symbolic CLI host and an unused preview Fuzz API while
+  routing all CLI characterization through the executable boundary.
   Diagnostics, proof outcomes, conservative unknowns, CLI bytes, serialization,
   and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,238 passing tests and two documented Main skips. One Flow test
+- Six lanes: 6,239 passing tests and two documented Main skips. One Flow test
   missed its diagnostic during the parallel all-lane run, then passed both an
   exact serial retry and the complete 257-test Flow lane serially.
 
