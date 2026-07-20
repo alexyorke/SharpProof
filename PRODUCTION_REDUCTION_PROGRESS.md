@@ -662,17 +662,25 @@ Tests are excluded from the metric and must not be deleted.
   operands through the shared `HasValue` IR while retaining reference null-test
   semantics. Differential state and evidence parity rejected capture skipping
   without source-operation resolution.
+- [x] Made non-returning expression completion canonical. The shared
+  `[DoesNotReturn]` exit classifier now marks the expression's normal successor
+  contradictory inside operation transfer, so CFG merging prunes it without a
+  scheduler-specific branch. Partial, unconditional, and all-branch exit cases
+  match structural state and evidence; `[DoesNotReturnIf]` normal completion
+  remains unchanged. CFG merging now also preserves contradiction when every
+  incoming path is impossible.
 
 ## Current evidence
 
-- Maintained production: 90,823 lines (87,000 C#, 3,093 scripts, and 730
-  specifications); net reduction: 16,803 lines; remaining reduction: 3,197.
-  This nullable-branch tranche adds thirteen maintained-production lines and
-  completes the characterized captured current-completion family. It changes no
-  diagnostics, proof results, conservative unknowns, CLI bytes, serialization,
-  or package contents and deletes no tests.
+- Maintained production: 90,833 lines (87,010 C#, 3,093 scripts, and 730
+  specifications); net reduction: 16,793 lines; remaining reduction: 3,207.
+  This tranche adds ten maintained-production lines while moving non-returning
+  expression successors onto canonical CFG state semantics and closing the
+  all-impossible-path merge gap. It changes no diagnostics, successful proof
+  results, conservative unknowns, CLI bytes, serialization, or package contents
+  and deletes no tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,220 passing tests and two documented Main skips.
+- Six lanes: 6,222 passing tests and two documented Main skips.
 
 ## Milestones
 

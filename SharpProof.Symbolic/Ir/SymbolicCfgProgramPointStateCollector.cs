@@ -324,8 +324,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                         GetActiveGuard(currentPath.GuardFrame),
                         true,
                         false,
-                        operation.Syntax is not ExpressionStatementSyntax expressionStatement ||
-                        !SymbolicControlFlowFacts.ExpressionStatementDefinitelyExits(expressionStatement, semanticModel, cancellationToken),
+                        true,
                         semanticModel,
                         cancellationToken,
                         forInitialEntry != null && IsForInitializerSyntax(operation.Syntax, forInitialEntry)
@@ -1310,6 +1309,14 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             return MergeIncomingStates(feasiblePaths, source);
         if (paths.Count == 1)
             return paths[0];
+        if (paths.Count != 0 && feasiblePaths.Length == 0)
+            return new CfgPathState(
+                SymbolicStateMerger.MergePathStatesAcrossAll(
+                        paths.Select(static path => path.State).ToArray(),
+                        SymbolicStateMerger.AreEvidenceEquivalentFacts,
+                        source.SpanStart)
+                    .MarkContradictory(),
+                null);
         if (TryMergeGuardedPaths(paths, source, out var merged))
             return merged;
 

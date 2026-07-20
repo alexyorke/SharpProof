@@ -1099,28 +1099,47 @@ static class C
         Assert.That(CreateEvidenceKey(actual.Value!), Does.Contain("ir.path.normal-completion.parameter-not-null"));
     }
 
-    [Test]
-    public void PriorDoesNotReturnExpression_RemainsConservativeFallback()
-    {
-        const string source = @"
+    [TestCase(@"
 using System.Diagnostics.CodeAnalysis;
 static class C
 {
     [DoesNotReturn] static void Fail() => throw new System.Exception();
     static int M(string? value) { if (value is null) Fail(); return value.Length; }
-}";
+}")]
+    [TestCase(@"
+using System.Diagnostics.CodeAnalysis;
+static class C
+{
+    [DoesNotReturn] static void Fail() => throw new System.Exception();
+    static int M() { Fail(); return 0; }
+}")]
+    [TestCase(@"
+using System.Diagnostics.CodeAnalysis;
+static class C
+{
+    [DoesNotReturn] static void Fail() => throw new System.Exception();
+    static int M(bool condition) { if (condition) Fail(); else Fail(); return 0; }
+}")]
+    public void PriorDoesNotReturnExpression_TerminatesCanonicalPath(string source)
+    {
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(PriorDoesNotReturnExpression_RemainsConservativeFallback));
+            nameof(PriorDoesNotReturnExpression_TerminatesCanonicalPath));
         var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Last();
 
         var actual = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
             fixture.SemanticModel,
             CancellationToken.None);
+        var structural = CollectStructuralState(fixture, site);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
 
-        Assert.That(actual.IsUnsupported, Is.True);
-        Assert.That(actual.Provenance.Single().Detail, Is.EqualTo("operation-ExpressionStatement"));
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        AssertStateParity(actual.Value!, structural);
+        AssertStateParity(routed, structural);
     }
 
     [TestCaseSource(nameof(CoalesceAssignmentCompletionCases))]

@@ -469,6 +469,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             includeThrowGuardFacts: true,
             semanticModel,
             cancellationToken).State;
+        if (SymbolicControlFlowFacts.ExpressionStatementDefinitelyExits(
+                expressionStatement, semanticModel, cancellationToken))
+            state = state.MarkContradictory();
         return true;
     }
 
