@@ -1518,7 +1518,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         targetIsInsideBranch && path.GuardFrame != null
             ? new SymbolicState(
                 state.Facts,
-                GetGuardsOuterToInner(path.GuardFrame).Concat(state.PathConditions),
+                GetGuardsOuterToInner(path.GuardFrame, state).Concat(state.PathConditions),
                 state.SymbolVersions,
                 state.IsContradictory)
             : state;
@@ -1578,10 +1578,15 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 frame.Guard);
     }
 
-    private static IReadOnlyList<SymbolicCondition> GetGuardsOuterToInner(CfgGuardFrame frame) {
+    private static IReadOnlyList<SymbolicCondition> GetGuardsOuterToInner(
+        CfgGuardFrame frame,
+        SymbolicState state) {
         var guards = new List<SymbolicCondition>();
         for (var current = frame; current != null; current = current.Parent)
-            if (!current.GuardInvalidated)
+            if (!current.GuardInvalidated && !state.SymbolVersions.Any(pair =>
+                    (!current.Baseline.SymbolVersions.TryGetValue(pair.Key, out var baselineVersion) ||
+                     baselineVersion != pair.Value) &&
+                    SymbolicIrReferenceScanner.ContainsVariableOrMember(current.Guard, pair.Key)))
                 guards.Add(current.Guard);
         guards.Reverse();
         return guards;

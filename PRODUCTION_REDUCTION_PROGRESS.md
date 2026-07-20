@@ -873,12 +873,17 @@ Tests are excluded from the metric and must not be deleted.
   the obsolete rejection gates repays two of the temporary migration lines;
   coalesce-assignment guards remain conservative until their merge can retain
   conditional-access and known-non-null facts.
+- [x] Extended stale-guard detection to the current statement's symbol-version
+  changes. Guard-mutating simple and checked/unchecked compound assignments now
+  produce exact current-completion state with structural parity. This adds five
+  temporary production lines; loop-local coalesce completion remains the sole
+  characterized assignment-current fallback.
 
 ## Current evidence
 
-- Phase-two maintained production: 81,100 lines (77,138 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,334-line reduction from the
-  84,434-line phase-two baseline. Another 16,666 lines remain to the 64,434
+- Phase-two maintained production: 81,105 lines (77,143 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,329-line reduction from the
+  84,434-line phase-two baseline. Another 16,671 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.

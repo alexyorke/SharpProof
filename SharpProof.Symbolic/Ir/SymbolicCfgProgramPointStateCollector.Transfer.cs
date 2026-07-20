@@ -562,13 +562,13 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 operation,
                 guard,
                 allowGuardedReferenceAssignments,
-                false,
+                allowGuardedReferenceAssignments,
                 false,
                 semanticModel,
                 cancellationToken,
                 "ir.path.prior-statement",
                 out var invalidatedGuardTarget) ||
-            invalidatedGuardTarget != null)
+            invalidatedGuardTarget != null && !allowGuardedReferenceAssignments)
             return false;
 
         state = completedState;

@@ -1019,15 +1019,15 @@ static class C
         TestName = "CompoundCurrentCompletion_Checked")]
     [TestCase(
         "static class C { static int M(int input) { int value = input; if (value < 10) { value = 12; } return value; } }",
-        false,
+        true,
         TestName = "GuardInvalidatingCurrentCompletion_SimpleAssignment")]
     [TestCase(
         "static class C { static int M(int input) { int value = input; if (value < 10) { value += 2; } return value; } }",
-        false,
+        true,
         TestName = "GuardInvalidatingCurrentCompletion_UncheckedCompoundAssignment")]
     [TestCase(
         "static class C { static int M(int input) { int value = input; if (value < 10) { checked { value += 2; } } return value; } }",
-        false,
+        true,
         TestName = "GuardInvalidatingCurrentCompletion_CheckedCompoundAssignment")]
     public void AssignmentCurrentCompletion_PreservesSafeParityAndRejectsGuardMutation(
         string source,
