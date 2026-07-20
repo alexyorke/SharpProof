@@ -85,8 +85,13 @@ Tests are excluded from the metric and must not be deleted.
   explicit Roslyn member-operation gap retained at enumeration.
 - [x] Removed the manual string-from-ReadOnlySpan and Path string-slice
   normalization wrapper rules. Generic fixed-point inference reproduces their
-  runtime and analyzer classifications; the fresh-copy and span-search rules
-  were independently shown to remain necessary and were retained.
+  runtime and analyzer classifications; the fresh-copy rule was independently
+  shown to remain necessary and was retained.
+- [x] Removed the remaining ReadOnlySpan Path search wrapper predicate and its
+  16-member call allowlist. Runtime Path characterization proves generic
+  fixed-point inference now owns these classifications; invariant casing and
+  both string-concat wrapper families were independently shown to remain live
+  and were retained.
 - [x] Removed the stack-local char-builder and immutable string-rewrite wrapper
   rules after independent PathCore and analyzer string-suite characterization.
   Generic fixed-point inference now owns both classifications and their call
@@ -741,15 +746,18 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current evidence
 
-- Maintained production: 90,268 lines (86,524 C#, 3,014 scripts, and 730
-  specifications); net reduction: 17,358 lines; remaining reduction: 2,642.
-  This migration removes 98 maintained-production lines by consolidating
-  Analyzer normal-completion discovery and old-aware condition-proof dispatch
-  without changing postcondition diagnostics or proof outcomes.
+- Maintained production: 90,239 lines (86,495 C#, 3,014 scripts, and 730
+  specifications); net reduction: 17,387 lines; remaining reduction: 2,613.
+  This migration removes 29 maintained-production lines by deleting the
+  redundant ReadOnlySpan Path semantic-wrapper allowlist after differential
+  runtime characterization, while preserving the three wrapper families whose
+  removal still changes behavior.
   Diagnostics, proof outcomes, conservative unknowns, CLI bytes, serialization,
   and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,236 passing tests and two documented Main skips.
+- Six lanes: 6,238 passing tests and two documented Main skips. One Flow test
+  missed its diagnostic during the parallel all-lane run, then passed both an
+  exact serial retry and the complete 257-test Flow lane serially.
 
 ## Milestones
 

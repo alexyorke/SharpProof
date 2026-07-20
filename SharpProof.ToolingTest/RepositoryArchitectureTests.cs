@@ -341,6 +341,21 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void EffectSummary_PathPurityDoesNotRegainAReadOnlySpanCallAllowlist()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var semanticWrappers = File.ReadAllText(Path.Combine(
+            root, "Tools", "SharpProof.EffectSummary", "EffectSummarySemanticWrapperRules.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(semanticWrappers, Does.Not.Contain("HasPureReadOnlyCharSpanSearchWrapperPattern"));
+            Assert.That(semanticWrappers, Does.Not.Contain("IsReadOnlyCharSpanSearchHelperCall"));
+            Assert.That(semanticWrappers, Does.Not.Contain("SemanticCallFamily.ReadOnlyCharSpanSearch"));
+        });
+    }
+
+    [Test]
     public void AnalyzerEffectSummaryJson_UsesParserAndCatalogLayoutOwners()
     {
         var assembly = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly;

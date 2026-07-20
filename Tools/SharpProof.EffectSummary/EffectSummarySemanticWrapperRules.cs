@@ -2,7 +2,6 @@ internal static class EffectSummarySemanticWrapperRules
 {
     private static readonly SemanticPureWrapperRule[] SemanticPureWrapperRules =
     [
-        new(HasPureReadOnlyCharSpanSearchWrapperPattern, "none"),
         new(HasPureInvariantTextInfoStringWrapperPattern, "internal_only"),
         new(HasPureTypeIdentityWrapperPattern, "none"),
         new(HasPureStringHashWrapperPattern, "none"),
@@ -69,16 +68,6 @@ internal static class EffectSummarySemanticWrapperRules
     {
         return string.Equals(symbol, "string.FastAllocateString(int)", StringComparison.Ordinal) ||
                string.Equals(symbol, "System.String.FastAllocateString(int)", StringComparison.Ordinal);
-    }
-
-    internal static bool HasPureReadOnlyCharSpanSearchWrapperPattern(MethodEffectSummary summary)
-    {
-        return CallsOnly(summary, "calls_method") &&
-               RootsAreSemanticallyPureWrapperCompatible(summary) &&
-               summary.Calls.Any(static call =>
-                   call.Contains("System.ReadOnlySpan`1<char>", StringComparison.Ordinal)) &&
-               summary.Calls.Any(IsReadOnlyCharSpanSearchHelperCall) &&
-               summary.Calls.All(IsReadOnlyCharSpanSearchHelperCall);
     }
 
     internal static bool HasPureInvariantTextInfoStringWrapperPattern(MethodEffectSummary summary)
@@ -212,22 +201,6 @@ internal static class EffectSummarySemanticWrapperRules
 
     private static readonly SemanticCallRule[] SemanticCallRules =
     [
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.Path.GetDirectoryNameOffset(System.ReadOnlySpan`1<char>)"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.Path.GetExtension(System.ReadOnlySpan`1<char>)"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.Path.GetFileName(System.ReadOnlySpan`1<char>)"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.Path.GetFileNameWithoutExtension(System.ReadOnlySpan`1<char>)"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.Path.GetPathRoot(System.ReadOnlySpan`1<char>)"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.PathInternal.GetRootLength(System.ReadOnlySpan`1<char>)"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.PathInternal.IsDirectorySeparator(char)"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.IO.PathInternal.IsEffectivelyEmpty(System.ReadOnlySpan`1<char>)"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.MemoryExtensions.IndexOf(System.ReadOnlySpan`1<"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan`1<"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.MemoryExtensions.LastIndexOf(System.ReadOnlySpan`1<"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.MemoryExtensions.LastIndexOfAny(System.ReadOnlySpan`1<"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.Slice("),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.get_Empty()"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.get_Item(int)"),
-        Prefix(SemanticCallFamily.ReadOnlyCharSpanSearch, "System.ReadOnlySpan`1<char>.get_Length()"),
         Exact(SemanticCallFamily.InvariantTextInfo, "System.Globalization.TextInfo.ToLower(string)->string"),
         Exact(SemanticCallFamily.InvariantTextInfo, "System.Globalization.TextInfo.ToUpper(string)->string"),
         Exact(SemanticCallFamily.TypeIdentity | SemanticCallFamily.TypeIdentityAnchor, "System.Type.Equals(System.Type)->bool"),
@@ -280,7 +253,6 @@ internal static class EffectSummarySemanticWrapperRules
     [Flags]
     private enum SemanticCallFamily
     {
-        ReadOnlyCharSpanSearch = 1 << 0,
         InvariantTextInfo = 1 << 6,
         TypeIdentity = 1 << 7,
         TypeIdentityAnchor = 1 << 8,
@@ -313,9 +285,6 @@ internal static class EffectSummarySemanticWrapperRules
 
     private static bool MatchesSemanticCall(string call, SemanticCallFamily family) =>
         SemanticCallRules.Any(rule => (rule.Families & family) != 0 && rule.Matches(call));
-
-    internal static bool IsReadOnlyCharSpanSearchHelperCall(string callSymbol) =>
-        MatchesSemanticCall(callSymbol, SemanticCallFamily.ReadOnlyCharSpanSearch);
 
     internal static bool IsInvariantTextInfoStringWrapperCall(string callSymbol) =>
         MatchesSemanticCall(callSymbol, SemanticCallFamily.InvariantTextInfo);
