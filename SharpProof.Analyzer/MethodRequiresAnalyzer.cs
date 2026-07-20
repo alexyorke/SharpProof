@@ -5,6 +5,7 @@ namespace SharpProof.Analyzer;
 internal static class MethodRequiresAnalyzer {
     internal static void AnalyzeSymbolForRequires(
         MethodBodyAnalysisContext context,
+        CompilationPurityService purityService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
@@ -13,8 +14,6 @@ internal static class MethodRequiresAnalyzer {
 
         var contracts =
             RequiresContractHelpers.CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);
-        if (contracts.Length == 0) return;
-
         foreach (var contract in contracts) {
             if (contract.InvalidReason != null) {
                 var invalidDiagnostic = InvalidContractArgumentDiagnostics.Create(
@@ -52,24 +51,23 @@ internal static class MethodRequiresAnalyzer {
                         "result placeholder is not supported in [Requires] conditions",
                         null));
         }
+
+        AnalyzeCallSitesForRequires(context, purityService, baseline, attributePolicy);
     }
 
-    internal static void AnalyzeCallSiteForRequires(
-        OperationAnalysisContext context,
+    private static void AnalyzeCallSitesForRequires(
+        MethodBodyAnalysisContext context,
         CompilationPurityService purityService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
-        foreach (var callSite in CreateCallSites(context.Operation)) {
+        foreach (var callSite in context.Snapshot.VisibleOperations.SelectMany(static operation =>
+                     CreateCallSites(operation))) {
             var contracts = RequiresContractHelpers.ValidContracts(
                 callSite.Method,
                 attributePolicy,
                 context.CancellationToken);
             if (contracts.Length == 0) continue;
 
-            var queryExecutor = new SymbolicQueryExecutor();
-            var source = SymbolicSourceInput.FromSyntaxTree(callSite.Syntax.SyntaxTree, context.Compilation);
-            var options = new SymbolicQueryOptions(smtAnalysis: purityService.SmtAnalysis)
-                .WithAnalysisLimits(purityService.AnalysisLimits);
             var location = callSite.Syntax.GetLocation();
             var lineSpan = location.GetLineSpan();
             var line = lineSpan.StartLinePosition.Line + 1;
@@ -108,16 +106,11 @@ internal static class MethodRequiresAnalyzer {
                     continue;
                 }
 
-                var proofOutcome = AnalyzerSymbolicQueryBoundary.TryExecute(() => queryExecutor.Prove(
-                        new SymbolicQueryContext(
-                            source,
-                            new SharpProofTarget(SharpProofTargetKind.Point, Line: line, Column: column),
-                            options),
-                        rewrittenCondition,
-                        context.CancellationToken));
-                var proof = AnalyzerSymbolicQueryBoundary.ResolveProof(
-                    proofOutcome,
+                var proof = context.State.ProveAtNode(
+                    callSite.Syntax,
                     rewrittenCondition,
+                    purityService.SmtAnalysis,
+                    includeCurrentStatementCompletionFacts: false,
                     context.CancellationToken);
 
                 if (proof.TruthValue == SymbolicTruthValue.ProvenTrue ||

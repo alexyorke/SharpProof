@@ -799,12 +799,19 @@ Tests are excluded from the metric and must not be deleted.
   route before structural fallback. Guarded updates remain explicit fallbacks
   when invalidation would discard a live branch condition. The complete CFG
   differential fixture preserves state, evidence, versions, and fallback cases.
+- [x] Moved `[Requires]` call-site verification into the common method analysis
+  snapshot. The feature now scans the snapshot's execution-root-bounded visible
+  operations and uses its session-owned proof engine and active analysis budget.
+  Deleted the separate ten-kind Roslyn operation-action registration, per-call
+  query executor, source reconstruction, and options adapter. Contract aliases,
+  inherited contracts, and the complete analyzer SMT lane preserve diagnostics,
+  proof outcomes, and conservative unknowns.
 
 ## Current evidence
 
-- Phase-two maintained production: 81,260 lines (77,298 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,174-line reduction from the
-  84,434-line phase-two baseline. Another 16,826 lines remain to the 64,434
+- Phase-two maintained production: 81,237 lines (77,275 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,197-line reduction from the
+  84,434-line phase-two baseline. Another 16,803 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.

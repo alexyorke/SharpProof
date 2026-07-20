@@ -72,24 +72,6 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
                         session.AttributePolicy),
                     SyntaxKind.AttributeList);
 
-            if (session.Features.Includes(AnalyzerFeatures.Requires))
-                startContext.RegisterOperationAction(
-                    c => MethodRequiresAnalyzer.AnalyzeCallSiteForRequires(
-                        c,
-                        session.PurityService,
-                        session.Baseline,
-                        session.AttributePolicy),
-                    OperationKind.Invocation,
-                    OperationKind.ObjectCreation,
-                    OperationKind.PropertyReference,
-                    OperationKind.SimpleAssignment,
-                    OperationKind.CompoundAssignment,
-                    OperationKind.Increment,
-                    OperationKind.Decrement,
-                    OperationKind.Binary,
-                    OperationKind.Unary,
-                    OperationKind.Conversion);
-
             if (session.Features.Includes(AnalyzerFeatures.CommonBugs)) {
                 startContext.RegisterSymbolAction(
                     c => CommonBugAnalyzer.AnalyzeNamedType(c, session),

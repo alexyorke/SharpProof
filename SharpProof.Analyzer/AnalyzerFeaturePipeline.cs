@@ -69,6 +69,7 @@ internal static class AnalyzerFeaturePipeline {
             if (features.Includes(AnalyzerFeatures.Requires))
                 MethodRequiresAnalyzer.AnalyzeSymbolForRequires(
                     context,
+                    session.PurityService,
                     session.Baseline,
                     session.AttributePolicy);
 
