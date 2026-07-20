@@ -382,7 +382,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                     operation.Syntax.SpanStart >= site.SpanStart)
                     return Unsupported(site, "operation-order");
                 ISymbol? invalidatedGuardTarget = null;
-                if (!TryApplyOperation(
+                var appliedOperation = TryApplyOperation(
                         ref state,
                         operation,
                         GetActiveGuard(currentPath.GuardFrame),
@@ -394,8 +394,16 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                         forInitialEntry != null && IsForInitializerSyntax(operation.Syntax, forInitialEntry)
                             ? "ir.path.for-initializer"
                             : "ir.path.prior-statement",
-                        out invalidatedGuardTarget))
-                    return Unsupported(operation.Syntax, "operation-" + operation.Kind);
+                        out invalidatedGuardTarget);
+                if (!appliedOperation) {
+                    if (currentPath.GuardFrame != null ||
+                        operation is not (IExpressionStatementOperation or IVariableDeclarationGroupOperation))
+                        return Unsupported(operation.Syntax, "operation-" + operation.Kind);
+                    SymbolicStateInvalidator.InvalidateNestedMutations(
+                        ref state, operation.Syntax, semanticModel, cancellationToken);
+                    AddOperationNormalCompletionFacts(
+                        ref state, operation, semanticModel, cancellationToken);
+                }
                 if (invalidatedGuardTarget != null)
                     currentPath = currentPath with {
                         GuardFrame = InvalidateGuards(

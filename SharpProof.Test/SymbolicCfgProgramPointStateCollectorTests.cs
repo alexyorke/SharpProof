@@ -2960,8 +2960,18 @@ static class C
             site,
             fixture.SemanticModel,
             CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
 
-        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+        Assert.That(result.IsExact, Is.True, result.Provenance.Single().Detail);
+        AssertStateParity(result.Value!, expected);
     }
 
     [TestCase(

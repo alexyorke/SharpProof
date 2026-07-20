@@ -860,12 +860,19 @@ Tests are excluded from the metric and must not be deleted.
   Declaration-free and reassigned catch targets retain parity. Nested catches
   and catch targets inside abrupt loops remain explicit structural fallbacks
   until the semantic graph can represent operation-indexed exceptional edges.
+- [x] Moved conservative mutation invalidation for unguarded expression and
+  declaration operations into the CFG program-point worklist. Unsupported
+  external-member assignments now match the structural fallback's normalized
+  state and normal-completion facts directly; guarded operations remain typed
+  fallbacks so a mutation cannot silently preserve a stale branch condition.
+  This adds eight temporary production lines that the next structural-owner
+  deletion tranche must repay.
 
 ## Current evidence
 
-- Phase-two maintained production: 81,094 lines (77,132 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,340-line reduction from the
-  84,434-line phase-two baseline. Another 16,660 lines remain to the 64,434
+- Phase-two maintained production: 81,102 lines (77,140 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,332-line reduction from the
+  84,434-line phase-two baseline. Another 16,668 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.
