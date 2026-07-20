@@ -20,8 +20,9 @@ internal static partial class ExecutionVisibility
                 out var armCondition))
             return false;
 
-        return IsSymbolicConditionAlwaysFalseAt(
+        return HasSymbolicConditionStatusAt(
             armCondition,
+            SymbolicProofStatus.ProvenFalse,
             switchExpression,
             semanticModel,
             cancellationToken,

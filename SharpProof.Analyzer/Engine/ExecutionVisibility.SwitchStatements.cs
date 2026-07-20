@@ -40,8 +40,9 @@ internal static partial class ExecutionVisibility
         if (IsReachableConstantSwitchGotoTarget(section, switchStatement, semanticModel, cancellationToken))
             return false;
 
-        return IsSymbolicConditionAlwaysFalseAt(
+        return HasSymbolicConditionStatusAt(
             sectionCondition,
+            SymbolicProofStatus.ProvenFalse,
             switchStatement,
             semanticModel,
             cancellationToken,
@@ -110,7 +111,7 @@ internal static partial class ExecutionVisibility
                 if (label is CaseSwitchLabelSyntax caseLabel)
                 {
                     var labelValue = semanticModel.GetConstantValue(caseLabel.Value, cancellationToken);
-                    if (labelValue.HasValue && ConstantValuesEqual(labelValue.Value, governingValue)) return section;
+                    if (labelValue.HasValue && Equals(labelValue.Value, governingValue)) return section;
 
                     continue;
                 }
@@ -144,7 +145,7 @@ internal static partial class ExecutionVisibility
         foreach (var section in switchStatement.Sections)
             if (section.Labels.OfType<CaseSwitchLabelSyntax>().Any(label =>
                     semanticModel.GetConstantValue(label.Value, cancellationToken) is { HasValue: true } labelValue &&
-                    ConstantValuesEqual(labelValue.Value, gotoValue.Value)))
+                    Equals(labelValue.Value, gotoValue.Value)))
                 return section;
 
         return null;
@@ -156,19 +157,16 @@ internal static partial class ExecutionVisibility
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        switch (pattern)
+        return pattern switch
         {
-            case DiscardPatternSyntax:
-                return true;
-            case ParenthesizedPatternSyntax parenthesizedPattern:
-                return PatternMatchesConstant(parenthesizedPattern.Pattern, governingValue, semanticModel,
-                    cancellationToken);
-            case ConstantPatternSyntax constantPattern:
-                var patternValue = semanticModel.GetConstantValue(constantPattern.Expression, cancellationToken);
-                return patternValue.HasValue && ConstantValuesEqual(patternValue.Value, governingValue);
-            default:
-                return false;
-        }
+            DiscardPatternSyntax => true,
+            ParenthesizedPatternSyntax parenthesized => PatternMatchesConstant(
+                parenthesized.Pattern, governingValue, semanticModel, cancellationToken),
+            ConstantPatternSyntax constant =>
+                semanticModel.GetConstantValue(constant.Expression, cancellationToken) is
+                    { HasValue: true } value && Equals(value.Value, governingValue),
+            _ => false
+        };
     }
 
     private static bool WhenClauseCanMatch(
@@ -176,16 +174,8 @@ internal static partial class ExecutionVisibility
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        if (whenClause == null) return true;
-
-        var constantValue = semanticModel.GetConstantValue(whenClause.Condition, cancellationToken);
-        return constantValue.HasValue &&
-               constantValue.Value is bool booleanValue &&
-               booleanValue;
-    }
-
-    private static bool ConstantValuesEqual(object? left, object? right)
-    {
-        return Equals(left, right);
+        return whenClause == null ||
+               semanticModel.GetConstantValue(whenClause.Condition, cancellationToken) is
+                   { HasValue: true, Value: true };
     }
 }

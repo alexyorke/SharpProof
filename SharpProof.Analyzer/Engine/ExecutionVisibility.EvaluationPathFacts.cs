@@ -10,11 +10,16 @@ internal static partial class ExecutionVisibility
         CancellationToken cancellationToken,
         Func<ISymbol, int>? getSymbolVersion)
     {
-        if (TryGetEvaluationBranch(ancestor, syntaxNode.SpanStart, out var condition, out var branchWhenTrue) &&
-            !IsGuardConditionInvalidatedBeforeUse(
+        if (TryGetEvaluationBranch(
                 ancestor,
+                syntaxNode.SpanStart,
+                out var condition,
+                out var branchWhenTrue,
+                out var branchBody) &&
+            !SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
                 condition,
-                syntaxNode,
+                branchBody,
+                syntaxNode.SpanStart,
                 semanticModel,
                 cancellationToken) &&
             SymbolicReachabilityLowerer.ApplyCondition(
@@ -99,98 +104,59 @@ internal static partial class ExecutionVisibility
         SyntaxNode ancestor,
         int position,
         out ExpressionSyntax condition,
-        out bool branchWhenTrue)
+        out bool branchWhenTrue,
+        out SyntaxNode branchBody)
     {
         switch (ancestor)
         {
             case IfStatementSyntax ifStatement when ifStatement.Statement.Span.Contains(position):
                 condition = ifStatement.Condition;
                 branchWhenTrue = true;
+                branchBody = ifStatement.Statement;
                 return true;
             case IfStatementSyntax ifStatement when ifStatement.Else?.Statement.Span.Contains(position) == true:
                 condition = ifStatement.Condition;
                 branchWhenTrue = false;
+                branchBody = ifStatement.Else!.Statement;
                 return true;
             case ConditionalExpressionSyntax conditional when conditional.WhenTrue.Span.Contains(position):
                 condition = conditional.Condition;
                 branchWhenTrue = true;
+                branchBody = conditional.WhenTrue;
                 return true;
             case ConditionalExpressionSyntax conditional when conditional.WhenFalse.Span.Contains(position):
                 condition = conditional.Condition;
                 branchWhenTrue = false;
+                branchBody = conditional.WhenFalse;
                 return true;
             case BinaryExpressionSyntax binary when binary.Right.Span.Contains(position) &&
                                                     binary.IsKind(SyntaxKind.LogicalAndExpression):
                 condition = binary.Left;
                 branchWhenTrue = true;
+                branchBody = binary.Right;
                 return true;
             case BinaryExpressionSyntax binary when binary.Right.Span.Contains(position) &&
                                                     binary.IsKind(SyntaxKind.LogicalOrExpression):
                 condition = binary.Left;
                 branchWhenTrue = false;
+                branchBody = binary.Right;
                 return true;
             case WhileStatementSyntax whileStatement when whileStatement.Statement.Span.Contains(position):
                 condition = whileStatement.Condition;
                 branchWhenTrue = true;
+                branchBody = whileStatement.Statement;
                 return true;
             case ForStatementSyntax { Condition: { } forCondition } forStatement
                 when forStatement.Statement.Span.Contains(position):
                 condition = forCondition;
                 branchWhenTrue = true;
+                branchBody = forStatement.Statement;
                 return true;
             default:
                 condition = null!;
                 branchWhenTrue = false;
+                branchBody = null!;
                 return false;
-        }
-    }
-
-    // A guard condition (from an if/conditional/logical-and-or/loop ancestor) must not be
-    // assumed at the use site if any symbol it references is reassigned between the guard's
-    // branch entry and the use. Otherwise a stale guard fact (e.g. x > 0) is applied at the
-    // reassigned symbol's current version, contradicting the new value (x = -1) and pruning a
-    // reachable path. This mirrors the reassignment guard already applied in
-    // SymbolicProgramPointFacts.CollectAncestorReachabilityState.
-    private static bool IsGuardConditionInvalidatedBeforeUse(
-        SyntaxNode ancestor,
-        ExpressionSyntax condition,
-        SyntaxNode use,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var body = GetGuardBranchBody(ancestor, use.SpanStart);
-        return body != null &&
-               SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
-                   condition,
-                   body,
-                   use.SpanStart,
-                   semanticModel,
-                   cancellationToken);
-    }
-
-    private static SyntaxNode? GetGuardBranchBody(SyntaxNode ancestor, int position)
-    {
-        switch (ancestor)
-        {
-            case IfStatementSyntax ifStatement when ifStatement.Statement.Span.Contains(position):
-                return ifStatement.Statement;
-            case IfStatementSyntax { Else.Statement: { } elseStatement }
-                when elseStatement.Span.Contains(position):
-                return elseStatement;
-            case ConditionalExpressionSyntax conditional when conditional.WhenTrue.Span.Contains(position):
-                return conditional.WhenTrue;
-            case ConditionalExpressionSyntax conditional when conditional.WhenFalse.Span.Contains(position):
-                return conditional.WhenFalse;
-            case BinaryExpressionSyntax binary when binary.Right.Span.Contains(position) &&
-                                                    (binary.IsKind(SyntaxKind.LogicalAndExpression) ||
-                                                     binary.IsKind(SyntaxKind.LogicalOrExpression)):
-                return binary.Right;
-            case WhileStatementSyntax whileStatement when whileStatement.Statement.Span.Contains(position):
-                return whileStatement.Statement;
-            case ForStatementSyntax forStatement when forStatement.Statement.Span.Contains(position):
-                return forStatement.Statement;
-            default:
-                return null;
         }
     }
 

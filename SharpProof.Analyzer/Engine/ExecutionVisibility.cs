@@ -12,35 +12,28 @@ internal static partial class ExecutionVisibility
         {
             if (CSharpSyntaxFacts.IsNestedLocalCallableBoundary(ancestor)) break;
 
-            if (ancestor is IfStatementSyntax ifStatement)
-            {
-                if (IsConditionAlwaysFalseAt(ifStatement.Condition, ifStatement, semanticModel, cancellationToken,
-                        smtAnalysis) &&
-                    ifStatement.Statement.Span.Contains(syntaxNode.SpanStart))
-                    return true;
+            if (ancestor is not ForStatementSyntax &&
+                TryGetEvaluationBranch(
+                    ancestor,
+                    syntaxNode.SpanStart,
+                    out var condition,
+                    out var branchWhenTrue,
+                    out _) &&
+                IsConditionTruthAt(
+                    condition,
+                    !branchWhenTrue,
+                    ancestor,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis))
+                return true;
 
-                if (IsConditionAlwaysTrueAt(ifStatement.Condition, ifStatement, semanticModel, cancellationToken,
-                        smtAnalysis) &&
-                    ifStatement.Else?.Statement.Span.Contains(syntaxNode.SpanStart) == true)
-                    return true;
-            }
-            else if (ancestor is ConditionalExpressionSyntax conditionalExpression)
-            {
-                if (IsConditionAlwaysFalseAt(conditionalExpression.Condition, conditionalExpression, semanticModel,
-                        cancellationToken, smtAnalysis) &&
-                    conditionalExpression.WhenTrue.Span.Contains(syntaxNode.SpanStart))
-                    return true;
-
-                if (IsConditionAlwaysTrueAt(conditionalExpression.Condition, conditionalExpression, semanticModel,
-                        cancellationToken, smtAnalysis) &&
-                    conditionalExpression.WhenFalse.Span.Contains(syntaxNode.SpanStart))
-                    return true;
-            }
-            else if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpression)
+            if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpression)
             {
                 if (conditionalAccessExpression.WhenNotNull.Span.Contains(syntaxNode.SpanStart) &&
-                    IsReferenceKnownNullAt(
+                    IsReferenceKnownNullStateAt(
                         conditionalAccessExpression.Expression,
+                        expectedNull: true,
                         conditionalAccessExpression,
                         semanticModel,
                         cancellationToken,
@@ -49,34 +42,16 @@ internal static partial class ExecutionVisibility
             }
             else if (ancestor is BinaryExpressionSyntax binaryExpression)
             {
-                if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression) &&
-                    binaryExpression.Right.Span.Contains(syntaxNode.SpanStart) &&
-                    IsConditionAlwaysFalseAt(binaryExpression.Left, binaryExpression, semanticModel, cancellationToken,
-                        smtAnalysis))
-                    return true;
-
-                if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression) &&
-                    binaryExpression.Right.Span.Contains(syntaxNode.SpanStart) &&
-                    IsConditionAlwaysTrueAt(binaryExpression.Left, binaryExpression, semanticModel, cancellationToken,
-                        smtAnalysis))
-                    return true;
-
                 if (binaryExpression.IsKind(SyntaxKind.CoalesceExpression) &&
                     binaryExpression.Right.Span.Contains(syntaxNode.SpanStart))
-                    if (IsReferenceKnownNonNullAt(
+                    if (IsReferenceKnownNullStateAt(
                             binaryExpression.Left,
+                            expectedNull: false,
                             binaryExpression,
                             semanticModel,
                             cancellationToken,
                             smtAnalysis))
                         return true;
-            }
-            else if (ancestor is WhileStatementSyntax whileStatement)
-            {
-                if (whileStatement.Statement.Span.Contains(syntaxNode.SpanStart) &&
-                    IsConditionAlwaysFalseAt(whileStatement.Condition, whileStatement, semanticModel, cancellationToken,
-                        smtAnalysis))
-                    return true;
             }
             else if (ancestor is ForStatementSyntax forStatement)
             {
@@ -103,9 +78,8 @@ internal static partial class ExecutionVisibility
             }
         }
 
-        if (IsProgramPointUnreachableUsingSharedFacts(syntaxNode, semanticModel, cancellationToken, smtAnalysis))
-            return true;
-        return false;
+        return IsProgramPointUnreachableUsingSharedFacts(
+            syntaxNode, semanticModel, cancellationToken, smtAnalysis);
     }
 
     public static bool IsEvaluationPathUnsatisfiableUsingSymbolicState(

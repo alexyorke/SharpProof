@@ -726,14 +726,20 @@ Tests are excluded from the metric and must not be deleted.
   preserve differential normalized state and evidence through one completion
   route; blocks that mutate their entry guard remain explicit conservative
   fallbacks.
+- [x] Consolidated Analyzer execution visibility around one evaluation-branch
+  resolver, one condition-truth classifier, one reference-null classifier, and
+  direct switch proof-status projection. Removed the parallel guarded-body
+  shape switch, true/false/null forwarding layers, and constant-comparison
+  wrappers while preserving version-aware path facts, guard-mutation safety,
+  constant-switch goto behavior, and conservative SMT outcomes.
 
 ## Current evidence
 
-- Maintained production: 90,556 lines (86,812 C#, 3,014 scripts, and 730
-  specifications); net reduction: 17,070 lines; remaining reduction: 2,930.
-  This migration removes 35 maintained-production lines while replacing
-  direct structural block-completion routing with the canonical completion
-  entry point and deleting its superseded shape gates and transfer method.
+- Maintained production: 90,366 lines (86,622 C#, 3,014 scripts, and 730
+  specifications); net reduction: 17,260 lines; remaining reduction: 2,740.
+  This migration removes 190 maintained-production lines by deleting duplicated
+  Analyzer evaluation-path shape and classification plumbing without changing
+  the version-aware symbolic owner or broadening successful proofs.
   Diagnostics, proof outcomes, conservative unknowns, CLI bytes, serialization,
   and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
