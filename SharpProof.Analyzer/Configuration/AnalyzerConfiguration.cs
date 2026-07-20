@@ -1,53 +1,30 @@
 namespace SharpProof.Analyzer.Configuration;
 
-internal class AnalyzerConfiguration(
-    ImmutableHashSet<string> extraImpureMethods,
-    ImmutableHashSet<string> extraPureMethods,
-    ImmutableHashSet<string> extraImpureNamespaces,
-    ImmutableHashSet<string> extraImpureTypes,
-    ImmutableHashSet<string> attributeStubNamespaces,
-    bool suggestMissingEnforcePure,
-    MissingPuritySuggestionOptions missingPuritySuggestions,
-    InferredContractSuggestionOptions inferredContractSuggestions,
-    bool emitExplanations,
-    bool reportBclFallbackGuesses,
-    RuntimeHazardMode runtimeHazardMode,
-    ProvenDiagnosticSuppressionOptions provenDiagnosticSuppressions,
-    bool reportExceptions,
-    bool checkedExceptions,
-    bool reportNullableInconclusive,
-    bool enableEffectSummaryJson,
-    string purityProfile,
-    TrustedBoundaryReviewMode trustedBoundaryReviewMode,
-    SmtAnalysisOptions smtOptions,
-    SharpProofAnalysisBudget analysisLimits,
-    ImmutableArray<InvalidAnalyzerConfigurationValue> invalidConfigurationValues)
+internal sealed record AnalyzerConfiguration(
+    ImmutableHashSet<string> ExtraKnownImpureMethods,
+    ImmutableHashSet<string> ExtraKnownPureMethods,
+    ImmutableHashSet<string> ExtraKnownImpureNamespaces,
+    ImmutableHashSet<string> ExtraKnownImpureTypes,
+    ImmutableHashSet<string> AttributeStubNamespaces,
+    bool SuggestMissingEnforcePure,
+    MissingPuritySuggestionOptions MissingPuritySuggestions,
+    InferredContractSuggestionOptions InferredContractSuggestions,
+    bool EmitExplanations,
+    bool ReportBclFallbackGuesses,
+    RuntimeHazardMode RuntimeHazardMode,
+    ProvenDiagnosticSuppressionOptions ProvenDiagnosticSuppressions,
+    bool ReportExceptions,
+    bool CheckedExceptions,
+    bool ReportNullableInconclusive,
+    bool EnableEffectSummaryJson,
+    string PurityProfile,
+    TrustedBoundaryReviewMode TrustedBoundaryReviewMode,
+    SmtAnalysisOptions SmtOptions,
+    SharpProofAnalysisBudget AnalysisLimits,
+    ImmutableArray<InvalidAnalyzerConfigurationValue> InvalidConfigurationValues)
 {
     private static readonly ImmutableHashSet<string> EmptyValues =
         ImmutableHashSet.Create<string>(StringComparer.Ordinal);
-
-    public ImmutableHashSet<string> ExtraKnownImpureMethods { get; } = extraImpureMethods;
-    public ImmutableHashSet<string> ExtraKnownPureMethods { get; } = extraPureMethods;
-    public ImmutableHashSet<string> ExtraKnownImpureNamespaces { get; } = extraImpureNamespaces;
-    public ImmutableHashSet<string> ExtraKnownImpureTypes { get; } = extraImpureTypes;
-    public ImmutableHashSet<string> AttributeStubNamespaces { get; } = attributeStubNamespaces;
-    public bool SuggestMissingEnforcePure { get; } = suggestMissingEnforcePure;
-    public MissingPuritySuggestionOptions MissingPuritySuggestions { get; } = missingPuritySuggestions;
-    public InferredContractSuggestionOptions InferredContractSuggestions { get; } = inferredContractSuggestions;
-    public bool EmitExplanations { get; } = emitExplanations;
-    public bool ReportBclFallbackGuesses { get; } = reportBclFallbackGuesses;
-    public RuntimeHazardMode RuntimeHazardMode { get; } = runtimeHazardMode;
-    public ProvenDiagnosticSuppressionOptions ProvenDiagnosticSuppressions { get; } = provenDiagnosticSuppressions;
-    public bool ReportExceptions { get; } = reportExceptions;
-    public bool CheckedExceptions { get; } = checkedExceptions;
-    public bool ReportNullableInconclusive { get; } = reportNullableInconclusive;
-    public bool EnableEffectSummaryJson { get; } = enableEffectSummaryJson;
-    public string PurityProfile { get; } = purityProfile;
-    public TrustedBoundaryReviewMode TrustedBoundaryReviewMode { get; } = trustedBoundaryReviewMode;
-    public SmtAnalysisOptions SmtOptions { get; } = smtOptions;
-    public SharpProofAnalysisBudget AnalysisLimits { get; } = analysisLimits;
-    public ImmutableArray<InvalidAnalyzerConfigurationValue> InvalidConfigurationValues { get; } =
-        invalidConfigurationValues;
 
     public static AnalyzerConfiguration FromOptions(AnalyzerOptions options)
     {
@@ -599,11 +576,11 @@ internal enum InferredContractConfidence
     High = 2
 }
 
-internal sealed class InferredContractSuggestionOptions(
-    bool enabled,
-    MissingPuritySuggestionScope scope,
-    ImmutableHashSet<string> kinds,
-    InferredContractConfidence minimumConfidence)
+internal sealed record InferredContractSuggestionOptions(
+    bool Enabled,
+    MissingPuritySuggestionScope Scope,
+    ImmutableHashSet<string> Kinds,
+    InferredContractConfidence MinimumConfidence)
 {
     internal static readonly ImmutableHashSet<string> AllKinds =
         ImmutableHashSet.Create(
@@ -616,10 +593,6 @@ internal sealed class InferredContractSuggestionOptions(
             "requires",
             "nullability");
 
-    public bool Enabled { get; } = enabled;
-    public MissingPuritySuggestionScope Scope { get; } = scope;
-    public ImmutableHashSet<string> Kinds { get; } = kinds;
-    public InferredContractConfidence MinimumConfidence { get; } = minimumConfidence;
     public bool IsEnabled => Enabled && Scope != MissingPuritySuggestionScope.Off && Kinds.Count > 0;
 
     public bool Includes(string kind, InferredContractConfidence confidence)
@@ -628,14 +601,10 @@ internal sealed class InferredContractSuggestionOptions(
     }
 }
 
-internal sealed class ProvenDiagnosticSuppressionOptions(
-    bool enabled,
-    ImmutableHashSet<string> diagnosticIds)
+internal sealed record ProvenDiagnosticSuppressionOptions(
+    bool Enabled,
+    ImmutableHashSet<string> DiagnosticIds)
 {
-    public bool Enabled { get; } = enabled;
-
-    public ImmutableHashSet<string> DiagnosticIds { get; } = diagnosticIds;
-
     public bool Includes(string diagnosticId)
     {
         return Enabled && DiagnosticIds.Contains(diagnosticId);
@@ -661,20 +630,13 @@ internal enum TrustedBoundaryReviewMode
     All
 }
 
-internal sealed class MissingPuritySuggestionOptions(
-    bool enabled,
-    MissingPuritySuggestionScope scope,
-    bool excludeGeneratedFiles,
-    bool excludeTestFiles,
-    int minimumComplexity,
-    ImmutableHashSet<string> namespaceFilters)
+internal sealed record MissingPuritySuggestionOptions(
+    bool Enabled,
+    MissingPuritySuggestionScope Scope,
+    bool ExcludeGeneratedFiles,
+    bool ExcludeTestFiles,
+    int MinimumComplexity,
+    ImmutableHashSet<string> NamespaceFilters)
 {
-    public bool Enabled { get; } = enabled;
-    public MissingPuritySuggestionScope Scope { get; } = scope;
-    public bool ExcludeGeneratedFiles { get; } = excludeGeneratedFiles;
-    public bool ExcludeTestFiles { get; } = excludeTestFiles;
-    public int MinimumComplexity { get; } = minimumComplexity;
-    public ImmutableHashSet<string> NamespaceFilters { get; } = namespaceFilters;
-
     public bool IsEnabled => Enabled && Scope != MissingPuritySuggestionScope.Off;
 }

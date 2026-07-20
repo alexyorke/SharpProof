@@ -82,20 +82,20 @@ public sealed class EffectSummaryEntryTrustEvaluatorTests
             assemblyIdentity,
             methodIdentity,
             null,
-            sourcePriority: 0,
-            builtInSourcePriority: 0,
-            additionalSourcePriority: 1,
-            sourcePath: "built-in.json",
-            compatibilityReporter: reporter);
+            SourcePriority: 0,
+            BuiltInSourcePriority: 0,
+            AdditionalSourcePriority: 1,
+            SourcePath: "built-in.json",
+            CompatibilityReporter: reporter);
         var additional = new EffectSummaryEntryTrustMetadata(
             assemblyIdentity,
             methodIdentity,
             null,
-            sourcePriority: 1,
-            builtInSourcePriority: 0,
-            additionalSourcePriority: 1,
-            sourcePath: "additional.json",
-            compatibilityReporter: reporter);
+            SourcePriority: 1,
+            BuiltInSourcePriority: 0,
+            AdditionalSourcePriority: 1,
+            SourcePath: "additional.json",
+            CompatibilityReporter: reporter);
 
         Assert.Multiple(() =>
         {

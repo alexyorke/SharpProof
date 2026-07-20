@@ -1,22 +1,12 @@
 namespace SharpProof.Analyzer;
 
-internal sealed class EffectSummaryArtifactSource(
-    string kind,
-    string? framework,
-    string? packageId,
-    string? packageVersion,
-    string? packageAssemblyRelativePath)
+internal sealed record EffectSummaryArtifactSource(
+    string Kind,
+    string? Framework,
+    string? PackageId,
+    string? PackageVersion,
+    string? PackageAssemblyRelativePath)
 {
-    private string Kind { get; } = kind;
-
-    private string? Framework { get; } = framework;
-
-    private string? PackageId { get; } = packageId;
-
-    private string? PackageVersion { get; } = packageVersion;
-
-    private string? PackageAssemblyRelativePath { get; } = packageAssemblyRelativePath;
-
     internal static EffectSummaryArtifactSource? FromContract(EffectSummaryArtifactSourceContract? source)
     {
         var kind = source?.Kind?.Trim();

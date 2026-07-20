@@ -104,33 +104,20 @@ internal static class AnalyzerConfigurationOptionRegistry
         All.Where(static option => option.PurityPolicyImpact != PurityPolicyImpact.None).ToImmutableArray();
 }
 
-internal sealed class AnalyzerConfigurationOption(
-    string key,
-    AnalyzerConfigurationScope scope,
-    AnalyzerConfigurationValueKind valueKind,
-    AnalyzerConfigurationDefault defaultValue,
-    string description,
-    ImmutableArray<string> allowedValues = default,
-    PurityPolicyImpact purityPolicyImpact = PurityPolicyImpact.None,
-    ImmutableArray<string> acceptedAliases = default,
-    string valueDescription = "",
-    string relatedDiagnostics = "",
-    string sampleValue = "")
+internal sealed record AnalyzerConfigurationOption(
+    string Key,
+    AnalyzerConfigurationScope Scope,
+    AnalyzerConfigurationValueKind ValueKind,
+    AnalyzerConfigurationDefault Default,
+    string Description,
+    ImmutableArray<string> AllowedValues = default,
+    PurityPolicyImpact PurityPolicyImpact = PurityPolicyImpact.None,
+    ImmutableArray<string> AcceptedAliases = default,
+    string ValueDescription = "",
+    string RelatedDiagnostics = "",
+    string SampleValue = "")
 {
-    public string Key { get; } = key;
-    public AnalyzerConfigurationScope Scope { get; } = scope;
-    public AnalyzerConfigurationValueKind ValueKind { get; } = valueKind;
-    public AnalyzerConfigurationDefault Default { get; } = defaultValue;
     public string DefaultValue => Default.DocumentationValue;
-    public string Description { get; } = description;
-    public ImmutableArray<string> AllowedValues { get; } =
-        allowedValues.IsDefault ? ImmutableArray<string>.Empty : allowedValues;
-    public PurityPolicyImpact PurityPolicyImpact { get; } = purityPolicyImpact;
-    public ImmutableArray<string> AcceptedAliases { get; } =
-        acceptedAliases.IsDefault ? ImmutableArray<string>.Empty : acceptedAliases;
-    public string ValueDescription { get; } = valueDescription;
-    public string RelatedDiagnostics { get; } = relatedDiagnostics;
-    public string SampleValue { get; } = sampleValue;
 
     public bool IsGlobal =>
         Scope == AnalyzerConfigurationScope.GlobalOnly ||

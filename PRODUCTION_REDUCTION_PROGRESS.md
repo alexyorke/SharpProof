@@ -586,12 +586,17 @@ Tests are excluded from the metric and must not be deleted.
   state. Runtime-hazard JSON order is now explicit rather than declaration-order
   dependent, and the removed constructor/property forwarding cannot return
   unnoticed. Cache identity, proof metadata, and serialized output remain exact.
+- [x] Extended record-owned state across analyzer configuration, EffectSummary
+  identity/trust metadata, exception evidence, symbolic project configuration,
+  and tool result carriers. Architecture coverage prevents those constructor-to-
+  property copy layers from returning; validation, evidence ordering, and
+  serialized property order remain unchanged.
 
 ## Current evidence
 
-- Maintained production: 91,474 lines (87,555 C#, 3,189 scripts, and 730
-  specifications); net reduction: 16,152 lines; remaining reduction: 3,848.
-  The immutable-carrier consolidation removed 144 maintained-production lines
+- Maintained production: 91,383 lines (87,464 C#, 3,189 scripts, and 730
+  specifications); net reduction: 16,243 lines; remaining reduction: 3,757.
+  This immutable-carrier tranche removed 91 maintained-production lines
   without deleting tests or changing serialized output.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,213 passing tests and two documented Main skips.

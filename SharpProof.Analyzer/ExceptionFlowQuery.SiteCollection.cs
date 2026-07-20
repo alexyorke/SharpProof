@@ -48,7 +48,8 @@ internal static partial class ExceptionFlowEngine
                         ExceptionTypes.Unknown,
                         ExceptionCategories.DynamicDispatch,
                         GetExceptionSourceMethodDisplay(calleeCallSite.Method.OriginalDefinition),
-                        calleeDisplay);
+                        calleeDisplay,
+                        ImmutableArray<ExceptionFlowEdge>.Empty);
             }
 
             foreach (var exception in CollectCalleeExceptionSites(
@@ -99,7 +100,9 @@ internal static partial class ExceptionFlowEngine
                 exceptionType,
                 site.Hazard.ExceptionType,
                 site.Category,
-                site.Source);
+                site.Source,
+                null,
+                ImmutableArray<ExceptionFlowEdge>.Empty);
         }
     }
 }

@@ -1,13 +1,9 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicProjectConfiguration(
-    SmtAnalysisOptions smtOptions,
-    SharpProofAnalysisBudget analysisLimits)
+internal sealed record SymbolicProjectConfiguration(
+    SmtAnalysisOptions SmtOptions,
+    SharpProofAnalysisBudget AnalysisLimits)
 {
-    public SmtAnalysisOptions SmtOptions { get; } = smtOptions;
-
-    public SharpProofAnalysisBudget AnalysisLimits { get; } = analysisLimits;
-
     public static SymbolicProjectConfiguration FromAnalyzerOptions(AnalyzerOptions analyzerOptions)
     {
         if (analyzerOptions == null) throw new ArgumentNullException(nameof(analyzerOptions));

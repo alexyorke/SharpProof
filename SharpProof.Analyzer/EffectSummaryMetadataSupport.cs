@@ -320,15 +320,11 @@ internal sealed class EffectSummaryIdentityResolver
     }
 }
 
-internal sealed class SummaryAssemblyIdentity(
-    string? assemblyName,
-    string? assemblySha256,
-    string? moduleVersionId)
+internal sealed record SummaryAssemblyIdentity(
+    string? AssemblyName,
+    string? AssemblySha256,
+    string? ModuleVersionId)
 {
-    public string? AssemblyName { get; } = assemblyName;
-    public string? AssemblySha256 { get; } = assemblySha256;
-    public string? ModuleVersionId { get; } = moduleVersionId;
-
     public bool IsComplete =>
         !string.IsNullOrWhiteSpace(AssemblyName) &&
         !string.IsNullOrWhiteSpace(AssemblySha256) &&
@@ -388,11 +384,8 @@ internal sealed class SummaryAssemblyIdentity(
     }
 }
 
-internal sealed class SummaryMethodIdentity(string? metadataToken, string? methodBodySha256)
+internal sealed record SummaryMethodIdentity(string? MetadataToken, string? MethodBodySha256)
 {
-    public string? MetadataToken { get; } = metadataToken;
-    public string? MethodBodySha256 { get; } = methodBodySha256;
-
     public bool MatchesMetadataToken(ActualMethodIdentity? actualMethodIdentity)
     {
         return actualMethodIdentity != null &&
@@ -558,17 +551,12 @@ internal sealed class MethodBodyHashProvider(string assemblyPath)
     }
 }
 
-internal sealed class ActualAssemblyIdentity(
-    string assemblyName,
-    string assemblySha256,
-    string moduleVersionId,
-    string? assemblyPath = null)
+internal sealed record ActualAssemblyIdentity(
+    string AssemblyName,
+    string AssemblySha256,
+    string ModuleVersionId,
+    string? AssemblyPath = null)
 {
-    public string AssemblyName { get; } = assemblyName;
-    public string AssemblySha256 { get; } = assemblySha256;
-    public string ModuleVersionId { get; } = moduleVersionId;
-    public string? AssemblyPath { get; } = assemblyPath;
-
     public static ActualAssemblyIdentity? FromFile(string path)
     {
         using var stream = File.OpenRead(path);

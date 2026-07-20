@@ -99,7 +99,7 @@ internal static partial class ExceptionFlowEngine
                             summaryException.ExceptionType,
                             ExceptionCategories.EffectSummary,
                             edge.SourcePath,
-                            edge.CallChain.Select(static identity => identity.ToCanonicalKey()),
+                            edge.CallChain.Select(static identity => identity.ToCanonicalKey()).ToArray(),
                             edge.CalleeIdentity?.ToCanonicalKey(),
                             edge.Depth ?? 0))
                         .ToImmutableArray();
@@ -205,7 +205,7 @@ internal static partial class ExceptionFlowEngine
                 exceptionType,
                 category,
                 null,
-                calleeChain,
+                calleeChain.ToArray(),
                 null,
                 depth))
             .ToImmutableArray();

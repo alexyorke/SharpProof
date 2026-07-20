@@ -9,26 +9,15 @@ internal static partial class ExceptionFlowEngine
         public ExceptionEvidenceProjection Evidence { get; } = new(Sites);
     }
 
-    internal sealed class ExceptionFlowSite(
-        SyntaxNode site,
-        IMethodSymbol method,
-        ITypeSymbol? type,
-        string exceptionType,
-        string category,
-        string source,
-        string? exceptionSymbol = null,
-        ImmutableArray<ExceptionFlowEdge> edges = default)
-    {
-        public SyntaxNode Site { get; } = site;
-        public IMethodSymbol Method { get; } = method;
-        public ITypeSymbol? Type { get; } = type;
-        public string ExceptionType { get; } = exceptionType;
-        public string Category { get; } = category;
-        public string Source { get; } = source;
-        public string? ExceptionSymbol { get; } = exceptionSymbol;
-        public ImmutableArray<ExceptionFlowEdge> Edges { get; } =
-            edges.IsDefault ? ImmutableArray<ExceptionFlowEdge>.Empty : edges;
-    }
+    internal sealed record ExceptionFlowSite(
+        SyntaxNode Site,
+        IMethodSymbol Method,
+        ITypeSymbol? Type,
+        string ExceptionType,
+        string Category,
+        string Source,
+        string? ExceptionSymbol,
+        ImmutableArray<ExceptionFlowEdge> Edges);
 
     internal sealed class ExceptionEvidenceProjection(IEnumerable<ExceptionFlowSite> sites)
     {
@@ -69,21 +58,14 @@ internal static partial class ExceptionFlowEngine
         }
     }
 
-    internal sealed class ExceptionFlowEdge(
-        string exceptionType,
-        string category,
-        string? sourcePath,
-        IEnumerable<string> callChain,
-        string? calleeIdentity,
-        int depth)
+    internal sealed record ExceptionFlowEdge(
+        string ExceptionType,
+        string Category,
+        string? SourcePath,
+        string[] CallChain,
+        string? CalleeIdentity,
+        int Depth)
     {
-        public string ExceptionType { get; } = exceptionType;
-        public string Category { get; } = category;
-        public string? SourcePath { get; } = sourcePath;
-        public string[] CallChain { get; } = callChain.ToArray();
-        public string? CalleeIdentity { get; } = calleeIdentity;
-        public int Depth { get; } = depth;
-
         internal string CreateKey() => ExceptionType + "|" + Category + "|" +
                                        (SourcePath ?? string.Empty) + "|" +
                                        string.Join(">", CallChain) + "|" +
