@@ -310,6 +310,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                         break;
                     }
                 }
+                if (operation is IFlowCaptureOperation &&
+                    operation.Syntax.FirstAncestorOrSelf<ExpressionStatementSyntax>() != null)
+                    continue;
                 if (forInitialEntry == null &&
                     !targetIsInsideLoop &&
                     operation.Syntax.SpanStart >= site.SpanStart)

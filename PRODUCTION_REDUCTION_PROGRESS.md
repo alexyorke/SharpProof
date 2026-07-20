@@ -690,17 +690,26 @@ Tests are excluded from the metric and must not be deleted.
   and architecture tests still require zero unassigned files, ambiguous owners,
   or dependency violations; script coverage prevents the dormant reports from
   returning.
+- [x] Moved expression-statement flow captures onto canonical CFG transfer.
+  Non-target captures are now treated as ephemeral CFG plumbing, while the
+  owning expression is re-resolved once through Roslyn and replayed through the
+  existing assignment, coalescing, mutation, and completion transfer. Six
+  conditional, short-circuit, coalescing, conditional-access, nested-branch,
+  and sole-surviving-branch cases preserve normalized state and evidence. The
+  superseded capture-reference invalidation branch is deleted; control-flow and
+  initializer captures remain conservative fallbacks.
 
 ## Current evidence
 
-- Maintained production: 90,580 lines (86,836 C#, 3,014 scripts, and 730
-  specifications); net reduction: 17,046 lines; remaining reduction: 2,954.
-  This tranche removes 79 maintained-production script lines by retiring
-  unconsumed refactoring-pressure reports. Architecture enforcement, production
-  counts, diagnostics, proof outcomes, conservative unknowns, CLI bytes,
-  serialization, and package contents are unchanged, and no test was deleted.
+- Maintained production: 90,589 lines (86,845 C#, 3,014 scripts, and 730
+  specifications); net reduction: 17,037 lines; remaining reduction: 2,963.
+  This migration adds nine maintained-production lines while replacing
+  expression-statement flow-capture fallback with canonical source-operation
+  replay and deleting its superseded invalidation branch. Diagnostics, proof
+  outcomes, conservative unknowns, CLI bytes, serialization, and package
+  contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,222 passing tests and two documented Main skips.
+- Six lanes: 6,228 passing tests and two documented Main skips.
 
 ## Milestones
 
@@ -777,12 +786,13 @@ API: it prevents Roslyn symbols, engine states, and SMT formulas from escaping.
 Do not remove that projection merely because breaking API changes are allowed.
 
 The syntax-based `SymbolicProgramPointFacts` fallback remains a live migration
-target rather than deletable legacy code. Normal prior expression completion is
-now canonical; the largest remaining characterized families are flow captures
-(19), successor/control-flow propagation (16), and current completion (11).
-Move those cases into `SymbolicCfgProgramPointStateCollector` in bounded
-tranches before deleting the structural owner; do not convert failures into
-successful proofs or discard truncation metadata.
+target rather than deletable legacy code. Normal prior expression completion
+and expression-statement flow captures are now canonical; remaining families
+include successor/control-flow propagation, current completion, and captures
+that own control-flow or initializer values. Move those cases into
+`SymbolicCfgProgramPointStateCollector` in bounded tranches before deleting the
+structural owner; do not convert failures into successful proofs or discard
+truncation metadata.
 
 Analyzer configuration's declarative option catalog owns documentation,
 validation metadata, defaults, aliases, scopes, and policy impact, while the

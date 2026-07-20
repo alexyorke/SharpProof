@@ -225,6 +225,37 @@ sealed class C
         Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expectedState)));
     }
 
+    [TestCase("static class C { static int M(bool condition) { int value = 0; value = condition ? 1 : 2; return value; } }")]
+    [TestCase("static class C { static bool M(bool first, bool second) { bool value = false; value = first && second; return value; } }")]
+    [TestCase("static class C { static string M(string? input) { string value = \"\"; value = input ?? \"fallback\"; return value; } }")]
+    [TestCase("static class C { static int? M(string? input) { int? value = 0; value = input?.Length; return value; } }")]
+    [TestCase("static class C { static int M(bool outer, bool condition) { int value = 0; if (outer) value = condition ? 1 : 2; return value; } }")]
+    [TestCase("static class C { static int M(bool exit, bool condition) { int value = 0; if (exit) return value; value = condition ? 1 : 2; return value; } }")]
+    public void CapturedExpressionState_MatchesStructuralCollector(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CapturedExpressionState_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Last();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None));
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        AssertStateParity(actual.Value!, expected);
+    }
+
     [Test]
     public void SwitchExitBeforeNestedBranch_RoutedFallbackIsUnreachable()
     {

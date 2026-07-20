@@ -326,6 +326,24 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             return true;
         }
 
+        if (allowExpressionStatementCompletion &&
+            operation.DescendantsAndSelf().OfType<IFlowCaptureReferenceOperation>().Any() &&
+            operation.Syntax.FirstAncestorOrSelf<ExpressionStatementSyntax>() is { } capturedStatement &&
+            semanticModel.GetOperation(capturedStatement, cancellationToken) is
+                IExpressionStatementOperation sourceOperation &&
+            !sourceOperation.DescendantsAndSelf().OfType<IFlowCaptureReferenceOperation>().Any())
+            return TryApplyOperation(
+                ref state,
+                sourceOperation,
+                guard,
+                allowGuardedReferenceAssignments,
+                allowGuardMutation,
+                allowExpressionStatementCompletion,
+                semanticModel,
+                cancellationToken,
+                assignmentProvenance,
+                out invalidatedGuardTarget);
+
         var deconstruction = operation switch
         {
             IExpressionStatementOperation { Operation: IDeconstructionAssignmentOperation nested } => nested,
@@ -357,18 +375,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 semanticModel,
                 cancellationToken,
                 out invalidatedGuardTarget);
-
-        if (allowExpressionStatementCompletion &&
-            operation is IExpressionStatementOperation atomicExpressionStatement &&
-            atomicExpressionStatement.DescendantsAndSelf()
-                .OfType<IFlowCaptureReferenceOperation>()
-                .Any())
-            return TryApplyExpressionStatement(
-                ref state,
-                atomicExpressionStatement,
-                guard,
-                semanticModel,
-                cancellationToken);
 
         var assignment = operation switch
         {
