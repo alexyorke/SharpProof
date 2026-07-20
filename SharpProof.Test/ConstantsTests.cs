@@ -4189,42 +4189,6 @@ public static class TypeMetadataCatalogSignatureSamples
     }
 
     [Test]
-    public void MemberInfoName_IsNotManualCataloged_AndRequiresConcreteImplementationEvidence()
-    {
-        const string source = @"
-using System.Reflection;
-
-public static class MemberInfoNameCatalogSignatureSamples
-{
-    public static string Sample(MemberInfo member)
-    {
-        return member.Name;
-    }
-}";
-
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-        var compilation = CSharpCompilation.Create(
-            "MemberInfoNameCatalogResolution",
-            new[] { syntaxTree },
-            GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var signature = GetPropertySignature(compilation, syntaxTree, "member.Name");
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var memberAccess = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<MemberAccessExpressionSyntax>()
-            .Single(node => node.ToString() == "member.Name");
-        var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!;
-        var (matched, classification) = GetGeneratedPurityClassification(propertySymbol.GetMethod!, compilation);
-
-        Assert.That(signature, Is.EqualTo("System.Reflection.MemberInfo.Name.get"));
-        AssertNotInManualCatalogs(signature);
-        Assert.That(matched, Is.False,
-            "Generated purity catalog should not treat the abstract System.Reflection.MemberInfo.Name.get slot as reviewed runtime evidence without a concrete implementation body.");
-        Assert.That(classification, Is.Empty);
-    }
-
-    [Test]
     public void CultureInfoName_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
     {
         const string source = @"

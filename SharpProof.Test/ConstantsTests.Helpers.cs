@@ -29,11 +29,10 @@ public partial class ConstantsTests
     private static (bool matched, string classification) GetGeneratedPurityClassification(IMethodSymbol methodSymbol,
         Compilation compilation)
     {
-        _ = methodSymbol;
-        _ = compilation;
-        Assert.Ignore(
-            "Generated purity classification remains dormant here until a test supplies synthetic effect summary inputs.");
-        return default;
+        return GetGeneratedPurityClassification(
+            methodSymbol,
+            compilation,
+            ImmutableArray<AdditionalText>.Empty);
     }
 
     private static (bool matched, string classification) GetGeneratedPurityClassification(
