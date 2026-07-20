@@ -80,8 +80,10 @@ public sealed class ScriptProcessOwnershipTests
             "scripts",
             "Invoke-SharpProofTests.ps1"));
 
-        Assert.That(source, Does.Contain("'Main' { return @($mainProject) }"));
-        Assert.That(source, Does.Contain("default { return @($mainProject, $toolingProject) }"));
+        Assert.That(source, Does.Contain("$lanes = [ordered]@{"));
+        Assert.That(source, Does.Contain("'Main' { return @($lanes.Main) }"));
+        Assert.That(source, Does.Contain("default { return @($lanes.Main, $lanes.Tooling) }"));
+        Assert.That(source, Does.Not.Contain("$mainProject ="));
         Assert.That(source, Does.Not.Contain("SharpProof\\.(?:Test|ToolingTest)\\."));
     }
 

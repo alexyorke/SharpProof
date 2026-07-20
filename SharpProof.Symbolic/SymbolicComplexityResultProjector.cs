@@ -33,25 +33,7 @@ internal static class SymbolicComplexityResultProjector
     }
 
     private static IReadOnlyList<SymbolicComplexityDriverInfo> DistinctDrivers(
-        IEnumerable<SymbolicComplexityDriverInfo> drivers)
-    {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var distinct = new List<SymbolicComplexityDriverInfo>();
-        foreach (var driver in drivers)
-        {
-            var key = string.Join(
-                "\u001f",
-                driver.Kind,
-                driver.Description,
-                driver.SourceSpanStart.ToString(CultureInfo.InvariantCulture),
-                driver.SourceSpanLength.ToString(CultureInfo.InvariantCulture),
-                driver.SourceLine.ToString(CultureInfo.InvariantCulture),
-                driver.SourceColumn.ToString(CultureInfo.InvariantCulture));
-            if (seen.Add(key)) distinct.Add(driver);
-        }
-
-        return distinct;
-    }
+        IEnumerable<SymbolicComplexityDriverInfo> drivers) => drivers.Distinct().ToArray();
 
     private static IReadOnlyList<SymbolicComplexityUnknownReason> DistinctUnknownReasons(
         IEnumerable<SymbolicComplexityUnknownReason> reasons)
@@ -63,22 +45,5 @@ internal static class SymbolicComplexityResultProjector
     }
 
     private static IReadOnlyList<SymbolicComplexityCalleeInfo> DistinctCalleeSummaries(
-        IEnumerable<SymbolicComplexityCalleeInfo> callees)
-    {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var distinct = new List<SymbolicComplexityCalleeInfo>();
-        foreach (var callee in callees)
-        {
-            var key = string.Join(
-                "\u001f",
-                callee.MethodDisplayName,
-                callee.ComplexityText,
-                callee.Kind.ToString(),
-                callee.IsConservative.ToString(),
-                callee.UnknownReason.ToString());
-            if (seen.Add(key)) distinct.Add(callee);
-        }
-
-        return distinct;
-    }
+        IEnumerable<SymbolicComplexityCalleeInfo> callees) => callees.Distinct().ToArray();
 }

@@ -128,84 +128,39 @@ function Resolve-SharpProofTestProjects
         [string]$Filter
     )
 
-    $mainProject = [ordered]@{
-        Name = 'Main'
-        ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
-        LaneFilter = ''
+    $mainPath = 'SharpProof.Test\SharpProof.Test.csproj'
+    $lanes = [ordered]@{
+        Main = [ordered]@{ Name = 'Main'; ProjectPath = $mainPath; LaneFilter = '' }
+        MainSmt = [ordered]@{ Name = 'MainSmt'; ProjectPath = $mainPath; LaneFilter = 'TestCategory=SmtHeavy' }
+        MainSmtOracle = [ordered]@{ Name = 'MainSmtOracle'; ProjectPath = $mainPath; LaneFilter = '(FullyQualifiedName~SemanticOracleSmtTests|FullyQualifiedName~PatternSmtInvariantTests|FullyQualifiedName~ExceptionReachabilitySmtTests)' }
+        MainSmtAnalyzer = [ordered]@{ Name = 'MainSmtAnalyzer'; ProjectPath = $mainPath; LaneFilter = '(FullyQualifiedName~SemanticOracleAnalyzerSmtTests|FullyQualifiedName~DiagnosticEvidenceTests)' }
+        MainSmtFlow = [ordered]@{ Name = 'MainSmtFlow'; ProjectPath = $mainPath; LaneFilter = '(FullyQualifiedName~ExceptionFlowPathFactStressTests|FullyQualifiedName~SemanticOracleRuntimeHazardAnalyzerSmtTests)' }
+        MainSmtCore = [ordered]@{ Name = 'MainSmtCore'; ProjectPath = $mainPath; LaneFilter = '(FullyQualifiedName~PathSensitiveSmtInvariantTests|FullyQualifiedName~SmtAnalysisServiceTests|FullyQualifiedName~ExpressionAtomSmtTests|FullyQualifiedName~StringLengthSmtTests|FullyQualifiedName~ForeachSmtInvariantTests|FullyQualifiedName~ElementAccessSmtTests|FullyQualifiedName~LoopExitSmtInvariantTests|FullyQualifiedName~ReferenceReachabilitySmtTests)' }
+        MainGeneral = [ordered]@{ Name = 'MainGeneral'; ProjectPath = $mainPath; LaneFilter = 'TestCategory!=SmtHeavy' }
+        Tooling = [ordered]@{ Name = 'Tooling'; ProjectPath = 'SharpProof.ToolingTest\SharpProof.ToolingTest.csproj'; LaneFilter = '' }
     }
-    $mainSmtProject = [ordered]@{
-        Name = 'MainSmt'
-        ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
-        LaneFilter = 'TestCategory=SmtHeavy'
-    }
-    $mainSmtOracleProject = [ordered]@{
-        Name = 'MainSmtOracle'
-        ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
-        LaneFilter = '(FullyQualifiedName~SemanticOracleSmtTests|FullyQualifiedName~PatternSmtInvariantTests|FullyQualifiedName~ExceptionReachabilitySmtTests)'
-    }
-    $mainSmtAnalyzerProject = [ordered]@{
-        Name = 'MainSmtAnalyzer'
-        ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
-        LaneFilter = '(FullyQualifiedName~SemanticOracleAnalyzerSmtTests|FullyQualifiedName~DiagnosticEvidenceTests)'
-    }
-    $mainSmtFlowProject = [ordered]@{
-        Name = 'MainSmtFlow'
-        ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
-        LaneFilter = '(FullyQualifiedName~ExceptionFlowPathFactStressTests|FullyQualifiedName~SemanticOracleRuntimeHazardAnalyzerSmtTests)'
-    }
-    $mainSmtCoreProject = [ordered]@{
-        Name = 'MainSmtCore'
-        ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
-        LaneFilter = '(FullyQualifiedName~PathSensitiveSmtInvariantTests|FullyQualifiedName~SmtAnalysisServiceTests|FullyQualifiedName~ExpressionAtomSmtTests|FullyQualifiedName~StringLengthSmtTests|FullyQualifiedName~ForeachSmtInvariantTests|FullyQualifiedName~ElementAccessSmtTests|FullyQualifiedName~LoopExitSmtInvariantTests|FullyQualifiedName~ReferenceReachabilitySmtTests)'
-    }
-    $mainGeneralProject = [ordered]@{
-        Name = 'MainGeneral'
-        ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
-        LaneFilter = 'TestCategory!=SmtHeavy'
-    }
-    $toolingProject = [ordered]@{
-        Name = 'Tooling'
-        ProjectPath = 'SharpProof.ToolingTest\SharpProof.ToolingTest.csproj'
-        LaneFilter = ''
-    }
-
-    if ($RequestedLane -eq 'Main' -and [string]::IsNullOrWhiteSpace($Filter))
-    {
-        return @($mainSmtOracleProject, $mainSmtAnalyzerProject, $mainSmtFlowProject, $mainSmtCoreProject, $mainGeneralProject)
-    }
-
-    if ($RequestedLane -eq 'MainSmt' -and [string]::IsNullOrWhiteSpace($Filter))
-    {
-        return @($mainSmtOracleProject, $mainSmtAnalyzerProject, $mainSmtFlowProject, $mainSmtCoreProject)
-    }
-
-    switch ($RequestedLane)
-    {
-        'Main' { }
-        'MainSmt' { }
-        'MainSmtOracle' { return @($mainSmtOracleProject) }
-        'MainSmtAnalyzer' { return @($mainSmtAnalyzerProject) }
-        'MainSmtFlow' { return @($mainSmtFlowProject) }
-        'MainSmtCore' { return @($mainSmtCoreProject) }
-        'MainGeneral' { return @($mainGeneralProject) }
-        'Tooling' { return @($toolingProject) }
-    }
+    $smtShards = @('MainSmtOracle', 'MainSmtAnalyzer', 'MainSmtFlow', 'MainSmtCore') |
+        ForEach-Object { $lanes[$_] }
+    $mainShards = @($smtShards) + @($lanes.MainGeneral)
 
     if ([string]::IsNullOrWhiteSpace($Filter))
     {
-        if ($RequestedLane -eq 'All')
-        {
-            return @($mainSmtOracleProject, $mainSmtAnalyzerProject, $mainSmtFlowProject, $mainSmtCoreProject, $mainGeneralProject, $toolingProject)
-        }
+        if ($RequestedLane -eq 'All') { return $mainShards + @($lanes.Tooling) }
+        if ($RequestedLane -eq 'Main') { return $mainShards }
+        if ($RequestedLane -eq 'MainSmt') { return @($smtShards) }
+    }
+    if ($RequestedLane -notin @('All', 'Main', 'MainSmt')) { return @($lanes[$RequestedLane]) }
 
-        return @($mainSmtProject, $mainGeneralProject, $toolingProject)
+    if ([string]::IsNullOrWhiteSpace($Filter))
+    {
+        return @($lanes.MainSmt, $lanes.MainGeneral, $lanes.Tooling)
     }
 
     switch ($RequestedLane)
     {
-        'Main' { return @($mainProject) }
-        'MainSmt' { return @($mainSmtProject) }
-        default { return @($mainProject, $toolingProject) }
+        'Main' { return @($lanes.Main) }
+        'MainSmt' { return @($lanes.MainSmt) }
+        default { return @($lanes.Main, $lanes.Tooling) }
     }
 }
 

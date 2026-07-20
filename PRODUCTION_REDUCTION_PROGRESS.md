@@ -643,15 +643,20 @@ Tests are excluded from the metric and must not be deleted.
   same configuration, lane, worker, profiling, timeout, and memory options in
   parallel. Removed the single-item fixture and base-reference pass-through
   helpers; selection, evidence, JSON, filters, and execution remain unchanged.
+- [x] Made one lane catalog the owner of main, SMT-shard, general, and tooling
+  project/filter routing. Removed eight parallel lane variables and three
+  repeated routing matrices; every established lane still executes its exact
+  historical fixture count. Complexity driver and callee records now own their
+  all-field equality instead of parallel string-key builders.
 
 ## Current evidence
 
-- Maintained production: 90,946 lines (87,081 C#, 3,135 scripts, and 730
-  specifications); net reduction: 16,680 lines; remaining reduction: 3,320.
-  This test-wrapper ownership tranche removes 54 maintained-production lines
-  and one parallel command-construction path. It changes no diagnostics, proof
-  results, test selection, CLI output, serialization, or package contents and
-  deletes no tests.
+- Maintained production: 90,871 lines (87,048 C#, 3,093 scripts, and 730
+  specifications); net reduction: 16,755 lines; remaining reduction: 3,245.
+  This lane/equality ownership tranche removes 75 maintained-production lines,
+  three routing matrices, and two manual all-field key builders. It changes no
+  diagnostics, proof results, test selection, CLI bytes, serialization, or
+  package contents and deletes no tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,216 passing tests and two documented Main skips.
 
