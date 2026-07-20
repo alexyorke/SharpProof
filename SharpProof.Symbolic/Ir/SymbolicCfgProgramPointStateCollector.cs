@@ -310,6 +310,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                         break;
                     }
                 }
+                if (forInitialEntry != null &&
+                    IsForInitializerSyntax(operation.Syntax, forInitialEntry))
+                    continue;
                 if (operation is IFlowCaptureOperation &&
                     operation.Syntax.FirstAncestorOrSelf<StatementSyntax>() is
                         ExpressionStatementSyntax or LocalDeclarationStatementSyntax)
@@ -318,9 +321,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                     !targetIsInsideLoop &&
                     operation.Syntax.SpanStart >= site.SpanStart)
                     return Unsupported(site, "operation-order");
-                if (forInitialEntry != null &&
-                    !SupportsForInitialEntryOperation(operation, forInitialEntry))
-                    return Unsupported(operation.Syntax, "for-initializer-operation");
                 ISymbol? invalidatedGuardTarget = null;
                 if (!TryApplyOperation(
                         ref state,
@@ -343,13 +343,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                             currentPath.GuardFrame,
                             invalidatedGuardTarget)
                     };
-                if (forInitialEntry != null)
-                    AddForDeclarationInitializerNormalCompletionFacts(
-                        ref state,
-                        operation,
-                        forInitialEntry,
-                        semanticModel,
-                        cancellationToken);
             }
 
             if (foundTarget)
@@ -360,14 +353,21 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 if (point.Continuation != null ||
                     targetIsInsideBranch && HasInvalidatedGuard(currentPath.GuardFrame))
                     return Unsupported(site, "for-initial-entry-path");
-                return Exact(
-                    OrderTargetState(state, currentPath, targetIsInsideBranch),
-                    site);
+                if (!TryApplyForInitializers(
+                        ref state,
+                        forInitialEntry!,
+                        GetActiveGuard(currentPath.GuardFrame),
+                        semanticModel,
+                        cancellationToken))
+                    return Unsupported(site, "for-initializer-operation");
+                targetState = OrderTargetState(state, currentPath, targetIsInsideBranch);
+                continue;
             }
 
             if (block.BranchValue != null)
             {
-                if (ContainsSite(block.BranchValue.Syntax, site) &&
+                if (forInitialEntry == null &&
+                    ContainsSite(block.BranchValue.Syntax, site) &&
                     !(includeCurrentStatementCompletionFacts &&
                       site is ExpressionStatementSyntax) &&
                     !(includeCurrentStatementCompletionFacts &&
@@ -391,6 +391,22 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                     if (!targetIsInsideLoop)
                         continue;
                 }
+            }
+
+            if (forInitialEntryHeader != null &&
+                block.BranchValue != null &&
+                IsForInitializerSyntax(block.BranchValue.Syntax, forInitialEntry!))
+            {
+                TryPropagateToPoint(
+                    new CfgTraversalPoint(forInitialEntryHeader, null),
+                    new CfgIncomingEdge(
+                        null,
+                        null,
+                        CfgIncomingEdgeKind.FallThrough,
+                        "for-initializer-source"),
+                    currentPath with { State = state },
+                    traversal);
+                continue;
             }
 
             if (!TryPropagateSuccessors(

@@ -705,17 +705,26 @@ Tests are excluded from the metric and must not be deleted.
   state and evidence checks preserve the structural behavior; captures that own
   control flow outside expression and declaration statements remain explicit
   fallbacks.
+- [x] Made the canonical CFG collector own non-linear `for` initializer entry.
+  Initializer CFG plumbing is bypassed to the real loop header, where the
+  original declaration or assignment sequence is transferred exactly once.
+  This preserves conditional, coalescing, throw-guarded, and prior captured-
+  declaration state and evidence while deleting the linear-prefix gate and the
+  per-operation initializer support and completion adapters. Calls, compound
+  updates, missing conditions, nested loop prefixes, and external member writes
+  remain explicit conservative fallbacks.
 
 ## Current evidence
 
-- Maintained production: 90,590 lines (86,846 C#, 3,014 scripts, and 730
-  specifications); net reduction: 17,036 lines; remaining reduction: 2,964.
-  This migration adds one maintained-production line while replacing local-
-  declaration initializer flow-capture fallback with canonical source-operation
-  replay. Diagnostics, proof outcomes, conservative unknowns, CLI bytes,
-  serialization, and package contents are unchanged, and no test was deleted.
+- Maintained production: 90,594 lines (86,850 C#, 3,014 scripts, and 730
+  specifications); net reduction: 17,032 lines; remaining reduction: 2,968.
+  This migration adds four maintained-production lines while replacing branchy
+  `for` initializer fallback with one canonical source-sequence transfer and
+  deleting its superseded support, completion, and linear-prefix adapters.
+  Diagnostics, proof outcomes, conservative unknowns, CLI bytes, serialization,
+  and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,232 passing tests and two documented Main skips.
+- Six lanes: 6,234 passing tests and two documented Main skips.
 
 ## Milestones
 
@@ -794,9 +803,9 @@ Do not remove that projection merely because breaking API changes are allowed.
 The syntax-based `SymbolicProgramPointFacts` fallback remains a live migration
 target rather than deletable legacy code. Normal prior expression completion
  and expression-statement and declaration-initializer flow captures are now
- canonical; remaining families include successor/control-flow propagation,
- current completion, and captures that own control-flow outside those statement
- forms. Move those cases into
+ canonical, including non-linear `for` initializer entry; remaining families
+ include successor/control-flow propagation, current completion, and captures
+ that own control-flow outside those statement forms. Move those cases into
 `SymbolicCfgProgramPointStateCollector` in bounded tranches before deleting the
 structural owner; do not convert failures into successful proofs or discard
 truncation metadata.

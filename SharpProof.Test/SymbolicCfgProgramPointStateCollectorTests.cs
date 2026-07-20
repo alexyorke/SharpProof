@@ -285,6 +285,31 @@ sealed class C
         AssertStateParity(actual.Value!, expected);
     }
 
+    [TestCase("static class C { static void M(bool condition) { for (int value = condition ? 1 : 2; value < 3; value++) { } } }")]
+    [TestCase("static class C { static void M(string? input) { for (string value = input ?? \"fallback\"; value.Length < 3;) { } } }")]
+    [TestCase("static class C { static void M(bool condition, int value) { for (value = condition ? 1 : 2; value < 3; value++) { } } }")]
+    [TestCase("static class C { static void M(string? input) { for (string value = input ?? throw new System.Exception(); value != null;) { } } }")]
+    [TestCase("static class C { static void M(bool select) { int value = select ? 1 : 2; for (int index = 0; index < 3; index++) { } } }")]
+    public void NonLinearForInitialEntryState_MatchesStructuralCollector(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(NonLinearForInitialEntryState_MatchesStructuralCollector));
+        var statement = fixture.Root.DescendantNodes().OfType<ForStatementSyntax>().Single();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectForInitialEntryState(
+            statement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var expected = SymbolicProgramPointFacts.CollectForInitialEntryState(
+            statement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        AssertStateParity(actual.Value!, expected);
+    }
+
     [Test]
     public void SwitchExitBeforeNestedBranch_RoutedFallbackIsUnreachable()
     {
@@ -1847,10 +1872,6 @@ static class C
     [TestCase(
         "static class C { static int Get() => 1; static void M() { int index = 0; for (index = 1, index = Get(); index < 3; index++) { } } }")]
     [TestCase(
-        "static class C { static void M(bool select) { for (int index = select ? 0 : 1; index < 3; index++) { } } }")]
-    [TestCase(
-        "static class C { static void M(string? input) { for (string value = input ?? throw new System.Exception(); value != null;) { } } }")]
-    [TestCase(
         "static class C { static void Set(out int value) => value = 0; static void M() { int index = 0; for (Set(out index); index < 3; index++) { } } }")]
     [TestCase(
         "static class C { static void M() { int index = 0; for (index++; index < 3; index++) { } } }")]
@@ -1860,8 +1881,6 @@ static class C
         "static class C { static void M() { for (int index = 0;; index++) { } } }")]
     [TestCase(
         "static class C { static void M(bool keepGoing) { while (keepGoing) { for (int index = 0; index < 3; index++) { } } } }")]
-    [TestCase(
-        "static class C { static void M(bool select) { int value = select ? 1 : 2; for (int index = 0; index < 3; index++) { } } }")]
     [TestCase(
         "sealed class C { int Value; void M() { for (Value = 0; Value < 3; Value++) { } } }")]
     public void UnsupportedForInitialEntry_RemainsConservativeFallback(string source)

@@ -585,53 +585,61 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         forStatement.Initializers.Any(initializer =>
             initializer.Span.Contains(syntax.SpanStart));
 
-    private static bool SupportsForInitialEntryOperation(
-        IOperation operation,
-        ForStatementSyntax forStatement)
-    {
-        if (!IsForInitializerSyntax(operation.Syntax, forStatement))
-            return true;
-        var assignment = operation switch
-        {
-            IExpressionStatementOperation { Operation: ISimpleAssignmentOperation nested } => nested,
-            ISimpleAssignmentOperation direct => direct,
-            _ => null
-        };
-        return assignment != null && TryGetDirectTarget(assignment.Target, out _);
-    }
-
-    private static void AddForDeclarationInitializerNormalCompletionFacts(
+    private static bool TryApplyForInitializers(
         ref SymbolicState state,
-        IOperation operation,
-        ForStatementSyntax forStatement,
+        ForStatementSyntax statement,
+        SymbolicCondition? guard,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var assignment = operation switch
+        foreach (var variable in statement.Declaration?.Variables ?? default)
         {
-            IExpressionStatementOperation { Operation: ISimpleAssignmentOperation nested } => nested,
-            ISimpleAssignmentOperation direct => direct,
-            _ => null
-        };
-        if (assignment == null ||
-            !TryGetDirectTarget(assignment.Target, out var assignmentTarget) ||
-            forStatement.Declaration?.Variables.FirstOrDefault(variable =>
-                variable.Span.Contains(operation.Syntax.SpanStart)) is not
-                {
-                    Initializer.Value: { } value
-                } declarator ||
-            !SymbolEqualityComparer.Default.Equals(
-                semanticModel.GetDeclaredSymbol(declarator, cancellationToken),
-                assignmentTarget))
-            return;
+            if (variable is not { Initializer.Value: { } value } ||
+                semanticModel.GetDeclaredSymbol(variable, cancellationToken) is not { } target ||
+                semanticModel.GetOperation(value, cancellationToken) is not { } valueOperation ||
+                !TryApplyAssignment(
+                    ref state,
+                    target,
+                    valueOperation,
+                    guard,
+                    true,
+                    false,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.path.for-initializer",
+                    out var invalidatedGuardTarget) ||
+                invalidatedGuardTarget != null)
+                return false;
+            state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
+                state,
+                value,
+                statement.Statement,
+                includeThrowGuardFacts: false,
+                semanticModel,
+                cancellationToken).State;
+        }
 
-        state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
-            state,
-            value,
-            forStatement.Statement,
-            includeThrowGuardFacts: false,
-            semanticModel,
-            cancellationToken).State;
+        foreach (var initializer in statement.Initializers)
+        {
+            if (semanticModel.GetOperation(initializer, cancellationToken) is not
+                    ISimpleAssignmentOperation assignment ||
+                !TryGetDirectTarget(assignment.Target, out var target) ||
+                !TryApplyAssignment(
+                    ref state,
+                    target,
+                    assignment.Value,
+                    guard,
+                    true,
+                    false,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.path.for-initializer",
+                    out var invalidatedGuardTarget) ||
+                invalidatedGuardTarget != null)
+                return false;
+        }
+
+        return true;
     }
 
     private static bool TryApplyCurrentDeclarationCompletion(
@@ -900,27 +908,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         }
 
         header = matches[0];
-        return HasLinearInitialEntryPrefix(header);
-    }
-
-    private static bool HasLinearInitialEntryPrefix(BasicBlock header)
-    {
-        var visited = new HashSet<BasicBlock>();
-        var current = header;
-        while (current.Kind != BasicBlockKind.Entry)
-        {
-            if (!visited.Add(current))
-                return false;
-            var forwardPredecessors = current.Predecessors.Where(predecessor =>
-                predecessor.Source.Ordinal < current.Ordinal &&
-                predecessor.Semantics is
-                    ControlFlowBranchSemantics.Regular or
-                    ControlFlowBranchSemantics.StructuredExceptionHandling).ToArray();
-            if (forwardPredecessors.Length != 1)
-                return false;
-            current = forwardPredecessors[0].Source;
-        }
-
         return true;
     }
 
