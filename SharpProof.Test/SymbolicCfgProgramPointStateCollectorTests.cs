@@ -963,6 +963,42 @@ static class C
         AssertStateParity(routed, structural);
     }
 
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 0; value = condition ? 1 : 2; return value; } }")]
+    [TestCase(
+        "static class C { static int M(int? input) { int value = 0; value = input ?? 2; return value; } }")]
+    [TestCase(
+        "static class C { static bool M(bool first, bool second) { bool value = false; value = first && second; return value; } }")]
+    [TestCase(
+        "static class C { static int M(bool condition) { int value = 0; value += condition ? 1 : 2; return value; } }")]
+    public void CapturedExpressionStatementCompletion_RemainsConservativeFallback(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(CapturedExpressionStatementCompletion_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes()
+            .OfType<ExpressionStatementSyntax>()
+            .Single(statement => statement.Expression is AssignmentExpressionSyntax);
+        var direct = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+        var structural = CollectStructuralState(
+            fixture,
+            site,
+            includeCurrentStatementCompletionFacts: true);
+        var routed = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None,
+            includeCurrentStatementCompletionFacts: true);
+
+        Assert.That(direct.IsUnsupported, Is.True, direct.Provenance.Single().Detail);
+        Assert.That(direct.Value, Is.Null);
+        AssertStateParity(routed, structural);
+    }
+
     [Test]
     public void MemberNotNullExpressionCompletion_CurrentRoutingCharacterization()
     {

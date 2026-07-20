@@ -653,6 +653,12 @@ Tests are excluded from the metric and must not be deleted.
   `SymbolicQueryExecutor` forwarding overloads and both nullable-contract proof
   adapters; ensures and nullable analysis now call the same state-owned proof
   boundary. Unsupported requests remain explicit conservative unknowns.
+- [x] Characterized the remaining expression-statement flow-capture boundary.
+  Conditional, null-coalescing, short-circuit, and compound captured assignments
+  require path-local capture identity and value propagation; merely skipping
+  `IFlowCaptureOperation` retained pre-assignment state and failed normalized
+  state parity. Differential tests keep those routes conservative until the CFG
+  path state owns and merges capture values.
 
 ## Current evidence
 
@@ -661,8 +667,10 @@ Tests are excluded from the metric and must not be deleted.
   This proof-boundary tranche removes 71 maintained-production lines and four
   forwarding methods. It changes no diagnostics, proof results, conservative
   unknowns, CLI bytes, serialization, or package contents and deletes no tests.
+  The subsequent flow-capture characterization changes no maintained production
+  lines and adds four parity cases for the next canonical migration tranche.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,216 passing tests and two documented Main skips.
+- Six lanes: 6,220 passing tests and two documented Main skips.
 
 ## Milestones
 
