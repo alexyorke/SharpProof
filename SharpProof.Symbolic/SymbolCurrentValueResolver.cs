@@ -37,6 +37,7 @@ internal static class SymbolCurrentValueResolver {
         foreach (var (block, containingStatement) in CSharpSyntaxFacts.EnumerateContainingBlocks(useNode).Reverse())
             foreach (var statement in block.Statements) {
                 if (ReferenceEquals(statement, containingStatement)) break;
+                var mutations = SymbolicMutationInventory.Create(statement, semanticModel, cancellationToken);
 
                 if (statement is LocalDeclarationStatementSyntax localDeclaration) {
                     foreach (var declarator in localDeclaration.Declaration.Variables)
@@ -44,11 +45,7 @@ internal static class SymbolCurrentValueResolver {
                             SymbolEqualityComparer.Default.Equals(localSymbol.OriginalDefinition, symbol))
                             currentValue = declarator.Initializer?.Value;
 
-                    if (SymbolMutationFacts.ContainsMutation(
-                            statement,
-                            symbol,
-                            semanticModel,
-                            cancellationToken))
+                    if (mutations.MutatesSymbol(symbol))
                         currentValue = null;
 
                     continue;
@@ -76,11 +73,7 @@ internal static class SymbolCurrentValueResolver {
                     continue;
                 }
 
-                if (SymbolMutationFacts.ContainsMutation(
-                        statement,
-                        symbol,
-                        semanticModel,
-                        cancellationToken))
+                if (mutations.MutatesSymbol(symbol))
                     currentValue = null;
             }
 
@@ -98,12 +91,7 @@ internal static class SymbolCurrentValueResolver {
         var loopBody = CSharpSyntaxFacts.GetContainingLoopBody(useNode);
         if (loopBody == null) return false;
 
-        return CSharpSyntaxFacts.DescendantNodesInExecution(loopBody)
-            .Any(candidate => candidate.SpanStart > useNode.SpanStart &&
-                              SymbolMutationFacts.MutatesSymbol(
-                                  candidate,
-                                  symbol,
-                                  semanticModel,
-                                  cancellationToken));
+        return SymbolicMutationInventory.Create(loopBody, semanticModel, cancellationToken)
+            .MutatesBetween(useNode.SpanStart, loopBody.Span.End, symbol);
     }
 }

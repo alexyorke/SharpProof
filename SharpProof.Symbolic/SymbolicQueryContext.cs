@@ -10,35 +10,16 @@ internal sealed class SymbolicQueryContext(
 }
 
 internal sealed class SymbolicQueryOptions(
-    SharpProofAnalysisBudget analysisLimits,
     IEnumerable<MetadataReference>? references = null,
     SmtAnalysisService? smtAnalysis = null,
     IEnumerable<string>? impliedConditions = null,
     bool includeExpressionProgramPoints = false,
-    bool includeCurrentStatementCompletionFacts = false) {
-    public static readonly SymbolicQueryOptions Default = new(SharpProofAnalysisBudget.Default);
-
-    public SymbolicQueryOptions(
-        IEnumerable<MetadataReference>? references = null,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false)
-        : this(
-            SharpProofAnalysisBudget.Default,
-            references,
-            smtAnalysis,
-            impliedConditions,
-            includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts) {
-    }
+    bool includeCurrentStatementCompletionFacts = false,
+    SharpProofAnalysisBudget? analysisLimits = null) {
+    public static readonly SymbolicQueryOptions Default = new();
 
     public SharpProofAnalysisBudget AnalysisLimits { get; } =
-        analysisLimits ?? throw new ArgumentNullException(nameof(analysisLimits));
-
-    public SymbolicQueryOptions WithAnalysisLimits(SharpProofAnalysisBudget analysisLimits) => new(
-        analysisLimits, References, SmtAnalysis, ImpliedConditions,
-        IncludeExpressionProgramPoints, IncludeCurrentStatementCompletionFacts);
+        (analysisLimits ?? SharpProofAnalysisBudget.Default).Validate();
 
     public ImmutableArray<MetadataReference> References { get; } =
         SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));

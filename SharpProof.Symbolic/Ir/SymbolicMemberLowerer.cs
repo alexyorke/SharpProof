@@ -151,7 +151,12 @@ internal static class SymbolicMemberLowerer {
             SymbolicSourcePredicateLowerer.TryLowerReturnedBoolean(getter, context, substitutions, receiver, out condition))
             return true;
 
-        return SymbolicSourcePredicateLowerer.TryLowerReturnedBoolean(propertySymbol, context, receiver, out condition);
+        return SymbolicSourcePredicateLowerer.TryLowerReturnedBoolean(
+            propertySymbol,
+            context,
+            substitutions,
+            receiver,
+            out condition);
     }
 
     private static bool TryGetInstanceMemberValueKind(

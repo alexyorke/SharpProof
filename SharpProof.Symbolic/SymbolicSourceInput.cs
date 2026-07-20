@@ -12,44 +12,29 @@ internal sealed record SymbolicSourceInput(
     SymbolicSourceMap? SourceMap = null) {
     internal const string DefaultFilePath = "SharpProof.Symbolic.Query.cs";
 
-    public static SymbolicSourceInput FromFile(string filePath) {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        return FromFile(filePath, SymbolicSourceCompilationProfile.Default);
-    }
-
     public static SymbolicSourceInput FromFile(
         string filePath,
-        SymbolicSourceCompilationProfile compilationProfile) {
+        SymbolicSourceCompilationProfile? compilationProfile = null) {
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("File path is required.", nameof(filePath));
 
         return new SymbolicSourceInput(
             SymbolicSourceInputKind.File,
             filePath,
-            CompilationProfile: compilationProfile ??
-                                throw new ArgumentNullException(nameof(compilationProfile)));
+            CompilationProfile: compilationProfile ?? SymbolicSourceCompilationProfile.Default);
     }
 
-    public static SymbolicSourceInput FromText(string sourceText, string? filePath = null) {
-        if (sourceText == null) throw new ArgumentNullException(nameof(sourceText));
-
-        return FromTextWithProfile(sourceText, SymbolicSourceCompilationProfile.Default, filePath);
-    }
-
-    public static SymbolicSourceInput FromTextWithProfile(
+    public static SymbolicSourceInput FromText(
         string sourceText,
-        SymbolicSourceCompilationProfile compilationProfile,
-        string? filePath = null) {
+        string? filePath = null,
+        SymbolicSourceCompilationProfile? compilationProfile = null) {
         if (sourceText == null) throw new ArgumentNullException(nameof(sourceText));
 
         return new SymbolicSourceInput(
             SymbolicSourceInputKind.Text,
             string.IsNullOrWhiteSpace(filePath) ? DefaultFilePath : filePath,
             sourceText,
-            CompilationProfile: compilationProfile ??
-                                throw new ArgumentNullException(nameof(compilationProfile)));
+            CompilationProfile: compilationProfile ?? SymbolicSourceCompilationProfile.Default);
     }
 
     public static SymbolicSourceInput FromSyntaxTree(SyntaxTree syntaxTree, Compilation compilation) {

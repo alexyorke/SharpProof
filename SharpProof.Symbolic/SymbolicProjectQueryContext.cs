@@ -132,8 +132,8 @@ internal sealed class SymbolicProjectQueryContext(
                 smtAnalysis: smtAnalysis,
                 impliedConditions: impliedConditions,
                 includeExpressionProgramPoints: includeExpressionProgramPoints,
-                includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts)
-            .WithAnalysisLimits(Configuration.AnalysisLimits);
+                includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts,
+                analysisLimits: Configuration.AnalysisLimits);
     }
 
     private static ImmutableArray<string> NormalizePaths(IEnumerable<string>? paths) {

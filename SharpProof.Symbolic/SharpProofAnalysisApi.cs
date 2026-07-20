@@ -536,7 +536,7 @@ public sealed class SharpProofAnalysisSession : IDisposable {
                 smtAnalysis: smtAnalysis,
                 impliedConditions: options.ImpliedConditions.IsDefault
                     ? ImmutableArray<string>.Empty
-                    : options.ImpliedConditions)
-            .WithAnalysisLimits((options.AnalysisBudget ?? SharpProofAnalysisBudget.Default).Validate());
+                    : options.ImpliedConditions,
+                analysisLimits: options.AnalysisBudget);
     }
 }

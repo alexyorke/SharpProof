@@ -1,33 +1,6 @@
 namespace SharpProof.Symbolic;
 
 internal static class SymbolMutationFacts {
-    internal static bool ContainsMutation(
-        SyntaxNode root,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        bool includeSelf = true) {
-        return CSharpSyntaxFacts.DescendantNodesInExecution(root, includeSelf)
-            .Any(node => MutatesSymbol(node, symbol, semanticModel, cancellationToken));
-    }
-
-    internal static bool MutatesSymbol(
-        SyntaxNode node,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        return node switch {
-            AssignmentExpressionSyntax assignment =>
-                MutatedExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken),
-            ExpressionSyntax expression
-                when CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(expression, out var operand, out _) =>
-                ExpressionMatchesSymbol(operand, symbol, semanticModel, cancellationToken),
-            ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) =>
-                ExpressionMatchesSymbol(argument.Expression, symbol, semanticModel, cancellationToken),
-            _ => false
-        };
-    }
-
     internal static bool TryGetMutationTarget(SyntaxNode node, out ExpressionSyntax expression) {
         if (node is ExpressionSyntax mutationExpression &&
             CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(mutationExpression, out expression, out _))
@@ -123,19 +96,4 @@ internal static class SymbolMutationFacts {
             out symbol);
     }
 
-    private static bool MutatedExpressionMatchesSymbol(
-        ExpressionSyntax expression,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        if (expression is TupleExpressionSyntax tuple)
-            return tuple.Arguments.Any(argument => MutatedExpressionMatchesSymbol(
-                argument.Expression,
-                symbol,
-                semanticModel,
-                cancellationToken));
-
-        return ExpressionMatchesSymbol(expression, symbol, semanticModel, cancellationToken);
-    }
 }

@@ -286,7 +286,7 @@ public sealed class SymbolicAnalysisLimitsTests
                               }
                               """;
         var limits = SharpProofAnalysisBudget.Default with { MaxFiniteForeachElementFacts = 1 };
-        var options = new SymbolicQueryOptions().WithAnalysisLimits(limits);
+        var options = new SymbolicQueryOptions(analysisLimits: limits);
 
         var result = new SymbolicQueryExecutor().Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "Sample.cs"),
@@ -322,7 +322,7 @@ public sealed class SymbolicAnalysisLimitsTests
                               """;
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var limits = SharpProofAnalysisBudget.Default with { MaxFiniteForeachElementFacts = 1 };
-        var options = new SymbolicQueryOptions(smtAnalysis: smtAnalysis).WithAnalysisLimits(limits);
+        var options = new SymbolicQueryOptions(smtAnalysis: smtAnalysis, analysisLimits: limits);
 
         var result = new SymbolicQueryExecutor().QueryRuntimeHazards(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "Sample.cs"),
@@ -505,7 +505,7 @@ public sealed class SymbolicAnalysisLimitsTests
         {
             foreach (var item in cases)
             {
-                var options = new SymbolicQueryOptions().WithAnalysisLimits(item.Limits);
+                var options = new SymbolicQueryOptions(analysisLimits: item.Limits);
                 var result = new SymbolicQueryExecutor().Query(new SymbolicQueryContext(
                     SymbolicSourceInput.FromText(item.Source, "Sample.cs"),
                     SharpProofTargetFactory.AllLines(),

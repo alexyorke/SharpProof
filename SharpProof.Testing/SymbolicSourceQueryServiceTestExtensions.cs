@@ -167,7 +167,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
     {
         var source = compilationProfile == null
             ? SymbolicSourceInput.FromText(sourceText, filePath)
-            : SymbolicSourceInput.FromTextWithProfile(sourceText, compilationProfile, filePath);
+            : SymbolicSourceInput.FromText(sourceText, filePath, compilationProfile);
         return executor.Prove(
             new SymbolicQueryContext(
                 source,

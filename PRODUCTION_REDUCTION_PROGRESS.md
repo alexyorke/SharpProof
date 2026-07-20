@@ -835,12 +835,19 @@ Tests are excluded from the metric and must not be deleted.
   Existing range, index, lowering, and runtime-hazard fixtures retain parity;
   the shared loop invalidation also fixes a characterized false proof that
   reused a range shape after a later loop-body mutation.
+- [x] Removed the remaining internal construction and traversal adapters for
+  query options, source inputs, source-predicate inlining, and mutation scans.
+  Analysis limits now enter the immutable query options once, source profiles
+  use one factory per input kind, predicate symbols use one lowering entry
+  point, and `SymbolicMutationInventory` is the sole mutation-enumeration owner.
+  Budget, source-profile, predicate, requires-entry, range/index, and CLI
+  characterization remains green.
 
 ## Current evidence
 
-- Phase-two maintained production: 81,087 lines (77,125 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,347-line reduction from the
-  84,434-line phase-two baseline. Another 16,653 lines remain to the 64,434
+- Phase-two maintained production: 80,994 lines (77,032 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,440-line reduction from the
+  84,434-line phase-two baseline. Another 16,560 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.

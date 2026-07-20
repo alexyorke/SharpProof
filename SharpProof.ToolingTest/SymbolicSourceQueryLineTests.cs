@@ -98,7 +98,7 @@ internal sealed class SymbolicSourceQueryLineTests
                               #endif
                               """;
         var profile = new SymbolicSourceCompilationProfile(preprocessorSymbols: new[] { "PROFILE" });
-        var input = SymbolicSourceInput.FromTextWithProfile(source, profile, "Profiled.cs");
+        var input = SymbolicSourceInput.FromText(source, "Profiled.cs", profile);
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var options = new SymbolicQueryOptions(
             AnalyzerTestHost.GetTrustedPlatformReferences(),

@@ -146,11 +146,8 @@ internal static class RequiresEntryStateBuilder {
                 !SymbolEq.AreEqual(parameter.ContainingSymbol, methodSymbol)))
             return false;
 
-        return !referencedSymbols.Any(symbol => SymbolMutationFacts.ContainsMutation(
-            methodNode,
-            symbol,
-            methodSemanticModel,
-            cancellationToken));
+        var mutations = SymbolicMutationInventory.Create(methodNode, methodSemanticModel, cancellationToken);
+        return !referencedSymbols.Any(mutations.MutatesSymbol);
     }
 
     private static bool IsStableConditionMember(

@@ -55,24 +55,6 @@ internal static class SymbolicSourcePredicateLowerer {
                method.Parameters.All(static parameter => parameter.RefKind == RefKind.None);
 
     internal static bool TryLowerReturnedBoolean(
-        IMethodSymbol method,
-        SymbolicLoweringContext callerContext,
-        Dictionary<ISymbol, SymbolicTerm> substitutions,
-        SymbolicTerm implicitThis,
-        out SymbolicCondition condition) => TryLowerReturnedBoolean(
-            (ISymbol)method, callerContext, substitutions, implicitThis, out condition);
-
-    internal static bool TryLowerReturnedBoolean(
-        IPropertySymbol property,
-        SymbolicLoweringContext callerContext,
-        SymbolicTerm implicitThis,
-        out SymbolicCondition condition) {
-        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default);
-        return TryLowerReturnedBoolean(
-            (ISymbol)property, callerContext, substitutions, implicitThis, out condition);
-    }
-
-    internal static bool TryLowerReturnedBoolean(
         ISymbol symbol,
         SymbolicLoweringContext callerContext,
         Dictionary<ISymbol, SymbolicTerm> substitutions,

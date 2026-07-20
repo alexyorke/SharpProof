@@ -613,10 +613,10 @@ internal sealed class SymbolicCliOptions {
         var sourceText = ReadSourceFromStdin
             ? standardInput ?? throw new InvalidOperationException("Standard input was not read.")
             : InlineSourceText ?? throw new InvalidOperationException("Inline source text is required.");
-        var input = SymbolicSourceInput.FromTextWithProfile(
+        var input = SymbolicSourceInput.FromText(
             sourceText,
-            CreateCompilationProfile(),
-            SourceFileName);
+            SourceFileName,
+            CreateCompilationProfile());
         return SourceMapUri == null
             ? input
             : input.WithSourceMap(new SymbolicSourceMap(
@@ -702,8 +702,8 @@ internal sealed class SymbolicCliOptions {
                 smtAnalysis,
                 ImpliedConditions,
                 LineExpressions,
-                PostLineInvariants)
-            .WithAnalysisLimits(CreateAnalysisLimits());
+                PostLineInvariants,
+                CreateAnalysisLimits());
 
     public SharpProofAnalysisBudget CreateAnalysisLimits() => SharpProofAnalysisBudget.FromNamedValues(
             ProjectAnalysisLimits ?? SharpProofAnalysisBudget.Default,
