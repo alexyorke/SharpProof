@@ -792,12 +792,19 @@ Tests are excluded from the metric and must not be deleted.
   independent semantic owner. Focused ProofCore and regex coverage preserves
   structural rewrite detection, unsupported options, approximate-regex
   conservatism, and nested conditional handling.
+- [x] Made operation transfer own conservative straight-line computed-update
+  invalidation when no exact prior numeric value is available. One unwrapped
+  expression operation now dispatches deconstruction, coalescing, simple, and
+  computed assignments; custom analysis budgets also attempt the canonical CFG
+  route before structural fallback. Guarded updates remain explicit fallbacks
+  when invalidation would discard a live branch condition. The complete CFG
+  differential fixture preserves state, evidence, versions, and fallback cases.
 
 ## Current evidence
 
-- Phase-two maintained production: 81,274 lines (77,312 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,160-line reduction from the
-  84,434-line phase-two baseline. Another 16,840 lines remain to the 64,434
+- Phase-two maintained production: 81,260 lines (77,298 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,174-line reduction from the
+  84,434-line phase-two baseline. Another 16,826 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.

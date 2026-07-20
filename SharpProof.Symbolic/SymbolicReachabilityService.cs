@@ -14,8 +14,7 @@ internal static class SymbolicReachabilityService {
         SymbolicState? initialState = null,
         bool includeCurrentStatementCompletionFacts = false) {
         cancellationToken.ThrowIfCancellationRequested();
-        if (initialState != null ||
-            !SymbolicCfgProgramPointStateCollector.UsesDefaultAnalysisLimits(SymbolicAnalysisLimitContext.Limits))
+        if (initialState != null)
             return BuildStructuralPathStateSnapshot(
                 site,
                 semanticModel,

@@ -642,10 +642,18 @@ static class C
             source,
             nameof(ExecutionRootTrace_ConcurrentQueriesRemainIsolatedByExecutionRoot));
         var sites = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().ToArray();
-        var expected = sites.Select(site => SymbolicReachabilityService.CollectPathStateAt(
-                site,
-                fixture.SemanticModel,
-                CancellationToken.None))
+        var expected = sites.Select(site =>
+            {
+                var canonical = SymbolicCfgProgramPointStateCollector.CollectState(
+                    site,
+                    fixture.SemanticModel,
+                    CancellationToken.None);
+                Assert.That(canonical.IsExact, Is.True, canonical.Provenance.Single().Detail);
+                return SymbolicReachabilityService.CollectPathStateAt(
+                    site,
+                    fixture.SemanticModel,
+                    CancellationToken.None);
+            })
             .Select(CreateTraceStateKey)
             .ToArray();
         var actual = new ConcurrentBag<string>();

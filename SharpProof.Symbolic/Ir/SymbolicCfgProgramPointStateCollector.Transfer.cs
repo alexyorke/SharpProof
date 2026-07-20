@@ -320,12 +320,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 assignmentProvenance,
                 out invalidatedGuardTarget);
 
-        var deconstruction = operation switch {
-            IExpressionStatementOperation { Operation: IDeconstructionAssignmentOperation nested } => nested,
-            IDeconstructionAssignmentOperation direct => direct,
-            _ => null
-        };
-        if (deconstruction != null)
+        var expressionOperation = operation is IExpressionStatementOperation expressionStatement
+            ? expressionStatement.Operation
+            : operation;
+        if (expressionOperation is IDeconstructionAssignmentOperation deconstruction)
             return TryApplyDeconstructionAssignment(
                 ref state,
                 deconstruction,
@@ -334,12 +332,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 cancellationToken,
                 out invalidatedGuardTarget);
 
-        var coalesce = operation switch {
-            IExpressionStatementOperation { Operation: ICoalesceAssignmentOperation nested } => nested,
-            ICoalesceAssignmentOperation direct => direct,
-            _ => null
-        };
-        if (coalesce != null)
+        if (expressionOperation is ICoalesceAssignmentOperation coalesce)
             return TryApplyCoalesceAssignment(
                 ref state,
                 coalesce,
@@ -350,12 +343,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 cancellationToken,
                 out invalidatedGuardTarget);
 
-        var assignment = operation switch {
-            IExpressionStatementOperation { Operation: ISimpleAssignmentOperation nested } => nested,
-            ISimpleAssignmentOperation direct => direct,
-            _ => null
-        };
-        if (assignment != null)
+        if (expressionOperation is ISimpleAssignmentOperation assignment)
             return TryGetDirectTarget(assignment.Target, out var target)
                 ? TryApplyAssignment(
                     ref state,
@@ -376,13 +364,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                     cancellationToken,
                     out invalidatedGuardTarget);
 
-        IOperation? computedUpdate = operation switch {
-            IExpressionStatementOperation { Operation: IIncrementOrDecrementOperation nested } => nested,
-            IExpressionStatementOperation { Operation: ICompoundAssignmentOperation nested } => nested,
-            IIncrementOrDecrementOperation direct => direct,
-            ICompoundAssignmentOperation direct => direct,
-            _ => null
-        };
+        var computedUpdate = expressionOperation is IIncrementOrDecrementOperation or ICompoundAssignmentOperation
+            ? expressionOperation
+            : null;
         var computedTarget = computedUpdate switch {
             IIncrementOrDecrementOperation increment => increment.Target,
             ICompoundAssignmentOperation compound => compound.Target,
@@ -391,14 +375,19 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         if (computedUpdate != null) {
             if (computedTarget == null ||
                 !TryGetDirectTarget(computedTarget, out var computedTargetSymbol) ||
-                computedUpdate.Syntax is not ExpressionSyntax expression ||
-                !TryApplyComputedUpdate(
+                computedUpdate.Syntax is not ExpressionSyntax expression)
+                return false;
+            if (!TryApplyComputedUpdate(
                     ref state,
                     computedTargetSymbol,
                     computedUpdate,
                     semanticModel,
-                    cancellationToken))
-                return false;
+                    cancellationToken)) {
+                if (guard != null) return false;
+                SymbolicStateInvalidator.InvalidateSymbol(ref state, computedTargetSymbol, expression);
+                SymbolicStateInvalidator.InvalidateNestedMutations(
+                    ref state, expression, semanticModel, cancellationToken);
+            }
             if (GuardReferencesTarget(guard, computedTargetSymbol))
                 invalidatedGuardTarget = computedTargetSymbol;
             return true;
@@ -1308,9 +1297,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             "program_point.completed_block_state");
         return true;
     }
-
-    internal static bool UsesDefaultAnalysisLimits(SharpProofAnalysisBudget limits) =>
-        limits == SharpProofAnalysisBudget.Default;
 
     internal static SymbolicLoweringResult<SymbolicState> Exact(
         SymbolicState state,
