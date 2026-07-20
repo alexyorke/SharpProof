@@ -221,20 +221,16 @@ internal static class InferredContractSuggestionAnalyzer
             session.AttributePolicy.HasAttribute(context.MethodSymbol, "AllowedExceptionsAttribute"))
             return;
 
-        ExceptionFlowEngine.ExceptionFlowResult result;
-        using (ExceptionFlowAnalyzer.UseAttributePolicy(session.AttributePolicy))
-        {
-            result = context.State.GetOrCreateSymbolicQueryResult(
-                "exception-flow",
-                () => ExceptionFlowEngine.AnalyzeMethod(
-                    context.MethodSymbol,
-                    context.Node,
-                    context.SemanticModel,
-                    context.CancellationToken,
-                    session.EffectSummaryCatalog,
-                    session.PurityService.SmtAnalysis,
-                    session.AttributePolicy));
-        }
+        var result = context.State.GetOrCreateSymbolicQueryResult(
+            "exception-flow",
+            () => ExceptionFlowEngine.AnalyzeMethod(
+                context.MethodSymbol,
+                context.Node,
+                context.SemanticModel,
+                context.CancellationToken,
+                session.EffectSummaryCatalog,
+                session.PurityService.SmtAnalysis,
+                session.AttributePolicy));
 
         if (result.Evidence.Count == 0)
         {

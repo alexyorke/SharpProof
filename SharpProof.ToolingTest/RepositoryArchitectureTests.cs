@@ -410,7 +410,7 @@ public sealed class RepositoryArchitectureTests
             ["SharpProof.ProofCore/SmtIntegerInterval.cs"] = "struct SmtIntegerInterval(",
             ["SharpProof.Symbolic/Ir/SymbolicLoweringResult.cs"] = "class SymbolicLoweringResult<T>(",
             ["SharpProof.Symbolic/SymbolicProgramPointProjector.cs"] =
-                "class SymbolicProgramPointQueryContext(",
+                "record SymbolicProgramPointQueryContext(",
             ["Tools/SharpProof.SymbolicCli/SymbolicCliInputContext.cs"] =
                 "class SymbolicCliInputContext("
         };
@@ -930,9 +930,14 @@ public sealed class RepositoryArchitectureTests
             ("SharpProof.Symbolic/SymbolicComplexityModels.cs", "record SymbolicComplexityResult("),
             ("SharpProof.Symbolic/SymbolicInputWitness.cs", "record SymbolicInputWitness("),
             ("SharpProof.Symbolic/SymbolicInvariantService.cs", "record SymbolicProgramPointAnalysis("),
+            ("SharpProof.Symbolic/SymbolicInvariantService.cs", "record SymbolicInvariantFactSummary("),
             ("SharpProof.Symbolic/SymbolicInvariantService.cs", "record SymbolicSmtDiagnostics("),
             ("SharpProof.Symbolic/SymbolicMethodResult.cs", "record SymbolicMethodResult("),
             ("SharpProof.Symbolic/SymbolicProgramPointResult.cs", "record SymbolicInvariantResult("),
+            ("SharpProof.Symbolic/SymbolicProgramPointProjector.cs", "record SymbolicProgramPointQueryContext("),
+            ("SharpProof.Symbolic/Ir/SymbolicOperationTransitionResult.cs",
+                "record SymbolicOperationTransitionResult("),
+            ("SharpProof.Symbolic/SymbolicErrors.cs", "record SymbolicErrorEnvelope("),
             ("SharpProof.Symbolic/SymbolicPublicModels.cs", "record SymbolicInvariantInfo("),
             ("SharpProof.Symbolic/SymbolicQueryFactSummaries.cs", "record SymbolicMergedPathFacts("),
             ("SharpProof.Symbolic/SymbolicQueryTarget.cs", "record SymbolicQueryScope("),
@@ -976,6 +981,27 @@ public sealed class RepositoryArchitectureTests
             Assert.That(Read("Tools/SharpProof.CorpusReport.Core/SarifCorpusReport.cs"),
                 Does.Not.Contain("CreateFromSarifJson("));
             Assert.That(File.Exists(Path.Combine(root, "SharpProof.Symbolic", "SymbolicSourceFile.cs")), Is.False);
+        });
+    }
+
+    [Test]
+    public void CanonicalCfgAndExceptionSessions_OwnBudgetAndAttributeContext()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var collector = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "Ir", "SymbolicCfgProgramPointStateCollector.cs"));
+        var transfer = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "Ir", "SymbolicCfgProgramPointStateCollector.Transfer.cs"));
+        var exceptionFlow = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Analyzer", "ExceptionFlowAnalyzer.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(collector, Does.Contain("TryPropagateCompletedTry"));
+            Assert.That(transfer, Does.Contain("MaxScopedBlockCompletionStatements"));
+            Assert.That(collector, Does.Not.Contain("RequiresStructuralAnalysisLimits"));
+            Assert.That(exceptionFlow, Does.Not.Contain("AsyncLocal<"));
+            Assert.That(exceptionFlow, Does.Not.Contain("UseAttributePolicy"));
         });
     }
 

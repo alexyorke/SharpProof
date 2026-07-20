@@ -1408,18 +1408,36 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         return target != null && declaration.Declaration.Variables.Any(variable =>
             SymbolEqualityComparer.Default.Equals(
                 semanticModel.GetDeclaredSymbol(variable, cancellationToken),
-                target));
+            target));
+    }
+
+    private static bool ShouldSkipScopedBlockCompletionOperation(
+        IOperation operation,
+        SyntaxNode site)
+    {
+        var statement = operation.Syntax.FirstAncestorOrSelf<StatementSyntax>();
+        if (statement?.Parent is not BlockSyntax block ||
+            block.Parent is not BlockSyntax ||
+            block.Span.Contains(site.SpanStart) ||
+            block.Span.End > site.SpanStart)
+            return false;
+
+        var statementIndex = block.Statements.IndexOf(statement);
+        var limit = SymbolicAnalysisLimitContext.Limits.MaxScopedBlockCompletionStatements;
+        if (statementIndex < 0 || statementIndex < limit)
+            return false;
+
+        SymbolicAnalysisLimitContext.Record(
+            SymbolicAnalysisLimitKind.ScopedBlockCompletionStatements,
+            limit,
+            block.Statements.Count,
+            block,
+            "program_point.completed_block_state");
+        return true;
     }
 
     internal static bool UsesDefaultAnalysisLimits(SharpProofAnalysisBudget limits) =>
         limits == SharpProofAnalysisBudget.Default;
-
-    private static bool RequiresStructuralAnalysisLimits(SharpProofAnalysisBudget limits)
-    {
-        var defaults = SharpProofAnalysisBudget.Default;
-        return limits.MaxMergedTryFacts != defaults.MaxMergedTryFacts ||
-               limits.MaxScopedBlockCompletionStatements != defaults.MaxScopedBlockCompletionStatements;
-    }
 
     internal static SymbolicLoweringResult<SymbolicState> Exact(
         SymbolicState state,

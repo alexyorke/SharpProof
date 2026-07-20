@@ -91,8 +91,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         var targetIsCompletedNestedBlock = includeCurrentStatementCompletionFacts &&
                                            site is BlockSyntax &&
                                            !targetIsCompletedRootBlock;
-        if (RequiresStructuralAnalysisLimits(SymbolicAnalysisLimitContext.Limits))
-            return Unsupported(site, "analysis-limits");
         if (!TryLowerLoopPlans(
                      executionRoot,
                      allowAbruptCompletion: false,
@@ -212,7 +210,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             completedPaths,
             loopPlans,
             finallyLocalTarget,
-            null);
+            null,
+            site);
         var loopTargetStates = new List<SymbolicState>();
         queue.Enqueue(entryPoint);
         SymbolicState? targetState = null;
@@ -243,6 +242,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 if (includeCurrentStatementCompletionFacts &&
                     site is LocalDeclarationStatementSyntax &&
                     operation is IFlowCaptureOperation)
+                    continue;
+                if (ShouldSkipScopedBlockCompletionOperation(operation, site))
                     continue;
                 if (forInitialEntry == null &&
                     !observedLoopTarget &&
@@ -550,6 +551,15 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         var statementRegion = context.RegionPlan;
         if (branch == null)
             return true;
+        var completedTryPropagation = TryPropagateCompletedTry(
+            source,
+            branch,
+            edgeKind,
+            activeContinuation,
+            path,
+            context);
+        if (completedTryPropagation.HasValue)
+            return completedTryPropagation.Value;
         if (!branch.FinallyRegions.IsDefaultOrEmpty)
         {
             var continuation = new CfgFinallyContinuation(
@@ -666,6 +676,63 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             new CfgIncomingEdge(branch, activeContinuation, edgeKind),
             path,
             context);
+    }
+
+    private static bool? TryPropagateCompletedTry(
+        BasicBlock source,
+        ControlFlowBranch branch,
+        CfgIncomingEdgeKind edgeKind,
+        CfgFinallyContinuation? activeContinuation,
+        CfgPathState path,
+        CfgTraversalContext context)
+    {
+        if (branch.Destination == null || context.RegionPlan != null)
+            return null;
+        var tryRegion = EnumerateContainingRegions(branch.Destination)
+            .FirstOrDefault(static region => region.Kind == ControlFlowRegionKind.Try);
+        var tryAndCatchRegion = tryRegion?.EnclosingRegion;
+        if (tryRegion == null ||
+            tryAndCatchRegion?.Kind != ControlFlowRegionKind.TryAndCatch ||
+            EnumerateContainingRegions(source).Contains(tryAndCatchRegion))
+            return null;
+
+        var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(
+            context.TargetSite,
+            ExecutionRootPolicy.Callable);
+        var statement = executionRoot?.DescendantNodes()
+            .OfType<TryStatementSyntax>()
+            .FirstOrDefault(candidate =>
+                candidate.Span.End <= context.TargetSite.SpanStart &&
+                RegionContainsSyntax(tryRegion, context.Graph, candidate.Block));
+        if (statement == null)
+            return null;
+
+        var completed = SymbolicCfgExceptionRegionTransfer.CollectCompletedTryState(
+            context.Graph,
+            statement,
+            path.State,
+            context.SemanticModel,
+            context.CancellationToken);
+        var exitOrdinal = tryAndCatchRegion.LastBlockOrdinal + 1;
+        if (completed is not { IsExact: true, Value: { } completedState } ||
+            exitOrdinal >= context.Graph.Blocks.Length)
+            return null;
+
+        return TryPropagateToPoint(
+            new CfgTraversalPoint(context.Graph.Blocks[exitOrdinal], activeContinuation),
+            new CfgIncomingEdge(
+                branch,
+                activeContinuation,
+                edgeKind,
+                "completed-try:" + statement.SpanStart.ToString(CultureInfo.InvariantCulture)),
+            path with { State = completedState },
+            context);
+    }
+
+    private static IEnumerable<ControlFlowRegion> EnumerateContainingRegions(BasicBlock block)
+    {
+        for (var region = block.EnclosingRegion; region != null; region = region.EnclosingRegion)
+            yield return region;
     }
 
     private static bool TryCompleteFinallyContinuation(
@@ -1416,7 +1483,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         ICollection<CfgPathState> CompletedPaths,
         IReadOnlyList<SymbolicLoopTransferPlan> LoopPlans,
         CfgFinallyLocalTargetPlan? FinallyLocalTarget,
-        CfgRegionPlan? RegionPlan);
+        CfgRegionPlan? RegionPlan,
+        SyntaxNode TargetSite);
 
     internal readonly record struct CfgIncomingEdge(
         ControlFlowBranch? Branch,

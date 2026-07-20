@@ -14,7 +14,8 @@ internal static partial class ExceptionFlowEngine
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
+        SmtAnalysisService smtAnalysis,
+        SharpProofAttributeIdentityPolicy attributePolicy)
     {
         private readonly Dictionary<SyntaxNode, SymbolicState> _pathStates = new();
 
@@ -51,7 +52,7 @@ internal static partial class ExceptionFlowEngine
             var initialState = RequiresEntryStateBuilder.CreateForUse(
                 site,
                 semanticModel,
-                ExceptionFlowAnalyzer.ActiveAttributePolicy,
+                attributePolicy,
                 cancellationToken);
             state = SymbolicReachabilityService.CollectPathStateAt(
                 site,

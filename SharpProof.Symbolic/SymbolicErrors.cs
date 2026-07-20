@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicErrorCodes
@@ -28,13 +30,14 @@ internal static class SymbolicErrorExitCodes
     public const int Canceled = 130;
 }
 
-internal sealed class SymbolicErrorEnvelope(SharpProofError error)
+internal sealed record SymbolicErrorEnvelope(
+    [property: JsonPropertyOrder(2)] SharpProofError Error)
 {
+    [JsonPropertyOrder(0)]
     public string Kind => "error";
 
+    [JsonPropertyOrder(1)]
     public int SchemaVersion => 1;
-
-    public SharpProofError Error { get; } = error ?? throw new ArgumentNullException(nameof(error));
 }
 
 internal sealed class SymbolicQueryException : Exception

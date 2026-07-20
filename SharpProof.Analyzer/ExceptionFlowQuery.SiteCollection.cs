@@ -13,7 +13,8 @@ internal static partial class ExceptionFlowEngine
         SharpProofAttributeIdentityPolicy attributePolicy,
         ImmutableArray<SymbolicRuntimeHazard> runtimeHazards)
     {
-        var assessment = new ExceptionSiteAssessment(methodNode, semanticModel, cancellationToken, smtAnalysis);
+        var assessment = new ExceptionSiteAssessment(
+            methodNode, semanticModel, cancellationToken, smtAnalysis, attributePolicy);
         var provenRuntimeHazardSites = ProjectProvenRuntimeHazardSites(methodNode, runtimeHazards);
 
         foreach (var entry in CreateProvenExceptionSiteEntries(

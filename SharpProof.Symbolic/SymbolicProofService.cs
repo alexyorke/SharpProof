@@ -1,16 +1,9 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicProofService
+internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis)
 {
     private const string ContradictoryStateReason = "path_unsatisfiable";
-    private readonly SymbolicProofCache proofCache;
-    private readonly SmtAnalysisService? smtAnalysis;
-
-    public SymbolicProofService(SmtAnalysisService? smtAnalysis)
-    {
-        this.smtAnalysis = smtAnalysis;
-        proofCache = SymbolicProofCacheStore.Get(smtAnalysis);
-    }
+    private readonly SymbolicProofCache proofCache = SymbolicProofCacheStore.Get(smtAnalysis);
 
     public SymbolicProofInfo ClassifyReachability(SymbolicState state)
     {

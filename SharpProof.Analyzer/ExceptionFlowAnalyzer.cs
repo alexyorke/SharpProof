@@ -2,18 +2,6 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowAnalyzer
 {
-    private static readonly AsyncLocal<SharpProofAttributeIdentityPolicy?> CurrentAttributePolicy = new();
-
-    internal static SharpProofAttributeIdentityPolicy ActiveAttributePolicy =>
-        CurrentAttributePolicy.Value ?? RequiresContractHelpers.OfficialAttributePolicy;
-
-    internal static IDisposable UseAttributePolicy(SharpProofAttributeIdentityPolicy attributePolicy)
-    {
-        var previous = CurrentAttributePolicy.Value;
-        CurrentAttributePolicy.Value = attributePolicy ?? RequiresContractHelpers.OfficialAttributePolicy;
-        return new AttributePolicyScope(previous);
-    }
-
     public static void AnalyzeSymbolForExceptions(
         MethodBodyAnalysisContext context,
         EffectSummaryCatalog exceptionSummaryCatalog,
@@ -48,36 +36,35 @@ internal static partial class ExceptionFlowAnalyzer
             reportCheckedExceptionSites ||
             reportUnknownRuntimeHazards ||
             hasValidExceptionContracts)
-            using (UseAttributePolicy(attributePolicy))
-            {
-                if (reportMethodSummaries || reportCheckedExceptionSites || hasValidExceptionContracts)
-                    queryResult = context.State.GetOrCreateSymbolicQueryResult(
-                        "exception-flow",
-                        () => ExceptionFlowEngine.AnalyzeMethod(
-                            context.MethodSymbol,
-                            context.Node,
-                            context.SemanticModel,
-                            context.CancellationToken,
-                            exceptionSummaryCatalog,
-                            purityService.SmtAnalysis,
-                            attributePolicy));
+        {
+            if (reportMethodSummaries || reportCheckedExceptionSites || hasValidExceptionContracts)
+                queryResult = context.State.GetOrCreateSymbolicQueryResult(
+                    "exception-flow",
+                    () => ExceptionFlowEngine.AnalyzeMethod(
+                        context.MethodSymbol,
+                        context.Node,
+                        context.SemanticModel,
+                        context.CancellationToken,
+                        exceptionSummaryCatalog,
+                        purityService.SmtAnalysis,
+                        attributePolicy));
 
-                if (reportUnknownRuntimeHazards)
-                {
-                    var hazardResult = queryResult ?? context.State.GetOrCreateSymbolicQueryResult(
-                        "unknown-runtime-hazards",
-                        () => ExceptionFlowEngine.AnalyzeHazards(
-                            context.Node,
-                            context.SemanticModel,
-                            context.CancellationToken,
-                            purityService.SmtAnalysis));
-                    unknownRuntimeHazards = hazardResult.RawHazards
-                        .Where(static hazard =>
-                            hazard.Status is SymbolicRuntimeHazardStatus.Unknown or
-                                SymbolicRuntimeHazardStatus.Unsupported)
-                        .ToImmutableArray();
-                }
+            if (reportUnknownRuntimeHazards)
+            {
+                var hazardResult = queryResult ?? context.State.GetOrCreateSymbolicQueryResult(
+                    "unknown-runtime-hazards",
+                    () => ExceptionFlowEngine.AnalyzeHazards(
+                        context.Node,
+                        context.SemanticModel,
+                        context.CancellationToken,
+                        purityService.SmtAnalysis));
+                unknownRuntimeHazards = hazardResult.RawHazards
+                    .Where(static hazard =>
+                        hazard.Status is SymbolicRuntimeHazardStatus.Unknown or
+                            SymbolicRuntimeHazardStatus.Unsupported)
+                    .ToImmutableArray();
             }
+        }
 
         AnalyzeExceptionContracts(context, methodSymbol, exceptionContracts, queryResult, baseline);
 
@@ -287,14 +274,6 @@ internal static partial class ExceptionFlowAnalyzer
             .OfType<TNode>();
     }
 
-    private static IEnumerable<TNode> GetRelevantDescendantsAndSelf<TNode>(SyntaxNode methodNode)
-        where TNode : SyntaxNode
-    {
-        return CSharpSyntaxFacts
-            .DescendantNodesInExecution(methodNode)
-            .OfType<TNode>();
-    }
-
     internal static IEnumerable<MethodCallCandidate> GetCalleeCallSites(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
@@ -454,7 +433,7 @@ internal static partial class ExceptionFlowAnalyzer
         candidate = new MethodCallCandidate(
             callSite,
             method.OriginalDefinition,
-            isDynamicDispatch: true);
+            IsDynamicDispatch: true);
         return true;
     }
 
@@ -567,26 +546,12 @@ internal static partial class ExceptionFlowAnalyzer
             : display;
     }
 
-    private sealed class AttributePolicyScope(SharpProofAttributeIdentityPolicy? previous) : IDisposable
-    {
-        public void Dispose() => CurrentAttributePolicy.Value = previous;
-    }
+    internal sealed record MethodCallCandidate(
+        SyntaxNode CallSite,
+        IMethodSymbol Method,
+        UsingDisposeGuard? UsingDisposeGuard = null,
+        bool IsDynamicDispatch = false);
 
-    internal sealed class MethodCallCandidate(
-        SyntaxNode callSite,
-        IMethodSymbol method,
-        UsingDisposeGuard? usingDisposeGuard = null,
-        bool isDynamicDispatch = false)
-    {
-        public SyntaxNode CallSite { get; } = callSite;
-        public IMethodSymbol Method { get; } = method;
-        public UsingDisposeGuard? UsingDisposeGuard { get; } = usingDisposeGuard;
-        public bool IsDynamicDispatch { get; } = isDynamicDispatch;
-    }
-
-    internal sealed class UsingDisposeGuard(ExpressionSyntax resourceExpression)
-    {
-        public ExpressionSyntax ResourceExpression { get; } = resourceExpression;
-    }
+    internal sealed record UsingDisposeGuard(ExpressionSyntax ResourceExpression);
 
 }

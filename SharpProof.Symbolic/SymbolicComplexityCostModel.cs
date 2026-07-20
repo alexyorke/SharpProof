@@ -1,14 +1,7 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicComplexityCostModel
+internal sealed class SymbolicComplexityCostModel(CancellationToken _cancellationToken)
 {
-    private readonly CancellationToken _cancellationToken;
-
-    internal SymbolicComplexityCostModel(CancellationToken cancellationToken)
-    {
-        _cancellationToken = cancellationToken;
-    }
-
     internal bool TryCreate(
         ExpressionSyntax? expression,
         SemanticModel semanticModel,

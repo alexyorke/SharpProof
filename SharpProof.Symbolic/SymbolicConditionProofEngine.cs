@@ -1,14 +1,7 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicConditionProofEngine
+internal sealed class SymbolicConditionProofEngine(SymbolicInvariantService _invariantService)
 {
-    private readonly SymbolicInvariantService _invariantService;
-
-    internal SymbolicConditionProofEngine(SymbolicInvariantService invariantService)
-    {
-        _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
-    }
-
     internal SymbolicConditionProofResult ProveAtSyntaxTree(
         SyntaxTree syntaxTree,
         Compilation compilation,

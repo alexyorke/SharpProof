@@ -91,7 +91,8 @@ internal static class SymbolicCfgStatementCompletion
             new List<CfgPathState>(),
             loopPlans,
             null,
-            region);
+            region,
+            statement);
         var summarizesLoop = statement is WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax;
         queue.Enqueue(entryPoint);
         var iterations = 0;

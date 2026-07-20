@@ -1,18 +1,9 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicComplexityLoopModel
+internal sealed class SymbolicComplexityLoopModel(
+    SymbolicComplexityCostModel _costModel,
+    CancellationToken _cancellationToken)
 {
-    private readonly CancellationToken _cancellationToken;
-    private readonly SymbolicComplexityCostModel _costModel;
-
-    internal SymbolicComplexityLoopModel(
-        SymbolicComplexityCostModel costModel,
-        CancellationToken cancellationToken)
-    {
-        _costModel = costModel ?? throw new ArgumentNullException(nameof(costModel));
-        _cancellationToken = cancellationToken;
-    }
-
     internal bool TryGetForLoopBound(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,

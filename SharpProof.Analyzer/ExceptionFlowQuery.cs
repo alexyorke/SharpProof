@@ -15,12 +15,10 @@ internal static partial class ExceptionFlowEngine
         if (methodSymbol == null) throw new ArgumentNullException(nameof(methodSymbol));
         if (methodNode == null) throw new ArgumentNullException(nameof(methodNode));
         if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-        var isRoot = visitedMethods == null;
         visitedMethods ??= new HashSet<IMethodSymbol>(SymbolEq.Default)
         {
             methodSymbol.OriginalDefinition
         };
-        using var attributeScope = isRoot ? ExceptionFlowAnalyzer.UseAttributePolicy(attributePolicy) : null;
         var runtimeHazards = QueryRuntimeHazards(
             methodNode,
             semanticModel,

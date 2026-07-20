@@ -213,11 +213,9 @@ internal sealed class SymbolicInvariantService
         SymbolicAnalysisTruncationInfo Truncation);
 }
 
-internal sealed class SymbolicInvariantFactSummary(IReadOnlyList<string> facts)
+internal sealed record SymbolicInvariantFactSummary(IReadOnlyList<string> Facts)
 {
-    public IReadOnlyList<string> Facts { get; } = facts ?? throw new ArgumentNullException(nameof(facts));
-
-    public string MergedInvariantText { get; } = FormatMergedInvariantFacts(facts!);
+    public string MergedInvariantText { get; } = FormatMergedInvariantFacts(Facts);
 
     internal static SymbolicInvariantFactSummary Merge(IEnumerable<IEnumerable<string>> factSets)
     {

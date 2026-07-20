@@ -1,14 +1,9 @@
 namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicSourceProgramPointExecutor(
-    SymbolicInvariantService invariantService,
-    SymbolicConditionProofEngine conditionProofEngine)
+    SymbolicInvariantService _invariantService,
+    SymbolicConditionProofEngine _conditionProofEngine)
 {
-    private readonly SymbolicInvariantService _invariantService =
-        invariantService ?? throw new ArgumentNullException(nameof(invariantService));
-    private readonly SymbolicConditionProofEngine _conditionProofEngine =
-        conditionProofEngine ?? throw new ArgumentNullException(nameof(conditionProofEngine));
-
     internal SymbolicProgramPointQueryContext AnalyzeAtPosition(
         SyntaxTree syntaxTree,
         Compilation compilation,

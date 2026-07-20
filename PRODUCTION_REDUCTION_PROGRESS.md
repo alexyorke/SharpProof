@@ -591,15 +591,22 @@ Tests are excluded from the metric and must not be deleted.
   and tool result carriers. Architecture coverage prevents those constructor-to-
   property copy layers from returning; validation, evidence ordering, and
   serialized property order remain unchanged.
+- [x] Migrated the final two custom analysis-budget families to the canonical
+  CFG program-point collector. Completed try/catch regions now use the shared
+  exception-region transfer and scoped completed blocks enforce their statement
+  budget during CFG traversal, so custom budgets no longer route queries to the
+  structural fallback. Exception-flow attribute identity is now session-owned
+  rather than stored in ambient `AsyncLocal` state, and the remaining small
+  constructor-only carriers use record or primary-constructor ownership.
 
 ## Current evidence
 
-- Maintained production: 91,383 lines (87,464 C#, 3,189 scripts, and 730
-  specifications); net reduction: 16,243 lines; remaining reduction: 3,757.
-  This immutable-carrier tranche removed 91 maintained-production lines
-  without deleting tests or changing serialized output.
+- Maintained production: 91,375 lines (87,456 C#, 3,189 scripts, and 730
+  specifications); net reduction: 16,251 lines; remaining reduction: 3,749.
+  This CFG-budget and session-context tranche removed 8 maintained-production
+  lines without deleting tests or changing serialized output.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,213 passing tests and two documented Main skips.
+- Six lanes: 6,214 passing tests and two documented Main skips.
 
 ## Milestones
 
@@ -676,12 +683,12 @@ API: it prevents Roslyn symbols, engine states, and SMT formulas from escaping.
 Do not remove that projection merely because breaking API changes are allowed.
 
 The syntax-based `SymbolicProgramPointFacts` fallback remains a live migration
-target rather than deletable legacy code. A no-fallback characterization probe
-showed current dependencies on custom analysis-limit/truncation reporting,
-finite `foreach` and loop lowering, and initial/current-completion states. Move
-those cases into `SymbolicCfgProgramPointStateCollector` in bounded tranches
-before deleting the structural owner; do not convert failures into successful
-proofs or discard the associated truncation metadata.
+target rather than deletable legacy code. Custom analysis-limit/truncation
+reporting is now owned by the CFG collector, but characterization still shows
+dependencies on complex nested/root completion and unsupported loop shapes.
+Move those cases into `SymbolicCfgProgramPointStateCollector` in bounded
+tranches before deleting the structural owner; do not convert failures into
+successful proofs or discard truncation metadata.
 
 Analyzer configuration's declarative option catalog owns documentation,
 validation metadata, defaults, aliases, scopes, and policy impact, while the

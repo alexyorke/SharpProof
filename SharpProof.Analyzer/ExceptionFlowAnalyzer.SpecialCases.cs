@@ -8,7 +8,7 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken)
     {
         var knownTargets = new Dictionary<ISymbol, ImmutableHashSet<IMethodSymbol>>(SymbolEq.Default);
-        foreach (var node in GetRelevantDescendantsAndSelf<SyntaxNode>(methodNode))
+        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(methodNode))
         {
             UpdateKnownDelegateTargets(node, semanticModel, cancellationToken, knownTargets);
             if (node is not InvocationExpressionSyntax invocation) continue;

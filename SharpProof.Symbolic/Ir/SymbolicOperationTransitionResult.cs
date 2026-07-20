@@ -1,22 +1,12 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal sealed class SymbolicOperationTransitionResult(
-    SymbolicState state,
-    SymbolicLoweringSupport support,
-    SymbolicUnknownReason unknownReason,
-    ImmutableArray<SymbolicLoweringProvenance> provenance,
-    SymbolicAnalysisTruncationInfo truncation)
+internal sealed record SymbolicOperationTransitionResult(
+    SymbolicState State,
+    SymbolicLoweringSupport Support,
+    SymbolicUnknownReason UnknownReason,
+    ImmutableArray<SymbolicLoweringProvenance> Provenance,
+    SymbolicAnalysisTruncationInfo Truncation)
 {
-    internal SymbolicState State { get; } = state.Normalize();
-
-    internal SymbolicLoweringSupport Support { get; } = support;
-
-    internal SymbolicUnknownReason UnknownReason { get; } = unknownReason;
-
-    internal ImmutableArray<SymbolicLoweringProvenance> Provenance { get; } = provenance;
-
-    internal SymbolicAnalysisTruncationInfo Truncation { get; } = truncation;
-
     internal bool IsExact => Support == SymbolicLoweringSupport.Exact;
 
     internal bool IsApproximate => Support == SymbolicLoweringSupport.Approximate;
@@ -29,7 +19,7 @@ internal sealed class SymbolicOperationTransitionResult(
         SymbolicAnalysisTruncationInfo? truncation = null)
     {
         return Create(
-            state,
+            state.Normalize(),
             SymbolicLoweringSupport.Exact,
             SymbolicUnknownReason.None,
             provenance,

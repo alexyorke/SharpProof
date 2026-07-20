@@ -1950,7 +1950,7 @@ namespace TestNamespace {
         Assert.That(errorSource, Does.Contain("public const string NativeSolverUnavailable = \"SPQ2000\""));
         Assert.That(errorSource, Does.Contain("public const string Canceled = \"SPQ3000\""));
         Assert.That(errorSource, Does.Not.Contain("SymbolicOperationResult<T>"));
-        Assert.That(errorSource, Does.Contain("internal sealed class SymbolicErrorEnvelope"));
+        Assert.That(errorSource, Does.Contain("internal sealed record SymbolicErrorEnvelope"));
         Assert.That(apiSource, Does.Contain("public sealed record SharpProofError("));
     }
 

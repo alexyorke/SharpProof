@@ -1,24 +1,11 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicComplexityCallModel
+internal sealed class SymbolicComplexityCallModel(
+    Compilation _compilation,
+    SymbolicComplexityCostModel _costModel,
+    Func<IMethodSymbol, SyntaxNode, SemanticModel, MethodAnalysisSummary> _analyzeMethod,
+    CancellationToken _cancellationToken)
 {
-    private readonly Func<IMethodSymbol, SyntaxNode, SemanticModel, MethodAnalysisSummary> _analyzeMethod;
-    private readonly CancellationToken _cancellationToken;
-    private readonly Compilation _compilation;
-    private readonly SymbolicComplexityCostModel _costModel;
-
-    internal SymbolicComplexityCallModel(
-        Compilation compilation,
-        SymbolicComplexityCostModel costModel,
-        Func<IMethodSymbol, SyntaxNode, SemanticModel, MethodAnalysisSummary> analyzeMethod,
-        CancellationToken cancellationToken)
-    {
-        _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
-        _costModel = costModel ?? throw new ArgumentNullException(nameof(costModel));
-        _analyzeMethod = analyzeMethod ?? throw new ArgumentNullException(nameof(analyzeMethod));
-        _cancellationToken = cancellationToken;
-    }
-
     private IMethodSymbol? ResolveInvocationTargetMethod(
         InvocationExpressionSyntax invocationSyntax,
         SemanticModel semanticModel,
