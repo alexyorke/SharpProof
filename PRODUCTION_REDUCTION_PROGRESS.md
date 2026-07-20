@@ -713,18 +713,24 @@ Tests are excluded from the metric and must not be deleted.
   per-operation initializer support and completion adapters. Calls, compound
   updates, missing conditions, nested loop prefixes, and external member writes
   remain explicit conservative fallbacks.
+- [x] Made declaration current-completion conservative inside the canonical CFG
+  collector even when an initializer value cannot be lowered. The canonical
+  path now performs the same nested invalidation, target-reference removal, and
+  normal-completion projection as prior-statement transfer. Removed the now-
+  constant unsupported-value switch; guarded unsupported declarations remain
+  explicit fallbacks because their branch facts cannot be safely detached.
 
 ## Current evidence
 
-- Maintained production: 90,594 lines (86,850 C#, 3,014 scripts, and 730
-  specifications); net reduction: 17,032 lines; remaining reduction: 2,968.
-  This migration adds four maintained-production lines while replacing branchy
-  `for` initializer fallback with one canonical source-sequence transfer and
-  deleting its superseded support, completion, and linear-prefix adapters.
+- Maintained production: 90,591 lines (86,847 C#, 3,014 scripts, and 730
+  specifications); net reduction: 17,035 lines; remaining reduction: 2,965.
+  This migration removes three maintained-production lines while replacing
+  unsupported declaration current-completion fallback with canonical
+  conservative transfer and deleting its superseded configuration switch.
   Diagnostics, proof outcomes, conservative unknowns, CLI bytes, serialization,
   and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,234 passing tests and two documented Main skips.
+- Six lanes: 6,236 passing tests and two documented Main skips.
 
 ## Milestones
 

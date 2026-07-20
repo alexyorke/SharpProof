@@ -232,7 +232,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 declaration,
                 guard: null,
                 allowGuardedReferenceAssignments: true,
-                allowUnsupportedValueCompletion: true,
                 semanticModel,
                 cancellationToken);
         if (semanticModel.GetOperation(statement, cancellationToken) is not { } operation)
@@ -647,7 +646,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         LocalDeclarationStatementSyntax declaration,
         SymbolicCondition? guard,
         bool allowGuardedReferenceAssignments,
-        bool allowUnsupportedValueCompletion,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
@@ -681,7 +679,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                     "ir.path.prior-statement",
                     out _))
             {
-                if (guard != null || !allowUnsupportedValueCompletion)
+                if (guard != null)
                     return false;
                 completedState = SymbolicStateValueFacts.RemoveReferences(
                     completedState,

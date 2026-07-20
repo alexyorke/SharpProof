@@ -278,7 +278,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                                 declaration,
                                 activeGuard,
                                 allowGuardedReferenceAssignments: true,
-                                allowUnsupportedValueCompletion: false,
                                 semanticModel,
                                 cancellationToken)
                             : TryApplyCurrentCompletion(

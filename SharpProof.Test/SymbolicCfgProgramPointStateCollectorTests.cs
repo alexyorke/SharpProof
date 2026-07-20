@@ -1439,23 +1439,34 @@ static class C
         Assert.That(CreateEvidenceKey(actual.Value), Is.EqualTo(CreateEvidenceKey(expected)));
     }
 
-    [Test]
-    public void UnsupportedDeclarationCompletion_RemainsConservativeFallback()
+    [TestCase("static class C { static int Get() => 1; static int M() { int value = Get(); return value; } }")]
+    [TestCase("static class C { static int Get() => 1; static int M() { int first = 1, value = Get(); return first + value; } }")]
+    [TestCase("static class C { static int Get(int[] values) => values[0]; static int M(int[] values) { int value = Get(values); return value; } }")]
+    public void UnsupportedDeclarationValueCompletion_MatchesStructuralCollector(string source)
     {
-        const string source =
-            "static class C { static int Get() => 1; static int M() { int value = Get(); return value; } }";
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(UnsupportedDeclarationCompletion_RemainsConservativeFallback));
+            nameof(UnsupportedDeclarationValueCompletion_MatchesStructuralCollector));
         var site = fixture.Root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().Single();
 
-        var result = SymbolicCfgProgramPointStateCollector.CollectState(
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
             fixture.SemanticModel,
             CancellationToken.None,
             includeCurrentStatementCompletionFacts: true);
+        var expected = SymbolicProgramPointFacts.MergeStates(
+            SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None),
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                fixture.SemanticModel,
+                CancellationToken.None,
+                includeCurrentStatementCompletionFacts: true));
 
-        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        AssertStateParity(actual.Value!, expected);
     }
 
     [TestCase("static class C { static void M() { int value = 7; value = 9; } }")]
