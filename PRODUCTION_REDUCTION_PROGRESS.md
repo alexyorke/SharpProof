@@ -683,14 +683,21 @@ Tests are excluded from the metric and must not be deleted.
   tail had no product caller. Retargeted lifecycle tests preserve automatic
   retry, local/shared cache behavior, service isolation, and disposal coverage;
   architecture coverage prevents the unused global protocol from returning.
+- [x] Reduced the production-metrics script to its enforced architecture and
+  line-counting responsibilities. Deleted the unconsumed top-file, oversized-
+  file, and partial-type pressure reports plus their thresholds and source
+  parser. The reduction gate still receives exact handwritten file/line counts,
+  and architecture tests still require zero unassigned files, ambiguous owners,
+  or dependency violations; script coverage prevents the dormant reports from
+  returning.
 
 ## Current evidence
 
-- Maintained production: 90,659 lines (86,836 C#, 3,093 scripts, and 730
-  specifications); net reduction: 16,967 lines; remaining reduction: 3,033.
-  This tranche removes 88 maintained-production lines by deleting the unused
-  global SMT context recycle protocol. Real transient/permanent recovery,
-  lifecycle diagnostics, proof outcomes, conservative unknowns, CLI bytes,
+- Maintained production: 90,580 lines (86,836 C#, 3,014 scripts, and 730
+  specifications); net reduction: 17,046 lines; remaining reduction: 2,954.
+  This tranche removes 79 maintained-production script lines by retiring
+  unconsumed refactoring-pressure reports. Architecture enforcement, production
+  counts, diagnostics, proof outcomes, conservative unknowns, CLI bytes,
   serialization, and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,222 passing tests and two documented Main skips.

@@ -158,6 +158,9 @@ public sealed class ScriptProcessOwnershipTests
             "Get-SharpProofProductionMetrics.ps1"));
         Assert.That(metricsSource, Does.Contain("SharpProofSourceInventory.ps1"));
         Assert.That(metricsSource, Does.Not.Contain("function Convert-ToRepoPath"));
+        Assert.That(metricsSource, Does.Not.Contain("Get-PartialTypeNames"));
+        Assert.That(metricsSource, Does.Not.Contain("PartialTypeLineLimit"));
+        Assert.That(metricsSource, Does.Not.Contain("largestFiles"));
 
         var dotnetWrapper = File.ReadAllText(Path.Combine(
             repositoryRoot,
