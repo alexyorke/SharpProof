@@ -567,13 +567,22 @@ Tests are excluded from the metric and must not be deleted.
   Packaging coverage now prevents a fictional shipped surface or preview
   tombstones from returning. This removed 988 tracked snapshot lines without
   changing package identities or runtime behavior.
+- [x] Migrated nine of eleven custom analysis-budget families onto the CFG
+  program-point collector. Seeded queries, current-completion queries,
+  finally-local targets, and for-loop initial-entry queries now retain CFG
+  state and truncation semantics under non-default path, guard, merge,
+  foreach, and null-depth limits. The structural fallback remains only for the
+  two limits whose behavior is not yet represented by CFG joins: try-fact
+  merging and scoped-block completion. Record equality now owns the cache's
+  default-budget check instead of an eleven-property comparison.
 
 ## Current evidence
 
-- Maintained production: 91,698 lines (87,779 C#, 3,189 scripts, and 730
-  specifications); net reduction: 15,928 lines; remaining reduction: 4,072.
-  This snapshot-cleanup tranche removed no maintained-production lines; it
-  removed 988 stale tracked compatibility lines without deleting tests.
+- Maintained production: 91,691 lines (87,772 C#, 3,189 scripts, and 730
+  specifications); net reduction: 15,935 lines; remaining reduction: 4,065.
+  The custom-budget CFG migration removed seven maintained-production lines
+  and narrowed the structural fallback to two explicitly characterized limit
+  families without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,213 passing tests and two documented Main skips.
 

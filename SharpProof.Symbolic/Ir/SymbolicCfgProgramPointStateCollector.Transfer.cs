@@ -1411,20 +1411,14 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 target));
     }
 
-    internal static bool UsesDefaultAnalysisLimits(SharpProofAnalysisBudget limits)
+    internal static bool UsesDefaultAnalysisLimits(SharpProofAnalysisBudget limits) =>
+        limits == SharpProofAnalysisBudget.Default;
+
+    private static bool RequiresStructuralAnalysisLimits(SharpProofAnalysisBudget limits)
     {
         var defaults = SharpProofAnalysisBudget.Default;
-        return limits.MaxMergedIfElseFacts == defaults.MaxMergedIfElseFacts &&
-               limits.MaxMergedSwitchFacts == defaults.MaxMergedSwitchFacts &&
-               limits.MaxMergedTryFacts == defaults.MaxMergedTryFacts &&
-               limits.MaxTryCompletionBranches == defaults.MaxTryCompletionBranches &&
-               limits.MaxFiniteForeachElementFacts == defaults.MaxFiniteForeachElementFacts &&
-               limits.MaxScopedBlockCompletionStatements == defaults.MaxScopedBlockCompletionStatements &&
-               limits.MaxStructuralNullStateDepth == defaults.MaxStructuralNullStateDepth &&
-               limits.MaxMergedPathConditions == defaults.MaxMergedPathConditions &&
-               limits.MaxMergeableFactsPerTargetPerState == defaults.MaxMergeableFactsPerTargetPerState &&
-               limits.MaxFactChoiceCombinationsPerTarget == defaults.MaxFactChoiceCombinationsPerTarget &&
-               limits.MaxGuardFactsPerTargetPerState == defaults.MaxGuardFactsPerTargetPerState;
+        return limits.MaxMergedTryFacts != defaults.MaxMergedTryFacts ||
+               limits.MaxScopedBlockCompletionStatements != defaults.MaxScopedBlockCompletionStatements;
     }
 
     internal static SymbolicLoweringResult<SymbolicState> Exact(

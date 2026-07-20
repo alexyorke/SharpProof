@@ -833,12 +833,12 @@ static class C
     }
 
     [Test]
-    public void SeededState_CustomLimitsPreserveSeedThroughStructuralFallback()
+    public void SeededState_CustomPathLimitsUseCfgAndPreserveSeed()
     {
         const string source = "static class C { static int M(int input) { return input; } }";
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(SeededState_CustomLimitsPreserveSeedThroughStructuralFallback));
+            nameof(SeededState_CustomPathLimitsUseCfgAndPreserveSeed));
         var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
         var parameter = fixture.SemanticModel.GetDeclaredSymbol(
             fixture.Root.DescendantNodes().OfType<ParameterSyntax>().Single())!;
@@ -867,8 +867,8 @@ static class C
                 CancellationToken.None,
                 initialState: seed));
 
-        Assert.That(cfg.IsUnsupported, Is.True, cfg.Provenance.Single().Detail);
-        Assert.That(cfg.Value, Is.Null);
+        Assert.That(cfg.IsExact, Is.True, cfg.Provenance.Single().Detail);
+        AssertStateParity(cfg.Value!, structural);
         AssertStateParity(routed, structural);
         Assert.That(SymbolicStateValueFacts.TryGetCurrentValue(routed, parameter, out var current), Is.True);
         Assert.That(current, Is.EqualTo(new SymbolicIntegerConstantTerm(17)));
@@ -997,11 +997,11 @@ static class C
     }
 
     [Test]
-    public void MemberNotNullExpressionCompletion_CustomLimitsUseConservativeFallback()
+    public void MemberNotNullExpressionCompletion_CustomPathLimitsUseCfg()
     {
         var fixture = RoslynTestFixture.CreateCompilation(
             MemberNotNullCompletionSource,
-            nameof(MemberNotNullExpressionCompletion_CustomLimitsUseConservativeFallback));
+            nameof(MemberNotNullExpressionCompletion_CustomPathLimitsUseCfg));
         var site = fixture.Root.DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
             .Single(invocation => invocation.Expression.ToString() == "EnsureValue");
@@ -1023,8 +1023,8 @@ static class C
             CancellationToken.None,
             includeCurrentStatementCompletionFacts: true);
 
-        Assert.That(cfg.IsUnsupported, Is.True, cfg.Provenance.Single().Detail);
-        Assert.That(cfg.Value, Is.Null);
+        Assert.That(cfg.IsExact, Is.True, cfg.Provenance.Single().Detail);
+        AssertStateParity(cfg.Value!, structural);
         AssertStateParity(routed, structural);
     }
 
@@ -1716,13 +1716,13 @@ static class C
     }
 
     [Test]
-    public void CustomLimitsForInitialEntry_RemainsConservativeFallback()
+    public void CustomPathLimitsForInitialEntry_UseCfg()
     {
         const string source =
             "static class C { static void M() { for (int index = 0; index < 3; index++) { } } }";
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(CustomLimitsForInitialEntry_RemainsConservativeFallback));
+            nameof(CustomPathLimitsForInitialEntry_UseCfg));
         var forStatement = fixture.Root.DescendantNodes().OfType<ForStatementSyntax>().Single();
         using var scope = SymbolicAnalysisLimitContext.Push(
             SharpProofAnalysisBudget.Default with { MaxMergedPathConditions = 1 });
@@ -1740,7 +1740,8 @@ static class C
             fixture.SemanticModel,
             CancellationToken.None);
 
-        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+        Assert.That(result.IsExact, Is.True, result.Provenance.Single().Detail);
+        AssertStateParity(result.Value!, expected);
         Assert.That(routed.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
         Assert.That(CreateEvidenceKey(routed), Is.EqualTo(CreateEvidenceKey(expected)));
     }
@@ -2552,12 +2553,12 @@ static class C
     }
 
     [Test]
-    public void FinallyLocalCustomLimits_PublishNoPartialState()
+    public void FinallyLocalCustomPathLimits_UseCfg()
     {
         const string source = "static class C { static void M() { int value = 1; try { value = 2; } finally { int marker = value; } } }";
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(FinallyLocalCustomLimits_PublishNoPartialState));
+            nameof(FinallyLocalCustomPathLimits_UseCfg));
         var site = GetFinallyMarkerSite(fixture);
         using var scope = SymbolicAnalysisLimitContext.Push(
             SharpProofAnalysisBudget.Default with { MaxMergedPathConditions = 1 });
@@ -2567,8 +2568,8 @@ static class C
             fixture.SemanticModel,
             CancellationToken.None);
 
-        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
-        Assert.That(result.Value, Is.Null);
+        Assert.That(result.IsExact, Is.True, result.Provenance.Single().Detail);
+        Assert.That(result.Value, Is.Not.Null);
     }
 
     [Test]

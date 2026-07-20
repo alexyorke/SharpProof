@@ -91,7 +91,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         var targetIsCompletedNestedBlock = includeCurrentStatementCompletionFacts &&
                                            site is BlockSyntax &&
                                            !targetIsCompletedRootBlock;
-        if (!UsesDefaultAnalysisLimits(SymbolicAnalysisLimitContext.Limits))
+        if (RequiresStructuralAnalysisLimits(SymbolicAnalysisLimitContext.Limits))
             return Unsupported(site, "analysis-limits");
         if (!TryLowerLoopPlans(
                      executionRoot,
