@@ -967,7 +967,7 @@ static class C
         true)]
     [TestCase(
         "static class C { static int M(int? input) { int value = 0; value = input ?? 2; return value; } }",
-        false)]
+        true)]
     [TestCase(
         "static class C { static bool M(bool first, bool second) { bool value = false; value = first && second; return value; } }",
         true)]

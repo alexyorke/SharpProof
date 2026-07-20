@@ -106,6 +106,19 @@ internal static class SymbolicReachabilityLowerer
                 operand,
                 "operation-transfer.branch-null-assumption");
         }
+        else if (condition is IIsNullOperation { Operand.Syntax: ExpressionSyntax nullableOperand } &&
+                 SymbolicSemanticPipeline.LowerNullableHasValueTerm(nullableOperand, context) is
+                     { IsExact: true, Value: { } hasValue })
+        {
+            source = nullableOperand;
+            var hasValueCondition = SymbolicIrLowerer.CreateFactCondition(
+                new SymbolicTruthAtom(hasValue),
+                nullableOperand,
+                "operation-transfer.branch-nullable-assumption");
+            branchCondition = branchWhenTrue
+                ? new SymbolicNotCondition(hasValueCondition)
+                : hasValueCondition;
+        }
         else if (condition.Syntax is ExpressionSyntax expression &&
                  SymbolicSemanticPipeline.LowerBranchCondition(
                      expression,
