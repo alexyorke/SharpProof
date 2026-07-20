@@ -8,16 +8,10 @@ internal static class SymbolicStateMerger {
             states.Select(static state => (IReadOnlyList<SymbolicCondition>)state.PathConditions).ToArray());
 
     internal static ImmutableArray<SymbolicCondition> MergePathConditionsAcrossAll(
-        IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets) {
-        var limits = SymbolicAnalysisLimitContext.Limits;
-        return PathConditionMergeEngine.MergeAcrossAll(
+        IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets) =>
+        PathConditionMergeEngine.MergeAcrossAll(
             conditionSets,
-            new PathConditionMergeLimits(
-                limits.MaxMergedPathConditions,
-                limits.MaxMergeableFactsPerTargetPerState,
-                limits.MaxFactChoiceCombinationsPerTarget,
-                limits.MaxGuardFactsPerTargetPerState));
-    }
+            SymbolicAnalysisLimitContext.Limits);
 
     internal static SymbolicCondition CreateGuardedChoice(
         SymbolicCondition guard,

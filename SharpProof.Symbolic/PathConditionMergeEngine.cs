@@ -1,15 +1,9 @@
 namespace SharpProof.Symbolic;
 
-internal readonly record struct PathConditionMergeLimits(
-    int MaxMergedConditions,
-    int MaxFactsPerTargetPerState,
-    int MaxFactChoiceCombinationsPerTarget,
-    int MaxGuardFactsPerTargetPerState);
-
 internal static class PathConditionMergeEngine {
     internal static ImmutableArray<SymbolicCondition> MergeAcrossAll(
         IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets,
-        PathConditionMergeLimits limits) {
+        SharpProofAnalysisBudget limits) {
         if (conditionSets.Count == 0) return ImmutableArray<SymbolicCondition>.Empty;
 
         var common = GetCommonConditions(conditionSets);
@@ -59,10 +53,10 @@ internal static class PathConditionMergeEngine {
 
                 var merged = SymbolicStateMerger.Combine(SymbolicConditionOperator.Or, branches);
                 if (!commonKeys.Add(SymbolicState.CreateProofConditionKey(merged))) continue;
-                if (emittedCount >= limits.MaxMergedConditions) {
+                if (emittedCount >= limits.MaxMergedPathConditions) {
                     RecordLimit(
                         SymbolicAnalysisLimitKind.MergedPathConditions,
-                        limits.MaxMergedConditions,
+                        limits.MaxMergedPathConditions,
                         emittedCount + 1,
                         "state_merge.merged_path_conditions");
                     return builder.ToImmutable();
@@ -97,7 +91,7 @@ internal static class PathConditionMergeEngine {
     private static IEnumerable<PathFact[]> EnumerateChoices(
         IReadOnlyList<StatePathFacts> states,
         string target,
-        PathConditionMergeLimits limits) =>
+        SharpProofAnalysisBudget limits) =>
         EnumerateChoices(states, target, 0, new PathFact[states.Count], limits);
 
     private static IEnumerable<PathFact[]> EnumerateChoices(
@@ -105,14 +99,14 @@ internal static class PathConditionMergeEngine {
         string target,
         int stateIndex,
         PathFact[] selected,
-        PathConditionMergeLimits limits) {
+        SharpProofAnalysisBudget limits) {
         if (stateIndex == states.Count) {
             yield return selected.ToArray();
             yield break;
         }
 
         foreach (var fact in states[stateIndex].FactsByTarget[target]
-                     .Take(limits.MaxFactsPerTargetPerState)) {
+                     .Take(limits.MaxMergeableFactsPerTargetPerState)) {
             selected[stateIndex] = fact;
             foreach (var choices in EnumerateChoices(states, target, stateIndex + 1, selected, limits))
                 yield return choices;
@@ -129,12 +123,12 @@ internal static class PathConditionMergeEngine {
     private sealed class StatePathFacts {
         private readonly ImmutableArray<SymbolicCondition> branches;
         private readonly ImmutableArray<PathFact> facts;
-        private readonly PathConditionMergeLimits limits;
+        private readonly SharpProofAnalysisBudget limits;
 
         internal StatePathFacts(
             IEnumerable<SymbolicCondition> conditions,
             ISet<string> commonKeys,
-            PathConditionMergeLimits limits) {
+            SharpProofAnalysisBudget limits) {
             this.limits = limits;
             var factsByTarget = new Dictionary<string, List<PathFact>>(StringComparer.Ordinal);
             var localBranches = ImmutableArray.CreateBuilder<SymbolicCondition>();
@@ -164,10 +158,10 @@ internal static class PathConditionMergeEngine {
                 static pair => pair.Value.ToArray(),
                 StringComparer.Ordinal);
             foreach (var pair in FactsByTarget)
-                if (pair.Value.Length > limits.MaxFactsPerTargetPerState)
+                if (pair.Value.Length > limits.MaxMergeableFactsPerTargetPerState)
                     RecordLimit(
                         SymbolicAnalysisLimitKind.MergeableFactsPerTargetPerState,
-                        limits.MaxFactsPerTargetPerState,
+                        limits.MaxMergeableFactsPerTargetPerState,
                         pair.Value.Length,
                         "state_merge.facts_per_target_per_state");
         }

@@ -883,12 +883,15 @@ Tests are excluded from the metric and must not be deleted.
   `SymbolicCondition` values while retaining deterministic keys, Cartesian
   choice bounds, guard construction, and every truncation event. This deletes
   22 maintained production lines without changing merge output.
+- [x] Removed the one-use `PathConditionMergeLimits` carrier. The canonical
+  immutable analysis budget now enters path merging directly, preserving all
+  four configured thresholds while deleting another 11 production lines.
 
 ## Current evidence
 
-- Phase-two maintained production: 81,083 lines (77,121 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,351-line reduction from the
-  84,434-line phase-two baseline. Another 16,649 lines remain to the 64,434
+- Phase-two maintained production: 81,072 lines (77,110 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,362-line reduction from the
+  84,434-line phase-two baseline. Another 16,638 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.
