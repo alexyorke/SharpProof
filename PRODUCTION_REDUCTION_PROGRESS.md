@@ -561,12 +561,19 @@ Tests are excluded from the metric and must not be deleted.
   the underlying `TryLower*` contracts without converting through nullable
   adapters. The impacted-test inventory was regenerated after removing the
   production file.
+- [x] Reset the unreleased Symbolic public API history. `PublicAPI.Shipped.txt`
+  now contains only its nullable-mode header, and `PublicAPI.Unshipped.txt`
+  contains the current preview API without 494 mirrored removal tombstones.
+  Packaging coverage now prevents a fictional shipped surface or preview
+  tombstones from returning. This removed 988 tracked snapshot lines without
+  changing package identities or runtime behavior.
 
 ## Current evidence
 
 - Maintained production: 91,698 lines (87,779 C#, 3,189 scripts, and 730
   specifications); net reduction: 15,928 lines; remaining reduction: 4,072.
-  This tranche removed 120 maintained lines without deleting tests.
+  This snapshot-cleanup tranche removed no maintained-production lines; it
+  removed 988 stale tracked compatibility lines without deleting tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,213 passing tests and two documented Main skips.
 
@@ -636,6 +643,14 @@ The preview public Symbolic boundary is already the requested
 Its typed payload projection is not a retained service-specific compatibility
 API: it prevents Roslyn symbols, engine states, and SMT formulas from escaping.
 Do not remove that projection merely because breaking API changes are allowed.
+
+The syntax-based `SymbolicProgramPointFacts` fallback remains a live migration
+target rather than deletable legacy code. A no-fallback characterization probe
+showed current dependencies on custom analysis-limit/truncation reporting,
+finite `foreach` and loop lowering, and initial/current-completion states. Move
+those cases into `SymbolicCfgProgramPointStateCollector` in bounded tranches
+before deleting the structural owner; do not convert failures into successful
+proofs or discard the associated truncation metadata.
 
 Analyzer configuration's declarative option catalog owns documentation,
 validation metadata, defaults, aliases, scopes, and policy impact, while the

@@ -1699,8 +1699,13 @@ namespace TestNamespace {
         var unshippedApiPath = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "PublicAPI.Unshipped.txt");
         var shippedApi = File.ReadAllLines(shippedApiPath);
         Assert.That(shippedApi.FirstOrDefault(), Is.EqualTo("#nullable enable"));
-        Assert.That(shippedApi, Has.Length.GreaterThan(100));
-        Assert.That(File.ReadLines(unshippedApiPath).FirstOrDefault(), Is.EqualTo("#nullable enable"));
+        Assert.That(shippedApi, Has.Length.EqualTo(1),
+            "The unreleased package must not retain a fictional shipped compatibility surface.");
+        var unshippedApi = File.ReadAllLines(unshippedApiPath);
+        Assert.That(unshippedApi.FirstOrDefault(), Is.EqualTo("#nullable enable"));
+        Assert.That(unshippedApi, Has.Length.GreaterThan(100));
+        Assert.That(unshippedApi, Has.None.StartsWith("*REMOVED*"),
+            "Preview API history should be reset instead of accumulating removal tombstones.");
 
         var nullableProperty = typeof(SymbolicSourceInput).GetProperty(nameof(SymbolicSourceInput.FilePath));
         Assert.That(nullableProperty, Is.Not.Null);
