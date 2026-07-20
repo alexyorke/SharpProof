@@ -311,7 +311,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                     }
                 }
                 if (operation is IFlowCaptureOperation &&
-                    operation.Syntax.FirstAncestorOrSelf<ExpressionStatementSyntax>() != null)
+                    operation.Syntax.FirstAncestorOrSelf<StatementSyntax>() is
+                        ExpressionStatementSyntax or LocalDeclarationStatementSyntax)
                     continue;
                 if (forInitialEntry == null &&
                     !targetIsInsideLoop &&

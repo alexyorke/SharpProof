@@ -698,18 +698,24 @@ Tests are excluded from the metric and must not be deleted.
   and sole-surviving-branch cases preserve normalized state and evidence. The
   superseded capture-reference invalidation branch is deleted; control-flow and
   initializer captures remain conservative fallbacks.
+- [x] Moved local-declaration initializer flow captures onto canonical CFG
+  transfer. Conditional, short-circuit, coalescing, and conditional-access
+  initializers now re-resolve their source declaration once and reuse the same
+  typed assignment transfer as uncaptured declarations. Differential normalized
+  state and evidence checks preserve the structural behavior; captures that own
+  control flow outside expression and declaration statements remain explicit
+  fallbacks.
 
 ## Current evidence
 
-- Maintained production: 90,589 lines (86,845 C#, 3,014 scripts, and 730
-  specifications); net reduction: 17,037 lines; remaining reduction: 2,963.
-  This migration adds nine maintained-production lines while replacing
-  expression-statement flow-capture fallback with canonical source-operation
-  replay and deleting its superseded invalidation branch. Diagnostics, proof
-  outcomes, conservative unknowns, CLI bytes, serialization, and package
-  contents are unchanged, and no test was deleted.
+- Maintained production: 90,590 lines (86,846 C#, 3,014 scripts, and 730
+  specifications); net reduction: 17,036 lines; remaining reduction: 2,964.
+  This migration adds one maintained-production line while replacing local-
+  declaration initializer flow-capture fallback with canonical source-operation
+  replay. Diagnostics, proof outcomes, conservative unknowns, CLI bytes,
+  serialization, and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,228 passing tests and two documented Main skips.
+- Six lanes: 6,232 passing tests and two documented Main skips.
 
 ## Milestones
 
@@ -787,9 +793,10 @@ Do not remove that projection merely because breaking API changes are allowed.
 
 The syntax-based `SymbolicProgramPointFacts` fallback remains a live migration
 target rather than deletable legacy code. Normal prior expression completion
-and expression-statement flow captures are now canonical; remaining families
-include successor/control-flow propagation, current completion, and captures
-that own control-flow or initializer values. Move those cases into
+ and expression-statement and declaration-initializer flow captures are now
+ canonical; remaining families include successor/control-flow propagation,
+ current completion, and captures that own control-flow outside those statement
+ forms. Move those cases into
 `SymbolicCfgProgramPointStateCollector` in bounded tranches before deleting the
 structural owner; do not convert failures into successful proofs or discard
 truncation metadata.

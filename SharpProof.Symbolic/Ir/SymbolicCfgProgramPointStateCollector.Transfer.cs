@@ -328,9 +328,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector
 
         if (allowExpressionStatementCompletion &&
             operation.DescendantsAndSelf().OfType<IFlowCaptureReferenceOperation>().Any() &&
-            operation.Syntax.FirstAncestorOrSelf<ExpressionStatementSyntax>() is { } capturedStatement &&
-            semanticModel.GetOperation(capturedStatement, cancellationToken) is
-                IExpressionStatementOperation sourceOperation &&
+            operation.Syntax.FirstAncestorOrSelf<StatementSyntax>() is { } capturedStatement &&
+            capturedStatement is ExpressionStatementSyntax or LocalDeclarationStatementSyntax &&
+            semanticModel.GetOperation(capturedStatement, cancellationToken) is { } sourceOperation &&
             !sourceOperation.DescendantsAndSelf().OfType<IFlowCaptureReferenceOperation>().Any())
             return TryApplyOperation(
                 ref state,
