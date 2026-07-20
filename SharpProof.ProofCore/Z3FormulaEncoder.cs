@@ -326,92 +326,17 @@ internal sealed class Z3FormulaEncoder : IDisposable {
     }
 
     private void EnsureSafeRegexInTerm(SmtFormula formula) {
-        switch (formula) {
-            case SmtIntegerUnaryTerm integerUnaryTerm:
-                EnsureSafeRegexInTerm(integerUnaryTerm.Operand);
-                return;
-            case SmtIntegerBinaryTerm integerBinaryTerm:
-                EnsureSafeRegexInTerm(integerBinaryTerm.Left);
-                EnsureSafeRegexInTerm(integerBinaryTerm.Right);
-                return;
-            case SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm:
-                EnsureSafeRegexInTerm(opaqueIntegerTerm.Left);
-                EnsureSafeRegexInTerm(opaqueIntegerTerm.Right);
-                return;
-            case SmtStringLengthTerm stringLengthTerm:
-                EnsureSafeRegexInTerm(stringLengthTerm.Value);
-                return;
-            case SmtStringConcatTerm stringConcatTerm:
-                EnsureSafeRegexInTerm(stringConcatTerm.Left);
-                EnsureSafeRegexInTerm(stringConcatTerm.Right);
-                return;
-            case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                EnsureSafeRegexInTerm(runtimeTypeTest.Value);
-                return;
-            case SmtConditionalFormula conditionalFormula:
-                EnsureExactRegexUse(conditionalFormula.Condition);
-                EnsureSafeRegexInTerm(conditionalFormula.WhenTrue);
-                EnsureSafeRegexInTerm(conditionalFormula.WhenFalse);
-                return;
-        }
+        foreach (var conditional in SmtFormulaTraversal.Enumerate(formula).OfType<SmtConditionalFormula>())
+            EnsureExactRegexUse(conditional.Condition);
     }
 
     private void EnsureExactRegexUse(SmtFormula formula) {
-        switch (formula) {
-            case SmtRegexMatchFormula regexMatch:
-                if (!CanEncodeRegexOptions(regexMatch.Options))
-                    throw new InvalidOperationException("Unsupported SMT regex options.");
+        foreach (var regexMatch in SmtFormulaTraversal.Enumerate(formula).OfType<SmtRegexMatchFormula>()) {
+            if (!CanEncodeRegexOptions(regexMatch.Options))
+                throw new InvalidOperationException("Unsupported SMT regex options.");
 
-                if (IsApproximateRegexPattern(regexMatch.Pattern, regexMatch.Options))
-                    throw new InvalidOperationException("Approximate SMT regex patterns require positive polarity.");
-
-                EnsureSafeRegexInTerm(regexMatch.Value);
-                return;
-            case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                EnsureExactRegexUse(runtimeTypeTest.Value);
-                return;
-            case SmtUnaryFormula unaryFormula:
-                EnsureExactRegexUse(unaryFormula.Operand);
-                return;
-            case SmtBinaryFormula binaryFormula:
-                EnsureExactRegexUse(binaryFormula.Left);
-                EnsureExactRegexUse(binaryFormula.Right);
-                return;
-            case SmtIntegerUnaryTerm integerUnaryTerm:
-                EnsureExactRegexUse(integerUnaryTerm.Operand);
-                return;
-            case SmtIntegerBinaryTerm integerBinaryTerm:
-                EnsureExactRegexUse(integerBinaryTerm.Left);
-                EnsureExactRegexUse(integerBinaryTerm.Right);
-                return;
-            case SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm:
-                EnsureExactRegexUse(opaqueIntegerTerm.Left);
-                EnsureExactRegexUse(opaqueIntegerTerm.Right);
-                return;
-            case SmtStringLengthTerm stringLengthTerm:
-                EnsureExactRegexUse(stringLengthTerm.Value);
-                return;
-            case SmtStringConcatTerm stringConcatTerm:
-                EnsureExactRegexUse(stringConcatTerm.Left);
-                EnsureExactRegexUse(stringConcatTerm.Right);
-                return;
-            case SmtStringContainsFormula stringContainsFormula:
-                EnsureExactRegexUse(stringContainsFormula.Value);
-                EnsureExactRegexUse(stringContainsFormula.Search);
-                return;
-            case SmtStringStartsWithFormula stringStartsWithFormula:
-                EnsureExactRegexUse(stringStartsWithFormula.Value);
-                EnsureExactRegexUse(stringStartsWithFormula.Prefix);
-                return;
-            case SmtStringEndsWithFormula stringEndsWithFormula:
-                EnsureExactRegexUse(stringEndsWithFormula.Value);
-                EnsureExactRegexUse(stringEndsWithFormula.Suffix);
-                return;
-            case SmtConditionalFormula conditionalFormula:
-                EnsureExactRegexUse(conditionalFormula.Condition);
-                EnsureExactRegexUse(conditionalFormula.WhenTrue);
-                EnsureExactRegexUse(conditionalFormula.WhenFalse);
-                return;
+            if (IsApproximateRegexPattern(regexMatch.Pattern, regexMatch.Options))
+                throw new InvalidOperationException("Approximate SMT regex patterns require positive polarity.");
         }
     }
 

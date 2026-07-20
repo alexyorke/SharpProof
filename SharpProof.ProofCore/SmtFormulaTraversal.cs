@@ -97,93 +97,7 @@ internal static class SmtFormulaTraversal {
     }
 
     internal static bool AreStructurallyEqual(SmtFormula left, SmtFormula right) {
-        var pairs = new Stack<FormulaPair>();
-        pairs.Push(new FormulaPair(left, right));
-        while (pairs.Count > 0) {
-            var pair = pairs.Pop();
-            if (ReferenceEquals(pair.Left, pair.Right)) continue;
-            if (pair.Left.GetType() != pair.Right.GetType() || pair.Left.Kind != pair.Right.Kind) return false;
-
-            switch (pair.Left) {
-                case SmtBooleanConstant leftValue when pair.Right is SmtBooleanConstant rightValue:
-                    if (leftValue.Value != rightValue.Value) return false;
-                    break;
-                case SmtIntegerConstant leftValue when pair.Right is SmtIntegerConstant rightValue:
-                    if (leftValue.Value != rightValue.Value) return false;
-                    break;
-                case SmtStringConstant leftValue when pair.Right is SmtStringConstant rightValue:
-                    if (!string.Equals(leftValue.Value, rightValue.Value, StringComparison.Ordinal)) return false;
-                    break;
-                case SmtNullConstant:
-                    break;
-                case SmtVariable leftValue when pair.Right is SmtVariable rightValue:
-                    if (!string.Equals(leftValue.Name, rightValue.Name, StringComparison.Ordinal)) return false;
-                    break;
-                case SmtUnaryFormula leftValue when pair.Right is SmtUnaryFormula rightValue:
-                    if (leftValue.Operator != rightValue.Operator) return false;
-                    pairs.Push(new FormulaPair(leftValue.Operand, rightValue.Operand));
-                    break;
-                case SmtBinaryFormula leftValue when pair.Right is SmtBinaryFormula rightValue:
-                    if (leftValue.Operator != rightValue.Operator) return false;
-                    pairs.Push(new FormulaPair(leftValue.Left, rightValue.Left));
-                    pairs.Push(new FormulaPair(leftValue.Right, rightValue.Right));
-                    break;
-                case SmtIntegerUnaryTerm leftValue when pair.Right is SmtIntegerUnaryTerm rightValue:
-                    if (leftValue.Operator != rightValue.Operator) return false;
-                    pairs.Push(new FormulaPair(leftValue.Operand, rightValue.Operand));
-                    break;
-                case SmtIntegerBinaryTerm leftValue when pair.Right is SmtIntegerBinaryTerm rightValue:
-                    if (leftValue.Operator != rightValue.Operator) return false;
-                    pairs.Push(new FormulaPair(leftValue.Left, rightValue.Left));
-                    pairs.Push(new FormulaPair(leftValue.Right, rightValue.Right));
-                    break;
-                case SmtOpaqueIntegerBinaryTerm leftValue
-                    when pair.Right is SmtOpaqueIntegerBinaryTerm rightValue:
-                    if (leftValue.Operator != rightValue.Operator) return false;
-                    pairs.Push(new FormulaPair(leftValue.Left, rightValue.Left));
-                    pairs.Push(new FormulaPair(leftValue.Right, rightValue.Right));
-                    break;
-                case SmtStringLengthTerm leftValue when pair.Right is SmtStringLengthTerm rightValue:
-                    pairs.Push(new FormulaPair(leftValue.Value, rightValue.Value));
-                    break;
-                case SmtStringConcatTerm leftValue when pair.Right is SmtStringConcatTerm rightValue:
-                    pairs.Push(new FormulaPair(leftValue.Left, rightValue.Left));
-                    pairs.Push(new FormulaPair(leftValue.Right, rightValue.Right));
-                    break;
-                case SmtStringContainsFormula leftValue when pair.Right is SmtStringContainsFormula rightValue:
-                    pairs.Push(new FormulaPair(leftValue.Value, rightValue.Value));
-                    pairs.Push(new FormulaPair(leftValue.Search, rightValue.Search));
-                    break;
-                case SmtStringStartsWithFormula leftValue when pair.Right is SmtStringStartsWithFormula rightValue:
-                    pairs.Push(new FormulaPair(leftValue.Value, rightValue.Value));
-                    pairs.Push(new FormulaPair(leftValue.Prefix, rightValue.Prefix));
-                    break;
-                case SmtStringEndsWithFormula leftValue when pair.Right is SmtStringEndsWithFormula rightValue:
-                    pairs.Push(new FormulaPair(leftValue.Value, rightValue.Value));
-                    pairs.Push(new FormulaPair(leftValue.Suffix, rightValue.Suffix));
-                    break;
-                case SmtRegexMatchFormula leftValue when pair.Right is SmtRegexMatchFormula rightValue:
-                    if (!string.Equals(leftValue.Pattern, rightValue.Pattern, StringComparison.Ordinal) ||
-                        leftValue.Options != rightValue.Options)
-                        return false;
-                    pairs.Push(new FormulaPair(leftValue.Value, rightValue.Value));
-                    break;
-                case SmtRuntimeTypeTestFormula leftValue when pair.Right is SmtRuntimeTypeTestFormula rightValue:
-                    if (!string.Equals(leftValue.TypeKey, rightValue.TypeKey, StringComparison.Ordinal)) return false;
-                    pairs.Push(new FormulaPair(leftValue.Value, rightValue.Value));
-                    break;
-                case SmtConditionalFormula leftValue when pair.Right is SmtConditionalFormula rightValue:
-                    if (leftValue.ResultKind != rightValue.ResultKind) return false;
-                    pairs.Push(new FormulaPair(leftValue.Condition, rightValue.Condition));
-                    pairs.Push(new FormulaPair(leftValue.WhenTrue, rightValue.WhenTrue));
-                    pairs.Push(new FormulaPair(leftValue.WhenFalse, rightValue.WhenFalse));
-                    break;
-                default:
-                    return false;
-            }
-        }
-
-        return true;
+        return Equals(left, right);
     }
 
     private static int GetChildCount(SmtFormula formula) =>
@@ -269,8 +183,6 @@ internal static class SmtFormulaTraversal {
     }
 
     private readonly record struct TraversalFrame(SmtFormula Formula, bool Visited);
-
-    private readonly record struct FormulaPair(SmtFormula Left, SmtFormula Right);
 
     private readonly record struct FormulaChildren(
         SmtFormula? First,
