@@ -932,63 +932,10 @@ internal static class EffectSummaryIlAnalyzer
     internal static bool TryGetPushedInt32Constant(OpCode opCode, byte[] il, int operandOffset, out int value)
     {
         value = 0;
-        if (opCode == OpCodes.Ldc_I4_M1)
+        var shortFormValue = opCode.Value - OpCodes.Ldc_I4_0.Value;
+        if (shortFormValue is >= -1 and <= 8)
         {
-            value = -1;
-            return true;
-        }
-
-        if (opCode == OpCodes.Ldc_I4_0)
-        {
-            value = 0;
-            return true;
-        }
-
-        if (opCode == OpCodes.Ldc_I4_1)
-        {
-            value = 1;
-            return true;
-        }
-
-        if (opCode == OpCodes.Ldc_I4_2)
-        {
-            value = 2;
-            return true;
-        }
-
-        if (opCode == OpCodes.Ldc_I4_3)
-        {
-            value = 3;
-            return true;
-        }
-
-        if (opCode == OpCodes.Ldc_I4_4)
-        {
-            value = 4;
-            return true;
-        }
-
-        if (opCode == OpCodes.Ldc_I4_5)
-        {
-            value = 5;
-            return true;
-        }
-
-        if (opCode == OpCodes.Ldc_I4_6)
-        {
-            value = 6;
-            return true;
-        }
-
-        if (opCode == OpCodes.Ldc_I4_7)
-        {
-            value = 7;
-            return true;
-        }
-
-        if (opCode == OpCodes.Ldc_I4_8)
-        {
-            value = 8;
+            value = shortFormValue;
             return true;
         }
 
@@ -1034,27 +981,13 @@ internal static class EffectSummaryIlAnalyzer
         OpCode wideForm,
         out int localIndex)
     {
-        if (opCode == index0)
+        var shortFormIndex = opCode.Value - index0.Value;
+        if (shortFormIndex is >= 0 and <= 3 &&
+            index1.Value == index0.Value + 1 &&
+            index2.Value == index0.Value + 2 &&
+            index3.Value == index0.Value + 3)
         {
-            localIndex = 0;
-            return true;
-        }
-
-        if (opCode == index1)
-        {
-            localIndex = 1;
-            return true;
-        }
-
-        if (opCode == index2)
-        {
-            localIndex = 2;
-            return true;
-        }
-
-        if (opCode == index3)
-        {
-            localIndex = 3;
+            localIndex = shortFormIndex;
             return true;
         }
 

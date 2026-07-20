@@ -598,13 +598,19 @@ Tests are excluded from the metric and must not be deleted.
   structural fallback. Exception-flow attribute identity is now session-owned
   rather than stored in ambient `AsyncLocal` state, and the remaining small
   constructor-only carriers use record or primary-constructor ownership.
+- [x] Replaced EffectSummary's branch-per-opcode decoding for the ECMA-defined
+  `ldc.i4.m1` through `ldc.i4.8`, `ldloc.0` through `ldloc.3`, and `stloc.0`
+  through `stloc.3` families with validated contiguous-range decoding. The
+  short and wide operand forms remain explicit, while runtime StringComparer,
+  same-assembly static-field, and full tooling coverage preserve tracked IL
+  constants, locals, and stable-identity evidence.
 
 ## Current evidence
 
-- Maintained production: 91,375 lines (87,456 C#, 3,189 scripts, and 730
-  specifications); net reduction: 16,251 lines; remaining reduction: 3,749.
-  This CFG-budget and session-context tranche removed 8 maintained-production
-  lines without deleting tests or changing serialized output.
+- Maintained production: 91,320 lines (87,401 C#, 3,189 scripts, and 730
+  specifications); net reduction: 16,306 lines; remaining reduction: 3,694.
+  This inferred IL opcode-family tranche removed 55 maintained-production lines
+  without deleting tests or changing serialized output.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,214 passing tests and two documented Main skips.
 
