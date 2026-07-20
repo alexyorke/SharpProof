@@ -1778,26 +1778,15 @@ internal static class SymbolicIndexingLowerer
         return false;
     }
 
-    private readonly struct IndexLengthShape(
-        ExpressionSyntax valueExpression,
-        bool fromEnd,
-        bool requiresNonNegativeValue = false)
-    {
-        public ExpressionSyntax ValueExpression { get; } = valueExpression;
-        public bool FromEnd { get; } = fromEnd;
-        public bool RequiresNonNegativeValue { get; } = requiresNonNegativeValue;
-    }
+    private readonly record struct IndexLengthShape(
+        ExpressionSyntax ValueExpression,
+        bool FromEnd,
+        bool RequiresNonNegativeValue = false);
 
-    private readonly struct RangeLengthShape(
-        bool hasStart,
-        IndexLengthShape start,
-        bool hasEnd,
-        IndexLengthShape end)
-    {
-        public bool HasStart { get; } = hasStart;
-        public IndexLengthShape Start { get; } = start;
-        public bool HasEnd { get; } = hasEnd;
-        public IndexLengthShape End { get; } = end;
-    }
+    private readonly record struct RangeLengthShape(
+        bool HasStart,
+        IndexLengthShape Start,
+        bool HasEnd,
+        IndexLengthShape End);
 
 }

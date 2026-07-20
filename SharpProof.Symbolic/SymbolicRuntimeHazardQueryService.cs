@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SharpProof.Symbolic;
 
 internal sealed partial class SymbolicRuntimeHazardQueryService
@@ -333,133 +335,86 @@ internal sealed class SymbolicRuntimeHazardQueryOptions(
     }
 }
 
-internal sealed class SymbolicRuntimeHazardQueryResult(
-    string filePath,
-    int lineCount,
-    int? scopeStart,
-    int? scopeEnd,
-    int? line,
-    IReadOnlyList<SymbolicRuntimeHazard> hazards,
-    SymbolicSmtDiagnostics? smtDiagnostics = null)
+internal sealed record SymbolicRuntimeHazardQueryResult(
+    [property: JsonPropertyOrder(0)] string FilePath,
+    [property: JsonPropertyOrder(1)] int LineCount,
+    [property: JsonPropertyOrder(2)] int? ScopeStart,
+    [property: JsonPropertyOrder(3)] int? ScopeEnd,
+    [property: JsonPropertyOrder(4)] int? Line,
+    [property: JsonPropertyOrder(5)] IReadOnlyList<SymbolicRuntimeHazard> Hazards,
+    [property: JsonIgnore] SymbolicSmtDiagnostics? RawSmtDiagnostics = null)
 {
-    public string FilePath { get; } = filePath;
-
-    public int LineCount { get; } = lineCount;
-
-    public int? ScopeStart { get; } = scopeStart;
-
-    public int? ScopeEnd { get; } = scopeEnd;
-
-    public int? Line { get; } = line;
-
-    public IReadOnlyList<SymbolicRuntimeHazard> Hazards { get; } =
-        hazards ?? throw new ArgumentNullException(nameof(hazards));
-
+    [JsonPropertyOrder(6)]
     public int HazardCount => Hazards.Count;
 
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; } =
-        SymbolicAnalysisTruncationInfo.Combine(
-            (hazards ?? throw new ArgumentNullException(nameof(hazards)))
-            .Select(static hazard => hazard.AnalysisTruncation));
+    [JsonPropertyOrder(7)]
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation =>
+        SymbolicAnalysisTruncationInfo.Combine(Hazards.Select(static hazard => hazard.AnalysisTruncation));
 
-    public SymbolicSmtDiagnostics SmtDiagnostics { get; } =
-        smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+    [JsonPropertyOrder(8)]
+    public SymbolicSmtDiagnostics SmtDiagnostics => RawSmtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
 
-    public IReadOnlyList<SymbolicInputWitness> TriggerWitnesses { get; } =
-        (hazards ?? throw new ArgumentNullException(nameof(hazards)))
-        .Select(static hazard => hazard.TriggerWitness).ToArray();
+    [JsonPropertyOrder(9)]
+    public IReadOnlyList<SymbolicInputWitness> TriggerWitnesses =>
+        Hazards.Select(static hazard => hazard.TriggerWitness).ToArray();
 
-    public SymbolicInputDomainSummary InputDomainSummary { get; } =
+    [JsonPropertyOrder(10)]
+    public SymbolicInputDomainSummary InputDomainSummary =>
         SymbolicInputWitnessFactory.MergeAlternatives(
-            (hazards ?? throw new ArgumentNullException(nameof(hazards)))
-            .Select(static hazard => hazard.TriggerWitness).ToArray());
-
+            Hazards.Select(static hazard => hazard.TriggerWitness).ToArray());
 }
 
-internal sealed class SymbolicRuntimeHazard(
-    string filePath,
-    SymbolicHazardOperation descriptor,
-    SymbolicRuntimeHazardStatus status,
-    string statusReason,
-    string nodeKind,
-    string operationText,
-    int spanStart,
-    int spanEnd,
-    int line,
-    int column,
-    int nodeStartLine,
-    int nodeStartColumn,
-    int nodeEndLine,
-    int nodeEndColumn,
-    string triggerCondition,
-    SymbolicFactInfo? triggerPrecondition,
-    string mergedInvariantText,
-    IReadOnlyList<string> pathConditions,
-    IReadOnlyList<SymbolicFactInfo> symbolicFacts,
-    SymbolicReachability reachability,
-    string reachabilityReason,
-    SymbolicProofInfo? proofInfo,
-    SymbolicSmtDiagnostics? smtDiagnostics = null,
-    SymbolicInputWitness? triggerWitness = null,
-    SymbolicAnalysisTruncationInfo? analysisTruncation = null)
+internal sealed record SymbolicRuntimeHazard(
+    [property: JsonPropertyOrder(0)] string FilePath,
+    [property: JsonIgnore] SymbolicHazardOperation Descriptor,
+    [property: JsonPropertyOrder(2)] SymbolicRuntimeHazardStatus Status,
+    [property: JsonPropertyOrder(3)] string StatusReason,
+    [property: JsonPropertyOrder(6)] string NodeKind,
+    [property: JsonPropertyOrder(7)] string OperationText,
+    [property: JsonPropertyOrder(8)] int SpanStart,
+    [property: JsonPropertyOrder(9)] int SpanEnd,
+    [property: JsonPropertyOrder(11)] int Line,
+    [property: JsonPropertyOrder(12)] int Column,
+    [property: JsonPropertyOrder(13)] int NodeStartLine,
+    [property: JsonPropertyOrder(14)] int NodeStartColumn,
+    [property: JsonPropertyOrder(15)] int NodeEndLine,
+    [property: JsonPropertyOrder(16)] int NodeEndColumn,
+    [property: JsonPropertyOrder(17)] string TriggerCondition,
+    [property: JsonPropertyOrder(18)] SymbolicFactInfo? TriggerPrecondition,
+    [property: JsonPropertyOrder(19)] string MergedInvariantText,
+    [property: JsonIgnore] IReadOnlyList<string> PathConditions,
+    [property: JsonPropertyOrder(21)] IReadOnlyList<SymbolicFactInfo> SymbolicFacts,
+    [property: JsonPropertyOrder(25)] SymbolicReachability Reachability,
+    [property: JsonPropertyOrder(26)] string ReachabilityReason,
+    [property: JsonIgnore] SymbolicProofInfo? RawProofInfo,
+    [property: JsonIgnore] SymbolicSmtDiagnostics? RawSmtDiagnostics = null,
+    [property: JsonIgnore] SymbolicInputWitness? RawTriggerWitness = null,
+    [property: JsonIgnore] SymbolicAnalysisTruncationInfo? RawAnalysisTruncation = null)
 {
-    public string FilePath { get; } = filePath;
+    [JsonPropertyOrder(1)]
+    public SymbolicRuntimeHazardKind Kind => Descriptor.HazardKind;
 
-    internal SymbolicHazardOperation Descriptor { get; } =
-        descriptor ?? throw new ArgumentNullException(nameof(descriptor));
+    [JsonPropertyOrder(4)]
+    public string ExceptionType => Descriptor.ExceptionType;
 
-    public SymbolicRuntimeHazardKind Kind { get; } = descriptor.HazardKind;
+    [JsonPropertyOrder(5)]
+    public string Category => Descriptor.Category;
 
-    public SymbolicRuntimeHazardStatus Status { get; } = status;
+    [JsonPropertyOrder(10)]
+    public int SpanLength => SpanEnd - SpanStart;
 
-    public string StatusReason { get; } = statusReason;
+    [JsonPropertyOrder(20)]
+    public int PathConditionCount => PathConditions.Count;
 
-    public string ExceptionType { get; } = descriptor.ExceptionType;
+    [JsonPropertyOrder(22)]
+    public SymbolicProofInfo Proof => CreateProofInfo(
+        Status, StatusReason, Category, TriggerCondition, Kind, RawProofInfo);
 
-    public string Category { get; } = descriptor.Category;
-
-    public string NodeKind { get; } = nodeKind;
-
-    public string OperationText { get; } = operationText;
-
-    public int SpanStart { get; } = spanStart;
-
-    public int SpanEnd { get; } = spanEnd;
-
-    public int SpanLength { get; } = spanEnd - spanStart;
-
-    public int Line { get; } = line;
-
-    public int Column { get; } = column;
-
-    public int NodeStartLine { get; } = nodeStartLine;
-
-    public int NodeStartColumn { get; } = nodeStartColumn;
-
-    public int NodeEndLine { get; } = nodeEndLine;
-
-    public int NodeEndColumn { get; } = nodeEndColumn;
-
-    public string TriggerCondition { get; } = triggerCondition;
-
-    public SymbolicFactInfo? TriggerPrecondition { get; } = triggerPrecondition;
-
-    public string MergedInvariantText { get; } = mergedInvariantText;
-
-    internal IReadOnlyList<string> PathConditions { get; } =
-        pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
-
-    public int PathConditionCount { get; } = pathConditions.Count;
-
-    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; } =
-        symbolicFacts ?? throw new ArgumentNullException(nameof(symbolicFacts));
-
-    public SymbolicProofInfo Proof { get; } = CreateProofInfo(
-        status, statusReason, descriptor.Category, triggerCondition, descriptor.HazardKind, proofInfo);
-
+    [JsonPropertyOrder(23)]
     public SymbolicUnknownReasonInfo UnknownReasonInfo => SymbolicUnknownReasonTaxonomy.ForRuntimeHazard(
         Status, StatusReason, Proof.UnknownReason);
 
+    [JsonPropertyOrder(24)]
     public SymbolicInvariantInfo InvariantInfo => new(
         MergedInvariantText,
         SymbolicFacts,
@@ -467,17 +422,15 @@ internal sealed class SymbolicRuntimeHazard(
         SymbolicInvariantMergeKind.Conjunction,
         PathConditionCount);
 
-    public SymbolicReachability Reachability { get; } = reachability;
+    [JsonPropertyOrder(27)]
+    public SymbolicSmtDiagnostics SmtDiagnostics => RawSmtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
 
-    public string ReachabilityReason { get; } = reachabilityReason;
+    [JsonPropertyOrder(28)]
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation =>
+        RawAnalysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
 
-    public SymbolicSmtDiagnostics SmtDiagnostics { get; } =
-        smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
-
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; } =
-        analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
-
-    public SymbolicInputWitness TriggerWitness { get; } = triggerWitness ??
+    [JsonPropertyOrder(29)]
+    public SymbolicInputWitness TriggerWitness => RawTriggerWitness ??
         SymbolicInputWitnessFactory.Unsupported("runtime_hazard_trigger_witness_unavailable");
 
     public string GetDisplayStatusReason()

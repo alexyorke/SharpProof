@@ -184,18 +184,14 @@ internal partial class PurityAnalysisEngine
                purity.AllowsNonEscapingArrayReturn;
     }
 
-    internal readonly struct TrustedMethodPurityMetadata(
-        string? knownImpureMemberSource,
-        bool hasTrustedGeneratedPurity,
-        EffectSummaryCatalog.PurityEntry generatedPurity)
+    internal readonly record struct TrustedMethodPurityMetadata(
+        string? KnownImpureMemberSource,
+        bool HasTrustedGeneratedPurity,
+        EffectSummaryCatalog.PurityEntry GeneratedPurity)
     {
-        public string? KnownImpureMemberSource { get; } = knownImpureMemberSource;
-
         public bool HasConfiguredKnownImpureMember =>
             string.Equals(KnownImpureMemberSource, "config_known_impure", StringComparison.Ordinal);
 
-        public bool HasTrustedGeneratedPurity { get; } = hasTrustedGeneratedPurity;
-        public EffectSummaryCatalog.PurityEntry GeneratedPurity { get; } = generatedPurity;
         public bool AllowsKnownPureFallback => !HasTrustedGeneratedPurity;
     }
 }

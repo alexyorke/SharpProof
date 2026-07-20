@@ -389,8 +389,9 @@ public sealed class RepositoryArchitectureTests
                 root, "SharpProof.Analyzer", "SharpProofProjectAnalysisContext.cs")), Is.False);
             Assert.That(programPoints, Does.Contain("class SymbolicProgramPointResult("));
             Assert.That(queryResult, Does.Contain("class SymbolicQueryResult("));
-            Assert.That(runtimeHazards, Does.Contain("class SymbolicRuntimeHazardQueryResult("));
-            Assert.That(runtimeHazards, Does.Contain("class SymbolicRuntimeHazard("));
+            Assert.That(runtimeHazards, Does.Contain("record SymbolicRuntimeHazardQueryResult("));
+            Assert.That(runtimeHazards, Does.Contain("record SymbolicRuntimeHazard("));
+            Assert.That(runtimeHazards, Does.Not.Contain("public string FilePath { get; } = filePath"));
             Assert.That(File.Exists(Path.Combine(
                 root, "SharpProof.Symbolic", "SymbolicProgramPointAnalyzer.cs")), Is.False);
             Assert.That(File.ReadAllText(Path.Combine(

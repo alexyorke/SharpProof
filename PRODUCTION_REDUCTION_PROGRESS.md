@@ -581,13 +581,18 @@ Tests are excluded from the metric and must not be deleted.
   classifier directly; validation helpers use one predicate; and field,
   method, and runtime-type lookups share one generic-erasing type-specification
   decoder. Exact metadata keys and classification decisions remain unchanged.
+- [x] Replaced nine immutable result, cache-key, dispatch-shape, source-location,
+  regex, EffectSummary trust, and exception-resource carriers with record-owned
+  state. Runtime-hazard JSON order is now explicit rather than declaration-order
+  dependent, and the removed constructor/property forwarding cannot return
+  unnoticed. Cache identity, proof metadata, and serialized output remain exact.
 
 ## Current evidence
 
-- Maintained production: 91,618 lines (87,699 C#, 3,189 scripts, and 730
-  specifications); net reduction: 16,008 lines; remaining reduction: 3,992.
-  The EffectSummary adapter consolidation removed 73 maintained-production
-  lines without deleting tests or changing serialized output.
+- Maintained production: 91,474 lines (87,555 C#, 3,189 scripts, and 730
+  specifications); net reduction: 16,152 lines; remaining reduction: 3,848.
+  The immutable-carrier consolidation removed 144 maintained-production lines
+  without deleting tests or changing serialized output.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,213 passing tests and two documented Main skips.
 
@@ -624,6 +629,13 @@ Type, StringComparer, FormattableString, Enum/Boolean/IPAddress parsing, and
 Unsafe semantics. Their duplicated operand traversal has now been removed, but
 the compact recognition rules must remain until canonical inference preserves
 dispatch, out-argument, compiler-lowering, and compile-time enum-type behavior.
+
+The comparer invocation rules are likewise live generic-dispatch owners rather
+than a replaceable purity catalog. They resolve concrete `Equals`, `GetHashCode`,
+and `CompareTo` implementations for collection and LINQ operations and preserve
+explicit unknown results for unresolved type-parameter or interface dispatch.
+Generated method purity does not currently encode those constructed-type call
+targets, so removing the tables would silently lose conservative behavior.
 
 The EffectSummary DateTime/DateTimeOffset call-semantic helpers remain live
 semantic owners. Removing them caused four focused date/time classification

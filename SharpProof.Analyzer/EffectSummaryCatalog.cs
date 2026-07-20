@@ -756,22 +756,15 @@ internal sealed class EffectSummaryCatalog
             _trust.IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity, DisplayName);
     }
 
-    internal readonly struct PurityEntry(
-        string classification,
-        ImmutableArray<string> categories,
-        string primaryCategory,
-        bool hasFreshArrayAllocationEvidence,
-        string freshnessClassification,
-        bool hasUnsupportedEffects,
-        string effectVisibilityClassification)
+    internal readonly record struct PurityEntry(
+        string Classification,
+        ImmutableArray<string> Categories,
+        string PrimaryCategory,
+        bool HasFreshArrayAllocationEvidence,
+        string FreshnessClassification,
+        bool HasUnsupportedEffects,
+        string EffectVisibilityClassification)
     {
-        public string Classification { get; } = classification;
-        public ImmutableArray<string> Categories { get; } = categories;
-        public string PrimaryCategory { get; } = primaryCategory;
-        public bool HasFreshArrayAllocationEvidence { get; } = hasFreshArrayAllocationEvidence;
-        public string FreshnessClassification { get; } = freshnessClassification;
-        public bool HasUnsupportedEffects { get; } = hasUnsupportedEffects;
-        public string EffectVisibilityClassification { get; } = effectVisibilityClassification;
         public bool IsPure => string.Equals(Classification, "pure", StringComparison.Ordinal);
         public bool IsImpure => string.Equals(Classification, "impure", StringComparison.Ordinal);
 
@@ -796,17 +789,11 @@ internal sealed class EffectSummaryCatalog
              string.Equals(EffectVisibilityClassification, "internal_only", StringComparison.Ordinal));
     }
 
-    internal readonly struct TrustedPurityEntry(
-        string source,
-        string value,
-        PurityEntry classification,
-        bool isSelected)
-    {
-        internal string Source { get; } = source;
-        internal string Value { get; } = value;
-        internal PurityEntry Classification { get; } = classification;
-        internal bool IsSelected { get; } = isSelected;
-    }
+    internal readonly record struct TrustedPurityEntry(
+        string Source,
+        string Value,
+        PurityEntry Classification,
+        bool IsSelected);
 
     internal sealed record SummaryExceptionInfo(
         string ExceptionType,

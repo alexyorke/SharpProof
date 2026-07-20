@@ -280,44 +280,10 @@ internal static partial class ExecutionVisibility
         public BoundedConcurrentCache<ConditionTruthCacheKey, bool?> Values { get; } = new(512);
     }
 
-    private readonly struct ConditionTruthCacheKey(
-        int expressionStart,
-        int expressionLength,
-        int siteStart,
-        int siteLength,
-        SmtAnalysisService? smtAnalysis) : IEquatable<ConditionTruthCacheKey>
-    {
-        public int ExpressionStart { get; } = expressionStart;
-        public int ExpressionLength { get; } = expressionLength;
-        public int SiteStart { get; } = siteStart;
-        public int SiteLength { get; } = siteLength;
-        public SmtAnalysisService? SmtAnalysis { get; } = smtAnalysis;
-
-        public bool Equals(ConditionTruthCacheKey other)
-        {
-            return ExpressionStart == other.ExpressionStart &&
-                   ExpressionLength == other.ExpressionLength &&
-                   SiteStart == other.SiteStart &&
-                   SiteLength == other.SiteLength &&
-                   ReferenceEquals(SmtAnalysis, other.SmtAnalysis);
-        }
-
-        public override bool Equals(object? obj)
-        {
-            return obj is ConditionTruthCacheKey other && Equals(other);
-        }
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                var hash = ExpressionStart;
-                hash = (hash * 397) ^ ExpressionLength;
-                hash = (hash * 397) ^ SiteStart;
-                hash = (hash * 397) ^ SiteLength;
-                hash = (hash * 397) ^ RuntimeHelpers.GetHashCode(SmtAnalysis);
-                return hash;
-            }
-        }
-    }
+    private readonly record struct ConditionTruthCacheKey(
+        int ExpressionStart,
+        int ExpressionLength,
+        int SiteStart,
+        int SiteLength,
+        SmtAnalysisService? SmtAnalysis);
 }

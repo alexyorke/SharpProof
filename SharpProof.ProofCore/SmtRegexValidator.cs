@@ -48,46 +48,7 @@ internal sealed class SmtRegexValidator
         _cache[key] = result;
     }
 
-    private readonly struct RegexValidationKey : IEquatable<RegexValidationKey>
-    {
-        private readonly string _input;
-        private readonly string _pattern;
-        private readonly RegexOptions _options;
+    private readonly record struct RegexValidationKey(string Input, string Pattern, RegexOptions Options);
 
-        internal RegexValidationKey(string input, string pattern, RegexOptions options)
-        {
-            _input = input;
-            _pattern = pattern;
-            _options = options;
-        }
-
-        public bool Equals(RegexValidationKey other)
-        {
-            return string.Equals(_input, other._input, StringComparison.Ordinal) &&
-                   string.Equals(_pattern, other._pattern, StringComparison.Ordinal) &&
-                   _options == other._options;
-        }
-
-        public override bool Equals(object? obj)
-        {
-            return obj is RegexValidationKey other && Equals(other);
-        }
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return (StringComparer.Ordinal.GetHashCode(_input) * 397) ^
-                       (StringComparer.Ordinal.GetHashCode(_pattern) * 397) ^
-                       (int)_options;
-            }
-        }
-    }
-
-    private readonly struct RegexValidationResult(bool isSupported, bool isMatch)
-    {
-        internal bool IsSupported { get; } = isSupported;
-
-        internal bool IsMatch { get; } = isMatch;
-    }
+    private readonly record struct RegexValidationResult(bool IsSupported, bool IsMatch);
 }

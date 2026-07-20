@@ -1006,34 +1006,14 @@ internal sealed class Z3RegexTranslator
         return char.IsLetterOrDigit(value) || value == '_';
     }
 
-    private readonly struct RegexLookaheadAssertion(ReExpr regex, bool isPositive, bool isExact)
-    {
-        public ReExpr Regex { get; } = regex;
+    private readonly record struct RegexLookaheadAssertion(ReExpr Regex, bool IsPositive, bool IsExact);
 
-        public bool IsPositive { get; } = isPositive;
+    private readonly record struct CharacterClassPart(
+        ReExpr Regex,
+        char? ExactCharacter,
+        bool IsApproximation,
+        CharacterRange[]? Ranges);
 
-        public bool IsExact { get; } = isExact;
-    }
-
-    private readonly struct CharacterClassPart(
-        ReExpr regex,
-        char? exactCharacter,
-        bool isApproximation,
-        CharacterRange[]? ranges)
-    {
-        public ReExpr Regex { get; } = regex;
-        public char? ExactCharacter { get; } = exactCharacter;
-        public bool IsApproximation { get; } = isApproximation;
-        public CharacterRange[]? Ranges { get; } = ranges;
-    }
-
-    private readonly struct RegexClassTranslation(ReExpr regex, bool isExact, CharacterRange[]? ranges)
-    {
-        public ReExpr Regex { get; } = regex;
-
-        public bool IsExact { get; } = isExact;
-
-        public CharacterRange[]? Ranges { get; } = ranges;
-    }
+    private readonly record struct RegexClassTranslation(ReExpr Regex, bool IsExact, CharacterRange[]? Ranges);
 
 }
