@@ -653,22 +653,23 @@ Tests are excluded from the metric and must not be deleted.
   `SymbolicQueryExecutor` forwarding overloads and both nullable-contract proof
   adapters; ensures and nullable analysis now call the same state-owned proof
   boundary. Unsupported requests remain explicit conservative unknowns.
-- [x] Characterized the remaining expression-statement flow-capture boundary.
-  Conditional, null-coalescing, short-circuit, and compound captured assignments
-  require path-local capture identity and value propagation; merely skipping
-  `IFlowCaptureOperation` retained pre-assignment state and failed normalized
-  state parity. Differential tests keep those routes conservative until the CFG
-  path state owns and merges capture values.
+- [x] Moved conditional, short-circuit, and compound captured-expression current
+  completion onto the canonical collector. Intermediate captures and embedded
+  branch values are traversed without becoming the requested program point; the
+  owning expression is re-resolved once through Roslyn's source semantic
+  operation and then uses the existing assignment/update transfer. Nullable
+  coalescing remains an explicit fallback because its capture-based `IIsNull`
+  branch is not yet lowerable. Differential state and evidence parity rejected
+  capture skipping without this source-operation resolution.
 
 ## Current evidence
 
-- Maintained production: 90,800 lines (86,977 C#, 3,093 scripts, and 730
-  specifications); net reduction: 16,826 lines; remaining reduction: 3,174.
-  This proof-boundary tranche removes 71 maintained-production lines and four
-  forwarding methods. It changes no diagnostics, proof results, conservative
-  unknowns, CLI bytes, serialization, or package contents and deletes no tests.
-  The subsequent flow-capture characterization changes no maintained production
-  lines and adds four parity cases for the next canonical migration tranche.
+- Maintained production: 90,810 lines (86,987 C#, 3,093 scripts, and 730
+  specifications); net reduction: 16,816 lines; remaining reduction: 3,184.
+  This captured-current-completion tranche adds ten maintained-production lines
+  while moving three flow-capture families onto the canonical route. It changes
+  no diagnostics, proof results, conservative unknowns, CLI bytes, serialization,
+  or package contents and deletes no tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,220 passing tests and two documented Main skips.
 

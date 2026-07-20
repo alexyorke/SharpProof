@@ -240,8 +240,12 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                 if (operation.IsImplicit && ReferenceEquals(operation.Syntax, executionRoot))
                     continue;
                 if (includeCurrentStatementCompletionFacts &&
-                    site is LocalDeclarationStatementSyntax &&
-                    operation is IFlowCaptureOperation)
+                    operation is IFlowCaptureOperation &&
+                    (site is LocalDeclarationStatementSyntax ||
+                     site is ExpressionStatementSyntax &&
+                     ReferenceEquals(
+                         operation.Syntax.FirstAncestorOrSelf<ExpressionStatementSyntax>(),
+                         site)))
                     continue;
                 if (ShouldSkipScopedBlockCompletionOperation(operation, site))
                     continue;
@@ -361,6 +365,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector
             if (block.BranchValue != null)
             {
                 if (ContainsSite(block.BranchValue.Syntax, site) &&
+                    !(includeCurrentStatementCompletionFacts &&
+                      site is ExpressionStatementSyntax) &&
                     !(includeCurrentStatementCompletionFacts &&
                       site is LocalDeclarationStatementSyntax))
                 {

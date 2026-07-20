@@ -934,7 +934,6 @@ static class C
         var site = fixture.Root.DescendantNodes()
             .OfType<ExpressionStatementSyntax>()
             .Single(statement => statement.Expression is AssignmentExpressionSyntax);
-
         var direct = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
             fixture.SemanticModel,
@@ -964,18 +963,24 @@ static class C
     }
 
     [TestCase(
-        "static class C { static int M(bool condition) { int value = 0; value = condition ? 1 : 2; return value; } }")]
+        "static class C { static int M(bool condition) { int value = 0; value = condition ? 1 : 2; return value; } }",
+        true)]
     [TestCase(
-        "static class C { static int M(int? input) { int value = 0; value = input ?? 2; return value; } }")]
+        "static class C { static int M(int? input) { int value = 0; value = input ?? 2; return value; } }",
+        false)]
     [TestCase(
-        "static class C { static bool M(bool first, bool second) { bool value = false; value = first && second; return value; } }")]
+        "static class C { static bool M(bool first, bool second) { bool value = false; value = first && second; return value; } }",
+        true)]
     [TestCase(
-        "static class C { static int M(bool condition) { int value = 0; value += condition ? 1 : 2; return value; } }")]
-    public void CapturedExpressionStatementCompletion_RemainsConservativeFallback(string source)
+        "static class C { static int M(bool condition) { int value = 0; value += condition ? 1 : 2; return value; } }",
+        true)]
+    public void CapturedExpressionStatementCompletion_PreservesExactBoundary(
+        string source,
+        bool expectedExact)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
-            nameof(CapturedExpressionStatementCompletion_RemainsConservativeFallback));
+            nameof(CapturedExpressionStatementCompletion_PreservesExactBoundary));
         var site = fixture.Root.DescendantNodes()
             .OfType<ExpressionStatementSyntax>()
             .Single(statement => statement.Expression is AssignmentExpressionSyntax);
@@ -994,8 +999,11 @@ static class C
             CancellationToken.None,
             includeCurrentStatementCompletionFacts: true);
 
-        Assert.That(direct.IsUnsupported, Is.True, direct.Provenance.Single().Detail);
-        Assert.That(direct.Value, Is.Null);
+        Assert.That(direct.IsExact, Is.EqualTo(expectedExact), direct.Provenance.Single().Detail);
+        if (expectedExact)
+            AssertStateParity(direct.Value!, structural);
+        else
+            Assert.That(direct.Value, Is.Null);
         AssertStateParity(routed, structural);
     }
 

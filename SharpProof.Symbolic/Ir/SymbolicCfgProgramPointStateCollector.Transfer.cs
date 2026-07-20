@@ -481,6 +481,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        if (site is ExpressionStatementSyntax capturedStatement &&
+            operation is IExpressionStatementOperation &&
+            semanticModel.GetOperation(capturedStatement.Expression, cancellationToken) is { } sourceOperation)
+            operation = sourceOperation;
         if (site is ExpressionSyntax expression &&
             CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression) is not AssignmentExpressionSyntax)
             return TryApplyFrameworkExpressionCompletion(
