@@ -31,7 +31,9 @@ internal class ProofCoreZ3SmokeTests
         TimeSpan? timeout = null)
     {
         using var solver = new SmtSolver();
-        Assert.That(solver.IsSatisfiable(pathConditions, timeout ?? SolverTimeout), Is.EqualTo(expected));
+        Assert.That(
+            solver.CheckSatisfiability(pathConditions, timeout ?? SolverTimeout).Feasibility,
+            Is.EqualTo(expected));
     }
 
     private static void AssertImplication(
@@ -41,7 +43,12 @@ internal class ProofCoreZ3SmokeTests
         TimeSpan? timeout = null)
     {
         using var solver = new SmtSolver();
-        Assert.That(solver.Implies(pathConditions, conclusion, timeout ?? SolverTimeout), Is.EqualTo(expected));
+        Assert.That(
+            solver.CheckSatisfiability(
+                    pathConditions.Concat(new[] { new SmtUnaryFormula(SmtUnaryOperator.Not, conclusion) }),
+                    timeout ?? SolverTimeout)
+                .Feasibility,
+            Is.EqualTo(expected));
     }
 
     [Test]
@@ -186,13 +193,13 @@ internal class ProofCoreZ3SmokeTests
             new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, length, new SmtIntegerConstant(0)),
             new SmtBinaryFormula(SmtBinaryOperator.LessThan, length, arrayLength));
 
-        var result = solver.CheckPathAndImpurity(
+        var result = solver.CheckPathAndImpurityWithWitness(
             conditions,
             inRange,
             TimeSpan.FromMilliseconds(50));
 
-        Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Satisfiable));
-        Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Path.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
+        Assert.That(result.Impurity.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
     }
 
     [TestCase(SmtIntegerBinaryOperator.Divide)]
@@ -1179,12 +1186,12 @@ internal class ProofCoreZ3SmokeTests
         using var solver = new SmtSolver();
         var text = new SmtVariable("text", SmtValueKind.String);
 
-        var result = solver.IsSatisfiable(
+        var result = solver.CheckSatisfiability(
             new SmtFormula[]
             {
                 new SmtRegexMatchFormula(text, pattern)
             },
-            TimeSpan.FromMilliseconds(250));
+            TimeSpan.FromMilliseconds(250)).Feasibility;
 
         Assert.That(result, Is.Not.EqualTo(Feasibility.Unsatisfiable));
     }

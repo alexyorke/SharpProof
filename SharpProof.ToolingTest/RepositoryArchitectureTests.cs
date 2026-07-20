@@ -607,6 +607,7 @@ public sealed class RepositoryArchitectureTests
         {
             Path.Combine(root, "SharpProof.Analyzer", "Configuration", "AnalyzerConfigurationOptionRegistry.cs"),
             Path.Combine(root, "SharpProof.Analyzer", "Engine", "PurityKnownBclSemantics.cs"),
+            Path.Combine(root, "SharpProof.ProofCore", "SmtSolver.cs"),
             Path.Combine(root, "Tools", "SharpProof.EffectSummary",
                 "EffectSummaryClassificationEvidenceRules.cs")
         }.Select(File.ReadAllText));
@@ -617,6 +618,9 @@ public sealed class RepositoryArchitectureTests
             Assert.That(sources, Does.Not.Contain("IsArrayInterfaceGetEnumeratorInvocation"));
             Assert.That(sources, Does.Not.Contain("GetFreshArrayNote"));
             Assert.That(sources, Does.Not.Contain("AggregateEffectVisibilityClassification"));
+            Assert.That(sources, Does.Not.Contain("public Feasibility IsSatisfiable("));
+            Assert.That(sources, Does.Not.Contain("public Feasibility Implies("));
+            Assert.That(sources, Does.Not.Contain("CheckPathAndImpurity("));
         });
     }
 

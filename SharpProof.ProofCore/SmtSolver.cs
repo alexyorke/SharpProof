@@ -51,17 +51,6 @@ internal sealed class SmtSolver : IDisposable
         return status;
     }
 
-    public Feasibility IsSatisfiable(IEnumerable<SmtFormula> pathConditions, TimeSpan timeout)
-    {
-        var query = Prepare(pathConditions);
-        if (query.Status != SmtConcreteFactPreparationStatus.Ready)
-            return query.Status == SmtConcreteFactPreparationStatus.Unsatisfiable
-                ? Feasibility.Unsatisfiable
-                : Feasibility.Unknown;
-
-        return IsSatisfiableRaw(query.Conditions, timeout, query.ContainsApproximateRegex);
-    }
-
     public SmtFeasibilityResult CheckSatisfiability(
         IEnumerable<SmtFormula> pathConditions,
         TimeSpan timeout)
@@ -150,28 +139,6 @@ internal sealed class SmtSolver : IDisposable
         return new SmtPathAndImpurityCheckResult(path, impurity);
     }
 
-    private Feasibility IsSatisfiableRaw(
-        IEnumerable<SmtFormula> pathConditions,
-        TimeSpan timeout,
-        bool? containsApproximateRegex = null)
-    {
-        if (timeout <= TimeSpan.Zero) return Feasibility.Unknown;
-
-        try
-        {
-            var conditions = pathConditions as SmtFormula[] ?? pathConditions.ToArray();
-            var isApproximate = containsApproximateRegex ?? ContainsApproximateRegex(conditions);
-            using var solver = _encoder.CreateSolver(timeout);
-            foreach (var formula in conditions) solver.Assert(_encoder.EncodeCondition(formula));
-
-            return AdjustForApproximation(ToFeasibility(CheckAndAccountResources(solver)), isApproximate);
-        }
-        catch (Exception ex) when (IsConservativeSolverFailure(ex))
-        {
-            return Feasibility.Unknown;
-        }
-    }
-
     private SmtFeasibilityResult CheckSatisfiabilityRawWithWitness(
         IReadOnlyList<SmtFormula> conditions,
         IReadOnlyList<SmtFormula> modelConditions,
@@ -214,72 +181,6 @@ internal sealed class SmtSolver : IDisposable
                 ? AdjustForApproximation(feasibility, isApproximate)
                 : feasibility,
             witness);
-    }
-
-    public Feasibility Implies(IEnumerable<SmtFormula> pathConditions, SmtFormula conclusion, TimeSpan timeout)
-    {
-        var combinedConditions = pathConditions
-            .Concat(new[] { new SmtUnaryFormula(SmtUnaryOperator.Not, conclusion) })
-            .ToArray();
-        return IsSatisfiable(combinedConditions, timeout);
-    }
-
-    public (Feasibility PathFeasibility, Feasibility ImpurityFeasibility) CheckPathAndImpurity(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula impurityCondition,
-        TimeSpan timeout)
-    {
-        var pathQuery = Prepare(pathConditions);
-        if (pathQuery.Status != SmtConcreteFactPreparationStatus.Ready)
-            return (pathQuery.Status == SmtConcreteFactPreparationStatus.Unsatisfiable
-                ? Feasibility.Unsatisfiable
-                : Feasibility.Unknown, Feasibility.Unknown);
-
-        if (timeout <= TimeSpan.Zero) return (Feasibility.Unknown, Feasibility.Unknown);
-
-        try
-        {
-            using var solver = _encoder.CreateSolver(timeout);
-            foreach (var formula in pathQuery.Conditions) solver.Assert(_encoder.EncodeCondition(formula));
-
-            var pathFeasibility = ToFeasibility(CheckAndAccountResources(solver));
-            if (pathFeasibility != Feasibility.Satisfiable) return (pathFeasibility, Feasibility.Unknown);
-
-            // A SAT path under regex approximation is only "may be feasible"; still check the
-            // combined query because UNSAT under the over-approximation remains a safe proof.
-            //
-            // Use the original path facts for the combined query. The path-only preparation pass
-            // may remove equalities as already-satisfied facts, but those equalities can still be
-            // required to prove the hazard condition unreachable.
-            var combinedQuery = Prepare(pathQuery.OriginalConditions.Append(impurityCondition));
-            if (combinedQuery.Status != SmtConcreteFactPreparationStatus.Ready)
-                return (pathFeasibility, combinedQuery.Status == SmtConcreteFactPreparationStatus.Unsatisfiable
-                    ? Feasibility.Unsatisfiable
-                    : Feasibility.Unknown);
-
-            if (combinedQuery.WasChanged)
-                return (pathFeasibility, IsSatisfiableRaw(
-                    combinedQuery.Conditions,
-                    timeout,
-                    combinedQuery.ContainsApproximateRegex));
-
-            solver.Push();
-            try
-            {
-                solver.Assert(_encoder.EncodeCondition(impurityCondition));
-                return (pathFeasibility, AdjustForApproximation(
-                    ToFeasibility(CheckAndAccountResources(solver)),
-                    combinedQuery.ContainsApproximateRegex));
-            }
-            finally
-            {
-                solver.Pop();
-            }
-        }
-        catch (Exception ex) when (IsConservativeSolverFailure(ex))
-        {
-            return (Feasibility.Unknown, Feasibility.Unknown);
-        }
     }
 
     private static Feasibility ToFeasibility(Status status)

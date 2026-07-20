@@ -669,16 +669,23 @@ Tests are excluded from the metric and must not be deleted.
   match structural state and evidence; `[DoesNotReturnIf]` normal completion
   remains unchanged. CFG merging now also preserves contradiction when every
   incoming path is impossible.
+- [x] Removed ProofCore's three remaining feasibility-only solver adapters.
+  Tests now consume the same witness-capable satisfiability and path/hazard
+  checks as production and project only the feasibility enum they assert. The
+  duplicate path-and-impurity solver execution, implication wrapper, raw
+  satisfiability helper, and their dead private tail are deleted; focused SMT,
+  semantic-oracle, and architecture coverage preserves every result and
+  prevents the parallel entry points from returning.
 
 ## Current evidence
 
-- Maintained production: 90,833 lines (87,010 C#, 3,093 scripts, and 730
-  specifications); net reduction: 16,793 lines; remaining reduction: 3,207.
-  This tranche adds ten maintained-production lines while moving non-returning
-  expression successors onto canonical CFG state semantics and closing the
-  all-impossible-path merge gap. It changes no diagnostics, successful proof
-  results, conservative unknowns, CLI bytes, serialization, or package contents
-  and deletes no tests.
+- Maintained production: 90,747 lines (86,924 C#, 3,093 scripts, and 730
+  specifications); net reduction: 16,879 lines; remaining reduction: 3,121.
+  This tranche removes 86 maintained-production lines by deleting ProofCore's
+  test-only feasibility API and its second path-and-impurity solver execution.
+  Tests use the production witness-returning boundary directly; diagnostics,
+  proof outcomes, conservative unknowns, CLI bytes, serialization, and package
+  contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,222 passing tests and two documented Main skips.
 
