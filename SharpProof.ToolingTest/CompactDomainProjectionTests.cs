@@ -31,8 +31,8 @@ public sealed class CompactDomainProjectionTests
         foreach (var (target, expectedKind) in targets)
         {
             var result = service.Query(new SymbolicQueryContext(input, target, options));
-            var filtered = result.Filter(new SymbolicSourceQueryFilter(
-                methodNameContains: new[] { "Identity" }));
+            var filtered = result.Filter(point =>
+                point.MethodName?.Contains("Identity", StringComparison.OrdinalIgnoreCase) == true);
 
             Assert.Multiple(() =>
             {

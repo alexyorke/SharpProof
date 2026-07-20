@@ -1224,8 +1224,8 @@ internal class TestClass
         Assert.That(impossibleReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.Unreachable));
         Assert.That(result.Metrics.UnreachableCount, Is.GreaterThanOrEqualTo(1));
 
-        var unreachableOnly = result.Filter(new SymbolicSourceQueryFilter(
-            reachability: new[] { SymbolicReachability.Unreachable }));
+        var unreachableOnly = result.Filter(point =>
+            point.Reachability == SymbolicReachability.Unreachable);
         Assert.That(unreachableOnly.ProgramPoints, Is.Not.Empty);
         Assert.That(unreachableOnly.ProgramPoints.All(point => point.Reachability == SymbolicReachability.Unreachable),
             Is.True);
@@ -1248,7 +1248,7 @@ internal class TestClass
 }";
         using var session = new SymbolicSourceQueryTestSession(source, "LineFilterQuery.cs");
         var result = session.AnalyzeLine("if (value > 0)");
-        var filtered = result.Filter(new SymbolicSourceQueryFilter(new[] { "ReturnStatement" }));
+        var filtered = result.Filter(point => point.NodeKind == "ReturnStatement");
 
         Assert.That(filtered.ProgramPoints, Has.Count.EqualTo(1));
         Assert.That(filtered.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
@@ -1395,10 +1395,10 @@ internal class TestClass
             compilation,
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "value > 0" });
-        var filtered = result.Filter(new SymbolicSourceQueryFilter(
-            new[] { "ReturnStatement" },
-            true,
-            new[] { SymbolicReachability.Reachable }));
+        var filtered = result.Filter(point =>
+            point.NodeKind == "ReturnStatement" &&
+            point.Facts.Count != 0 &&
+            point.Reachability == SymbolicReachability.Reachable);
 
         Assert.That(filtered.Lines, Is.Not.Empty);
         Assert.That(filtered.ProgramPointCount, Is.EqualTo(filtered.Lines.Sum(line => line.ProgramPoints.Count)));
@@ -1427,7 +1427,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryFilter_CanFilterByMethodAndConditionMetadata()
+    public void SymbolicQueryResult_CanFilterByMethodAndConditionMetadata()
     {
         const string source = @"
 internal class TestClass
@@ -1455,12 +1455,13 @@ internal class TestClass
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         var result = new SymbolicQueryExecutor().QuerySyntaxTreeAllLines(syntaxTree, compilation);
-        var filtered = result.Filter(new SymbolicSourceQueryFilter(
-            methodNames: new[] { "First" },
-            requirePathConditions: true,
-            conditionTargets: new[] { "value" },
-            conditionTexts: new[] { "value > 0" },
-            conditionTextContains: new[] { "value" }));
+        var filtered = result.Filter(point =>
+            string.Equals(point.MethodName, "First", StringComparison.OrdinalIgnoreCase) &&
+            point.PathConditionCount != 0 &&
+            point.Invariant.Conditions.Any(condition =>
+                string.Equals(condition.Target, "value", StringComparison.OrdinalIgnoreCase) &&
+                condition.Text == "value > 0" &&
+                condition.Text.Contains("value", StringComparison.OrdinalIgnoreCase)));
         var points = filtered.Lines.SelectMany(static line => line.ProgramPoints).ToArray();
 
         Assert.That(points, Is.Not.Empty);
@@ -1480,7 +1481,7 @@ internal class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryFilter_CanFilterByLinePointKindMethodSubstringAndProofMetadata()
+    public void SymbolicQueryResult_CanFilterByLinePointKindMethodSubstringAndProofMetadata()
     {
         const string source = @"
 internal class TestClass
@@ -1523,16 +1524,14 @@ internal class TestClass
             smtAnalysis: smtAnalysis,
             impliedConditions: new[] { "value > 0" },
             includeExpressionProgramPoints: true);
-        var filtered = result.Filter(new SymbolicSourceQueryFilter(
-            methodNameContains: new[] { "First" },
-            lines: new[] { firstReturnLine },
-            lineStart: firstReturnLine,
-            lineEnd: firstReturnLine,
-            programPointKinds: new[] { SymbolicProgramPointKinds.Expression },
-            requireProofs: true,
-            proofOutcomes: new[] { SymbolicTruthValue.ProvenTrue },
-            proofConditions: new[] { "value > 0" },
-            proofConditionContains: new[] { "value" }));
+        var filtered = result.Filter(point =>
+            point.MethodName?.Contains("First", StringComparison.OrdinalIgnoreCase) == true &&
+            point.Line == firstReturnLine &&
+            point.ProgramPointKind == SymbolicProgramPointKinds.Expression &&
+            point.ConditionProofs.Any(proof =>
+                proof.TruthValue == SymbolicTruthValue.ProvenTrue &&
+                proof.Condition == "value > 0" &&
+                proof.Condition.Contains("value", StringComparison.OrdinalIgnoreCase)));
         var points = filtered.Lines.SelectMany(static line => line.ProgramPoints).ToArray();
 
         Assert.That(points, Has.Length.EqualTo(1));

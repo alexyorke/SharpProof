@@ -364,6 +364,9 @@ public sealed class RepositoryArchitectureTests
 
         Assert.Multiple(() =>
         {
+            Assert.That(typeof(SharpProofAnalysisSession).Assembly.GetType(
+                "SharpProof.Symbolic.SymbolicSourceQueryFilter"), Is.Null,
+                "CLI result filtering must not return to the symbolic engine contract.");
             Assert.That(summaries, Does.Contain("SymbolicQueryMetrics"));
             Assert.That(summaries, Does.Contain("SymbolicConditionProofProjection"));
             Assert.That(summaries, Does.Not.Contain("class SymbolicConditionProofSummary"));

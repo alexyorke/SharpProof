@@ -1998,10 +1998,11 @@ namespace TestNamespace {
         Assert.That(source, Does.Contain("options.CreateRuntimeHazardTarget()"));
         Assert.That(source, Does.Contain("options.CreateComplexityTarget()"));
         Assert.That(source, Does.Contain("options.CreateCapabilityTarget()"));
-        Assert.That(source, Does.Contain("options.CreateQueryOptions(smtAnalysis,"));
+        Assert.That(source, Does.Contain("options.CreateQueryOptions(smtAnalysis)"));
         Assert.That(source, Does.Contain("SymbolicComplexityResult"));
         Assert.That(source, Does.Contain("SymbolicCapabilityResult"));
-        Assert.That(source, Does.Contain("SymbolicSourceQueryFilter"));
+        Assert.That(source, Does.Contain("options.FilterResult(queryResult)"));
+        Assert.That(source, Does.Not.Contain("SymbolicSourceQueryFilter"));
         Assert.That(source, Does.Contain("options.CreateSmtOptions()"));
         Assert.That(source, Does.Contain("Complexity:"));
         Assert.That(source, Does.Contain("Capabilities:"));

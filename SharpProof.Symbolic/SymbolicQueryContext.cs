@@ -16,8 +16,7 @@ internal sealed class SymbolicQueryOptions(
     SmtAnalysisService? smtAnalysis = null,
     IEnumerable<string>? impliedConditions = null,
     bool includeExpressionProgramPoints = false,
-    bool includeCurrentStatementCompletionFacts = false,
-    SymbolicSourceQueryFilter? filter = null)
+    bool includeCurrentStatementCompletionFacts = false)
 {
     public static readonly SymbolicQueryOptions Default = new(SharpProofAnalysisBudget.Default);
 
@@ -26,16 +25,14 @@ internal sealed class SymbolicQueryOptions(
         SmtAnalysisService? smtAnalysis = null,
         IEnumerable<string>? impliedConditions = null,
         bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false,
-        SymbolicSourceQueryFilter? filter = null)
+        bool includeCurrentStatementCompletionFacts = false)
         : this(
             SharpProofAnalysisBudget.Default,
             references,
             smtAnalysis,
             impliedConditions,
             includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts,
-            filter)
+            includeCurrentStatementCompletionFacts)
     {
     }
 
@@ -44,7 +41,7 @@ internal sealed class SymbolicQueryOptions(
 
     public SymbolicQueryOptions WithAnalysisLimits(SharpProofAnalysisBudget analysisLimits) => new(
         analysisLimits, References, SmtAnalysis, ImpliedConditions,
-        IncludeExpressionProgramPoints, IncludeCurrentStatementCompletionFacts, Filter);
+        IncludeExpressionProgramPoints, IncludeCurrentStatementCompletionFacts);
 
     public ImmutableArray<MetadataReference> References { get; } =
         SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));
@@ -55,7 +52,6 @@ internal sealed class SymbolicQueryOptions(
         .ToImmutableArray() ?? ImmutableArray<string>.Empty;
     public bool IncludeExpressionProgramPoints { get; } = includeExpressionProgramPoints;
     public bool IncludeCurrentStatementCompletionFacts { get; } = includeCurrentStatementCompletionFacts;
-    public SymbolicSourceQueryFilter? Filter { get; } = filter;
 }
 
 internal static class SymbolicQueryOptionHelpers

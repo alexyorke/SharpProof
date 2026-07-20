@@ -25,13 +25,7 @@ internal sealed partial class SymbolicQueryExecutor
         SymbolicQueryContext context,
         CancellationToken cancellationToken = default)
     {
-        return ExecuteWithLimits(context, cancellationToken, (request, token) =>
-        {
-            var result = QuerySource(request, token);
-            return request.Options.Filter == null || request.Options.Filter.IsEmpty
-                ? result
-                : result.Filter(request.Options.Filter);
-        });
+        return ExecuteWithLimits(context, cancellationToken, QuerySource);
     }
 
     public SymbolicConditionProofResult Prove(

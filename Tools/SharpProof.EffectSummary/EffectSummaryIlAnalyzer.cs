@@ -1332,21 +1332,12 @@ internal static class EffectSummaryIlAnalyzer
         return operandType switch
         {
             OperandType.InlineNone => 0,
-            OperandType.ShortInlineBrTarget => 1,
-            OperandType.ShortInlineI => 1,
-            OperandType.ShortInlineVar => 1,
+            OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
             OperandType.InlineVar => 2,
-            OperandType.InlineBrTarget => 4,
-            OperandType.InlineField => 4,
-            OperandType.InlineI => 4,
-            OperandType.InlineMethod => 4,
-            OperandType.InlineSig => 4,
-            OperandType.InlineString => 4,
-            OperandType.InlineTok => 4,
-            OperandType.InlineType => 4,
-            OperandType.ShortInlineR => 4,
-            OperandType.InlineI8 => 8,
-            OperandType.InlineR => 8,
+            OperandType.InlineBrTarget or OperandType.InlineField or OperandType.InlineI or
+                OperandType.InlineMethod or OperandType.InlineSig or OperandType.InlineString or
+                OperandType.InlineTok or OperandType.InlineType or OperandType.ShortInlineR => 4,
+            OperandType.InlineI8 or OperandType.InlineR => 8,
             OperandType.InlineSwitch => 4 + BitConverter.ToInt32(il, operandOffset) * 4,
             _ => 0
         };
@@ -1362,25 +1353,12 @@ internal static class EffectSummaryIlAnalyzer
 
     internal static bool IsIndirectWrite(OpCode opCode)
     {
-        return opCode == OpCodes.Stind_I ||
-               opCode == OpCodes.Stind_I1 ||
-               opCode == OpCodes.Stind_I2 ||
-               opCode == OpCodes.Stind_I4 ||
-               opCode == OpCodes.Stind_I8 ||
-               opCode == OpCodes.Stind_R4 ||
-               opCode == OpCodes.Stind_R8 ||
-               opCode == OpCodes.Stind_Ref ||
-               opCode == OpCodes.Stobj ||
+        var name = opCode.Name;
+        return opCode == OpCodes.Stobj ||
                opCode == OpCodes.Initobj ||
                opCode == OpCodes.Stelem ||
-               opCode == OpCodes.Stelem_I ||
-               opCode == OpCodes.Stelem_I1 ||
-               opCode == OpCodes.Stelem_I2 ||
-               opCode == OpCodes.Stelem_I4 ||
-               opCode == OpCodes.Stelem_I8 ||
-               opCode == OpCodes.Stelem_R4 ||
-               opCode == OpCodes.Stelem_R8 ||
-               opCode == OpCodes.Stelem_Ref;
+               name?.StartsWith("stind.", StringComparison.Ordinal) == true ||
+               name?.StartsWith("stelem.", StringComparison.Ordinal) == true;
     }
 
     internal static void AddSameAssemblyStaticFieldToken(

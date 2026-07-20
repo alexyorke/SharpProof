@@ -134,15 +134,13 @@ internal sealed class SymbolicProjectQueryContext(
         SmtAnalysisService? smtAnalysis = null,
         IEnumerable<string>? impliedConditions = null,
         bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false,
-        SymbolicSourceQueryFilter? filter = null)
+        bool includeCurrentStatementCompletionFacts = false)
     {
         return new SymbolicQueryOptions(
                 smtAnalysis: smtAnalysis,
                 impliedConditions: impliedConditions,
                 includeExpressionProgramPoints: includeExpressionProgramPoints,
-                includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts,
-                filter: filter)
+                includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts)
             .WithAnalysisLimits(Configuration.AnalysisLimits);
     }
 

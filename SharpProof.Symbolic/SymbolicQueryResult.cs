@@ -125,11 +125,11 @@ internal sealed class SymbolicQueryResult(
         _ => ProgramPointCount == 0 ? 0 : 1
     };
 
-    public SymbolicQueryResult Filter(SymbolicSourceQueryFilter filter)
+    internal SymbolicQueryResult Filter(Func<SymbolicProgramPointResult, bool> matches)
     {
-        if (filter == null) throw new ArgumentNullException(nameof(filter));
+        if (matches == null) throw new ArgumentNullException(nameof(matches));
 
-        var points = ProgramPoints.Where(filter.Matches).ToArray();
+        var points = ProgramPoints.Where(matches).ToArray();
         return Scope.Kind switch
         {
             SymbolicQueryScopeKind.File => FromFile(
@@ -138,7 +138,7 @@ internal sealed class SymbolicQueryResult(
                 LineGroups
                     .Select(group => new SymbolicQueryLineGroup(
                         group.Line,
-                        group.ProgramPoints.Where(filter.Matches).ToArray()))
+                        group.ProgramPoints.Where(matches).ToArray()))
                     .Where(static group => group.ProgramPoints.Count != 0)
                     .ToArray(),
                 SmtDiagnostics),

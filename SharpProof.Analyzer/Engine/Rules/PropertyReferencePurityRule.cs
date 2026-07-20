@@ -259,18 +259,8 @@ internal partial class PropertyReferencePurityRule
                 out var instanceBclFallbackResult))
             return instanceBclFallbackResult;
 
-        if (propertySymbol.GetMethod != null &&
-            context.AttributePolicy.HasAttribute(propertySymbol.GetMethod, "PureAttribute"))
-            return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context);
-
         if (propertySymbol.GetMethod != null)
             return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context);
-
-        if (propertySymbol.GetMethod != null &&
-            context.PurityCache.TryGetValue(propertySymbol.GetMethod.OriginalDefinition, out var cachedGetterResult) &&
-            !cachedGetterResult.IsPure)
-            return cachedGetterResult.WithCallee(propertySymbol.GetMethod, propertyReferenceOperation.Syntax);
-
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }

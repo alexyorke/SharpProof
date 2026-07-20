@@ -47,9 +47,7 @@ static async Task<int> RunAsync(string[] args)
         return 0;
     }
 
-    var queryOptions = options.CreateQueryOptions(smtAnalysis, !options.RuntimeHazards &&
-                                                               !options.Complexity &&
-                                                               !options.Capabilities);
+    var queryOptions = options.CreateQueryOptions(smtAnalysis);
     var executor = new SymbolicQueryExecutor();
     object result = options.RuntimeHazards
         ? executor.QueryRuntimeHazards(
@@ -66,6 +64,8 @@ static async Task<int> RunAsync(string[] args)
 
     if (options.HasRuntimeHazardFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
         result = options.FilterRuntimeHazards(runtimeHazardResult);
+    else if (result is SymbolicQueryResult queryResult)
+        result = options.FilterResult(queryResult);
 
     if (options.Json)
     {

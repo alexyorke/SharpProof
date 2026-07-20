@@ -31,7 +31,7 @@ internal sealed record SymbolicCliExplainReport(
         ArgumentNullException.ThrowIfNull(smtAnalysis);
 
         var source = inputContext.SourceInput;
-        var queryOptions = options.CreateQueryOptions(smtAnalysis, false);
+        var queryOptions = options.CreateQueryOptions(smtAnalysis);
         var requestedTarget = options.Position.HasValue
             ? new SharpProofTarget(SharpProofTargetKind.Position, Position: options.Position.Value)
             : new SharpProofTarget(SharpProofTargetKind.Point, Line: options.Line, Column: options.Column);

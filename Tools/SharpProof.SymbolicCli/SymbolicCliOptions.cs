@@ -378,6 +378,14 @@ internal sealed class SymbolicCliOptions
         {
             NormalizeStringList(options.InvariantTargets);
             NormalizeStringList(options.PreprocessorSymbols);
+            NormalizeStringList(options.NodeKinds);
+            NormalizeStringList(options.MethodNames);
+            NormalizeStringList(options.MethodNameContains);
+            NormalizeStringList(options.ConditionTargets);
+            NormalizeStringList(options.Conditions);
+            NormalizeStringList(options.ConditionContains);
+            NormalizeStringList(options.ProofConditions);
+            NormalizeStringList(options.ProofConditionContains);
             _ = options.CreateCompilationProfile();
 
             Reject((options.Sarif ? 1 : 0) +
@@ -634,26 +642,48 @@ internal sealed class SymbolicCliOptions
         ProjectAnalysisLimits = context?.Configuration.AnalysisLimits;
     }
 
-    public SymbolicSourceQueryFilter CreateResultFilter()
+    public SymbolicQueryResult FilterResult(SymbolicQueryResult result)
     {
-        return new SymbolicSourceQueryFilter(
-            NodeKinds,
-            WithFacts,
-            ReachabilityFilters,
-            MethodNames,
-            WithConditions,
-            ConditionTargets,
-            Conditions,
-            ConditionContains,
-            MethodNameContains,
-            FilterLines,
-            FilterLineStart,
-            FilterLineEnd,
-            ProgramPointKinds,
-            WithProofs,
-            ProofOutcomes,
-            ProofConditions,
-            ProofConditionContains);
+        ArgumentNullException.ThrowIfNull(result);
+        return HasResultFilter ? result.Filter(MatchesResult) : result;
+    }
+
+    private bool MatchesResult(SymbolicProgramPointResult result)
+    {
+        if (WithFacts && result.Facts.Count == 0 ||
+            WithConditions && result.PathConditionCount == 0 ||
+            WithProofs && result.ConditionProofs.Count == 0 ||
+            NodeKinds.Count != 0 && !Contains(NodeKinds, result.NodeKind, StringComparison.OrdinalIgnoreCase) ||
+            ProgramPointKinds.Count != 0 &&
+            !Contains(ProgramPointKinds, result.ProgramPointKind, StringComparison.OrdinalIgnoreCase) ||
+            FilterLines.Count != 0 && !FilterLines.Contains(result.Line) ||
+            FilterLineStart.HasValue && result.Line < FilterLineStart.Value ||
+            FilterLineEnd.HasValue && result.Line > FilterLineEnd.Value ||
+            ReachabilityFilters.Count != 0 && !ReachabilityFilters.Contains(result.Reachability) ||
+            MethodNames.Count != 0 && !Contains(MethodNames, result.MethodName, StringComparison.OrdinalIgnoreCase) ||
+            MethodNameContains.Count != 0 &&
+            !ContainsFragment(MethodNameContains, result.MethodName, StringComparison.OrdinalIgnoreCase) ||
+            ConditionTargets.Count != 0 && !result.Invariant.Conditions.Any(condition =>
+                Contains(ConditionTargets, condition.Target, StringComparison.OrdinalIgnoreCase)) ||
+            Conditions.Count != 0 && !result.Invariant.Conditions.Any(condition =>
+                Contains(Conditions, condition.Text, StringComparison.Ordinal)) ||
+            ConditionContains.Count != 0 && !result.Invariant.Conditions.Any(condition =>
+                ContainsFragment(ConditionContains, condition.Text, StringComparison.OrdinalIgnoreCase)) ||
+            ProofOutcomes.Count != 0 &&
+            !result.ConditionProofs.Any(proof => ProofOutcomes.Contains(proof.TruthValue)) ||
+            ProofConditions.Count != 0 && !result.ConditionProofs.Any(proof =>
+                Contains(ProofConditions, proof.Condition, StringComparison.Ordinal)) ||
+            ProofConditionContains.Count != 0 && !result.ConditionProofs.Any(proof =>
+                ContainsFragment(ProofConditionContains, proof.Condition, StringComparison.OrdinalIgnoreCase)))
+            return false;
+
+        return true;
+
+        static bool Contains(IEnumerable<string> values, string? candidate, StringComparison comparison) =>
+            candidate != null && values.Any(value => string.Equals(value, candidate, comparison));
+
+        static bool ContainsFragment(IEnumerable<string> values, string? candidate, StringComparison comparison) =>
+            candidate != null && values.Any(value => candidate.IndexOf(value, comparison) >= 0);
     }
 
     public SmtAnalysisOptions CreateSmtOptions()
@@ -682,17 +712,14 @@ internal sealed class SymbolicCliOptions
                     : lifecycleDefaults.DisposeCurrentThreadContextOnServiceDispose));
     }
 
-    public SymbolicQueryOptions CreateQueryOptions(
-        SmtAnalysisService? smtAnalysis,
-        bool includeResultFilter)
+    public SymbolicQueryOptions CreateQueryOptions(SmtAnalysisService? smtAnalysis)
     {
         return new SymbolicQueryOptions(
                 CreateReferences(),
                 smtAnalysis,
                 ImpliedConditions,
                 LineExpressions,
-                PostLineInvariants,
-                includeResultFilter && HasResultFilter ? CreateResultFilter() : null)
+                PostLineInvariants)
             .WithAnalysisLimits(CreateAnalysisLimits());
     }
 

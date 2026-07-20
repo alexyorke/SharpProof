@@ -604,13 +604,21 @@ Tests are excluded from the metric and must not be deleted.
   short and wide operand forms remain explicit, while runtime StringComparer,
   same-assembly static-field, and full tooling coverage preserve tracked IL
   constants, locals, and stable-identity evidence.
+- [x] Made source-query result filtering a CLI-owned concern instead of an
+  engine request contract. Deleted the constructor-heavy 18-field
+  `SymbolicSourceQueryFilter` and its query-option plumbing; the CLI now applies
+  the same normalized typed predicate after canonical query execution, while
+  result aggregation still recomputes every filtered summary. Also removed an
+  unreachable property-getter cache branch and inferred indirect-write and
+  operand-size IL families from opcode metadata. Architecture coverage prevents
+  the filter adapter from returning.
 
 ## Current evidence
 
-- Maintained production: 91,320 lines (87,401 C#, 3,189 scripts, and 730
-  specifications); net reduction: 16,306 lines; remaining reduction: 3,694.
-  This inferred IL opcode-family tranche removed 55 maintained-production lines
-  without deleting tests or changing serialized output.
+- Maintained production: 91,120 lines (87,201 C#, 3,189 scripts, and 730
+  specifications); net reduction: 16,506 lines; remaining reduction: 3,494.
+  This CLI-filter ownership and final dead-code tranche removed 200 maintained-
+  production lines without deleting tests or changing serialized output.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,214 passing tests and two documented Main skips.
 
