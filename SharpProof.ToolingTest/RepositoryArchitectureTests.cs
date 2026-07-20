@@ -656,6 +656,27 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void ContractCompletionAnalysis_HasOneOwner()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var analyzerRoot = Path.Combine(root, "SharpProof.Analyzer");
+        var completion = File.ReadAllText(Path.Combine(analyzerRoot, "MethodCompletionAnalysis.cs"));
+        var ensures = File.ReadAllText(Path.Combine(analyzerRoot, "MethodEnsuresAnalyzer.cs"));
+        var nullable = File.ReadAllText(Path.Combine(analyzerRoot, "NullableContractAnalyzer.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(completion, Does.Contain("record struct MethodNormalCompletion"));
+            Assert.That(completion, Does.Contain("IsCompilerMarkedUnreachable"));
+            Assert.That(completion, Does.Contain("TryCreateEntrySnapshotProofCondition"));
+            Assert.That(ensures, Does.Not.Contain("CollectCompletionSites"));
+            Assert.That(ensures, Does.Not.Contain("record struct CompletionSite"));
+            Assert.That(nullable, Does.Not.Contain("CollectNormalCompletions"));
+            Assert.That(nullable, Does.Not.Contain("record struct NormalCompletion"));
+        });
+    }
+
+    [Test]
     public void ProofMetadata_HasOneResultAndProjectionOwner()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

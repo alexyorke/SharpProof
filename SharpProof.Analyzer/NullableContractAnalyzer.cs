@@ -6,7 +6,7 @@ internal static class NullableContractAnalyzer
     {
         if (context.Snapshot.RootOperation == null) return;
 
-        var completions = CollectNormalCompletions(context);
+        var completions = MethodCompletionAnalysis.Collect(context, distinctByQueryPosition: true);
         if (completions.Length != 0)
         {
             VerifyReturnContracts(context, session, completions);
@@ -20,7 +20,7 @@ internal static class NullableContractAnalyzer
     private static void VerifyReturnContracts(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        ImmutableArray<NormalCompletion> completions)
+        ImmutableArray<MethodNormalCompletion> completions)
     {
         var method = context.MethodSymbol;
         if (method.ReturnsVoid || method.ReturnType.SpecialType == SpecialType.System_Void) return;
@@ -73,7 +73,7 @@ internal static class NullableContractAnalyzer
     private static void VerifyParameterContracts(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        ImmutableArray<NormalCompletion> completions)
+        ImmutableArray<MethodNormalCompletion> completions)
     {
         foreach (var parameter in context.MethodSymbol.Parameters)
         {
@@ -136,7 +136,7 @@ internal static class NullableContractAnalyzer
     private static void VerifyMemberContracts(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        ImmutableArray<NormalCompletion> completions)
+        ImmutableArray<MethodNormalCompletion> completions)
     {
         var method = context.MethodSymbol;
         if (method.IsStatic || method.ContainingType == null) return;
@@ -152,7 +152,7 @@ internal static class NullableContractAnalyzer
     private static void VerifyMemberTarget(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        ImmutableArray<NormalCompletion> completions,
+        ImmutableArray<MethodNormalCompletion> completions,
         string targetName,
         bool? expectedResult)
     {
@@ -372,7 +372,7 @@ internal static class NullableContractAnalyzer
     private static void Verify(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        NormalCompletion completion,
+        MethodNormalCompletion completion,
         string condition,
         DiagnosticDescriptor violationDescriptor,
         string kind,
@@ -395,7 +395,7 @@ internal static class NullableContractAnalyzer
     private static void Verify(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
-        NormalCompletion completion,
+        MethodNormalCompletion completion,
         string condition,
         DiagnosticDescriptor violationDescriptor,
         string kind,
@@ -404,34 +404,11 @@ internal static class NullableContractAnalyzer
         bool unknownIsViolation,
         bool counterexampleIsViolation)
     {
-        var proof = condition.IndexOf("old(", StringComparison.Ordinal) >= 0
-            ? MethodEnsuresAnalyzer.TryCreateEntrySnapshotProofCondition(
-                condition,
-                context.MethodSymbol,
-                context.SemanticModel,
-                completion.QueryNode.SpanStart,
-                context.CancellationToken,
-                out var symbolicCondition,
-                out var initialState,
-                out var snapshotFailureReason)
-                ? context.State.ProveAtNode(
-                    completion.QueryNode,
-                    condition,
-                    symbolicCondition,
-                    initialState,
-                    session.PurityService.SmtAnalysis,
-                    completion.IncludeCurrentStatementCompletionFacts,
-                    context.CancellationToken)
-                : new SymbolicConditionProofResult(
-                    condition,
-                    SymbolicTruthValue.Unknown,
-                    snapshotFailureReason ?? "entry snapshot could not be created")
-            : context.State.ProveAtNode(
-                completion.QueryNode,
-                condition,
-                session.PurityService.SmtAnalysis,
-                completion.IncludeCurrentStatementCompletionFacts,
-                context.CancellationToken);
+        var proof = MethodCompletionAnalysis.Prove(
+            context,
+            session.PurityService.SmtAnalysis,
+            completion,
+            condition);
         if (proof.TruthValue is SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable) return;
 
         if (proof.TruthValue == SymbolicTruthValue.ProvenFalse ||
@@ -604,46 +581,6 @@ internal static class NullableContractAnalyzer
             condition);
     }
 
-    private static ImmutableArray<NormalCompletion> CollectNormalCompletions(MethodBodyAnalysisContext context)
-    {
-        var builder = ImmutableArray.CreateBuilder<NormalCompletion>();
-        foreach (var operation in context.Snapshot.VisibleOperations)
-        {
-            context.CancellationToken.ThrowIfCancellationRequested();
-            if (operation is not IReturnOperation returnOperation ||
-                AnalyzerSyntaxHelpers.IsCompilerMarkedUnreachable(
-                    operation.Syntax,
-                    context.SemanticModel,
-                    context.CancellationToken))
-                continue;
-
-            var expression = returnOperation.ReturnedValue?.Syntax as ExpressionSyntax;
-            builder.Add(new NormalCompletion(
-                expression,
-                expression?.GetLocation() ?? operation.Syntax.GetLocation(),
-                operation.Syntax,
-                false));
-        }
-
-        if (CSharpSyntaxFacts.TryGetExpressionBody(context.Node, out var expressionBody))
-        {
-            var hasResultValue = AnalyzerSyntaxHelpers.HasResultValue(context.MethodSymbol);
-            builder.Add(new NormalCompletion(
-                hasResultValue ? expressionBody : null,
-                expressionBody.GetLocation(),
-                expressionBody,
-                !hasResultValue));
-        }
-        else if (CSharpSyntaxFacts.GetBlockBody(context.Node) is { } body &&
-                 AnalyzerSyntaxHelpers.BodyEndPointIsReachable(body, context.SemanticModel))
-            builder.Add(new NormalCompletion(null, body.CloseBraceToken.GetLocation(), body, true));
-
-        return builder
-            .GroupBy(static completion => completion.QueryNode.SpanStart)
-            .Select(static group => group.First())
-            .ToImmutableArray();
-    }
-
     private static string ConditionalImplication(ExpressionSyntax result, bool expected, string consequence)
     {
         return Parenthesize(result) + " != " + FormatBoolean(expected) + " || " + consequence;
@@ -658,9 +595,4 @@ internal static class NullableContractAnalyzer
 
     private static string EscapeIdentifier(string identifier) => "@" + identifier;
 
-    private readonly record struct NormalCompletion(
-        ExpressionSyntax? ResultExpression,
-        Location Location,
-        SyntaxNode QueryNode,
-        bool IncludeCurrentStatementCompletionFacts);
 }

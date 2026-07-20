@@ -57,9 +57,7 @@ internal static class MethodEnsuresAnalyzer
         }
 
         var requiresAssumptions = CollectRequiresAssumptions(methodSymbol, attributePolicy, context.CancellationToken);
-        var completionSites =
-            CollectCompletionSites(methodSymbol, context.Node, context.SemanticModel, context.Snapshot,
-                context.CancellationToken);
+        var completionSites = MethodCompletionAnalysis.Collect(context);
         if (completionSites.Length == 0) return;
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -84,7 +82,7 @@ internal static class MethodEnsuresAnalyzer
 
             if (!ContractConditionHelpers.TryCreateSpeculativeModel(
                     context.SemanticModel,
-                    GetSpeculativePosition(completionSites[0]),
+                    completionSites[0].QueryNode.SpanStart,
                     conditionStatement,
                     out var speculativeModel))
             {
@@ -99,7 +97,7 @@ internal static class MethodEnsuresAnalyzer
                 continue;
             }
 
-            if (!CompletionSitesHaveResult(completionSites) &&
+            if (!completionSites.All(static site => site.ResultExpression != null) &&
                 RequiresContractHelpers.ContainsResultReference(conditionExpression))
             {
                 var diagnostic = CreateUnsupportedDiagnostic(
@@ -162,42 +160,11 @@ internal static class MethodEnsuresAnalyzer
 
                 var proofCondition =
                     RequiresContractHelpers.CombineAsImplication(requiresAssumptions, rewrittenCondition);
-                SymbolicConditionProofResult proof;
-                if (TryCreateOldAwareProofCondition(
-                        proofCondition,
-                        methodSymbol,
-                        context.SemanticModel,
-                        completionSite,
-                        context.CancellationToken,
-                        out var symbolicCondition,
-                        out var initialState,
-                        out var oldFailureReason))
-                {
-                    proof = context.State.ProveAtNode(
-                        completionSite.QueryNode,
-                        proofCondition,
-                        symbolicCondition,
-                        initialState,
-                        purityService.SmtAnalysis,
-                        completionSite.IncludeCurrentStatementCompletionFacts,
-                        context.CancellationToken);
-                }
-                else if (oldFailureReason == null)
-                {
-                    proof = context.State.ProveAtNode(
-                        completionSite.QueryNode,
-                        proofCondition,
-                        purityService.SmtAnalysis,
-                        completionSite.IncludeCurrentStatementCompletionFacts,
-                        context.CancellationToken);
-                }
-                else
-                {
-                    proof = new SymbolicConditionProofResult(
-                        proofCondition,
-                        SymbolicTruthValue.Unknown,
-                        oldFailureReason);
-                }
+                var proof = MethodCompletionAnalysis.Prove(
+                    context,
+                    purityService.SmtAnalysis,
+                    completionSite,
+                    proofCondition);
 
                 if (proof.TruthValue == SymbolicTruthValue.ProvenTrue ||
                     proof.TruthValue == SymbolicTruthValue.Unreachable)
@@ -315,83 +282,6 @@ internal static class MethodEnsuresAnalyzer
         return true;
     }
 
-    private static ImmutableArray<CompletionSite> CollectCompletionSites(
-        IMethodSymbol methodSymbol,
-        SyntaxNode methodNode,
-        SemanticModel semanticModel,
-        MethodAnalysisSnapshot snapshot,
-        CancellationToken cancellationToken)
-    {
-        if (snapshot.RootOperation == null) return ImmutableArray<CompletionSite>.Empty;
-
-        var builder = ImmutableArray.CreateBuilder<CompletionSite>();
-        foreach (var operation in snapshot.VisibleOperations)
-            if (operation is IReturnOperation returnOperation)
-            {
-                if (AnalyzerSyntaxHelpers.IsCompilerMarkedUnreachable(
-                        operation.Syntax,
-                        semanticModel,
-                        cancellationToken))
-                    continue;
-
-                if (returnOperation.ReturnedValue?.Syntax is ExpressionSyntax returnedExpression)
-                {
-                    builder.Add(new CompletionSite(
-                        returnedExpression,
-                        returnedExpression.GetLocation(),
-                        operation.Syntax,
-                        false,
-                        returnedExpression.ToString()));
-                    continue;
-                }
-
-                builder.Add(new CompletionSite(
-                    null,
-                    operation.Syntax.GetLocation(),
-                    operation.Syntax,
-                    false,
-                    "return"));
-            }
-
-        if (CSharpSyntaxFacts.TryGetExpressionBody(methodNode, out var expressionBody))
-        {
-            var hasResultValue = AnalyzerSyntaxHelpers.HasResultValue(methodSymbol);
-            builder.Add(new CompletionSite(
-                hasResultValue ? expressionBody : null,
-                expressionBody.GetLocation(),
-                expressionBody,
-                !hasResultValue,
-                hasResultValue ? expressionBody.ToString() : "normal completion"));
-        }
-        else if (CSharpSyntaxFacts.GetBlockBody(methodNode) is { } bodyBlock &&
-                 AnalyzerSyntaxHelpers.BodyEndPointIsReachable(bodyBlock, semanticModel))
-        {
-            builder.Add(new CompletionSite(
-                null,
-                GetBodyCompletionLocation(bodyBlock),
-                bodyBlock,
-                true,
-                "normal completion"));
-        }
-
-        return builder.ToImmutable();
-    }
-
-    private static Location GetBodyCompletionLocation(BlockSyntax body)
-    {
-        return body.CloseBraceToken.GetLocation();
-    }
-
-    private static int GetSpeculativePosition(CompletionSite completionSite)
-    {
-        return completionSite.QueryNode.SpanStart;
-    }
-
-    private static bool CompletionSitesHaveResult(ImmutableArray<CompletionSite> completionSites)
-    {
-        return completionSites.All(static site => site.ResultExpression != null);
-    }
-
     private static bool ReferencesUserLocalOrUnsupportedParameter(
         ExpressionSyntax conditionExpression,
         SemanticModel speculativeModel,
@@ -425,7 +315,7 @@ internal static class MethodEnsuresAnalyzer
 
     private static bool TryRewriteConditionForCompletionSite(
         string conditionText,
-        CompletionSite completionSite,
+        MethodNormalCompletion completionSite,
         NullableFlowFactState resultState,
         out string rewrittenCondition,
         out ExpressionSyntax rewrittenExpression)
@@ -448,27 +338,6 @@ internal static class MethodEnsuresAnalyzer
         rewrittenCondition = rewritten.ToFullString();
         rewrittenExpression = rewritten;
         return true;
-    }
-
-    private static bool TryCreateOldAwareProofCondition(
-        string proofCondition,
-        IMethodSymbol methodSymbol,
-        SemanticModel semanticModel,
-        CompletionSite completionSite,
-        CancellationToken cancellationToken,
-        out SymbolicCondition symbolicCondition,
-        out SymbolicState initialState,
-        out string? failureReason)
-    {
-        return TryCreateEntrySnapshotProofCondition(
-            proofCondition,
-            methodSymbol,
-            semanticModel,
-            GetSpeculativePosition(completionSite),
-            cancellationToken,
-            out symbolicCondition,
-            out initialState,
-            out failureReason);
     }
 
     internal static bool TryCreateEntrySnapshotProofCondition(
@@ -546,7 +415,7 @@ internal static class MethodEnsuresAnalyzer
     private static Diagnostic CreateNotProvenDiagnostic(
         IMethodSymbol methodSymbol,
         string condition,
-        CompletionSite completionSite,
+        MethodNormalCompletion completionSite,
         Location? contractLocation,
         SymbolicConditionProofResult proof)
     {
@@ -785,10 +654,4 @@ internal static class MethodEnsuresAnalyzer
         string Argument,
         string? InvalidReason);
 
-    private readonly record struct CompletionSite(
-        ExpressionSyntax? ResultExpression,
-        Location Location,
-        SyntaxNode QueryNode,
-        bool IncludeCurrentStatementCompletionFacts,
-        string DisplayText);
 }

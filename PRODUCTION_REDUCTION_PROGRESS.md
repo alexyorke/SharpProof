@@ -732,14 +732,20 @@ Tests are excluded from the metric and must not be deleted.
   shape switch, true/false/null forwarding layers, and constant-comparison
   wrappers while preserving version-aware path facts, guard-mutation safety,
   constant-switch goto behavior, and conservative SMT outcomes.
+- [x] Made one immutable normal-completion model and collector own return,
+  expression-body, and reachable body-end discovery for both nullable
+  postconditions and `[Ensures]`. The same completion component now owns
+  old-value-aware proof dispatch as well; duplicate completion DTOs, traversal,
+  result-shape helpers, and proof branching are deleted while diagnostic policy
+  and evidence remain feature-owned.
 
 ## Current evidence
 
-- Maintained production: 90,366 lines (86,622 C#, 3,014 scripts, and 730
-  specifications); net reduction: 17,260 lines; remaining reduction: 2,740.
-  This migration removes 190 maintained-production lines by deleting duplicated
-  Analyzer evaluation-path shape and classification plumbing without changing
-  the version-aware symbolic owner or broadening successful proofs.
+- Maintained production: 90,268 lines (86,524 C#, 3,014 scripts, and 730
+  specifications); net reduction: 17,358 lines; remaining reduction: 2,642.
+  This migration removes 98 maintained-production lines by consolidating
+  Analyzer normal-completion discovery and old-aware condition-proof dispatch
+  without changing postcondition diagnostics or proof outcomes.
   Diagnostics, proof outcomes, conservative unknowns, CLI bytes, serialization,
   and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
