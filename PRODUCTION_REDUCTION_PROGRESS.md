@@ -622,6 +622,11 @@ Tests are excluded from the metric and must not be deleted.
   executable, including stdin and JSON requests; production uses ordinary
   process console streams and working-directory path resolution. Also removed
   one unused preview Fuzz expectation convenience method.
+- [x] Consolidated nullable contract metadata traversal into one current/original
+  symbol stream, including property getter and setter-input projection. Removed
+  the second invocation/property/field expression-contract pass after Roslyn
+  nullable-flow characterization proved it redundant; exact contract queries
+  still retain their explicit conservative path.
 - [x] Made the canonical baseline and EffectSummary loaders own additional-file
   validation results. Deleted the 241-line `AnalyzerAdditionalFileValidator`
   and its second JSON traversal; one session-owned issue accumulator now
@@ -751,17 +756,18 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current evidence
 
-- Maintained production: 90,183 lines (86,439 C#, 3,014 scripts, and 730
-  specifications); net reduction: 17,443 lines; remaining reduction: 2,557.
-  This migration removes 56 maintained-production lines by deleting the
-  test-only ambient Symbolic CLI host and an unused preview Fuzz API while
-  routing all CLI characterization through the executable boundary.
+- Maintained production: 90,097 lines (86,353 C#, 3,014 scripts, and 730
+  specifications); net reduction: 17,529 lines; remaining reduction: 2,471.
+  This migration removes 86 maintained-production lines by centralizing
+  nullable attribute traversal and relying on Roslyn flow state instead of a
+  redundant expression-contract pass.
   Diagnostics, proof outcomes, conservative unknowns, CLI bytes, serialization,
   and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,239 passing tests and two documented Main skips. One Flow test
-  missed its diagnostic during the parallel all-lane run, then passed both an
-  exact serial retry and the complete 257-test Flow lane serially.
+- Six lanes: 6,240 passing tests and two documented Main skips. One existing
+  ProofCore Z3 smoke test returned `Unknown` under the loaded MainGeneral run,
+  then passed exactly and the complete 4,003-test lane passed with one NUnit
+  worker; all other lanes passed directly.
 
 ## Milestones
 

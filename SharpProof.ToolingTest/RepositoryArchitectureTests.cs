@@ -411,6 +411,24 @@ public sealed class RepositoryArchitectureTests
     }
 
     [Test]
+    public void NullableFlowFacts_UseRoslynFlowAndOneAttributeTraversal()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Symbolic", "NullableFlowFacts.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(source, Does.Contain("typeInfo.Nullability.FlowState"));
+            Assert.That(source, Does.Contain("GetAttributes(ISymbol symbol)"));
+            Assert.That(source, Does.Contain("GetReadAttributes(IPropertySymbol property)"));
+            Assert.That(source, Does.Not.Contain("TryGetExplicitExpressionState"));
+            Assert.That(source, Does.Not.Contain("PropertyHasAttribute"));
+            Assert.That(source, Does.Not.Contain("FieldHasAttribute"));
+        });
+    }
+
+    [Test]
     public void SymbolicQueryResults_UseCanonicalContextAndPrimaryConstructorOwners()
     {
         var root = ReadmeExampleFixture.GetRepositoryRoot();

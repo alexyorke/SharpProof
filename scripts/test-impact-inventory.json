@@ -5078,7 +5078,7 @@
                                                   "NullableFlowFacts",
                                                   "NullableFlowFactState"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "NullableFlowFacts",
                                                      "NullableFlowFactState"
@@ -9595,13 +9595,14 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "NullableFlowFactsTests",
+                                                                 "RepositoryArchitectureTests",
                                                                  "SymbolicSemanticPipelineTests"
                                                              ],
                                     "tokens":  [
                                                    "NullableFlowFacts",
                                                    "NullableFlowFactState"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Polyfills/IsExternalInit.cs",

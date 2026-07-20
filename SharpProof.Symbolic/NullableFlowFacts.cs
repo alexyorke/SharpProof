@@ -43,9 +43,6 @@ internal static class NullableFlowFacts
         if (type == null || !SymbolicTypeFacts.IsReferenceLikeType(type))
             return NullableFlowFactState.Unknown;
 
-        if (TryGetExplicitExpressionState(expression, semanticModel, cancellationToken, out var explicitState))
-            return explicitState;
-
         var flowState = typeInfo.Nullability.FlowState != NullableFlowState.None
             ? typeInfo.Nullability.FlowState
             : typeInfo.ConvertedNullability.FlowState;
@@ -306,9 +303,7 @@ internal static class NullableFlowFacts
     {
         if (method == null) throw new ArgumentNullException(nameof(method));
 
-        return HasAttribute(method.GetAttributes(), DoesNotReturnAttributeName) ||
-               (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition) &&
-                HasAttribute(method.OriginalDefinition.GetAttributes(), DoesNotReturnAttributeName));
+        return HasAttribute(GetAttributes(method), DoesNotReturnAttributeName);
     }
 
     internal static NullableFlowFactState GetMethodReturnState(IMethodSymbol method)
@@ -339,42 +334,12 @@ internal static class NullableFlowFacts
         return FromAnnotation(taskLike.TypeArgumentNullableAnnotations[0]);
     }
 
-    internal static NullableFlowFactState GetPropertyReadState(IPropertySymbol property)
-    {
-        if (property == null) throw new ArgumentNullException(nameof(property));
-
-        if (!SymbolicTypeFacts.IsReferenceLikeType(property.Type)) return NullableFlowFactState.Unknown;
-
-        var contractState = GetPropertyReadContractState(property);
-        if (contractState != NullableFlowFactState.Unknown) return contractState;
-
-        return FromAnnotation(property.NullableAnnotation);
-    }
-
-    internal static NullableFlowFactState GetFieldReadState(IFieldSymbol field)
-    {
-        if (field == null) throw new ArgumentNullException(nameof(field));
-
-        if (!SymbolicTypeFacts.IsReferenceLikeType(field.Type)) return NullableFlowFactState.Unknown;
-
-        var contractState = GetFieldReadContractState(field);
-        if (contractState != NullableFlowFactState.Unknown) return contractState;
-
-        return FromAnnotation(field.NullableAnnotation);
-    }
-
     internal static ImmutableArray<string> GetMemberNotNullTargets(IMethodSymbol method)
     {
         if (method == null) throw new ArgumentNullException(nameof(method));
 
         var targets = ImmutableArray.CreateBuilder<string>();
-        AddMemberTargets(method.GetAttributes(), MemberNotNullAttributeName, null, targets);
-        if (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition))
-            AddMemberTargets(
-                method.OriginalDefinition.GetAttributes(),
-                MemberNotNullAttributeName,
-                null,
-                targets);
+        AddMemberTargets(GetAttributes(method), MemberNotNullAttributeName, null, targets);
 
         return targets.Distinct(StringComparer.Ordinal).ToImmutableArray();
     }
@@ -387,16 +352,10 @@ internal static class NullableFlowFacts
 
         var targets = ImmutableArray.CreateBuilder<string>();
         AddMemberTargets(
-            method.GetAttributes(),
+            GetAttributes(method),
             MemberNotNullWhenAttributeName,
             methodReturnValue,
             targets);
-        if (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition))
-            AddMemberTargets(
-                method.OriginalDefinition.GetAttributes(),
-                MemberNotNullWhenAttributeName,
-                methodReturnValue,
-                targets);
 
         return targets.Distinct(StringComparer.Ordinal).ToImmutableArray();
     }
@@ -451,62 +410,13 @@ internal static class NullableFlowFacts
 
     internal static bool TryGetNotNullIfNotNullParameterName(
         IMethodSymbol method,
-        out string parameterName)
-    {
-        if (TryGetNotNullIfNotNullParameterName(method.GetReturnTypeAttributes(), out parameterName)) return true;
-
-        if (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition) &&
-            TryGetNotNullIfNotNullParameterName(
-                method.OriginalDefinition.GetReturnTypeAttributes(),
-                out parameterName))
-            return true;
-
-        parameterName = string.Empty;
-        return false;
-    }
+        out string parameterName) =>
+        TryGetNotNullIfNotNullParameterName(GetReturnAttributes(method), out parameterName);
 
     internal static bool TryGetNotNullIfNotNullParameterName(
         IPropertySymbol property,
-        out string parameterName)
-    {
-        if (TryGetNotNullIfNotNullParameterName(property.GetAttributes(), out parameterName) ||
-            TryGetNotNullIfNotNullParameterName(
-                property.GetMethod?.GetReturnTypeAttributes() ?? ImmutableArray<AttributeData>.Empty,
-                out parameterName))
-            return true;
-
-        if (!SymbolEqualityComparer.Default.Equals(property, property.OriginalDefinition) &&
-            (TryGetNotNullIfNotNullParameterName(
-                 property.OriginalDefinition.GetAttributes(),
-                 out parameterName) ||
-             TryGetNotNullIfNotNullParameterName(
-                 property.OriginalDefinition.GetMethod?.GetReturnTypeAttributes() ??
-                 ImmutableArray<AttributeData>.Empty,
-                 out parameterName)))
-            return true;
-
-        parameterName = string.Empty;
-        return false;
-    }
-
-    private static bool TryGetExplicitExpressionState(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out NullableFlowFactState state)
-    {
-        var operation = semanticModel.GetOperation(expression, cancellationToken);
-        while (operation is IConversionOperation conversion) operation = conversion.Operand;
-
-        state = operation switch
-        {
-            IInvocationOperation invocation => GetMethodReturnState(invocation.TargetMethod),
-            IPropertyReferenceOperation property => GetPropertyReadState(property.Property),
-            IFieldReferenceOperation field => GetFieldReadState(field.Field),
-            _ => NullableFlowFactState.Unknown
-        };
-        return state != NullableFlowFactState.Unknown;
-    }
+        out string parameterName) =>
+        TryGetNotNullIfNotNullParameterName(GetReadAttributes(property), out parameterName);
 
     private static NullableFlowFactState GetExactExpressionState(
         ExpressionSyntax expression,
@@ -587,25 +497,21 @@ internal static class NullableFlowFacts
 
     private static NullableFlowFactState GetMethodReturnContractState(IMethodSymbol method)
     {
-        var attributes = method.GetReturnTypeAttributes();
-        var originalAttributes = SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition)
-            ? ImmutableArray<AttributeData>.Empty
-            : method.OriginalDefinition.GetReturnTypeAttributes();
-        if (HasAttribute(attributes, MaybeNullAttributeName) ||
-            HasAttribute(originalAttributes, MaybeNullAttributeName))
+        var attributes = GetReturnAttributes(method).ToArray();
+        if (HasAttribute(attributes, MaybeNullAttributeName))
             return NullableFlowFactState.MaybeNull;
 
-        return HasAttribute(attributes, NotNullAttributeName) ||
-               HasAttribute(originalAttributes, NotNullAttributeName)
+        return HasAttribute(attributes, NotNullAttributeName)
             ? NullableFlowFactState.NotNull
             : NullableFlowFactState.Unknown;
     }
 
     private static NullableFlowFactState GetPropertyReadContractState(IPropertySymbol property)
     {
-        if (PropertyHasAttribute(property, MaybeNullAttributeName)) return NullableFlowFactState.MaybeNull;
+        var attributes = GetReadAttributes(property).ToArray();
+        if (HasAttribute(attributes, MaybeNullAttributeName)) return NullableFlowFactState.MaybeNull;
 
-        return PropertyHasAttribute(property, NotNullAttributeName)
+        return HasAttribute(attributes, NotNullAttributeName)
             ? NullableFlowFactState.NotNull
             : NullableFlowFactState.Unknown;
     }
@@ -621,9 +527,10 @@ internal static class NullableFlowFacts
             })
             return NullableFlowFactState.NotNull;
 
-        if (FieldHasAttribute(field, MaybeNullAttributeName)) return NullableFlowFactState.MaybeNull;
+        var attributes = GetAttributes(field).ToArray();
+        if (HasAttribute(attributes, MaybeNullAttributeName)) return NullableFlowFactState.MaybeNull;
 
-        return FieldHasAttribute(field, NotNullAttributeName)
+        return HasAttribute(attributes, NotNullAttributeName)
             ? NullableFlowFactState.NotNull
             : NullableFlowFactState.Unknown;
     }
@@ -640,22 +547,7 @@ internal static class NullableFlowFacts
 
     private static bool HasParameterAttribute(IParameterSymbol parameter, string attributeName)
     {
-        if (HasAttribute(parameter.GetAttributes(), attributeName)) return true;
-
-        if (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
-            HasAttribute(parameter.OriginalDefinition.GetAttributes(), attributeName))
-            return true;
-
-        if (parameter.ContainingSymbol is IMethodSymbol
-            {
-                MethodKind: MethodKind.PropertySet,
-                AssociatedSymbol: IPropertySymbol property
-            } setter &&
-            parameter.Ordinal == setter.Parameters.Length - 1 &&
-            PropertyHasAttribute(property, attributeName))
-            return true;
-
-        return false;
+        return HasAttribute(GetInputAttributes(parameter), attributeName);
     }
 
     private static bool IsNullGuardForParameter(ExpressionSyntax condition, string parameterName)
@@ -686,42 +578,47 @@ internal static class NullableFlowFacts
     private static bool TryGetParameterBooleanAttributeValue(
         IParameterSymbol parameter,
         string attributeName,
-        out bool value)
+        out bool value) =>
+        TryGetBooleanAttributeValue(GetAttributes(parameter), attributeName, out value);
+
+    private static IEnumerable<AttributeData> GetInputAttributes(IParameterSymbol parameter)
     {
-        if (TryGetBooleanAttributeValue(parameter.GetAttributes(), attributeName, out value)) return true;
+        foreach (var attribute in GetAttributes(parameter)) yield return attribute;
 
-        if (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
-            TryGetBooleanAttributeValue(parameter.OriginalDefinition.GetAttributes(), attributeName, out value))
-            return true;
+        if (parameter.ContainingSymbol is not IMethodSymbol
+            {
+                MethodKind: MethodKind.PropertySet,
+                AssociatedSymbol: IPropertySymbol property
+            } setter ||
+            parameter.Ordinal != setter.Parameters.Length - 1)
+            yield break;
 
-        value = false;
-        return false;
+        foreach (var attribute in GetReadAttributes(property)) yield return attribute;
     }
 
-    private static bool PropertyHasAttribute(IPropertySymbol property, string attributeName)
+    private static IEnumerable<AttributeData> GetReturnAttributes(IMethodSymbol method)
     {
-        if (HasAttribute(property.GetAttributes(), attributeName) ||
-            HasAttribute(
-                property.GetMethod?.GetReturnTypeAttributes() ?? ImmutableArray<AttributeData>.Empty,
-                attributeName))
-            return true;
-
-        return !SymbolEqualityComparer.Default.Equals(property, property.OriginalDefinition) &&
-               (HasAttribute(property.OriginalDefinition.GetAttributes(), attributeName) ||
-                HasAttribute(
-                    property.OriginalDefinition.GetMethod?.GetReturnTypeAttributes() ??
-                    ImmutableArray<AttributeData>.Empty,
-                    attributeName));
+        foreach (var attribute in method.GetReturnTypeAttributes()) yield return attribute;
+        if (SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition)) yield break;
+        foreach (var attribute in method.OriginalDefinition.GetReturnTypeAttributes()) yield return attribute;
     }
 
-    private static bool FieldHasAttribute(IFieldSymbol field, string attributeName)
+    private static IEnumerable<AttributeData> GetReadAttributes(IPropertySymbol property)
     {
-        return HasAttribute(field.GetAttributes(), attributeName) ||
-               (!SymbolEqualityComparer.Default.Equals(field, field.OriginalDefinition) &&
-                HasAttribute(field.OriginalDefinition.GetAttributes(), attributeName));
+        foreach (var attribute in GetAttributes(property)) yield return attribute;
+        if (property.GetMethod is { } getter)
+            foreach (var attribute in GetReturnAttributes(getter))
+                yield return attribute;
     }
 
-    private static bool HasAttribute(ImmutableArray<AttributeData> attributes, string attributeName)
+    private static IEnumerable<AttributeData> GetAttributes(ISymbol symbol)
+    {
+        foreach (var attribute in symbol.GetAttributes()) yield return attribute;
+        if (SymbolEqualityComparer.Default.Equals(symbol, symbol.OriginalDefinition)) yield break;
+        foreach (var attribute in symbol.OriginalDefinition.GetAttributes()) yield return attribute;
+    }
+
+    private static bool HasAttribute(IEnumerable<AttributeData> attributes, string attributeName)
     {
         return attributes.Any(attribute =>
             string.Equals(
@@ -731,7 +628,7 @@ internal static class NullableFlowFacts
     }
 
     private static bool TryGetBooleanAttributeValue(
-        ImmutableArray<AttributeData> attributes,
+        IEnumerable<AttributeData> attributes,
         string attributeName,
         out bool value)
     {
@@ -754,7 +651,7 @@ internal static class NullableFlowFacts
     }
 
     private static void AddMemberTargets(
-        ImmutableArray<AttributeData> attributes,
+        IEnumerable<AttributeData> attributes,
         string attributeName,
         bool? methodReturnValue,
         ICollection<string> targets)
@@ -806,7 +703,7 @@ internal static class NullableFlowFacts
     }
 
     private static bool TryGetNotNullIfNotNullParameterName(
-        ImmutableArray<AttributeData> attributes,
+        IEnumerable<AttributeData> attributes,
         out string parameterName)
     {
         foreach (var attribute in attributes)
