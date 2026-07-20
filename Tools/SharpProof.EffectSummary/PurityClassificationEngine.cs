@@ -395,7 +395,7 @@ internal static class PurityClassificationEngine
                     out var reviewedCalleeClassification))
                 effectiveCalleeClassification = reviewedCalleeClassification;
 
-            if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary,
+            if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary.Symbol,
                     effectiveCalleeClassification)) continue;
 
             if (callSite.UsesDynamicDispatch &&

@@ -13,19 +13,6 @@ internal static class EffectSummaryCallPurityRules
     internal static bool ShouldTreatCallAsSemanticallyPure(
         MethodEffectSummary callerSummary,
         CallSiteSummary callSite,
-        MethodEffectSummary resolvedCallSummary,
-        MethodPurityClassification calleeClassification)
-    {
-        return ShouldTreatCallAsSemanticallyPure(
-            callerSummary,
-            callSite,
-            resolvedCallSummary.Symbol,
-            calleeClassification);
-    }
-
-    internal static bool ShouldTreatCallAsSemanticallyPure(
-        MethodEffectSummary callerSummary,
-        CallSiteSummary callSite,
         string calleeSymbol,
         MethodPurityClassification calleeClassification)
     {
@@ -68,22 +55,12 @@ internal static class EffectSummaryCallPurityRules
 
     internal static bool IsDateTimeOffsetArithmeticHelperCall(string callerSymbol, string calleeSymbol)
     {
-        return IsDateTimeOffsetArithmeticWrapper(callerSymbol) &&
-               (IsDateTimeArithmeticCall(calleeSymbol) ||
+        return IsDateTimeArithmeticMember(callerSymbol, "System.DateTimeOffset") &&
+               (IsDateTimeArithmeticMember(calleeSymbol, "System.DateTime") ||
                 string.Equals(calleeSymbol, "System.DateTimeOffset..ctor(System.DateTime, System.TimeSpan)",
                     StringComparison.Ordinal) ||
                 string.Equals(calleeSymbol, "System.DateTimeOffset.get_ClockDateTime()", StringComparison.Ordinal) ||
                 string.Equals(calleeSymbol, "System.DateTimeOffset.get_Offset()", StringComparison.Ordinal));
-    }
-
-    internal static bool IsDateTimeOffsetArithmeticWrapper(string symbol)
-    {
-        return IsDateTimeArithmeticMember(symbol, "System.DateTimeOffset");
-    }
-
-    internal static bool IsDateTimeArithmeticCall(string symbol)
-    {
-        return IsDateTimeArithmeticMember(symbol, "System.DateTime");
     }
 
     internal static bool IsDateTimeArithmeticMember(string symbol, string containingType)

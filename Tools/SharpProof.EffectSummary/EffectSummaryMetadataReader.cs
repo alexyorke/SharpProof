@@ -154,7 +154,7 @@ internal static class EffectSummaryMetadataReader
     internal static string GetMemberReferenceFieldLookupSymbol(MetadataReader reader, MemberReferenceHandle handle)
     {
         var memberReference = reader.GetMemberReference(handle);
-        var parentName = GetMemberReferenceFieldLookupParentName(reader, memberReference.Parent);
+        var parentName = GetMemberReferenceLookupParentName(reader, memberReference.Parent);
         return $"{parentName}.{reader.GetString(memberReference.Name)}";
     }
 
@@ -162,7 +162,7 @@ internal static class EffectSummaryMetadataReader
     {
         var memberReference = reader.GetMemberReference(handle);
         var parentName =
-            NormalizeExactTypeName(GetMemberReferenceFieldLookupParentName(reader, memberReference.Parent));
+            NormalizeExactTypeName(GetMemberReferenceLookupParentName(reader, memberReference.Parent));
         var fieldName = reader.GetString(memberReference.Name);
         var fieldType = DecodeMemberReferenceFieldExactType(memberReference);
         return $"{parentName}.{fieldName}:{fieldType}";
@@ -306,9 +306,8 @@ internal static class EffectSummaryMetadataReader
         {
             HandleKind.TypeDefinition => GetTypeName(reader, (TypeDefinitionHandle)handle),
             HandleKind.TypeReference => GetTypeReferenceName(reader, (TypeReferenceHandle)handle),
-            HandleKind.TypeSpecification => DecodeTypeSpecificationForMethodLookup(
-                reader,
-                (TypeSpecificationHandle)handle),
+            HandleKind.TypeSpecification => DecodeTypeSpecificationForMemberLookup(
+                reader, (TypeSpecificationHandle)handle),
             _ => null
         };
         if (string.IsNullOrWhiteSpace(typeName)) return null;
@@ -365,7 +364,7 @@ internal static class EffectSummaryMetadataReader
     {
         var memberReference = reader.GetMemberReference(handle);
         var parentName =
-            NormalizeExactTypeName(GetMemberReferenceMethodLookupParentName(reader, memberReference.Parent));
+            NormalizeExactTypeName(GetMemberReferenceLookupParentName(reader, memberReference.Parent));
         var name = reader.GetString(memberReference.Name);
         var signature = DecodeMethodSignature(memberReference, includeReturnType: true);
         return $"{parentName}.{name}{signature}";
@@ -385,21 +384,11 @@ internal static class EffectSummaryMetadataReader
         };
     }
 
-    internal static string GetMemberReferenceFieldLookupParentName(MetadataReader reader, EntityHandle handle)
+    internal static string GetMemberReferenceLookupParentName(MetadataReader reader, EntityHandle handle)
     {
         return handle.Kind switch
         {
-            HandleKind.TypeSpecification => DecodeTypeSpecificationForFieldLookup(reader,
-                (TypeSpecificationHandle)handle),
-            _ => GetMemberReferenceParentName(reader, handle)
-        };
-    }
-
-    internal static string GetMemberReferenceMethodLookupParentName(MetadataReader reader, EntityHandle handle)
-    {
-        return handle.Kind switch
-        {
-            HandleKind.TypeSpecification => DecodeTypeSpecificationForMethodLookup(reader,
+            HandleKind.TypeSpecification => DecodeTypeSpecificationForMemberLookup(reader,
                 (TypeSpecificationHandle)handle),
             _ => GetMemberReferenceParentName(reader, handle)
         };
@@ -507,17 +496,7 @@ internal static class EffectSummaryMetadataReader
         }
     }
 
-    internal static string DecodeTypeSpecificationForFieldLookup(MetadataReader reader, TypeSpecificationHandle handle)
-    {
-        return DecodeTypeSpecificationForMemberLookup(reader, handle);
-    }
-
-    internal static string DecodeTypeSpecificationForMethodLookup(MetadataReader reader, TypeSpecificationHandle handle)
-    {
-        return DecodeTypeSpecificationForMemberLookup(reader, handle);
-    }
-
-    private static string DecodeTypeSpecificationForMemberLookup(MetadataReader reader, TypeSpecificationHandle handle)
+    internal static string DecodeTypeSpecificationForMemberLookup(MetadataReader reader, TypeSpecificationHandle handle)
     {
         try
         {

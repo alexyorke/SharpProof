@@ -575,14 +575,19 @@ Tests are excluded from the metric and must not be deleted.
   two limits whose behavior is not yet represented by CFG joins: try-fact
   merging and scoped-block completion. Record equality now owns the cache's
   default-budget check instead of an eleven-property comparison.
+- [x] Removed EffectSummary's remaining one-consumer classification and ECMA
+  lookup adapters. Reviewed-entry validation now has one path; call purity has
+  one symbol-based predicate; date arithmetic uses the shared type/member
+  classifier directly; validation helpers use one predicate; and field,
+  method, and runtime-type lookups share one generic-erasing type-specification
+  decoder. Exact metadata keys and classification decisions remain unchanged.
 
 ## Current evidence
 
-- Maintained production: 91,691 lines (87,772 C#, 3,189 scripts, and 730
-  specifications); net reduction: 15,935 lines; remaining reduction: 4,065.
-  The custom-budget CFG migration removed seven maintained-production lines
-  and narrowed the structural fallback to two explicitly characterized limit
-  families without deleting tests.
+- Maintained production: 91,618 lines (87,699 C#, 3,189 scripts, and 730
+  specifications); net reduction: 16,008 lines; remaining reduction: 3,992.
+  The EffectSummary adapter consolidation removed 73 maintained-production
+  lines without deleting tests or changing serialized output.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,213 passing tests and two documented Main skips.
 
@@ -591,7 +596,7 @@ Tests are excluded from the metric and must not be deleted.
 - [x] 3,000 lines removed: inferred-summary foundation and first migrated rules.
 - [x] 7,000 lines removed: manual semantic catalogs substantially migrated.
 - [x] 12,000 lines removed: canonical symbolic traversal owns all transfer paths.
-- [ ] 16,000 lines removed: query, analyzer policy, and EffectSummary duplication removed.
+- [x] 16,000 lines removed: query, analyzer policy, and EffectSummary duplication removed.
 - [ ] 20,000 lines removed: CLI/ProofCore cleanup and final dead-code deletion complete.
 
 ## Current tranche

@@ -254,7 +254,7 @@ internal static class EffectSummaryClassificationEvidenceRules
         return false;
     }
 
-    internal static bool TryResolveReviewedImplementationClassification(
+    internal static bool TryResolveReviewedUpgrade(
         AssemblyEffectReport assembly,
         string symbol,
         MethodEffectSummary summary,
@@ -268,22 +268,6 @@ internal static class EffectSummaryClassificationEvidenceRules
 
         classification = CreateClassification(entry);
         return !string.Equals(classification.Classification, "conservative_unknown", StringComparison.Ordinal);
-    }
-
-    internal static bool TryResolveReviewedUpgrade(
-        AssemblyEffectReport assembly,
-        string symbol,
-        MethodEffectSummary summary,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
-        out MethodPurityClassification classification)
-    {
-        return TryResolveReviewedImplementationClassification(
-                   assembly,
-                   symbol,
-                   summary,
-                   externalGeneratedPurityEntries,
-                   out classification) &&
-               !string.Equals(classification.Classification, "conservative_unknown", StringComparison.Ordinal);
     }
 
     internal static bool TryGetExternalEntry(
@@ -436,8 +420,8 @@ internal static class EffectSummaryClassificationEvidenceRules
             symbol,
             context,
             context.FreshOwnedInitializationMemo,
-            IsFreshOwnedInitializationRoot,
-            IsFreshOwnedInitializationEffect);
+            "object_state_write",
+            "writes_instance_field");
     }
 
     internal static bool IsValidationThrowHelperCompatible(
@@ -448,16 +432,16 @@ internal static class EffectSummaryClassificationEvidenceRules
             symbol,
             context,
             context.ValidationThrowHelperMemo,
-            IsValidationThrowHelperRoot,
-            IsValidationThrowHelperEffect);
+            "throw",
+            "throws");
     }
 
     private static bool IsClassificationCompatible(
         string symbol,
         PurityClassificationContext context,
         Dictionary<string, bool> memo,
-        Func<string, bool> isAllowedRoot,
-        Func<string, bool> isAllowedEffect)
+        string allowedRoot,
+        string allowedEffect)
     {
         if (memo.TryGetValue(symbol, out var cached)) return cached;
 
@@ -467,8 +451,8 @@ internal static class EffectSummaryClassificationEvidenceRules
             context,
             memo,
             compatibilityVisiting,
-            isAllowedRoot,
-            isAllowedEffect);
+            allowedRoot,
+            allowedEffect);
         memo[symbol] = compatible;
         return compatible;
     }
@@ -478,15 +462,19 @@ internal static class EffectSummaryClassificationEvidenceRules
         PurityClassificationContext context,
         Dictionary<string, bool> memo,
         HashSet<string> compatibilityVisiting,
-        Func<string, bool> isAllowedRoot,
-        Func<string, bool> isAllowedEffect)
+        string allowedRoot,
+        string allowedEffect)
     {
         if (memo.TryGetValue(symbol, out var cached)) return cached;
         if (!context.BySymbol.TryGetValue(symbol, out var summary)) return false;
         if (!compatibilityVisiting.Add(symbol)) return false;
 
-        if (summary.RootCandidates.Any(root => !isAllowedRoot(root)) ||
-            summary.Effects.Any(effect => !isAllowedEffect(effect)))
+        if (summary.RootCandidates.Any(root =>
+                !InternalOnlyRoots.Contains(root) &&
+                !string.Equals(root, allowedRoot, StringComparison.Ordinal)) ||
+            summary.Effects.Any(effect =>
+                !SafeEffects.Contains(effect) &&
+                !string.Equals(effect, allowedEffect, StringComparison.Ordinal)))
         {
             compatibilityVisiting.Remove(symbol);
             return false;
@@ -517,7 +505,11 @@ internal static class EffectSummaryClassificationEvidenceRules
 
             var calleeClassification = ClassifyMethod(resolvedCallKey, context);
             if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) ||
-                ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, calleeClassification))
+                ShouldTreatCallAsSemanticallyPure(
+                    summary,
+                    callSite,
+                    resolvedCallSummary.Symbol,
+                    calleeClassification))
                 continue;
 
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal) &&
@@ -526,8 +518,8 @@ internal static class EffectSummaryClassificationEvidenceRules
                     context,
                     memo,
                     compatibilityVisiting,
-                    isAllowedRoot,
-                    isAllowedEffect))
+                    allowedRoot,
+                    allowedEffect))
                 continue;
 
             compatibilityVisiting.Remove(symbol);
@@ -539,29 +531,6 @@ internal static class EffectSummaryClassificationEvidenceRules
         return true;
     }
 
-    private static bool IsFreshOwnedInitializationRoot(string root)
-    {
-        return InternalOnlyRoots.Contains(root) ||
-               string.Equals(root, "object_state_write", StringComparison.Ordinal);
-    }
-
-    private static bool IsFreshOwnedInitializationEffect(string effect)
-    {
-        return SafeEffects.Contains(effect) ||
-               string.Equals(effect, "writes_instance_field", StringComparison.Ordinal);
-    }
-
-    private static bool IsValidationThrowHelperRoot(string root)
-    {
-        return InternalOnlyRoots.Contains(root) ||
-               string.Equals(root, "throw", StringComparison.Ordinal);
-    }
-
-    private static bool IsValidationThrowHelperEffect(string effect)
-    {
-        return SafeEffects.Contains(effect) ||
-               string.Equals(effect, "throws", StringComparison.Ordinal);
-    }
     internal static bool IsFreshOwnedObjectConstructor(MethodEffectSummary summary)
     {
         if (string.IsNullOrWhiteSpace(summary.Symbol) ||
@@ -591,18 +560,8 @@ internal static class EffectSummaryClassificationEvidenceRules
     internal static bool IsValidationThrowHelperSupportCall(string symbol)
     {
         var methodBaseSymbol = GetMethodBaseSymbol(symbol);
-        return IsExceptionConstructor(methodBaseSymbol) ||
-               IsResourceStringLookup(methodBaseSymbol);
-    }
-
-    internal static bool IsExceptionConstructor(string methodBaseSymbol)
-    {
-        return methodBaseSymbol.EndsWith("Exception..ctor", StringComparison.Ordinal);
-    }
-
-    internal static bool IsResourceStringLookup(string methodBaseSymbol)
-    {
-        return methodBaseSymbol.StartsWith("System.SR.get_", StringComparison.Ordinal) ||
+        return methodBaseSymbol.EndsWith("Exception..ctor", StringComparison.Ordinal) ||
+               methodBaseSymbol.StartsWith("System.SR.get_", StringComparison.Ordinal) ||
                string.Equals(methodBaseSymbol, "System.SR.GetResourceString", StringComparison.Ordinal) ||
                string.Equals(methodBaseSymbol, "System.SR.Format", StringComparison.Ordinal);
     }
