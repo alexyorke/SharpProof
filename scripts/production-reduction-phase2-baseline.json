@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "phase": 2,
+  "baselineCommit": "f5e75830",
+  "capturedAt": "2026-07-20T00:00:00-07:00",
+  "productionCSharpLines": 80686,
+  "productionScriptLines": 3014,
+  "productionSpecificationLines": 734,
+  "maintainedProductionLines": 84434,
+  "targetReductionLines": 20000,
+  "maximumMaintainedProductionLines": 64434,
+  "currentCeilingLines": 84934,
+  "scriptRoot": "scripts/",
+  "specificationPaths": [
+    "SharpProof.Analyzer/BuiltInEffectSummaryArtifactSpec.json",
+    "scripts/architecture-modules.json",
+    "scripts/package-projects.json"
+  ]
+}

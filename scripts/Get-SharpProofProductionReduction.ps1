@@ -14,11 +14,17 @@ param(
     [switch]$Json,
 
     [Parameter()]
+    [string]$BaselinePath = '',
+
+    [Parameter()]
     [ValidateRange(0, 1000000)]
     [int]$RequiredReductionLines = 0,
 
     [Parameter()]
-    [switch]$EnforceTarget
+    [switch]$EnforceTarget,
+
+    [Parameter()]
+    [switch]$EnforceCurrentCeiling
 )
 
 Set-StrictMode -Version Latest
@@ -26,7 +32,22 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $repoPrefix = $repoRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
-$baselinePath = Join-Path $PSScriptRoot 'production-reduction-baseline.json'
+$baselinePath = if ([string]::IsNullOrWhiteSpace($BaselinePath))
+{
+    Join-Path $PSScriptRoot 'production-reduction-phase2-baseline.json'
+}
+else
+{
+    $candidate = if ([System.IO.Path]::IsPathRooted($BaselinePath))
+    {
+        $BaselinePath
+    }
+    else
+    {
+        Join-Path $repoRoot $BaselinePath
+    }
+    (Resolve-Path -LiteralPath $candidate).Path
+}
 $productionMetricsPath = Join-Path $PSScriptRoot 'Get-SharpProofProductionMetrics.ps1'
 $baseline = Get-Content -LiteralPath $baselinePath -Raw | ConvertFrom-Json
 
@@ -108,13 +129,23 @@ try
     $baselineLines = [int]$baseline.maintainedProductionLines
     $targetReduction = [int]$baseline.targetReductionLines
     $maximumLines = [int]$baseline.maximumMaintainedProductionLines
+    $currentCeiling = if ($baseline.PSObject.Properties.Name -contains 'currentCeilingLines')
+    {
+        [int]$baseline.currentCeilingLines
+    }
+    else
+    {
+        $maximumLines
+    }
     if ($maximumLines -ne $baselineLines - $targetReduction)
     {
         throw 'Production reduction baseline has an inconsistent maximum line count.'
     }
 
     $reduction = $baselineLines - $currentLines
-    $enforcementRequested = $EnforceTarget -or $PSBoundParameters.ContainsKey('RequiredReductionLines')
+    $reductionEnforcementRequested = $EnforceTarget -or
+                                     $PSBoundParameters.ContainsKey('RequiredReductionLines')
+    $enforcementRequested = $reductionEnforcementRequested -or $EnforceCurrentCeiling
     $requiredReduction = if ($EnforceTarget) { $targetReduction } else { $RequiredReductionLines }
     $report = [ordered]@{
         schemaVersion = 1
@@ -123,6 +154,7 @@ try
         baselineLines = $baselineLines
         targetReductionLines = $targetReduction
         maximumMaintainedProductionLines = $maximumLines
+        currentCeilingLines = $currentCeiling
         current = [ordered]@{
             files = $productionCSharp.files + $scripts.files + $specifications.files
             lines = $currentLines
@@ -134,7 +166,8 @@ try
         remainingLines = [Math]::Max(0, $targetReduction - $reduction)
         enforcementRequested = $enforcementRequested
         requiredReductionLines = $requiredReduction
-        meetsRequiredReduction = -not $enforcementRequested -or $reduction -ge $requiredReduction
+        meetsRequiredReduction = -not $reductionEnforcementRequested -or $reduction -ge $requiredReduction
+        meetsCurrentCeiling = $currentLines -le $currentCeiling
         meetsTarget = $currentLines -le $maximumLines
     }
 
@@ -147,12 +180,18 @@ try
         "Maintained production LOC: $currentLines"
         "Reduction from baseline: $reduction"
         "Remaining to 20,000-line target: $($report.remainingLines)"
+        "Current tranche ceiling: $currentCeiling"
         "C#: $($productionCSharp.lines); scripts: $($scripts.lines); specifications: $($specifications.lines)"
     }
 
-    if ($enforcementRequested -and -not $report.meetsRequiredReduction)
+    if ($reductionEnforcementRequested -and -not $report.meetsRequiredReduction)
     {
         Write-Error "Required production reduction is $requiredReduction lines; current reduction is $reduction."
+        exit 1
+    }
+    if ($EnforceCurrentCeiling -and -not $report.meetsCurrentCeiling)
+    {
+        Write-Error "Current maintained production ceiling is $currentCeiling lines; current total is $currentLines."
         exit 1
     }
 }

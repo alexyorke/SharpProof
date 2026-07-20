@@ -22,6 +22,21 @@ Tests are excluded from the metric and must not be deleted.
 - Completion ceiling: 87,626 lines.
 - Baseline tests: 6,147 passing with two documented skips.
 
+## Phase Two Baseline
+
+- Commit: `f5e75830`.
+- Maintained production: 84,434 lines (80,686 C#, 3,014 scripts, and
+  734 maintained specification lines).
+- Required additional reduction: 20,000 lines.
+- Completion ceiling: 64,434 lines.
+- Migration-scaffolding ceiling: 84,934 lines until the first semantic-owner
+  deletion tranche ratchets it downward.
+- Test preservation baseline: 4,469 attributed test methods. Existing methods
+  and parameterized-case counts may not decrease, and no new ignore, explicit,
+  or runtime-ignore marker may be introduced.
+- `scripts/production-reduction-phase2-baseline.json` is the immutable phase-two
+  accounting source. The original baseline remains historical evidence.
+
 ## Completed
 
 - [x] Added a tracked maintained-production baseline covering handwritten C#,
@@ -768,17 +783,16 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current evidence
 
-- Maintained production: 84,430 lines (80,686 C#, 3,014 scripts, and 730
-  specifications); net reduction: 23,196 lines; remaining reduction: zero.
-  This migration removes 5,221 maintained-production lines through compiler-
-  backed member/control-flow canonicalization and production layout
-  normalization.
-  Diagnostics, proof outcomes, conservative unknowns, CLI bytes, serialization,
-  and package contents are unchanged, and no test was deleted.
+- Phase-two maintained production: 84,648 lines (80,686 C#, 3,228 scripts,
+  and 734 maintained specification lines). The 214-line temporary increase is
+  baseline/enforcement scaffolding and remains below the 84,934 migration
+  ceiling; 20,214 lines remain to the 64,434 completion ceiling.
+- The test-preservation check finds all 4,469 baseline attributed test methods,
+  unchanged parameterized-case counts, and no new disable markers.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,241 passing tests and two documented Main skips, run sequentially
-  with one NUnit worker: Oracle 573, Analyzer 487, Flow 257, Core 257,
-  MainGeneral 4,001 plus two skips, and Tooling 666.
+- Phase-two baseline six-lane run: 6,190 passing and zero skipped, run
+  sequentially with one NUnit worker: Oracle 573, Analyzer 487, Flow 257,
+  Core 257, MainGeneral 4,002, and Tooling 614.
 
 ## Milestones
 

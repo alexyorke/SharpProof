@@ -276,5 +276,7 @@ This is the active source of truth for the comprehensive refactor. Read
 
 ## Next cheapest step
 
-The comprehensive architecture refactor remains complete. Continue the
-separate maintained-production reduction from `PRODUCTION_REDUCTION_PROGRESS.md`.
+The comprehensive architecture refactor remains complete. The second
+20,000-line maintained-production reduction is tracked in
+`PRODUCTION_REDUCTION_PROGRESS.md`; its immutable starting point is commit
+`f5e75830` at 84,434 maintained-production lines.
