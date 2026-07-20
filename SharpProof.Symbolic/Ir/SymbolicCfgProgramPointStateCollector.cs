@@ -319,8 +319,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                         includeCurrentStatementCompletionFacts &&
                         !SupportsLoopLocalCurrentCompletion(site, operation))
                         return Unsupported(site, "loop-current-completion");
-                    if (targetIsInsideBranch && HasInvalidatedGuard(currentPath.GuardFrame))
-                        return Unsupported(site, "branch-guard-mutation");
                     if (finallyLocalTarget != null &&
                         !TryObserveFinallyLocalTarget(
                             point.Continuation,
@@ -387,7 +385,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                         operation,
                         GetActiveGuard(currentPath.GuardFrame),
                         true,
-                        false,
+                        targetIsInsideBranch,
                         true,
                         semanticModel,
                         cancellationToken,
@@ -416,8 +414,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 continue;
 
             if (forInitialEntryHeader != null && ReferenceEquals(block, forInitialEntryHeader)) {
-                if (point.Continuation != null ||
-                    targetIsInsideBranch && HasInvalidatedGuard(currentPath.GuardFrame))
+                if (point.Continuation != null)
                     return Unsupported(site, "for-initial-entry-path");
                 if (!TryApplyForInitializers(
                         ref state,
@@ -437,8 +434,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                       site is ExpressionStatementSyntax) &&
                     !(includeCurrentStatementCompletionFacts &&
                       site is LocalDeclarationStatementSyntax)) {
-                    if (targetIsInsideBranch && HasInvalidatedGuard(currentPath.GuardFrame))
-                        return Unsupported(site, "branch-guard-mutation");
                     if (finallyLocalTarget != null &&
                         !TryObserveFinallyLocalTarget(
                             point.Continuation,
@@ -1573,6 +1568,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             return null;
 
         var parent = GetActiveGuard(frame.Parent);
+        if (frame.GuardInvalidated)
+            return parent;
         return parent == null
             ? frame.Guard
             : new SymbolicBinaryCondition(
@@ -1584,7 +1581,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
     private static IReadOnlyList<SymbolicCondition> GetGuardsOuterToInner(CfgGuardFrame frame) {
         var guards = new List<SymbolicCondition>();
         for (var current = frame; current != null; current = current.Parent)
-            guards.Add(current.Guard);
+            if (!current.GuardInvalidated)
+                guards.Add(current.Guard);
         guards.Reverse();
         return guards;
     }

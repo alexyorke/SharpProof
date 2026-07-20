@@ -867,12 +867,18 @@ Tests are excluded from the metric and must not be deleted.
   fallbacks so a mutation cannot silently preserve a stale branch condition.
   This adds eight temporary production lines that the next structural-owner
   deletion tranche must repay.
+- [x] Made CFG guard frames discard only invalidated conditions while retaining
+  unaffected outer guards. Branch-local scalar/reference mutations now match
+  the structural state directly instead of routing through fallback. Removing
+  the obsolete rejection gates repays two of the temporary migration lines;
+  coalesce-assignment guards remain conservative until their merge can retain
+  conditional-access and known-non-null facts.
 
 ## Current evidence
 
-- Phase-two maintained production: 81,102 lines (77,140 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,332-line reduction from the
-  84,434-line phase-two baseline. Another 16,668 lines remain to the 64,434
+- Phase-two maintained production: 81,100 lines (77,138 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,334-line reduction from the
+  84,434-line phase-two baseline. Another 16,666 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.

@@ -2225,8 +2225,10 @@ static class C
             site,
             fixture.SemanticModel,
             CancellationToken.None);
+        var expected = CollectStructuralState(fixture, site);
 
-        Assert.That(result.IsUnsupported, Is.True);
+        Assert.That(result.IsExact, Is.True, result.Provenance.Single().Detail);
+        AssertStateParity(result.Value!, expected);
     }
 
     [Test]
@@ -2242,8 +2244,10 @@ static class C
             site,
             fixture.SemanticModel,
             CancellationToken.None);
+        var expected = CollectStructuralState(fixture, site);
 
-        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
+        Assert.That(result.IsExact, Is.True, result.Provenance.Single().Detail);
+        AssertStateParity(result.Value!, expected);
     }
 
     [Test]
