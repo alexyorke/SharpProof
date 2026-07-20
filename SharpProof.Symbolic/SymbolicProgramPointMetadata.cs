@@ -1,6 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicProgramPointMetadata
+internal static class SymbolicProgramPointClassifier
 {
     public static string? GetContainingMethodName(SyntaxNode node)
     {

@@ -4182,12 +4182,25 @@ internal class TestClass
         SymbolicTruthValue truthValue)
     {
         return new SymbolicProgramPointResult(
-            "Synthetic.cs",
-            1,
-            1,
-            0,
-            0,
-            "ReturnStatement",
+            new SymbolicProgramPointMetadata(
+                "Synthetic.cs",
+                1,
+                1,
+                0,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                "ReturnStatement",
+                null,
+                SymbolicProgramPointKinds.Normalize(null, "ReturnStatement")),
             Array.Empty<string>(),
             conditionProofs: new[]
             {

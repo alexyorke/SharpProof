@@ -31,13 +31,27 @@ internal static class SymbolicProgramPointProjector
             query.Analysis.PathConditions,
             mergedInvariantText);
 
-        return new SymbolicProgramPointResult(
+        var metadata = new SymbolicProgramPointMetadata(
             syntaxTree.FilePath,
             line,
             column,
             query.Position,
+            requestedLine,
+            requestedColumn,
+            requestedPosition,
+            requestedPositionDistance,
+            containsRequestedPosition,
             query.Node.SpanStart,
+            query.Node.Span.End,
+            nodeSourceSpan.StartLine,
+            nodeSourceSpan.StartColumn,
+            nodeSourceSpan.EndLine,
+            nodeSourceSpan.EndColumn,
             query.Node.Kind().ToString(),
+            SymbolicProgramPointClassifier.GetContainingMethodName(query.Node),
+            SymbolicProgramPointClassifier.GetProgramPointKind(query.Node));
+        return new SymbolicProgramPointResult(
+            metadata,
             query.Analysis.Facts,
             query.Analysis.Reachability,
             query.Analysis.ReachabilityReason,
@@ -45,18 +59,6 @@ internal static class SymbolicProgramPointProjector
             smtDiagnostics,
             mergedInvariantText,
             invariant,
-            query.Node.Span.End,
-            nodeSourceSpan.StartLine,
-            nodeSourceSpan.StartColumn,
-            nodeSourceSpan.EndLine,
-            nodeSourceSpan.EndColumn,
-            SymbolicProgramPointMetadata.GetContainingMethodName(query.Node),
-            SymbolicProgramPointMetadata.GetProgramPointKind(query.Node),
-            requestedLine,
-            requestedColumn,
-            requestedPosition,
-            requestedPositionDistance,
-            containsRequestedPosition,
             SymbolicFactInfo.FromState(query.Analysis.PathState),
             SymbolicInputWitnessFactory.CreateReachability(
                 query.Analysis.ReachabilityProof?.PathCheck.Witness,

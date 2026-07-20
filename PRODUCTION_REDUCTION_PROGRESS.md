@@ -632,15 +632,20 @@ Tests are excluded from the metric and must not be deleted.
   non-returning calls and guard-invalidating shapes remain explicit structural
   fallbacks. The focused fallback characterization dropped from 92 routed cases
   to 74 while preserving all 659 symbolic results.
+- [x] Made one immutable program-point metadata value the owner of source,
+  target, span, method, and requested-position identity. Program-point results
+  and their condition proofs now share that value instead of copying nineteen
+  constructor parameters and properties through a second projection layer.
+  Flat CLI JSON properties, ordering, source selection, and proof evidence
+  remain unchanged.
 
 ## Current evidence
 
-- Maintained production: 91,072 lines (87,153 C#, 3,189 scripts, and 730
-  specifications); net reduction: 16,554 lines; remaining reduction: 3,446.
-  This canonical-transfer tranche adds one maintained-production line while
-  removing 18 characterized queries from the structural fallback. It changes
-  no diagnostics, proof results, CLI output, or package contents and deletes no
-  tests.
+- Maintained production: 91,000 lines (87,081 C#, 3,189 scripts, and 730
+  specifications); net reduction: 16,626 lines; remaining reduction: 3,374.
+  This metadata-ownership tranche removes 72 maintained-production lines and
+  one nineteen-field copy layer. It changes no diagnostics, proof results, CLI
+  output, serialization, or package contents and deletes no tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,216 passing tests and two documented Main skips.
 

@@ -2,13 +2,31 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Symbolic;
 
+internal sealed record SymbolicProgramPointMetadata(
+    string FilePath,
+    int Line,
+    int Column,
+    int Position,
+    int? RequestedLine,
+    int? RequestedColumn,
+    int? RequestedPosition,
+    int? RequestedPositionDistance,
+    bool? ContainsRequestedPosition,
+    int NodeSpanStart,
+    int NodeSpanEnd,
+    int NodeStartLine,
+    int NodeStartColumn,
+    int NodeEndLine,
+    int NodeEndColumn,
+    string NodeKind,
+    string? MethodName,
+    string ProgramPointKind)
+{
+    public int NodeSpanLength => Math.Max(0, NodeSpanEnd - NodeSpanStart);
+}
+
 internal sealed class SymbolicProgramPointResult(
-    string filePath,
-    int line,
-    int column,
-    int position,
-    int nodeSpanStart,
-    string nodeKind,
+    SymbolicProgramPointMetadata metadata,
     IReadOnlyList<string> facts,
     SymbolicReachability reachability = SymbolicReachability.NotChecked,
     string reachabilityReason = "reachability_not_checked",
@@ -16,60 +34,31 @@ internal sealed class SymbolicProgramPointResult(
     SymbolicSmtDiagnostics? smtDiagnostics = null,
     string? mergedInvariantText = null,
     SymbolicInvariantResult? invariant = null,
-    int? nodeSpanEnd = null,
-    int? nodeStartLine = null,
-    int? nodeStartColumn = null,
-    int? nodeEndLine = null,
-    int? nodeEndColumn = null,
-    string? methodName = null,
-    string? programPointKind = null,
-    int? requestedLine = null,
-    int? requestedColumn = null,
-    int? requestedPosition = null,
-    int? requestedPositionDistance = null,
-    bool? containsRequestedPosition = null,
     IReadOnlyList<SymbolicFactInfo>? symbolicFacts = null,
     SymbolicInputWitness? reachabilityWitness = null,
     SymbolicAnalysisTruncationInfo? analysisTruncation = null)
 {
-    public string FilePath { get; } = filePath;
+    [JsonIgnore] internal SymbolicProgramPointMetadata Metadata { get; } = metadata;
 
-    public int Line { get; } = line;
-
-    public int Column { get; } = column;
-
-    public int Position { get; } = position;
-
-    public int? RequestedLine { get; } = requestedLine;
-
-    public int? RequestedColumn { get; } = requestedColumn;
-
-    public int? RequestedPosition { get; } = requestedPosition;
-
-    public int? RequestedPositionDistance { get; } = requestedPositionDistance;
-
-    public bool? ContainsRequestedPosition { get; } = containsRequestedPosition;
-
-    public int NodeSpanStart { get; } = nodeSpanStart;
-
-    public int NodeSpanEnd { get; } = nodeSpanEnd ?? nodeSpanStart;
-
-    public int NodeSpanLength => Math.Max(0, NodeSpanEnd - NodeSpanStart);
-
-    public int NodeStartLine { get; } = nodeStartLine ?? line;
-
-    public int NodeStartColumn { get; } = nodeStartColumn ?? column;
-
-    public int NodeEndLine { get; } = nodeEndLine ?? nodeStartLine ?? line;
-
-    public int NodeEndColumn { get; } = nodeEndColumn ??
-        (nodeStartColumn ?? column) + Math.Max(0, (nodeSpanEnd ?? nodeSpanStart) - nodeSpanStart);
-
-    public string NodeKind { get; } = nodeKind;
-
-    public string? MethodName { get; } = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
-
-    public string ProgramPointKind { get; } = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
+    public string FilePath => Metadata.FilePath;
+    public int Line => Metadata.Line;
+    public int Column => Metadata.Column;
+    public int Position => Metadata.Position;
+    public int? RequestedLine => Metadata.RequestedLine;
+    public int? RequestedColumn => Metadata.RequestedColumn;
+    public int? RequestedPosition => Metadata.RequestedPosition;
+    public int? RequestedPositionDistance => Metadata.RequestedPositionDistance;
+    public bool? ContainsRequestedPosition => Metadata.ContainsRequestedPosition;
+    public int NodeSpanStart => Metadata.NodeSpanStart;
+    public int NodeSpanEnd => Metadata.NodeSpanEnd;
+    public int NodeSpanLength => Metadata.NodeSpanLength;
+    public int NodeStartLine => Metadata.NodeStartLine;
+    public int NodeStartColumn => Metadata.NodeStartColumn;
+    public int NodeEndLine => Metadata.NodeEndLine;
+    public int NodeEndColumn => Metadata.NodeEndColumn;
+    public string NodeKind => Metadata.NodeKind;
+    public string? MethodName => Metadata.MethodName;
+    public string ProgramPointKind => Metadata.ProgramPointKind;
 
     public IReadOnlyList<string> Facts { get; } = facts ?? Array.Empty<string>();
 
@@ -98,32 +87,13 @@ internal sealed class SymbolicProgramPointResult(
 
     public SymbolicInputWitness ReachabilityWitness { get; } = reachabilityWitness ??
         SymbolicInputWitnessFactory.CreateReachability(
-            null, Array.Empty<SmtFormula>(), null, position, reachability, reachabilityReason);
+            null, Array.Empty<SmtFormula>(), null, metadata.Position, reachability, reachabilityReason);
 
     public SymbolicInputDomainSummary InputDomainSummary => ReachabilityWitness.DomainSummary;
 
     public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; } =
         (conditionProofs ?? Array.Empty<SymbolicConditionProofResult>())
-        .Select(proof => proof.WithProgramPointMetadata(
-            filePath,
-            line,
-            column,
-            position,
-            nodeSpanStart,
-            nodeSpanEnd ?? nodeSpanStart,
-            nodeStartLine ?? line,
-            nodeStartColumn ?? column,
-            nodeEndLine ?? nodeStartLine ?? line,
-            nodeEndColumn ?? (nodeStartColumn ?? column) +
-            Math.Max(0, (nodeSpanEnd ?? nodeSpanStart) - nodeSpanStart),
-            nodeKind,
-            string.IsNullOrWhiteSpace(methodName) ? null : methodName,
-            SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind),
-            requestedLine,
-            requestedColumn,
-            requestedPosition,
-            requestedPositionDistance,
-            containsRequestedPosition))
+        .Select(proof => proof.WithProgramPointMetadata(metadata))
         .ToArray();
 
     public SymbolicProofOutcomeSummary ProofOutcomes => new(
@@ -347,24 +317,7 @@ internal sealed record SymbolicConditionProofResult(
     [property: JsonIgnore] string? valueKind = null,
     [property: JsonIgnore] string? formulaText = null,
     [property: JsonIgnore] bool? isSolverBacked = null,
-    [property: JsonIgnore] string? filePath = null,
-    [property: JsonIgnore] int? line = null,
-    [property: JsonIgnore] int? column = null,
-    [property: JsonIgnore] int? position = null,
-    [property: JsonIgnore] int? nodeSpanStart = null,
-    [property: JsonIgnore] int? nodeSpanEnd = null,
-    [property: JsonIgnore] int? nodeStartLine = null,
-    [property: JsonIgnore] int? nodeStartColumn = null,
-    [property: JsonIgnore] int? nodeEndLine = null,
-    [property: JsonIgnore] int? nodeEndColumn = null,
-    [property: JsonIgnore] string? nodeKind = null,
-    [property: JsonIgnore] string? methodName = null,
-    [property: JsonIgnore] string? programPointKind = null,
-    [property: JsonIgnore] int? requestedLine = null,
-    [property: JsonIgnore] int? requestedColumn = null,
-    [property: JsonIgnore] int? requestedPosition = null,
-    [property: JsonIgnore] int? requestedPositionDistance = null,
-    [property: JsonIgnore] bool? containsRequestedPosition = null,
+    [property: JsonIgnore] SymbolicProgramPointMetadata? programPoint = null,
     [property: JsonIgnore] SymbolicInputWitness? witness = null,
     [property: JsonIgnore] SymbolicInputWitness? counterexampleWitness = null,
     [property: JsonIgnore] SymbolicAnalysisTruncationInfo? analysisTruncation = null)
@@ -396,46 +349,27 @@ internal sealed record SymbolicConditionProofResult(
         DisplayKind,
         TruthValue == SymbolicTruthValue.Unknown ? Reason : null);
 
-    public string? FilePath { get; init; } = string.IsNullOrWhiteSpace(filePath) ? null : filePath;
+    [JsonIgnore] internal SymbolicProgramPointMetadata? ProgramPoint { get; init; } = programPoint;
 
-    public int? Line { get; init; } = line;
-
-    public int? Column { get; init; } = column;
-
-    public int? Position { get; init; } = position;
-
-    public int? NodeSpanStart { get; init; } = nodeSpanStart;
-
-    public int? NodeSpanEnd { get; init; } = nodeSpanEnd;
-
-    public int? NodeSpanLength { get; init; } = nodeSpanStart.HasValue && nodeSpanEnd.HasValue
-        ? Math.Max(0, nodeSpanEnd.Value - nodeSpanStart.Value)
-        : null;
-
-    public int? NodeStartLine { get; init; } = nodeStartLine;
-
-    public int? NodeStartColumn { get; init; } = nodeStartColumn;
-
-    public int? NodeEndLine { get; init; } = nodeEndLine;
-
-    public int? NodeEndColumn { get; init; } = nodeEndColumn;
-
-    public string? NodeKind { get; init; } = string.IsNullOrWhiteSpace(nodeKind) ? null : nodeKind;
-
-    public string? MethodName { get; init; } = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
-
-    public string? ProgramPointKind { get; init; } =
-        string.IsNullOrWhiteSpace(programPointKind) ? null : programPointKind;
-
-    public int? RequestedLine { get; init; } = requestedLine;
-
-    public int? RequestedColumn { get; init; } = requestedColumn;
-
-    public int? RequestedPosition { get; init; } = requestedPosition;
-
-    public int? RequestedPositionDistance { get; init; } = requestedPositionDistance;
-
-    public bool? ContainsRequestedPosition { get; init; } = containsRequestedPosition;
+    public string? FilePath => ProgramPoint?.FilePath;
+    public int? Line => ProgramPoint?.Line;
+    public int? Column => ProgramPoint?.Column;
+    public int? Position => ProgramPoint?.Position;
+    public int? NodeSpanStart => ProgramPoint?.NodeSpanStart;
+    public int? NodeSpanEnd => ProgramPoint?.NodeSpanEnd;
+    public int? NodeSpanLength => ProgramPoint?.NodeSpanLength;
+    public int? NodeStartLine => ProgramPoint?.NodeStartLine;
+    public int? NodeStartColumn => ProgramPoint?.NodeStartColumn;
+    public int? NodeEndLine => ProgramPoint?.NodeEndLine;
+    public int? NodeEndColumn => ProgramPoint?.NodeEndColumn;
+    public string? NodeKind => ProgramPoint?.NodeKind;
+    public string? MethodName => ProgramPoint?.MethodName;
+    public string? ProgramPointKind => ProgramPoint?.ProgramPointKind;
+    public int? RequestedLine => ProgramPoint?.RequestedLine;
+    public int? RequestedColumn => ProgramPoint?.RequestedColumn;
+    public int? RequestedPosition => ProgramPoint?.RequestedPosition;
+    public int? RequestedPositionDistance => ProgramPoint?.RequestedPositionDistance;
+    public bool? ContainsRequestedPosition => ProgramPoint?.ContainsRequestedPosition;
 
     public SymbolicInputWitness Witness { get; init; } = witness ?? (truthValue == SymbolicTruthValue.Unreachable
         ? SymbolicInputWitnessFactory.None(reason ?? string.Empty)
@@ -467,50 +401,9 @@ internal sealed record SymbolicConditionProofResult(
     public string GetDisplayReason() => SymbolicReasonDisplay.Format(Reason);
 
     internal SymbolicConditionProofResult WithProgramPointMetadata(
-        string filePath,
-        int line,
-        int column,
-        int position,
-        int nodeSpanStart,
-        int nodeSpanEnd,
-        int nodeStartLine,
-        int nodeStartColumn,
-        int nodeEndLine,
-        int nodeEndColumn,
-        string nodeKind,
-        string? methodName,
-        string programPointKind,
-        int? requestedLine,
-        int? requestedColumn,
-        int? requestedPosition,
-        int? requestedPositionDistance,
-        bool? containsRequestedPosition)
-    {
-        var effectiveSpanStart = NodeSpanStart ?? nodeSpanStart;
-        var effectiveSpanEnd = NodeSpanEnd ?? nodeSpanEnd;
-        return this with
-        {
-            FilePath = FilePath ?? filePath,
-            Line = Line ?? line,
-            Column = Column ?? column,
-            Position = Position ?? position,
-            NodeSpanStart = effectiveSpanStart,
-            NodeSpanEnd = effectiveSpanEnd,
-            NodeSpanLength = Math.Max(0, effectiveSpanEnd - effectiveSpanStart),
-            NodeStartLine = NodeStartLine ?? nodeStartLine,
-            NodeStartColumn = NodeStartColumn ?? nodeStartColumn,
-            NodeEndLine = NodeEndLine ?? nodeEndLine,
-            NodeEndColumn = NodeEndColumn ?? nodeEndColumn,
-            NodeKind = NodeKind ?? nodeKind,
-            MethodName = MethodName ?? methodName,
-            ProgramPointKind = ProgramPointKind ?? programPointKind,
-            RequestedLine = RequestedLine ?? requestedLine,
-            RequestedColumn = RequestedColumn ?? requestedColumn,
-            RequestedPosition = RequestedPosition ?? requestedPosition,
-            RequestedPositionDistance = RequestedPositionDistance ?? requestedPositionDistance,
-            ContainsRequestedPosition = ContainsRequestedPosition ?? containsRequestedPosition
-        };
-    }
+        SymbolicProgramPointMetadata metadata) => ProgramPoint == null
+        ? this with { ProgramPoint = metadata }
+        : this;
 
     internal SymbolicConditionProofResult WithAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation) =>
         this with { AnalysisTruncation = truncation };
