@@ -123,18 +123,6 @@ function Convert-ToRepoPath
     return $normalized.TrimStart('/')
 }
 
-function Resolve-BaseRef
-{
-    param([string]$RequestedBaseRef)
-
-    if (-not [string]::IsNullOrWhiteSpace($RequestedBaseRef))
-    {
-        return $RequestedBaseRef
-    }
-
-    return 'HEAD'
-}
-
 function Get-ChangedRepoFiles
 {
     param(
@@ -157,7 +145,7 @@ function Get-ChangedRepoFiles
         throw 'git is required to discover changed files; pass -ChangedFile for an explicit selection.'
     }
 
-    $base = Resolve-BaseRef $RequestedBaseRef
+    $base = if ([string]::IsNullOrWhiteSpace($RequestedBaseRef)) { 'HEAD' } else { $RequestedBaseRef }
     $mergeBase = (& git merge-base HEAD $base 2>$null)
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($mergeBase))
     {
@@ -211,24 +199,6 @@ function Get-ChangedRepoFiles
     return $files | Sort-Object
 }
 
-function Add-TestClass
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.HashSet[string]]$Set,
-
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyString()]
-        [string]$ClassName
-    )
-
-    if (-not [string]::IsNullOrWhiteSpace($ClassName))
-    {
-        [void]$Set.Add($ClassName)
-    }
-}
-
 function Add-TestClasses
 {
     param(
@@ -242,7 +212,10 @@ function Add-TestClasses
 
     foreach ($className in $ClassNames)
     {
-        Add-TestClass -Set $Set -ClassName $className
+        if (-not [string]::IsNullOrWhiteSpace($className))
+        {
+            [void]$Set.Add($className)
+        }
     }
 }
 
@@ -258,13 +231,7 @@ function Get-AddedTestClasses
         [string[]]$Before
     )
 
-    $beforeSet = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
-    foreach ($className in $Before)
-    {
-        [void]$beforeSet.Add($className)
-    }
-
-    return @($Set | Where-Object { -not $beforeSet.Contains($_) } | Sort-Object)
+    return @($Set | Where-Object { $Before -cnotcontains $_ } | Sort-Object)
 }
 
 function Add-SelectionEvidence
@@ -685,94 +652,56 @@ function Get-TestLaneForFixtures
     return 'All'
 }
 
+function Get-TestWrapperParameters
+{
+    param(
+        [ValidateSet('All', 'Main', 'Tooling')]
+        [string]$TestLane,
+        [string]$Configuration,
+        [bool]$NoBuild,
+        [bool]$FailFast,
+        [int]$Workers,
+        [bool]$Profile,
+        [int]$Top,
+        [int]$MemoryLimitMb,
+        [int]$TimeoutSeconds
+    )
+
+    $parameters = [ordered]@{ Configuration = $Configuration; TestLane = $TestLane }
+    if ($NoBuild) { $parameters.NoBuild = $true }
+    if ($FailFast) { $parameters.FailFast = $true }
+    if ($Workers -gt 0) { $parameters.Workers = $Workers }
+    if ($Profile) { $parameters.Profile = $true }
+    if ($Top -ne 30) { $parameters.Top = $Top }
+    if ($MemoryLimitMb -gt 0) { $parameters.MemoryLimitMb = $MemoryLimitMb }
+    if ($TimeoutSeconds -gt 0) { $parameters.TimeoutSeconds = $TimeoutSeconds }
+    return $parameters
+}
+
 function Format-TestWrapperCommand
 {
     param(
         [Parameter(Mandatory = $true)]
         [ValidateSet('RunFullSuite', 'RunPartial', 'RunPartialForced', 'Skip')]
         [string]$SuggestedAction,
-
         [string]$Filter,
-
-        [ValidateSet('All', 'Main', 'Tooling')]
-        [string]$TestLane,
-
-        [string]$Configuration,
-
-        [bool]$NoBuild,
-
-        [bool]$FailFast,
-
-        [int]$Workers,
-
-        [bool]$Profile,
-
-        [int]$Top,
-
-        [int]$MemoryLimitMb,
-
-        [int]$TimeoutSeconds
+        [Parameter(Mandatory = $true)]
+        [System.Collections.IDictionary]$Parameters
     )
 
-    if ($SuggestedAction -eq 'Skip')
-    {
-        return ''
-    }
-
+    if ($SuggestedAction -eq 'Skip') { return '' }
     $parts = New-Object System.Collections.Generic.List[string]
     $parts.Add('.\scripts\Invoke-SharpProofTests.ps1')
-    $parts.Add('-Configuration')
-    $parts.Add($Configuration)
-
-    $parts.Add('-TestLane')
-    $parts.Add($TestLane)
-
-    if ($NoBuild)
+    foreach ($entry in $Parameters.GetEnumerator())
     {
-        $parts.Add('-NoBuild')
+        $parts.Add("-$($entry.Key)")
+        if ($entry.Value -isnot [bool]) { $parts.Add([string]$entry.Value) }
     }
-
-    if ($FailFast)
-    {
-        $parts.Add('-FailFast')
-    }
-
-    if ($Workers -gt 0)
-    {
-        $parts.Add('-Workers')
-        $parts.Add([string]$Workers)
-    }
-
-    if ($Profile)
-    {
-        $parts.Add('-Profile')
-    }
-
-    if ($Top -ne 30)
-    {
-        $parts.Add('-Top')
-        $parts.Add([string]$Top)
-    }
-
-    if ($MemoryLimitMb -gt 0)
-    {
-        $parts.Add('-MemoryLimitMb')
-        $parts.Add([string]$MemoryLimitMb)
-    }
-
-    if ($TimeoutSeconds -gt 0)
-    {
-        $parts.Add('-TimeoutSeconds')
-        $parts.Add([string]$TimeoutSeconds)
-    }
-
     if ($SuggestedAction -ne 'RunFullSuite' -and -not [string]::IsNullOrWhiteSpace($Filter))
     {
-        $escapedFilter = $Filter.Replace("'", "''")
         $parts.Add('-Filter')
-        $parts.Add("'$escapedFilter'")
+        $parts.Add("'$($Filter.Replace("'", "''"))'")
     }
-
     return ($parts -join ' ')
 }
 
@@ -896,7 +825,7 @@ try
             if ($path -match '(Throw|Hazard)')
             {
                 $before = @($testClasses | Sort-Object)
-                Add-TestClass $testClasses $className
+                Add-TestClasses $testClasses @($className)
                 Add-ExceptionReachabilityRuntimeHazardTestClasses $testClasses
                 Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'test-name-map' 'Throw/hazard-named test change maps to exception reachability and runtime-hazard fixtures' $before $testClasses
             }
@@ -907,7 +836,7 @@ try
             else
             {
                 $before = @($testClasses | Sort-Object)
-                Add-TestClass $testClasses $className
+                Add-TestClasses $testClasses @($className)
                 Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'changed-test-file' 'Changed test file maps to its owning fixture' $before $testClasses
             }
 
@@ -984,9 +913,7 @@ try
         'RunPartial'
     }
 
-    $suggestedCommand = Format-TestWrapperCommand `
-        -SuggestedAction $suggestedAction `
-        -Filter $filter `
+    $wrapperParams = Get-TestWrapperParameters `
         -TestLane $testLane `
         -Configuration $Configuration `
         -NoBuild ([bool]$NoBuild) `
@@ -996,6 +923,10 @@ try
         -Top $Top `
         -MemoryLimitMb $MemoryLimitMb `
         -TimeoutSeconds $TimeoutSeconds
+    $suggestedCommand = Format-TestWrapperCommand `
+        -SuggestedAction $suggestedAction `
+        -Filter $filter `
+        -Parameters $wrapperParams
 
     $recommendation = [ordered]@{
         changedFiles = @($changedFiles)
@@ -1124,18 +1055,6 @@ try
     }
 
     $wrapperPath = Join-Path $PSScriptRoot 'Invoke-SharpProofTests.ps1'
-    $wrapperParams = @{
-        Configuration = $Configuration
-        MemoryLimitMb = $MemoryLimitMb
-        TimeoutSeconds = $TimeoutSeconds
-        Top = $Top
-    }
-
-    if ($NoBuild) { $wrapperParams.NoBuild = $true }
-    if ($FailFast) { $wrapperParams.FailFast = $true }
-    if ($Workers -gt 0) { $wrapperParams.Workers = $Workers }
-    if ($Profile) { $wrapperParams.Profile = $true }
-    $wrapperParams.TestLane = $testLane
 
     if ($requiresFull -and -not $ForcePartial)
     {

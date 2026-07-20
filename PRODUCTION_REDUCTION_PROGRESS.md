@@ -638,14 +638,20 @@ Tests are excluded from the metric and must not be deleted.
   constructor parameters and properties through a second projection layer.
   Flat CLI JSON properties, ordering, source selection, and proof evidence
   remain unchanged.
+- [x] Made one ordered parameter map the owner of impacted-test wrapper
+  invocation. Suggested commands and executed commands no longer rebuild the
+  same configuration, lane, worker, profiling, timeout, and memory options in
+  parallel. Removed the single-item fixture and base-reference pass-through
+  helpers; selection, evidence, JSON, filters, and execution remain unchanged.
 
 ## Current evidence
 
-- Maintained production: 91,000 lines (87,081 C#, 3,189 scripts, and 730
-  specifications); net reduction: 16,626 lines; remaining reduction: 3,374.
-  This metadata-ownership tranche removes 72 maintained-production lines and
-  one nineteen-field copy layer. It changes no diagnostics, proof results, CLI
-  output, serialization, or package contents and deletes no tests.
+- Maintained production: 90,946 lines (87,081 C#, 3,135 scripts, and 730
+  specifications); net reduction: 16,680 lines; remaining reduction: 3,320.
+  This test-wrapper ownership tranche removes 54 maintained-production lines
+  and one parallel command-construction path. It changes no diagnostics, proof
+  results, test selection, CLI output, serialization, or package contents and
+  deletes no tests.
 - Release solution build: zero warnings and errors.
 - Six lanes: 6,216 passing tests and two documented Main skips.
 
