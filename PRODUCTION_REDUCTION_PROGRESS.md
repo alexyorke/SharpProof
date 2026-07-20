@@ -823,11 +823,18 @@ Tests are excluded from the metric and must not be deleted.
   completion contradictory. Loop-local current completion remains an explicit
   typed fallback until loop observations can preserve the same state contract.
 
+- [x] Replaced the simple-assignment-only `for` initializer gate with canonical
+  operation dispatch. Increment and compound initializers now produce exact
+  initial-entry state through computed-update transfer; invocations, missing
+  conditions, nested loops, and member targets remain typed fallbacks. This
+  fixes the characterized legacy bug that ignored `index++` and `index += 1`
+  and retained zero rather than one.
+
 ## Current evidence
 
-- Phase-two maintained production: 81,156 lines (77,194 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,278-line reduction from the
-  84,434-line phase-two baseline. Another 16,722 lines remain to the 64,434
+- Phase-two maintained production: 81,154 lines (77,192 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,280-line reduction from the
+  84,434-line phase-two baseline. Another 16,720 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.

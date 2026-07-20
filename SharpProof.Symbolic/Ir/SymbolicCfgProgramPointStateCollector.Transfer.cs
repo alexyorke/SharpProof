@@ -573,16 +573,14 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         }
 
         foreach (var initializer in statement.Initializers) {
-            if (semanticModel.GetOperation(initializer, cancellationToken) is not
-                    ISimpleAssignmentOperation assignment ||
-                !TryGetDirectTarget(assignment.Target, out var target) ||
-                !TryApplyAssignment(
+            if (semanticModel.GetOperation(initializer, cancellationToken) is not { } operation ||
+                !TryApplyOperation(
                     ref state,
-                    target,
-                    assignment.Value,
+                    operation,
                     guard,
-                    true,
-                    false,
+                    allowGuardedReferenceAssignments: true,
+                    allowGuardMutation: false,
+                    allowExpressionStatementCompletion: false,
                     semanticModel,
                     cancellationToken,
                     "ir.path.for-initializer",

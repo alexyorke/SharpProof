@@ -1949,22 +1949,30 @@ static class C
     }
 
     [TestCase(
-        "static class C { static int Get() => 1; static void M() { for (int index = Get(); index < 3; index++) { } } }")]
+        "static class C { static int Get() => 1; static void M() { for (int index = Get(); index < 3; index++) { } } }",
+        false)]
     [TestCase(
-        "static class C { static int Get() => 1; static void M() { int index = 0; for (index = 1, index = Get(); index < 3; index++) { } } }")]
+        "static class C { static int Get() => 1; static void M() { int index = 0; for (index = 1, index = Get(); index < 3; index++) { } } }",
+        false)]
     [TestCase(
-        "static class C { static void Set(out int value) => value = 0; static void M() { int index = 0; for (Set(out index); index < 3; index++) { } } }")]
+        "static class C { static void Set(out int value) => value = 0; static void M() { int index = 0; for (Set(out index); index < 3; index++) { } } }",
+        false)]
     [TestCase(
-        "static class C { static void M() { int index = 0; for (index++; index < 3; index++) { } } }")]
+        "static class C { static void M() { int index = 0; for (index++; index < 3; index++) { } } }",
+        true)]
     [TestCase(
-        "static class C { static void M() { int index = 0; for (index += 1; index < 3; index++) { } } }")]
+        "static class C { static void M() { int index = 0; for (index += 1; index < 3; index++) { } } }",
+        true)]
     [TestCase(
-        "static class C { static void M() { for (int index = 0;; index++) { } } }")]
+        "static class C { static void M() { for (int index = 0;; index++) { } } }",
+        false)]
     [TestCase(
-        "static class C { static void M(bool keepGoing) { while (keepGoing) { for (int index = 0; index < 3; index++) { } } } }")]
+        "static class C { static void M(bool keepGoing) { while (keepGoing) { for (int index = 0; index < 3; index++) { } } } }",
+        false)]
     [TestCase(
-        "sealed class C { int Value; void M() { for (Value = 0; Value < 3; Value++) { } } }")]
-    public void UnsupportedForInitialEntry_RemainsConservativeFallback(string source)
+        "sealed class C { int Value; void M() { for (Value = 0; Value < 3; Value++) { } } }",
+        false)]
+    public void UnsupportedForInitialEntry_RemainsConservativeFallback(string source, bool expectedExact)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
@@ -1984,9 +1992,26 @@ static class C
             fixture.SemanticModel,
             CancellationToken.None);
 
-        Assert.That(result.IsUnsupported, Is.True, result.Provenance.Single().Detail);
-        Assert.That(routed.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
-        Assert.That(CreateEvidenceKey(routed), Is.EqualTo(CreateEvidenceKey(expected)));
+        Assert.That(result.IsExact, Is.EqualTo(expectedExact), result.Provenance.Single().Detail);
+        if (expectedExact)
+        {
+            var index = fixture.Root.DescendantNodes()
+                .OfType<VariableDeclaratorSyntax>()
+                .Select(variable => fixture.SemanticModel.GetDeclaredSymbol(variable))
+                .OfType<ILocalSymbol>()
+                .Single(symbol => symbol.Name == "index");
+            Assert.That(
+                SymbolicStateValueFacts.TryGetCurrentValue(result.Value!, index, out var currentValue),
+                Is.True);
+            Assert.That(currentValue, Is.EqualTo(new SymbolicIntegerConstantTerm(1)));
+            AssertStateParity(routed, result.Value!);
+        }
+        else
+        {
+            Assert.That(result.Value, Is.Null);
+            Assert.That(routed.NormalizedProofKey, Is.EqualTo(expected.NormalizedProofKey));
+            Assert.That(CreateEvidenceKey(routed), Is.EqualTo(CreateEvidenceKey(expected)));
+        }
     }
 
     [Test]
