@@ -6,18 +6,12 @@ internal static class EffectSummaryHash
         return LowerHex(SHA256.HashData(stream));
     }
 
-    internal static string Sha256(byte[] bytes)
-    {
-        return LowerHex(SHA256.HashData(bytes));
-    }
+    internal static string Sha256(byte[] bytes) =>
+        LowerHex(SHA256.HashData(bytes));
 
-    internal static string Sha256(string text)
-    {
-        return Sha256(Encoding.UTF8.GetBytes(text));
-    }
+    internal static string Sha256(string text) =>
+        Sha256(Encoding.UTF8.GetBytes(text));
 
-    private static string LowerHex(byte[] bytes)
-    {
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+    private static string LowerHex(byte[] bytes) =>
+        Convert.ToHexString(bytes).ToLowerInvariant();
 }

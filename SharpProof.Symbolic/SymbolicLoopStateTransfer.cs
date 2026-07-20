@@ -815,15 +815,11 @@ internal static class SymbolicLoopStateTransfer
                IsCompatibleSubtrahend(subtractValue, direction);
     }
 
-    private static bool IsCompatibleDelta(long delta, MonotonicDirection direction)
-    {
-        return direction == MonotonicDirection.NonDecreasing ? delta >= 0 : delta <= 0;
-    }
+    private static bool IsCompatibleDelta(long delta, MonotonicDirection direction) =>
+        direction == MonotonicDirection.NonDecreasing ? delta >= 0 : delta <= 0;
 
-    private static bool IsCompatibleSubtrahend(long subtrahend, MonotonicDirection direction)
-    {
-        return direction == MonotonicDirection.NonDecreasing ? subtrahend <= 0 : subtrahend >= 0;
-    }
+    private static bool IsCompatibleSubtrahend(long subtrahend, MonotonicDirection direction) =>
+        direction == MonotonicDirection.NonDecreasing ? subtrahend <= 0 : subtrahend >= 0;
 
     private enum MonotonicDirection
     {

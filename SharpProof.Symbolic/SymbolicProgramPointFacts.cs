@@ -561,10 +561,8 @@ internal static class SymbolicProgramPointFacts
                type?.SpecialType == SpecialType.System_String;
     }
 
-    internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
-    {
-        return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-    }
+    internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression) =>
+        CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
 
 
 

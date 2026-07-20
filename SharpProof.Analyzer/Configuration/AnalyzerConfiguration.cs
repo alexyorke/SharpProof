@@ -503,10 +503,8 @@ internal sealed record AnalyzerConfiguration(
         builder.Add(new InvalidAnalyzerConfigurationValue(key, value.Trim(), reason));
     }
 
-    private static bool TryGetAnalyzerConfigOption(AnalyzerConfigOptions options, string key, out string value)
-    {
-        return AnalyzerConfigurationValueReader.TryGetNonEmpty(options, key, out value);
-    }
+    private static bool TryGetAnalyzerConfigOption(AnalyzerConfigOptions options, string key, out string value) =>
+        AnalyzerConfigurationValueReader.TryGetNonEmpty(options, key, out value);
 
     private readonly struct ConfigurationOptionSource
     {
@@ -595,20 +593,16 @@ internal sealed record InferredContractSuggestionOptions(
 
     public bool IsEnabled => Enabled && Scope != MissingPuritySuggestionScope.Off && Kinds.Count > 0;
 
-    public bool Includes(string kind, InferredContractConfidence confidence)
-    {
-        return IsEnabled && Kinds.Contains(kind) && confidence >= MinimumConfidence;
-    }
+    public bool Includes(string kind, InferredContractConfidence confidence) =>
+        IsEnabled && Kinds.Contains(kind) && confidence >= MinimumConfidence;
 }
 
 internal sealed record ProvenDiagnosticSuppressionOptions(
     bool Enabled,
     ImmutableHashSet<string> DiagnosticIds)
 {
-    public bool Includes(string diagnosticId)
-    {
-        return Enabled && DiagnosticIds.Contains(diagnosticId);
-    }
+    public bool Includes(string diagnosticId) =>
+        Enabled && DiagnosticIds.Contains(diagnosticId);
 }
 
 [Flags]

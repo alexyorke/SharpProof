@@ -374,10 +374,8 @@ internal static class SwitchPathConditionBuilder
         };
     }
 
-    private static bool IsCanonicalDesignationTerm(SymbolicTerm term, ISet<string> designationNames)
-    {
-        return term is SymbolicVariableTerm variable && designationNames.Contains(variable.Name);
-    }
+    private static bool IsCanonicalDesignationTerm(SymbolicTerm term, ISet<string> designationNames) =>
+        term is SymbolicVariableTerm variable && designationNames.Contains(variable.Name);
 
     private static SymbolicCondition SubstituteCanonicalTerms(
         SymbolicCondition condition,

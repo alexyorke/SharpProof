@@ -2,25 +2,17 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicComplexityAlgebra
 {
-    internal static ComplexityArtifacts CombineSequence(IEnumerable<ComplexityArtifacts> parts)
-    {
-        return Combine(parts);
-    }
+    internal static ComplexityArtifacts CombineSequence(IEnumerable<ComplexityArtifacts> parts) =>
+        Combine(parts);
 
-    internal static ComplexityArtifacts CombineSequence(params ComplexityArtifacts[] parts)
-    {
-        return Combine(parts);
-    }
+    internal static ComplexityArtifacts CombineSequence(params ComplexityArtifacts[] parts) =>
+        Combine(parts);
 
-    internal static ComplexityArtifacts CombineBranch(IEnumerable<ComplexityArtifacts> parts)
-    {
-        return Combine(parts);
-    }
+    internal static ComplexityArtifacts CombineBranch(IEnumerable<ComplexityArtifacts> parts) =>
+        Combine(parts);
 
-    internal static ComplexityArtifacts CombineBranch(params ComplexityArtifacts[] parts)
-    {
-        return Combine(parts);
-    }
+    internal static ComplexityArtifacts CombineBranch(params ComplexityArtifacts[] parts) =>
+        Combine(parts);
 
     internal static ComplexityArtifacts Multiply(SymbolicCostExpression multiplier, ComplexityArtifacts body)
     {

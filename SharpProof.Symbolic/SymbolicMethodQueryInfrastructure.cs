@@ -312,10 +312,8 @@ internal sealed record ResolvedMethodLikeTarget(
 
 internal static class SymbolicMethodSourceResolver
 {
-    internal static bool IsBackedBySource(IMethodSymbol method)
-    {
-        return method.OriginalDefinition.DeclaringSyntaxReferences.Length != 0;
-    }
+    internal static bool IsBackedBySource(IMethodSymbol method) =>
+        method.OriginalDefinition.DeclaringSyntaxReferences.Length != 0;
 
     internal static bool TryResolve(
         Compilation compilation,

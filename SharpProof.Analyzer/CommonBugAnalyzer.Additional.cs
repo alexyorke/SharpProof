@@ -50,10 +50,8 @@ internal static partial class CommonBugAnalyzer
         }
     }
 
-    private static bool IsFloatingPoint(ITypeSymbol? type)
-    {
-        return type?.SpecialType is SpecialType.System_Single or SpecialType.System_Double;
-    }
+    private static bool IsFloatingPoint(ITypeSymbol? type) =>
+        type?.SpecialType is SpecialType.System_Single or SpecialType.System_Double;
 
     private static ISymbol? GetStableLocalOrParameter(IOperation operation)
     {

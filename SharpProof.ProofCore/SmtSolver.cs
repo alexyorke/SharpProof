@@ -193,10 +193,8 @@ internal sealed class SmtSolver : IDisposable
         };
     }
 
-    private bool ContainsApproximateRegex(IEnumerable<SmtFormula> formulas)
-    {
-        return formulas.Any(_encoder.ContainsApproximateRegex);
-    }
+    private bool ContainsApproximateRegex(IEnumerable<SmtFormula> formulas) =>
+        formulas.Any(_encoder.ContainsApproximateRegex);
 
     private PreparedSmtQuery Prepare(IEnumerable<SmtFormula> conditions)
     {

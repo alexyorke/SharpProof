@@ -99,8 +99,6 @@ internal static class ExplainDiagnosticProperties
         return builder.ToString();
     }
 
-    private static string Quote(string value)
-    {
-        return "\"" + value.Replace("\"", "\\\"") + "\"";
-    }
+    private static string Quote(string value) =>
+        "\"" + value.Replace("\"", "\\\"") + "\"";
 }

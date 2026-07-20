@@ -457,10 +457,8 @@ internal sealed class Z3FormulaEncoder : IDisposable
         }
     }
 
-    private bool IsApproximateRegexPattern(string pattern, RegexOptions options)
-    {
-        return GetRegexTranslationPrecision(pattern, options) == RegexTranslationPrecision.Approximate;
-    }
+    private bool IsApproximateRegexPattern(string pattern, RegexOptions options) =>
+        GetRegexTranslationPrecision(pattern, options) == RegexTranslationPrecision.Approximate;
 
     private RegexTranslationPrecision GetRegexTranslationPrecision(string pattern, RegexOptions options)
     {
@@ -477,10 +475,8 @@ internal sealed class Z3FormulaEncoder : IDisposable
         return precision;
     }
 
-    private static bool CanEncodeRegexOptions(RegexOptions options)
-    {
-        return SmtRegexSemantics.CanEncodeOptions(options);
-    }
+    private static bool CanEncodeRegexOptions(RegexOptions options) =>
+        SmtRegexSemantics.CanEncodeOptions(options);
 
     private static bool GetBooleanComparisonOperandPolarity(
         SmtBinaryOperator op,

@@ -202,10 +202,8 @@ internal static class SmtFormulaTraversal
         return true;
     }
 
-    private static int GetChildCount(SmtFormula formula)
-    {
-        return GetChildren(formula).Count;
-    }
+    private static int GetChildCount(SmtFormula formula) =>
+        GetChildren(formula).Count;
 
     private static void PushChildrenInReverse(SmtFormula formula, Stack<SmtFormula> stack)
     {

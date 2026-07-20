@@ -30,10 +30,8 @@ internal sealed class SmtProofResultCache
 
     public static long SharedEvictionCount => s_sharedResults.EvictionCount;
 
-    public bool TryGetLocal(string queryKey, out PurityProofResult result)
-    {
-        return _localResults.TryGetValue(queryKey, out result);
-    }
+    public bool TryGetLocal(string queryKey, out PurityProofResult result) =>
+        _localResults.TryGetValue(queryKey, out result);
 
     public bool TryGetShared(
         SmtAnalysisOptions options,
@@ -88,10 +86,8 @@ internal sealed class SmtProofResultCache
         if (lease.OwnsFlight) s_sharedFlights.TryRemove(lease.Key, out _);
     }
 
-    public static bool IsShareable(PurityProofResult result)
-    {
-        return result.Outcome is PurityProofOutcome.ProvablyPure or PurityProofOutcome.ProvablyImpure;
-    }
+    public static bool IsShareable(PurityProofResult result) =>
+        result.Outcome is PurityProofOutcome.ProvablyPure or PurityProofOutcome.ProvablyImpure;
 
     public static bool IsTransientFailure(PurityProofResult result)
     {

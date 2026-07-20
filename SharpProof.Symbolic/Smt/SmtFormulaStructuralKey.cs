@@ -44,8 +44,6 @@ internal static class SmtFormulaStructuralKey
         };
     }
 
-    private static string Encode(string value)
-    {
-        return value.Length.ToString(CultureInfo.InvariantCulture) + ":" + value;
-    }
+    private static string Encode(string value) =>
+        value.Length.ToString(CultureInfo.InvariantCulture) + ":" + value;
 }

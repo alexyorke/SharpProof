@@ -67,10 +67,8 @@ internal partial class PurityAnalysisEngine
         return false;
     }
 
-    private static bool BranchTrueUsesConditionalSuccessor(BasicBlock block)
-    {
-        return block.ConditionKind == ControlFlowConditionKind.WhenTrue;
-    }
+    private static bool BranchTrueUsesConditionalSuccessor(BasicBlock block) =>
+        block.ConditionKind == ControlFlowConditionKind.WhenTrue;
 
     private static bool TryCreateSuccessorState(
         PurityAnalysisState currentState,

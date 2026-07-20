@@ -329,10 +329,8 @@ internal sealed class SymbolicRuntimeHazardQueryOptions(
     public ImmutableHashSet<SymbolicRuntimeHazardKind> Kinds { get; } =
         kinds?.ToImmutableHashSet() ?? ImmutableHashSet<SymbolicRuntimeHazardKind>.Empty;
 
-    public bool Includes(SymbolicRuntimeHazardKind kind)
-    {
-        return Kinds.Count == 0 || Kinds.Contains(kind);
-    }
+    public bool Includes(SymbolicRuntimeHazardKind kind) =>
+        Kinds.Count == 0 || Kinds.Contains(kind);
 }
 
 internal sealed record SymbolicRuntimeHazardQueryResult(
@@ -433,10 +431,8 @@ internal sealed record SymbolicRuntimeHazard(
     public SymbolicInputWitness TriggerWitness => RawTriggerWitness ??
         SymbolicInputWitnessFactory.Unsupported("runtime_hazard_trigger_witness_unavailable");
 
-    public string GetDisplayStatusReason()
-    {
-        return SymbolicReasonDisplay.Format(StatusReason);
-    }
+    public string GetDisplayStatusReason() =>
+        SymbolicReasonDisplay.Format(StatusReason);
 
     private static SymbolicProofInfo CreateProofInfo(
         SymbolicRuntimeHazardStatus status,

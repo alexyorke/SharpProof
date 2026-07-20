@@ -372,15 +372,11 @@ internal static partial class CommonBugAnalyzer
             SpecialType.System_IntPtr or SpecialType.System_UIntPtr;
     }
 
-    private static IOperation? GetInvocationSource(IInvocationOperation invocation)
-    {
-        return invocation.Instance ?? invocation.Arguments.FirstOrDefault()?.Value;
-    }
+    private static IOperation? GetInvocationSource(IInvocationOperation invocation) =>
+        invocation.Instance ?? invocation.Arguments.FirstOrDefault()?.Value;
 
-    private static bool IsLinqMethod(IMethodSymbol method, string containingType)
-    {
-        return string.Equals(method.ContainingType.ToDisplayString(), containingType, StringComparison.Ordinal);
-    }
+    private static bool IsLinqMethod(IMethodSymbol method, string containingType) =>
+        string.Equals(method.ContainingType.ToDisplayString(), containingType, StringComparison.Ordinal);
 
     private static bool ImplementsIQueryable(ITypeSymbol? type)
     {

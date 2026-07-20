@@ -189,15 +189,11 @@ internal sealed class PurityProofSearch : IPurityProofSearchSession
             reason);
     }
 
-    private static ProofCheckInfo Attempted(SmtFeasibilityResult result)
-    {
-        return new ProofCheckInfo(true, result.Feasibility, result.Witness);
-    }
+    private static ProofCheckInfo Attempted(SmtFeasibilityResult result) =>
+        new ProofCheckInfo(true, result.Feasibility, result.Witness);
 
-    private static ProofCheckInfo NotAttempted()
-    {
-        return new ProofCheckInfo(false, Feasibility.Unknown);
-    }
+    private static ProofCheckInfo NotAttempted() =>
+        new ProofCheckInfo(false, Feasibility.Unknown);
 
     private enum HazardClassificationMode
     {

@@ -413,8 +413,6 @@ internal static class SymbolicRegexLowerer
                value == 0;
     }
 
-    private static bool IsRegexType(ITypeSymbol? type)
-    {
-        return string.Equals(type?.ToDisplayString(), RegexMetadataName, StringComparison.Ordinal);
-    }
+    private static bool IsRegexType(ITypeSymbol? type) =>
+        string.Equals(type?.ToDisplayString(), RegexMetadataName, StringComparison.Ordinal);
 }

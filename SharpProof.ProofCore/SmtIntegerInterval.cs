@@ -80,10 +80,8 @@ internal readonly struct SmtIntegerInterval(
                ExcludedValues.SequenceEqual(other.ExcludedValues);
     }
 
-    public override bool Equals(object? obj)
-    {
-        return obj is SmtIntegerInterval other && Equals(other);
-    }
+    public override bool Equals(object? obj) =>
+        obj is SmtIntegerInterval other && Equals(other);
 
     public override int GetHashCode()
     {
@@ -136,8 +134,6 @@ internal readonly struct SmtIntegerInterval(
             (UpperBound.HasValue && value > UpperBound.Value));
     }
 
-    private SmtIntegerInterval Impossible()
-    {
-        return new SmtIntegerInterval(LowerBound, UpperBound, ExcludedValues, true);
-    }
+    private SmtIntegerInterval Impossible() =>
+        new SmtIntegerInterval(LowerBound, UpperBound, ExcludedValues, true);
 }

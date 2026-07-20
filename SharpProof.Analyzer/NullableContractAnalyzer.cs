@@ -527,10 +527,8 @@ internal static class NullableContractAnalyzer
         if (!session.Baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
     }
 
-    private static bool ShouldReportInconclusive(MethodBodyAnalysisContext context)
-    {
-        return context.Configuration.ReportNullableInconclusive;
-    }
+    private static bool ShouldReportInconclusive(MethodBodyAnalysisContext context) =>
+        context.Configuration.ReportNullableInconclusive;
 
     private static ImmutableDictionary<string, string?> CreateProperties(
         MethodBodyAnalysisContext context,
@@ -581,10 +579,8 @@ internal static class NullableContractAnalyzer
             condition);
     }
 
-    private static string ConditionalImplication(ExpressionSyntax result, bool expected, string consequence)
-    {
-        return Parenthesize(result) + " != " + FormatBoolean(expected) + " || " + consequence;
-    }
+    private static string ConditionalImplication(ExpressionSyntax result, bool expected, string consequence) =>
+        Parenthesize(result) + " != " + FormatBoolean(expected) + " || " + consequence;
 
     private static string FormatBooleanAttribute(string name, bool value) =>
         "[" + name + "(" + FormatBoolean(value) + ")]";

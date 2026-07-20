@@ -176,10 +176,8 @@ internal sealed class SymbolicComplexityCallModel(
             });
     }
 
-    private static bool IsSourceMethod(IMethodSymbol methodSymbol)
-    {
-        return SymbolicMethodSourceResolver.IsBackedBySource(methodSymbol);
-    }
+    private static bool IsSourceMethod(IMethodSymbol methodSymbol) =>
+        SymbolicMethodSourceResolver.IsBackedBySource(methodSymbol);
 
     private bool TryResolveSourceMethod(
         IMethodSymbol methodSymbol,

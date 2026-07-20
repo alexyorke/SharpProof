@@ -26,10 +26,8 @@ public static class SarifCorpusReport
         ImmutableHashSet.Create(StringComparer.Ordinal, "unknown_external_call", "dynamic_dispatch",
             "unsupported_operation", "unresolved_delegate_target");
 
-    public static CorpusReportSummary CreateFromSarifFiles(IEnumerable<string> sarifPaths)
-    {
-        return CreateFromSarifFiles(sarifPaths.Select(path => new SarifCorpusInput(path, path)));
-    }
+    public static CorpusReportSummary CreateFromSarifFiles(IEnumerable<string> sarifPaths) =>
+        CreateFromSarifFiles(sarifPaths.Select(path => new SarifCorpusInput(path, path)));
 
     public static CorpusReportSummary CreateFromSarifFiles(IEnumerable<SarifCorpusInput> inputs)
     {
@@ -233,10 +231,8 @@ public static class SarifCorpusReport
                 .ToImmutableDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         }
 
-        private static ImmutableArray<RankedItem> ToRankedItems(Dictionary<string, int> values)
-        {
-            return Rank(values.Select(static pair => new RankedItem(pair.Key, pair.Value)));
-        }
+        private static ImmutableArray<RankedItem> ToRankedItems(Dictionary<string, int> values) =>
+            Rank(values.Select(static pair => new RankedItem(pair.Key, pair.Value)));
 
         private static ImmutableArray<RankedItem> ToCategorizedRankedItems(
             Dictionary<(string Category, string Value), int> values)

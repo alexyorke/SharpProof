@@ -10,15 +10,11 @@ internal readonly struct SmtAffineIntegerTerm(SmtFormula? baseTerm, long scale, 
 
     internal long Offset { get; } = offset;
 
-    internal static SmtAffineIntegerTerm Constant(long value)
-    {
-        return new SmtAffineIntegerTerm(null, 0, value);
-    }
+    internal static SmtAffineIntegerTerm Constant(long value) =>
+        new SmtAffineIntegerTerm(null, 0, value);
 
-    internal static SmtAffineIntegerTerm Term(SmtFormula term)
-    {
-        return new SmtAffineIntegerTerm(term, 1, 0);
-    }
+    internal static SmtAffineIntegerTerm Term(SmtFormula term) =>
+        new SmtAffineIntegerTerm(term, 1, 0);
 
     internal static bool TryCreate(
         SmtFormula formula,
@@ -308,20 +304,14 @@ internal static class SmtIntegerArithmetic
         }
     }
 
-    internal static bool TryAdd(long left, long right, out long value)
-    {
-        return TryBinary(left, right, static (first, second) => checked(first + second), out value);
-    }
+    internal static bool TryAdd(long left, long right, out long value) =>
+        TryBinary(left, right, static (first, second) => checked(first + second), out value);
 
-    internal static bool TrySubtract(long left, long right, out long value)
-    {
-        return TryBinary(left, right, static (first, second) => checked(first - second), out value);
-    }
+    internal static bool TrySubtract(long left, long right, out long value) =>
+        TryBinary(left, right, static (first, second) => checked(first - second), out value);
 
-    internal static bool TryMultiply(long left, long right, out long value)
-    {
-        return TryBinary(left, right, static (first, second) => checked(first * second), out value);
-    }
+    internal static bool TryMultiply(long left, long right, out long value) =>
+        TryBinary(left, right, static (first, second) => checked(first * second), out value);
 
     internal static bool TryNegate(long value, out long result)
     {

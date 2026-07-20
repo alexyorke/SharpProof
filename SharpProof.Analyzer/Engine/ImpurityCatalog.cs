@@ -57,15 +57,11 @@ internal static partial class ImpurityCatalog
             ContainingType.SpecialType: SpecialType.System_Object
         };
 
-    internal static bool IsConfiguredKnownPureMember(ISymbol symbol)
-    {
-        return TryGetConfiguredKnownPureMember(symbol, out _);
-    }
+    internal static bool IsConfiguredKnownPureMember(ISymbol symbol) =>
+        TryGetConfiguredKnownPureMember(symbol, out _);
 
-    internal static bool TryGetConfiguredKnownPureMember(ISymbol symbol, out string configuredValue)
-    {
-        return TryGetConfiguredMember(symbol, ExtraPureMethods, out configuredValue);
-    }
+    internal static bool TryGetConfiguredKnownPureMember(ISymbol symbol, out string configuredValue) =>
+        TryGetConfiguredMember(symbol, ExtraPureMethods, out configuredValue);
 
     internal static bool TryGetConfiguredKnownPureMember(
         ISymbol symbol,
@@ -123,10 +119,8 @@ internal static partial class ImpurityCatalog
         return null;
     }
 
-    internal static bool TryGetConfiguredKnownImpureMember(ISymbol symbol, out string configuredValue)
-    {
-        return TryGetConfiguredMember(symbol, ExtraImpureMethods, out configuredValue);
-    }
+    internal static bool TryGetConfiguredKnownImpureMember(ISymbol symbol, out string configuredValue) =>
+        TryGetConfiguredMember(symbol, ExtraImpureMethods, out configuredValue);
 
     internal static bool TryGetConfiguredKnownImpureMember(
         ISymbol symbol,
@@ -202,10 +196,8 @@ internal static partial class ImpurityCatalog
         return true;
     }
 
-    public static bool IsInImpureNamespaceOrType(ISymbol symbol)
-    {
-        return IsInConfiguredImpureNamespaceOrType(symbol);
-    }
+    public static bool IsInImpureNamespaceOrType(ISymbol symbol) =>
+        IsInConfiguredImpureNamespaceOrType(symbol);
 
     public static bool IsInConfiguredImpureNamespaceOrType(ISymbol symbol)
     {

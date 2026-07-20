@@ -134,10 +134,8 @@ public static class SharpProofBaseline
             baseline.Diagnostics.Length - kept.Length);
     }
 
-    public static string ToJson(BaselineDocument baseline)
-    {
-        return JsonSerializer.Serialize(baseline, OutputJsonOptions) + Environment.NewLine;
-    }
+    public static string ToJson(BaselineDocument baseline) =>
+        JsonSerializer.Serialize(baseline, OutputJsonOptions) + Environment.NewLine;
 
     private static BaselineEntry? TryCreateEntry(JsonElement result)
     {

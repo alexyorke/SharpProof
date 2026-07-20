@@ -25,20 +25,14 @@ internal sealed record SmtSatisfyingWitness(
 {
     public bool IsAvailable => Status is SmtWitnessStatus.Exact or SmtWitnessStatus.Approximate;
 
-    internal static SmtSatisfyingWitness None(string reason)
-    {
-        return Absent(SmtWitnessStatus.None, reason);
-    }
+    internal static SmtSatisfyingWitness None(string reason) =>
+        Absent(SmtWitnessStatus.None, reason);
 
-    internal static SmtSatisfyingWitness Unsupported(string reason)
-    {
-        return Absent(SmtWitnessStatus.Unsupported, reason);
-    }
+    internal static SmtSatisfyingWitness Unsupported(string reason) =>
+        Absent(SmtWitnessStatus.Unsupported, reason);
 
-    private static SmtSatisfyingWitness Absent(SmtWitnessStatus status, string reason)
-    {
-        return new SmtSatisfyingWitness(status, reason, Array.Empty<SmtModelAssignment>());
-    }
+    private static SmtSatisfyingWitness Absent(SmtWitnessStatus status, string reason) =>
+        new SmtSatisfyingWitness(status, reason, Array.Empty<SmtModelAssignment>());
 }
 
 internal sealed record SmtFeasibilityResult(

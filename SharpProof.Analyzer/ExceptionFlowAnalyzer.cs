@@ -261,10 +261,8 @@ internal static partial class ExceptionFlowAnalyzer
                exceptionEvidence.FormatEdges();
     }
 
-    private static string CreateExceptionSiteKey(SyntaxNode node)
-    {
-        return CreateSourceSpanKey(node);
-    }
+    private static string CreateExceptionSiteKey(SyntaxNode node) =>
+        CreateSourceSpanKey(node);
 
     internal static IEnumerable<TNode> GetRelevantDescendants<TNode>(SyntaxNode methodNode)
         where TNode : SyntaxNode
@@ -469,10 +467,8 @@ internal static partial class ExceptionFlowAnalyzer
         return fallbackTarget.OriginalDefinition;
     }
 
-    private static string CreateSourceSpanKey(SyntaxNode node)
-    {
-        return CreateSourceSpanKey(node.SpanStart, node.Span.End);
-    }
+    private static string CreateSourceSpanKey(SyntaxNode node) =>
+        CreateSourceSpanKey(node.SpanStart, node.Span.End);
 
     private static string CreateSourceSpanKey(int spanStart, int spanEnd)
     {

@@ -408,10 +408,8 @@ internal sealed partial class SmtConcreteFactIndex
             return integerContradiction || stringContradiction || referenceContradiction;
         }
 
-        private SmtFormula FindCanonical(SmtFormula formula)
-        {
-            return FindCanonical(_aliases, formula, out _);
-        }
+        private SmtFormula FindCanonical(SmtFormula formula) =>
+            FindCanonical(_aliases, formula, out _);
 
         private static SmtFormula FindCanonical(
             Dictionary<SmtFormula, (SmtFormula Parent, bool Differs)> equivalences,
@@ -432,10 +430,8 @@ internal sealed partial class SmtConcreteFactIndex
             return canonical;
         }
 
-        private static SmtFormula SelectCanonical(SmtFormula left, SmtFormula right)
-        {
-            return string.CompareOrdinal(left.ToString(), right.ToString()) <= 0 ? left : right;
-        }
+        private static SmtFormula SelectCanonical(SmtFormula left, SmtFormula right) =>
+            string.CompareOrdinal(left.ToString(), right.ToString()) <= 0 ? left : right;
 
         private void MergeIntegerFacts(
             SmtFormula canonical,

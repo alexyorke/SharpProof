@@ -541,10 +541,8 @@ internal static class MethodEnsuresAnalyzer
                    string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal);
         }
 
-        private static bool IsNull(ExpressionSyntax expression)
-        {
-            return expression.IsKind(SyntaxKind.NullLiteralExpression);
-        }
+        private static bool IsNull(ExpressionSyntax expression) =>
+            expression.IsKind(SyntaxKind.NullLiteralExpression);
 
     }
 
@@ -642,10 +640,8 @@ internal static class MethodEnsuresAnalyzer
             return typeInfo.ConvertedType ?? typeInfo.Type;
         }
 
-        public SymbolicState CreateInitialState()
-        {
-            return new SymbolicState(_snapshotFacts);
-        }
+        public SymbolicState CreateInitialState() =>
+            new SymbolicState(_snapshotFacts);
     }
 
     private readonly record struct EnsuresContract(

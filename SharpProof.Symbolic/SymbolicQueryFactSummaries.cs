@@ -56,10 +56,8 @@ internal sealed record SymbolicConservativeUnknownDiagnostic(
     [JsonPropertyOrder(4)]
     public int MaybeFactCount => MaybeFacts.Count;
 
-    public string GetDisplayReason()
-    {
-        return SymbolicReasonDisplay.Format(Reason);
-    }
+    public string GetDisplayReason() =>
+        SymbolicReasonDisplay.Format(Reason);
 }
 
 internal sealed record SymbolicMergedPathFacts(
@@ -194,10 +192,8 @@ internal sealed record SymbolicMergedPathFacts(
         return diagnostics;
     }
 
-    internal static string FormatConservativeUnknown(string target)
-    {
-        return "unknown(" + (string.IsNullOrWhiteSpace(target) ? "path" : target) + ")";
-    }
+    internal static string FormatConservativeUnknown(string target) =>
+        "unknown(" + (string.IsNullOrWhiteSpace(target) ? "path" : target) + ")";
 }
 
 internal readonly record struct SymbolicQueryMetrics(

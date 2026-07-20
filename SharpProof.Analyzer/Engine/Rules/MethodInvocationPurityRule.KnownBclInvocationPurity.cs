@@ -94,10 +94,8 @@ internal partial class MethodInvocationPurityRule
                definition.Name is "Empty" or "Range" or "Repeat";
     }
 
-    internal static IMethodSymbol GetExtensionDefinition(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.ReducedFrom ?? methodSymbol;
-    }
+    internal static IMethodSymbol GetExtensionDefinition(IMethodSymbol methodSymbol) =>
+        methodSymbol.ReducedFrom ?? methodSymbol;
 
     internal static bool ShouldDeferToSpecializedDispatchPurity(IMethodSymbol methodSymbol)
     {
@@ -136,15 +134,11 @@ internal partial class MethodInvocationPurityRule
         return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
     }
 
-    private static bool IsPureOutArgumentTarget(IOperation? operation)
-    {
-        return IsOutArgumentTarget(operation, true);
-    }
+    private static bool IsPureOutArgumentTarget(IOperation? operation) =>
+        IsOutArgumentTarget(operation, true);
 
-    private static bool IsDeclarationOrDiscardOutArgumentTarget(IOperation? operation)
-    {
-        return IsOutArgumentTarget(operation, false);
-    }
+    private static bool IsDeclarationOrDiscardOutArgumentTarget(IOperation? operation) =>
+        IsOutArgumentTarget(operation, false);
 
     private static bool IsOutArgumentTarget(IOperation? operation, bool allowLocalReference)
     {
@@ -531,10 +525,8 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static ITypeSymbol? GetFirstTypeArgument(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.TypeArguments.Length > 0 ? methodSymbol.TypeArguments[0] : null;
-    }
+    private static ITypeSymbol? GetFirstTypeArgument(IMethodSymbol methodSymbol) =>
+        methodSymbol.TypeArguments.Length > 0 ? methodSymbol.TypeArguments[0] : null;
 
     private static bool TryCheckHashCodeCombineDispatchPurity(
         IInvocationOperation invocationOperation,

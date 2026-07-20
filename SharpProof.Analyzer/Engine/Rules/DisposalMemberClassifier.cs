@@ -33,10 +33,8 @@ internal static class DisposalMemberClassifier
         return baseMembers.Concat(interfaceMembers).DistinctByOriginalDefinition();
     }
 
-    internal static bool IsAsyncDisposable(INamedTypeSymbol type)
-    {
-        return TypeHierarchyEnumeration.IsTypeNamed(type, "System", "IAsyncDisposable", 0);
-    }
+    internal static bool IsAsyncDisposable(INamedTypeSymbol type) =>
+        TypeHierarchyEnumeration.IsTypeNamed(type, "System", "IAsyncDisposable", 0);
 
     private static IMethodSymbol? FindDisposalMember(
         ITypeSymbol type,
@@ -63,9 +61,7 @@ internal static class DisposalMemberClassifier
         return null;
     }
 
-    private static bool IsDisposable(INamedTypeSymbol type)
-    {
-        return type.OriginalDefinition.SpecialType == SpecialType.System_IDisposable;
-    }
+    private static bool IsDisposable(INamedTypeSymbol type) =>
+        type.OriginalDefinition.SpecialType == SpecialType.System_IDisposable;
 
 }

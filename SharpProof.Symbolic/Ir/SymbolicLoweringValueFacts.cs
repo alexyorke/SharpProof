@@ -74,8 +74,6 @@ internal static class SymbolicLoweringValueFacts
         return false;
     }
 
-    internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
-    {
-        return CSharpSyntaxFacts.UnwrapExpression(expression, ExpressionCastUnwrapPolicy.NullableOnly);
-    }
+    internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression) =>
+        CSharpSyntaxFacts.UnwrapExpression(expression, ExpressionCastUnwrapPolicy.NullableOnly);
 }

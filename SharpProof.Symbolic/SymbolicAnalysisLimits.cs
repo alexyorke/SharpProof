@@ -137,10 +137,8 @@ internal static class SymbolicAnalysisLimitContext
 
         internal int? DefaultSourceSpanStart { get; } = defaultSourceSpanStart;
 
-        internal SymbolicAnalysisTruncationInfo Snapshot()
-        {
-            return _events.ToInfo();
-        }
+        internal SymbolicAnalysisTruncationInfo Snapshot() =>
+            _events.ToInfo();
 
         internal void Record(
             SymbolicAnalysisLimitKind kind,

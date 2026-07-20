@@ -302,10 +302,8 @@ internal sealed class SmtAnalysisService : IDisposable
                string.Equals(ex.GetType().Name, "Z3Exception", StringComparison.Ordinal);
     }
 
-    private static bool IsPermanentSolverFailure(Exception ex)
-    {
-        return FindPermanentSolverFailure(ex) != null;
-    }
+    private static bool IsPermanentSolverFailure(Exception ex) =>
+        FindPermanentSolverFailure(ex) != null;
 
     private static string GetPermanentFailureCode(Exception ex)
     {
@@ -346,10 +344,8 @@ internal sealed class SmtAnalysisService : IDisposable
         return exception is TypeInitializationException ? exception : null;
     }
 
-    private SmtAnalysisHealthState GetHealthState()
-    {
-        return (SmtAnalysisHealthState)Volatile.Read(ref _healthState);
-    }
+    private SmtAnalysisHealthState GetHealthState() =>
+        (SmtAnalysisHealthState)Volatile.Read(ref _healthState);
 
     private void SetHealthState(SmtAnalysisHealthState state)
     {

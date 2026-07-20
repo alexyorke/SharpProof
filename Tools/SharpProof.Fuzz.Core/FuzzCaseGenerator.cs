@@ -149,10 +149,8 @@ public sealed class FuzzCaseGenerator
 
 
 
-    private Random CreateRandom(int index)
-    {
-        return new Random(StableHash(_seed, index, 0x51ED270B));
-    }
+    private Random CreateRandom(int index) =>
+        new Random(StableHash(_seed, index, 0x51ED270B));
 
     private static int StableHash(int first, int second, int third) =>
         Mix(Mix(Mix(unchecked((int)2166136261), first), second), third);

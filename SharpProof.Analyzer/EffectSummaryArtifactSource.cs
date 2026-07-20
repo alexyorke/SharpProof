@@ -148,10 +148,8 @@ internal sealed record EffectSummaryArtifactSource(
         return platformSeparator < 0 ? normalized : normalized.Substring(0, platformSeparator);
     }
 
-    private static string NormalizePath(string path)
-    {
-        return path.Trim().Replace('\\', '/').Trim('/');
-    }
+    private static string NormalizePath(string path) =>
+        path.Trim().Replace('\\', '/').Trim('/');
 
     private static string NormalizePackageVersion(string version)
     {

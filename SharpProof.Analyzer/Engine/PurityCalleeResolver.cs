@@ -4,10 +4,8 @@ namespace SharpProof.Analyzer.Engine;
 
 internal static class PurityCalleeResolver
 {
-    internal static string? GetKnownImpureMemberSource(ISymbol symbol)
-    {
-        return ImpurityCatalog.GetKnownImpureMemberSource(symbol);
-    }
+    internal static string? GetKnownImpureMemberSource(ISymbol symbol) =>
+        ImpurityCatalog.GetKnownImpureMemberSource(symbol);
 
     internal static bool IsKnownMutableCollectionBoundaryType(ITypeSymbol? typeSymbol)
     {

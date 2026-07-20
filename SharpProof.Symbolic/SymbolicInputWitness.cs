@@ -220,15 +220,11 @@ internal static class SymbolicInputWitnessFactory
             1);
     }
 
-    internal static SymbolicInputWitness None(string reason)
-    {
-        return CreateEmpty(SymbolicWitnessStatus.None, reason, 0);
-    }
+    internal static SymbolicInputWitness None(string reason) =>
+        CreateEmpty(SymbolicWitnessStatus.None, reason, 0);
 
-    internal static SymbolicInputWitness Unsupported(string reason)
-    {
-        return CreateEmpty(SymbolicWitnessStatus.Unsupported, reason, 0);
-    }
+    internal static SymbolicInputWitness Unsupported(string reason) =>
+        CreateEmpty(SymbolicWitnessStatus.Unsupported, reason, 0);
 
     private static SymbolicInputWitness CreateEmpty(
         SymbolicWitnessStatus status,
@@ -424,10 +420,8 @@ internal sealed class SymbolicInputRoleMap
         return end;
     }
 
-    private static string GetDisplayName(string root)
-    {
-        return RemoveNumericLocationSuffix(root, 0);
-    }
+    private static string GetDisplayName(string root) =>
+        RemoveNumericLocationSuffix(root, 0);
 
     private static string RemoveNumericLocationSuffix(string value, int minimumPrefixLength)
     {

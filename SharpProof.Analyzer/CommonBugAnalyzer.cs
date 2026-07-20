@@ -136,10 +136,8 @@ internal static partial class CommonBugAnalyzer
             .Add("sharpproof.common_bug.symbol", symbol);
     }
 
-    private static string CreateBaselineDiscriminator(DiagnosticDescriptor descriptor, Location location)
-    {
-        return descriptor.Id + "@" + location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture);
-    }
+    private static string CreateBaselineDiscriminator(DiagnosticDescriptor descriptor, Location location) =>
+        descriptor.Id + "@" + location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture);
 
     private static Diagnostic CreateCommonBugDiagnostic(
         DiagnosticDescriptor descriptor,

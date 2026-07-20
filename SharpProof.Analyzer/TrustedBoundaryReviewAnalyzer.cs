@@ -434,10 +434,8 @@ internal static class TrustedBoundaryReviewAnalyzer
                    StringComparison.Ordinal);
     }
 
-    private static string GetAttributeValue(AttributeData attribute)
-    {
-        return attribute.AttributeClass?.ToDisplayString() ?? "<unknown attribute>";
-    }
+    private static string GetAttributeValue(AttributeData attribute) =>
+        attribute.AttributeClass?.ToDisplayString() ?? "<unknown attribute>";
 
     private readonly record struct TrustCandidate(
         string Source,

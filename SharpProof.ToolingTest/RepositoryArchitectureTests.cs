@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using NUnit.Framework;
 using SharpProof.Symbolic;
@@ -426,6 +427,37 @@ public sealed class RepositoryArchitectureTests
             Assert.That(source, Does.Not.Contain("PropertyHasAttribute"));
             Assert.That(source, Does.Not.Contain("FieldHasAttribute"));
         });
+    }
+
+    [Test]
+    public void ProductionCode_UsesExpressionBodiesForTrivialReturns()
+    {
+        var root = ReadmeExampleFixture.GetRepositoryRoot();
+        var productionRoots = new[]
+        {
+            "SharpProof.Analyzer",
+            "SharpProof.Symbolic",
+            "SharpProof.ProofCore",
+            "SharpProof.Contracts",
+            "SharpProof.Tooling.Core",
+            "SharpProof.Attributes",
+            "SharpProof.CodeFixes",
+            "Tools"
+        };
+        var trivialReturn = new Regex(
+            @"(?m)^([ \t]+)(?:public|private|internal|protected)[^\r\n]+\)\r?\n\1\{\r?\n\1    return [^\r\n]+;\r?\n\1\}",
+            RegexOptions.CultureInvariant);
+        var offenders = productionRoots
+            .SelectMany(path => Directory.EnumerateFiles(
+                Path.Combine(root, path), "*.cs", SearchOption.AllDirectories))
+            .Where(path => !path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar) &&
+                           !path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar))
+            .Where(path => trivialReturn.IsMatch(File.ReadAllText(path)))
+            .Select(path => Path.GetRelativePath(root, path))
+            .ToArray();
+
+        Assert.That(offenders, Is.Empty,
+            "Single-return methods should use the canonical expression-body form.");
     }
 
     [Test]

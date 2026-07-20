@@ -237,10 +237,8 @@ internal static class NullableFlowFacts
             : NullableFlowFactState.Unknown;
     }
 
-    internal static bool HasNotNullPostcondition(IParameterSymbol parameter)
-    {
-        return HasParameterAttribute(parameter, NotNullAttributeName);
-    }
+    internal static bool HasNotNullPostcondition(IParameterSymbol parameter) =>
+        HasParameterAttribute(parameter, NotNullAttributeName);
 
     internal static bool HasInferredNotNullNormalCompletionPostcondition(
         IParameterSymbol parameter,
@@ -284,20 +282,14 @@ internal static class NullableFlowFacts
         return false;
     }
 
-    internal static bool TryGetNotNullWhenValue(IParameterSymbol parameter, out bool value)
-    {
-        return TryGetParameterBooleanAttributeValue(parameter, NotNullWhenAttributeName, out value);
-    }
+    internal static bool TryGetNotNullWhenValue(IParameterSymbol parameter, out bool value) =>
+        TryGetParameterBooleanAttributeValue(parameter, NotNullWhenAttributeName, out value);
 
-    internal static bool TryGetMaybeNullWhenValue(IParameterSymbol parameter, out bool value)
-    {
-        return TryGetParameterBooleanAttributeValue(parameter, MaybeNullWhenAttributeName, out value);
-    }
+    internal static bool TryGetMaybeNullWhenValue(IParameterSymbol parameter, out bool value) =>
+        TryGetParameterBooleanAttributeValue(parameter, MaybeNullWhenAttributeName, out value);
 
-    internal static bool TryGetDoesNotReturnIfValue(IParameterSymbol parameter, out bool value)
-    {
-        return TryGetParameterBooleanAttributeValue(parameter, DoesNotReturnIfAttributeName, out value);
-    }
+    internal static bool TryGetDoesNotReturnIfValue(IParameterSymbol parameter, out bool value) =>
+        TryGetParameterBooleanAttributeValue(parameter, DoesNotReturnIfAttributeName, out value);
 
     internal static bool HasDoesNotReturn(IMethodSymbol method)
     {
@@ -545,10 +537,8 @@ internal static class NullableFlowFacts
         };
     }
 
-    private static bool HasParameterAttribute(IParameterSymbol parameter, string attributeName)
-    {
-        return HasAttribute(GetInputAttributes(parameter), attributeName);
-    }
+    private static bool HasParameterAttribute(IParameterSymbol parameter, string attributeName) =>
+        HasAttribute(GetInputAttributes(parameter), attributeName);
 
     private static bool IsNullGuardForParameter(ExpressionSyntax condition, string parameterName)
     {

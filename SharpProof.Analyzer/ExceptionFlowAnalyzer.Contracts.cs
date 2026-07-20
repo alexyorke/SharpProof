@@ -325,10 +325,8 @@ internal static partial class ExceptionFlowAnalyzer
         return attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
     }
 
-    private static IEnumerable<Location>? AdditionalLocations(Location? location)
-    {
-        return location == null ? null : new[] { location };
-    }
+    private static IEnumerable<Location>? AdditionalLocations(Location? location) =>
+        location == null ? null : new[] { location };
 
     private enum ExceptionContractKind
     {

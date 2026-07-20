@@ -304,15 +304,11 @@ internal readonly record struct StaticFieldInitializerValue(
     public static StaticFieldInitializerValue StableIdentity =>
         new(StaticFieldInitializerValueKind.StableIdentity, TrackedStackValue.Unknown);
 
-    public static StaticFieldInitializerValue FromConstantTracked(TrackedStackValue trackedValue)
-    {
-        return new StaticFieldInitializerValue(StaticFieldInitializerValueKind.Constant, trackedValue);
-    }
+    public static StaticFieldInitializerValue FromConstantTracked(TrackedStackValue trackedValue) =>
+        new StaticFieldInitializerValue(StaticFieldInitializerValueKind.Constant, trackedValue);
 
-    public static StaticFieldInitializerValue FromStableIdentityTracked(TrackedStackValue trackedValue)
-    {
-        return new StaticFieldInitializerValue(StaticFieldInitializerValueKind.StableIdentity, trackedValue);
-    }
+    public static StaticFieldInitializerValue FromStableIdentityTracked(TrackedStackValue trackedValue) =>
+        new StaticFieldInitializerValue(StaticFieldInitializerValueKind.StableIdentity, trackedValue);
 }
 
 internal readonly record struct TrackedStackValue(
@@ -327,18 +323,12 @@ internal readonly record struct TrackedStackValue(
         string.IsNullOrWhiteSpace(KnownStringComparer) &&
         string.IsNullOrWhiteSpace(KnownExceptionType);
 
-    public static TrackedStackValue FromInt32(int value)
-    {
-        return new TrackedStackValue(value, null, null);
-    }
+    public static TrackedStackValue FromInt32(int value) =>
+        new TrackedStackValue(value, null, null);
 
-    public static TrackedStackValue FromKnownStringComparer(string value)
-    {
-        return new TrackedStackValue(null, value, null);
-    }
+    public static TrackedStackValue FromKnownStringComparer(string value) =>
+        new TrackedStackValue(null, value, null);
 
-    public static TrackedStackValue FromKnownExceptionType(string value)
-    {
-        return new TrackedStackValue(null, null, value);
-    }
+    public static TrackedStackValue FromKnownExceptionType(string value) =>
+        new TrackedStackValue(null, null, value);
 }

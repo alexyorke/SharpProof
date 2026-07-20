@@ -215,10 +215,8 @@ internal sealed record SymbolicFact(
         return new SymbolicFact(atom, true, SymbolicFactConfidence.Exact, provenance, node.Span, symbol, evidenceKey);
     }
 
-    public SymbolicFact Negate()
-    {
-        return this with { Polarity = !Polarity };
-    }
+    public SymbolicFact Negate() =>
+        this with { Polarity = !Polarity };
 }
 
 internal abstract record SymbolicCondition;
@@ -900,10 +898,8 @@ internal sealed class SymbolicState
         };
     }
 
-    private static IEnumerable<SymbolicFact> EnumerateConditionFacts(SymbolicCondition condition)
-    {
-        return EnumerateConjunctiveFacts(condition, false);
-    }
+    private static IEnumerable<SymbolicFact> EnumerateConditionFacts(SymbolicCondition condition) =>
+        EnumerateConjunctiveFacts(condition, false);
 
     private static IEnumerable<SymbolicFact> EnumerateConjunctiveFacts(
         SymbolicCondition condition,
@@ -970,30 +966,20 @@ internal sealed class SymbolicState
         return string.Join("\n", parts);
     }
 
-    internal static string CreateProofFactKey(SymbolicFact fact)
-    {
-        return CreateFactKey(fact);
-    }
+    internal static string CreateProofFactKey(SymbolicFact fact) =>
+        CreateFactKey(fact);
 
-    internal static string CreateProofTermKey(SymbolicTerm term)
-    {
-        return CreateTermKey(term);
-    }
+    internal static string CreateProofTermKey(SymbolicTerm term) =>
+        CreateTermKey(term);
 
-    internal static string CreateProofConditionKey(SymbolicCondition condition)
-    {
-        return CreateConditionKey(condition);
-    }
+    internal static string CreateProofConditionKey(SymbolicCondition condition) =>
+        CreateConditionKey(condition);
 
-    internal static IEnumerable<string> EnumerateProofConditionFactKeys(SymbolicCondition condition)
-    {
-        return EnumerateConditionFacts(condition).Select(CreateFactKey);
-    }
+    internal static IEnumerable<string> EnumerateProofConditionFactKeys(SymbolicCondition condition) =>
+        EnumerateConditionFacts(condition).Select(CreateFactKey);
 
-    internal static bool TryEvaluateProofFact(SymbolicFact fact, out bool value)
-    {
-        return TryEvaluateFact(fact, out value);
-    }
+    internal static bool TryEvaluateProofFact(SymbolicFact fact, out bool value) =>
+        TryEvaluateFact(fact, out value);
 
     private static string CreateFactKey(SymbolicFact fact)
     {
@@ -1353,15 +1339,11 @@ internal sealed class SymbolicState
                integer.Value == value;
     }
 
-    private static bool IsAssociativeCommutativeBinaryTermOperator(SymbolicBinaryTermOperator binaryOperator)
-    {
-        return binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Multiply;
-    }
+    private static bool IsAssociativeCommutativeBinaryTermOperator(SymbolicBinaryTermOperator binaryOperator) =>
+        binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Multiply;
 
-    private static bool IsCommutativeBinaryTermOperator(SymbolicBinaryTermOperator binaryOperator)
-    {
-        return binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Multiply;
-    }
+    private static bool IsCommutativeBinaryTermOperator(SymbolicBinaryTermOperator binaryOperator) =>
+        binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Multiply;
 
     private static string CreateConditionKey(SymbolicCondition condition)
     {
@@ -1462,10 +1444,8 @@ internal sealed class SymbolicState
         }
     }
 
-    private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicFact fact)
-    {
-        return ContainsPotentiallyExceptionalArithmetic(fact.Atom);
-    }
+    private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicFact fact) =>
+        ContainsPotentiallyExceptionalArithmetic(fact.Atom);
 
     private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicAtom atom)
     {

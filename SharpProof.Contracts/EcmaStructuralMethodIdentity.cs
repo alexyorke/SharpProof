@@ -51,10 +51,8 @@ internal static class EcmaStructuralMethodIdentity
                 : StructuralRefKinds.None);
     }
 
-    internal static string GetCanonicalKey(MetadataReader reader, MethodDefinitionHandle handle)
-    {
-        return Create(reader, handle).ToCanonicalKey();
-    }
+    internal static string GetCanonicalKey(MetadataReader reader, MethodDefinitionHandle handle) =>
+        Create(reader, handle).ToCanonicalKey();
 
     private static Dictionary<int, ParameterAttributes> GetParameterAttributes(
         MetadataReader reader,
@@ -115,10 +113,8 @@ internal static class EcmaStructuralMethodIdentity
         return metadataName;
     }
 
-    private static string GetSimpleMetadataName(string metadataName)
-    {
-        return metadataName.Substring(metadataName.LastIndexOf('.') + 1);
-    }
+    private static string GetSimpleMetadataName(string metadataName) =>
+        metadataName.Substring(metadataName.LastIndexOf('.') + 1);
 
     private static string GetMemberReferenceContainingMetadataType(MetadataReader reader, EntityHandle parent)
     {
@@ -176,15 +172,11 @@ internal readonly record struct StructuralDecodedType(
 
 internal sealed class StructuralTypeProvider : ISignatureTypeProvider<StructuralDecodedType, object?>
 {
-    public StructuralDecodedType GetArrayType(StructuralDecodedType elementType, ArrayShape shape)
-    {
-        return new StructuralDecodedType("array:" + shape.Rank + "[" + elementType.Key + "]");
-    }
+    public StructuralDecodedType GetArrayType(StructuralDecodedType elementType, ArrayShape shape) =>
+        new StructuralDecodedType("array:" + shape.Rank + "[" + elementType.Key + "]");
 
-    public StructuralDecodedType GetByReferenceType(StructuralDecodedType elementType)
-    {
-        return elementType with { IsByRef = true };
-    }
+    public StructuralDecodedType GetByReferenceType(StructuralDecodedType elementType) =>
+        elementType with { IsByRef = true };
 
     public StructuralDecodedType GetFunctionPointerType(MethodSignature<StructuralDecodedType> signature)
     {
@@ -208,15 +200,11 @@ internal sealed class StructuralTypeProvider : ISignatureTypeProvider<Structural
             genericType.Key + "[" + string.Join(";", typeArguments.Select(static argument => argument.Key)) + "]");
     }
 
-    public StructuralDecodedType GetGenericMethodParameter(object? genericContext, int index)
-    {
-        return new StructuralDecodedType("mparam:" + index);
-    }
+    public StructuralDecodedType GetGenericMethodParameter(object? genericContext, int index) =>
+        new StructuralDecodedType("mparam:" + index);
 
-    public StructuralDecodedType GetGenericTypeParameter(object? genericContext, int index)
-    {
-        return new StructuralDecodedType("tparam:" + index);
-    }
+    public StructuralDecodedType GetGenericTypeParameter(object? genericContext, int index) =>
+        new StructuralDecodedType("tparam:" + index);
 
     public StructuralDecodedType GetModifiedType(
         StructuralDecodedType modifier,
@@ -233,15 +221,11 @@ internal sealed class StructuralTypeProvider : ISignatureTypeProvider<Structural
         return unmodifiedType with { IsReadOnlyModifier = unmodifiedType.IsReadOnlyModifier || isReadOnly };
     }
 
-    public StructuralDecodedType GetPinnedType(StructuralDecodedType elementType)
-    {
-        return elementType;
-    }
+    public StructuralDecodedType GetPinnedType(StructuralDecodedType elementType) =>
+        elementType;
 
-    public StructuralDecodedType GetPointerType(StructuralDecodedType elementType)
-    {
-        return new StructuralDecodedType("pointer[" + elementType.Key + "]");
-    }
+    public StructuralDecodedType GetPointerType(StructuralDecodedType elementType) =>
+        new StructuralDecodedType("pointer[" + elementType.Key + "]");
 
     public StructuralDecodedType GetPrimitiveType(PrimitiveTypeCode typeCode)
     {
@@ -269,10 +253,8 @@ internal sealed class StructuralTypeProvider : ISignatureTypeProvider<Structural
         }));
     }
 
-    public StructuralDecodedType GetSZArrayType(StructuralDecodedType elementType)
-    {
-        return new StructuralDecodedType("array:1[" + elementType.Key + "]");
-    }
+    public StructuralDecodedType GetSZArrayType(StructuralDecodedType elementType) =>
+        new StructuralDecodedType("array:1[" + elementType.Key + "]");
 
     public StructuralDecodedType GetTypeFromDefinition(
         MetadataReader reader,

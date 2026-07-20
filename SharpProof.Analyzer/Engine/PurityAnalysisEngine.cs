@@ -226,10 +226,8 @@ internal partial class PurityAnalysisEngine
         public static PurityAnalysisState Pure => new(false, null, null, null);
 
 
-        public static PurityAnalysisState Merge(IEnumerable<PurityAnalysisState> states)
-        {
-            return PurityAnalysisStateMerger.MergeStatesAcrossAll(states.ToList(), 0);
-        }
+        public static PurityAnalysisState Merge(IEnumerable<PurityAnalysisState> states) =>
+            PurityAnalysisStateMerger.MergeStatesAcrossAll(states.ToList(), 0);
 
 
         public bool Equals(PurityAnalysisState other)
@@ -265,10 +263,8 @@ internal partial class PurityAnalysisEngine
             return true;
         }
 
-        public override bool Equals(object obj)
-        {
-            return obj is PurityAnalysisState other && Equals(other);
-        }
+        public override bool Equals(object obj) =>
+            obj is PurityAnalysisState other && Equals(other);
 
 
         public override int GetHashCode()
@@ -356,15 +352,11 @@ internal partial class PurityAnalysisEngine
             return this with { DelegateTargetMap = newMap };
         }
 
-        public PurityAnalysisState WithFlowCaptureResult(CaptureId id, PurityAnalysisResult result)
-        {
-            return this with { FlowCaptures = FlowCaptures.SetItem(id, result) };
-        }
+        public PurityAnalysisState WithFlowCaptureResult(CaptureId id, PurityAnalysisResult result) =>
+            this with { FlowCaptures = FlowCaptures.SetItem(id, result) };
 
-        public PurityAnalysisState WithFlowCaptureTarget(CaptureId id, PotentialTargets targets)
-        {
-            return this with { FlowCaptureTargets = FlowCaptureTargets.SetItem(id, targets) };
-        }
+        public PurityAnalysisState WithFlowCaptureTarget(CaptureId id, PotentialTargets targets) =>
+            this with { FlowCaptureTargets = FlowCaptureTargets.SetItem(id, targets) };
 
         public PurityAnalysisState WithFlowCaptureConcreteType(
             CaptureId id,
@@ -383,10 +375,8 @@ internal partial class PurityAnalysisEngine
             };
         }
 
-        public PurityAnalysisState WithFlowCaptureSymbol(CaptureId id, ISymbol symbol)
-        {
-            return this with { FlowCaptureSymbols = FlowCaptureSymbols.SetItem(id, symbol) };
-        }
+        public PurityAnalysisState WithFlowCaptureSymbol(CaptureId id, ISymbol symbol) =>
+            this with { FlowCaptureSymbols = FlowCaptureSymbols.SetItem(id, symbol) };
 
         public PurityAnalysisState ResetFlowCaptureFacts(CaptureId id, SyntaxNode source)
         {
@@ -504,15 +494,11 @@ internal partial class PurityAnalysisEngine
                 out concreteType);
         }
 
-        public bool TryGetFlowCaptureSymbol(CaptureId id, out ISymbol symbol)
-        {
-            return FlowCaptureSymbols.TryGetValue(id, out symbol!);
-        }
+        public bool TryGetFlowCaptureSymbol(CaptureId id, out ISymbol symbol) =>
+            FlowCaptureSymbols.TryGetValue(id, out symbol!);
 
-        public PurityAnalysisState WithPathState(SymbolicState pathState)
-        {
-            return this with { PathState = pathState ?? new SymbolicState() };
-        }
+        public PurityAnalysisState WithPathState(SymbolicState pathState) =>
+            this with { PathState = pathState ?? new SymbolicState() };
 
         public int GetSmtSymbolVersion(ISymbol symbol)
         {
@@ -588,10 +574,8 @@ internal partial class PurityAnalysisEngine
                    MethodSymbols.SetEquals(other.MethodSymbols);
         }
 
-        public override bool Equals(object obj)
-        {
-            return obj is PotentialTargets other && Equals(other);
-        }
+        public override bool Equals(object obj) =>
+            obj is PotentialTargets other && Equals(other);
 
         public override int GetHashCode()
         {
@@ -753,10 +737,8 @@ internal partial class PurityAnalysisEngine
             };
         }
 
-        public PurityEvidence WithSymbol(string symbol)
-        {
-            return this with { Symbol = symbol };
-        }
+        public PurityEvidence WithSymbol(string symbol) =>
+            this with { Symbol = symbol };
 
         public ImmutableDictionary<string, string?> ToDiagnosticProperties()
         {

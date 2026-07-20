@@ -16,15 +16,11 @@ internal sealed class FixedAnalyzerConfigOptionsProvider : AnalyzerConfigOptions
 
     public override AnalyzerConfigOptions GlobalOptions { get; }
 
-    public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
-    {
-        return _emptyOptions;
-    }
+    public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) =>
+        _emptyOptions;
 
-    public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
-    {
-        return _emptyOptions;
-    }
+    public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) =>
+        _emptyOptions;
 }
 
 internal sealed class FixedAnalyzerConfigOptions : AnalyzerConfigOptions
@@ -36,8 +32,6 @@ internal sealed class FixedAnalyzerConfigOptions : AnalyzerConfigOptions
         _values = values;
     }
 
-    public override bool TryGetValue(string key, out string value)
-    {
-        return _values.TryGetValue(key, out value!);
-    }
+    public override bool TryGetValue(string key, out string value) =>
+        _values.TryGetValue(key, out value!);
 }

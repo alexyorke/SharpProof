@@ -921,10 +921,8 @@ internal static class SymbolicStringLowerer
         return false;
     }
 
-    internal static bool CanRepresentRegexOptions(RegexOptions options)
-    {
-        return SmtRegexSemantics.CanPreserveOptions(options);
-    }
+    internal static bool CanRepresentRegexOptions(RegexOptions options) =>
+        SmtRegexSemantics.CanPreserveOptions(options);
 
     private static bool TryGetOrdinalStringComparison(
         ExpressionSyntax expression,

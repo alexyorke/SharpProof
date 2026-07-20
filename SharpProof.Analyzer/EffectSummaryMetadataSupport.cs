@@ -586,10 +586,8 @@ internal static class RuntimeMetadataAssemblyLocator
     private static readonly Lazy<ImmutableArray<string>> TrustedPlatformAssemblyPaths =
         new(CreateTrustedPlatformAssemblyPaths, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    public static IEnumerable<string> GetTrustedPlatformAssemblyPaths()
-    {
-        return TrustedPlatformAssemblyPaths.Value;
-    }
+    public static IEnumerable<string> GetTrustedPlatformAssemblyPaths() =>
+        TrustedPlatformAssemblyPaths.Value;
 
     private static ImmutableArray<string> CreateTrustedPlatformAssemblyPaths()
     {

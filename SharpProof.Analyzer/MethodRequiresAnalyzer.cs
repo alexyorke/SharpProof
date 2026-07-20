@@ -411,10 +411,8 @@ internal static class MethodRequiresAnalyzer
             reason);
     }
 
-    private static IEnumerable<Location>? AdditionalLocations(Location? location)
-    {
-        return location == null ? null : new[] { location };
-    }
+    private static IEnumerable<Location>? AdditionalLocations(Location? location) =>
+        location == null ? null : new[] { location };
 
     private readonly record struct RequiresCallSite(
         IMethodSymbol Method,

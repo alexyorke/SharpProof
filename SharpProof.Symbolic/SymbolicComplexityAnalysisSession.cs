@@ -24,10 +24,8 @@ internal sealed class SymbolicComplexityAnalysisSession
             cancellationToken);
     }
 
-    public MethodAnalysisSummary Analyze(ResolvedMethodLikeTarget target)
-    {
-        return AnalyzeMethod(target.MethodSymbol!, target.BodyNode!, target.SemanticModel);
-    }
+    public MethodAnalysisSummary Analyze(ResolvedMethodLikeTarget target) =>
+        AnalyzeMethod(target.MethodSymbol!, target.BodyNode!, target.SemanticModel);
 
     private MethodAnalysisSummary AnalyzeMethod(
         IMethodSymbol methodSymbol,

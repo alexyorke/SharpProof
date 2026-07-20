@@ -1738,10 +1738,8 @@ internal static class SymbolicIndexingLowerer
         return IsSystemRangeType(typeInfo.ConvertedType ?? typeInfo.Type, context.SemanticModel.Compilation);
     }
 
-    private static bool IsSystemRangeType(ITypeSymbol? typeSymbol, Compilation compilation)
-    {
-        return IsSystemType(typeSymbol, compilation, "System.Range");
-    }
+    private static bool IsSystemRangeType(ITypeSymbol? typeSymbol, Compilation compilation) =>
+        IsSystemType(typeSymbol, compilation, "System.Range");
 
     private static bool IsSystemIndexExpression(ExpressionSyntax expression, SymbolicLoweringContext context)
     {
@@ -1749,10 +1747,8 @@ internal static class SymbolicIndexingLowerer
         return IsSystemIndexType(typeInfo.ConvertedType ?? typeInfo.Type, context.SemanticModel.Compilation);
     }
 
-    private static bool IsSystemIndexType(ITypeSymbol? typeSymbol, Compilation compilation)
-    {
-        return IsSystemType(typeSymbol, compilation, "System.Index");
-    }
+    private static bool IsSystemIndexType(ITypeSymbol? typeSymbol, Compilation compilation) =>
+        IsSystemType(typeSymbol, compilation, "System.Index");
 
     private static bool IsSystemType(ITypeSymbol? typeSymbol, Compilation compilation, string metadataName)
     {

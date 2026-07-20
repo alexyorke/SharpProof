@@ -72,10 +72,8 @@ internal sealed class EffectSummaryCatalog
         return CreateCatalog(entries);
     }
 
-    public static IDisposable UseCurrent(EffectSummaryCatalog catalog)
-    {
-        return new Scope(CurrentCatalog.Value, catalog.IsEmpty ? null : catalog);
-    }
+    public static IDisposable UseCurrent(EffectSummaryCatalog catalog) =>
+        new Scope(CurrentCatalog.Value, catalog.IsEmpty ? null : catalog);
 
     private static Dictionary<string, ImmutableArray<SummaryEntry>.Builder> CloneEntries(
         ImmutableDictionary<string, ImmutableArray<SummaryEntry>> source)

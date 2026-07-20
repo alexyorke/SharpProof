@@ -69,10 +69,8 @@ internal static class RuntimeAssemblyResolver
         return int.Parse(digits);
     }
 
-    private static Version? TryParseVersion(string text)
-    {
-        return Version.TryParse(text, out var version) ? version : null;
-    }
+    private static Version? TryParseVersion(string text) =>
+        Version.TryParse(text, out var version) ? version : null;
 
     private static IEnumerable<string> EnumerateCandidateAssemblyPaths(string framework, string assemblyName)
     {

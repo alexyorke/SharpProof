@@ -11,10 +11,8 @@ internal static class SmtRegexSemantics
         RegexOptions.IgnorePatternWhitespace |
         RegexOptions.IgnoreCase;
 
-    internal static bool CanPreserveOptions(RegexOptions options)
-    {
-        return (options & ~PreservedOptions) == 0;
-    }
+    internal static bool CanPreserveOptions(RegexOptions options) =>
+        (options & ~PreservedOptions) == 0;
 
     internal static bool CanEncodeOptions(RegexOptions options)
     {

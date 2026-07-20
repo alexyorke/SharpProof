@@ -68,10 +68,8 @@ internal partial class PurityAnalysisEngine
         return EffectSummaryCatalog.Current.TryGetPurity(methodSymbol, compilation, out purity);
     }
 
-    internal static bool IsMetadataSymbol(ISymbol? symbol)
-    {
-        return symbol?.Locations.FirstOrDefault()?.IsInMetadata == true;
-    }
+    internal static bool IsMetadataSymbol(ISymbol? symbol) =>
+        symbol?.Locations.FirstOrDefault()?.IsInMetadata == true;
 
     internal static bool TryGetTrustedDefinitiveGeneratedPurity(
         IMethodSymbol? methodSymbol,

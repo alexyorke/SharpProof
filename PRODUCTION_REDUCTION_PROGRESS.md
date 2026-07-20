@@ -627,6 +627,11 @@ Tests are excluded from the metric and must not be deleted.
   the second invocation/property/field expression-contract pass after Roslyn
   nullable-flow characterization proved it redundant; exact contract queries
   still retain their explicit conservative path.
+- [x] Canonicalized 223 trivial one-return production methods as expression
+  bodies across Analyzer, Symbolic, ProofCore, Contracts, CodeFixes, and tools.
+  The rewrite is limited to the exact four-line single-return shape; an
+  architecture test prevents block-bodied forwarding shells from accumulating
+  again without compressing multi-step domain logic.
 - [x] Made the canonical baseline and EffectSummary loaders own additional-file
   validation results. Deleted the 241-line `AnalyzerAdditionalFileValidator`
   and its second JSON traversal; one session-owned issue accumulator now
@@ -756,18 +761,16 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current evidence
 
-- Maintained production: 90,097 lines (86,353 C#, 3,014 scripts, and 730
-  specifications); net reduction: 17,529 lines; remaining reduction: 2,471.
-  This migration removes 86 maintained-production lines by centralizing
-  nullable attribute traversal and relying on Roslyn flow state instead of a
-  redundant expression-contract pass.
+- Maintained production: 89,651 lines (85,907 C#, 3,014 scripts, and 730
+  specifications); net reduction: 17,975 lines; remaining reduction: 2,025.
+  This migration removes 446 maintained-production lines by replacing 223
+  trivial block-bodied return shells with their idiomatic expression-body form.
   Diagnostics, proof outcomes, conservative unknowns, CLI bytes, serialization,
   and package contents are unchanged, and no test was deleted.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,240 passing tests and two documented Main skips. One existing
-  ProofCore Z3 smoke test returned `Unknown` under the loaded MainGeneral run,
-  then passed exactly and the complete 4,003-test lane passed with one NUnit
-  worker; all other lanes passed directly.
+- Six lanes: 6,241 passing tests and two documented Main skips, run sequentially
+  with one NUnit worker: Oracle 573, Analyzer 487, Flow 257, Core 257,
+  MainGeneral 4,001 plus two skips, and Tooling 666.
 
 ## Milestones
 

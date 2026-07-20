@@ -90,10 +90,8 @@ internal readonly record struct SymbolicTermPropagation(SymbolicTerm Source, Sym
 internal sealed record SymbolicOperationSequence(
     ImmutableArray<SymbolicOperationDescriptor> Operations)
 {
-    internal static SymbolicOperationSequence Single(SymbolicOperationDescriptor operation)
-    {
-        return new SymbolicOperationSequence(ImmutableArray.Create(operation));
-    }
+    internal static SymbolicOperationSequence Single(SymbolicOperationDescriptor operation) =>
+        new SymbolicOperationSequence(ImmutableArray.Create(operation));
 }
 
 internal sealed record SymbolicAssignmentOperation(

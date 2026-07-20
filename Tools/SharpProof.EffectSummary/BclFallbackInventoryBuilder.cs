@@ -115,10 +115,8 @@ internal static class BclFallbackInventoryBuilder
         return lastSeparator <= 0 ? string.Empty : typeName.Substring(0, lastSeparator);
     }
 
-    private static int CountGuess(IReadOnlyList<BclFallbackInventoryEntry> entries, string guess)
-    {
-        return entries.Count(entry => string.Equals(entry.Guess, guess, StringComparison.Ordinal));
-    }
+    private static int CountGuess(IReadOnlyList<BclFallbackInventoryEntry> entries, string guess) =>
+        entries.Count(entry => string.Equals(entry.Guess, guess, StringComparison.Ordinal));
 
 }
 

@@ -89,10 +89,8 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private bool TryParseConcat(out ReExpr regex)
-    {
-        return TryParseConcat(out regex, out _);
-    }
+    private bool TryParseConcat(out ReExpr regex) =>
+        TryParseConcat(out regex, out _);
 
     private bool TryParseConcat(out ReExpr regex, out bool consumedAny)
     {
@@ -173,15 +171,11 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private bool TryParseLookaheadAssertion(out RegexLookaheadAssertion assertion)
-    {
-        return TryParseLookaroundAssertion(false, out assertion);
-    }
+    private bool TryParseLookaheadAssertion(out RegexLookaheadAssertion assertion) =>
+        TryParseLookaroundAssertion(false, out assertion);
 
-    private bool TryParseLookbehindAssertion(out RegexLookaheadAssertion assertion)
-    {
-        return TryParseLookaroundAssertion(true, out assertion);
-    }
+    private bool TryParseLookbehindAssertion(out RegexLookaheadAssertion assertion) =>
+        TryParseLookaroundAssertion(true, out assertion);
 
     private bool TryParseLookaroundAssertion(bool lookbehind, out RegexLookaheadAssertion assertion)
     {
@@ -280,15 +274,11 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private ReExpr ConstrainPrefixEnd(ReExpr prefix, ReExpr finalCharacter)
-    {
-        return _context.MkIntersect(prefix, _expressions.Concat(_expressions.AnyString(), finalCharacter));
-    }
+    private ReExpr ConstrainPrefixEnd(ReExpr prefix, ReExpr finalCharacter) =>
+        _context.MkIntersect(prefix, _expressions.Concat(_expressions.AnyString(), finalCharacter));
 
-    private ReExpr ConstrainSuffixStart(ReExpr suffix, ReExpr firstCharacter)
-    {
-        return _context.MkIntersect(suffix, _expressions.Concat(firstCharacter, _expressions.AnyString()));
-    }
+    private ReExpr ConstrainSuffixStart(ReExpr suffix, ReExpr firstCharacter) =>
+        _context.MkIntersect(suffix, _expressions.Concat(firstCharacter, _expressions.AnyString()));
 
     private bool TryParseRepeat(out ReExpr regex)
     {
@@ -404,10 +394,8 @@ internal sealed class Z3RegexTranslator
         }
     }
 
-    private RegexOptionScope CaptureOptions()
-    {
-        return new RegexOptionScope(_ignorePatternWhitespace, _singleline, _ignoreCase);
-    }
+    private RegexOptionScope CaptureOptions() =>
+        new RegexOptionScope(_ignorePatternWhitespace, _singleline, _ignoreCase);
 
     private void ApplyOptions(RegexOptionScope options)
     {
@@ -885,10 +873,8 @@ internal sealed class Z3RegexTranslator
         return (char)value;
     }
 
-    private static bool IsOctalDigit(char value)
-    {
-        return value is >= '0' and <= '7';
-    }
+    private static bool IsOctalDigit(char value) =>
+        value is >= '0' and <= '7';
 
     private static int HexValue(char value)
     {
@@ -950,20 +936,14 @@ internal sealed class Z3RegexTranslator
         return _expressions.AnyCharacter();
     }
 
-    private bool Peek(char value)
-    {
-        return _position < _pattern.Length && _pattern[_position] == value;
-    }
+    private bool Peek(char value) =>
+        _position < _pattern.Length && _pattern[_position] == value;
 
-    private static bool IsRegexMetaCharacter(char value)
-    {
-        return value is '|' or '?' or '*' or '+' or ')' or '[' or ']' or '{' or '}';
-    }
+    private static bool IsRegexMetaCharacter(char value) =>
+        value is '|' or '?' or '*' or '+' or ')' or '[' or ']' or '{' or '}';
 
-    private static bool IsEscapedLiteralCharacter(char value)
-    {
-        return !char.IsLetterOrDigit(value);
-    }
+    private static bool IsEscapedLiteralCharacter(char value) =>
+        !char.IsLetterOrDigit(value);
 
     private static bool TryGetEscapedLiteralCharacter(char escaped, bool inCharacterClass, out char value)
     {
@@ -1001,10 +981,8 @@ internal sealed class Z3RegexTranslator
         return true;
     }
 
-    private static bool IsSupportedCaptureNameCharacter(char value)
-    {
-        return char.IsLetterOrDigit(value) || value == '_';
-    }
+    private static bool IsSupportedCaptureNameCharacter(char value) =>
+        char.IsLetterOrDigit(value) || value == '_';
 
     private readonly record struct RegexLookaheadAssertion(ReExpr Regex, bool IsPositive, bool IsExact);
 

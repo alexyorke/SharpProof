@@ -186,8 +186,6 @@ internal static class SymbolicErrorClassifier
                string.Equals(exception.GetType().Name, "Z3Exception", StringComparison.Ordinal);
     }
 
-    private static bool IsExceptionType(Exception exception, string fullName)
-    {
-        return string.Equals(exception.GetType().FullName, fullName, StringComparison.Ordinal);
-    }
+    private static bool IsExceptionType(Exception exception, string fullName) =>
+        string.Equals(exception.GetType().FullName, fullName, StringComparison.Ordinal);
 }

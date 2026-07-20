@@ -34,10 +34,8 @@ internal sealed class SymbolicCostExpression(
 
     public bool IsConstant => Kind == SymbolicCostNodeKind.Monomial && Factors.Count == 0;
 
-    public static SymbolicCostExpression Constant()
-    {
-        return new SymbolicCostExpression(SymbolicCostNodeKind.Monomial);
-    }
+    public static SymbolicCostExpression Constant() =>
+        new SymbolicCostExpression(SymbolicCostNodeKind.Monomial);
 
     public static SymbolicCostExpression Variable(string key)
     {
@@ -46,10 +44,8 @@ internal sealed class SymbolicCostExpression(
             ImmutableSortedDictionary<string, int>.Empty.WithComparers(StringComparer.Ordinal).Add(key, 1));
     }
 
-    public static SymbolicCostExpression Unknown(SymbolicComplexityUnknownReason reason)
-    {
-        return new SymbolicCostExpression(SymbolicCostNodeKind.Unknown, unknownReason: reason);
-    }
+    public static SymbolicCostExpression Unknown(SymbolicComplexityUnknownReason reason) =>
+        new SymbolicCostExpression(SymbolicCostNodeKind.Unknown, unknownReason: reason);
 
     public static SymbolicCostExpression RecursiveUnknown()
     {
@@ -148,10 +144,8 @@ internal sealed class SymbolicCostExpression(
         return substituted;
     }
 
-    public string ToBigOText(IMethodSymbol? contextMethod = null)
-    {
-        return "O(" + ToTermText(contextMethod) + ")";
-    }
+    public string ToBigOText(IMethodSymbol? contextMethod = null) =>
+        "O(" + ToTermText(contextMethod) + ")";
 
     public SymbolicComplexityKind ToPublicKind()
     {

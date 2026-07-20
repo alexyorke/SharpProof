@@ -97,8 +97,6 @@ internal static class SymbolicStateFactBuilder
             out kind);
     }
 
-    private static bool IsProgramPointReferenceLikeType(ITypeSymbol type)
-    {
-        return SymbolicTypeFacts.IsSymbolicReferenceLikeType(type);
-    }
+    private static bool IsProgramPointReferenceLikeType(ITypeSymbol type) =>
+        SymbolicTypeFacts.IsSymbolicReferenceLikeType(type);
 }

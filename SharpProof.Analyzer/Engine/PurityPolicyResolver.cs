@@ -193,13 +193,9 @@ internal static class PurityPolicyResolver
             candidates.Add(Pure("assembly_pure_external_attribute", 20, "pure_boundary_attribute", "attribute"));
     }
 
-    private static PurityPolicyCandidate Pure(string source, int priority, string category, string catalogSource)
-    {
-        return new PurityPolicyCandidate(PurityPolicyDecision.Pure, source, priority, category, catalogSource);
-    }
+    private static PurityPolicyCandidate Pure(string source, int priority, string category, string catalogSource) =>
+        new PurityPolicyCandidate(PurityPolicyDecision.Pure, source, priority, category, catalogSource);
 
-    private static PurityPolicyCandidate Impure(string source, int priority, string category, string catalogSource)
-    {
-        return new PurityPolicyCandidate(PurityPolicyDecision.Impure, source, priority, category, catalogSource);
-    }
+    private static PurityPolicyCandidate Impure(string source, int priority, string category, string catalogSource) =>
+        new PurityPolicyCandidate(PurityPolicyDecision.Impure, source, priority, category, catalogSource);
 }

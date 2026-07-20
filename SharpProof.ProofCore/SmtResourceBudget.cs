@@ -25,10 +25,8 @@ internal static class SmtResourceBudget
     /// </summary>
     public const int WallClockSafetyFactor = 8;
 
-    public static uint GetRlimit(TimeSpan budget)
-    {
-        return (uint)GetSaturatedRlimit(budget, uint.MaxValue, 1);
-    }
+    public static uint GetRlimit(TimeSpan budget) =>
+        (uint)GetSaturatedRlimit(budget, uint.MaxValue, 1);
 
     public static TimeSpan GetWallClockSafetyNet(TimeSpan budget)
     {
@@ -39,10 +37,8 @@ internal static class SmtResourceBudget
         return TimeSpan.FromTicks(budget.Ticks * WallClockSafetyFactor);
     }
 
-    public static long GetMethodRlimitBudget(TimeSpan methodBudget)
-    {
-        return GetSaturatedRlimit(methodBudget, long.MaxValue, 0);
-    }
+    public static long GetMethodRlimitBudget(TimeSpan methodBudget) =>
+        GetSaturatedRlimit(methodBudget, long.MaxValue, 0);
 
     private static long GetSaturatedRlimit(TimeSpan budget, long maximum, long minimum)
     {

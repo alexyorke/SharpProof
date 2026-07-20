@@ -41,10 +41,8 @@ internal static class Z3RegexCharacterRanges
         return true;
     }
 
-    internal static bool TryGet(string atomPattern, out CharacterRange[] ranges)
-    {
-        return TryGet(atomPattern, RegexOptions.None, out ranges);
-    }
+    internal static bool TryGet(string atomPattern, out CharacterRange[] ranges) =>
+        TryGet(atomPattern, RegexOptions.None, out ranges);
 
     internal static bool TryGet(string atomPattern, RegexOptions options, out CharacterRange[] ranges)
     {

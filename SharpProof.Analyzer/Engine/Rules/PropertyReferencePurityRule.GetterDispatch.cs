@@ -127,10 +127,8 @@ internal partial class PropertyReferencePurityRule
         return GetterResultOrPure(getterResult, propertySymbol, getter, propertyReferenceOperation);
     }
 
-    private static string GetCatalogHitCategory(ISymbol symbol)
-    {
-        return ImpurityCatalog.GetKnownImpureCatalogHitCategory(symbol);
-    }
+    private static string GetCatalogHitCategory(ISymbol symbol) =>
+        ImpurityCatalog.GetKnownImpureCatalogHitCategory(symbol);
 
     private static PurityAnalysisEngine.PurityAnalysisResult CreateReflectionEnvironmentSourceResult(
         IPropertySymbol propertySymbol,

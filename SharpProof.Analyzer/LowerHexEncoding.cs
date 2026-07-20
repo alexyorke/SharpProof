@@ -17,8 +17,6 @@ internal static class LowerHexEncoding
         return new string(chars);
     }
 
-    private static char ToHexChar(int value)
-    {
-        return (char)(value < 10 ? '0' + value : 'a' + (value - 10));
-    }
+    private static char ToHexChar(int value) =>
+        (char)(value < 10 ? '0' + value : 'a' + (value - 10));
 }

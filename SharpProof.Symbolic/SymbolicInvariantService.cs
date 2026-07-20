@@ -190,10 +190,8 @@ internal sealed class SymbolicInvariantService
         return projected;
     }
 
-    private static bool HasPathStateFacts(SymbolicState pathState)
-    {
-        return pathState.Facts.Length != 0 || pathState.PathConditions.Length != 0;
-    }
+    private static bool HasPathStateFacts(SymbolicState pathState) =>
+        pathState.Facts.Length != 0 || pathState.PathConditions.Length != 0;
 
     private static SymbolicReachability MapReachability(SymbolicProofStatus status)
     {

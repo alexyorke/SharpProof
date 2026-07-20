@@ -41,10 +41,8 @@ internal static class MethodAllocationAnalyzer
         }
     }
 
-    internal static bool HasVisibleAllocationSites(MethodAnalysisSnapshot snapshot)
-    {
-        return CollectAllocationSites(snapshot.VisibleOperations).Any();
-    }
+    internal static bool HasVisibleAllocationSites(MethodAnalysisSnapshot snapshot) =>
+        CollectAllocationSites(snapshot.VisibleOperations).Any();
 
     private static ImmutableDictionary<string, string?> CreateAllocationProperties(
         AllocationSite allocationSite,

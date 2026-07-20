@@ -283,10 +283,8 @@ internal static class SymbolicProofEncoder
         return SymbolicProofStateFacts.StateContradictsCondition(state, zeroCondition);
     }
 
-    private static SymbolicState AssumePathCondition(SymbolicState state, SymbolicCondition condition)
-    {
-        return SymbolicProofStateFacts.NormalizeState(state.AddPathCondition(condition));
-    }
+    private static SymbolicState AssumePathCondition(SymbolicState state, SymbolicCondition condition) =>
+        SymbolicProofStateFacts.NormalizeState(state.AddPathCondition(condition));
 
     private static SafeDivisorAssumption<SymbolicState> AssumeStatePathCondition(
         SymbolicState state,

@@ -2,10 +2,8 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicProofStateFacts
 {
-    internal static SymbolicState NormalizeState(SymbolicState state)
-    {
-        return state.Normalize();
-    }
+    internal static SymbolicState NormalizeState(SymbolicState state) =>
+        state.Normalize();
 
     internal static SymbolicCondition RewriteQueryConditionToCurrentVersions(SymbolicCondition condition,
         SymbolicState state)
@@ -59,10 +57,8 @@ internal static class SymbolicProofStateFacts
                        StringComparison.Ordinal)));
     }
 
-    internal static bool StateContradictsFact(SymbolicState state, SymbolicFact fact)
-    {
-        return StateContainsFact(state, fact.Negate());
-    }
+    internal static bool StateContradictsFact(SymbolicState state, SymbolicFact fact) =>
+        StateContainsFact(state, fact.Negate());
 
     internal static bool StateContainsCondition(SymbolicState state, SymbolicCondition condition)
     {

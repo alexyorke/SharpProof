@@ -10,10 +10,8 @@ internal static class SymbolicStateValueFacts
         return RemoveReferences(state, symbolName);
     }
 
-    internal static SymbolicState RemoveReferences(SymbolicState state, string symbolName)
-    {
-        return SymbolicIrReferenceScanner.RemoveVariableReferences(state, symbolName);
-    }
+    internal static SymbolicState RemoveReferences(SymbolicState state, string symbolName) =>
+        SymbolicIrReferenceScanner.RemoveVariableReferences(state, symbolName);
 
     internal static bool TryGetCurrentValue(
         SymbolicState state,
@@ -33,15 +31,11 @@ internal static class SymbolicStateValueFacts
         return false;
     }
 
-    internal static bool IsKnownNonNullReference(SymbolicState state, ISymbol symbol)
-    {
-        return TryGetKnownReferenceNullState(state, symbol, out var isNull) && !isNull;
-    }
+    internal static bool IsKnownNonNullReference(SymbolicState state, ISymbol symbol) =>
+        TryGetKnownReferenceNullState(state, symbol, out var isNull) && !isNull;
 
-    internal static bool IsKnownNullReference(SymbolicState state, ISymbol symbol)
-    {
-        return TryGetKnownReferenceNullState(state, symbol, out var isNull) && isNull;
-    }
+    internal static bool IsKnownNullReference(SymbolicState state, ISymbol symbol) =>
+        TryGetKnownReferenceNullState(state, symbol, out var isNull) && isNull;
 
     internal static bool IsKnownNullReference(SymbolicState state, SymbolicTerm reference)
     {
@@ -50,15 +44,11 @@ internal static class SymbolicStateValueFacts
                isNull;
     }
 
-    internal static bool IsKnownNullableHasValue(SymbolicState state, ISymbol symbol)
-    {
-        return TryGetKnownNullableHasValueState(state, symbol, out var hasValue) && hasValue;
-    }
+    internal static bool IsKnownNullableHasValue(SymbolicState state, ISymbol symbol) =>
+        TryGetKnownNullableHasValueState(state, symbol, out var hasValue) && hasValue;
 
-    internal static bool IsKnownNullableNoValue(SymbolicState state, ISymbol symbol)
-    {
-        return TryGetKnownNullableHasValueState(state, symbol, out var hasValue) && !hasValue;
-    }
+    internal static bool IsKnownNullableNoValue(SymbolicState state, ISymbol symbol) =>
+        TryGetKnownNullableHasValueState(state, symbol, out var hasValue) && !hasValue;
 
     private static bool TryGetKnownReferenceNullState(
         SymbolicState state,

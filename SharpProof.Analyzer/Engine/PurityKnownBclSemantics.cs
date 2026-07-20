@@ -326,10 +326,8 @@ internal static class PurityKnownBclSemantics
             "System.TimeSpan";
     }
 
-    private static bool IsDateOnlyOrTimeOnlyType(ITypeSymbol? containingType)
-    {
-        return containingType?.ToDisplayString() is "System.DateOnly" or "System.TimeOnly";
-    }
+    private static bool IsDateOnlyOrTimeOnlyType(ITypeSymbol? containingType) =>
+        containingType?.ToDisplayString() is "System.DateOnly" or "System.TimeOnly";
 
     private static bool IsFormatSpecifierType(ITypeSymbol typeSymbol)
     {
@@ -431,25 +429,17 @@ internal static class PurityKnownBclSemantics
         return false;
     }
 
-    private static bool IsSingleTimeSpanConstantFormat(IOperation? operation)
-    {
-        return IsSingleStringConstant(operation, static format => format is "c" or "g" or "G");
-    }
+    private static bool IsSingleTimeSpanConstantFormat(IOperation? operation) =>
+        IsSingleStringConstant(operation, static format => format is "c" or "g" or "G");
 
-    private static bool IsSingleDateOnlyInvariantFormat(IOperation? operation)
-    {
-        return IsSingleStringConstant(operation, static format => format == "d");
-    }
+    private static bool IsSingleDateOnlyInvariantFormat(IOperation? operation) =>
+        IsSingleStringConstant(operation, static format => format == "d");
 
-    private static bool IsSingleTimeOnlyInvariantFormat(IOperation? operation)
-    {
-        return IsSingleStringConstant(operation, static format => format == "t");
-    }
+    private static bool IsSingleTimeOnlyInvariantFormat(IOperation? operation) =>
+        IsSingleStringConstant(operation, static format => format == "t");
 
-    private static bool IsSingleDateTimeOffsetRoundtripFormat(IOperation? operation)
-    {
-        return IsSingleStringConstant(operation, static format => format is "O" or "o");
-    }
+    private static bool IsSingleDateTimeOffsetRoundtripFormat(IOperation? operation) =>
+        IsSingleStringConstant(operation, static format => format is "O" or "o");
 
     private static bool IsSingleStringConstant(IOperation? operation, Func<string, bool> matchesFormat)
     {
@@ -467,15 +457,11 @@ internal static class PurityKnownBclSemantics
                styles == 0;
     }
 
-    private static bool IsTimeSpanStylesNone(IOperation? operation)
-    {
-        return IsZeroStyle(operation);
-    }
+    private static bool IsTimeSpanStylesNone(IOperation? operation) =>
+        IsZeroStyle(operation);
 
-    private static bool IsDateTimeStylesNone(IOperation? operation)
-    {
-        return IsZeroStyle(operation);
-    }
+    private static bool IsDateTimeStylesNone(IOperation? operation) =>
+        IsZeroStyle(operation);
 
     private static bool IsCultureInfoInvariantCulture(IOperation? operation)
     {

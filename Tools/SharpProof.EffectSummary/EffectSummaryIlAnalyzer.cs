@@ -817,10 +817,8 @@ internal static class EffectSummaryIlAnalyzer
         return true;
     }
 
-    internal static bool IsKnownStableIdentityInitializerCall(string calledSymbol)
-    {
-        return calledSymbol.StartsWith("System.Array.Empty<", StringComparison.Ordinal);
-    }
+    internal static bool IsKnownStableIdentityInitializerCall(string calledSymbol) =>
+        calledSymbol.StartsWith("System.Array.Empty<", StringComparison.Ordinal);
 
     internal static StaticFieldInitializerValue[] PopStaticFieldInitializerValues(
         List<StaticFieldInitializerValue> trackedStack,
@@ -1189,10 +1187,8 @@ internal static class EffectSummaryIlAnalyzer
             : null;
     }
 
-    internal static bool ContainsOffset(int startOffset, int length, int instructionOffset)
-    {
-        return instructionOffset >= startOffset && instructionOffset < startOffset + length;
-    }
+    internal static bool ContainsOffset(int startOffset, int length, int instructionOffset) =>
+        instructionOffset >= startOffset && instructionOffset < startOffset + length;
 
     internal static string? GetCatchExceptionType(MetadataReader reader, ExceptionRegion exceptionRegion)
     {

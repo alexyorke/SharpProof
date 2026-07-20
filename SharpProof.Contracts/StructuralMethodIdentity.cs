@@ -178,10 +178,8 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
         return true;
     }
 
-    public override bool Equals(object? obj)
-    {
-        return obj is StructuralMethodIdentity other && Equals(other);
-    }
+    public override bool Equals(object? obj) =>
+        obj is StructuralMethodIdentity other && Equals(other);
 
     public override int GetHashCode()
     {
@@ -199,10 +197,8 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
         }
     }
 
-    private static string Encode(string value)
-    {
-        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
-    }
+    private static string Encode(string value) =>
+        Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
 
     private static bool TryDecode(string value, out string decoded)
     {

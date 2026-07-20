@@ -2,20 +2,14 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicIrReferenceScanner
 {
-    internal static bool ContainsVariablePrefix(SymbolicFact fact, string variablePrefix)
-    {
-        return ContainsVariable(fact, name => MatchesVariablePrefix(name, variablePrefix));
-    }
+    internal static bool ContainsVariablePrefix(SymbolicFact fact, string variablePrefix) =>
+        ContainsVariable(fact, name => MatchesVariablePrefix(name, variablePrefix));
 
-    internal static bool ContainsVariablePrefix(SymbolicCondition condition, string variablePrefix)
-    {
-        return ContainsVariable(condition, name => MatchesVariablePrefix(name, variablePrefix));
-    }
+    internal static bool ContainsVariablePrefix(SymbolicCondition condition, string variablePrefix) =>
+        ContainsVariable(condition, name => MatchesVariablePrefix(name, variablePrefix));
 
-    internal static bool ContainsVariableOrMember(SymbolicFact fact, string variableName)
-    {
-        return ContainsVariable(fact, name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
-    }
+    internal static bool ContainsVariableOrMember(SymbolicFact fact, string variableName) =>
+        ContainsVariable(fact, name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
 
     internal static bool ContainsVariableOrMember(SymbolicCondition condition, string variableName)
     {

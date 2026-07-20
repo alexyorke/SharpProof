@@ -27,10 +27,8 @@ internal static class RoslynStructuralMethodIdentity
                         : StructuralRefKinds.None);
     }
 
-    internal static string GetCanonicalKey(IMethodSymbol method)
-    {
-        return Create(method).ToCanonicalKey();
-    }
+    internal static string GetCanonicalKey(IMethodSymbol method) =>
+        Create(method).ToCanonicalKey();
 
     internal static ImmutableArray<string> GetCanonicalKeys(IMethodSymbol method) =>
         ImmutableArray.Create(GetCanonicalKey(method));

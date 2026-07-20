@@ -71,10 +71,8 @@ internal sealed class CompilationPurityService : IDisposable
         });
     }
 
-    private SemanticModel GetSemanticModel(SyntaxTree syntaxTree)
-    {
-        return _semanticModelCache.GetOrAdd(syntaxTree, tree => _compilation.GetSemanticModel(tree));
-    }
+    private SemanticModel GetSemanticModel(SyntaxTree syntaxTree) =>
+        _semanticModelCache.GetOrAdd(syntaxTree, tree => _compilation.GetSemanticModel(tree));
 
     private SemanticModel? GetSemanticModelForMethod(IMethodSymbol methodSymbol)
     {

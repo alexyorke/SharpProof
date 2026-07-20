@@ -16,10 +16,8 @@ internal static class SymbolicTypeFacts
             SpecialType.System_UInt64;
     }
 
-    internal static bool IsBuiltInIntegralOrEnumType(ITypeSymbol? typeSymbol)
-    {
-        return IsBuiltInIntegralType(typeSymbol) || typeSymbol?.TypeKind == TypeKind.Enum;
-    }
+    internal static bool IsBuiltInIntegralOrEnumType(ITypeSymbol? typeSymbol) =>
+        IsBuiltInIntegralType(typeSymbol) || typeSymbol?.TypeKind == TypeKind.Enum;
 
     public static string? GetFullMetadataName(INamedTypeSymbol? type)
     {

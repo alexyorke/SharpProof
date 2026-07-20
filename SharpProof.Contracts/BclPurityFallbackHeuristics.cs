@@ -91,10 +91,8 @@ internal static class BclPurityFallbackHeuristics
                IsLikelyFrameworkValueTypeName(normalized);
     }
 
-    public static string NormalizeTypeName(string typeName)
-    {
-        return typeName.Trim().TrimEnd('&');
-    }
+    public static string NormalizeTypeName(string typeName) =>
+        typeName.Trim().TrimEnd('&');
 
     public static string GetDisplayReason(string reason)
     {
@@ -216,15 +214,11 @@ internal static class BclPurityFallbackHeuristics
                name.Equals("Dispose", StringComparison.Ordinal);
     }
 
-    private static bool IsKnownPrimitiveOrValueAlias(string typeName)
-    {
-        return GetKnownPrimitiveOrValueAliases().Contains(typeName);
-    }
+    private static bool IsKnownPrimitiveOrValueAlias(string typeName) =>
+        GetKnownPrimitiveOrValueAliases().Contains(typeName);
 
-    private static ImmutableHashSet<string> GetKnownPrimitiveOrValueAliases()
-    {
-        return KnownPrimitiveOrValueAliases.Value;
-    }
+    private static ImmutableHashSet<string> GetKnownPrimitiveOrValueAliases() =>
+        KnownPrimitiveOrValueAliases.Value;
 
     private static bool IsLikelyFrameworkValueTypeName(string typeName)
     {
@@ -241,30 +235,20 @@ internal static class BclPurityFallbackHeuristics
                typeName.StartsWith("System.Tuple<", StringComparison.Ordinal);
     }
 
-    private static bool StartsWithAny(string value, params string[] prefixes)
-    {
-        return prefixes.Any(prefix => value.StartsWith(prefix, StringComparison.Ordinal));
-    }
+    private static bool StartsWithAny(string value, params string[] prefixes) =>
+        prefixes.Any(prefix => value.StartsWith(prefix, StringComparison.Ordinal));
 
-    private static Classification ProbablyPureBecause(string reason)
-    {
-        return ClassificationBecause(ProbablyPure, "probably_pure", reason);
-    }
+    private static Classification ProbablyPureBecause(string reason) =>
+        ClassificationBecause(ProbablyPure, "probably_pure", reason);
 
-    private static Classification ProbablyImpureBecause(string reason)
-    {
-        return ClassificationBecause(ProbablyImpure, "probably_impure", reason);
-    }
+    private static Classification ProbablyImpureBecause(string reason) =>
+        ClassificationBecause(ProbablyImpure, "probably_impure", reason);
 
-    private static Classification UnknownBecause(string reason)
-    {
-        return ClassificationBecause(Unknown, "unknown", reason);
-    }
+    private static Classification UnknownBecause(string reason) =>
+        ClassificationBecause(Unknown, "unknown", reason);
 
-    private static Classification ClassificationBecause(string guess, string category, string reason)
-    {
-        return new Classification(guess, "low", reason, "bcl_fallback_" + category);
-    }
+    private static Classification ClassificationBecause(string guess, string category, string reason) =>
+        new Classification(guess, "low", reason, "bcl_fallback_" + category);
 
     public readonly record struct Shape(
         string NamespaceName,

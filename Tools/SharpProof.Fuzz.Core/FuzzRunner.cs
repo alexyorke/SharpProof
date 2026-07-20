@@ -523,10 +523,8 @@ public static class FuzzRunner
             allowUnsafe ? UnsafeCompilationOptions : SafeCompilationOptions);
     }
 
-    private static ImmutableArray<MetadataReference> GetMetadataReferences()
-    {
-        return MetadataReferences.Value;
-    }
+    private static ImmutableArray<MetadataReference> GetMetadataReferences() =>
+        MetadataReferences.Value;
 
     private static CSharpCompilationOptions CreateCompilationOptions(bool allowUnsafe)
     {

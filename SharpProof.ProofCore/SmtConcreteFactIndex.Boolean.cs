@@ -2,15 +2,11 @@ namespace SharpProof.ProofCore.Smt;
 
 internal sealed partial class SmtConcreteFactIndex
 {
-        internal bool TryEvaluateBoolean(SmtFormula formula, out bool value)
-        {
-            return TryEvaluateBoolean(formula, out value, 0);
-        }
+        internal bool TryEvaluateBoolean(SmtFormula formula, out bool value) =>
+            TryEvaluateBoolean(formula, out value, 0);
 
-        internal bool TryEvaluateDerivedBoolean(SmtFormula formula, out bool value)
-        {
-            return TryEvaluateBoolean(formula, out value, 0, false);
-        }
+        internal bool TryEvaluateDerivedBoolean(SmtFormula formula, out bool value) =>
+            TryEvaluateBoolean(formula, out value, 0, false);
 
         private bool TryEvaluateBoolean(
             SmtFormula formula,
@@ -161,10 +157,8 @@ internal sealed partial class SmtConcreteFactIndex
             return false;
         }
 
-        private bool TryAddBooleanFact(SmtFormula formula, out bool hasContradiction)
-        {
-            return TryAddBooleanFact(formula, true, out hasContradiction);
-        }
+        private bool TryAddBooleanFact(SmtFormula formula, out bool hasContradiction) =>
+            TryAddBooleanFact(formula, true, out hasContradiction);
 
         private bool TryAddBooleanFact(
             SmtFormula formula,
@@ -477,10 +471,8 @@ internal sealed partial class SmtConcreteFactIndex
             return true;
         }
 
-        private SmtFormula FindBooleanCanonical(SmtFormula formula, out bool isNegatedFromCanonical)
-        {
-            return FindCanonical(_booleanEquivalences, formula, out isNegatedFromCanonical);
-        }
+        private SmtFormula FindBooleanCanonical(SmtFormula formula, out bool isNegatedFromCanonical) =>
+            FindCanonical(_booleanEquivalences, formula, out isNegatedFromCanonical);
 
         private void MergeBooleanFacts(
             SmtFormula canonical,

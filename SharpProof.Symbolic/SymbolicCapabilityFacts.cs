@@ -76,33 +76,21 @@ internal static class SymbolicCapabilityFacts
         return values.Length == 0 ? "None" : string.Join(", ", values);
     }
 
-    internal static int GetMask(SymbolicCapabilityResult result)
-    {
-        return (int)result.Capabilities;
-    }
+    internal static int GetMask(SymbolicCapabilityResult result) =>
+        (int)result.Capabilities;
 
-    internal static int GetMask(SymbolicCapabilitySite site)
-    {
-        return (int)site.Capabilities;
-    }
+    internal static int GetMask(SymbolicCapabilitySite site) =>
+        (int)site.Capabilities;
 
-    internal static int NormalizeMask(int capabilities)
-    {
-        return (int)Normalize((SymbolicCapability)capabilities);
-    }
+    internal static int NormalizeMask(int capabilities) =>
+        (int)Normalize((SymbolicCapability)capabilities);
 
-    internal static int ExpandAllowedMask(int capabilities)
-    {
-        return (int)ExpandAllowed((SymbolicCapability)capabilities);
-    }
+    internal static int ExpandAllowedMask(int capabilities) =>
+        (int)ExpandAllowed((SymbolicCapability)capabilities);
 
-    internal static string FormatMask(int capabilities)
-    {
-        return Format((SymbolicCapability)capabilities);
-    }
+    internal static string FormatMask(int capabilities) =>
+        Format((SymbolicCapability)capabilities);
 
-    internal static string GetName(int capability)
-    {
-        return ((SymbolicCapability)capability).ToString();
-    }
+    internal static string GetName(int capability) =>
+        ((SymbolicCapability)capability).ToString();
 }

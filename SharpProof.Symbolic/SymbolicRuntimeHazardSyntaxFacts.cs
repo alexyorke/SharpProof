@@ -365,10 +365,8 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
                IsReferenceType(operandType);
     }
 
-    internal static bool IsReferenceType(ITypeSymbol? typeSymbol)
-    {
-        return SymbolicTypeFacts.IsReferenceType(typeSymbol);
-    }
+    internal static bool IsReferenceType(ITypeSymbol? typeSymbol) =>
+        SymbolicTypeFacts.IsReferenceType(typeSymbol);
 
 
     internal static bool IsDynamicExpression(
@@ -389,10 +387,8 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
                typeSymbol.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T;
     }
 
-    internal static bool TryGetNullableUnderlyingType(ITypeSymbol? typeSymbol, out ITypeSymbol underlyingType)
-    {
-        return SymbolicTypeFacts.TryGetNullableUnderlyingType(typeSymbol, out underlyingType);
-    }
+    internal static bool TryGetNullableUnderlyingType(ITypeSymbol? typeSymbol, out ITypeSymbol underlyingType) =>
+        SymbolicTypeFacts.TryGetNullableUnderlyingType(typeSymbol, out underlyingType);
 
 
     internal static IEnumerable<ExpressionSyntax> GetStackAllocLengthExpressions(
@@ -406,13 +402,9 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
                     yield return size;
     }
 
-    internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
-    {
-        return CSharpSyntaxFacts.UnwrapExpression(expression, ExpressionCastUnwrapPolicy.All);
-    }
+    internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression) =>
+        CSharpSyntaxFacts.UnwrapExpression(expression, ExpressionCastUnwrapPolicy.All);
 
-    internal static ExpressionSyntax UnwrapDynamicExpression(ExpressionSyntax expression)
-    {
-        return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-    }
+    internal static ExpressionSyntax UnwrapDynamicExpression(ExpressionSyntax expression) =>
+        CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
 }

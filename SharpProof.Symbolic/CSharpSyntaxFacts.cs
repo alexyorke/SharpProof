@@ -175,10 +175,8 @@ internal static class CSharpSyntaxFacts
         return operand != null;
     }
 
-    public static bool IsNullLiteral(ExpressionSyntax expression)
-    {
-        return UnwrapParentheses(expression).IsKind(SyntaxKind.NullLiteralExpression);
-    }
+    public static bool IsNullLiteral(ExpressionSyntax expression) =>
+        UnwrapParentheses(expression).IsKind(SyntaxKind.NullLiteralExpression);
 
     public static bool TryGetNullPatternPolarity(PatternSyntax pattern, out bool matchesNonNull)
     {
@@ -246,10 +244,8 @@ internal static class CSharpSyntaxFacts
         }
     }
 
-    internal static ExpressionSyntax UnwrapParenthesesAndNullableSuppression(ExpressionSyntax expression)
-    {
-        return UnwrapExpression(expression, ExpressionCastUnwrapPolicy.None);
-    }
+    internal static ExpressionSyntax UnwrapParenthesesAndNullableSuppression(ExpressionSyntax expression) =>
+        UnwrapExpression(expression, ExpressionCastUnwrapPolicy.None);
 
     internal static ExpressionSyntax UnwrapExpression(
         ExpressionSyntax expression,

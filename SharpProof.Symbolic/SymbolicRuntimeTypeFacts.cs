@@ -317,13 +317,9 @@ internal static class SymbolicRuntimeTypeFacts
                !IsNullableType(typeSymbol);
     }
 
-    private static bool IsNullableType(ITypeSymbol? typeSymbol)
-    {
-        return SymbolicTypeFacts.IsNullableType(typeSymbol);
-    }
+    private static bool IsNullableType(ITypeSymbol? typeSymbol) =>
+        SymbolicTypeFacts.IsNullableType(typeSymbol);
 
-    private static ExpressionSyntax UnwrapRuntimeTypeExpression(ExpressionSyntax expression)
-    {
-        return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-    }
+    private static ExpressionSyntax UnwrapRuntimeTypeExpression(ExpressionSyntax expression) =>
+        CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
 }

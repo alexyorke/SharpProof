@@ -213,10 +213,8 @@ internal static class SymbolicFormulaDisplay
                op == SmtBinaryOperator.GreaterThanOrEqual;
     }
 
-    private static bool IsConstant(SmtFormula formula)
-    {
-        return formula is SmtBooleanConstant or SmtIntegerConstant or SmtStringConstant or SmtNullConstant;
-    }
+    private static bool IsConstant(SmtFormula formula) =>
+        formula is SmtBooleanConstant or SmtIntegerConstant or SmtStringConstant or SmtNullConstant;
 
     private static string FormatVariableName(string name)
     {

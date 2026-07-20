@@ -192,10 +192,8 @@ internal static class MethodExpectedComplexityAnalyzer
         return ComplexityOrder.Incomparable;
     }
 
-    private static ComplexityGrowthClass MapDeclared(DeclaredComplexityKind kind)
-    {
-        return GetDeclaredComplexityDescriptor(kind).GrowthClass;
-    }
+    private static ComplexityGrowthClass MapDeclared(DeclaredComplexityKind kind) =>
+        GetDeclaredComplexityDescriptor(kind).GrowthClass;
 
     private static (ComplexityGrowthClass GrowthClass, string Text) GetDeclaredComplexityDescriptor(
         DeclaredComplexityKind kind)
@@ -344,10 +342,8 @@ internal static class MethodExpectedComplexityAnalyzer
         public static readonly ComplexityVerificationClassification Exceeded =
             new(ComplexityVerificationKind.Exceeded, string.Empty);
 
-        public static ComplexityVerificationClassification Unknown(string reason)
-        {
-            return new ComplexityVerificationClassification(ComplexityVerificationKind.Unknown, reason);
-        }
+        public static ComplexityVerificationClassification Unknown(string reason) =>
+            new ComplexityVerificationClassification(ComplexityVerificationKind.Unknown, reason);
     }
 
     private enum ComplexityVerificationKind

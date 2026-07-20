@@ -186,10 +186,8 @@ internal static class EffectSummarySemanticWrapperRules
             string.Equals(root, "safe_static_constant_read", StringComparison.Ordinal));
     }
 
-    internal static bool CallsOnly(MethodEffectSummary summary, params string[] allowedEffects)
-    {
-        return summary.Effects.All(effect => allowedEffects.Contains(effect, StringComparer.Ordinal));
-    }
+    internal static bool CallsOnly(MethodEffectSummary summary, params string[] allowedEffects) =>
+        summary.Effects.All(effect => allowedEffects.Contains(effect, StringComparer.Ordinal));
 
     private static bool HasFieldlessDynamicDispatchWrapperShape(MethodEffectSummary summary)
     {

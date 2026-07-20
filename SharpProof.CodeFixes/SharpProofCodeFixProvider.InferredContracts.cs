@@ -237,15 +237,11 @@ namespace SharpProof;
 
         private sealed class SharpProofAttributeNameRewriter(string attributeNamespace) : CSharpSyntaxRewriter
         {
-            public override SyntaxNode? VisitQualifiedName(QualifiedNameSyntax node)
-            {
-                return Shorten(node) ?? base.VisitQualifiedName(node);
-            }
+            public override SyntaxNode? VisitQualifiedName(QualifiedNameSyntax node) =>
+                Shorten(node) ?? base.VisitQualifiedName(node);
 
-            public override SyntaxNode? VisitAliasQualifiedName(AliasQualifiedNameSyntax node)
-            {
-                return Shorten(node) ?? base.VisitAliasQualifiedName(node);
-            }
+            public override SyntaxNode? VisitAliasQualifiedName(AliasQualifiedNameSyntax node) =>
+                Shorten(node) ?? base.VisitAliasQualifiedName(node);
 
             public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
             {

@@ -8,10 +8,8 @@ internal enum TypeIdentityPolicy
 
 internal static class TypeHierarchyEnumeration
 {
-    internal static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(INamespaceSymbol root)
-    {
-        return EnumerateAllNamedTypes(root, CancellationToken.None);
-    }
+    internal static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(INamespaceSymbol root) =>
+        EnumerateAllNamedTypes(root, CancellationToken.None);
 
     internal static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(
         INamespaceSymbol root,

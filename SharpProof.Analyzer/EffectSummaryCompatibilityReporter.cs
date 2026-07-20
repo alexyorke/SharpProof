@@ -73,8 +73,6 @@ internal readonly record struct EffectSummaryCompatibility(
 {
     internal static EffectSummaryCompatibility Compatible { get; } = new(true, string.Empty, string.Empty);
 
-    internal static EffectSummaryCompatibility Incompatible(string reasonCode, string reason)
-    {
-        return new EffectSummaryCompatibility(false, reasonCode, reason);
-    }
+    internal static EffectSummaryCompatibility Incompatible(string reasonCode, string reason) =>
+        new EffectSummaryCompatibility(false, reasonCode, reason);
 }
