@@ -4,6 +4,21 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal partial class MethodInvocationPurityRule
 {
+    private static readonly (string MetadataName, Func<IMethodSymbol, bool> Matches)[]
+        PureMetadataOperandRules =
+        [
+            ("System.Type", static method =>
+                method.Name == nameof(object.Equals) && method.Parameters.Length == 1 ||
+                method.Name == nameof(GetHashCode) && method.Parameters.Length == 0),
+            ("System.Enum", static method =>
+                method.Name == "HasFlag" && method.Parameters.Length == 1 ||
+                method.Name == "ToString" && method.Parameters.Length == 0),
+            ("System.FormattableString", static method =>
+                method.Parameters.Length == 1 &&
+                (method.IsStatic && method.Name == "Invariant" ||
+                 !method.IsStatic && method.Name == "ToString"))
+        ];
+
     private static bool TryCheckCompilerGeneratedInterpolatedStringHandlerPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
@@ -16,8 +31,7 @@ internal partial class MethodInvocationPurityRule
 
         if (ContainsFormattedOrAlignedInterpolation(invocationOperation.Syntax)) return false;
 
-        result = CheckPureViewInvocationInputs(invocationOperation, context, currentState);
-        return true;
+        return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
     }
 
     private static bool IsDefaultInterpolatedStringHandlerInvocation(IInvocationOperation invocationOperation)
@@ -50,78 +64,6 @@ internal partial class MethodInvocationPurityRule
 
         var assemblyName = methodSymbol.ContainingAssembly?.Identity.Name;
         return !EffectSummaryCatalog.IsFrameworkAssemblyName(assemblyName);
-    }
-
-    private static bool TryCheckArrayAsReadOnlyOwnedLocalArrayPurity(
-        IInvocationOperation invocationOperation,
-        PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
-        result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-        if (PurityKnownBclSemantics.IsArrayAsReadOnlyInvocation(invocationOperation))
-        {
-            var inputResult = CheckPureViewInvocationInputs(invocationOperation, context, currentState);
-            if (!inputResult.IsPure) result = inputResult;
-
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryCheckSpanAndMemoryViewPurity(
-        IInvocationOperation invocationOperation,
-        PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
-        result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-        if (IsArrayAsSpanInvocation(invocationOperation))
-        {
-            var inputResult = CheckPureViewInvocationInputs(invocationOperation, context, currentState);
-            if (!inputResult.IsPure) result = inputResult;
-
-            return true;
-        }
-
-        if (RuleAnalysisHelper.IsSemanticallyPureSpanLikeSliceInvocation(invocationOperation))
-        {
-            var inputResult = CheckPureViewInvocationInputs(invocationOperation, context, currentState);
-            if (!inputResult.IsPure) result = inputResult;
-
-            return true;
-        }
-
-        return false;
-    }
-
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckPureViewInvocationInputs(
-        IInvocationOperation invocationOperation,
-        PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
-        if (invocationOperation.Instance != null)
-        {
-            var instanceResult = PurityAnalysisEngine.CheckSingleOperation(
-                invocationOperation.Instance,
-                context,
-                currentState);
-            if (!instanceResult.IsPure) return instanceResult;
-        }
-
-        foreach (var argument in invocationOperation.Arguments)
-        {
-            var argumentResult = PurityAnalysisEngine.CheckSingleOperation(
-                argument.Value,
-                context,
-                currentState);
-            if (!argumentResult.IsPure) return argumentResult;
-        }
-
-        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
 
     private static bool IsArrayAsSpanInvocation(IInvocationOperation invocationOperation)
@@ -413,25 +355,6 @@ internal partial class MethodInvocationPurityRule
             catalogSource);
     }
 
-    private static bool TryCheckSystemTypeMemberPurity(
-        IInvocationOperation invocationOperation,
-        PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState,
-        string methodName,
-        int parameterCount,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
-        result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-        var methodSymbol = invocationOperation.TargetMethod;
-        if (methodSymbol.Name != methodName ||
-            methodSymbol.Parameters.Length != parameterCount ||
-            !IsMemberOfMetadataType(methodSymbol, context, "System.Type"))
-            return false;
-
-        return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
-    }
-
     private static bool IsMemberOfMetadataType(
         IMethodSymbol methodSymbol,
         PurityAnalysisContext context,
@@ -461,22 +384,21 @@ internal partial class MethodInvocationPurityRule
         return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
     }
 
-    private static bool TryCheckMetadataMemberOperandPurity(
+    private static bool TryCheckKnownMetadataMemberOperandPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
-        string metadataName,
-        Func<IMethodSymbol, bool> matchesMember,
         out PurityAnalysisEngine.PurityAnalysisResult result)
     {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
-        if (!IsMemberOfMetadataType(methodSymbol, context, metadataName) ||
-            !matchesMember(methodSymbol))
-            return false;
+        foreach (var rule in PureMetadataOperandRules)
+            if (IsMemberOfMetadataType(methodSymbol, context, rule.MetadataName) &&
+                rule.Matches(methodSymbol))
+                return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
 
-        return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
+        return false;
     }
 
     private static bool EnsureInvocationOperandsArePure(
@@ -493,21 +415,17 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool TryCheckSemanticallyPureParsePurity(
-        IInvocationOperation invocationOperation,
-        PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
+    private static bool IsSemanticallyPureParseInvocation(IInvocationOperation invocationOperation)
     {
-        result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
         var methodSymbol = invocationOperation.TargetMethod?.OriginalDefinition;
         if (methodSymbol == null) return false;
 
         return IsBooleanParseMethod(methodSymbol) ||
                IsBooleanTryParseMethod(methodSymbol) ||
                IsEnumTryParseMethod(methodSymbol) ||
-               TryCheckEnumParsePurity(invocationOperation, methodSymbol, context, currentState, out result) ||
+               (IsEnumParseMethod(methodSymbol) &&
+                invocationOperation.Arguments.Length >= 2 &&
+                IsCompileTimeEnumTypeArgument(invocationOperation.Arguments[0].Value)) ||
                IsIPAddressParseMethod(methodSymbol);
     }
 
@@ -546,36 +464,6 @@ internal partial class MethodInvocationPurityRule
         var outParameter = methodSymbol.Parameters[methodSymbol.Parameters.Length - 1];
         return outParameter.RefKind == RefKind.Out &&
                SymbolEq.AreEqual(outParameter.Type, methodSymbol.TypeParameters[0]);
-    }
-
-    private static bool TryCheckEnumParsePurity(
-        IInvocationOperation invocationOperation,
-        IMethodSymbol methodSymbol,
-        PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState,
-        out PurityAnalysisEngine.PurityAnalysisResult result)
-    {
-        result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-        if (!IsEnumParseMethod(methodSymbol) ||
-            invocationOperation.Arguments.Length < 2 ||
-            !IsCompileTimeEnumTypeArgument(invocationOperation.Arguments[0].Value))
-            return false;
-
-        for (var index = 1; index < invocationOperation.Arguments.Length; index++)
-        {
-            var argumentResult = PurityAnalysisEngine.CheckSingleOperation(
-                invocationOperation.Arguments[index].Value,
-                context,
-                currentState);
-            if (!argumentResult.IsPure)
-            {
-                result = argumentResult;
-                return true;
-            }
-        }
-
-        return true;
     }
 
     private static bool IsEnumParseMethod(IMethodSymbol methodSymbol)

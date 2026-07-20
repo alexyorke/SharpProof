@@ -545,14 +545,22 @@ Tests are excluded from the metric and must not be deleted.
   preview API and byte snapshots are updated, and architecture coverage prevents
   the retired factories, fallback keys, and compatibility constants from
   returning.
+- [x] Consolidated the remaining BCL invocation purity exceptions around the
+  canonical invocation operand traversal. Enum, Boolean, and IPAddress parsing
+  plus array/span view recognition now classify only after the common receiver
+  and argument checks; deleted their duplicate traversal adapters. Type, Enum,
+  and FormattableString early-lowering exceptions now share one declarative
+  member table and one operand checker, and the LINQ source path no longer keeps
+  empty compatibility branches. Focused parsing, collection-view, string,
+  networking, and reflection tests preserve the characterized semantics.
 
 ## Current evidence
 
-- Maintained production: 91,958 lines (88,039 C#, 3,189 scripts, and 730
-  specifications); net reduction: 15,668 lines; remaining reduction: 4,332.
-  This tranche removed 201 maintained lines without deleting tests.
+- Maintained production: 91,818 lines (87,899 C#, 3,189 scripts, and 730
+  specifications); net reduction: 15,808 lines; remaining reduction: 4,192.
+  This tranche removed 140 maintained lines without deleting tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,212 passing tests and two documented Main skips.
+- Six lanes: 6,213 passing tests and two documented Main skips.
 
 ## Milestones
 
@@ -564,8 +572,8 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current tranche
 
-Replace the next complete duplicated semantic owner whose superseded path
-repays at least 200 maintained-production lines, preferring 350-line or larger
+Replace the next complete duplicated semantic owner, preferring cuts that repay
+at least 200 maintained-production lines and especially 350-line or larger
 cuts in Symbolic, Analyzer, ProofCore, or EffectSummary. Prefer inferred or
 canonical analysis over manual catalogs when characterization proves it is
 complete; otherwise preserve the explicit owner. Require focused parity before
@@ -582,10 +590,11 @@ restore parallel Roslyn-kind or analyzer-action tables; extend the registry,
 rule ownership, or compact family inference when Roslyn adds a new shape.
 
 The analyzer's remaining BCL invocation overrides are also characterized as
-semantic owners, not adapters. Removing the Type, StringComparer,
-FormattableString, Enum/Boolean/IPAddress parsing, and Unsafe routes caused 17
-focused regressions; generated summaries alone do not yet preserve their
-operand, dispatch, out-argument, and compiler-lowering semantics.
+semantic owners, not adapters. Generated summaries alone do not preserve the
+Type, StringComparer, FormattableString, Enum/Boolean/IPAddress parsing, and
+Unsafe semantics. Their duplicated operand traversal has now been removed, but
+the compact recognition rules must remain until canonical inference preserves
+dispatch, out-argument, compiler-lowering, and compile-time enum-type behavior.
 
 The EffectSummary DateTime/DateTimeOffset call-semantic helpers remain live
 semantic owners. Removing them caused four focused date/time classification

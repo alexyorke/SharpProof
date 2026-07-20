@@ -37,49 +37,11 @@ internal partial class MethodInvocationPurityRule
         if (TryCheckByRefArgumentBorrowConflict(invocationOperation, context, currentState,
                 out var byRefBorrowConflictResult)) return byRefBorrowConflictResult;
 
-        if (TryCheckSystemTypeMemberPurity(
-                invocationOperation,
-                context,
-                currentState,
-                nameof(object.Equals),
-                1,
-                out var earlyTypeEqualityResult))
-            return earlyTypeEqualityResult;
-
-        if (TryCheckSystemTypeMemberPurity(
-                invocationOperation,
-                context,
-                currentState,
-                nameof(GetHashCode),
-                0,
-                out var typeHashCodeResult))
-            return typeHashCodeResult;
-
         if (TryCheckStringComparerInvocationPurity(invocationOperation, context, currentState,
                 out var stringComparerResult)) return stringComparerResult;
 
-        if (TryCheckMetadataMemberOperandPurity(
-                invocationOperation,
-                context,
-                currentState,
-                "System.Enum",
-                static methodSymbol =>
-                    (methodSymbol.Name == "HasFlag" && methodSymbol.Parameters.Length == 1) ||
-                    (methodSymbol.Name == "ToString" && methodSymbol.Parameters.Length == 0),
-                out var enumResult))
-            return enumResult;
-
-        if (TryCheckMetadataMemberOperandPurity(
-                invocationOperation,
-                context,
-                currentState,
-                "System.FormattableString",
-                static methodSymbol =>
-                    methodSymbol.Parameters.Length == 1 &&
-                    ((methodSymbol.IsStatic && methodSymbol.Name == "Invariant") ||
-                     (!methodSymbol.IsStatic && methodSymbol.Name == "ToString")),
-                out var formattableStringResult))
-            return formattableStringResult;
+        if (TryCheckKnownMetadataMemberOperandPurity(invocationOperation, context, currentState,
+                out var metadataMemberResult)) return metadataMemberResult;
 
         if (TryCheckCompilerGeneratedInterpolatedStringHandlerPurity(invocationOperation, context, currentState,
                 out var interpolatedStringHandlerResult)) return interpolatedStringHandlerResult;
@@ -132,35 +94,24 @@ internal partial class MethodInvocationPurityRule
                 firstRemainingArgumentIndex = 1;
             }
 
-            if (sourceOperation != null)
+            if (sourceOperation != null &&
+                !IsImmediateFreshArrayLinqSource(sourceOperation, context.SemanticModel.Compilation))
             {
-                if (IsImmediateFreshArrayLinqSource(sourceOperation, context.SemanticModel.Compilation))
-                {
-                }
-                else
-                {
-                    var sourceResult =
-                        PurityAnalysisEngine.CheckSingleOperation(sourceOperation, context, currentState);
+                var sourceResult =
+                    PurityAnalysisEngine.CheckSingleOperation(sourceOperation, context, currentState);
 
-                    if (!sourceResult.IsPure) return sourceResult;
-                    checkSourceEnumerator = true;
-                }
+                if (!sourceResult.IsPure) return sourceResult;
+                checkSourceEnumerator = true;
             }
-            else
+            else if (sourceOperation == null && !IsLinqSourceLessFactory(invokedMethodSymbol))
             {
-                if (IsLinqSourceLessFactory(invokedMethodSymbol))
-                {
-                }
-                else
-                {
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        invocationOperation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "unsupported_operation",
-                            nameof(MethodInvocationPurityRule),
-                            invocationOperation,
-                            symbol: invokedMethodSymbol));
-                }
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    invocationOperation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        "unsupported_operation",
+                        nameof(MethodInvocationPurityRule),
+                        invocationOperation,
+                        symbol: invokedMethodSymbol));
             }
 
 
@@ -169,8 +120,6 @@ internal partial class MethodInvocationPurityRule
                  argumentIndex++)
             {
                 var argument = invocationOperation.Arguments[argumentIndex];
-                var parameter = argument.Parameter;
-                var argumentKind = parameter?.Type?.TypeKind == TypeKind.Delegate ? "delegate" : "non-delegate";
 
                 var argumentResult = PurityAnalysisEngine.CheckSingleOperation(argument.Value, context, currentState);
                 if (!argumentResult.IsPure)
@@ -388,8 +337,8 @@ internal partial class MethodInvocationPurityRule
         if (TryCheckStringEnumerableJoinPurity(invocationOperation, context, currentState,
                 out var stringEnumerableJoinResult)) return stringEnumerableJoinResult;
 
-        if (TryCheckSemanticallyPureParsePurity(invocationOperation, context, currentState,
-                out var semanticParseResult)) return semanticParseResult;
+        if (IsSemanticallyPureParseInvocation(invocationOperation))
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (invocationOperation.Type is IArrayTypeSymbol &&
             PurityConcreteReceiverResolver.IsTrustedFreshArrayFactoryOperation(
@@ -398,11 +347,10 @@ internal partial class MethodInvocationPurityRule
                 out _))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (TryCheckArrayAsReadOnlyOwnedLocalArrayPurity(invocationOperation, context, currentState,
-                out var arrayAsReadOnlyResult)) return arrayAsReadOnlyResult;
-
-        if (TryCheckSpanAndMemoryViewPurity(invocationOperation, context, currentState,
-                out var spanAndMemoryViewResult)) return spanAndMemoryViewResult;
+        if (PurityKnownBclSemantics.IsArrayAsReadOnlyInvocation(invocationOperation) ||
+            IsArrayAsSpanInvocation(invocationOperation) ||
+            RuleAnalysisHelper.IsSemanticallyPureSpanLikeSliceInvocation(invocationOperation))
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (PurityKnownBclSemantics.IsInvariantCultureDeterministicParseInvocation(invocationOperation))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
