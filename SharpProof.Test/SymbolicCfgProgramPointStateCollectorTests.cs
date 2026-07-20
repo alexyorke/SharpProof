@@ -1028,6 +1028,57 @@ static class C
         AssertStateParity(routed, structural);
     }
 
+    [Test]
+    public void PriorExpressionCompletion_MatchesStructuralCollector()
+    {
+        const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+static class C
+{
+    static void Ensure([NotNull] string? value) { }
+    static int M(string? value) { Ensure(value); return value.Length; }
+}";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(PriorExpressionCompletion_MatchesStructuralCollector));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+        var structural = CollectStructuralState(fixture, site);
+
+        Assert.That(actual.IsExact, Is.True, actual.Provenance.Single().Detail);
+        AssertStateParity(actual.Value!, structural);
+        Assert.That(CreateEvidenceKey(actual.Value!), Does.Contain("ir.path.normal-completion.parameter-not-null"));
+    }
+
+    [Test]
+    public void PriorDoesNotReturnExpression_RemainsConservativeFallback()
+    {
+        const string source = @"
+using System.Diagnostics.CodeAnalysis;
+static class C
+{
+    [DoesNotReturn] static void Fail() => throw new System.Exception();
+    static int M(string? value) { if (value is null) Fail(); return value.Length; }
+}";
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(PriorDoesNotReturnExpression_RemainsConservativeFallback));
+        var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>().Last();
+
+        var actual = SymbolicCfgProgramPointStateCollector.CollectState(
+            site,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(actual.IsUnsupported, Is.True);
+        Assert.That(actual.Provenance.Single().Detail, Is.EqualTo("operation-ExpressionStatement"));
+    }
+
     [TestCaseSource(nameof(CoalesceAssignmentCompletionCases))]
     public void CoalesceAssignmentCompletion_CurrentRoutingCharacterization(string source)
     {

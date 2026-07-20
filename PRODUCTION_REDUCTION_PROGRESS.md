@@ -626,16 +626,23 @@ Tests are excluded from the metric and must not be deleted.
   truth cache and nested program-point cache now live directly in their
   compilation-scoped weak tables. Catalog, cache, and architecture coverage
   preserve observable behavior and prevent all three wrappers from returning.
+- [x] Moved normal prior expression-statement completion onto the canonical CFG
+  collector. Framework postconditions, mutation invalidation, completion facts,
+  and evidence now replay through the same operation traversal as assignments;
+  non-returning calls and guard-invalidating shapes remain explicit structural
+  fallbacks. The focused fallback characterization dropped from 92 routed cases
+  to 74 while preserving all 659 symbolic results.
 
 ## Current evidence
 
-- Maintained production: 91,071 lines (87,152 C#, 3,189 scripts, and 730
-  specifications); net reduction: 16,555 lines; remaining reduction: 3,445.
-  This facade/cache-holder tranche removed 17 maintained-production lines
-  without deleting tests or changing diagnostics, proof results, CLI output,
-  package contents, or cache behavior.
+- Maintained production: 91,072 lines (87,153 C#, 3,189 scripts, and 730
+  specifications); net reduction: 16,554 lines; remaining reduction: 3,446.
+  This canonical-transfer tranche adds one maintained-production line while
+  removing 18 characterized queries from the structural fallback. It changes
+  no diagnostics, proof results, CLI output, or package contents and deletes no
+  tests.
 - Release solution build: zero warnings and errors.
-- Six lanes: 6,214 passing tests and two documented Main skips.
+- Six lanes: 6,216 passing tests and two documented Main skips.
 
 ## Milestones
 
@@ -712,9 +719,9 @@ API: it prevents Roslyn symbols, engine states, and SMT formulas from escaping.
 Do not remove that projection merely because breaking API changes are allowed.
 
 The syntax-based `SymbolicProgramPointFacts` fallback remains a live migration
-target rather than deletable legacy code. Custom analysis-limit/truncation
-reporting is now owned by the CFG collector, but characterization still shows
-dependencies on complex nested/root completion and unsupported loop shapes.
+target rather than deletable legacy code. Normal prior expression completion is
+now canonical; the largest remaining characterized families are flow captures
+(19), successor/control-flow propagation (16), and current completion (11).
 Move those cases into `SymbolicCfgProgramPointStateCollector` in bounded
 tranches before deleting the structural owner; do not convert failures into
 successful proofs or discard truncation metadata.

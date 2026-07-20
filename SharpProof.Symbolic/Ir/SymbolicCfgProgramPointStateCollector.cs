@@ -320,7 +320,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector
                         GetActiveGuard(currentPath.GuardFrame),
                         true,
                         false,
-                        false,
+                        operation.Syntax is not ExpressionStatementSyntax expressionStatement ||
+                        !SymbolicControlFlowFacts.ExpressionStatementDefinitelyExits(expressionStatement, semanticModel, cancellationToken),
                         semanticModel,
                         cancellationToken,
                         forInitialEntry != null && IsForInitializerSyntax(operation.Syntax, forInitialEntry)
