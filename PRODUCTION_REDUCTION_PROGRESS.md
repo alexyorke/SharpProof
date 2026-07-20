@@ -813,12 +813,21 @@ Tests are excluded from the metric and must not be deleted.
   lambda, local-function, and analyzer evidence fixtures preserve all outcomes.
   Removed the now-unused operation-context diagnostic reporter overload and
   regenerated the impact inventory without stale type entries.
+- [x] Moved non-loop coalesce-assignment current completion off the structural
+  program-point fallback. The CFG collector now obtains the canonical entry
+  snapshot and applies the existing operation-kind coalesce transfer atomically,
+  preserving normalized state and evidence for reference, nullable, known, and
+  unknown values under default and custom budgets. This also fixes the
+  characterized guarded-assignment bug that combined a pre-assignment null guard
+  with the post-assignment non-null value and incorrectly marked a reachable
+  completion contradictory. Loop-local current completion remains an explicit
+  typed fallback until loop observations can preserve the same state contract.
 
 ## Current evidence
 
-- Phase-two maintained production: 81,132 lines (77,170 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,302-line reduction from the
-  84,434-line phase-two baseline. Another 16,698 lines remain to the 64,434
+- Phase-two maintained production: 81,156 lines (77,194 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,278-line reduction from the
+  84,434-line phase-two baseline. Another 16,722 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.

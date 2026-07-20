@@ -190,11 +190,23 @@ sealed class C
     {
         yield return CoalesceCase(
             "GuardMutationFallback",
-            "static class C { static void M(string? value) { if (value == null) { value ??= \"new\"; } } }");
+            "static class C { static void M(string? value) { if (value == null) { value ??= \"new\"; } } }",
+            expectedExact: true,
+            expectedStructuralParity: false);
         yield return CoalesceCase(
             "LoopCurrentCompletionFallback",
-            "static class C { static void M(string? value, bool repeat) { while (repeat) { value ??= \"new\"; } } }");
+            "static class C { static void M(string? value, bool repeat) { while (repeat) { value ??= \"new\"; } } }",
+            expectedExact: false,
+            expectedStructuralParity: true);
     }
+
+    private static TestCaseData CoalesceCase(
+        string name,
+        string source,
+        bool expectedExact,
+        bool expectedStructuralParity) =>
+        new TestCaseData(source, expectedExact, expectedStructuralParity)
+            .SetName($"CoalesceAssignmentCompletion_{name}");
 
     [TestCaseSource(nameof(StraightLineCases))]
     public void StraightLineState_MatchesStructuralCollector((string Source, string Target) testCase)
@@ -1258,13 +1270,16 @@ static class C
             CancellationToken.None,
             includeCurrentStatementCompletionFacts: true);
 
-        Assert.That(cfg.IsUnsupported, Is.True, cfg.Provenance.Single().Detail);
-        Assert.That(cfg.Value, Is.Null);
+        Assert.That(cfg.IsExact, Is.True, cfg.Provenance.Single().Detail);
+        AssertStateParity(cfg.Value!, structural);
         AssertStateParity(routed, structural);
     }
 
     [TestCaseSource(nameof(UnsupportedCoalesceAssignmentCompletionCases))]
-    public void CoalesceAssignmentCompletion_UnsafeShapeUsesStructuralFallback(string source)
+    public void CoalesceAssignmentCompletion_UnsafeShapeUsesStructuralFallback(
+        string source,
+        bool expectedExact,
+        bool expectedStructuralParity)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
@@ -1286,9 +1301,18 @@ static class C
             CancellationToken.None,
             includeCurrentStatementCompletionFacts: true);
 
-        Assert.That(cfg.IsUnsupported, Is.True, cfg.Provenance.Single().Detail);
-        Assert.That(cfg.Value, Is.Null);
-        AssertStateParity(routed, structural);
+        Assert.That(cfg.IsExact, Is.EqualTo(expectedExact), cfg.Provenance.Single().Detail);
+        if (expectedExact && expectedStructuralParity)
+            AssertStateParity(cfg.Value!, structural);
+        else if (expectedExact)
+        {
+            Assert.That(cfg.Value!.IsContradictory, Is.False);
+            AssertStateParity(routed, cfg.Value);
+        }
+        else
+            Assert.That(cfg.Value, Is.Null);
+        if (expectedStructuralParity)
+            AssertStateParity(routed, structural);
     }
 
     [Test]
@@ -1318,8 +1342,8 @@ static class C
             CancellationToken.None,
             includeCurrentStatementCompletionFacts: true);
 
-        Assert.That(cfg.IsUnsupported, Is.True, cfg.Provenance.Single().Detail);
-        Assert.That(cfg.Value, Is.Null);
+        Assert.That(cfg.IsExact, Is.True, cfg.Provenance.Single().Detail);
+        AssertStateParity(cfg.Value!, structural);
         AssertStateParity(routed, structural);
     }
 

@@ -104,6 +104,30 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         cancellationToken.ThrowIfCancellationRequested();
         var includeCurrentStatementCompletionFacts =
             targetKind == CfgProgramPointTargetKind.CurrentCompletion;
+        if (includeCurrentStatementCompletionFacts &&
+            site is ExpressionStatementSyntax {
+                Expression: AssignmentExpressionSyntax coalesceAssignment
+            } coalesceStatement &&
+            coalesceAssignment.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.CoalesceAssignmentExpression)) {
+            var entry = CollectState(
+                site,
+                semanticModel,
+                cancellationToken,
+                initialState,
+                CfgProgramPointTargetKind.BeforeCurrent);
+            if (entry is not { IsExact: true, Value: { } entryState }) return entry;
+            if (semanticModel.GetOperation(coalesceAssignment, cancellationToken) is not { } operation ||
+                !TryApplyCurrentCompletion(
+                    ref entryState,
+                    coalesceStatement,
+                    operation,
+                    guard: null,
+                    allowGuardedReferenceAssignments: true,
+                    semanticModel,
+                    cancellationToken))
+                return Unsupported(site, "coalesce-completion");
+            return Exact(entryState, site);
+        }
         var forInitialEntry = targetKind == CfgProgramPointTargetKind.ForInitialEntry
             ? (ForStatementSyntax)site
             : null;
