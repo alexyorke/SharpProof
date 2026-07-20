@@ -2979,13 +2979,22 @@ static class C
     [TestCase(
         "static class C { static int M() { try { throw new System.Exception(); } catch (System.InvalidOperationException) { } catch (System.Exception error) { return error.Message.Length; } return 0; } }",
         TestName = "LaterCatchLocalTarget")]
+    [TestCase(
+        "sealed class C { int Value; static C Get() => new(); static int M() { try { Get().Value = 1; throw new System.Exception(); } catch (System.Exception error) { return error.Message.Length; } } }",
+        TestName = "CatchLocalTargetWithUnnameableProtectedMutation")]
+    [TestCase(
+        "static class C { static int M(int value) { try { throw new System.Exception(); } catch { value = 2; return value; } } }",
+        TestName = "DeclarationFreeCatchLocalTarget")]
+    [TestCase(
+        "static class C { static int M() { try { throw new System.Exception(); } catch (System.Exception error) { error = new System.Exception(); return error.Message.Length; } } }",
+        TestName = "ReassignedCatchLocalTarget")]
     public void CatchEntryTarget_MatchesStructuralCollector(string source)
     {
         var fixture = RoslynTestFixture.CreateCompilation(
             source,
             nameof(CatchEntryTarget_MatchesStructuralCollector));
         var site = fixture.Root.DescendantNodes().OfType<ReturnStatementSyntax>()
-            .First(statement => statement.Expression?.ToString().Contains("error.Message", StringComparison.Ordinal) == true);
+            .First(statement => statement.Ancestors().Any(static ancestor => ancestor is CatchClauseSyntax));
 
         var actual = SymbolicCfgProgramPointStateCollector.CollectState(
             site,

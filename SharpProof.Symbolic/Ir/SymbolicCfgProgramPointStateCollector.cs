@@ -367,8 +367,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 if (forInitialEntry != null &&
                     IsForInitializerSyntax(operation.Syntax, forInitialEntry))
                     continue;
-                if (catchLocalTarget != null &&
-                    IsCatchLocalInitialization(
+                if (catchLocalTarget != null && IsCatchLocalInitialization(
                         operation,
                         catchLocalTarget.Clause,
                         semanticModel,
@@ -625,8 +624,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         var statementRegion = context.RegionPlan;
         if (branch == null)
             return true;
-        if (!TrySeedCatchLocalTarget(source, branch, activeContinuation, path, context))
-            return false;
+        var catchSeed = TrySeedCatchLocalTarget(source, branch, activeContinuation, path, context);
+        if (catchSeed.HasValue)
+            return catchSeed.Value;
         var completedTryPropagation = TryPropagateCompletedTry(
             source,
             branch,
@@ -745,7 +745,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             context);
     }
 
-    private static bool TrySeedCatchLocalTarget(
+    private static bool? TrySeedCatchLocalTarget(
         BasicBlock source,
         ControlFlowBranch branch,
         CfgFinallyContinuation? activeContinuation,
@@ -757,7 +757,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
              source.Ordinal <= plan.TryRegion.LastBlockOrdinal) ||
             branch.Destination.Ordinal < plan.TryRegion.FirstBlockOrdinal ||
             branch.Destination.Ordinal > plan.TryRegion.LastBlockOrdinal)
-            return true;
+            return null;
 
         var catchState = SymbolicStateInvalidator.ApplyNestedMutationInvalidations(
             path.State,

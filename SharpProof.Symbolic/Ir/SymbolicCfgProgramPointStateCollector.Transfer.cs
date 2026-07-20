@@ -233,8 +233,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             tryStatement.Block,
             semanticModel,
             cancellationToken);
-        if (protectedMutations.HasUnsupportedMutation)
-            return false;
         plan = new CfgCatchLocalTargetPlan(
             clause,
             tryRegion,
