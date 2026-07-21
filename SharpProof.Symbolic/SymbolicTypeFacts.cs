@@ -160,10 +160,15 @@ internal static class SymbolicTypeFacts {
         }
     }
 
-    private static bool IsBigIntegerType(ITypeSymbol typeSymbol) {
-        return typeSymbol is INamedTypeSymbol namedType &&
-               namedType.ToDisplayString() == "System.Numerics.BigInteger";
-    }
+    /// <summary>
+    /// The single owner of the BigInteger check. Matched on namespace and name rather
+    /// than a display string so it holds for any <see cref="ITypeSymbol" />.
+    /// </summary>
+    internal static bool IsBigIntegerType(ITypeSymbol? typeSymbol) =>
+        typeSymbol != null &&
+        string.Equals(typeSymbol.ContainingNamespace?.ToDisplayString(), "System.Numerics",
+            StringComparison.Ordinal) &&
+        string.Equals(typeSymbol.Name, "BigInteger", StringComparison.Ordinal);
 
     public static bool TryGetCheckedIntegralRange(
         ITypeSymbol? typeSymbol,

@@ -530,20 +530,13 @@ internal sealed class MethodEffectAnalysisSession(
 
     private static bool IsIntrinsicMetadataMethod(IMethodSymbol method) =>
         method is { MethodKind: MethodKind.Constructor, ContainingType.SpecialType: SpecialType.System_Object } ||
+        SymbolicTypeFacts.IsBuiltInIntegralType(method.ContainingType) ||
         method.ContainingType?.SpecialType is SpecialType.System_String or
             SpecialType.System_Boolean or
-            SpecialType.System_Char or
-            SpecialType.System_SByte or
-            SpecialType.System_Byte or
-            SpecialType.System_Int16 or
-            SpecialType.System_UInt16 or
-            SpecialType.System_Int32 or
-            SpecialType.System_UInt32 or
-            SpecialType.System_Int64 or
-            SpecialType.System_UInt64 or
             SpecialType.System_Single or
             SpecialType.System_Double or
             SpecialType.System_Decimal ||
+        // These have no SpecialType, so they are still matched by name.
         method.ContainingType?.OriginalDefinition.ToDisplayString() is
             "System.Span<T>" or
             "System.ReadOnlySpan<T>" or

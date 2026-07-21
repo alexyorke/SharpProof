@@ -35,9 +35,7 @@ internal static class CSharpMathPatternRecognizer {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
-        return type != null &&
-               (SymbolicTypeFacts.IsBuiltInIntegralOrEnumType(type) ||
-                (type is INamedTypeSymbol namedType &&
-                 namedType.ToDisplayString() == "System.Numerics.BigInteger"));
+        return SymbolicTypeFacts.IsBuiltInIntegralOrEnumType(type) ||
+               SymbolicTypeFacts.IsBigIntegerType(type);
     }
 }

@@ -252,6 +252,38 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
+    public void ForeachOverCollectionOutsideAnyNameTable_IsLinearInCount()
+    {
+        // HashSet is deliberately not one of the types the cost model used to name
+        // explicitly. It is recognised because it exposes an instance int Count, so
+        // any collection of that shape now gets a bound instead of falling to unknown.
+        const string source = """
+                              using System.Collections.Generic;
+
+                              public static class C
+                              {
+                                  public static int SumAll(HashSet<int> values)
+                                  {
+                                      var sum = 0;
+                                      foreach (var value in values)
+                                      {
+                                          sum += value;
+                                      }
+
+                                      return sum;
+                                  }
+                              }
+                              """;
+
+        var result = QueryComplexityAtMarker(source, "return sum;");
+
+        Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Linear));
+        // The size variable is spelled ".Length" for every sized receiver reached through
+        // this path, including the Count-bearing ones such as List and Dictionary.
+        Assert.That(result.Complexity.Text, Is.EqualTo("O(values.Length)"));
+    }
+
+    [Test]
     public void MonotoneWhileLoop_IsLinear()
     {
         const string source = """

@@ -52,29 +52,20 @@ internal sealed class SymbolicComplexityCostModel(CancellationToken _cancellatio
             out value);
     }
 
-    internal static bool IsKnownSizedType(ITypeSymbol? typeSymbol) {
-        if (typeSymbol == null) return false;
-
-        if (typeSymbol is IArrayTypeSymbol) return true;
-
-        if (typeSymbol.SpecialType == SpecialType.System_String) return true;
-
-        var originalDefinition = typeSymbol.OriginalDefinition;
-        var containingNamespace = originalDefinition.ContainingNamespace?.ToDisplayString() ?? string.Empty;
-        var metadataName = originalDefinition.MetadataName;
-        return (string.Equals(containingNamespace, "System", StringComparison.Ordinal) &&
-                (string.Equals(metadataName, "Span`1", StringComparison.Ordinal) ||
-                 string.Equals(metadataName, "ReadOnlySpan`1", StringComparison.Ordinal) ||
-                 string.Equals(metadataName, "Memory`1", StringComparison.Ordinal) ||
-                 string.Equals(metadataName, "ReadOnlyMemory`1", StringComparison.Ordinal))) ||
-               (string.Equals(containingNamespace, "System.Collections.Generic", StringComparison.Ordinal) &&
-                (string.Equals(metadataName, "List`1", StringComparison.Ordinal) ||
-                 string.Equals(metadataName, "Dictionary`2", StringComparison.Ordinal) ||
-                 string.Equals(metadataName, "ICollection`1", StringComparison.Ordinal) ||
-                 string.Equals(metadataName, "IReadOnlyCollection`1", StringComparison.Ordinal))) ||
-               (string.Equals(containingNamespace, "System.Collections.Immutable", StringComparison.Ordinal) &&
-                string.Equals(metadataName, "ImmutableArray`1", StringComparison.Ordinal));
-    }
+    /// <summary>
+    /// A type is sized when it exposes an instance <see cref="int" /> Length or Count,
+    /// which is the shape this model actually depends on. Asking the symbol that
+    /// question covers the spans, lists, dictionaries and immutable arrays a name table
+    /// used to enumerate, and additionally reaches every collection such a table missed
+    /// — HashSet, Queue, Stack, ImmutableList and user-defined collections. Arrays are
+    /// checked separately because their Length is a special member rather than a
+    /// declared one.
+    /// </summary>
+    internal static bool IsKnownSizedType(ITypeSymbol? typeSymbol) =>
+        typeSymbol is IArrayTypeSymbol ||
+        typeSymbol?.SpecialType == SpecialType.System_String ||
+        SymbolicTypeFacts.HasInstanceInt32Member(typeSymbol, "Length") ||
+        SymbolicTypeFacts.HasInstanceInt32Member(typeSymbol, "Count");
 
     private bool TryCreateScalar(
         ExpressionSyntax expression,

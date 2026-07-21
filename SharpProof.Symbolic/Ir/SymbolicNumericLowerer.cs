@@ -176,7 +176,5 @@ internal static class SymbolicNumericLowerer {
         return false;
     }
 
-    internal static bool IsBigIntegerType(ITypeSymbol type) => string.Equals(type.ContainingNamespace?.ToDisplayString(), "System.Numerics",
-                   StringComparison.Ordinal) &&
-               string.Equals(type.Name, "BigInteger", StringComparison.Ordinal);
+    internal static bool IsBigIntegerType(ITypeSymbol type) => SymbolicTypeFacts.IsBigIntegerType(type);
 }
