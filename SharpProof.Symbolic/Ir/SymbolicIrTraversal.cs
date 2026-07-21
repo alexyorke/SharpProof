@@ -1,5 +1,80 @@
 namespace SharpProof.Symbolic.Ir;
 
+/// <summary>
+/// The direct children of an IR atom or term, in the one shape every structural
+/// walker needs: at most two term children, an optional condition child, and the
+/// variable-length indices carried by a multi-element term.
+/// </summary>
+/// <remarks>
+/// This is deliberately a struct returned by value rather than an iterator: the
+/// walkers below run per symbolic state on the analysis hot path, where an
+/// allocation per visited node would be charged against the SMT wall-clock budget.
+/// Children are consumed in field order, so a walker observes terms before the
+/// condition child. Both <see cref="SymbolicIrVisitor"/> subclasses are
+/// order-insensitive (one sorts its output by key, the other sets a found flag),
+/// and the folds built on this are boolean, so the order is not load-bearing.
+/// Rewriting is not expressible here because it must reconstruct each record with
+/// its own constructor; see <see cref="SymbolicIrRewriter"/>.
+/// </remarks>
+internal readonly record struct SymbolicIrChildren(
+    SymbolicTerm? First = null,
+    SymbolicTerm? Second = null,
+    SymbolicCondition? Condition = null,
+    ImmutableArray<SymbolicTerm> Rest = default) {
+    internal static SymbolicIrChildren OfAtom(SymbolicAtom atom) => atom switch {
+        // Named Condition, but declared as a term: SymbolicTruthAtom(SymbolicTerm Condition).
+        SymbolicTruthAtom truth => new(truth.Condition),
+        SymbolicRelationAtom relation => new(relation.Left, relation.Right),
+        SymbolicStringPredicateAtom predicate => new(predicate.Value, predicate.Argument),
+        SymbolicBoundsAtom bounds => new(bounds.Index, bounds.Length),
+        SymbolicFreshnessAtom freshness => new(freshness.Value),
+        SymbolicOwnershipAtom ownership => new(ownership.Value),
+        SymbolicAliasAtom alias => new(alias.Source, alias.Target),
+        SymbolicBorrowAtom borrow => new(borrow.Owner, borrow.Borrow),
+        SymbolicEscapeAtom escape => new(escape.Value),
+        SymbolicReturnedOwnershipAtom returnedOwnership => new(returnedOwnership.Value),
+        SymbolicMutationAtom mutation => new(mutation.Target),
+        SymbolicDisposalAtom disposal => new(disposal.Resource),
+        SymbolicResourceLifetimeAtom lifetime => new(lifetime.Resource),
+        SymbolicTypeTestAtom typeTest => new(typeTest.Value),
+        SymbolicExceptionPreconditionAtom precondition =>
+            new(precondition.Subject, Condition: precondition.Trigger),
+        _ => default,
+    };
+
+    /// <summary>
+    /// Children of the terms whose sub-terms are traversed uniformly. Leaves and the
+    /// name-carrying terms yield nothing; <see cref="SymbolicBinaryTerm"/> and
+    /// <see cref="SymbolicConditionalTerm"/> are included, but callers that treat
+    /// either specially — the divide/remainder predicate, or refining a context across
+    /// a conditional — must match those before falling back to this.
+    /// </summary>
+    internal static SymbolicIrChildren OfTerm(SymbolicTerm term) => term switch {
+        SymbolicMemberTerm member => new(member.Receiver),
+        SymbolicElementTerm element => new(element.Receiver, element.Index),
+        SymbolicMultiElementTerm element => new(element.Receiver, Rest: element.Indices),
+        SymbolicFromEndIndexTerm fromEnd => new(fromEnd.Value),
+        SymbolicStringContentTerm stringContent => new(stringContent.Reference),
+        SymbolicStringConcatTerm stringConcat => new(stringConcat.Left, stringConcat.Right),
+        SymbolicLengthTerm length => new(length.Value),
+        SymbolicArrayDimensionLengthTerm arrayLength => new(arrayLength.Value),
+        SymbolicCountTerm count => new(count.Value),
+        SymbolicBinaryTerm binary => new(binary.Left, binary.Right),
+        SymbolicConditionalTerm conditional =>
+            new(conditional.WhenTrue, conditional.WhenFalse, conditional.Condition),
+        _ => default,
+    };
+
+    /// <summary>
+    /// Returns whether any child term satisfies <paramref name="predicate"/>. Pass a
+    /// static method group so the delegate is cached rather than allocated per call.
+    /// </summary>
+    internal bool AnyTerm(Func<SymbolicTerm, bool> predicate) =>
+        First != null && predicate(First) ||
+        Second != null && predicate(Second) ||
+        !Rest.IsDefaultOrEmpty && Rest.Any(predicate);
+}
+
 internal abstract class SymbolicIrRewriter {
     internal SymbolicFact Rewrite(SymbolicFact fact) {
         var atom = Rewrite(fact.Atom);
@@ -155,114 +230,32 @@ internal abstract class SymbolicIrVisitor {
         }
     }
 
-    internal void Visit(SymbolicAtom atom) {
-        switch (atom) {
-            case SymbolicTruthAtom truth:
-                Visit(truth.Condition);
-                break;
-            case SymbolicRelationAtom relation:
-                Visit(relation.Left);
-                Visit(relation.Right);
-                break;
-            case SymbolicStringPredicateAtom predicate:
-                Visit(predicate.Value);
-                Visit(predicate.Argument);
-                break;
-            case SymbolicBoundsAtom bounds:
-                Visit(bounds.Index);
-                Visit(bounds.Length);
-                break;
-            case SymbolicFreshnessAtom freshness:
-                Visit(freshness.Value);
-                break;
-            case SymbolicOwnershipAtom ownership:
-                Visit(ownership.Value);
-                break;
-            case SymbolicAliasAtom alias:
-                Visit(alias.Source);
-                Visit(alias.Target);
-                break;
-            case SymbolicBorrowAtom borrow:
-                Visit(borrow.Owner);
-                Visit(borrow.Borrow);
-                break;
-            case SymbolicEscapeAtom escape:
-                Visit(escape.Value);
-                break;
-            case SymbolicReturnedOwnershipAtom returned:
-                Visit(returned.Value);
-                break;
-            case SymbolicMutationAtom mutation:
-                Visit(mutation.Target);
-                break;
-            case SymbolicDisposalAtom disposal:
-                Visit(disposal.Resource);
-                break;
-            case SymbolicResourceLifetimeAtom lifetime:
-                Visit(lifetime.Resource);
-                break;
-            case SymbolicTypeTestAtom typeTest:
-                Visit(typeTest.Value);
-                break;
-            case SymbolicExceptionPreconditionAtom precondition:
-                if (precondition.Subject != null) Visit(precondition.Subject);
-                Visit(precondition.Trigger);
-                break;
-        }
-    }
+    internal void Visit(SymbolicAtom atom) => VisitChildren(SymbolicIrChildren.OfAtom(atom));
 
     internal void Visit(SymbolicTerm term) {
         OnTerm(term);
         switch (term) {
             case SymbolicVariableTerm variable:
                 OnVariableLikeName(variable.Name);
-                break;
+                return;
             case SymbolicNullableHasValueTerm nullableHasValue:
                 OnVariableLikeName(nullableHasValue.NullableName);
-                break;
+                return;
             case SymbolicNullableValueTerm nullableValue:
                 OnVariableLikeName(nullableValue.NullableName);
-                break;
-            case SymbolicMemberTerm member:
-                Visit(member.Receiver);
-                break;
-            case SymbolicElementTerm element:
-                Visit(element.Receiver);
-                Visit(element.Index);
-                break;
-            case SymbolicMultiElementTerm element:
-                Visit(element.Receiver);
-                foreach (var index in element.Indices) Visit(index);
-                break;
-            case SymbolicFromEndIndexTerm fromEnd:
-                Visit(fromEnd.Value);
-                break;
-            case SymbolicStringContentTerm content:
-                Visit(content.Reference);
-                break;
-            case SymbolicStringConcatTerm concat:
-                Visit(concat.Left);
-                Visit(concat.Right);
-                break;
-            case SymbolicLengthTerm length:
-                Visit(length.Value);
-                break;
-            case SymbolicArrayDimensionLengthTerm length:
-                Visit(length.Value);
-                break;
-            case SymbolicCountTerm count:
-                Visit(count.Value);
-                break;
-            case SymbolicBinaryTerm binary:
-                Visit(binary.Left);
-                Visit(binary.Right);
-                break;
-            case SymbolicConditionalTerm conditional:
-                Visit(conditional.Condition);
-                Visit(conditional.WhenTrue);
-                Visit(conditional.WhenFalse);
-                break;
+                return;
         }
+
+        VisitChildren(SymbolicIrChildren.OfTerm(term));
+    }
+
+    private void VisitChildren(SymbolicIrChildren children) {
+        if (children.First != null) Visit(children.First);
+        if (children.Second != null) Visit(children.Second);
+        if (!children.Rest.IsDefaultOrEmpty)
+            foreach (var index in children.Rest)
+                Visit(index);
+        if (children.Condition != null) Visit(children.Condition);
     }
 
     protected virtual void OnTerm(SymbolicTerm term) {

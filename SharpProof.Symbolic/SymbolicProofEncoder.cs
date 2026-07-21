@@ -106,31 +106,36 @@ internal static class SymbolicProofEncoder {
                        (binary.Operator is not (SymbolicBinaryTermOperator.Divide
                             or SymbolicBinaryTermOperator.Remainder) ||
                         strategy.IsTermProvablyNonZero(binary.Right, context, sourceNode));
-            case SymbolicMemberTerm member:
-                return HasSafeIntegerDivisorsCore(member.Receiver, context, sourceNode, strategy);
-            case SymbolicElementTerm element:
-                return HasSafeIntegerDivisorsCore(element.Receiver, context, sourceNode, strategy) &&
-                       HasSafeIntegerDivisorsCore(element.Index, context, sourceNode, strategy);
-            case SymbolicMultiElementTerm element:
-                return HasSafeIntegerDivisorsCore(element.Receiver, context, sourceNode, strategy) &&
-                       element.Indices.All(index =>
-                           HasSafeIntegerDivisorsCore(index, context, sourceNode, strategy));
-            case SymbolicFromEndIndexTerm fromEnd:
-                return HasSafeIntegerDivisorsCore(fromEnd.Value, context, sourceNode, strategy);
-            case SymbolicStringContentTerm stringContent:
-                return HasSafeIntegerDivisorsCore(stringContent.Reference, context, sourceNode, strategy);
-            case SymbolicStringConcatTerm stringConcat:
-                return HasSafeIntegerDivisorsCore(stringConcat.Left, context, sourceNode, strategy) &&
-                       HasSafeIntegerDivisorsCore(stringConcat.Right, context, sourceNode, strategy);
-            case SymbolicLengthTerm length:
-                return HasSafeIntegerDivisorsCore(length.Value, context, sourceNode, strategy);
-            case SymbolicArrayDimensionLengthTerm arrayLength:
-                return HasSafeIntegerDivisorsCore(arrayLength.Value, context, sourceNode, strategy);
-            case SymbolicCountTerm count:
-                return HasSafeIntegerDivisorsCore(count.Value, context, sourceNode, strategy);
             default:
-                return true;
+                return HasSafeIntegerDivisorsInChildren(
+                    SymbolicIrChildren.OfTerm(term), context, sourceNode, strategy);
         }
+    }
+
+    /// <summary>
+    /// Conjunction over the children of an atom or of a term that neither refines the
+    /// context nor is itself a divisor hazard. Written as explicit recursion rather
+    /// than a predicate over the children so that threading
+    /// <typeparamref name="TContext"/> does not allocate a closure per visited node.
+    /// </summary>
+    private static bool HasSafeIntegerDivisorsInChildren<TContext>(
+        SymbolicIrChildren children,
+        TContext context,
+        SyntaxNode sourceNode,
+        SafeDivisorProofStrategy<TContext> strategy) {
+        if (children.First != null &&
+            !HasSafeIntegerDivisorsCore(children.First, context, sourceNode, strategy))
+            return false;
+        if (children.Second != null &&
+            !HasSafeIntegerDivisorsCore(children.Second, context, sourceNode, strategy))
+            return false;
+        if (!children.Rest.IsDefaultOrEmpty)
+            foreach (var index in children.Rest)
+                if (!HasSafeIntegerDivisorsCore(index, context, sourceNode, strategy))
+                    return false;
+
+        return children.Condition == null ||
+               HasSafeIntegerDivisorsCore(children.Condition, context, sourceNode, strategy);
     }
 
     private static bool HasSafeIntegerDivisorsCore<TContext>(
@@ -188,49 +193,9 @@ internal static class SymbolicProofEncoder {
         SymbolicAtom atom,
         TContext context,
         SyntaxNode sourceNode,
-        SafeDivisorProofStrategy<TContext> strategy) {
-        switch (atom) {
-            case SymbolicTruthAtom truth:
-                return HasSafeIntegerDivisorsCore(truth.Condition, context, sourceNode, strategy);
-            case SymbolicRelationAtom relation:
-                return HasSafeIntegerDivisorsCore(relation.Left, context, sourceNode, strategy) &&
-                       HasSafeIntegerDivisorsCore(relation.Right, context, sourceNode, strategy);
-            case SymbolicStringPredicateAtom predicate:
-                return HasSafeIntegerDivisorsCore(predicate.Value, context, sourceNode, strategy) &&
-                       HasSafeIntegerDivisorsCore(predicate.Argument, context, sourceNode, strategy);
-            case SymbolicBoundsAtom bounds:
-                return HasSafeIntegerDivisorsCore(bounds.Index, context, sourceNode, strategy) &&
-                       HasSafeIntegerDivisorsCore(bounds.Length, context, sourceNode, strategy);
-            case SymbolicFreshnessAtom freshness:
-                return HasSafeIntegerDivisorsCore(freshness.Value, context, sourceNode, strategy);
-            case SymbolicOwnershipAtom ownership:
-                return HasSafeIntegerDivisorsCore(ownership.Value, context, sourceNode, strategy);
-            case SymbolicAliasAtom alias:
-                return HasSafeIntegerDivisorsCore(alias.Source, context, sourceNode, strategy) &&
-                       HasSafeIntegerDivisorsCore(alias.Target, context, sourceNode, strategy);
-            case SymbolicBorrowAtom borrow:
-                return HasSafeIntegerDivisorsCore(borrow.Owner, context, sourceNode, strategy) &&
-                       HasSafeIntegerDivisorsCore(borrow.Borrow, context, sourceNode, strategy);
-            case SymbolicEscapeAtom escape:
-                return HasSafeIntegerDivisorsCore(escape.Value, context, sourceNode, strategy);
-            case SymbolicReturnedOwnershipAtom returnedOwnership:
-                return HasSafeIntegerDivisorsCore(returnedOwnership.Value, context, sourceNode, strategy);
-            case SymbolicMutationAtom mutation:
-                return HasSafeIntegerDivisorsCore(mutation.Target, context, sourceNode, strategy);
-            case SymbolicDisposalAtom disposal:
-                return HasSafeIntegerDivisorsCore(disposal.Resource, context, sourceNode, strategy);
-            case SymbolicResourceLifetimeAtom lifetime:
-                return HasSafeIntegerDivisorsCore(lifetime.Resource, context, sourceNode, strategy);
-            case SymbolicTypeTestAtom typeTest:
-                return HasSafeIntegerDivisorsCore(typeTest.Value, context, sourceNode, strategy);
-            case SymbolicExceptionPreconditionAtom precondition:
-                return (precondition.Subject == null ||
-                        HasSafeIntegerDivisorsCore(precondition.Subject, context, sourceNode, strategy)) &&
-                       HasSafeIntegerDivisorsCore(precondition.Trigger, context, sourceNode, strategy);
-            default:
-                return true;
-        }
-    }
+        SafeDivisorProofStrategy<TContext> strategy) =>
+        HasSafeIntegerDivisorsInChildren(
+            SymbolicIrChildren.OfAtom(atom), context, sourceNode, strategy);
 
     private static bool IsTermProvablyNonZero(
         SymbolicTerm term,

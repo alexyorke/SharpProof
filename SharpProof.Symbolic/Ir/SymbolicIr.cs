@@ -1285,55 +1285,20 @@ internal sealed class SymbolicState {
     private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicFact fact) =>
         ContainsPotentiallyExceptionalArithmetic(fact.Atom);
 
-    private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicAtom atom) => atom switch {
-        SymbolicTruthAtom truth => ContainsPotentiallyExceptionalArithmetic(truth.Condition),
-        SymbolicRelationAtom relation => ContainsPotentiallyExceptionalArithmetic(relation.Left) ||
-                               ContainsPotentiallyExceptionalArithmetic(relation.Right),
-        SymbolicStringPredicateAtom predicate => ContainsPotentiallyExceptionalArithmetic(predicate.Value) ||
-                               ContainsPotentiallyExceptionalArithmetic(predicate.Argument),
-        SymbolicBoundsAtom bounds => ContainsPotentiallyExceptionalArithmetic(bounds.Index) ||
-                               ContainsPotentiallyExceptionalArithmetic(bounds.Length),
-        SymbolicFreshnessAtom freshness => ContainsPotentiallyExceptionalArithmetic(freshness.Value),
-        SymbolicOwnershipAtom ownership => ContainsPotentiallyExceptionalArithmetic(ownership.Value),
-        SymbolicAliasAtom alias => ContainsPotentiallyExceptionalArithmetic(alias.Source) ||
-                               ContainsPotentiallyExceptionalArithmetic(alias.Target),
-        SymbolicBorrowAtom borrow => ContainsPotentiallyExceptionalArithmetic(borrow.Owner) ||
-                               ContainsPotentiallyExceptionalArithmetic(borrow.Borrow),
-        SymbolicEscapeAtom escape => ContainsPotentiallyExceptionalArithmetic(escape.Value),
-        SymbolicReturnedOwnershipAtom returnedOwnership => ContainsPotentiallyExceptionalArithmetic(returnedOwnership.Value),
-        SymbolicMutationAtom mutation => ContainsPotentiallyExceptionalArithmetic(mutation.Target),
-        SymbolicDisposalAtom disposal => ContainsPotentiallyExceptionalArithmetic(disposal.Resource),
-        SymbolicResourceLifetimeAtom lifetime => ContainsPotentiallyExceptionalArithmetic(lifetime.Resource),
-        SymbolicTypeTestAtom typeTest => ContainsPotentiallyExceptionalArithmetic(typeTest.Value),
-        SymbolicExceptionPreconditionAtom precondition => (precondition.Subject != null &&
-                                ContainsPotentiallyExceptionalArithmetic(precondition.Subject)) ||
-                               ContainsPotentiallyExceptionalArithmetic(precondition.Trigger),
-        _ => false,
-    };
+    private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicAtom atom) =>
+        ContainsPotentiallyExceptionalArithmetic(SymbolicIrChildren.OfAtom(atom));
 
-    private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicTerm term) => term switch {
-        SymbolicBinaryTerm {
+    // A divide or remainder is the hazard itself; every other term only carries
+    // whichever hazards its children do.
+    private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicTerm term) =>
+        term is SymbolicBinaryTerm {
             Operator: SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder
-        } => true,
-        SymbolicBinaryTerm binary => ContainsPotentiallyExceptionalArithmetic(binary.Left) ||
-                   ContainsPotentiallyExceptionalArithmetic(binary.Right),
-        SymbolicConditionalTerm conditional => ContainsPotentiallyExceptionalArithmetic(conditional.Condition) ||
-                   ContainsPotentiallyExceptionalArithmetic(conditional.WhenTrue) ||
-                   ContainsPotentiallyExceptionalArithmetic(conditional.WhenFalse),
-        SymbolicMemberTerm member => ContainsPotentiallyExceptionalArithmetic(member.Receiver),
-        SymbolicElementTerm element => ContainsPotentiallyExceptionalArithmetic(element.Receiver) ||
-                   ContainsPotentiallyExceptionalArithmetic(element.Index),
-        SymbolicMultiElementTerm element => ContainsPotentiallyExceptionalArithmetic(element.Receiver) ||
-                   element.Indices.Any(ContainsPotentiallyExceptionalArithmetic),
-        SymbolicFromEndIndexTerm fromEnd => ContainsPotentiallyExceptionalArithmetic(fromEnd.Value),
-        SymbolicStringContentTerm stringContent => ContainsPotentiallyExceptionalArithmetic(stringContent.Reference),
-        SymbolicStringConcatTerm stringConcat => ContainsPotentiallyExceptionalArithmetic(stringConcat.Left) ||
-                   ContainsPotentiallyExceptionalArithmetic(stringConcat.Right),
-        SymbolicLengthTerm length => ContainsPotentiallyExceptionalArithmetic(length.Value),
-        SymbolicArrayDimensionLengthTerm arrayLength => ContainsPotentiallyExceptionalArithmetic(arrayLength.Value),
-        SymbolicCountTerm count => ContainsPotentiallyExceptionalArithmetic(count.Value),
-        _ => false,
-    };
+        } ||
+        ContainsPotentiallyExceptionalArithmetic(SymbolicIrChildren.OfTerm(term));
+
+    private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicIrChildren children) =>
+        children.AnyTerm(ContainsPotentiallyExceptionalArithmetic) ||
+        children.Condition != null && ContainsPotentiallyExceptionalArithmetic(children.Condition);
 
     private static void CollectBinaryConditionOperands(
         SymbolicCondition condition,
