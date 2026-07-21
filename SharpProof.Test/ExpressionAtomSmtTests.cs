@@ -1,716 +1,126 @@
 using NUnit.Framework;
-using SharpProof.Symbolic;
-using SharpProof.Symbolic.Smt;
 using static SharpProof.Test.SymbolicProofTestAssertions;
 
 namespace SharpProof.Test;
 
 [TestFixture]
 [Category("SmtHeavy")]
-public sealed class ExpressionAtomSmtTests
-{
-    [Test]
-    public void SymbolicSourceQueryService_ProvesConditionalNullableMemberFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(bool flag, int? left, int? right)
-    {
-        if (flag && left.HasValue && left.Value == 5)
-        {
-            return left.Value;
-        }
+public sealed class ExpressionAtomSmtTests {
+    public sealed record Expectation(string Marker, string Condition, bool Proven = true);
 
-        return 0;
-    }
-}";
+    public sealed record ExpressionCase(string Source, Expectation[] Expectations);
 
-        AssertConditionProven(
-            source,
-            "return left.Value;",
-            "(flag ? left : right).HasValue && (flag ? left : right).Value == 5");
-    }
+    private const string Holder = "public sealed class Holder\n{\n    public string Text;\n}";
+    private const string Mode = "public enum Mode\n{\n    None = 0,\n    Ready = 1\n}";
 
-    [Test]
-    public void SymbolicSourceQueryService_ProvesNullableValueComparisonHasValueFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int? value)
-    {
-        if (value.Value == 5)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "value.HasValue");
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "value.Value == 5");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesConditionalAccessReferenceNullCheck()
-    {
-        const string source = @"
-public sealed class Holder
-{
-    public string Text;
-}
-
-public class TestClass
-{
-    public string TestMethod(Holder holder)
-    {
-        if (holder != null && holder.Text != null)
-        {
-            return holder?.Text;
-        }
-
-        return null;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return holder?.Text;",
-            "holder?.Text != null");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesConditionalAccessStringEqualityFacts()
-    {
-        const string source = @"
-public sealed class Holder
-{
-    public string Text;
-}
-
-public class TestClass
-{
-    public int TestMethod(Holder holder)
-    {
-        if (holder?.Text == ""ABC"")
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "holder != null && holder.Text == \"ABC\"");
+    private static IEnumerable<TestCaseData> Cases() {
+        yield return Case("SymbolicSourceQueryService_ProvesConditionalNullableMemberFacts",
+            Method("int", "bool flag, int? left, int? right", "if (flag && left.HasValue && left.Value == 5)\n{\n    return left.Value;\n}\n\nreturn 0;"),
+            Yes("return left.Value;", "(flag ? left : right).HasValue && (flag ? left : right).Value == 5"));
+        yield return Case("SymbolicSourceQueryService_ProvesNullableValueComparisonHasValueFacts",
+            Method("int", "int? value", "if (value.Value == 5)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "value.HasValue"), Yes("return 1;", "value.Value == 5"));
+        yield return Case("SymbolicSourceQueryService_ProvesConditionalAccessReferenceNullCheck",
+            Method("string", "Holder holder", "if (holder != null && holder.Text != null)\n{\n    return holder?.Text;\n}\n\nreturn null;", prefix: Holder),
+            Yes("return holder?.Text;", "holder?.Text != null"));
+        yield return Case("SymbolicSourceQueryService_ProvesConditionalAccessStringEqualityFacts",
+            Method("int", "Holder holder", "if (holder?.Text == \"ABC\")\n{\n    return 1;\n}\n\nreturn 0;", prefix: Holder),
+            Yes("return 1;", "holder != null && holder.Text == \"ABC\""));
+        yield return Case("SymbolicSourceQueryService_ProvesConditionalAccessStringCoalesceLengthFacts",
+            Method("int", "Holder holder, string fallback", "if ((holder?.Text ?? fallback) == \"OK\")\n{\n    return 1;\n}\n\nreturn 0;", prefix: Holder),
+            Yes("return 1;", "(holder?.Text ?? fallback).Length == 2"));
+        yield return Case("SymbolicSourceQueryService_ProvesTupleEqualityElementRelation",
+            Method("int", "(int A, int B) left, (int A, int B) right", "if (left == right)\n{\n    return left.A;\n}\n\nreturn 0;"),
+            Yes("return left.A;", "left.B == right.B"));
+        yield return Case("SymbolicSourceQueryService_ProvesIdentityBooleanCastFacts",
+            Method("int", "bool flag", "if ((bool)flag)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "flag == true"));
+        yield return Case("SymbolicSourceQueryService_ProvesIdentityStringCastLengthFacts",
+            Method("int", "string text", "if (text != null && ((string)text).Length == 3)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "text.Length != 4"));
+        yield return Case("SymbolicSourceQueryService_ProvesTupleLiteralElementArithmeticFacts",
+            Method("int", "int value, bool flag", "if ((value + 1, flag).Item1 == 5)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "value == 4"));
+        yield return Case("SymbolicSourceQueryService_ProvesCheckedArithmeticAtomFacts",
+            Method("int", "int value", "if (checked(value + 1) == 5)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "value == 4"));
+        yield return Case("SymbolicSourceQueryService_ProvesCheckedNarrowingCastAtomFacts",
+            Method("int", "int value", "if (checked((byte)value) == 5)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "value >= 0"), Yes("return 1;", "value <= 255"), Yes("return 1;", "value == 5"));
+        yield return Case("SymbolicSourceQueryService_ProvesUncheckedEnumCastAtomFacts",
+            Method("int", "Mode mode", "if (unchecked((int)mode) == 1)\n{\n    return 1;\n}\n\nreturn 0;", prefix: Mode),
+            Yes("return 1;", "mode == Mode.Ready"));
+        yield return Case("SymbolicSourceQueryService_ProvesCheckedIndexAtomFacts",
+            Method("int", "int[] values, int index", "if (values != null && index >= 0 && index < values.Length && values[checked(index)] == 7)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "values[index] == 7"));
+        yield return Case("SymbolicSourceQueryService_ProvesConditionalTupleElementFacts",
+            Method("int", "bool flag, (int A, int B) left, (int A, int B) right", "if ((flag ? left : right).A > 0)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "(flag ? left : right).A != 0"));
+        yield return Case("SymbolicSourceQueryService_ProvesConditionalBooleanAtomNullFacts",
+            Method("int", "string text", "if (text != null ? text.Length == 3 : false)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "text != null"), Yes("return 1;", "text.Length == 3"));
+        yield return Case("SymbolicSourceQueryService_ProvesConditionalBooleanAtomGuardedDivisionFacts",
+            Method("int", "int value, int divisor", "if (divisor != 0 ? value / divisor == 3 : false)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "divisor != 0"));
+        yield return Case("SymbolicSourceQueryService_ProvesEnumConstantComparison",
+            Method("int", "Mode mode", "if (mode == Mode.Ready)\n{\n    return 1;\n}\n\nreturn 0;", prefix: Mode),
+            Yes("return 1;", "mode != Mode.None"));
+        yield return Case("SymbolicSourceQueryService_ProvesTypeOfStableConstantFacts",
+            Method("int", string.Empty, "if (typeof(string) != typeof(object) && typeof(int) == typeof(int) && typeof(string) != null)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "typeof(string) != typeof(object)"), Yes("return 1;", "typeof(int) == typeof(int)"),
+            Yes("return 1;", "typeof(string) != null"));
+        yield return Case("SymbolicSourceQueryService_ProvesNullableEnumCoalesceComparisonFacts",
+            Method("int", "Mode? left, Mode? right", "if ((left ?? right) == Mode.Ready)\n{\n    return 1;\n}\n\nreturn 0;", prefix: Mode),
+            Yes("return 1;", "(left ?? right).HasValue && (left ?? right).Value != Mode.None"));
+        yield return Case("SymbolicSourceQueryService_ProvesStringIndexCharAtom",
+            Method("int", "string text", "if (text != null && text.Length > 0 && text[0] == 'A')\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "text[0] != 'B'"));
+        yield return Case("SymbolicSourceQueryService_ProvesDefaultStaticStringEqualsFacts",
+            Method("int", "string left, string right", "if (string.Equals(left, right))\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "left == right"));
+        yield return Case("SymbolicSourceQueryService_ProvesDefaultInstanceStringEqualsFacts",
+            Method("int", "string text", "if (text != null && text.Equals(\"ABC\"))\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "text == \"ABC\""));
+        yield return Case("SymbolicSourceQueryService_ProvesDefaultStringContainsFacts",
+            Method("int", "string text", "if (text != null && text.Contains(\"Z\"))\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "text != \"ABC\""));
+        yield return Case("SymbolicSourceQueryService_DefaultStringStartsWithRemainsConservative",
+            Method("int", "string text, string prefix", "if (text != null && prefix != null && text.StartsWith(prefix))\n{\n    return 1;\n}\n\nreturn 0;"),
+            No("return 1;", "text.StartsWith(prefix, System.StringComparison.Ordinal)"));
+        yield return Case("SymbolicSourceQueryService_ProvesAsExpressionNonNullImpliesSourceNonNull",
+            Method("int", "object value", "if ((value as string) != null)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "value != null"));
+        yield return Case("SymbolicSourceQueryService_ProvesIdentityReferenceCastNullRelation",
+            Method("int", "string text", "if ((object)text != null)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "text != null"));
+        yield return Case("SymbolicSourceQueryService_ProvesAsExpressionPreservesNullEquality",
+            Method("int", "string text", "if ((text as object) == null)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Yes("return 1;", "text == null"));
+        yield return Case("SymbolicSourceQueryService_NonNullObjectDoesNotProveTypeTest",
+            Method("int", "object value", "if (value != null)\n{\n    return 1;\n}\n\nreturn 0;"),
+            No("return 1;", "value is string"));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProvesConditionalAccessStringCoalesceLengthFacts()
-    {
-        const string source = @"
-public sealed class Holder
-{
-    public string Text;
-}
-
-public class TestClass
-{
-    public int TestMethod(Holder holder, string fallback)
-    {
-        if ((holder?.Text ?? fallback) == ""OK"")
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "(holder?.Text ?? fallback).Length == 2");
+    [TestCaseSource(nameof(Cases))]
+    public void ExpressionAtomMatrix(ExpressionCase testCase) {
+        foreach (var expectation in testCase.Expectations)
+            if (expectation.Proven)
+                AssertConditionProven(testCase.Source, expectation.Marker, expectation.Condition);
+            else
+                AssertConditionUnknown(testCase.Source, expectation.Marker, expectation.Condition);
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProvesTupleEqualityElementRelation()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod((int A, int B) left, (int A, int B) right)
-    {
-        if (left == right)
-        {
-            return left.A;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return left.A;",
-            "left.B == right.B");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesIdentityBooleanCastFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(bool flag)
-    {
-        if ((bool)flag)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "flag == true");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesIdentityStringCastLengthFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text)
-    {
-        if (text != null && ((string)text).Length == 3)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "text.Length != 4");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesTupleLiteralElementArithmeticFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value, bool flag)
-    {
-        if ((value + 1, flag).Item1 == 5)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "value == 4");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesCheckedArithmeticAtomFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        if (checked(value + 1) == 5)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "value == 4");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesCheckedNarrowingCastAtomFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        if (checked((byte)value) == 5)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "value >= 0");
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "value <= 255");
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "value == 5");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesUncheckedEnumCastAtomFacts()
-    {
-        const string source = @"
-public enum Mode
-{
-    None = 0,
-    Ready = 1
-}
-
-public class TestClass
-{
-    public int TestMethod(Mode mode)
-    {
-        if (unchecked((int)mode) == 1)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "mode == Mode.Ready");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesCheckedIndexAtomFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values, int index)
-    {
-        if (values != null &&
-            index >= 0 &&
-            index < values.Length &&
-            values[checked(index)] == 7)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "values[index] == 7");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesConditionalTupleElementFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(bool flag, (int A, int B) left, (int A, int B) right)
-    {
-        if ((flag ? left : right).A > 0)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "(flag ? left : right).A != 0");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesConditionalBooleanAtomNullFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text)
-    {
-        if (text != null ? text.Length == 3 : false)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "text != null");
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "text.Length == 3");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesConditionalBooleanAtomGuardedDivisionFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int value, int divisor)
-    {
-        if (divisor != 0 ? value / divisor == 3 : false)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "divisor != 0");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesEnumConstantComparison()
-    {
-        const string source = @"
-public enum Mode
-{
-    None = 0,
-    Ready = 1
-}
-
-public class TestClass
-{
-    public int TestMethod(Mode mode)
-    {
-        if (mode == Mode.Ready)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "mode != Mode.None");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesTypeOfStableConstantFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
-        if (typeof(string) != typeof(object) && typeof(int) == typeof(int) && typeof(string) != null)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "typeof(string) != typeof(object)");
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "typeof(int) == typeof(int)");
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "typeof(string) != null");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesNullableEnumCoalesceComparisonFacts()
-    {
-        const string source = @"
-public enum Mode
-{
-    None = 0,
-    Ready = 1
-}
-
-public class TestClass
-{
-    public int TestMethod(Mode? left, Mode? right)
-    {
-        if ((left ?? right) == Mode.Ready)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "(left ?? right).HasValue && (left ?? right).Value != Mode.None");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesStringIndexCharAtom()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text)
-    {
-        if (text != null && text.Length > 0 && text[0] == 'A')
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "text[0] != 'B'");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesDefaultStaticStringEqualsFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string left, string right)
-    {
-        if (string.Equals(left, right))
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "left == right");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesDefaultInstanceStringEqualsFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text)
-    {
-        if (text != null && text.Equals(""ABC""))
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "text == \"ABC\"");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesDefaultStringContainsFacts()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text)
-    {
-        if (text != null && text.Contains(""Z""))
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "text != \"ABC\"");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_DefaultStringStartsWithRemainsConservative()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text, string prefix)
-    {
-        if (text != null && prefix != null && text.StartsWith(prefix))
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionUnknown(
-            source,
-            "return 1;",
-            "text.StartsWith(prefix, System.StringComparison.Ordinal)");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesAsExpressionNonNullImpliesSourceNonNull()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(object value)
-    {
-        if ((value as string) != null)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "value != null");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesIdentityReferenceCastNullRelation()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text)
-    {
-        if ((object)text != null)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "text != null");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesAsExpressionPreservesNullEquality()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(string text)
-    {
-        if ((text as object) == null)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return 1;",
-            "text == null");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_NonNullObjectDoesNotProveTypeTest()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(object value)
-    {
-        if (value != null)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionUnknown(
-            source,
-            "return 1;",
-            "value is string");
-    }
-
+    private static string Method(
+        string returnType,
+        string parameters,
+        string body,
+        string? usings = null,
+        string? prefix = null) => SemanticTestSource.Method(returnType, parameters, body, usings, prefix);
+
+    private static Expectation Yes(string marker, string condition) => new(marker, condition);
+
+    private static Expectation No(string marker, string condition) => new(marker, condition, false);
+
+    private static TestCaseData Case(string name, string source, params Expectation[] expectations) =>
+        new TestCaseData(new ExpressionCase(source, expectations)).SetName(name);
 }

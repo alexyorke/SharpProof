@@ -1,704 +1,114 @@
 using NUnit.Framework;
-using SharpProof.Symbolic;
-using SharpProof.Symbolic.Smt;
 using static SharpProof.Test.SymbolicProofTestAssertions;
 
 namespace SharpProof.Test;
 
 [TestFixture]
 [Category("SmtHeavy")]
-public sealed class ElementAccessSmtTests
-{
-    [Test]
-    public void SymbolicSourceQueryService_ProvesArrayElementAccessThroughAssignedIndex()
-    {
-        const string source = @"
-using System;
+public sealed class ElementAccessSmtTests {
+    public sealed record Expectation(string Marker, string Condition, bool Proven = true);
 
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        Index index = ^1;
-        if (values != null && values.Length > 0)
-        {
-            var result = values[index];
-            return result;
-        }
+    public sealed record ElementCase(string Source, Expectation[] Expectations);
 
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return result;",
-            "result == values[^1]");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesArrayElementAccessThroughImplicitIndexCreation()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        Index index = new(1, true);
-        if (values != null && values.Length > 0)
-        {
-            var result = values[index];
-            return result;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return result;",
-            "result == values[^1]");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesAssignedModuloIndexRange()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values, int hash)
-    {
-        if (values != null && values.Length > 0 && hash >= 0)
-        {
-            var index = hash % values.Length;
-            return values[index];
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return values[index];",
-            "index >= 0 && index < values.Length");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesAssignedAbsModuloIndexRange()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int[] values, int hash)
-    {
-        if (values != null && values.Length > 0)
-        {
-            var index = Math.Abs(hash % values.Length);
-            return values[index];
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return values[index];",
-            "index >= 0 && index < values.Length");
+    private static IEnumerable<TestCaseData> Cases() {
+        yield return Case("SymbolicSourceQueryService_ProvesArrayElementAccessThroughAssignedIndex",
+            Method("int", "int[] values", "Index index = ^1;\nif (values != null && values.Length > 0)\n{\n    var result = values[index];\n    return result;\n}\n\nreturn 0;", "using System;"),
+            Yes("return result;", "result == values[^1]"));
+        yield return Case("SymbolicSourceQueryService_ProvesArrayElementAccessThroughImplicitIndexCreation",
+            Method("int", "int[] values", "Index index = new(1, true);\nif (values != null && values.Length > 0)\n{\n    var result = values[index];\n    return result;\n}\n\nreturn 0;", "using System;"),
+            Yes("return result;", "result == values[^1]"));
+        yield return Case("SymbolicSourceQueryService_ProvesAssignedModuloIndexRange",
+            Method("int", "int[] values, int hash", "if (values != null && values.Length > 0 && hash >= 0)\n{\n    var index = hash % values.Length;\n    return values[index];\n}\n\nreturn 0;"),
+            Yes("return values[index];", "index >= 0 && index < values.Length"));
+        yield return Case("SymbolicSourceQueryService_ProvesAssignedAbsModuloIndexRange",
+            Method("int", "int[] values, int hash", "if (values != null && values.Length > 0)\n{\n    var index = Math.Abs(hash % values.Length);\n    return values[index];\n}\n\nreturn 0;", "using System;"),
+            Yes("return values[index];", "index >= 0 && index < values.Length"));
+        yield return Case("SymbolicSourceQueryService_ProvesMultidimensionalArrayElementAccess",
+            Method("int", "int[,] values", "var result = values[0, 1];\nreturn result;"),
+            Yes("return result;", "result == values[0, 1]"));
+        yield return Case("SymbolicSourceQueryService_DifferentMultidimensionalArrayElementRemainsUnknown",
+            Method("int", "int[,] values", "var result = values[0, 1];\nreturn result;"),
+            No("return result;", "result == values[1, 0]"));
+        yield return Case("SymbolicSourceQueryService_ReassignedIndexRemainsUnknown",
+            Method("int", "int[] values", "Index index = ^1;\nindex = 0;\nif (values != null && values.Length > 0)\n{\n    var result = values[index];\n    return result;\n}\n\nreturn 0;", "using System;"),
+            No("return result;", "result == values[^1]"));
+        yield return Case("SymbolicSourceQueryService_UnassignedIndexParameterRemainsUnknown",
+            Method("int", "int[] values, Index index", "if (values != null && values.Length > 0)\n{\n    var result = values[index];\n    return result;\n}\n\nreturn 0;", "using System;"),
+            No("return result;", "result == values[^1]"));
+        yield return Case("SymbolicSourceQueryService_ProvesArrayRangeLengthThroughAssignedRange",
+            Method("int", "int[] values", "Range slice = 1..^1;\nif (values != null && values.Length >= 2)\n{\n    var result = values[slice].Length;\n    return result;\n}\n\nreturn 0;", "using System;"),
+            Yes("return result;", "result == values.Length - 2"));
+        yield return Case("SymbolicSourceQueryService_ProvesArrayRangeLengthThroughImplicitRangeCreation",
+            Method("int", "int[] values", "Range slice = new(Index.FromStart(1), Index.FromEnd(1));\nif (values != null && values.Length >= 2)\n{\n    var result = values[slice].Length;\n    return result;\n}\n\nreturn 0;", "using System;"),
+            Yes("return result;", "result == values.Length - 2"));
+        yield return Case("SymbolicSourceQueryService_ProvesSpanRangeLength",
+            Method("int", "Span<int> values", "if (values.Length >= 2)\n{\n    var result = values[1..^1].Length;\n    return result;\n}\n\nreturn 0;", "using System;"),
+            Yes("return result;", "result == values.Length - 2"));
+        yield return Case("SymbolicSourceQueryService_ProvesArrayAsSpanAndAsMemoryResultLengths",
+            SemanticTestSource.Class("public int Tail(int[] values, int start)\n{\n    if (values != null && start >= 0 && start <= values.Length)\n    {\n        return values.AsSpan(start).Length;\n    }\n    return 0;\n}\n\npublic int Window(int[] values, int start, int length)\n{\n    if (values != null && start >= 0 && length >= 0 && start + length <= values.Length)\n    {\n        return values.AsMemory(start, length).Length;\n    }\n    return 0;\n}\n\npublic int RangeWindow(int[] values)\n{\n    if (values != null && values.Length >= 2)\n    {\n        return values.AsSpan(1..^1).Length;\n    }\n    return 0;\n}", "using System;"),
+            Yes("return values.AsSpan(start).Length;", "values.AsSpan(start).Length == values.Length - start"),
+            Yes("return values.AsMemory(start, length).Length;", "values.AsMemory(start, length).Length == length"),
+            Yes("return values.AsSpan(1..^1).Length;", "values.AsSpan(1..^1).Length == values.Length - 2"));
+        yield return Case("SymbolicSourceQueryService_ProvesCollectionExpressionSpreadArrayLength",
+            Method("int", "int[] values", "if (values != null)\n{\n    int[] copy = [0, .. values, 1];\n    return copy.Length;\n}\n\nreturn 0;"),
+            Yes("return copy.Length;", "copy.Length == values.Length + 2"));
+        yield return Case("SymbolicSourceQueryService_ProvesCollectionExpressionSpreadCountLength",
+            Method("int", "IReadOnlyCollection<int> values", "if (values != null)\n{\n    int[] copy = [0, .. values, 1];\n    return copy.Length;\n}\n\nreturn 0;", "using System.Collections.Generic;"),
+            Yes("return copy.Length;", "copy.Length == values.Count + 2"));
+        yield return Case("SymbolicSourceQueryService_EnumerableCollectionExpressionSpreadLengthRemainsUnknown",
+            Method("int", "IEnumerable<int> values", "if (values != null)\n{\n    int[] copy = [.. values, 1];\n    return copy.Length;\n}\n\nreturn 0;", "using System.Collections.Generic;"),
+            No("return copy.Length;", "copy.Length == 1"));
+        yield return Case("SymbolicSourceQueryService_ProvesListIndexerRangeThroughCountGuard",
+            Method("int", "List<int> values", "if (values.Count > 0)\n{\n    var result = values[0];\n    return result;\n}\n\nreturn 0;", "using System.Collections.Generic;"),
+            Yes("return result;", "0 >= 0 && 0 < values.Count"));
+        yield return Case("SymbolicSourceQueryService_ProvesIReadOnlyListIndexerRangeThroughAssignedIndex",
+            Method("int", "IReadOnlyList<int> values, int hash", "if (values != null && values.Count > 0 && hash >= 0)\n{\n    var index = hash % values.Count;\n    return values[index];\n}\n\nreturn 0;", "using System.Collections.Generic;"),
+            Yes("return values[index];", "index >= 0 && index < values.Count"));
+        yield return Case("SymbolicSourceQueryService_ProvesIListElementAccessThroughAssignedIndex",
+            Method("int", "IList<int> values", "if (values.Count > 0)\n{\n    var result = values[0];\n    return result;\n}\n\nreturn 0;", "using System.Collections.Generic;"),
+            Yes("return result;", "result == values[0]"));
+        yield return Case("SymbolicSourceQueryService_LinqCountRemainsUnknown",
+            Method("int", "IEnumerable<int> values", "if (values.Count() > 0)\n{\n    return values.Count();\n}\n\nreturn 0;", "using System.Collections.Generic;\nusing System.Linq;"),
+            No("return values.Count();", "values.Count() > 0"));
+        yield return Case("SymbolicSourceQueryService_ProvesSpanElementAccessThroughAssignedIndex",
+            Method("int", "Span<int> values", "Index index = ^1;\nif (values.Length > 0)\n{\n    var result = values[index];\n    return result;\n}\n\nreturn 0;", "using System;"),
+            Yes("return result;", "result == values[^1]"));
+        yield return Case("SymbolicSourceQueryService_ProvesStringListPatternElementBinding",
+            Method("char", "string text", "if (text is [var first, ..])\n{\n    return first;\n}\n\nreturn '\\0';"),
+            Yes("return first;", "first == text[0]"));
+        yield return Case("SymbolicSourceQueryService_ProvesSpanListPatternElementBinding",
+            Method("int", "ReadOnlySpan<int> values", "if (values is [var first, ..])\n{\n    return first;\n}\n\nreturn 0;", "using System;"),
+            Yes("return first;", "first == values[0]"));
+        yield return Case("SymbolicSourceQueryService_ProvesCountBackedListPatternLengthFact",
+            Method("int", "IReadOnlyList<int> values", "if (values is [_, ..])\n{\n    return values.Count;\n}\n\nreturn 0;", "using System.Collections.Generic;"),
+            Yes("return values.Count;", "values.Count >= 1"));
+        yield return Case("SymbolicSourceQueryService_ReassignedRangeUsesLatestKnownAssignment",
+            Method("int", "int[] values", "Range slice = 1..^1;\nslice = 0..^0;\nif (values != null && values.Length >= 2)\n{\n    var result = values[slice].Length;\n    return result;\n}\n\nreturn 0;", "using System;"),
+            Yes("return result;", "result == values.Length"));
+        yield return Case("SymbolicSourceQueryService_UnknownReassignedRangeRemainsUnknown",
+            Method("int", "int[] values, Range other", "Range slice = 1..^1;\nslice = other;\nif (values != null && values.Length >= 2)\n{\n    var result = values[slice].Length;\n    return result;\n}\n\nreturn 0;", "using System;"),
+            No("return result;", "result == values.Length - 2"));
+        yield return Case("SymbolicSourceQueryService_RangeMutatedAfterLoopUseRemainsUnknown",
+            Method("int", "int[] values, bool repeat", "Range slice = 1..^1;\nwhile (repeat)\n{\n    var result = values[slice].Length;\n    slice = 0..^0;\n}\n\nreturn 0;", "using System;"),
+            No("var result = values[slice].Length;", "values[slice].Length == values.Length - 2"));
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_ProvesMultidimensionalArrayElementAccess()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[,] values)
-    {
-        var result = values[0, 1];
-        return result;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return result;",
-            "result == values[0, 1]");
+    [TestCaseSource(nameof(Cases))]
+    public void ElementAccessMatrix(ElementCase testCase) {
+        foreach (var expectation in testCase.Expectations)
+            if (expectation.Proven)
+                AssertConditionProven(testCase.Source, expectation.Marker, expectation.Condition);
+            else
+                AssertConditionUnknown(testCase.Source, expectation.Marker, expectation.Condition);
     }
 
-    [Test]
-    public void SymbolicSourceQueryService_DifferentMultidimensionalArrayElementRemainsUnknown()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[,] values)
-    {
-        var result = values[0, 1];
-        return result;
-    }
-}";
+    private static string Method(string returnType, string parameters, string body, string? usings = null) =>
+        SemanticTestSource.Method(returnType, parameters, body, usings);
 
-        AssertConditionUnknown(
-            source,
-            "return result;",
-            "result == values[1, 0]");
-    }
+    private static Expectation Yes(string marker, string condition) => new(marker, condition);
 
-    [Test]
-    public void SymbolicSourceQueryService_ReassignedIndexRemainsUnknown()
-    {
-        const string source = @"
-using System;
+    private static Expectation No(string marker, string condition) => new(marker, condition, false);
 
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        Index index = ^1;
-        index = 0;
-        if (values != null && values.Length > 0)
-        {
-            var result = values[index];
-            return result;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionUnknown(
-            source,
-            "return result;",
-            "result == values[^1]");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_UnassignedIndexParameterRemainsUnknown()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int[] values, Index index)
-    {
-        if (values != null && values.Length > 0)
-        {
-            var result = values[index];
-            return result;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionUnknown(
-            source,
-            "return result;",
-            "result == values[^1]");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesArrayRangeLengthThroughAssignedRange()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        Range slice = 1..^1;
-        if (values != null && values.Length >= 2)
-        {
-            var result = values[slice].Length;
-            return result;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return result;",
-            "result == values.Length - 2");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesArrayRangeLengthThroughImplicitRangeCreation()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        Range slice = new(Index.FromStart(1), Index.FromEnd(1));
-        if (values != null && values.Length >= 2)
-        {
-            var result = values[slice].Length;
-            return result;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return result;",
-            "result == values.Length - 2");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesSpanRangeLength()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(Span<int> values)
-    {
-        if (values.Length >= 2)
-        {
-            var result = values[1..^1].Length;
-            return result;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return result;",
-            "result == values.Length - 2");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesArrayAsSpanAndAsMemoryResultLengths()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int Tail(int[] values, int start)
-    {
-        if (values != null && start >= 0 && start <= values.Length)
-        {
-            return values.AsSpan(start).Length;
-        }
-
-        return 0;
-    }
-
-    public int Window(int[] values, int start, int length)
-    {
-        if (values != null && start >= 0 && length >= 0 && start + length <= values.Length)
-        {
-            return values.AsMemory(start, length).Length;
-        }
-
-        return 0;
-    }
-
-    public int RangeWindow(int[] values)
-    {
-        if (values != null && values.Length >= 2)
-        {
-            return values.AsSpan(1..^1).Length;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return values.AsSpan(start).Length;",
-            "values.AsSpan(start).Length == values.Length - start");
-        AssertConditionProven(
-            source,
-            "return values.AsMemory(start, length).Length;",
-            "values.AsMemory(start, length).Length == length");
-        AssertConditionProven(
-            source,
-            "return values.AsSpan(1..^1).Length;",
-            "values.AsSpan(1..^1).Length == values.Length - 2");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesCollectionExpressionSpreadArrayLength()
-    {
-        const string source = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        if (values != null)
-        {
-            int[] copy = [0, .. values, 1];
-            return copy.Length;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return copy.Length;",
-            "copy.Length == values.Length + 2");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesCollectionExpressionSpreadCountLength()
-    {
-        const string source = @"
-using System.Collections.Generic;
-
-public class TestClass
-{
-    public int TestMethod(IReadOnlyCollection<int> values)
-    {
-        if (values != null)
-        {
-            int[] copy = [0, .. values, 1];
-            return copy.Length;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return copy.Length;",
-            "copy.Length == values.Count + 2");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_EnumerableCollectionExpressionSpreadLengthRemainsUnknown()
-    {
-        const string source = @"
-using System.Collections.Generic;
-
-public class TestClass
-{
-    public int TestMethod(IEnumerable<int> values)
-    {
-        if (values != null)
-        {
-            int[] copy = [.. values, 1];
-            return copy.Length;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionUnknown(
-            source,
-            "return copy.Length;",
-            "copy.Length == 1");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesListIndexerRangeThroughCountGuard()
-    {
-        const string source = @"
-using System.Collections.Generic;
-
-public class TestClass
-{
-    public int TestMethod(List<int> values)
-    {
-        if (values.Count > 0)
-        {
-            var result = values[0];
-            return result;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return result;",
-            "0 >= 0 && 0 < values.Count");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesIReadOnlyListIndexerRangeThroughAssignedIndex()
-    {
-        const string source = @"
-using System.Collections.Generic;
-
-public class TestClass
-{
-    public int TestMethod(IReadOnlyList<int> values, int hash)
-    {
-        if (values != null && values.Count > 0 && hash >= 0)
-        {
-            var index = hash % values.Count;
-            return values[index];
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return values[index];",
-            "index >= 0 && index < values.Count");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesIListElementAccessThroughAssignedIndex()
-    {
-        const string source = @"
-using System.Collections.Generic;
-
-public class TestClass
-{
-    public int TestMethod(IList<int> values)
-    {
-        if (values.Count > 0)
-        {
-            var result = values[0];
-            return result;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return result;",
-            "result == values[0]");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_LinqCountRemainsUnknown()
-    {
-        const string source = @"
-using System.Collections.Generic;
-using System.Linq;
-
-public class TestClass
-{
-    public int TestMethod(IEnumerable<int> values)
-    {
-        if (values.Count() > 0)
-        {
-            return values.Count();
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionUnknown(
-            source,
-            "return values.Count();",
-            "values.Count() > 0");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesSpanElementAccessThroughAssignedIndex()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(Span<int> values)
-    {
-        Index index = ^1;
-        if (values.Length > 0)
-        {
-            var result = values[index];
-            return result;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return result;",
-            "result == values[^1]");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesStringListPatternElementBinding()
-    {
-        const string source = @"
-public class TestClass
-{
-    public char TestMethod(string text)
-    {
-        if (text is [var first, ..])
-        {
-            return first;
-        }
-
-        return '\0';
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return first;",
-            "first == text[0]");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesSpanListPatternElementBinding()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(ReadOnlySpan<int> values)
-    {
-        if (values is [var first, ..])
-        {
-            return first;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return first;",
-            "first == values[0]");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ProvesCountBackedListPatternLengthFact()
-    {
-        const string source = @"
-using System.Collections.Generic;
-
-public class TestClass
-{
-    public int TestMethod(IReadOnlyList<int> values)
-    {
-        if (values is [_, ..])
-        {
-            return values.Count;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return values.Count;",
-            "values.Count >= 1");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_ReassignedRangeUsesLatestKnownAssignment()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
-        Range slice = 1..^1;
-        slice = 0..^0;
-        if (values != null && values.Length >= 2)
-        {
-            var result = values[slice].Length;
-            return result;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionProven(
-            source,
-            "return result;",
-            "result == values.Length");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_UnknownReassignedRangeRemainsUnknown()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int[] values, Range other)
-    {
-        Range slice = 1..^1;
-        slice = other;
-        if (values != null && values.Length >= 2)
-        {
-            var result = values[slice].Length;
-            return result;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionUnknown(
-            source,
-            "return result;",
-            "result == values.Length - 2");
-    }
-
-    [Test]
-    public void SymbolicSourceQueryService_RangeMutatedAfterLoopUseRemainsUnknown()
-    {
-        const string source = @"
-using System;
-
-public class TestClass
-{
-    public int TestMethod(int[] values, bool repeat)
-    {
-        Range slice = 1..^1;
-        while (repeat)
-        {
-            var result = values[slice].Length;
-            slice = 0..^0;
-        }
-
-        return 0;
-    }
-}";
-
-        AssertConditionUnknown(
-            source,
-            "var result = values[slice].Length;",
-            "values[slice].Length == values.Length - 2");
-    }
-
+    private static TestCaseData Case(string name, string source, params Expectation[] expectations) =>
+        new TestCaseData(new ElementCase(source, expectations)).SetName(name);
 }
