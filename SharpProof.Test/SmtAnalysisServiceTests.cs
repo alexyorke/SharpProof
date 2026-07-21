@@ -9,6 +9,7 @@ using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
+using static SharpProof.Test.SmtTestFormula;
 
 namespace SharpProof.Test;
 
@@ -378,7 +379,7 @@ public class SmtAnalysisServiceTests {
             4,
             16));
 
-        var result = service.Classify(CreateQuery(Array.Empty<SmtFormula>(), new SmtBooleanConstant(true)));
+        var result = service.Classify(CreateQuery(Array.Empty<SmtFormula>(), Boolean(true)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo("smt_disabled"));
@@ -388,7 +389,7 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_PathConditionBudgetExceeded_ReturnsConservativeUnknownWithoutSolver() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
+        var x = Int("x");
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromMilliseconds(50),
@@ -399,10 +400,10 @@ public class SmtAnalysisServiceTests {
         var result = service.Classify(CreateQuery(
             new SmtFormula[]
             {
-                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(0)),
-                new SmtBinaryFormula(SmtBinaryOperator.LessThan, x, new SmtIntegerConstant(10))
+                GreaterThanOrEqual(x, Integer(0)),
+                LessThan(x, Integer(10))
             },
-            new SmtBooleanConstant(true)));
+            Boolean(true)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo("smt_path_condition_budget_exceeded"));
@@ -412,8 +413,8 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_ZeroTimeout_ReturnsConservativeTimeoutWithoutSolver() {
-        var value = new SmtVariable("timeout_value_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
-        var containsNeedle = new SmtStringContainsFormula(value, new SmtStringConstant("needle"));
+        var value = String("timeout_value_" + Guid.NewGuid().ToString("N"));
+        var containsNeedle = new SmtStringContainsFormula(value, Text("needle"));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.Zero,
@@ -441,20 +442,14 @@ public class SmtAnalysisServiceTests {
         bool includeDuplicateAndTrueConditions,
         int maxPathConditions) {
         var prefix = includeDuplicateAndTrueConditions ? "normalized_" : "ordered_";
-        var x = new SmtVariable(prefix + "x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var y = new SmtVariable(prefix + "y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var xAtLeastZero = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            x,
-            new SmtIntegerConstant(0));
-        var yAtLeastZero = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            y,
-            new SmtIntegerConstant(0));
+        var x = Int(prefix + "x_" + Guid.NewGuid().ToString("N"));
+        var y = Int(prefix + "y_" + Guid.NewGuid().ToString("N"));
+        var xAtLeastZero = GreaterThanOrEqual(x, Integer(0));
+        var yAtLeastZero = GreaterThanOrEqual(y, Integer(0));
         var fact = new SmtBinaryFormula(
             SmtBinaryOperator.GreaterThanOrEqual,
             new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, y),
-            new SmtIntegerConstant(0));
+            Integer(0));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromSeconds(2),
@@ -463,7 +458,7 @@ public class SmtAnalysisServiceTests {
             64));
 
         var firstPath = includeDuplicateAndTrueConditions
-            ? new SmtFormula[] { xAtLeastZero, yAtLeastZero, new SmtBooleanConstant(true), xAtLeastZero }
+            ? new SmtFormula[] { xAtLeastZero, yAtLeastZero, Boolean(true), xAtLeastZero }
             : new SmtFormula[] { xAtLeastZero, yAtLeastZero };
         var first = service.ClassifyImplication(
             firstPath,
@@ -478,7 +473,7 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_SyntacticPathContradiction_BypassesBudgetsAndSolver() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
+        var x = Int("x");
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromMilliseconds(50),
@@ -489,10 +484,10 @@ public class SmtAnalysisServiceTests {
         var result = service.Classify(CreateQuery(
             new SmtFormula[]
             {
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0)),
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, x, new SmtIntegerConstant(0))
+                Equal(x, Integer(0)),
+                NotEqual(x, Integer(0))
             },
-            new SmtBooleanConstant(true)));
+            Boolean(true)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
@@ -506,7 +501,7 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_SyntacticIntegerIntervalContradiction_BypassesBudgetsAndSolver() {
-        var x = new SmtVariable("interval_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+        var x = Int("interval_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromMilliseconds(50),
@@ -517,10 +512,10 @@ public class SmtAnalysisServiceTests {
         var result = service.Classify(CreateQuery(
             new SmtFormula[]
             {
-                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(10)),
-                new SmtBinaryFormula(SmtBinaryOperator.LessThan, x, new SmtIntegerConstant(10))
+                GreaterThanOrEqual(x, Integer(10)),
+                LessThan(x, Integer(10))
             },
-            new SmtBooleanConstant(true)));
+            Boolean(true)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
@@ -534,28 +529,22 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_SyntacticDisjunctionOfKnownComparisonComplements_BypassesSolver() {
-        var values = new SmtVariable("values_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
-        var index = new SmtVariable("index_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var length = new SmtVariable(values.Name + ".Length", SmtValueKind.Int);
+        var values = Reference("values_" + Guid.NewGuid().ToString("N"));
+        var index = Int("index_" + Guid.NewGuid().ToString("N"));
+        var length = Int(values.Name + ".Length");
         var valuesIsNotNull = new SmtBinaryFormula(
             SmtBinaryOperator.NotEqual,
             values,
             new SmtNullConstant());
-        var indexIsNonNegative = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            index,
-            new SmtIntegerConstant(0));
-        var indexIsInBounds = new SmtBinaryFormula(
-            SmtBinaryOperator.LessThan,
-            index,
-            length);
+        var indexIsNonNegative = GreaterThanOrEqual(index, Integer(0));
+        var indexIsInBounds = LessThan(index, length);
         var contradiction = new SmtBinaryFormula(
             SmtBinaryOperator.Or,
             new SmtBinaryFormula(SmtBinaryOperator.Equal, values, new SmtNullConstant()),
             new SmtBinaryFormula(
                 SmtBinaryOperator.Or,
-                new SmtBinaryFormula(SmtBinaryOperator.LessThan, index, new SmtIntegerConstant(0)),
-                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, index, length)));
+                LessThan(index, Integer(0)),
+                GreaterThanOrEqual(index, length)));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.Zero,
@@ -580,16 +569,16 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_NestedConjunctIntegerContradiction_BypassesSolver() {
-        var x = new SmtVariable("nested_interval_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+        var x = Int("nested_interval_" + Guid.NewGuid().ToString("N"));
         var nestedBounds = new SmtBinaryFormula(
             SmtBinaryOperator.And,
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(3)),
-            new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, x, new SmtIntegerConstant(3)));
+            GreaterThan(x, Integer(3)),
+            LessThanOrEqual(x, Integer(3)));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
         var result = service.Classify(CreateQuery(
             new[] { nestedBounds },
-            new SmtBooleanConstant(true)));
+            Boolean(true)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
@@ -600,8 +589,8 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_DirectPathFact_BypassesSolver() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
-        var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
+        var x = Int("x");
+        var xIsZero = Equal(x, Integer(0));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
         var result = service.ClassifyImplication(new[] { xIsZero }, xIsZero);
@@ -619,15 +608,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_IntegerIntervalEntailment_BypassesSolver() {
-        var x = new SmtVariable("interval_entailment_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var xAtMostNine = new SmtBinaryFormula(
-            SmtBinaryOperator.LessThanOrEqual,
-            x,
-            new SmtIntegerConstant(9));
-        var xLessThanTen = new SmtBinaryFormula(
-            SmtBinaryOperator.LessThan,
-            x,
-            new SmtIntegerConstant(10));
+        var x = Int("interval_entailment_" + Guid.NewGuid().ToString("N"));
+        var xAtMostNine = LessThanOrEqual(x, Integer(9));
+        var xLessThanTen = LessThan(x, Integer(10));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
         var result = service.ClassifyImplication(new[] { xAtMostNine }, xLessThanTen);
@@ -642,15 +625,12 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_ExactStringLengthEntailment_BypassesSolver() {
-        var text = new SmtVariable("exact_string_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
-        var textIsAbc = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            text,
-            new SmtStringConstant("ABC"));
+        var text = String("exact_string_" + Guid.NewGuid().ToString("N"));
+        var textIsAbc = Equal(text, Text("ABC"));
         var lengthAtLeastThree = new SmtBinaryFormula(
             SmtBinaryOperator.GreaterThanOrEqual,
             new SmtStringLengthTerm(text),
-            new SmtIntegerConstant(3));
+            Integer(3));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
         var result = service.ClassifyImplication(new[] { textIsAbc }, lengthAtLeastThree);
@@ -663,12 +643,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_ExactStringPredicateEntailment_BypassesSolver() {
-        var text = new SmtVariable("exact_predicate_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
-        var textIsAbc = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            text,
-            new SmtStringConstant("ABC"));
-        var startsWithA = new SmtStringStartsWithFormula(text, new SmtStringConstant("A"));
+        var text = String("exact_predicate_" + Guid.NewGuid().ToString("N"));
+        var textIsAbc = Equal(text, Text("ABC"));
+        var startsWithA = new SmtStringStartsWithFormula(text, Text("A"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
         var result = service.ClassifyImplication(new[] { textIsAbc }, startsWithA);
@@ -681,14 +658,11 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_ExactStringNegatedPredicateEntailment_BypassesSolver() {
-        var text = new SmtVariable("exact_negated_predicate_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
-        var textIsAbc = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            text,
-            new SmtStringConstant("ABC"));
+        var text = String("exact_negated_predicate_" + Guid.NewGuid().ToString("N"));
+        var textIsAbc = Equal(text, Text("ABC"));
         var doesNotEndWithZ = new SmtUnaryFormula(
             SmtUnaryOperator.Not,
-            new SmtStringEndsWithFormula(text, new SmtStringConstant("Z")));
+            new SmtStringEndsWithFormula(text, Text("Z")));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
         var result = service.ClassifyImplication(new[] { textIsAbc }, doesNotEndWithZ);
@@ -701,7 +675,7 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_ContradictoryExactStringValues_BypassesSolver() {
-        var text = new SmtVariable("exact_contradiction_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+        var text = String("exact_contradiction_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromMilliseconds(50),
@@ -711,8 +685,8 @@ public class SmtAnalysisServiceTests {
 
         var result = service.ClassifyPathFeasibility(new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("ABC")),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("XYZ"))
+            Equal(text, Text("ABC")),
+            Equal(text, Text("XYZ"))
         });
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
@@ -724,15 +698,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_DivideByZeroContradictedByGuard_BypassesSolver() {
-        var divisor = new SmtVariable("divisor", SmtValueKind.Int);
-        var divisorIsNotZero = new SmtBinaryFormula(
-            SmtBinaryOperator.NotEqual,
-            divisor,
-            new SmtIntegerConstant(0));
-        var divisorIsZero = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            divisor,
-            new SmtIntegerConstant(0));
+        var divisor = Int("divisor");
+        var divisorIsNotZero = NotEqual(divisor, Integer(0));
+        var divisorIsZero = Equal(divisor, Integer(0));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
         var result = service.Classify(new AnalysisProofQuery(
@@ -749,15 +717,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_DivideByZeroContradictedByPositiveInterval_BypassesSolver() {
-        var divisor = new SmtVariable("positive_divisor_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var divisorIsPositive = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThan,
-            divisor,
-            new SmtIntegerConstant(0));
-        var divisorIsZero = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            divisor,
-            new SmtIntegerConstant(0));
+        var divisor = Int("positive_divisor_" + Guid.NewGuid().ToString("N"));
+        var divisorIsPositive = GreaterThan(divisor, Integer(0));
+        var divisorIsZero = Equal(divisor, Integer(0));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
         var result = service.Classify(new AnalysisProofQuery(
@@ -774,17 +736,17 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_ReusedSolverContext_DistinguishesSameNamedVariablesByKind() {
-        var intX = new SmtVariable("x", SmtValueKind.Int);
-        var stringX = new SmtVariable("x", SmtValueKind.String);
+        var intX = Int("x");
+        var stringX = String("x");
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
         var intResult = service.ClassifyPathFeasibility(new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, intX, new SmtIntegerConstant(1))
+            Equal(intX, Integer(1))
         });
         var stringResult = service.ClassifyPathFeasibility(new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, stringX, new SmtStringConstant("A"))
+            Equal(stringX, Text("A"))
         });
 
         Assert.That(intResult.PathCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
@@ -794,11 +756,11 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_ExpressionNodeBudgetExceeded_ReturnsConservativeUnknownWithoutSolver() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
+        var x = Int("x");
         var trigger = new SmtBinaryFormula(
             SmtBinaryOperator.And,
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(0)),
-            new SmtBinaryFormula(SmtBinaryOperator.LessThan, x, new SmtIntegerConstant(10)));
+            GreaterThanOrEqual(x, Integer(0)),
+            LessThan(x, Integer(10)));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromMilliseconds(50),
@@ -825,7 +787,7 @@ public class SmtAnalysisServiceTests {
 
         var result = service.Classify(CreateQuery(
             new[] { CreateNestedNegation(4096) },
-            new SmtBooleanConstant(true)));
+            Boolean(true)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo("smt_expression_budget_exceeded"));
@@ -835,8 +797,8 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public async Task Classify_MethodBudgetDoesNotExpireBeforeFirstSolverQueryByWallClock() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
-        var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
+        var x = Int("x");
+        var xIsZero = Equal(x, Integer(0));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromSeconds(2),
@@ -854,9 +816,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_MethodBudgetExceededAfterSolverTime_ReturnsConservativeUnknownWithoutSolver() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
-        var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
-        var xIsPositive = new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0));
+        var x = Int("x");
+        var xIsZero = Equal(x, Integer(0));
+        var xIsPositive = GreaterThan(x, Integer(0));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromSeconds(2),
@@ -874,8 +836,8 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_RepeatedEquivalentQuery_UsesCache() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
-        var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
+        var x = Int("x");
+        var xIsZero = Equal(x, Integer(0));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromSeconds(2),
@@ -896,10 +858,10 @@ public class SmtAnalysisServiceTests {
     [Test]
     public void Classify_CacheHitsBypassExhaustedMethodBudget() {
         var variableName = "budget_cache_" + Guid.NewGuid().ToString("N");
-        var x = new SmtVariable(variableName, SmtValueKind.Int);
-        var y = new SmtVariable(variableName + "_other", SmtValueKind.Int);
-        var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
-        var yIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, y, new SmtIntegerConstant(0));
+        var x = Int(variableName);
+        var y = Int(variableName + "_other");
+        var xIsZero = Equal(x, Integer(0));
+        var yIsZero = Equal(y, Integer(0));
         var options = new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromSeconds(2),
@@ -931,8 +893,8 @@ public class SmtAnalysisServiceTests {
     [Test]
     public void Classify_SharedResultCacheEnabled_ReusesResultAcrossServices() {
         var variableName = "shared_" + Guid.NewGuid().ToString("N");
-        var x = new SmtVariable(variableName, SmtValueKind.Int);
-        var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
+        var x = Int(variableName);
+        var xIsZero = Equal(x, Integer(0));
         var options = new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromSeconds(2),
@@ -957,8 +919,8 @@ public class SmtAnalysisServiceTests {
     [Test]
     public async Task Classify_SharedResultCacheEnabled_CoalescesConcurrentQueries() {
         var variableName = "shared_concurrent_" + Guid.NewGuid().ToString("N");
-        var x = new SmtVariable(variableName, SmtValueKind.Int);
-        var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
+        var x = Int(variableName);
+        var xIsZero = Equal(x, Integer(0));
         var options = new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromSeconds(2),
@@ -1023,13 +985,13 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_ProvesFactFromPathConditions() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
+        var x = Int("x");
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0))
+            Equal(x, Integer(0))
         };
-        var fact = new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, x, new SmtIntegerConstant(1));
+        var fact = LessThanOrEqual(x, Integer(1));
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -1043,13 +1005,13 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_ReturnsReachableWhenFactDoesNotFollow() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
+        var x = Int("x");
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(0))
+            GreaterThanOrEqual(x, Integer(0))
         };
-        var fact = new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0));
+        var fact = GreaterThan(x, Integer(0));
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -1061,238 +1023,70 @@ public class SmtAnalysisServiceTests {
             Is.Not.EqualTo(AnalysisProofOutcome.Proven));
     }
 
-    [Test]
-    public void ClassifyImplication_ProvesStrictRegexLiteralLengthFact() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, @"\A[A-Z][0-9]\z")
-        };
-        var fact = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            new SmtStringLengthTerm(text),
-            new SmtIntegerConstant(2));
+    private sealed record ServiceRegexCase(
+        string Pattern,
+        string? Text,
+        bool TextEquality,
+        int? ImpliedLength,
+        AnalysisProofOutcome? Outcome,
+        Feasibility Feasibility,
+        string? Reason = null);
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+    private static IEnumerable<TestCaseData> ServiceRegexCases() {
+        yield return CreateServiceRegexCase("ClassifyImplication_ProvesStrictRegexLiteralLengthFact", @"\A[A-Z][0-9]\z", null, true, 2, AnalysisProofOutcome.Proven, Feasibility.Unsatisfiable);
+        yield return CreateServiceRegexCase("ClassifyPathFeasibility_DollarAnchorAllowsTrailingNewline", "^AB$", "AB\n", true, null, null, Feasibility.Satisfiable);
+        yield return CreateServiceRegexCase("ClassifyPathFeasibility_CombinesStrictRegexAndStringEquality", @"\AAB\z", "AB", false, null, AnalysisProofOutcome.Proven, Feasibility.Unsatisfiable);
+        yield return CreateServiceRegexCase("ClassifyPathFeasibility_CombinesNonCapturingRegexGroupAndStringEquality", @"\A(?:AB|CD)\z", "EF", true, null, AnalysisProofOutcome.Proven, Feasibility.Unsatisfiable);
+        yield return CreateServiceRegexCase("ClassifyPathFeasibility_CombinesNegatedRegexClassAndStringEquality", @"\A[^A]\z", "A", true, null, AnalysisProofOutcome.Proven, Feasibility.Unsatisfiable);
+        yield return CreateServiceRegexCase("ClassifyPathFeasibility_CombinesRegexHexEscapesAndStringEquality", "\\A\\u0041\\x42\\z", "AB", false, null, AnalysisProofOutcome.Proven, Feasibility.Unsatisfiable);
+        yield return CreateServiceRegexCase("ClassifyImplication_ProvesShorthandRegexLengthFact", @"\A\d\s\w\z", null, true, 3, AnalysisProofOutcome.Proven, Feasibility.Unsatisfiable);
+        yield return CreateServiceRegexCase("ClassifyPathFeasibility_NegatedShorthandRegexClassConcreteMatchIsSelfVerified", @"\A[^\d]\z", "A", true, null, null, Feasibility.Satisfiable);
+        yield return CreateServiceRegexCase("ClassifyPathFeasibility_ShorthandRegexConcreteMismatchIsRejectedByDotNetValidation", @"\A\d\z", "A", true, null, AnalysisProofOutcome.Proven, Feasibility.Unsatisfiable, "path_unsatisfiable");
+        yield return CreateServiceRegexCase("ClassifyImplication_ProvesCategoryRegexLengthFact", @"\A\p{Lu}\P{Ll}\z", null, true, 2, AnalysisProofOutcome.Proven, Feasibility.Unsatisfiable);
+        yield return CreateServiceRegexCase("ClassifyImplication_WordBoundaryRegexLengthFactRemainsConservative", @"\A\bAB\B?\z", null, true, 2, AnalysisProofOutcome.Unknown, Feasibility.Unknown);
+        yield return CreateServiceRegexCase("ClassifyPathFeasibility_NegatedCategoryRegexClassConcreteMismatchIsRejectedByDotNetValidation", @"\A[^\p{Lu}]\z", "A", true, null, AnalysisProofOutcome.Proven, Feasibility.Unsatisfiable, "path_unsatisfiable");
+        yield return CreateServiceRegexCase("ClassifyPathFeasibility_InvalidConcreteRegexRemainsUnknown", "(", "A", true, null, AnalysisProofOutcome.Unknown, Feasibility.Unknown);
     }
 
-    [Test]
-    public void ClassifyPathFeasibility_DollarAnchorAllowsTrailingNewline() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, "^AB$"),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AB\n"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
+    [TestCaseSource(nameof(ServiceRegexCases))]
+    public void ServiceRegexMatrix(object value) {
+        var testCase = (ServiceRegexCase)value;
+        var text = String("text");
+        using var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var regex = new SmtRegexMatchFormula(text, testCase.Pattern);
+        AnalysisProofResult result;
+        if (testCase.ImpliedLength is { } length) {
+            result = service.ClassifyImplication([regex], Equal(new SmtStringLengthTerm(text), Integer(length)));
+            Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(testCase.Feasibility));
+        }
+        else {
+            var comparison = testCase.TextEquality ? Equal(text, Text(testCase.Text!)) : NotEqual(text, Text(testCase.Text!));
+            result = service.ClassifyPathFeasibility([regex, comparison]);
+            Assert.That(result.PathCheck.Feasibility, Is.EqualTo(testCase.Feasibility));
+        }
+        if (testCase.Outcome is { } outcome) Assert.That(result.Outcome, Is.EqualTo(outcome));
+        if (testCase.Reason != null) Assert.That(result.Reason, Is.EqualTo(testCase.Reason));
     }
 
-    [Test]
-    public void ClassifyPathFeasibility_CombinesStrictRegexAndStringEquality() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, @"\AAB\z"),
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant("AB"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_CombinesNonCapturingRegexGroupAndStringEquality() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, @"\A(?:AB|CD)\z"),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("EF"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_CombinesNegatedRegexClassAndStringEquality() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, @"\A[^A]\z"),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("A"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_CombinesRegexHexEscapesAndStringEquality() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, "\\A\\u0041\\x42\\z"),
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant("AB"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-    }
-
-    [Test]
-    public void ClassifyImplication_ProvesShorthandRegexLengthFact() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, @"\A\d\s\w\z")
-        };
-        var fact = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            new SmtStringLengthTerm(text),
-            new SmtIntegerConstant(3));
-
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_NegatedShorthandRegexClassConcreteMatchIsSelfVerified() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, @"\A[^\d]\z"),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("A"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_ShorthandRegexConcreteMismatchIsRejectedByDotNetValidation() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, @"\A\d\z"),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("A"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-    }
-
-    [Test]
-    public void ClassifyImplication_ProvesCategoryRegexLengthFact() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, @"\A\p{Lu}\P{Ll}\z")
-        };
-        var fact = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            new SmtStringLengthTerm(text),
-            new SmtIntegerConstant(2));
-
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-    }
-
-    [Test]
-    public void ClassifyImplication_WordBoundaryRegexLengthFactRemainsConservative() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, @"\A\bAB\B?\z")
-        };
-        var fact = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            new SmtStringLengthTerm(text),
-            new SmtIntegerConstant(2));
-
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_NegatedCategoryRegexClassConcreteMismatchIsRejectedByDotNetValidation() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, @"\A[^\p{Lu}]\z"),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("A"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_InvalidConcreteRegexRemainsUnknown() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtRegexMatchFormula(text, "("),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("A"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-    }
-
+    private static TestCaseData CreateServiceRegexCase(
+        string name,
+        string pattern,
+        string? text,
+        bool textEquality,
+        int? impliedLength,
+        AnalysisProofOutcome? outcome,
+        Feasibility feasibility,
+        string? reason = null) => new TestCaseData(
+        new ServiceRegexCase(pattern, text, textEquality, impliedLength, outcome, feasibility, reason)).SetName(name);
     [Test]
     public void ConcreteRegexValidationCache_IsBounded() {
         using var solver = new SmtSolver();
-        var text = new SmtVariable("text", SmtValueKind.String);
+        var text = String("text");
         for (var index = 0; index < SmtSolver.MaxRegexValidationCacheEntries * 2; index++) {
             var pathConditions = new SmtFormula[]
             {
                 new SmtRegexMatchFormula(text, "^value[0-9]+$"),
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    text,
-                    new SmtStringConstant("value" + index))
+                Equal(text, Text("value" + index))
             };
 
             _ = solver.CheckSatisfiability(pathConditions, TimeSpan.FromMilliseconds(50));
@@ -1304,12 +1098,12 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_CombinesStringContainsAndEquality() {
-        var text = new SmtVariable("text", SmtValueKind.String);
+        var text = String("text");
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtStringContainsFormula(text, new SmtStringConstant("Z")),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("ABC"))
+            new SmtStringContainsFormula(text, Text("Z")),
+            Equal(text, Text("ABC"))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1320,12 +1114,12 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_ConcreteStringStartsWithMismatchIsRejected() {
-        var text = new SmtVariable("text", SmtValueKind.String);
+        var text = String("text");
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtStringStartsWithFormula(text, new SmtStringConstant("AB")),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("ZAB"))
+            new SmtStringStartsWithFormula(text, Text("AB")),
+            Equal(text, Text("ZAB"))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1337,14 +1131,14 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_ConcreteNegatedStringEndsWithMismatchIsRejected() {
-        var text = new SmtVariable("text", SmtValueKind.String);
+        var text = String("text");
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtUnaryFormula(
                 SmtUnaryOperator.Not,
-                new SmtStringEndsWithFormula(text, new SmtStringConstant("BC"))),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("ABC"))
+                new SmtStringEndsWithFormula(text, Text("BC"))),
+            Equal(text, Text("ABC"))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1361,8 +1155,8 @@ public class SmtAnalysisServiceTests {
         {
             new SmtBinaryFormula(
                 SmtBinaryOperator.NotEqual,
-                new SmtStringConcatTerm(new SmtStringConstant("A"), new SmtStringConstant("B")),
-                new SmtStringConstant("AB"))
+                new SmtStringConcatTerm(Text("A"), new SmtStringConstant("B")),
+                Text("AB"))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1373,12 +1167,12 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_ReportsContradictoryPathUnsatisfiable() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
+        var x = Int("x");
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0)),
-            new SmtBinaryFormula(SmtBinaryOperator.LessThan, x, new SmtIntegerConstant(0))
+            GreaterThan(x, Integer(0)),
+            LessThan(x, Integer(0))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1390,17 +1184,17 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_BooleanAliasComparisonContradiction_IsUnsatisfiable() {
-        var value = new SmtVariable("value", SmtValueKind.Int);
-        var isZero = new SmtVariable("isZero", SmtValueKind.Bool);
+        var value = Int("value");
+        var isZero = Bool("isZero");
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtBinaryFormula(
                 SmtBinaryOperator.Equal,
                 isZero,
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtIntegerConstant(0))),
+                Equal(value, Integer(0))),
             isZero,
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtIntegerConstant(0))
+            NotEqual(value, Integer(0))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1412,16 +1206,16 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_TransitiveBooleanEquivalenceEntailment_BypassesSolver() {
-        var left = new SmtVariable("bool_equiv_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var middle = new SmtVariable("bool_equiv_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var right = new SmtVariable("bool_equiv_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+        var left = Bool("bool_equiv_left_" + Guid.NewGuid().ToString("N"));
+        var middle = Bool("bool_equiv_middle_" + Guid.NewGuid().ToString("N"));
+        var right = Bool("bool_equiv_right_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, left, middle),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, middle, right)
+            Equal(left, middle),
+            Equal(middle, right)
         };
-        var fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right);
+        var fact = Equal(left, right);
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -1434,16 +1228,16 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_TransitiveBooleanNegationEntailment_BypassesSolver() {
-        var left = new SmtVariable("bool_neg_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var middle = new SmtVariable("bool_neg_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var right = new SmtVariable("bool_neg_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+        var left = Bool("bool_neg_left_" + Guid.NewGuid().ToString("N"));
+        var middle = Bool("bool_neg_middle_" + Guid.NewGuid().ToString("N"));
+        var right = Bool("bool_neg_right_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, left, middle),
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, middle, right)
+            NotEqual(left, middle),
+            NotEqual(middle, right)
         };
-        var fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right);
+        var fact = Equal(left, right);
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -1456,9 +1250,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_NegatedBooleanRelationEntailment_BypassesSolver() {
-        var left = new SmtVariable("bool_not_rel_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var middle = new SmtVariable("bool_not_rel_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var right = new SmtVariable("bool_not_rel_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+        var left = Bool("bool_not_rel_left_" + Guid.NewGuid().ToString("N"));
+        var middle = Bool("bool_not_rel_middle_" + Guid.NewGuid().ToString("N"));
+        var right = Bool("bool_not_rel_right_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
@@ -1466,9 +1260,9 @@ public class SmtAnalysisServiceTests {
                 SmtBinaryOperator.Equal,
                 left,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, middle)),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, middle, right)
+            Equal(middle, right)
         };
-        var fact = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, left, right);
+        var fact = NotEqual(left, right);
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -1481,9 +1275,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_NegatedBooleanRelationParityContradiction_BypassesSolver() {
-        var left = new SmtVariable("bool_not_parity_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var middle = new SmtVariable("bool_not_parity_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var right = new SmtVariable("bool_not_parity_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+        var left = Bool("bool_not_parity_left_" + Guid.NewGuid().ToString("N"));
+        var middle = Bool("bool_not_parity_middle_" + Guid.NewGuid().ToString("N"));
+        var right = Bool("bool_not_parity_right_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
@@ -1491,8 +1285,8 @@ public class SmtAnalysisServiceTests {
                 SmtBinaryOperator.Equal,
                 left,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, middle)),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, middle, right),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right)
+            Equal(middle, right),
+            Equal(left, right)
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1506,15 +1300,15 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_BooleanEquivalenceParityContradiction_BypassesSolver() {
-        var left = new SmtVariable("bool_parity_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var middle = new SmtVariable("bool_parity_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var right = new SmtVariable("bool_parity_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+        var left = Bool("bool_parity_left_" + Guid.NewGuid().ToString("N"));
+        var middle = Bool("bool_parity_middle_" + Guid.NewGuid().ToString("N"));
+        var right = Bool("bool_parity_right_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, left, middle),
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, middle, right),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right)
+            Equal(left, middle),
+            NotEqual(middle, right),
+            Equal(left, right)
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1528,14 +1322,14 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_IntegerAliasIntervalContradiction_BypassesSolver() {
-        var x = new SmtVariable("alias_int_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var y = new SmtVariable("alias_int_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+        var x = Int("alias_int_x_" + Guid.NewGuid().ToString("N"));
+        var y = Int("alias_int_y_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(10)),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, x, y),
-            new SmtBinaryFormula(SmtBinaryOperator.LessThan, y, new SmtIntegerConstant(10))
+            GreaterThanOrEqual(x, Integer(10)),
+            Equal(x, y),
+            LessThan(y, Integer(10))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1549,18 +1343,15 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_IntegerAliasIntervalEntailment_BypassesSolver() {
-        var x = new SmtVariable("alias_entail_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var y = new SmtVariable("alias_entail_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+        var x = Int("alias_entail_x_" + Guid.NewGuid().ToString("N"));
+        var y = Int("alias_entail_y_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, x, y),
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(3))
+            Equal(x, y),
+            GreaterThanOrEqual(x, Integer(3))
         };
-        var fact = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            y,
-            new SmtIntegerConstant(3));
+        var fact = GreaterThanOrEqual(y, Integer(3));
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -1573,16 +1364,16 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_AffineOffsetAliasIntervalContradiction_BypassesSolver() {
-        var x = new SmtVariable("affine_offset_alias_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var y = new SmtVariable("affine_offset_alias_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(2));
-        var yPlusFour = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, new SmtIntegerConstant(4));
+        var x = Int("affine_offset_alias_x_" + Guid.NewGuid().ToString("N"));
+        var y = Int("affine_offset_alias_y_" + Guid.NewGuid().ToString("N"));
+        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
+        var yPlusFour = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, Integer(4));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(5)),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, xPlusTwo, yPlusFour),
-            new SmtBinaryFormula(SmtBinaryOperator.LessThan, y, new SmtIntegerConstant(3))
+            GreaterThanOrEqual(x, Integer(5)),
+            Equal(xPlusTwo, yPlusFour),
+            LessThan(y, Integer(3))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1596,20 +1387,17 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_AffineOffsetAliasIntervalEntailment_BypassesSolver() {
-        var x = new SmtVariable("affine_offset_entail_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var y = new SmtVariable("affine_offset_entail_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(2));
-        var yPlusFour = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, new SmtIntegerConstant(4));
+        var x = Int("affine_offset_entail_x_" + Guid.NewGuid().ToString("N"));
+        var y = Int("affine_offset_entail_y_" + Guid.NewGuid().ToString("N"));
+        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
+        var yPlusFour = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, Integer(4));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, xPlusTwo, yPlusFour),
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(5))
+            Equal(xPlusTwo, yPlusFour),
+            GreaterThanOrEqual(x, Integer(5))
         };
-        var fact = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            y,
-            new SmtIntegerConstant(3));
+        var fact = GreaterThanOrEqual(y, Integer(3));
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -1622,13 +1410,13 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_SameBaseAffineEqualityContradiction_BypassesSolver() {
-        var x = new SmtVariable("same_base_affine_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(2));
-        var xPlusThree = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(3));
+        var x = Int("same_base_affine_x_" + Guid.NewGuid().ToString("N"));
+        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
+        var xPlusThree = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(3));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, xPlusTwo, xPlusThree)
+            Equal(xPlusTwo, xPlusThree)
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1642,13 +1430,13 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_SameBaseAffineOrderingContradiction_BypassesSolver() {
-        var x = new SmtVariable("same_base_affine_order_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(2));
-        var xPlusThree = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(3));
+        var x = Int("same_base_affine_order_x_" + Guid.NewGuid().ToString("N"));
+        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
+        var xPlusThree = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(3));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.LessThan, xPlusThree, xPlusTwo)
+            LessThan(xPlusThree, xPlusTwo)
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1662,11 +1450,11 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_SameBaseAffineOrderingTautology_BypassesSolver() {
-        var x = new SmtVariable("same_base_affine_tautology_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(1));
-        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(2));
+        var x = Int("same_base_affine_tautology_x_" + Guid.NewGuid().ToString("N"));
+        var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(1));
+        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var fact = new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, xPlusOne, xPlusTwo);
+        var fact = LessThanOrEqual(xPlusOne, xPlusTwo);
 
         var result = service.ClassifyImplication(Array.Empty<SmtFormula>(), fact);
 
@@ -1679,16 +1467,16 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_AffineComparisonAgainstExactTerm_BypassesSolver() {
-        var x = new SmtVariable("affine_exact_compare_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var y = new SmtVariable("affine_exact_compare_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(2));
+        var x = Int("affine_exact_compare_x_" + Guid.NewGuid().ToString("N"));
+        var y = Int("affine_exact_compare_y_" + Guid.NewGuid().ToString("N"));
+        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, y, new SmtIntegerConstant(10)),
-            new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, x, new SmtIntegerConstant(8))
+            Equal(y, Integer(10)),
+            LessThanOrEqual(x, Integer(8))
         };
-        var fact = new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, xPlusTwo, y);
+        var fact = LessThanOrEqual(xPlusTwo, y);
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -1701,14 +1489,14 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_StringAliasContradiction_BypassesSolver() {
-        var left = new SmtVariable("alias_text_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
-        var right = new SmtVariable("alias_text_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+        var left = String("alias_text_left_" + Guid.NewGuid().ToString("N"));
+        var right = String("alias_text_right_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, left, new SmtStringConstant("ABC")),
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, right, new SmtStringConstant("ABC"))
+            Equal(left, right),
+            Equal(left, Text("ABC")),
+            NotEqual(right, Text("ABC"))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1722,12 +1510,12 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_ReferenceAliasNullContradiction_BypassesSolver() {
-        var left = new SmtVariable("alias_ref_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
-        var right = new SmtVariable("alias_ref_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+        var left = Reference("alias_ref_left_" + Guid.NewGuid().ToString("N"));
+        var right = Reference("alias_ref_right_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right),
+            Equal(left, right),
             new SmtBinaryFormula(SmtBinaryOperator.Equal, left, new SmtNullConstant()),
             new SmtBinaryFormula(SmtBinaryOperator.NotEqual, right, new SmtNullConstant())
         };
@@ -1743,13 +1531,13 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_DisjunctionReferenceNullContradiction_BypassesSolver() {
-        var value = new SmtVariable("disjunction_ref_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
-        var guard = new SmtVariable("disjunction_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+        var value = Reference("disjunction_ref_" + Guid.NewGuid().ToString("N"));
+        var guard = Bool("disjunction_guard_" + Guid.NewGuid().ToString("N"));
         var valueIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant());
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Or, valueIsNull, guard),
+            Or(valueIsNull, guard),
             new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
             new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant())
         };
@@ -1765,15 +1553,15 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_NegatedDisjunctionReferenceNullContradiction_BypassesSolver() {
-        var value = new SmtVariable("negated_disjunction_ref_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
-        var guard = new SmtVariable("negated_disjunction_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+        var value = Reference("negated_disjunction_ref_" + Guid.NewGuid().ToString("N"));
+        var guard = Bool("negated_disjunction_guard_" + Guid.NewGuid().ToString("N"));
         var valueIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant());
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtUnaryFormula(
                 SmtUnaryOperator.Not,
-                new SmtBinaryFormula(SmtBinaryOperator.Or, valueIsNull, guard)),
+                Or(valueIsNull, guard)),
             new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant())
         };
 
@@ -1788,12 +1576,12 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_ReferenceAliasNonNullEntailment_BypassesSolver() {
-        var left = new SmtVariable("alias_ref_entail_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
-        var right = new SmtVariable("alias_ref_entail_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+        var left = Reference("alias_ref_entail_left_" + Guid.NewGuid().ToString("N"));
+        var right = Reference("alias_ref_entail_right_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right),
+            Equal(left, right),
             new SmtBinaryFormula(SmtBinaryOperator.NotEqual, left, new SmtNullConstant())
         };
         var fact = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, right, new SmtNullConstant());
@@ -1826,16 +1614,16 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_AliasInsideIntegerExpressionIntervalContradiction_BypassesSolver() {
-        var x = new SmtVariable("expr_alias_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var y = new SmtVariable("expr_alias_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(1));
-        var yPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, new SmtIntegerConstant(1));
+        var x = Int("expr_alias_x_" + Guid.NewGuid().ToString("N"));
+        var y = Int("expr_alias_y_" + Guid.NewGuid().ToString("N"));
+        var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(1));
+        var yPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, Integer(1));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, x, y),
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, xPlusOne, new SmtIntegerConstant(5)),
-            new SmtBinaryFormula(SmtBinaryOperator.LessThan, yPlusOne, new SmtIntegerConstant(5))
+            Equal(x, y),
+            GreaterThanOrEqual(xPlusOne, Integer(5)),
+            LessThan(yPlusOne, Integer(5))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1849,13 +1637,13 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_SubtractionIntervalContradiction_BypassesSolver() {
-        var x = new SmtVariable("subtract_interval_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var xMinusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, x, new SmtIntegerConstant(1));
+        var x = Int("subtract_interval_x_" + Guid.NewGuid().ToString("N"));
+        var xMinusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, x, Integer(1));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(5)),
-            new SmtBinaryFormula(SmtBinaryOperator.LessThan, xMinusOne, new SmtIntegerConstant(4))
+            GreaterThanOrEqual(x, Integer(5)),
+            LessThan(xMinusOne, Integer(4))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1869,14 +1657,14 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_PositiveConstantMultiplyIntervalEntailment_BypassesSolver() {
-        var x = new SmtVariable("multiply_interval_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var twiceX = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, x, new SmtIntegerConstant(2));
+        var x = Int("multiply_interval_x_" + Guid.NewGuid().ToString("N"));
+        var twiceX = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, x, Integer(2));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(3))
+            GreaterThanOrEqual(x, Integer(3))
         };
-        var fact = new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, twiceX, new SmtIntegerConstant(6));
+        var fact = GreaterThanOrEqual(twiceX, Integer(6));
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -1889,17 +1677,17 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_AliasInsideStringLengthEntailment_BypassesSolver() {
-        var left = new SmtVariable("length_alias_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
-        var right = new SmtVariable("length_alias_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+        var left = String("length_alias_left_" + Guid.NewGuid().ToString("N"));
+        var right = String("length_alias_right_" + Guid.NewGuid().ToString("N"));
         var leftLength = new SmtStringLengthTerm(left);
         var rightLength = new SmtStringLengthTerm(right);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, leftLength, new SmtIntegerConstant(3))
+            Equal(left, right),
+            Equal(leftLength, Integer(3))
         };
-        var fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, rightLength, new SmtIntegerConstant(3));
+        var fact = Equal(rightLength, Integer(3));
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -1912,16 +1700,16 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_AliasInsideStringConcatContradiction_BypassesSolver() {
-        var left = new SmtVariable("concat_alias_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
-        var right = new SmtVariable("concat_alias_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
-        var leftConcat = new SmtStringConcatTerm(left, new SmtStringConstant("!"));
-        var rightConcat = new SmtStringConcatTerm(right, new SmtStringConstant("!"));
+        var left = String("concat_alias_left_" + Guid.NewGuid().ToString("N"));
+        var right = String("concat_alias_right_" + Guid.NewGuid().ToString("N"));
+        var leftConcat = new SmtStringConcatTerm(left, Text("!"));
+        var rightConcat = new SmtStringConcatTerm(right, Text("!"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, leftConcat, new SmtStringConstant("A!")),
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, rightConcat, new SmtStringConstant("A!"))
+            Equal(left, right),
+            Equal(leftConcat, Text("A!")),
+            NotEqual(rightConcat, Text("A!"))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1935,8 +1723,8 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_StringConcatKnownOperandLengths_BypassesSolver() {
-        var left = new SmtVariable("concat_length_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
-        var right = new SmtVariable("concat_length_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+        var left = String("concat_length_left_" + Guid.NewGuid().ToString("N"));
+        var right = String("concat_length_right_" + Guid.NewGuid().ToString("N"));
         var concatLength = new SmtStringLengthTerm(new SmtStringConcatTerm(left, right));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1944,16 +1732,13 @@ public class SmtAnalysisServiceTests {
             new SmtBinaryFormula(
                 SmtBinaryOperator.Equal,
                 new SmtStringLengthTerm(left),
-                new SmtIntegerConstant(2)),
+                Integer(2)),
             new SmtBinaryFormula(
                 SmtBinaryOperator.Equal,
                 new SmtStringLengthTerm(right),
-                new SmtIntegerConstant(3))
+                Integer(3))
         };
-        var fact = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            concatLength,
-            new SmtIntegerConstant(5));
+        var fact = Equal(concatLength, Integer(5));
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -1966,14 +1751,14 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_NegativeStringLength_BypassesSolver() {
-        var text = new SmtVariable("negative_length_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+        var text = String("negative_length_" + Guid.NewGuid().ToString("N"));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtBinaryFormula(
                 SmtBinaryOperator.LessThan,
                 new SmtStringLengthTerm(text),
-                new SmtIntegerConstant(0))
+                Integer(0))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -1987,16 +1772,16 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_ConditionalIntegerComparisonWithKnownGuard_BypassesSolver() {
-        var guard = new SmtVariable("conditional_int_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var selected = new SmtVariable("conditional_int_selected_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var fallback = new SmtVariable("conditional_int_fallback_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+        var guard = Bool("conditional_int_guard_" + Guid.NewGuid().ToString("N"));
+        var selected = Int("conditional_int_selected_" + Guid.NewGuid().ToString("N"));
+        var fallback = Int("conditional_int_fallback_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, selected, fallback, SmtValueKind.Int);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             guard,
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, conditional, new SmtIntegerConstant(10)),
-            new SmtBinaryFormula(SmtBinaryOperator.LessThan, selected, new SmtIntegerConstant(10))
+            GreaterThanOrEqual(conditional, Integer(10)),
+            LessThan(selected, Integer(10))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -2010,9 +1795,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_ConditionalReferenceNullFactWithKnownGuard_BypassesSolver() {
-        var guard = new SmtVariable("conditional_ref_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var left = new SmtVariable("conditional_ref_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
-        var right = new SmtVariable("conditional_ref_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+        var guard = Bool("conditional_ref_guard_" + Guid.NewGuid().ToString("N"));
+        var left = Reference("conditional_ref_left_" + Guid.NewGuid().ToString("N"));
+        var right = Reference("conditional_ref_right_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, left, right, SmtValueKind.Reference);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -2033,19 +1818,16 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_ConditionalReferenceAliasNullStatePropagatesToSelectedBranch_BypassesSolver() {
-        var guard = new SmtVariable("conditional_ref_alias_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var selected = new SmtVariable("conditional_ref_alias_selected_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Reference);
-        var whenTrue = new SmtVariable("conditional_ref_alias_true_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Reference);
-        var whenFalse = new SmtVariable("conditional_ref_alias_false_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Reference);
+        var guard = Bool("conditional_ref_alias_guard_" + Guid.NewGuid().ToString("N"));
+        var selected = Reference("conditional_ref_alias_selected_" + Guid.NewGuid().ToString("N"));
+        var whenTrue = Reference("conditional_ref_alias_true_" + Guid.NewGuid().ToString("N"));
+        var whenFalse = Reference("conditional_ref_alias_false_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, whenTrue, whenFalse, SmtValueKind.Reference);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             guard,
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, selected, conditional),
+            Equal(selected, conditional),
             new SmtBinaryFormula(SmtBinaryOperator.Equal, selected, new SmtNullConstant())
         };
         var fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, whenTrue, new SmtNullConstant());
@@ -2061,9 +1843,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_ConditionalBooleanWithKnownGuard_BypassesSolver() {
-        var guard = new SmtVariable("conditional_bool_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var selected = new SmtVariable("conditional_bool_selected_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var fallback = new SmtVariable("conditional_bool_fallback_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+        var guard = Bool("conditional_bool_guard_" + Guid.NewGuid().ToString("N"));
+        var selected = Bool("conditional_bool_selected_" + Guid.NewGuid().ToString("N"));
+        var fallback = Bool("conditional_bool_fallback_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, selected, fallback, SmtValueKind.Bool);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -2084,15 +1866,14 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_ConditionalWithEqualBranchesCollapsesBeforeSolver() {
-        var guard = new SmtVariable("conditional_equal_branch_guard_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Bool);
-        var value = new SmtVariable("conditional_equal_branch_value_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+        var guard = Bool("conditional_equal_branch_guard_" + Guid.NewGuid().ToString("N"));
+        var value = Int("conditional_equal_branch_value_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, value, value, SmtValueKind.Int);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, conditional, new SmtIntegerConstant(7)),
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtIntegerConstant(7))
+            Equal(conditional, Integer(7)),
+            NotEqual(value, Integer(7))
         };
 
         var result = service.ClassifyPathFeasibility(pathConditions);
@@ -2106,10 +1887,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_ConditionalIntegerBranchImplications_BypassesSolver() {
-        var guard = new SmtVariable("conditional_branch_int_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var whenTrue = new SmtVariable("conditional_branch_int_true_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var whenFalse = new SmtVariable("conditional_branch_int_false_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Int);
+        var guard = Bool("conditional_branch_int_guard_" + Guid.NewGuid().ToString("N"));
+        var whenTrue = Int("conditional_branch_int_true_" + Guid.NewGuid().ToString("N"));
+        var whenFalse = Int("conditional_branch_int_false_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, whenTrue, whenFalse, SmtValueKind.Int);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -2117,16 +1897,13 @@ public class SmtAnalysisServiceTests {
             new SmtBinaryFormula(
                 SmtBinaryOperator.Or,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
-                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, whenTrue, new SmtIntegerConstant(0))),
+                GreaterThanOrEqual(whenTrue, Integer(0))),
             new SmtBinaryFormula(
                 SmtBinaryOperator.Or,
                 guard,
-                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, whenFalse, new SmtIntegerConstant(0)))
+                GreaterThanOrEqual(whenFalse, Integer(0)))
         };
-        var fact = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            conditional,
-            new SmtIntegerConstant(0));
+        var fact = GreaterThanOrEqual(conditional, Integer(0));
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -2139,11 +1916,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_ConditionalReferenceBranchImplications_BypassesSolver() {
-        var guard = new SmtVariable("conditional_branch_ref_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var whenTrue = new SmtVariable("conditional_branch_ref_true_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Reference);
-        var whenFalse = new SmtVariable("conditional_branch_ref_false_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Reference);
+        var guard = Bool("conditional_branch_ref_guard_" + Guid.NewGuid().ToString("N"));
+        var whenTrue = Reference("conditional_branch_ref_true_" + Guid.NewGuid().ToString("N"));
+        var whenFalse = Reference("conditional_branch_ref_false_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, whenTrue, whenFalse, SmtValueKind.Reference);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -2170,11 +1945,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_ConditionalBooleanBranchImplications_BypassesSolver() {
-        var guard = new SmtVariable("conditional_branch_bool_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
-        var whenTrue = new SmtVariable("conditional_branch_bool_true_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Bool);
-        var whenFalse = new SmtVariable("conditional_branch_bool_false_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Bool);
+        var guard = Bool("conditional_branch_bool_guard_" + Guid.NewGuid().ToString("N"));
+        var whenTrue = Bool("conditional_branch_bool_true_" + Guid.NewGuid().ToString("N"));
+        var whenFalse = Bool("conditional_branch_bool_false_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, whenTrue, whenFalse, SmtValueKind.Bool);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -2183,10 +1956,7 @@ public class SmtAnalysisServiceTests {
                 SmtBinaryOperator.Or,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
                 whenTrue),
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Or,
-                guard,
-                whenFalse),
+            Or(guard, whenFalse),
             new SmtUnaryFormula(SmtUnaryOperator.Not, conditional)
         };
 
@@ -2201,14 +1971,10 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_ConditionalSelectedReferenceNullBranchImplication_BypassesSolver() {
-        var guard = new SmtVariable("conditional_selected_ref_guard_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Bool);
-        var first = new SmtVariable("conditional_selected_ref_first_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Reference);
-        var second = new SmtVariable("conditional_selected_ref_second_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Reference);
-        var resultReference = new SmtVariable("conditional_selected_ref_result_" + Guid.NewGuid().ToString("N"),
-            SmtValueKind.Reference);
+        var guard = Bool("conditional_selected_ref_guard_" + Guid.NewGuid().ToString("N"));
+        var first = Reference("conditional_selected_ref_first_" + Guid.NewGuid().ToString("N"));
+        var second = Reference("conditional_selected_ref_second_" + Guid.NewGuid().ToString("N"));
+        var resultReference = Reference("conditional_selected_ref_result_" + Guid.NewGuid().ToString("N"));
         var resultIsNonNull = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, resultReference, new SmtNullConstant());
         var firstIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, first, new SmtNullConstant());
         var secondIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, second, new SmtNullConstant());
@@ -2217,7 +1983,7 @@ public class SmtAnalysisServiceTests {
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, resultReference, selectedReference),
+            Equal(resultReference, selectedReference),
             new SmtBinaryFormula(
                 SmtBinaryOperator.Equal,
                 new SmtBinaryFormula(SmtBinaryOperator.Equal, resultReference, new SmtNullConstant()),
@@ -2228,17 +1994,11 @@ public class SmtAnalysisServiceTests {
             new SmtBinaryFormula(
                 SmtBinaryOperator.Or,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.Or,
-                    resultIsNonNull,
-                    firstIsNull)),
+                Or(resultIsNonNull, firstIsNull)),
             new SmtBinaryFormula(
                 SmtBinaryOperator.Or,
                 guard,
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.Or,
-                    resultIsNonNull,
-                    secondIsNull)));
+                Or(resultIsNonNull, secondIsNull)));
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
@@ -2251,9 +2011,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyImplication_RuntimeTypeTestPredicateIsCongruentUnderReferenceEquality() {
-        var x = new SmtVariable("runtime_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
-        var y = new SmtVariable("runtime_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
-        var xEqualsY = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, y);
+        var x = Reference("runtime_x_" + Guid.NewGuid().ToString("N"));
+        var y = Reference("runtime_y_" + Guid.NewGuid().ToString("N"));
+        var xEqualsY = Equal(x, y);
         var xIsString = new SmtRuntimeTypeTestFormula(x, "System.String");
         var yIsString = new SmtRuntimeTypeTestFormula(y, "System.String");
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -2265,9 +2025,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void ClassifyPathFeasibility_RuntimeTypeTestPredicateContradictsItsNegationThroughReferenceEquality() {
-        var x = new SmtVariable("runtime_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
-        var y = new SmtVariable("runtime_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
-        var xEqualsY = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, y);
+        var x = Reference("runtime_x_" + Guid.NewGuid().ToString("N"));
+        var y = Reference("runtime_y_" + Guid.NewGuid().ToString("N"));
+        var xEqualsY = Equal(x, y);
         var xIsString = new SmtRuntimeTypeTestFormula(x, "System.String");
         var yIsNotString = new SmtUnaryFormula(
             SmtUnaryOperator.Not,
@@ -2310,11 +2070,8 @@ public class SmtAnalysisServiceTests {
     }
 
     private static AnalysisProofQuery CreateSolverQuery(string name) {
-        var value = new SmtVariable(name, SmtValueKind.Int);
-        var valueIsZero = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            value,
-            new SmtIntegerConstant(0));
+        var value = Int(name);
+        var valueIsZero = Equal(value, Integer(0));
         return CreateQuery(new[] { valueIsZero }, valueIsZero);
     }
 
@@ -2396,7 +2153,7 @@ public class SmtAnalysisServiceTests {
     }
 
     private static SmtFormula CreateNestedNegation(int depth) {
-        SmtFormula formula = new SmtBooleanConstant(true);
+        SmtFormula formula = Boolean(true);
         for (var index = 0; index < depth; index++) formula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
 
         return formula;
