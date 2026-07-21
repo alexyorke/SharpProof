@@ -32,6 +32,11 @@ public sealed class UnifiedCliTests {
                 Assert.That(document.RootElement.TryGetProperty("methodEffects", out _), Is.True);
                 Assert.That(document.RootElement.TryGetProperty("hazards", out _), Is.True);
                 Assert.That(document.RootElement.TryGetProperty("unknownReasons", out _), Is.True);
+                Assert.That(document.RootElement.TryGetProperty("purity", out _), Is.False);
+                Assert.That(document.RootElement.TryGetProperty("allocationFree", out _), Is.False);
+                Assert.That(document.RootElement.TryGetProperty("doesNotThrow", out _), Is.False);
+                Assert.That(document.RootElement.TryGetProperty("evidence", out _), Is.False);
+                Assert.That(document.RootElement.TryGetProperty("budget", out _), Is.False);
             });
         }
         finally { File.Delete(file); }

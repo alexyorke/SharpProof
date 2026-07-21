@@ -124,31 +124,12 @@ internal sealed record SymbolicComplexityCalleeInfo(
 }
 
 internal sealed record SymbolicComplexityResult(
-    string FilePath,
     string MethodName,
-    string MethodDisplayName,
     string DeclarationKind,
-    int SpanStart,
-    int SpanEnd,
-    int StartLine,
-    int StartColumn,
-    int EndLine,
-    int EndColumn,
     SymbolicComplexityInfo Complexity,
     IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,
     IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons,
-    IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries)
-    : SymbolicMethodResult(
-        FilePath,
-        MethodName,
-        MethodDisplayName,
-        DeclarationKind,
-        SpanStart,
-        SpanEnd,
-        StartLine,
-        StartColumn,
-        EndLine,
-        EndColumn) {
+    IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries) {
     public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; } =
         UnknownReasons
         .Select(SymbolicUnknownReasonTaxonomy.ForComplexity)

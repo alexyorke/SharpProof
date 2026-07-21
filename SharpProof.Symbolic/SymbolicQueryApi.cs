@@ -55,7 +55,6 @@ internal sealed partial class SymbolicQueryExecutor {
                 SymbolicSourceCompilationKind.Complexity,
                 "Complexity source kind is not supported.",
                 "Complexity queries support point, position, line, or node targets only.",
-                "Complexity node queries require a node target.",
                 static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true),
                 ExecuteComplexityAnalysis,
                 token));

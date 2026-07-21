@@ -91,31 +91,6 @@ internal static class SymbolicSourceQueryServiceTestExtensions
             cancellationToken);
     }
 
-    internal static SymbolicQueryResult QuerySyntaxTreeLineSpan(
-        this SymbolicQueryExecutor executor,
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        int startLine,
-        int startColumn,
-        int endLine,
-        int endColumn,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false)
-    {
-        return executor.Query(new SymbolicQueryContext(
-                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-                SharpProofTargetFactory.LineSpan(startLine, startColumn, endLine, endColumn),
-                new SymbolicQueryOptions(
-                    smtAnalysis: smtAnalysis,
-                    impliedConditions: impliedConditions,
-                    includeExpressionProgramPoints: includeExpressionProgramPoints,
-                    includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts)),
-            cancellationToken);
-    }
-
     internal static SymbolicQueryResult QuerySyntaxTreeAllLines(
         this SymbolicQueryExecutor executor,
         SyntaxTree syntaxTree,

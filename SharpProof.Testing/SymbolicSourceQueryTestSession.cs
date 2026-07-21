@@ -84,28 +84,6 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable
             includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
     }
 
-    public SymbolicQueryResult AnalyzeLineSpan(
-        int startLine,
-        int startColumn,
-        int endLine,
-        int endColumn,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false)
-    {
-        return _service.QuerySyntaxTreeLineSpan(
-            _syntaxTree,
-            _compilation,
-            startLine,
-            startColumn,
-            endLine,
-            endColumn,
-            smtAnalysis: _smtAnalysis,
-            impliedConditions: impliedConditions,
-            includeExpressionProgramPoints: includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
-    }
-
     public int FindLineStartPosition(string marker)
     {
         var line = FindLine(marker);

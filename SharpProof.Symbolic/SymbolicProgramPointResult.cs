@@ -1,102 +1,25 @@
 namespace SharpProof.Symbolic;
 
-internal sealed record SymbolicProgramPointMetadata(
-    string FilePath,
-    int Line,
-    int Column,
-    int Position,
-    int? RequestedLine,
-    int? RequestedColumn,
-    int? RequestedPosition,
-    int? RequestedPositionDistance,
-    bool? ContainsRequestedPosition,
-    int NodeSpanStart,
-    int NodeSpanEnd,
-    int NodeStartLine,
-    int NodeStartColumn,
-    int NodeEndLine,
-    int NodeEndColumn,
-    string NodeKind,
-    string? MethodName,
-    string ProgramPointKind) {
-    public int NodeSpanLength => Math.Max(0, NodeSpanEnd - NodeSpanStart);
-}
-
 internal sealed class SymbolicProgramPointResult(
-    SymbolicProgramPointMetadata metadata,
-    IReadOnlyList<string> facts,
-    SymbolicReachability reachability = SymbolicReachability.NotChecked,
-    string reachabilityReason = "reachability_not_checked",
-    IReadOnlyList<SymbolicConditionProofResult>? conditionProofs = null,
-    SymbolicSmtDiagnostics? smtDiagnostics = null,
-    string? mergedInvariantText = null,
-    SymbolicInvariantResult? invariant = null,
-    IReadOnlyList<SymbolicFactInfo>? symbolicFacts = null,
-    SymbolicInputWitness? reachabilityWitness = null,
-    SymbolicAnalysisTruncationInfo? analysisTruncation = null) {
-    internal SymbolicProgramPointMetadata Metadata { get; } = metadata;
-
-    public string FilePath => Metadata.FilePath;
-    public int Line => Metadata.Line;
-    public int Column => Metadata.Column;
-    public int Position => Metadata.Position;
-    public int? RequestedLine => Metadata.RequestedLine;
-    public int? RequestedColumn => Metadata.RequestedColumn;
-    public int? RequestedPosition => Metadata.RequestedPosition;
-    public int? RequestedPositionDistance => Metadata.RequestedPositionDistance;
-    public bool? ContainsRequestedPosition => Metadata.ContainsRequestedPosition;
-    public int NodeSpanStart => Metadata.NodeSpanStart;
-    public int NodeSpanEnd => Metadata.NodeSpanEnd;
-    public int NodeSpanLength => Metadata.NodeSpanLength;
-    public int NodeStartLine => Metadata.NodeStartLine;
-    public int NodeStartColumn => Metadata.NodeStartColumn;
-    public int NodeEndLine => Metadata.NodeEndLine;
-    public int NodeEndColumn => Metadata.NodeEndColumn;
-    public string NodeKind => Metadata.NodeKind;
-    public string? MethodName => Metadata.MethodName;
-    public string ProgramPointKind => Metadata.ProgramPointKind;
-
-    public IReadOnlyList<string> Facts { get; } = facts ?? Array.Empty<string>();
-
-    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; } = symbolicFacts ?? Array.Empty<SymbolicFactInfo>();
-
-    public string MergedInvariantText { get; } = mergedInvariantText ?? invariant?.MergedInvariantText ??
-        FormatMergedInvariantText(facts ?? Array.Empty<string>());
-
-    public SymbolicInvariantResult Invariant { get; } = invariant ?? SymbolicInvariantResult.FromFacts(
-        facts ?? Array.Empty<string>(),
-        mergedInvariantText ?? FormatMergedInvariantText(facts ?? Array.Empty<string>()),
-        SymbolicInvariantMergeKind.Conjunction);
-
-    public int PathConditionCount => Invariant.ConditionCount;
+    SymbolicInvariantResult invariant,
+    SymbolicReachability reachability,
+    string reachabilityReason,
+    IReadOnlyList<SymbolicConditionProofResult> conditionProofs,
+    SymbolicInputWitness reachabilityWitness,
+    SymbolicAnalysisTruncationInfo analysisTruncation) {
+    public SymbolicInvariantResult Invariant { get; } = invariant;
 
     public SymbolicReachability Reachability { get; } = reachability;
 
     public string ReachabilityReason { get; } = reachabilityReason;
 
-    public SymbolicInputWitness ReachabilityWitness { get; } = reachabilityWitness ??
-        SymbolicInputWitnessFactory.CreateReachability(
-            null, Array.Empty<SmtFormula>(), null, metadata.Position, reachability, reachabilityReason);
+    public SymbolicInputWitness ReachabilityWitness { get; } = reachabilityWitness;
 
     public SymbolicInputDomainSummary InputDomainSummary => ReachabilityWitness.DomainSummary;
 
-    public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; } =
-        (conditionProofs ?? Array.Empty<SymbolicConditionProofResult>())
-        .Select(proof => proof.WithProgramPointMetadata(metadata))
-        .ToArray();
+    public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; } = conditionProofs;
 
-    public SymbolicSmtDiagnostics SmtDiagnostics { get; } = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
-
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; } =
-        analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
-
-    private static string FormatMergedInvariantText(IReadOnlyList<string> facts) {
-        if (facts.Count == 0) return "true";
-
-        if (facts.Count == 1) return facts[0];
-
-        return string.Join(" && ", facts.Select(static fact => "(" + fact + ")"));
-    }
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; } = analysisTruncation;
 
 }
 
@@ -255,7 +178,6 @@ internal sealed record SymbolicConditionProofResult(
     string? valueKind = null,
     string? formulaText = null,
     bool? isSolverBacked = null,
-    SymbolicProgramPointMetadata? programPoint = null,
     SymbolicInputWitness? witness = null,
     SymbolicInputWitness? counterexampleWitness = null,
     SymbolicAnalysisTruncationInfo? analysisTruncation = null) {
@@ -286,28 +208,6 @@ internal sealed record SymbolicConditionProofResult(
         DisplayKind,
         TruthValue == SymbolicTruthValue.Unknown ? Reason : null);
 
-    internal SymbolicProgramPointMetadata? ProgramPoint { get; init; } = programPoint;
-
-    public string? FilePath => ProgramPoint?.FilePath;
-    public int? Line => ProgramPoint?.Line;
-    public int? Column => ProgramPoint?.Column;
-    public int? Position => ProgramPoint?.Position;
-    public int? NodeSpanStart => ProgramPoint?.NodeSpanStart;
-    public int? NodeSpanEnd => ProgramPoint?.NodeSpanEnd;
-    public int? NodeSpanLength => ProgramPoint?.NodeSpanLength;
-    public int? NodeStartLine => ProgramPoint?.NodeStartLine;
-    public int? NodeStartColumn => ProgramPoint?.NodeStartColumn;
-    public int? NodeEndLine => ProgramPoint?.NodeEndLine;
-    public int? NodeEndColumn => ProgramPoint?.NodeEndColumn;
-    public string? NodeKind => ProgramPoint?.NodeKind;
-    public string? MethodName => ProgramPoint?.MethodName;
-    public string? ProgramPointKind => ProgramPoint?.ProgramPointKind;
-    public int? RequestedLine => ProgramPoint?.RequestedLine;
-    public int? RequestedColumn => ProgramPoint?.RequestedColumn;
-    public int? RequestedPosition => ProgramPoint?.RequestedPosition;
-    public int? RequestedPositionDistance => ProgramPoint?.RequestedPositionDistance;
-    public bool? ContainsRequestedPosition => ProgramPoint?.ContainsRequestedPosition;
-
     public SymbolicInputWitness Witness { get; init; } = witness ?? (truthValue == SymbolicTruthValue.Unreachable
         ? SymbolicInputWitnessFactory.None(reason ?? string.Empty)
         : SymbolicInputWitnessFactory.Unsupported("condition_witness_unavailable"));
@@ -334,13 +234,6 @@ internal sealed record SymbolicConditionProofResult(
         string.IsNullOrWhiteSpace(value)
             ? formula == null ? condition ?? string.Empty : SymbolicFormulaDisplay.Format(formula)
             : value!;
-
-    public string GetDisplayReason() => SymbolicReasonDisplay.Format(Reason);
-
-    internal SymbolicConditionProofResult WithProgramPointMetadata(
-        SymbolicProgramPointMetadata metadata) => ProgramPoint == null
-        ? this with { ProgramPoint = metadata }
-        : this;
 
     internal SymbolicConditionProofResult WithAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation) =>
         this with { AnalysisTruncation = truncation };

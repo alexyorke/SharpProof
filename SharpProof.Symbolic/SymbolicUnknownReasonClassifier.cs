@@ -25,29 +25,3 @@ internal static class SymbolicUnknownReasonClassifier {
         return SymbolicUnknownReason.Unknown;
     }
 }
-
-internal static class SymbolicReasonDisplay {
-    internal static string Format(string? reason) {
-        if (string.IsNullOrWhiteSpace(reason)) return reason ?? string.Empty;
-
-        return reason switch {
-            "smt_disabled" => "SMT disabled",
-            "smt_disposed" => "SMT solver disposed",
-            "smt_timeout" => "SMT solver timed out",
-            "smt_unavailable" => "SMT solver unavailable",
-            "smt_transient_failure" => "SMT solver remained unavailable after transient-failure retries",
-            "smt_encoding_failure" => "SMT formula encoding failed",
-            "smt_expression_budget_exceeded" => "SMT expression node budget exceeded",
-            "smt_path_condition_budget_exceeded" => "SMT path condition budget exceeded",
-            "smt_method_budget_exceeded" => "SMT method-level budget exceeded",
-            "unsupported_typed_projection" =>
-                "runtime-hazard trigger could not be projected to typed symbolic IR",
-            "trigger_always_true" => "trigger condition is always true",
-            "trigger_always_false" => "trigger condition is always false",
-            "path_unsatisfiable" => "path condition is unsatisfiable",
-            "condition_parse_failure" => "condition could not be parsed",
-            "not_common_to_all_candidate_program_points" => "not common to all candidate program points",
-            _ => reason!
-        };
-    }
-}

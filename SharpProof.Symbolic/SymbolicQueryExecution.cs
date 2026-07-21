@@ -25,8 +25,7 @@ internal sealed partial class SymbolicQueryExecutor {
 
     private static bool SupportsSourceTarget(SharpProofTargetKind kind) =>
         kind is SharpProofTargetKind.Point or SharpProofTargetKind.Position or
-            SharpProofTargetKind.Line or SharpProofTargetKind.Span or SharpProofTargetKind.LineSpan or
-            SharpProofTargetKind.AllLines;
+            SharpProofTargetKind.Line or SharpProofTargetKind.Span or SharpProofTargetKind.AllLines;
 
     private SymbolicQueryResult QuerySourceSyntaxTree(
         SyntaxTree syntaxTree,
@@ -43,9 +42,6 @@ internal sealed partial class SymbolicQueryExecutor {
                 syntaxTree, compilation, target.Line!.Value, options, cancellationToken),
             SharpProofTargetKind.Span => _rangeQueryExecutor.QuerySpan(
                 syntaxTree, compilation, target.SpanStart!.Value, target.SpanEnd!.Value, options, cancellationToken),
-            SharpProofTargetKind.LineSpan => _rangeQueryExecutor.QueryLineSpan(
-                syntaxTree, compilation, target.StartLine!.Value, target.StartColumn!.Value,
-                target.EndLine!.Value, target.EndColumn!.Value, options, cancellationToken),
             SharpProofTargetKind.AllLines => _rangeQueryExecutor.QueryAllLines(
                 syntaxTree, compilation, options, cancellationToken),
             _ => throw new NotSupportedException("Target kind is not supported for syntax tree queries.")
@@ -64,16 +60,8 @@ internal sealed partial class SymbolicQueryExecutor {
             position,
             options,
             cancellationToken);
-        var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
-            syntaxTree,
-            position,
-            cancellationToken,
-            true);
         return _programPointExecutor.Project(
-            syntaxTree,
             query,
-            lineColumn.Line,
-            lineColumn.Column,
             options,
             cancellationToken);
     }
@@ -81,28 +69,19 @@ internal sealed partial class SymbolicQueryExecutor {
     private SymbolicQueryResult QuerySourceNode(
         SyntaxNode node,
         SemanticModel semanticModel,
-        SharpProofTarget target,
+        SharpProofTarget _,
         SymbolicQueryOptions options,
         CancellationToken cancellationToken) {
-        if (target.Kind != SharpProofTargetKind.Node)
-            throw new NotSupportedException("Node sources require a node target.");
-
         var analysis = node is ForStatementSyntax forStatement
             ? _invariantService.AnalyzeForInitialEntry(
                 forStatement, semanticModel, options.SmtAnalysis, cancellationToken)
             : _invariantService.AnalyzeAt(node, semanticModel, options.SmtAnalysis, cancellationToken,
                 options.IncludeCurrentStatementCompletionFacts);
-        var linePosition = SymbolicSourceLocation.GetLineAndColumn(
-            node.SyntaxTree, node.SpanStart, cancellationToken, true);
         var proofs = CreateNodeProofs(
             semanticModel, node, analysis, options.ImpliedConditions, options.SmtAnalysis, cancellationToken);
         return SymbolicQueryResult.From(SymbolicProgramPointProjector.Project(
-            node.SyntaxTree,
             new SymbolicProgramPointQueryContext(semanticModel, node.SpanStart, node, analysis),
-            linePosition.Line,
-            linePosition.Column,
             proofs,
-            SymbolicSmtDiagnostics.FromService(options.SmtAnalysis),
             cancellationToken));
     }
 
@@ -169,7 +148,7 @@ internal sealed partial class SymbolicQueryExecutor {
             (syntaxTree, compilation, target, token) => _runtimeHazardService.QuerySyntaxTreeRuntimeHazards(
                 syntaxTree, compilation, target, request.Options.SmtAnalysis!, token, hazardOptions),
             (node, semanticModel, target, token) => _runtimeHazardService.QueryNodeRuntimeHazards(
-                node, semanticModel, smtAnalysis, token, hazardOptions, target.IncludeNestedCallables),
+                node, semanticModel, smtAnalysis, token, hazardOptions, false),
             cancellationToken);
     }
 

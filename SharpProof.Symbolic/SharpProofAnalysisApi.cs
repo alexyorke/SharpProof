@@ -22,9 +22,7 @@ public enum SharpProofTargetKind {
     Position,
     Line,
     Span,
-    LineSpan,
-    AllLines,
-    Node
+    AllLines
 }
 
 public sealed record SharpProofTarget(
@@ -33,16 +31,9 @@ public sealed record SharpProofTarget(
     int? Column = null,
     int? Position = null,
     int? SpanStart = null,
-    int? SpanEnd = null,
-    int? StartLine = null,
-    int? StartColumn = null,
-    int? EndLine = null,
-    int? EndColumn = null,
-    bool IncludeNestedCallables = false);
+    int? SpanEnd = null);
 
 public sealed record SharpProofAnalysisOptions(
-    bool EnableSmt = false,
-    ImmutableArray<string> ImpliedConditions = default,
     SharpProofAnalysisBudget? AnalysisBudget = null);
 
 public sealed record SharpProofAnalysisBudget(
@@ -110,12 +101,12 @@ public sealed record SharpProofTruncationReason(
     string Provenance,
     int? SourceSpanStart);
 
-public sealed record SharpProofBudgetMetadata(
-    ImmutableArray<SharpProofTruncationReason> Truncations) {
-    public bool IsExhausted => !Truncations.IsDefaultOrEmpty;
-}
-
-public sealed record SharpProofEvidence(string Status, string Reason);
+public sealed record SharpProofProofFact(
+    string Condition,
+    string Status,
+    string Reason,
+    string SymbolicCondition,
+    string? Counterexample);
 
 public sealed record SharpProofHazard(
     string Kind,
@@ -123,11 +114,9 @@ public sealed record SharpProofHazard(
     string Reason,
     string ExceptionType,
     string Operation,
-    string FilePath,
-    int? Line,
-    int? Column,
     int? SpanStart,
-    int? SpanEnd);
+    int? SpanEnd,
+    string? Counterexample);
 
 public enum SharpProofErrorCategory {
     Usage,
@@ -153,21 +142,17 @@ public sealed record SharpProofAnalysisResult(
     SharpProofTarget Target,
     SharpProofQueryStatus Status,
     MethodEffects? MethodEffects,
-    SharpProofVerdict Purity,
-    SharpProofVerdict AllocationFree,
-    SharpProofVerdict DoesNotThrow,
-    ImmutableArray<string> ProofFacts,
+    ImmutableArray<SharpProofProofFact> ProofFacts,
     ImmutableArray<SharpProofHazard> Hazards,
     string? Complexity,
     ImmutableArray<SharpProofUnknownReason> UnknownReasons,
-    ImmutableArray<SharpProofEvidence> Evidence,
-    SharpProofBudgetMetadata Budget,
+    ImmutableArray<SharpProofTruncationReason> Truncations,
     SharpProofError? Error);
 
 public sealed class SharpProofAnalysisSession : IDisposable {
     private readonly ConcurrentDictionary<SharpProofAnalysisRequest, Lazy<SharpProofAnalysisResult>> _results = new();
     private readonly SymbolicQueryExecutor _executor = new();
-    private readonly SmtAnalysisService? _ownedSmtAnalysis;
+    private readonly SmtAnalysisService _ownedSmtAnalysis;
     private readonly SymbolicSourceInput _source;
     private readonly SymbolicQueryOptions _options;
     private bool _disposed;
@@ -175,7 +160,7 @@ public sealed class SharpProofAnalysisSession : IDisposable {
     private SharpProofAnalysisSession(
         SymbolicSourceInput source,
         SymbolicQueryOptions options,
-        SmtAnalysisService? ownedSmtAnalysis = null) {
+        SmtAnalysisService ownedSmtAnalysis) {
         _source = source;
         _options = options;
         _ownedSmtAnalysis = ownedSmtAnalysis;
@@ -227,7 +212,7 @@ public sealed class SharpProofAnalysisSession : IDisposable {
     public void Dispose() {
         _disposed = true;
         _results.Clear();
-        _ownedSmtAnalysis?.Dispose();
+        _ownedSmtAnalysis.Dispose();
     }
 
     private SharpProofAnalysisResult Execute(
@@ -236,8 +221,7 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         try {
             MethodEffects? effects = null;
             var unknowns = ImmutableArray.CreateBuilder<SharpProofUnknownReason>();
-            var evidence = ImmutableArray.CreateBuilder<SharpProofEvidence>();
-            var proofFacts = ImmutableArray.CreateBuilder<string>();
+            var proofFacts = ImmutableArray.CreateBuilder<SharpProofProofFact>();
             var hazards = ImmutableArray.CreateBuilder<SharpProofHazard>();
             var truncations = ImmutableArray.CreateBuilder<SharpProofTruncationReason>();
             string? complexity = null;
@@ -246,15 +230,13 @@ public sealed class SharpProofAnalysisSession : IDisposable {
             if ((request.Facets & SharpProofAnalysisFacet.Effects) != 0) {
                 effects = AnalyzeMethodEffects(context, cancellationToken);
                 unknowns.AddRange(effects.UnknownReasons);
-                evidence.AddRange(effects.Sites.Select(static site =>
-                    new SharpProofEvidence(site.Reason, site.Operation)));
             }
 
             if ((request.Facets & SharpProofAnalysisFacet.ProofFacts) != 0)
-                AnalyzeProofFacts(request, context, proofFacts, unknowns, evidence, truncations, cancellationToken);
+                AnalyzeProofFacts(request, context, proofFacts, unknowns, truncations, cancellationToken);
 
             if ((request.Facets & SharpProofAnalysisFacet.RuntimeHazards) != 0)
-                AnalyzeHazards(context, hazards, unknowns, evidence, truncations, cancellationToken);
+                AnalyzeHazards(context, hazards, unknowns, truncations, cancellationToken);
 
             if ((request.Facets & SharpProofAnalysisFacet.Complexity) != 0)
                 complexity = AnalyzeComplexity(context, unknowns, cancellationToken);
@@ -265,15 +247,11 @@ public sealed class SharpProofAnalysisSession : IDisposable {
                     ? SharpProofQueryStatus.Succeeded
                     : SharpProofQueryStatus.Unknown,
                 effects,
-                effects?.Purity ?? SharpProofVerdict.Unknown,
-                effects?.AllocationFree ?? SharpProofVerdict.Unknown,
-                effects?.DoesNotThrow ?? SharpProofVerdict.Unknown,
                 proofFacts.ToImmutable(),
                 hazards.ToImmutable(),
                 complexity,
                 unknowns.Distinct().ToImmutableArray(),
-                evidence.ToImmutable(),
-                new SharpProofBudgetMetadata(truncations.ToImmutable()),
+                truncations.ToImmutable(),
                 null);
         }
         catch (Exception exception) when (!SymbolicErrorClassifier.IsFatal(exception)) {
@@ -284,15 +262,11 @@ public sealed class SharpProofAnalysisSession : IDisposable {
                     ? SharpProofQueryStatus.Canceled
                     : SharpProofQueryStatus.Failed,
                 null,
-                SharpProofVerdict.Unknown,
-                SharpProofVerdict.Unknown,
-                SharpProofVerdict.Unknown,
-                ImmutableArray<string>.Empty,
+                ImmutableArray<SharpProofProofFact>.Empty,
                 ImmutableArray<SharpProofHazard>.Empty,
                 null,
                 ImmutableArray<SharpProofUnknownReason>.Empty,
-                ImmutableArray<SharpProofEvidence>.Empty,
-                new SharpProofBudgetMetadata(ImmutableArray<SharpProofTruncationReason>.Empty),
+                ImmutableArray<SharpProofTruncationReason>.Empty,
                 error);
         }
     }
@@ -305,7 +279,6 @@ public sealed class SharpProofAnalysisSession : IDisposable {
             SymbolicSourceCompilationKind.Query,
             "Method-effect source kind is not supported.",
             "Method-effect analysis supports point, position, line, or node targets only.",
-            "Method-effect node queries require a node target.",
             static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true),
             (resolved, compilation, token) => {
                 if (resolved.MethodSymbol == null)
@@ -320,26 +293,33 @@ public sealed class SharpProofAnalysisSession : IDisposable {
     private void AnalyzeProofFacts(
         SharpProofAnalysisRequest request,
         SymbolicQueryContext context,
-        ImmutableArray<string>.Builder facts,
+        ImmutableArray<SharpProofProofFact>.Builder facts,
         ImmutableArray<SharpProofUnknownReason>.Builder unknowns,
-        ImmutableArray<SharpProofEvidence>.Builder evidence,
         ImmutableArray<SharpProofTruncationReason>.Builder truncations,
         CancellationToken cancellationToken) {
         if (!string.IsNullOrWhiteSpace(request.Condition)) {
             var proof = _executor.Prove(context, request.Condition!, cancellationToken);
-            facts.Add($"{proof.Condition}: {proof.TruthValue} ({proof.Reason})");
+            facts.Add(Project(proof));
             if (proof.TruthValue == SymbolicTruthValue.Unknown)
                 unknowns.Add(Convert(SymbolicUnknownReasonTaxonomy.ForProof(
                     SymbolicUnknownReason.Unknown,
                     proof.Reason)));
-            AddEvidence(evidence, proof.Witness, proof.CounterexampleWitness);
             AddTruncations(truncations, proof.AnalysisTruncation);
             return;
         }
 
         var result = _executor.Query(context, cancellationToken);
-        facts.Add(result.MergedInvariantText);
-        foreach (var proof in result.ProgramPoints.SelectMany(static point => point.ConditionProofs))
+        var conditionProofs = result.ProgramPoints.SelectMany(static point => point.ConditionProofs).ToArray();
+        var hasUnknown = conditionProofs.Any(static proof => proof.TruthValue == SymbolicTruthValue.Unknown) ||
+                         result.ProgramPoints.Any(static point => point.Reachability == SymbolicReachability.Unknown);
+        facts.Add(new SharpProofProofFact(
+            "invariant",
+            hasUnknown ? "Unknown" : "Proven",
+            "merged_symbolic_invariant",
+            result.MergedInvariantText,
+            null));
+        facts.AddRange(conditionProofs.Select(Project));
+        foreach (var proof in conditionProofs)
             if (proof.TruthValue == SymbolicTruthValue.Unknown)
                 unknowns.Add(Convert(SymbolicUnknownReasonTaxonomy.ForProof(
                     SymbolicUnknownReason.Unknown,
@@ -349,8 +329,6 @@ public sealed class SharpProofAnalysisSession : IDisposable {
                 unknowns.Add(Convert(SymbolicUnknownReasonTaxonomy.ForProof(
                     SymbolicUnknownReason.Unknown,
                     point.ReachabilityReason)));
-        evidence.AddRange(result.ReachabilityWitnesses.Select(static witness =>
-            new SharpProofEvidence(witness.Status.ToString(), witness.Reason)));
         AddTruncations(truncations, result.AnalysisTruncation);
     }
 
@@ -358,19 +336,8 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         SymbolicQueryContext context,
         ImmutableArray<SharpProofHazard>.Builder hazards,
         ImmutableArray<SharpProofUnknownReason>.Builder unknowns,
-        ImmutableArray<SharpProofEvidence>.Builder evidence,
         ImmutableArray<SharpProofTruncationReason>.Builder truncations,
         CancellationToken cancellationToken) {
-        if (_options.SmtAnalysis == null) {
-            unknowns.Add(new SharpProofUnknownReason(
-                "SP-SMT-REQUIRED",
-                "Configuration",
-                "Runtime-hazard analysis requires EnableSmt.",
-                false,
-                true));
-            return;
-        }
-
         var result = _executor.QueryRuntimeHazards(
             context,
             new SymbolicRuntimeHazardQueryOptions(true),
@@ -381,17 +348,13 @@ public sealed class SharpProofAnalysisSession : IDisposable {
             hazard.StatusReason,
             hazard.ExceptionType,
             hazard.OperationText,
-            hazard.FilePath,
-            hazard.Line,
-            hazard.Column,
             hazard.SpanStart,
-            hazard.SpanEnd)));
+            hazard.SpanEnd,
+            FormatCounterexample(hazard.TriggerWitness))));
         unknowns.AddRange(result.Hazards
             .Where(static hazard => hazard.Status is SymbolicRuntimeHazardStatus.Unknown or
                 SymbolicRuntimeHazardStatus.Unsupported)
             .Select(static hazard => Convert(hazard.UnknownReasonInfo)));
-        evidence.AddRange(result.TriggerWitnesses.Select(static witness =>
-            new SharpProofEvidence(witness.Status.ToString(), witness.Reason)));
         AddTruncations(truncations, result.AnalysisTruncation);
     }
 
@@ -411,11 +374,19 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         reason.IsRetryable,
         reason.IsConfigurationRelated);
 
-    private static void AddEvidence(
-        ImmutableArray<SharpProofEvidence>.Builder evidence,
-        params SymbolicInputWitness[] witnesses) =>
-        evidence.AddRange(witnesses.Select(static witness =>
-            new SharpProofEvidence(witness.Status.ToString(), witness.Reason)));
+    private static SharpProofProofFact Project(SymbolicConditionProofResult proof) => new(
+        proof.Condition,
+        proof.TruthValue.ToString(),
+        proof.Reason,
+        proof.FormulaText,
+        FormatCounterexample(proof.CounterexampleWitness));
+
+    private static string? FormatCounterexample(SymbolicInputWitness witness) {
+        if (!witness.IsAvailable || witness.Assignments.Count == 0) return null;
+        return string.Join(", ", witness.Assignments
+            .OrderBy(static assignment => assignment.SourceName, StringComparer.Ordinal)
+            .Select(static assignment => assignment.SourceName + "=" + assignment.Value));
+    }
 
     private static void AddTruncations(
         ImmutableArray<SharpProofTruncationReason>.Builder target,
@@ -429,11 +400,8 @@ public sealed class SharpProofAnalysisSession : IDisposable {
 
     private static SymbolicQueryOptions CreateQueryOptions(
         SharpProofAnalysisOptions options,
-        SmtAnalysisService? smt) =>
+        SmtAnalysisService smt) =>
         new(
             smtAnalysis: smt,
-            impliedConditions: options.ImpliedConditions.IsDefault
-                ? ImmutableArray<string>.Empty
-                : options.ImpliedConditions,
             analysisLimits: options.AnalysisBudget);
 }

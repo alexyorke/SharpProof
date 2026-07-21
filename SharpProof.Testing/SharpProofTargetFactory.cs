@@ -28,31 +28,9 @@ internal static class SharpProofTargetFactory
         return new SharpProofTarget(SharpProofTargetKind.Span, SpanStart: start, SpanEnd: end);
     }
 
-    internal static SharpProofTarget LineSpan(
-        int startLine,
-        int startColumn,
-        int endLine,
-        int endColumn)
-    {
-        ValidatePositive(startLine, nameof(startLine));
-        ValidatePositive(startColumn, nameof(startColumn));
-        ValidatePositive(endLine, nameof(endLine));
-        ValidatePositive(endColumn, nameof(endColumn));
-        if (endLine < startLine) throw new ArgumentOutOfRangeException(nameof(endLine));
-        if (endLine == startLine && endColumn < startColumn)
-            throw new ArgumentOutOfRangeException(nameof(endColumn));
-        return new SharpProofTarget(
-            SharpProofTargetKind.LineSpan,
-            StartLine: startLine,
-            StartColumn: startColumn,
-            EndLine: endLine,
-            EndColumn: endColumn);
-    }
-
     internal static SharpProofTarget AllLines() => new(SharpProofTargetKind.AllLines);
 
-    internal static SharpProofTarget Node(bool includeNestedCallables = false) =>
-        new(SharpProofTargetKind.Node, IncludeNestedCallables: includeNestedCallables);
+    internal static SharpProofTarget Node() => new(SharpProofTargetKind.Span);
 
     private static void ValidatePositive(int value, string parameterName)
     {

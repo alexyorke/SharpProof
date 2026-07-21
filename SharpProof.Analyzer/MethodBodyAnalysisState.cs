@@ -39,7 +39,7 @@ internal sealed class MethodBodyAnalysisState {
         return GetOrCreateSymbolicQueryResult(
             "complexity",
             () => AnalyzerSymbolicQueryBoundary.TryExecute(() => QueryExecutor.QueryComplexity(
-                new SymbolicQueryContext(Snapshot.Source, new SharpProofTarget(SharpProofTargetKind.Node)),
+                new SymbolicQueryContext(Snapshot.Source, new SharpProofTarget(SharpProofTargetKind.Span)),
                 cancellationToken)));
     }
 

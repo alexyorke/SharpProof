@@ -354,12 +354,12 @@ public static class FuzzRunner {
         SharpProofAnalysisResult result,
         ImmutableArray<Diagnostic> diagnostics,
         ImmutableArray<FuzzFinding>.Builder findings) {
-        if (result.Purity != fuzzCase.Expectation.PurityVerdict)
+        if (result.MethodEffects!.Purity != fuzzCase.Expectation.PurityVerdict)
             findings.Add(new FuzzFinding(
                 fuzzCase.Name,
                 fuzzCase.Family,
                 "unexpected_purity_verdict",
-                $"Expected {fuzzCase.Expectation.PurityVerdict}, observed {result.Purity}.",
+                $"Expected {fuzzCase.Expectation.PurityVerdict}, observed {result.MethodEffects.Purity}.",
                 null,
                 result.UnknownReasons.Select(static reason => reason.Category + ":" + reason.Code).ToImmutableArray()));
 
@@ -405,14 +405,14 @@ public static class FuzzRunner {
                     ToDiagnosticSignatures(diagnostics)));
 
         var enforcePureFailure = diagnostics.Any(static diagnostic => diagnostic.Id == "SP0002");
-        if ((result.Purity == SharpProofVerdict.Proven) == enforcePureFailure)
+        if ((result.MethodEffects!.Purity == SharpProofVerdict.Proven) == enforcePureFailure)
             findings.Add(new FuzzFinding(
                 fuzzCase.Name,
                 fuzzCase.Family,
                 "enforce_pure_projection_mismatch",
                 "[EnforcePure] diagnostic did not match the canonical purity verdict.",
                 null,
-                ImmutableArray.Create("verdict=" + result.Purity, "diagnostic=" + enforcePureFailure)));
+                ImmutableArray.Create("verdict=" + result.MethodEffects.Purity, "diagnostic=" + enforcePureFailure)));
     }
 
     private static ImmutableSortedDictionary<string, int> CollectOperationKinds(

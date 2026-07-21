@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Test;
 
@@ -136,5 +137,17 @@ public sealed class EffectArchitectureTests {
         var session = File.ReadAllText(Path.Combine(root, "SharpProof.Analyzer", "AnalyzerSession.cs"));
         Assert.That(session, Does.Contain("ProofService.SmtAnalysis"));
         Assert.That(session, Does.Contain("MethodEffectAnalysisSession"));
+
+        var api = File.ReadAllText(Path.Combine(root, "SharpProof.Symbolic", "SharpProofAnalysisApi.cs"));
+        Assert.That(api, Does.Contain("new SmtAnalysisService"));
+        Assert.That(api, Does.Not.Contain("EnableSmt"));
+        Assert.That(api, Does.Not.Contain("SharpProofEvidence"));
+        Assert.That(api, Does.Not.Contain("SharpProofBudgetMetadata"));
+        Assert.That(api, Does.Not.Contain("SharpProofVerdict Purity"));
+        Assert.That(api, Does.Not.Contain("SharpProofTargetKind.Node"));
+        Assert.That(api, Does.Not.Contain("SharpProofTargetKind.LineSpan"));
+        Assert.That(
+            Enum.GetNames(typeof(SharpProofTargetKind)),
+            Is.EqualTo(new[] { "Point", "Position", "Line", "Span", "AllLines" }));
     }
 }

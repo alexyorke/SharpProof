@@ -69,25 +69,6 @@ internal static class SymbolicSourceLocation {
         return new LineColumn(line.LineNumber + 1, position - line.Start + 1);
     }
 
-    public static NodeSourceSpan GetNodeSourceSpan(
-        SyntaxTree syntaxTree,
-        TextSpan span,
-        CancellationToken cancellationToken) {
-        var text = syntaxTree.GetText(cancellationToken);
-        var startLine = text.Lines.GetLineFromPosition(span.Start);
-        var endLine = text.Lines.GetLineFromPosition(span.End);
-        return new NodeSourceSpan(
-            startLine.LineNumber + 1,
-            span.Start - startLine.Start + 1,
-            endLine.LineNumber + 1,
-            span.End - endLine.Start + 1);
-    }
 }
 
 internal readonly record struct LineColumn(int Line, int Column);
-
-internal readonly record struct NodeSourceSpan(
-    int StartLine,
-    int StartColumn,
-    int EndLine,
-    int EndColumn);

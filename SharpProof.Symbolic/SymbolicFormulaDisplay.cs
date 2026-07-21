@@ -233,10 +233,3 @@ internal static class SymbolicFormulaDisplay {
             .Replace("\t", "\\t");
     }
 }
-
-internal static class SymbolicProgramPointKinds {
-    public const string Statement = "Statement";
-    public const string Expression = "Expression";
-    public const string Other = "Other";
-
-}

@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using SharpProof.Symbolic;
@@ -27,13 +26,11 @@ const string source = """
 
 using var session = SharpProofAnalysisSession.FromText(
     source,
-    "NativeSmtProbe.cs",
-    new SharpProofAnalysisOptions(
-        EnableSmt: true,
-        ImpliedConditions: ImmutableArray.Create("left < middle", "left < right")));
+    "NativeSmtProbe.cs");
 var result = session.Analyze(new SharpProofAnalysisRequest(
     new SharpProofTarget(SharpProofTargetKind.Point, Line: 10, Column: 9),
-    SharpProofAnalysisFacet.ProofFacts));
+    SharpProofAnalysisFacet.ProofFacts,
+    "left < right"));
 var proofsHold = result.Status == SharpProofQueryStatus.Succeeded;
 var unknownProofCount = result.UnknownReasons.Length;
 var nativeAvailable = proofsHold;

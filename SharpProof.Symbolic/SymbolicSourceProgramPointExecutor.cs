@@ -21,16 +21,10 @@ internal sealed class SymbolicSourceProgramPointExecutor(
     }
 
     internal SymbolicProgramPointResult AnalyzeAndProjectNode(
-        SyntaxTree syntaxTree,
         SemanticModel semanticModel,
         SyntaxNode node,
         SymbolicQueryOptions options,
-        CancellationToken cancellationToken,
-        int? requestedLine = null,
-        int? requestedColumn = null,
-        int? requestedPosition = null,
-        int? requestedPositionDistance = null,
-        bool? containsRequestedPosition = null) {
+        CancellationToken cancellationToken) {
         var query = _invariantService.Analyze(
             semanticModel,
             node.SpanStart,
@@ -38,37 +32,13 @@ internal sealed class SymbolicSourceProgramPointExecutor(
             options.SmtAnalysis,
             cancellationToken,
             options.IncludeCurrentStatementCompletionFacts);
-        var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
-            syntaxTree,
-            query.Position,
-            cancellationToken,
-            true);
-        return Project(
-            syntaxTree,
-            query,
-            lineColumn.Line,
-            lineColumn.Column,
-            options,
-            cancellationToken,
-            requestedLine,
-            requestedColumn,
-            requestedPosition,
-            requestedPositionDistance,
-            containsRequestedPosition);
+        return Project(query, options, cancellationToken);
     }
 
     internal SymbolicProgramPointResult Project(
-        SyntaxTree syntaxTree,
         SymbolicProgramPointQueryContext query,
-        int line,
-        int column,
         SymbolicQueryOptions options,
-        CancellationToken cancellationToken,
-        int? requestedLine = null,
-        int? requestedColumn = null,
-        int? requestedPosition = null,
-        int? requestedPositionDistance = null,
-        bool? containsRequestedPosition = null) {
+        CancellationToken cancellationToken) {
         var conditionProofs = _conditionProofEngine.ProveAll(
             query.SemanticModel,
             query.Position,
@@ -78,17 +48,8 @@ internal sealed class SymbolicSourceProgramPointExecutor(
             options.SmtAnalysis,
             cancellationToken);
         return SymbolicProgramPointProjector.Project(
-            syntaxTree,
             query,
-            line,
-            column,
             conditionProofs,
-            SymbolicSmtDiagnostics.FromService(options.SmtAnalysis),
-            cancellationToken,
-            requestedLine,
-            requestedColumn,
-            requestedPosition,
-            requestedPositionDistance,
-            containsRequestedPosition);
+            cancellationToken);
     }
 }

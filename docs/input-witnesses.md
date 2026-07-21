@@ -1,103 +1,28 @@
-# Solver Witnesses And Input Domains
+# Solver witnesses and input domains
 
-SharpProof query results can explain which inputs make a program point or
-runtime hazard feasible. The public API exposes both a concrete solver model
-and a conservative summary of the constraints around that model.
+Z3 satisfying assignments, counterexamples, and synthesized input domains are
+core analysis evidence. SharpProof keeps their typed internal representation so
+analyzer projections and tests can distinguish exact, approximate, unsupported,
+and absent witnesses.
 
-These are different claims:
+A satisfying assignment is one model accepted by the bounded solver, not the
+complete input set. Domain synthesis conservatively summarizes supported facts
+such as integer bounds, nullness, string predicates, collection lengths, and
+index relationships. Unsupported translations, timeouts, solver failures, and
+budget exhaustion stay unknown.
 
-- A satisfying assignment is one example accepted by the bounded solver. It is
-  not the complete set of inputs.
-- An input domain summarizes supported path constraints such as integer bounds,
-  nullness, string predicates, collection lengths, and index relationships.
-  It can be exact, approximate, or unsupported independently of the model.
+The supported `SharpProofAnalysisResult` does not serialize full solver models
+or domain graphs. Each `SharpProofProofFact` exposes only:
 
-## Query Surfaces
+- the source condition and compact status;
+- the proof reason and relevant symbolic condition;
+- an optional summarized counterexample such as `value=0`.
 
-`SharpProofQueryResult.Evidence` exposes bounded status/reason summaries without
-leaking solver assignments or internal symbolic state into the .NET API. The
-CLI's compatibility JSON retains detailed assignments and input domains at the
-external process boundary.
+Runtime hazards use the same approach: the result contains the hazard status,
+reason, source span, and optional compact trigger counterexample. Full
+`SymbolicInputWitness`, satisfying assignments, domain summaries, Z3 proof
+results, cache metadata, and solver diagnostics remain inside the analysis
+pipeline and retain dedicated test coverage.
 
-## Status And Precision
-
-Evidence status values are:
-
-- `Exact` means the value or supported constraint is represented exactly by
-  the current bounded model.
-- `Approximate` means the result is useful but intentionally conservative. This
-  includes opaque non-null reference identities, regex predicates whose .NET
-  semantics may be approximated, disjunctive path summaries, and domains merged
-  across alternative program points.
-- `Unsupported` means SharpProof could not produce the requested model or
-  domain shape. `Reason` identifies the boundary.
-- `None` means no satisfying witness applies, normally because the path or
-  trigger is unsatisfiable.
-
-Consumers must not reinterpret `Approximate` or `Unsupported` as an exact input
-contract. A witness attached to an `Unknown` proof is evidence of satisfiability
-for the represented candidate constraints, not a proof that all source/runtime
-semantics were modeled.
-
-## Assignments
-
-Each `SymbolicSatisfyingAssignment` includes:
-
-- the internal `SymbolicName` and source-oriented `SourceName`
-- `Role`: parameter, local, receiver, receiver state, derived, or unknown
-- `ValueKind`: boolean, integer, reference, string, or unknown
-- a stable display `Value` and the applicable typed property:
-  `BooleanValue`, `IntegerValue`, `StringValue`, or `IsNull`
-- its precision `Status` and `Reason`
-
-Non-null reference values are opaque solver identities. Their `IsNull = false`
-fact is useful, but their display value is marked approximate and must not be
-treated as a constructible object graph.
-
-## Domain Summaries
-
-`SymbolicInputDomain` groups related solver variables under a source input. For
-example, a string reference, its `.String` content variable, and a string-length
-term are reported as one string domain. A collection reference and its
-`.Length` or `.Count` variable are reported as one collection domain.
-
-Supported fields include:
-
-- `IntegerRange`, with inclusive/exclusive minimum and maximum bounds
-- `Nullness`
-- `ExactString` and `StringLengthRange`
-- required prefixes, suffixes, and substrings
-- regex patterns, explicitly marked approximate
-- `CollectionLengthRange`
-- `IsIndex` and `RelatedCollection`
-- normalized `Predicates` with per-predicate precision and reasons
-
-Point domains represent a conjunction of the supported path constraints.
-Aggregate line/span/file domains represent alternative paths. Their range is a
-conservative envelope, nullness or exact content is retained only when common,
-and required string predicates are intersected. The aggregate is marked
-`Approximate` with `AlternativeCount` so a consumer cannot mistake the union for
-a single path contract.
-
-## API Example
-
-```csharp
-using SharpProof.Symbolic;
-using var session = SharpProofAnalysisSession.FromText(
-    source,
-    "Example.cs",
-    new SharpProofAnalysisOptions(EnableSmt: true));
-var response = session.Analyze(
-    new SharpProofQuery(
-        SharpProofQueryKind.Reachability,
-        new SharpProofTarget(SharpProofTargetKind.Line, Line: 42)));
-var result = (SourceQueryPayload)response.Payload!;
-
-foreach (var evidence in response.Evidence)
-    Console.WriteLine($"{evidence.Status}: {evidence.Reason}");
-```
-
-For a divide-by-zero candidate, inspect
-`hazard.TriggerWitness.Assignments` and select the `divisor` assignment. A
-satisfying trigger witness will report integer value `0`; an unreachable
-candidate reports `None` instead of inventing an input.
+This split keeps the default CLI JSON stable and small without weakening the Z3
+proof path or discarding evidence needed for diagnostics and validation.

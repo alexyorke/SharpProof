@@ -25,8 +25,8 @@ public sealed class MethodEffectsTests {
 
         Assert.Multiple(() => {
             Assert.That(result.Status, Is.EqualTo(SharpProofQueryStatus.Succeeded));
-            Assert.That(result.Purity, Is.EqualTo(expectedPurity));
-            Assert.That(result.AllocationFree, Is.EqualTo(expectedAllocationFree));
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(expectedPurity));
+            Assert.That(result.MethodEffects.AllocationFree, Is.EqualTo(expectedAllocationFree));
         });
     }
 
@@ -43,7 +43,7 @@ public sealed class MethodEffectsTests {
             new SharpProofTarget(SharpProofTargetKind.Line, Line: 3),
             SharpProofAnalysisFacet.Effects));
 
-        Assert.That(result.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+        Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
         Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
     }
 
@@ -60,7 +60,7 @@ public sealed class MethodEffectsTests {
             new SharpProofTarget(SharpProofTargetKind.Line, Line: 3),
             SharpProofAnalysisFacet.Effects));
 
-        Assert.That(result.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
+        Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
         Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.True);
     }
 
@@ -78,9 +78,9 @@ public sealed class MethodEffectsTests {
             """, 3);
 
         Assert.Multiple(() => {
-            Assert.That(result.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
                 string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
-            Assert.That(result.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
             Assert.That(result.MethodEffects!.ExceptionFacts, Has.Some.Matches<MethodExceptionFact>(fact =>
                 fact.ExceptionType == exceptionType && fact.Source == source &&
                 fact.Escape == SharpProofVerdict.Proven));
@@ -99,7 +99,7 @@ public sealed class MethodEffectsTests {
             }
             """, 3);
 
-        Assert.That(result.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven),
+        Assert.That(result.MethodEffects!.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven),
             string.Join(" | ", result.MethodEffects!.ExceptionFacts.Select(static fact =>
                 fact.ExceptionType + ":" + fact.Escape + ":" + fact.Reason)));
         Assert.That(result.MethodEffects!.ExceptionFacts,
@@ -129,7 +129,7 @@ public sealed class MethodEffectsTests {
             """);
 
         Assert.Multiple(() => {
-            Assert.That(result.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
             Assert.That(result.UnknownReasons, Has.Some.Property(nameof(SharpProofUnknownReason.Message))
                 .EqualTo("recursive_call"));
         });

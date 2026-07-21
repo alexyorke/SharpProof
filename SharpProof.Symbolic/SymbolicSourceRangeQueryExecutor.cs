@@ -19,7 +19,6 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
             options.IncludeExpressionProgramPoints);
         var results = nodes
             .Select(node => _programPointExecutor.AnalyzeAndProjectNode(
-                syntaxTree,
                 semanticModel,
                 node,
                 options,
@@ -48,16 +47,10 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
 
         var node = SymbolicSourceTargetSelector.SelectNearest(nodes, position);
         return _programPointExecutor.AnalyzeAndProjectNode(
-            syntaxTree,
             semanticModel,
             node,
             options,
-            cancellationToken,
-            line,
-            column,
-            position,
-            SymbolicSourceTargetSelector.GetDistance(node, position),
-            SymbolicSourceTargetSelector.ContainsPosition(node, position));
+            cancellationToken);
     }
 
     internal SymbolicQueryResult QuerySpan(
@@ -77,34 +70,12 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
             cancellationToken);
         var results = nodes
             .Select(node => _programPointExecutor.AnalyzeAndProjectNode(
-                syntaxTree,
                 semanticModel,
                 node,
                 options,
                 cancellationToken))
             .ToArray();
         return SymbolicQueryResult.From(results);
-    }
-
-    internal SymbolicQueryResult QueryLineSpan(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        int startLine,
-        int startColumn,
-        int endLine,
-        int endColumn,
-        SymbolicQueryOptions options,
-        CancellationToken cancellationToken) {
-        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-        var spanStart = SymbolicSourceLocation.GetPosition(syntaxTree, startLine, startColumn, cancellationToken);
-        var spanEnd = SymbolicSourceLocation.GetPosition(syntaxTree, endLine, endColumn, cancellationToken);
-        return QuerySpan(
-            syntaxTree,
-            compilation,
-            spanStart,
-            spanEnd,
-            options,
-            cancellationToken);
     }
 
     internal SymbolicQueryResult QueryAllLines(

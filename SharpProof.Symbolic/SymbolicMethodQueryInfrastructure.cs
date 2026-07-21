@@ -78,7 +78,6 @@ internal static class SymbolicMethodLikeQueryDispatcher {
         SymbolicSourceCompilationKind compilationKind,
         string unsupportedSourceMessage,
         string unsupportedTargetMessage,
-        string nodeTargetMessage,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
         Func<ResolvedMethodLikeTarget, Compilation, CancellationToken, TResult> executeAnalysis,
         CancellationToken cancellationToken) {
@@ -118,9 +117,6 @@ internal static class SymbolicMethodLikeQueryDispatcher {
             CancellationToken queryCancellationToken) {
             if (node == null) throw new ArgumentNullException(nameof(node));
             if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-            if (queryTarget.Kind != SharpProofTargetKind.Node)
-                throw new NotSupportedException(nodeTargetMessage);
-
             var resolvedTarget = SymbolicMethodLikeTargetResolver.ResolveNode(
                 node,
                 semanticModel,
@@ -245,20 +241,15 @@ internal static class SymbolicMethodLikeTargetResolver {
 }
 
 internal sealed record ResolvedMethodLikeTarget(
-    SyntaxTree SyntaxTree,
     SemanticModel SemanticModel,
     SyntaxNode Declaration,
     SyntaxNode? BodyNode,
-    IMethodSymbol? MethodSymbol,
-    NodeSourceSpan SourceSpan) {
+    IMethodSymbol? MethodSymbol) {
     internal string MethodName => !string.IsNullOrWhiteSpace(MethodSymbol?.Name)
         ? MethodSymbol!.Name
         : Declaration is AnonymousFunctionExpressionSyntax
             ? "anonymous_function"
             : Declaration.Kind().ToString();
-
-    internal string MethodDisplayName =>
-        MethodSymbol?.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) ?? MethodName;
 
     internal string DeclarationKind => Declaration switch {
         MethodDeclarationSyntax => "method",
@@ -279,15 +270,10 @@ internal sealed record ResolvedMethodLikeTarget(
         SemanticModel semanticModel,
         CancellationToken cancellationToken) =>
         new(
-            declaration.SyntaxTree,
             semanticModel,
             declaration,
             SymbolicMethodSourceResolver.GetBodyNode(declaration),
-            SymbolicMethodLikeDeclaration.GetMethodSymbol(declaration, semanticModel, cancellationToken),
-            SymbolicSourceLocation.GetNodeSourceSpan(
-                declaration.SyntaxTree,
-                declaration.Span,
-                cancellationToken));
+            SymbolicMethodLikeDeclaration.GetMethodSymbol(declaration, semanticModel, cancellationToken));
 }
 
 internal static class SymbolicMethodSourceResolver {

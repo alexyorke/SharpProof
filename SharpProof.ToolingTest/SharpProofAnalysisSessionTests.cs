@@ -47,6 +47,29 @@ public sealed class SharpProofAnalysisSessionTests {
     }
 
     [Test]
+    public void ConditionProofExposesCompactCounterexampleWithoutPublicSolverModel() {
+        using var session = SharpProofAnalysisSession.FromText("""
+            class C {
+                static int M(int value) {
+                    return value;
+                }
+            }
+            """);
+
+        var result = session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Point, Line: 3, Column: 13),
+            SharpProofAnalysisFacet.ProofFacts,
+            "value > 0"));
+
+        var proof = result.ProofFacts.Single();
+        Assert.Multiple(() => {
+            Assert.That(proof.Status, Is.EqualTo("Unknown"));
+            Assert.That(proof.SymbolicCondition, Does.Contain("value"));
+            Assert.That(proof.Counterexample, Does.Contain("value="));
+        });
+    }
+
+    [Test]
     public void RequestsAreSafeToReuseConcurrently() {
         using var session = SharpProofAnalysisSession.FromText("""
             class C {

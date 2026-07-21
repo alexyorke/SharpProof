@@ -41,10 +41,7 @@ try {
     var format = values.TryGetValue("--format", out var selectedFormat) ? selectedFormat : "text";
     if (format is not ("text" or "json")) return Usage("--format must be text or json.");
 
-    using var session = SharpProofAnalysisSession.FromFile(
-        file,
-        new SharpProofAnalysisOptions(EnableSmt: (facets &
-            (SharpProofAnalysisFacet.ProofFacts | SharpProofAnalysisFacet.RuntimeHazards)) != 0));
+    using var session = SharpProofAnalysisSession.FromFile(file);
     var result = session.Analyze(new SharpProofAnalysisRequest(
         target,
         facets,
@@ -66,13 +63,14 @@ try {
         if (result.MethodEffects != null) {
             Console.WriteLine($"Effects: {result.MethodEffects.Effects}");
             Console.WriteLine($"Capabilities: {result.MethodEffects.Capabilities}");
-            Console.WriteLine($"Purity: {result.Purity}");
-            Console.WriteLine($"Allocation-free: {result.AllocationFree}");
-            Console.WriteLine($"Does-not-throw: {result.DoesNotThrow}");
+            Console.WriteLine($"Purity: {result.MethodEffects.Purity}");
+            Console.WriteLine($"Allocation-free: {result.MethodEffects.AllocationFree}");
+            Console.WriteLine($"Does-not-throw: {result.MethodEffects.DoesNotThrow}");
             foreach (var site in result.MethodEffects.Sites)
                 Console.WriteLine($"  effect {site.Reason} at {site.SpanStart}: {site.Operation}");
         }
-        foreach (var fact in result.ProofFacts) Console.WriteLine("Proof: " + fact);
+        foreach (var fact in result.ProofFacts)
+            Console.WriteLine($"Proof: {fact.Condition}: {fact.Status} ({fact.Reason})");
         foreach (var hazard in result.Hazards)
             Console.WriteLine($"Hazard: {hazard.Kind} {hazard.Status}: {hazard.Operation}");
         if (result.Complexity != null) Console.WriteLine("Complexity: " + result.Complexity);
@@ -80,12 +78,18 @@ try {
             Console.WriteLine($"Unknown: {reason.Code}: {reason.Message}");
     }
 
-    if (flags.Contains("--fail-on-disproven") &&
-        new[] { result.Purity, result.AllocationFree, result.DoesNotThrow }.Contains(SharpProofVerdict.Disproven))
+    var verdicts = result.MethodEffects == null
+        ? Array.Empty<SharpProofVerdict>()
+        : new[] {
+            result.MethodEffects.Purity,
+            result.MethodEffects.AllocationFree,
+            result.MethodEffects.DoesNotThrow
+        };
+    if (flags.Contains("--fail-on-disproven") && verdicts.Contains(SharpProofVerdict.Disproven))
         return 5;
     if (flags.Contains("--fail-on-unknown") &&
         (result.Status == SharpProofQueryStatus.Unknown || !result.UnknownReasons.IsDefaultOrEmpty ||
-         new[] { result.Purity, result.AllocationFree, result.DoesNotThrow }.Contains(SharpProofVerdict.Unknown)))
+         verdicts.Contains(SharpProofVerdict.Unknown)))
         return 4;
     return 0;
 }

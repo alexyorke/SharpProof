@@ -20,12 +20,10 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
         SymbolicRuntimeHazardQueryOptions? options = null) {
         var scope = target.Kind switch {
             SharpProofTargetKind.Line or SharpProofTargetKind.Point => new RuntimeHazardScope(
-                SymbolicSourceLocation.GetLineSpan(syntaxTree, target.Line!.Value, cancellationToken),
-                target.Line),
+                SymbolicSourceLocation.GetLineSpan(syntaxTree, target.Line!.Value, cancellationToken)),
             SharpProofTargetKind.Span => new RuntimeHazardScope(
                 SymbolicSourceLocation.GetSourceSpan(
-                    syntaxTree, target.SpanStart!.Value, target.SpanEnd!.Value, cancellationToken),
-                null),
+                    syntaxTree, target.SpanStart!.Value, target.SpanEnd!.Value, cancellationToken)),
             SharpProofTargetKind.AllLines => RuntimeHazardScope.All,
             _ => throw new NotSupportedException("Target kind is not supported for runtime hazard queries.")
         };
@@ -51,7 +49,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             node.SyntaxTree,
             semanticModel,
             node,
-            new RuntimeHazardScope(node.Span, null),
+            new RuntimeHazardScope(node.Span),
             smtAnalysis,
             cancellationToken,
             options,
@@ -74,7 +72,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             node.SyntaxTree,
             semanticModel,
             node,
-            new RuntimeHazardScope(node.Span, null),
+            new RuntimeHazardScope(node.Span),
             smtAnalysis,
             cancellationToken,
             options,
@@ -133,7 +131,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             .Where(candidate => !scope.Span.HasValue || candidate.Site.Span.IntersectsWith(scope.Span.Value))
             .Where(candidate => options.Includes(candidate.Kind))
             .Select(candidate => ClassifyCandidate(
-                syntaxTree,
                 semanticModel,
                 candidate,
                 smtAnalysis,
@@ -144,23 +141,14 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             .ThenBy(static hazard => hazard.Kind.ToString(), StringComparer.Ordinal)
             .ToArray();
 
-        var sourceText = syntaxTree.GetText(cancellationToken);
-        return new SymbolicRuntimeHazardQueryResult(
-            syntaxTree.FilePath,
-            sourceText.Lines.Count,
-            scope.Span?.Start,
-            scope.Span?.End,
-            scope.RequestedLine,
-            hazards,
-            SymbolicSmtDiagnostics.FromService(smtAnalysis));
+        return new SymbolicRuntimeHazardQueryResult(hazards);
     }
 
-    readonly record struct RuntimeHazardScope(TextSpan? Span, int? RequestedLine) {
-        public static RuntimeHazardScope All { get; } = new(null, null);
+    readonly record struct RuntimeHazardScope(TextSpan? Span) {
+        public static RuntimeHazardScope All { get; } = new(null);
     }
 
     private SymbolicRuntimeHazard ClassifyCandidate(
-        SyntaxTree syntaxTree,
         SemanticModel semanticModel,
         RuntimeHazardCandidate candidate,
         SmtAnalysisService smtAnalysis,
@@ -181,9 +169,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             triggerCondition,
             triggerPrecondition,
             smtAnalysis);
-        var lineColumn =
-            SymbolicSourceLocation.GetLineAndColumn(syntaxTree, candidate.Site.SpanStart, cancellationToken);
-        var sourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(syntaxTree, candidate.Site.Span, cancellationToken);
         var triggerWitness = CreateTriggerWitness(
             analysis,
             triggerCondition,
@@ -194,31 +179,14 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             reason);
 
         return new SymbolicRuntimeHazard(
-            syntaxTree.FilePath,
             descriptor,
             status,
             reason,
-            candidate.Site.Kind().ToString(),
             candidate.Site.ToString(),
             candidate.Site.SpanStart,
             candidate.Site.Span.End,
-            lineColumn.Line,
-            lineColumn.Column,
-            sourceSpan.StartLine,
-            sourceSpan.StartColumn,
-            sourceSpan.EndLine,
-            sourceSpan.EndColumn,
             SymbolicFormulaDisplay.Format(triggerCondition),
-            SymbolicFactInfo.FromFact(triggerPrecondition),
-            analysis.MergedInvariantText,
-            analysis.Facts,
-            SymbolicFactInfo.Distinct(
-                SymbolicFactInfo.FromState(analysis.PathState).Concat(
-                    new[] { SymbolicFactInfo.FromFact(triggerPrecondition) })),
-            analysis.Reachability,
-            analysis.ReachabilityReason,
             proofInfo,
-            SymbolicSmtDiagnostics.FromService(smtAnalysis),
             triggerWitness,
             analysis.Truncation);
     }
@@ -316,20 +284,9 @@ internal sealed class SymbolicRuntimeHazardQueryOptions(
         Kinds.Count == 0 || Kinds.Contains(kind);
 }
 
-internal sealed record SymbolicRuntimeHazardQueryResult(
-    string FilePath,
-    int LineCount,
-    int? ScopeStart,
-    int? ScopeEnd,
-    int? Line,
-    IReadOnlyList<SymbolicRuntimeHazard> Hazards,
-    SymbolicSmtDiagnostics? RawSmtDiagnostics = null) {
-    public int HazardCount => Hazards.Count;
-
+internal sealed record SymbolicRuntimeHazardQueryResult(IReadOnlyList<SymbolicRuntimeHazard> Hazards) {
     public SymbolicAnalysisTruncationInfo AnalysisTruncation =>
         SymbolicAnalysisTruncationInfo.Combine(Hazards.Select(static hazard => hazard.AnalysisTruncation));
-
-    public SymbolicSmtDiagnostics SmtDiagnostics => RawSmtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
 
     public IReadOnlyList<SymbolicInputWitness> TriggerWitnesses =>
         Hazards.Select(static hazard => hazard.TriggerWitness).ToArray();
@@ -340,29 +297,14 @@ internal sealed record SymbolicRuntimeHazardQueryResult(
 }
 
 internal sealed record SymbolicRuntimeHazard(
-    string FilePath,
     SymbolicHazardOperation Descriptor,
     SymbolicRuntimeHazardStatus Status,
     string StatusReason,
-    string NodeKind,
     string OperationText,
     int SpanStart,
     int SpanEnd,
-    int Line,
-    int Column,
-    int NodeStartLine,
-    int NodeStartColumn,
-    int NodeEndLine,
-    int NodeEndColumn,
     string TriggerCondition,
-    SymbolicFactInfo? TriggerPrecondition,
-    string MergedInvariantText,
-    IReadOnlyList<string> PathConditions,
-    IReadOnlyList<SymbolicFactInfo> SymbolicFacts,
-    SymbolicReachability Reachability,
-    string ReachabilityReason,
     SymbolicProofInfo? RawProofInfo,
-    SymbolicSmtDiagnostics? RawSmtDiagnostics = null,
     SymbolicInputWitness? RawTriggerWitness = null,
     SymbolicAnalysisTruncationInfo? RawAnalysisTruncation = null) {
     public SymbolicRuntimeHazardKind Kind => Descriptor.HazardKind;
@@ -371,17 +313,11 @@ internal sealed record SymbolicRuntimeHazard(
 
     public string Category => Descriptor.Category;
 
-    public int SpanLength => SpanEnd - SpanStart;
-
-    public int PathConditionCount => PathConditions.Count;
-
     public SymbolicProofInfo Proof => CreateProofInfo(
         Status, StatusReason, Category, TriggerCondition, Kind, RawProofInfo);
 
     public SymbolicUnknownReasonInfo UnknownReasonInfo => SymbolicUnknownReasonTaxonomy.ForRuntimeHazard(
         Status, StatusReason, Proof.UnknownReason);
-
-    public SymbolicSmtDiagnostics SmtDiagnostics => RawSmtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
 
     public SymbolicAnalysisTruncationInfo AnalysisTruncation =>
         RawAnalysisTruncation ?? SymbolicAnalysisTruncationInfo.None;

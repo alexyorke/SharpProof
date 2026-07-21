@@ -14,16 +14,8 @@ internal static class SymbolicComplexityResultProjector {
             summary.Cost.IsRecursiveUnknown);
 
         return new SymbolicComplexityResult(
-            target.SyntaxTree.FilePath ?? string.Empty,
             target.MethodName,
-            target.MethodDisplayName,
             target.DeclarationKind,
-            target.Declaration.SpanStart,
-            target.Declaration.Span.End,
-            target.SourceSpan.StartLine,
-            target.SourceSpan.StartColumn,
-            target.SourceSpan.EndLine,
-            target.SourceSpan.EndColumn,
             complexity,
             DistinctDrivers(summary.Drivers),
             DistinctUnknownReasons(summary.UnknownReasons),
