@@ -488,7 +488,6 @@ public sealed class NullableContractVerificationTests
     {
         return AnalyzerTestHost.GetDiagnosticsAsync(
             source,
-            globalOptions: options,
-            analyzerFeatures: AnalyzerFeatures.Nullability);
+            globalOptions: options);
     }
 }

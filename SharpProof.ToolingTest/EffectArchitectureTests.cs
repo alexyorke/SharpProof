@@ -44,7 +44,13 @@ public sealed class EffectArchitectureTests {
             "SharpProof.Analyzer/SharpProofDiagnosticSuppressor.cs",
             "SharpProof.Analyzer/AttributePlacementAnalyzer.cs",
             "SharpProof.Analyzer/TrustedBoundaryReviewAnalyzer.cs",
-            "SharpProof.Analyzer/Configuration/DiagnosticBaseline.cs"
+            "SharpProof.Analyzer/Configuration/DiagnosticBaseline.cs",
+            "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.json",
+            "SharpProof.Analyzer/Configuration/AnalyzerConfigurationOptions.json",
+            "SharpProof.Analyzer/AnalyzerFeatures.cs",
+            "SharpProof.Analyzer/RequiresEntryStateBuilder.cs",
+            "SharpProof.Symbolic/SharpProofCapabilityFacts.cs",
+            "SharpProof.Symbolic/SymbolicInvariantTargetFilter.cs"
         };
         foreach (var relativePath in removedFiles)
             Assert.That(File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))),
@@ -133,7 +139,7 @@ public sealed class EffectArchitectureTests {
         Assert.That(File.Exists(Path.Combine(root, "SharpProof.ProofCore", "Z3FormulaEncoder.cs")), Is.True);
 
         var configuration = File.ReadAllText(Path.Combine(
-            root, "SharpProof.Analyzer", "Configuration", "AnalyzerConfigurationOptions.json"));
+            root, "SharpProof.Analyzer", "Configuration", "AnalyzerConfigurationOptionRegistry.cs"));
         Assert.That(configuration, Does.Contain("sharpproof_smt_mode"));
         Assert.That(configuration, Does.Not.Contain("disabled"));
 

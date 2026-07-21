@@ -2,16 +2,6 @@ namespace SharpProof.Analyzer;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class SharpProofAnalyzer : DiagnosticAnalyzer {
-    public SharpProofAnalyzer()
-        : this(AnalyzerFeatures.All) {
-    }
-
-    internal SharpProofAnalyzer(AnalyzerFeatures features) {
-        Features = features;
-    }
-
-    internal AnalyzerFeatures Features { get; }
-
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         AnalyzerDiagnosticCatalog.SupportedDiagnostics;
 
@@ -25,8 +15,7 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
             var session = new AnalyzerSession(
                 startContext.Compilation,
                 startContext.Options,
-                startContext.CancellationToken,
-                Features);
+                startContext.CancellationToken);
 
             startContext.RegisterCompilationEndAction(endContext => {
                 try {
@@ -40,24 +29,22 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
                 }
             });
 
-            if ((session.Features & AnalyzerFeatures.Callable) != 0) {
-                startContext.RegisterOperationBlockAction(
-                    c => AnalyzerFeaturePipeline.AnalyzeOperationBlock(c, session));
-                startContext.RegisterSyntaxNodeAction(
-                    c => AnalyzerFeaturePipeline.AnalyzeSyntaxFallback(c, session),
-                    SyntaxKind.AddAccessorDeclaration,
-                    SyntaxKind.MethodDeclaration,
-                    SyntaxKind.GetAccessorDeclaration,
-                    SyntaxKind.InitAccessorDeclaration,
-                    SyntaxKind.IndexerDeclaration,
-                    SyntaxKind.RemoveAccessorDeclaration,
-                    SyntaxKind.PropertyDeclaration,
-                    SyntaxKind.SetAccessorDeclaration,
-                    SyntaxKind.ConstructorDeclaration,
-                    SyntaxKind.ConversionOperatorDeclaration,
-                    SyntaxKind.OperatorDeclaration,
-                    SyntaxKind.LocalFunctionStatement);
-            }
+            startContext.RegisterOperationBlockAction(
+                c => AnalyzerFeaturePipeline.AnalyzeOperationBlock(c, session));
+            startContext.RegisterSyntaxNodeAction(
+                c => AnalyzerFeaturePipeline.AnalyzeSyntaxFallback(c, session),
+                SyntaxKind.AddAccessorDeclaration,
+                SyntaxKind.MethodDeclaration,
+                SyntaxKind.GetAccessorDeclaration,
+                SyntaxKind.InitAccessorDeclaration,
+                SyntaxKind.IndexerDeclaration,
+                SyntaxKind.RemoveAccessorDeclaration,
+                SyntaxKind.PropertyDeclaration,
+                SyntaxKind.SetAccessorDeclaration,
+                SyntaxKind.ConstructorDeclaration,
+                SyntaxKind.ConversionOperatorDeclaration,
+                SyntaxKind.OperatorDeclaration,
+                SyntaxKind.LocalFunctionStatement);
 
             startContext.RegisterSyntaxTreeAction(AnalyzeTreeConfiguration);
         });

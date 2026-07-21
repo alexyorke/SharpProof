@@ -1,6 +1,6 @@
 # SharpProof diagnostics
 
-The authoritative diagnostic titles, severities, messages, descriptions, and configuration are maintained in `SharpProof.Analyzer/AnalyzerDiagnosticCatalog.json`. The links below provide stable anchors for analyzer help URLs. Purity is reported only through the `[EnforcePure]` contract; all verdicts are derived from the canonical method-effect result.
+The authoritative diagnostic titles, severities, messages, descriptions, and configuration are maintained in `SharpProof.Analyzer/AnalyzerDiagnosticCatalog.cs`. The links below provide stable anchors for analyzer help URLs. Purity is reported only through the `[EnforcePure]` contract; all verdicts are derived from the canonical method-effect result.
 
 <a id="sp0002"></a> SP0002 - observable purity was not proven.
 <a id="sp0013"></a> SP0013 - allocation violates `[ZeroAllocations]`.

@@ -15,7 +15,6 @@ namespace SharpProof.Test;
 
 internal static class AnalyzerTestHost
 {
-    private const string SuggestMissingEnforcePureOption = "sharpproof_suggest_missing_enforce_pure";
     private static readonly CSharpParseOptions PreviewParseOptions = new(LanguageVersion.Preview);
 
     private static readonly CSharpCompilationOptions DefaultCompilationOptions =
@@ -24,9 +23,8 @@ internal static class AnalyzerTestHost
     private static readonly CSharpCompilationOptions UnsafeCompilationOptions =
         DefaultCompilationOptions.WithAllowUnsafe(true);
 
-    private static readonly ConcurrentDictionary<AnalyzerFeatures, ImmutableArray<DiagnosticAnalyzer>>
-        AnalyzerInstances =
-            new();
+    private static readonly ImmutableArray<DiagnosticAnalyzer> AnalyzerInstances =
+        ImmutableArray.Create<DiagnosticAnalyzer>(new SharpProofAnalyzer());
 
     private static readonly Lazy<ImmutableArray<MetadataReference>> TrustedPlatformReferences =
         new(CreateTrustedPlatformReferences);
@@ -89,60 +87,6 @@ internal static class AnalyzerTestHost
             ImmutableArray<AdditionalText>.Empty,
             new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
 
-    public static string CreateExpressionBodiedPropertyContractSource(
-        string attributeText,
-        bool disablePurityPlacementDiagnostic = false)
-    {
-        if (string.IsNullOrWhiteSpace(attributeText))
-            throw new ArgumentException("Attribute text is required.", nameof(attributeText));
-
-        const string sourceTemplate = """
-                                      using SharpProof.Attributes;
-
-                                      public sealed class TestClass
-                                      {
-                                          [ATTRIBUTE]
-                                          public int Value => 42;
-                                      }
-                                      """;
-        var pragma = disablePurityPlacementDiagnostic
-            ? "#pragma warning disable SP0004\n"
-            : string.Empty;
-        return pragma + sourceTemplate.Replace("ATTRIBUTE", attributeText, StringComparison.Ordinal);
-    }
-
-    public static ImmutableDictionary<string, string> CreateExceptionFlowOptions(
-        bool? reportExceptions = true,
-        bool? checkedExceptions = true)
-    {
-        var options = ImmutableDictionary<string, string>.Empty;
-        if (reportExceptions.HasValue)
-            options = options.Add(
-                "sharpproof_report_exceptions",
-                reportExceptions.Value ? "true" : "false");
-        if (checkedExceptions.HasValue)
-            options = options.Add(
-                "sharpproof_checked_exceptions",
-                checkedExceptions.Value ? "true" : "false");
-        return options;
-    }
-
-    public static Task<ImmutableArray<Diagnostic>> GetExceptionFlowDiagnosticsAsync(
-        string source,
-        string compilationName,
-        bool? reportExceptions = true,
-        bool? checkedExceptions = true,
-        ImmutableArray<MetadataReference>? frameworkReferences = null,
-        bool concurrentAnalysis = false)
-    {
-        return GetDiagnosticsAsync(
-            source,
-            CreateExceptionFlowOptions(reportExceptions, checkedExceptions),
-            frameworkReferences: frameworkReferences,
-            concurrentAnalysis: concurrentAnalysis,
-            compilationName: compilationName);
-    }
-
     public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
         string source,
         ImmutableDictionary<string, string>? globalOptions = null,
@@ -152,8 +96,7 @@ internal static class AnalyzerTestHost
         ImmutableArray<MetadataReference>? frameworkReferences = null,
         bool concurrentAnalysis = false,
         ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
-        string compilationName = "AnalyzerTestHost",
-        AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.All)
+        string compilationName = "AnalyzerTestHost")
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
@@ -172,11 +115,11 @@ internal static class AnalyzerTestHost
             syntaxTree);
 
         var analyzerOptions = CreateAnalyzerOptions(
-            ApplyFileLevelDiagnosticOptions(source, globalOptions),
+            globalOptions,
             additionalFiles);
 
         var compilationWithAnalyzers = compilation.WithAnalyzers(
-            GetAnalyzers(analyzerFeatures),
+            AnalyzerInstances,
             new CompilationWithAnalyzersOptions(
                 analyzerOptions,
                 null,
@@ -185,14 +128,6 @@ internal static class AnalyzerTestHost
                 false));
 
         return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
-    }
-
-    private static ImmutableArray<DiagnosticAnalyzer> GetAnalyzers(AnalyzerFeatures features)
-    {
-        return AnalyzerInstances.GetOrAdd(
-            features,
-            static requestedFeatures => ImmutableArray.Create<DiagnosticAnalyzer>(
-                new SharpProofAnalyzer(requestedFeatures)));
     }
 
     public static AnalyzerOptions CreateAnalyzerOptions(
@@ -213,154 +148,6 @@ internal static class AnalyzerTestHost
         return new AnalyzerOptions(
             analyzerAdditionalFiles,
             new TestAnalyzerConfigOptionsProvider(analyzerGlobalOptions));
-    }
-
-    internal static bool HasFileLevelMissingPuritySuppression(string source)
-    {
-        return source.AsSpan().TrimStart().StartsWith(
-            "#pragma warning disable SP0004".AsSpan(),
-            StringComparison.Ordinal);
-    }
-
-    private static ImmutableDictionary<string, string>? ApplyFileLevelDiagnosticOptions(
-        string source,
-        ImmutableDictionary<string, string>? globalOptions)
-    {
-        if (!HasFileLevelMissingPuritySuppression(source) ||
-            globalOptions?.ContainsKey(SuggestMissingEnforcePureOption) == true)
-            return globalOptions;
-
-        return (globalOptions ?? ImmutableDictionary<string, string>.Empty)
-            .Add(SuggestMissingEnforcePureOption, "false");
-    }
-
-    public static Diagnostic SingleDiagnostic(
-        ImmutableArray<Diagnostic> diagnostics,
-        string diagnosticId)
-    {
-        return diagnostics.Single(diagnostic => diagnostic.Id == diagnosticId);
-    }
-
-    public static (string Source, string? ExpectedSpanText) StripSp0002Markup(string markedSource)
-    {
-        return StripDiagnosticMarkup(markedSource, "SP0002", false);
-    }
-
-    public static (string Source, string ExpectedSpanText) StripRequiredSp0002Markup(string markedSource)
-    {
-        var (source, expectedSpanText) = StripDiagnosticMarkup(
-            markedSource,
-            "SP0002",
-            true);
-        return (source, expectedSpanText!);
-    }
-
-    public static async Task<(string Source, Diagnostic? Diagnostic)> AssertOptionalSingleSp0002Async(
-        string markedSource,
-        ImmutableArray<MetadataReference>? frameworkReferences = null,
-        bool concurrentAnalysis = false,
-        AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.Purity)
-    {
-        var (source, expectedSpanText) = StripSp0002Markup(markedSource);
-        var diagnostics = await GetDiagnosticsAsync(
-            source,
-            frameworkReferences: frameworkReferences,
-            concurrentAnalysis: concurrentAnalysis,
-            analyzerFeatures: analyzerFeatures);
-        var purityDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == "SP0002")
-            .ToArray();
-
-        if (expectedSpanText == null)
-        {
-            Assert.That(purityDiagnostics, Is.Empty);
-            Assert.That(diagnostics, Is.Empty);
-            return (source, null);
-        }
-
-        Assert.That(purityDiagnostics, Has.Length.EqualTo(1));
-        Assert.That(diagnostics, Has.Length.EqualTo(1));
-
-        var diagnostic = purityDiagnostics[0];
-        AssertDiagnosticSpan(source, diagnostic, expectedSpanText);
-        return (source, diagnostic);
-    }
-
-    public static async Task<(string Source, Diagnostic Diagnostic)> AssertSingleSp0002Async(
-        string markedSource,
-        ImmutableArray<MetadataReference>? frameworkReferences = null,
-        bool concurrentAnalysis = false,
-        AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.Purity)
-    {
-        var (source, expectedSpanText) = StripRequiredSp0002Markup(markedSource);
-        var diagnostics = await GetDiagnosticsAsync(
-            source,
-            frameworkReferences: frameworkReferences,
-            concurrentAnalysis: concurrentAnalysis,
-            analyzerFeatures: analyzerFeatures);
-        var diagnostic = SingleDiagnostic(diagnostics, "SP0002");
-
-        Assert.That(diagnostics, Has.Length.EqualTo(1));
-        AssertDiagnosticSpan(source, diagnostic, expectedSpanText);
-        return (source, diagnostic);
-    }
-
-    public static async Task<(string Source, Diagnostic Diagnostic)> AssertSingleDiagnosticAsync(
-        string markedSource,
-        string diagnosticId,
-        ImmutableArray<MetadataReference>? frameworkReferences = null,
-        bool concurrentAnalysis = false,
-        AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.All)
-    {
-        var (source, expectedSpanText) = StripDiagnosticMarkup(
-            markedSource,
-            diagnosticId,
-            true);
-        var diagnostics = await GetDiagnosticsAsync(
-            source,
-            frameworkReferences: frameworkReferences,
-            concurrentAnalysis: concurrentAnalysis,
-            analyzerFeatures: analyzerFeatures);
-        var diagnostic = SingleDiagnostic(diagnostics, diagnosticId);
-
-        Assert.That(diagnostics, Has.Length.EqualTo(1));
-        AssertDiagnosticSpan(source, diagnostic, expectedSpanText!);
-        return (source, diagnostic);
-    }
-
-    public static void AssertDiagnosticSpan(
-        string source,
-        Diagnostic diagnostic,
-        string expectedSpanText)
-    {
-        var actualSpanText = source.Substring(
-            diagnostic.Location.SourceSpan.Start,
-            diagnostic.Location.SourceSpan.Length);
-        Assert.That(actualSpanText, Is.EqualTo(expectedSpanText));
-    }
-
-    private static (string Source, string? ExpectedSpanText) StripDiagnosticMarkup(
-        string markedSource,
-        string diagnosticId,
-        bool required)
-    {
-        var prefix = "{|" + diagnosticId + ":";
-        const string suffix = "|}";
-        var start = markedSource.IndexOf(prefix, StringComparison.Ordinal);
-        if (start < 0)
-        {
-            if (required) throw new InvalidOperationException("Expected " + diagnosticId + " markup start.");
-
-            return (markedSource, null);
-        }
-
-        var contentStart = start + prefix.Length;
-        var end = markedSource.IndexOf(suffix, contentStart, StringComparison.Ordinal);
-        if (end < 0) throw new InvalidOperationException("Expected " + diagnosticId + " markup end.");
-
-        var expectedSpanText = markedSource.Substring(contentStart, end - contentStart);
-        var source = markedSource.Remove(end, suffix.Length).Remove(start, prefix.Length);
-        return (source, expectedSpanText);
     }
 
     public static ConditionContext CreateConditionContext(string parameterList, string conditionExpression)

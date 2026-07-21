@@ -1,40 +1,37 @@
 namespace SharpProof.Analyzer.Configuration;
 
 internal static class AnalyzerConfigurationOptionRegistry {
-    private const string ResourceName = "SharpProof.Analyzer.Configuration.Options.json";
+    public static ImmutableArray<AnalyzerConfigurationOption> All { get; } = [
+        Positive("sharpproof_analysis_max_fact_choice_combinations_per_target"),
+        Positive("sharpproof_analysis_max_finite_foreach_element_facts"),
+        Positive("sharpproof_analysis_max_guard_facts_per_target_per_state"),
+        Positive("sharpproof_analysis_max_mergeable_facts_per_target_per_state"),
+        Positive("sharpproof_analysis_max_merged_if_else_facts"),
+        Positive("sharpproof_analysis_max_merged_path_conditions"),
+        Positive("sharpproof_analysis_max_merged_switch_facts"),
+        Positive("sharpproof_analysis_max_merged_try_facts"),
+        Positive("sharpproof_analysis_max_scoped_block_completion_statements"),
+        Positive("sharpproof_analysis_max_structural_null_state_depth"),
+        Positive("sharpproof_analysis_max_try_completion_branches"),
+        Bool("sharpproof_smt_dispose_thread_context_on_service_dispose"),
+        Positive("sharpproof_smt_max_expression_nodes"),
+        Positive("sharpproof_smt_max_path_conditions"),
+        Positive("sharpproof_smt_method_budget_ms"),
+        new("sharpproof_smt_mode", AnalyzerConfigurationValueKind.SmtMode, ["bounded", "deep"]),
+        Bool("sharpproof_smt_recycle_context_on_transient_failure"),
+        Positive("sharpproof_smt_timeout_ms"),
+        new("sharpproof_smt_transient_retry_count", AnalyzerConfigurationValueKind.NonNegativeInteger)
+    ];
 
-    public static ImmutableArray<AnalyzerConfigurationOption> All { get; } = Load();
-
-    private static ImmutableArray<AnalyzerConfigurationOption> Load() {
-        using var stream = typeof(AnalyzerConfigurationOptionRegistry).Assembly.GetManifestResourceStream(ResourceName)
-            ?? throw new InvalidOperationException($"Missing embedded configuration catalog '{ResourceName}'.");
-        var definitions = JsonSerializer.Deserialize<ConfigurationOptionDefinition[]>(stream)
-            ?? throw new InvalidOperationException("The embedded configuration catalog is empty.");
-        var keys = new HashSet<string>(StringComparer.Ordinal);
-        return definitions.Select(definition => {
-            if (!keys.Add(definition.Key))
-                throw new InvalidOperationException($"Duplicate configuration key '{definition.Key}'.");
-            if (!Enum.TryParse<AnalyzerConfigurationValueKind>(definition.ValueKind, out var valueKind))
-                throw new InvalidOperationException($"Configuration option '{definition.Key}' has invalid enum metadata.");
-            return new AnalyzerConfigurationOption(
-                definition.Key,
-                valueKind,
-                definition.AllowedValues.ToImmutableArray());
-        }).ToImmutableArray();
-    }
-
-    sealed class ConfigurationOptionDefinition {
-        public string Key { get; set; } = string.Empty;
-        public string ValueKind { get; set; } = string.Empty;
-        public string[] AllowedValues { get; set; } = [];
-    }
-
-    internal static bool IsAcceptedValue(AnalyzerConfigurationOption option, string? value) {
-        if (option == null) throw new ArgumentNullException(nameof(option));
-        return !string.IsNullOrWhiteSpace(value) && option.AllowedValues.Contains(
+    internal static bool IsAcceptedValue(AnalyzerConfigurationOption option, string? value) =>
+        !string.IsNullOrWhiteSpace(value) && option.AllowedValues.Contains(
             value!.Trim().ToLowerInvariant(), StringComparer.Ordinal);
-    }
 
+    private static AnalyzerConfigurationOption Positive(string key) =>
+        new(key, AnalyzerConfigurationValueKind.PositiveInteger);
+
+    private static AnalyzerConfigurationOption Bool(string key) =>
+        new(key, AnalyzerConfigurationValueKind.Bool);
 }
 
 internal sealed record AnalyzerConfigurationOption(
@@ -42,9 +39,4 @@ internal sealed record AnalyzerConfigurationOption(
     AnalyzerConfigurationValueKind ValueKind,
     ImmutableArray<string> AllowedValues = default);
 
-internal enum AnalyzerConfigurationValueKind {
-    Bool,
-    NonNegativeInteger,
-    PositiveInteger,
-    SmtMode
-}
+internal enum AnalyzerConfigurationValueKind { Bool, NonNegativeInteger, PositiveInteger, SmtMode }

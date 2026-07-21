@@ -10,9 +10,7 @@ internal sealed class AnalyzerSession : IDisposable {
     internal AnalyzerSession(
         Compilation compilation,
         AnalyzerOptions options,
-        CancellationToken cancellationToken,
-        AnalyzerFeatures requestedFeatures) {
-        Features = requestedFeatures;
+        CancellationToken cancellationToken) {
         Configuration = AnalyzerConfiguration.FromOptions(options);
         AttributePolicy = SharpProofAttributeIdentityPolicy.Create();
 
@@ -30,8 +28,6 @@ internal sealed class AnalyzerSession : IDisposable {
             ProofService.SmtAnalysis);
 
     }
-
-    internal AnalyzerFeatures Features { get; }
 
     internal AnalyzerConfiguration Configuration { get; }
 

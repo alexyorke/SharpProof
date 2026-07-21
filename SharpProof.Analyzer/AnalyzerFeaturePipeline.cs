@@ -42,48 +42,14 @@ internal static class AnalyzerFeaturePipeline {
         MethodBodyAnalysisContext context,
         AnalyzerSession session) {
         using (SymbolicAnalysisLimitContext.Push(session.Configuration.AnalysisLimits, context.Node)) {
-            var features = session.Features;
-
-            if (features.Includes(AnalyzerFeatures.Purity))
-                EnforcePureContractAnalyzer.Analyze(
-                    context,
-                    session.AttributePolicy);
-
-            if (features.Includes(AnalyzerFeatures.Allocation))
-                MethodAllocationAnalyzer.AnalyzeSymbolForZeroAllocations(
-                    context,
-                    session.AttributePolicy);
-
-            if (features.Includes(AnalyzerFeatures.Capability))
-                MethodCapabilityAnalyzer.AnalyzeSymbolForCapabilities(
-                    context,
-                    session.AttributePolicy);
-
-            if (features.Includes(AnalyzerFeatures.Requires))
-                MethodRequiresAnalyzer.AnalyzeSymbolForRequires(
-                    context,
-                    session.ProofService,
-                    session.AttributePolicy);
-
-            if (features.Includes(AnalyzerFeatures.Ensures))
-                MethodEnsuresAnalyzer.AnalyzeSymbolForEnsures(
-                    context,
-                    session.ProofService,
-                    session.AttributePolicy);
-
-            if (features.Includes(AnalyzerFeatures.Complexity))
-                MethodExpectedComplexityAnalyzer.AnalyzeSymbolForExpectedComplexity(
-                    context,
-                    session.AttributePolicy);
-
-            if (features.Includes(AnalyzerFeatures.Exceptions))
-                ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(
-                    context,
-                    session.AttributePolicy);
-
-            if (features.Includes(AnalyzerFeatures.Nullability))
-                NullableContractAnalyzer.Analyze(context, session);
-
+            EnforcePureContractAnalyzer.Analyze(context, session.AttributePolicy);
+            MethodAllocationAnalyzer.AnalyzeSymbolForZeroAllocations(context, session.AttributePolicy);
+            MethodCapabilityAnalyzer.AnalyzeSymbolForCapabilities(context, session.AttributePolicy);
+            MethodRequiresAnalyzer.AnalyzeSymbolForRequires(context, session.ProofService, session.AttributePolicy);
+            MethodEnsuresAnalyzer.AnalyzeSymbolForEnsures(context, session.ProofService, session.AttributePolicy);
+            MethodExpectedComplexityAnalyzer.AnalyzeSymbolForExpectedComplexity(context, session.AttributePolicy);
+            ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(context, session.AttributePolicy);
+            NullableContractAnalyzer.Analyze(context, session);
         }
     }
 

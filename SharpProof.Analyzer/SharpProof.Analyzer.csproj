@@ -24,8 +24,6 @@
   <ItemGroup>
     <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
     <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
-    <EmbeddedResource Include="AnalyzerDiagnosticCatalog.json" LogicalName="SharpProof.Analyzer.DiagnosticCatalog.json" />
-    <EmbeddedResource Include="Configuration\AnalyzerConfigurationOptions.json" LogicalName="SharpProof.Analyzer.Configuration.Options.json" />
   </ItemGroup>
 
   <ItemGroup>
