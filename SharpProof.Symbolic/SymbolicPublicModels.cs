@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace SharpProof.Symbolic;
 
 internal enum SymbolicProofBackend {
@@ -177,12 +175,9 @@ internal sealed record SymbolicProofInfo(
 
     internal static SymbolicProofStatus MapStatus<TStatus>(TStatus value)
         where TStatus : struct, Enum => (object)value switch {
-        SymbolicTruthValue.ProvenTrue or SymbolicConditionProofSummaryStatus.AlwaysTrue or
-            SymbolicRuntimeHazardStatus.Proven => SymbolicProofStatus.ProvenTrue,
-        SymbolicTruthValue.ProvenFalse or SymbolicConditionProofSummaryStatus.AlwaysFalse =>
-            SymbolicProofStatus.ProvenFalse,
-        SymbolicTruthValue.Unreachable or SymbolicConditionProofSummaryStatus.UnreachableOnly or
-            SymbolicRuntimeHazardStatus.Unreachable => SymbolicProofStatus.Unreachable,
+        SymbolicTruthValue.ProvenTrue or SymbolicRuntimeHazardStatus.Proven => SymbolicProofStatus.ProvenTrue,
+        SymbolicTruthValue.ProvenFalse => SymbolicProofStatus.ProvenFalse,
+        SymbolicTruthValue.Unreachable or SymbolicRuntimeHazardStatus.Unreachable => SymbolicProofStatus.Unreachable,
         _ => SymbolicProofStatus.Unknown
     };
 
@@ -334,10 +329,3 @@ internal sealed record SymbolicFactInfo(
         return "unknown(" + precondition.Kind + " trigger)";
     }
 }
-
-internal sealed record SymbolicInvariantInfo(
-    [property: JsonPropertyOrder(0)] string MergedText,
-    [property: JsonPropertyOrder(3)] IReadOnlyList<SymbolicFactInfo> Facts,
-    [property: JsonPropertyOrder(4)] IReadOnlyList<SymbolicProofInfo> Proofs,
-    [property: JsonPropertyOrder(1)] SymbolicInvariantMergeKind MergeKind,
-    [property: JsonPropertyOrder(2)] int ConditionCount);

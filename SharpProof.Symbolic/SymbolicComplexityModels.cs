@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using SharpProof.Attributes;
 
 namespace SharpProof.Symbolic;
@@ -135,10 +134,10 @@ internal sealed record SymbolicComplexityResult(
     int StartColumn,
     int EndLine,
     int EndColumn,
-    [property: JsonPropertyOrder(-5)] SymbolicComplexityInfo Complexity,
-    [property: JsonPropertyOrder(-4)] IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,
-    [property: JsonPropertyOrder(-3)] IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons,
-    [property: JsonPropertyOrder(-1)] IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries)
+    SymbolicComplexityInfo Complexity,
+    IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,
+    IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons,
+    IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries)
     : SymbolicMethodResult(
         FilePath,
         MethodName,
@@ -150,7 +149,6 @@ internal sealed record SymbolicComplexityResult(
         StartColumn,
         EndLine,
         EndColumn) {
-    [JsonPropertyOrder(-2)]
     public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; } =
         UnknownReasons
         .Select(SymbolicUnknownReasonTaxonomy.ForComplexity)

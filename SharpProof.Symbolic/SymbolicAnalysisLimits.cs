@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace SharpProof.Symbolic;
 
 internal enum SymbolicAnalysisLimitKind {
@@ -17,12 +15,11 @@ internal enum SymbolicAnalysisLimitKind {
 }
 
 internal sealed record SymbolicAnalysisTruncationEvent(
-    [property: JsonPropertyOrder(0)] SymbolicAnalysisLimitKind Kind,
-    [property: JsonPropertyOrder(2)] int Limit,
-    [property: JsonPropertyOrder(3)] int Observed,
-    [property: JsonPropertyOrder(4)] string Provenance,
-    [property: JsonPropertyOrder(5)] int? SourceSpanStart) {
-    [JsonPropertyOrder(1)]
+    SymbolicAnalysisLimitKind Kind,
+    int Limit,
+    int Observed,
+    string Provenance,
+    int? SourceSpanStart) {
     public string Code { get; } = GetCode(Kind);
     private static string GetCode(SymbolicAnalysisLimitKind value) {
         var text = value.ToString();
@@ -38,10 +35,9 @@ internal sealed record SymbolicAnalysisTruncationEvent(
 }
 
 internal sealed record SymbolicAnalysisTruncationInfo(
-    [property: JsonPropertyOrder(1)] IReadOnlyList<SymbolicAnalysisTruncationEvent> Events) {
+    IReadOnlyList<SymbolicAnalysisTruncationEvent> Events) {
     public static readonly SymbolicAnalysisTruncationInfo None = new(Array.Empty<SymbolicAnalysisTruncationEvent>());
 
-    [JsonPropertyOrder(0)]
     public bool IsTruncated => Events.Count != 0;
 
     internal static SymbolicAnalysisTruncationInfo Combine(

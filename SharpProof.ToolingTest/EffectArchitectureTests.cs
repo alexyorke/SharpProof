@@ -23,6 +23,7 @@ public sealed class EffectArchitectureTests {
             "SharpProof.Analyzer/LowerHexEncoding.cs",
             "SharpProof.Symbolic/SymbolicCapabilityService.cs",
             "SharpProof.Symbolic/SymbolicCapabilityModels.cs",
+            "SharpProof.Symbolic/SymbolicQueryTarget.cs",
             "Tools/SharpProof.SymbolicCli.Core/SharpProof.SymbolicCli.Core.csproj",
             "scripts/Test-SharpProofTestPreservation.ps1",
             "scripts/Generate-ConfigurationReference.ps1",
@@ -55,6 +56,11 @@ public sealed class EffectArchitectureTests {
             "Collect" + "AncestorReachabilityState",
             "SHARPPROOF_" + "TRACE_CFG_FALLBACK",
             "Symbolic" + "CapabilityResult",
+            "Symbolic" + "QueryScope",
+            "Symbolic" + "QueryMetrics",
+            "Symbolic" + "ConditionProofSummary",
+            "Symbolic" + "MergedPathFacts",
+            "Symbolic" + "InvariantInfo",
             "Method" + "PurityAnalyzer",
             "Sp0002" + "Expectation",
             "sharpproof." + "impurity.",
@@ -82,6 +88,18 @@ public sealed class EffectArchitectureTests {
                     Assert.That(text, Does.Not.Contain(value), $"Forbidden legacy surface in {file}: {value}");
                 Assert.That(legacyDiagnostic.IsMatch(text), Is.False, $"Disabled diagnostic returned in {file}");
             }
+        }
+
+        foreach (var file in Directory.EnumerateFiles(
+                     Path.Combine(root, "SharpProof.Symbolic"), "*.cs", SearchOption.AllDirectories)) {
+            if (file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)) continue;
+            var text = File.ReadAllText(file);
+            Assert.That(text, Does.Not.Contain("System.Text.Json.Serialization"),
+                $"Symbolic JSON presentation annotation returned in {file}");
+            Assert.That(text, Does.Not.Contain("JsonPropertyOrder"),
+                $"Symbolic JSON property ordering returned in {file}");
+            Assert.That(text, Does.Not.Contain("JsonIgnore"),
+                $"Symbolic JSON property filtering returned in {file}");
         }
     }
 }

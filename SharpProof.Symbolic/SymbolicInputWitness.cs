@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace SharpProof.Symbolic;
 
 internal enum SymbolicWitnessStatus {
@@ -121,31 +119,31 @@ internal sealed record SymbolicInputDomain(
     int AlternativeCount = 1);
 
 internal sealed record SymbolicInputDomainSummary(
-    [property: JsonPropertyOrder(0)] SymbolicWitnessStatus Status,
-    [property: JsonPropertyOrder(1)] string Reason,
-    [property: JsonPropertyOrder(2)] IReadOnlyList<SymbolicInputDomain> Domains,
-    [property: JsonPropertyOrder(4)] int AlternativeCount) {
-    [JsonPropertyOrder(3)] public int DomainCount => Domains.Count;
+    SymbolicWitnessStatus Status,
+    string Reason,
+    IReadOnlyList<SymbolicInputDomain> Domains,
+    int AlternativeCount) {
+    public int DomainCount => Domains.Count;
 
-    [JsonPropertyOrder(5)] public bool HasApproximation =>
+    public bool HasApproximation =>
         Status == SymbolicWitnessStatus.Approximate ||
         Domains.Any(static domain =>
             domain.Status == SymbolicWitnessStatus.Approximate ||
             domain.Predicates.Any(static predicate => predicate.Status == SymbolicWitnessStatus.Approximate));
 
-    [JsonPropertyOrder(6)] public bool HasUnsupportedDomains =>
+    public bool HasUnsupportedDomains =>
         Status == SymbolicWitnessStatus.Unsupported ||
         Domains.Any(static domain => domain.Status == SymbolicWitnessStatus.Unsupported);
 }
 
 internal sealed record SymbolicInputWitness(
-    [property: JsonPropertyOrder(0)] SymbolicWitnessStatus Status,
-    [property: JsonPropertyOrder(1)] string Reason,
-    [property: JsonPropertyOrder(2)] IReadOnlyList<SymbolicSatisfyingAssignment> Assignments,
-    [property: JsonPropertyOrder(4)] SymbolicInputDomainSummary DomainSummary) {
-    [JsonPropertyOrder(3)] public int AssignmentCount => Assignments.Count;
+    SymbolicWitnessStatus Status,
+    string Reason,
+    IReadOnlyList<SymbolicSatisfyingAssignment> Assignments,
+    SymbolicInputDomainSummary DomainSummary) {
+    public int AssignmentCount => Assignments.Count;
 
-    [JsonPropertyOrder(5)] public bool IsAvailable =>
+    public bool IsAvailable =>
         Status is SymbolicWitnessStatus.Exact or SymbolicWitnessStatus.Approximate;
 }
 

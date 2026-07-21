@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicInvariantService {
@@ -227,14 +225,14 @@ internal sealed record SymbolicInvariantFactSummary(IReadOnlyList<string> Facts)
 
 internal sealed record SymbolicProgramPointAnalysis(
     int SpanStart,
-    [property: JsonIgnore] IReadOnlyList<SmtFormula> PathConditions,
+    IReadOnlyList<SmtFormula> PathConditions,
     SymbolicState PathState,
     SymbolicReachability Reachability,
     string ReachabilityReason,
     SymbolicSmtDiagnostics SmtDiagnostics,
-    [property: JsonIgnore] SyntaxNode SourceNode,
-    [property: JsonIgnore] SymbolicAnalysisTruncationInfo AnalysisTruncation,
-    [property: JsonIgnore] AnalysisProofResult? ReachabilityProof = null) {
+    SyntaxNode SourceNode,
+    SymbolicAnalysisTruncationInfo AnalysisTruncation,
+    AnalysisProofResult? ReachabilityProof = null) {
     internal SymbolicProgramPointAnalysis(
         int spanStart,
         IReadOnlyList<SmtFormula> pathConditions,

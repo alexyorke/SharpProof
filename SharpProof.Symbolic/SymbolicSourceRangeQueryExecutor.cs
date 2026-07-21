@@ -26,11 +26,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
                 cancellationToken))
             .ToArray();
 
-        return SymbolicQueryResult.FromLine(
-            syntaxTree.FilePath,
-            line,
-            results,
-            SymbolicSmtDiagnostics.FromService(options.SmtAnalysis));
+        return SymbolicQueryResult.From(results);
     }
 
     internal SymbolicProgramPointResult QueryLinePoint(
@@ -87,19 +83,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
                 options,
                 cancellationToken))
             .ToArray();
-        var start = SymbolicSourceLocation.GetLineAndColumn(syntaxTree, sourceSpan.Start, cancellationToken, true);
-        var end = SymbolicSourceLocation.GetLineAndColumn(syntaxTree, sourceSpan.End, cancellationToken, true);
-
-        return SymbolicQueryResult.FromSpan(
-            syntaxTree.FilePath,
-            sourceSpan.Start,
-            sourceSpan.End,
-            start.Line,
-            start.Column,
-            end.Line,
-            end.Column,
-            results,
-            SymbolicSmtDiagnostics.FromService(options.SmtAnalysis));
+        return SymbolicQueryResult.From(results);
     }
 
     internal SymbolicQueryResult QueryLineSpan(
@@ -130,7 +114,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
         CancellationToken cancellationToken) {
         Validate(syntaxTree, compilation);
         var lineCount = syntaxTree.GetText(cancellationToken).Lines.Count;
-        var lineResults = new List<SymbolicQueryLineGroup>();
+        var results = new List<SymbolicProgramPointResult>();
         for (var line = 1; line <= lineCount; line++) {
             var lineResult = QueryLine(
                 syntaxTree,
@@ -138,15 +122,10 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
                 line,
                 options,
                 cancellationToken);
-            if (lineResult.ProgramPoints.Count != 0)
-                lineResults.Add(new SymbolicQueryLineGroup(line, lineResult.ProgramPoints));
+            results.AddRange(lineResult.ProgramPoints);
         }
 
-        return SymbolicQueryResult.FromFile(
-            syntaxTree.FilePath,
-            lineCount,
-            lineResults,
-            SymbolicSmtDiagnostics.FromService(options.SmtAnalysis));
+        return SymbolicQueryResult.From(results);
     }
 
     private static void Validate(SyntaxTree syntaxTree, Compilation compilation) {

@@ -2953,7 +2953,6 @@
         "SymbolicBudgetInfo",
         "SymbolicCacheInfo",
         "SymbolicFactInfo",
-        "SymbolicInvariantInfo",
         "SymbolicProofBackend",
         "SymbolicProofInfo",
         "SymbolicProofStage",
@@ -3011,38 +3010,16 @@
       "path": "SharpProof.Symbolic/SymbolicQueryFactSummaries.cs",
       "module": "Symbolic",
       "declaredTypes": [
-        "SymbolicConditionProofProjection",
-        "SymbolicConditionProofReason",
-        "SymbolicConditionProofSummary",
-        "SymbolicConditionProofSummaryStatus",
-        "SymbolicConservativeUnknownDiagnostic",
-        "SymbolicMergedPathFacts",
-        "SymbolicProgramPointSummary",
-        "SymbolicProofOutcomeSummary",
-        "SymbolicQueryMetrics",
-        "SymbolicReachabilitySummary"
-      ],
-      "referencingFixtureCount": 1,
-      "referencedTokens": [
-        "SymbolicConditionProofSummaryStatus"
-      ]
-    },
-    {
-      "path": "SharpProof.Symbolic/SymbolicQueryResult.cs",
-      "module": "Symbolic",
-      "declaredTypes": [
-        "SymbolicQueryLineGroup",
-        "SymbolicQueryResult"
+        "SymbolicMergedPathFactMerger"
       ],
       "referencingFixtureCount": 0,
       "referencedTokens": []
     },
     {
-      "path": "SharpProof.Symbolic/SymbolicQueryTarget.cs",
+      "path": "SharpProof.Symbolic/SymbolicQueryResult.cs",
       "module": "Symbolic",
       "declaredTypes": [
-        "SymbolicQueryScope",
-        "SymbolicQueryScopeKind"
+        "SymbolicQueryResult"
       ],
       "referencingFixtureCount": 0,
       "referencedTokens": []
@@ -4832,17 +4809,6 @@
         "SymbolicQueryExecutor"
       ],
       "fixtureCount": 4
-    },
-    {
-      "path": "SharpProof.Symbolic/SymbolicQueryFactSummaries.cs",
-      "module": "Symbolic",
-      "selectedTestFixtures": [
-        "SymbolicProofModelTests"
-      ],
-      "tokens": [
-        "SymbolicConditionProofSummaryStatus"
-      ],
-      "fixtureCount": 1
     },
     {
       "path": "SharpProof.Symbolic/SymbolicReachabilityService.cs",

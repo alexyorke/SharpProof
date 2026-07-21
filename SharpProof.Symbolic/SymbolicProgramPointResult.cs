@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace SharpProof.Symbolic;
 
 internal sealed record SymbolicProgramPointMetadata(
@@ -36,7 +34,7 @@ internal sealed class SymbolicProgramPointResult(
     IReadOnlyList<SymbolicFactInfo>? symbolicFacts = null,
     SymbolicInputWitness? reachabilityWitness = null,
     SymbolicAnalysisTruncationInfo? analysisTruncation = null) {
-    [JsonIgnore] internal SymbolicProgramPointMetadata Metadata { get; } = metadata;
+    internal SymbolicProgramPointMetadata Metadata { get; } = metadata;
 
     public string FilePath => Metadata.FilePath;
     public int Line => Metadata.Line;
@@ -70,14 +68,7 @@ internal sealed class SymbolicProgramPointResult(
         mergedInvariantText ?? FormatMergedInvariantText(facts ?? Array.Empty<string>()),
         SymbolicInvariantMergeKind.Conjunction);
 
-    public SymbolicInvariantInfo InvariantInfo => new(
-        MergedInvariantText,
-        SymbolicFacts,
-        ConditionProofs.Select(static proof => proof.Proof).ToArray(),
-        Invariant.MergeKind,
-        Invariant.ConditionCount);
-
-    public int PathConditionCount => InvariantInfo.ConditionCount;
+    public int PathConditionCount => Invariant.ConditionCount;
 
     public SymbolicReachability Reachability { get; } = reachability;
 
@@ -93,13 +84,6 @@ internal sealed class SymbolicProgramPointResult(
         (conditionProofs ?? Array.Empty<SymbolicConditionProofResult>())
         .Select(proof => proof.WithProgramPointMetadata(metadata))
         .ToArray();
-
-    public SymbolicProofOutcomeSummary ProofOutcomes => new(
-        ConditionProofs.Count,
-        ConditionProofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.Unknown),
-        ConditionProofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.ProvenTrue),
-        ConditionProofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.ProvenFalse),
-        ConditionProofs.Count(static proof => proof.TruthValue == SymbolicTruthValue.Unreachable));
 
     public SymbolicSmtDiagnostics SmtDiagnostics { get; } = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
 
@@ -117,19 +101,15 @@ internal sealed class SymbolicProgramPointResult(
 }
 
 internal sealed record SymbolicInvariantResult(
-    [property: JsonPropertyOrder(0)] IReadOnlyList<SymbolicInvariantCondition> Conditions,
-    [property: JsonPropertyOrder(4)] string MergedInvariantText,
-    [property: JsonPropertyOrder(5)] SymbolicInvariantMergeKind MergeKind) {
-    [JsonPropertyOrder(1)]
+    IReadOnlyList<SymbolicInvariantCondition> Conditions,
+    string MergedInvariantText,
+    SymbolicInvariantMergeKind MergeKind) {
     public int ConditionCount => Conditions.Count;
 
-    [JsonPropertyOrder(2)]
     public int ConservativeUnknownCount => Conditions.Count(static condition => condition.IsConservativeUnknown);
 
-    [JsonPropertyOrder(3)]
     public bool HasConservativeUnknowns => ConservativeUnknownCount != 0;
 
-    [JsonPropertyOrder(6)]
     public bool IsTrivial =>
         Conditions.Count == 0 && string.Equals(MergedInvariantText, "true", StringComparison.Ordinal);
 
@@ -161,33 +141,16 @@ internal sealed record SymbolicInvariantResult(
             mergeKind);
     }
 
-    public static SymbolicInvariantResult FromMergedPathFacts(SymbolicMergedPathFacts facts) {
-        if (facts == null) throw new ArgumentNullException(nameof(facts));
-
-        var conditions = new List<SymbolicInvariantCondition>();
-        foreach (var fact in facts.AlwaysFacts)
-            conditions.Add(SymbolicInvariantCondition.FromText(conditions.Count, fact));
-
-        foreach (var unknown in facts.ConservativeUnknowns)
-            conditions.Add(SymbolicInvariantCondition.FromConservativeUnknown(conditions.Count, unknown));
-
-        if (facts.IsUnreachable) conditions.Add(SymbolicInvariantCondition.FromText(conditions.Count, "false"));
-
-        return new SymbolicInvariantResult(
-            conditions,
-            facts.MergedInvariantText,
-            SymbolicInvariantMergeKind.ConservativeFactMerge);
-    }
 }
 
 internal sealed record SymbolicInvariantCondition(
-    [property: JsonPropertyOrder(0)] int Index,
-    [property: JsonPropertyOrder(1)] string Text,
-    [property: JsonPropertyOrder(2)] string DisplayKind,
-    [property: JsonPropertyOrder(3)] string ValueKind,
-    [property: JsonPropertyOrder(4)] bool IsSolverBacked,
-    [property: JsonPropertyOrder(5)] string Target,
-    [property: JsonPropertyOrder(6)] bool IsConservativeUnknown) {
+    int Index,
+    string Text,
+    string DisplayKind,
+    string ValueKind,
+    bool IsSolverBacked,
+    string Target,
+    bool IsConservativeUnknown) {
     public static SymbolicInvariantCondition FromText(int index, string text) {
         var normalizedText = text ?? string.Empty;
         return new SymbolicInvariantCondition(
@@ -283,19 +246,19 @@ internal enum SymbolicInvariantMergeKind {
 }
 
 internal sealed record SymbolicConditionProofResult(
-    [property: JsonIgnore] string condition,
-    [property: JsonIgnore] SymbolicTruthValue truthValue,
-    [property: JsonIgnore] string reason,
-    [property: JsonIgnore] SmtFormula? formula = null,
-    [property: JsonIgnore] string? target = null,
-    [property: JsonIgnore] string? formulaKind = null,
-    [property: JsonIgnore] string? valueKind = null,
-    [property: JsonIgnore] string? formulaText = null,
-    [property: JsonIgnore] bool? isSolverBacked = null,
-    [property: JsonIgnore] SymbolicProgramPointMetadata? programPoint = null,
-    [property: JsonIgnore] SymbolicInputWitness? witness = null,
-    [property: JsonIgnore] SymbolicInputWitness? counterexampleWitness = null,
-    [property: JsonIgnore] SymbolicAnalysisTruncationInfo? analysisTruncation = null) {
+    string condition,
+    SymbolicTruthValue truthValue,
+    string reason,
+    SmtFormula? formula = null,
+    string? target = null,
+    string? formulaKind = null,
+    string? valueKind = null,
+    string? formulaText = null,
+    bool? isSolverBacked = null,
+    SymbolicProgramPointMetadata? programPoint = null,
+    SymbolicInputWitness? witness = null,
+    SymbolicInputWitness? counterexampleWitness = null,
+    SymbolicAnalysisTruncationInfo? analysisTruncation = null) {
     public string Condition { get; init; } = condition ?? string.Empty;
 
     public string Target { get; init; } = ResolveTarget(formula, target);
@@ -323,7 +286,7 @@ internal sealed record SymbolicConditionProofResult(
         DisplayKind,
         TruthValue == SymbolicTruthValue.Unknown ? Reason : null);
 
-    [JsonIgnore] internal SymbolicProgramPointMetadata? ProgramPoint { get; init; } = programPoint;
+    internal SymbolicProgramPointMetadata? ProgramPoint { get; init; } = programPoint;
 
     public string? FilePath => ProgramPoint?.FilePath;
     public int? Line => ProgramPoint?.Line;

@@ -338,7 +338,7 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         }
 
         var result = _executor.Query(context, cancellationToken);
-        facts.Add(result.InvariantInfo.MergedText);
+        facts.Add(result.MergedInvariantText);
         foreach (var proof in result.ProgramPoints.SelectMany(static point => point.ConditionProofs))
             if (proof.TruthValue == SymbolicTruthValue.Unknown)
                 unknowns.Add(Convert(SymbolicUnknownReasonTaxonomy.ForProof(

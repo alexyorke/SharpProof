@@ -25,20 +25,6 @@ internal class SymbolicProofModelTests
         Assert.That(SymbolicProofInfo.MapStatus(value), Is.EqualTo(expected));
     }
 
-    [TestCase(SymbolicConditionProofSummaryStatus.None, SymbolicProofStatus.Unknown)]
-    [TestCase(SymbolicConditionProofSummaryStatus.UnreachableOnly, SymbolicProofStatus.Unreachable)]
-    [TestCase(SymbolicConditionProofSummaryStatus.AlwaysTrue, SymbolicProofStatus.ProvenTrue)]
-    [TestCase(SymbolicConditionProofSummaryStatus.AlwaysFalse, SymbolicProofStatus.ProvenFalse)]
-    [TestCase(SymbolicConditionProofSummaryStatus.Mixed, SymbolicProofStatus.Unknown)]
-    [TestCase(SymbolicConditionProofSummaryStatus.Unknown, SymbolicProofStatus.Unknown)]
-    [TestCase((SymbolicConditionProofSummaryStatus)999, SymbolicProofStatus.Unknown)]
-    public void ProofStatusProjection_MapsSummaryStatusesConservatively(
-        SymbolicConditionProofSummaryStatus value,
-        SymbolicProofStatus expected)
-    {
-        Assert.That(SymbolicProofInfo.MapStatus(value), Is.EqualTo(expected));
-    }
-
     [TestCase(SymbolicRuntimeHazardStatus.Proven, SymbolicProofStatus.ProvenTrue)]
     [TestCase(SymbolicRuntimeHazardStatus.Unknown, SymbolicProofStatus.Unknown)]
     [TestCase(SymbolicRuntimeHazardStatus.Unsupported, SymbolicProofStatus.Unknown)]
