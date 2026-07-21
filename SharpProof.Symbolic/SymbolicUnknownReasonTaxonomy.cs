@@ -3,8 +3,7 @@ namespace SharpProof.Symbolic;
 internal enum SymbolicUnknownReasonSource {
     Proof,
     Complexity,
-    RuntimeHazard,
-    Ensures
+    RuntimeHazard
 }
 
 internal enum SymbolicUnknownReasonCategory {
@@ -21,8 +20,6 @@ internal enum SymbolicUnknownReasonCategory {
     NativeSolverFailure,
     SolverEncodingFailure,
     Cancellation,
-    InvalidInput,
-    AnalysisUnavailable,
     Unknown
 }
 
@@ -42,9 +39,6 @@ internal static class SymbolicUnknownReasonTaxonomy {
 
     internal static SymbolicUnknownReasonInfo ForComplexity(SymbolicComplexityUnknownReason reason) =>
         Create(SymbolicUnknownReasonSource.Complexity, "complexity", Describe(reason), reason.ToString());
-
-    internal static SymbolicUnknownReasonInfo ForComplexityFailure(string? rawReason) =>
-        Failure(SymbolicUnknownReasonSource.Complexity, "complexity", rawReason);
 
     internal static SymbolicUnknownReasonInfo ForRuntimeHazard(
         SymbolicRuntimeHazardStatus status,
@@ -66,28 +60,6 @@ internal static class SymbolicUnknownReasonTaxonomy {
         return Create(SymbolicUnknownReasonSource.RuntimeHazard, "runtime_hazard",
             new(unsupported ? SymbolicUnknownReasonCategory.UnsupportedOperation : SymbolicUnknownReasonCategory.Unknown,
                 unsupported ? "unsupported" : "unknown"), rawReason);
-    }
-
-    internal static SymbolicUnknownReasonInfo ForEnsures(
-        string? rawReason,
-        SymbolicUnknownReason proofReason = SymbolicUnknownReason.Unknown) {
-        if (proofReason is not (SymbolicUnknownReason.None or SymbolicUnknownReason.Unknown))
-            return ChangeSource(ForProof(proofReason, rawReason), SymbolicUnknownReasonSource.Ensures, "ensures");
-
-        if (Contains(rawReason, "parse") || Contains(rawReason, "binding"))
-            return Create(SymbolicUnknownReasonSource.Ensures, "ensures",
-                new(SymbolicUnknownReasonCategory.InvalidInput, "invalid_condition"), rawReason);
-
-        if (Contains(rawReason, "not supported") || Contains(rawReason, "unsupported") ||
-            Contains(rawReason, "not available"))
-            return Create(SymbolicUnknownReasonSource.Ensures, "ensures",
-                new(SymbolicUnknownReasonCategory.UnsupportedSyntax, "unsupported_condition"), rawReason);
-
-        var classified = SymbolicUnknownReasonClassifier.Classify(rawReason ?? string.Empty);
-        return classified == SymbolicUnknownReason.Unknown
-            ? Create(SymbolicUnknownReasonSource.Ensures, "ensures",
-                new(SymbolicUnknownReasonCategory.Unknown, "unknown"), rawReason)
-            : ChangeSource(ForProof(classified, rawReason), SymbolicUnknownReasonSource.Ensures, "ensures");
     }
 
     private static ReasonDescriptor Describe(SymbolicUnknownReason reason) => reason switch {
@@ -136,12 +108,6 @@ internal static class SymbolicUnknownReasonTaxonomy {
 
     private static ReasonDescriptor Budget(string suffix) =>
         new(SymbolicUnknownReasonCategory.SolverBudget, suffix, true, true);
-
-    private static SymbolicUnknownReasonInfo Failure(
-        SymbolicUnknownReasonSource source,
-        string prefix,
-        string? rawReason) => Create(source, prefix,
-        new(SymbolicUnknownReasonCategory.AnalysisUnavailable, "analysis_failure", true), rawReason);
 
     private static SymbolicUnknownReasonInfo ChangeSource(
         SymbolicUnknownReasonInfo info,

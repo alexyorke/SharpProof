@@ -40,26 +40,6 @@ internal sealed class SymbolicConditionProofEngine(SymbolicInvariantService _inv
         return ProveAtQuery(query, conditionText, smtAnalysis, cancellationToken);
     }
 
-    internal SymbolicConditionProofResult ProveAtAnalysis(
-        SemanticModel semanticModel,
-        SyntaxNode node,
-        SymbolicProgramPointAnalysis analysis,
-        string conditionText,
-        SmtAnalysisService smtAnalysis,
-        CancellationToken cancellationToken = default) {
-        ValidateRequest(semanticModel, node, conditionText, smtAnalysis);
-        if (analysis == null) throw new ArgumentNullException(nameof(analysis));
-
-        return Prove(
-            semanticModel,
-            node.SpanStart,
-            node,
-            analysis,
-            conditionText,
-            smtAnalysis,
-            cancellationToken).WithAnalysisTruncation(analysis.Truncation);
-    }
-
     internal SymbolicConditionProofResult ProveAtSyntaxNode(
         SemanticModel semanticModel,
         SyntaxNode node,

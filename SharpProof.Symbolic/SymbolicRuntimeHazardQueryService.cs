@@ -56,30 +56,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             includeNestedCallables);
     }
 
-    internal SymbolicRuntimeHazardQueryResult QueryNodeRuntimeHazardsWithInitialState(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        SmtAnalysisService smtAnalysis,
-        SymbolicState initialState,
-        CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null,
-        bool includeNestedCallables = false) {
-        if (node == null) throw new ArgumentNullException(nameof(node));
-
-        if (initialState == null) throw new ArgumentNullException(nameof(initialState));
-
-        return QueryRuntimeHazardsCore(
-            node.SyntaxTree,
-            semanticModel,
-            node,
-            new RuntimeHazardScope(node.Span),
-            smtAnalysis,
-            cancellationToken,
-            options,
-            includeNestedCallables,
-            initialState);
-    }
-
     private SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazardsCore(
         SyntaxTree syntaxTree,
         Compilation compilation,

@@ -1,14 +1,12 @@
-using System.Reflection;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using SharpProof.Symbolic;
-using SharpProof.Symbolic.Smt;
+using static SharpProof.Test.SymbolicProofTestAssertions;
 
 namespace SharpProof.Test;
 
 [TestFixture]
 [Category("SmtHeavy")]
-public sealed class StringLengthSmtTests
+public sealed class StringLengthSmtTests : SemanticOracleSmtTestBase
 {
     [Test]
     public void SymbolicQueryExecutor_ProvesStringRemoveStartResultLength()
@@ -709,47 +707,4 @@ public class TestClass
             "text.Substring(0, text.Length) == text");
     }
 
-    private static void AssertConditionProven(string source, string sourceLine, string condition)
-    {
-        var proof = ProveCondition(source, sourceLine, condition);
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-    }
-
-    private static void AssertConditionUnknown(string source, string sourceLine, string condition)
-    {
-        var proof = ProveCondition(source, sourceLine, condition);
-
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-    }
-
-    private static SymbolicConditionProofResult ProveCondition(string source, string sourceLine, string condition)
-    {
-        return new SymbolicQueryExecutor().ProveConditionAtSource(
-            source,
-            "StringLengthSmtTests.cs",
-            FindLine(source, sourceLine),
-            20,
-            condition,
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-    }
-
-    private static int FindLine(string source, string text) {
-        var position = source.IndexOf(text, StringComparison.Ordinal);
-        if (position < 0) throw new InvalidOperationException("Source marker was not found: " + text);
-        return source[..position].Count(static character => character == '\n') + 1;
-    }
-
-    private static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression)
-    {
-        var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression);
-        var method = typeof(SharpProofAnalyzer).Assembly
-            .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", true)!
-            .GetMethod("IsConditionAlwaysFalseUsingSmt",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        return (bool)method.Invoke(null,
-            new object?[] { context.Expression, context.SemanticModel, CancellationToken.None, null })!;
-    }
 }

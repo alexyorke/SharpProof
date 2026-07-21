@@ -19,15 +19,6 @@ internal enum SymbolicComplexityComparison {
 }
 
 internal static class SymbolicComplexityFacts {
-    internal static bool TryGetBoundName(SymbolicComplexityKind kind, out string name) {
-        if (TryGetBound(kind, out var bound)) {
-            name = bound.ToString();
-            return true;
-        }
-        name = string.Empty;
-        return false;
-    }
-
     internal static bool IsDefinedBound(int value) => Enum.IsDefined(typeof(ComplexityKind), value);
 
     internal static string GetBoundText(int value) => ((ComplexityKind)value) switch {

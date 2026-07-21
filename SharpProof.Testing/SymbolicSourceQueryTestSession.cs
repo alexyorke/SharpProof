@@ -41,42 +41,6 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable
         _smtAnalysis.Dispose();
     }
 
-    public SymbolicProgramPointResult AnalyzeAtPosition(int position)
-    {
-        return _service.QuerySyntaxTreeAtPosition(
-            _syntaxTree,
-            _compilation,
-            position,
-            smtAnalysis: _smtAnalysis);
-    }
-
-    public SymbolicQueryResult AnalyzeLine(string marker)
-    {
-        return _service.QuerySyntaxTreeLine(
-            _syntaxTree,
-            _compilation,
-            FindLine(marker),
-            smtAnalysis: _smtAnalysis);
-    }
-
-    public SymbolicProgramPointResult AnalyzeLinePoint(
-        int line,
-        int column)
-    {
-        return _service.QuerySyntaxTreeLinePoint(
-            _syntaxTree,
-            _compilation,
-            line,
-            column,
-            smtAnalysis: _smtAnalysis);
-    }
-
-    public int FindLineStartPosition(string marker)
-    {
-        var line = FindLine(marker);
-        return _syntaxTree.GetText().Lines[line - 1].Start;
-    }
-
     public SymbolicConditionProofResult ProveAtMarker((int Line, int Column, int Position) marker, string condition)
     {
         return _service.ProveConditionAtSyntaxTree(

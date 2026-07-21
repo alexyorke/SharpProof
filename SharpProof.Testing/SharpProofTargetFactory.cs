@@ -30,8 +30,6 @@ internal static class SharpProofTargetFactory
 
     internal static SharpProofTarget AllLines() => new(SharpProofTargetKind.AllLines);
 
-    internal static SharpProofTarget Node() => new(SharpProofTargetKind.Span);
-
     private static void ValidatePositive(int value, string parameterName)
     {
         if (value <= 0) throw new ArgumentOutOfRangeException(parameterName);

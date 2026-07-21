@@ -38,63 +38,6 @@ internal static class RequiresContractHelpers {
                 string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal));
     }
 
-    internal static bool TryCreateCondition(
-        SemanticModel semanticModel,
-        int position,
-        string conditionText,
-        CancellationToken cancellationToken,
-        out ExpressionSyntax conditionExpression,
-        out SemanticModel conditionSemanticModel,
-        out SymbolicCondition condition,
-        out string failureReason) {
-        condition = null!;
-        if (!ContractConditionHelpers.TryParse(conditionText, out var conditionStatement, out conditionExpression)) {
-            conditionSemanticModel = semanticModel;
-            failureReason = "condition parse failure";
-            return false;
-        }
-
-        if (!ContractConditionHelpers.TryCreateSpeculativeModel(
-                semanticModel,
-                position,
-                conditionStatement,
-                out conditionSemanticModel)) {
-            failureReason = "condition binding failure";
-            return false;
-        }
-
-        var lowering = SymbolicSemanticPipeline.LowerCondition(
-            conditionExpression,
-            new SymbolicLoweringContext(conditionSemanticModel, cancellationToken));
-        if (lowering is not { IsExact: true, Value: { } loweredCondition }) {
-            failureReason = "condition is not supported by the current bounded proof engine";
-            return false;
-        }
-
-        condition = loweredCondition;
-        failureReason = string.Empty;
-        return true;
-    }
-
-    internal static int GetMethodEntrySpeculativePosition(SyntaxNode methodNode) {
-        return methodNode switch {
-            MethodDeclarationSyntax { Body: { } body } => body.OpenBraceToken.Span.End,
-            MethodDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression.SpanStart,
-            ConstructorDeclarationSyntax { Body: { } body } => body.OpenBraceToken.Span.End,
-            ConstructorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression.SpanStart,
-            OperatorDeclarationSyntax { Body: { } body } => body.OpenBraceToken.Span.End,
-            OperatorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression.SpanStart,
-            ConversionOperatorDeclarationSyntax { Body: { } body } => body.OpenBraceToken.Span.End,
-            ConversionOperatorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression
-                .SpanStart,
-            AccessorDeclarationSyntax { Body: { } body } => body.OpenBraceToken.Span.End,
-            AccessorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression.SpanStart,
-            LocalFunctionStatementSyntax { Body: { } body } => body.OpenBraceToken.Span.End,
-            LocalFunctionStatementSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression.SpanStart,
-            _ => methodNode.SpanStart
-        };
-    }
-
     internal static string CombineAsImplication(
         ImmutableArray<RequiresContract> requiresContracts,
         string consequent) {

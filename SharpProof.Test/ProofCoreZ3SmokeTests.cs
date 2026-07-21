@@ -229,928 +229,159 @@ internal class ProofCoreZ3SmokeTests
             new SmtFormula[] { affineEquality, xIsNonNegative });
     }
 
-    [Test]
-    public void SmtSolver_UnsupportedRegexWithoutConcreteInput_ReturnsUnknown()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
+    public enum RegexConstraint { None, Equal, NotEqual, StartsWith, LengthEqual, StartsWithAndLength, NegatedMatchAndLength }
 
-        AssertSatisfiability(
-            Feasibility.Unknown,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, "(")
-            });
+    public enum RegexConclusion { Equal, LengthEqual, LengthAtMost }
+
+    public sealed record RegexCase(
+        Feasibility Expected,
+        string Pattern,
+        RegexConstraint Constraint = RegexConstraint.None,
+        string? Value = null,
+        int Length = 0,
+        RegexOptions Options = RegexOptions.None,
+        bool ExtendedTimeout = false);
+
+    public sealed record RegexImplicationCase(
+        string Pattern,
+        RegexConclusion Conclusion,
+        string? Value = null,
+        int Length = 0,
+        RegexOptions Options = RegexOptions.None);
+
+    private static IEnumerable<TestCaseData> RegexSatisfiabilityCases() {
+        yield return CreateRegexCase("SmtSolver_UnsupportedRegexWithoutConcreteInput_ReturnsUnknown", Feasibility.Unknown, "(");
+        yield return CreateRegexCase("SmtSolver_UnsupportedRegexOptionsWithoutConcreteInput_ReturnsUnknown", Feasibility.Unknown, @"\Aab\z", options: RegexOptions.IgnoreCase);
+        yield return CreateRegexCase("SmtSolver_UnsupportedRegexOptionsConcreteMismatchUsesDotNetOptions", Feasibility.Unsatisfiable, @"\Aab\z", RegexConstraint.Equal, "CD", options: RegexOptions.IgnoreCase);
+        yield return CreateRegexCase("SmtSolver_MultilineCaretAnchorWithoutConcreteInput_ReturnsUnknown", Feasibility.Unknown, "^AB", options: RegexOptions.Multiline);
+        yield return CreateRegexCase("SmtSolver_LeadingContiguousAnchorRegexAcceptsInitialMatch", Feasibility.Satisfiable, @"\GAB", RegexConstraint.StartsWith, "AB");
+        yield return CreateRegexCase("SmtSolver_LeadingContiguousAnchorRegexContradictsLaterMatch", Feasibility.Unsatisfiable, @"\GAB", RegexConstraint.StartsWith, "XAB");
+        yield return CreateRegexCase("SmtSolver_InternalContiguousAnchorRegexWithoutConcreteInput_ReturnsUnknown", Feasibility.Unknown, @"\AA\GB\z");
+        yield return CreateRegexCase("SmtSolver_CultureInvariantIgnoreCaseRegexAcceptsCaseVariantLiteral", Feasibility.Satisfiable, @"\Aab\z", RegexConstraint.Equal, "AB", options: RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+        yield return CreateRegexCase("SmtSolver_CultureInvariantIgnoreCaseCharClassAcceptsUppercaseVariant", Feasibility.Satisfiable, @"\A[a-c]\z", RegexConstraint.Equal, "B", options: RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+        yield return CreateRegexCase("SmtSolver_InvalidRegexCategoryWithoutConcreteInput_ReturnsUnknown", Feasibility.Unknown, @"\A\p{NotARealCategory}\z", RegexConstraint.LengthEqual, length: 1);
+        yield return CreateRegexCase("SmtSolver_IgnorePatternWhitespaceBeforeStrictStartAnchorSkipsTrivia", Feasibility.Unsatisfiable, "(?x) # leading trivia\n \\A A B \\z", RegexConstraint.NotEqual, "AB");
+        yield return CreateRegexCase("SmtSolver_InlineSinglelineBeforeCaretAnchorAllowsNewlineDot", Feasibility.Satisfiable, @"(?s)^.\z", RegexConstraint.Equal, "\n");
+        yield return CreateRegexCase("SmtSolver_IgnorePatternWhitespaceGroupSkipsWhitespaceAndComments", Feasibility.Unsatisfiable, "\\A(?x:A B # ignored comment\n C)\\z", RegexConstraint.NotEqual, "ABC");
+        yield return CreateRegexCase("SmtSolver_IgnorePatternWhitespaceGroupKeepsEscapedSpaceLiteral", Feasibility.Unsatisfiable, "\\A(?x:A\\ B)\\z", RegexConstraint.NotEqual, "A B");
+        yield return CreateRegexCase("SmtSolver_DefaultDotRejectsNewline", Feasibility.Unsatisfiable, @"\A.\z", RegexConstraint.Equal, "\n");
+        yield return CreateRegexCase("SmtSolver_InlineSinglelineDotAllowsNewline", Feasibility.Satisfiable, @"\A(?s:.)\z", RegexConstraint.Equal, "\n");
+        yield return CreateRegexCase("SmtSolver_ScopedSinglelineDisableDotRejectsNewline", Feasibility.Unsatisfiable, @"\A(?s:A(?-s:.)C)\z", RegexConstraint.Equal, "A\nC");
+        yield return CreateRegexCase("SmtSolver_InlineIgnoreCaseOptionGroupAffectsFollowingLiterals", Feasibility.Satisfiable, @"\A(?i)ab\z", RegexConstraint.Equal, "AB", options: RegexOptions.CultureInvariant);
+        yield return CreateRegexCase("SmtSolver_InlineIgnoreCaseDisableMakesFollowingLiteralCaseSensitive", Feasibility.Unsatisfiable, @"\A(?i)ab(?-i)c\z", RegexConstraint.Equal, "ABC", options: RegexOptions.CultureInvariant);
+        yield return CreateRegexCase("SmtSolver_InlineIgnorePatternWhitespaceOptionSkipsRemainderTrivia", Feasibility.Unsatisfiable, "\\A(?x)A B # ignored comment\n C\\z", RegexConstraint.NotEqual, "ABC");
+        yield return CreateRegexCase("SmtSolver_InlineSinglelineDisableMakesFollowingDotRejectsNewline", Feasibility.Unsatisfiable, @"\A(?s).(?-s).\z", RegexConstraint.Equal, "\n\n");
+        yield return CreateRegexCase("SmtSolver_InlineRegexCommentBeforeQuantifierPreservesPreviousAtom", Feasibility.Satisfiable, @"\AA(?# repeat previous atom)*\z", RegexConstraint.Equal, "AA");
+        yield return CreateRegexCase("SmtSolver_LeadingInlineRegexCommentBeforeStartAnchorKeepsAnchorStrict", Feasibility.Unsatisfiable, @"(?# leading comment)\AAB\z", RegexConstraint.StartsWith, "XAB");
+        yield return CreateRegexCase("SmtSolver_EscapedRegexClassLiteralContradictsPrefix", Feasibility.Unsatisfiable, @"\A[\.\]]\z", RegexConstraint.StartsWith, "A");
+        yield return CreateRegexCase("SmtSolver_LeadingBracketRegexClassLiteralContradictsPrefix", Feasibility.Unsatisfiable, @"\A[]]\z", RegexConstraint.StartsWith, "A");
+        yield return CreateRegexCase("SmtSolver_CharacterClassSubtractionRejectsExcludedLiteral", Feasibility.Unsatisfiable, @"\A[a-z-[aeiou]]\z", RegexConstraint.Equal, "a");
+        yield return CreateRegexCase("SmtSolver_CharacterClassSubtractionAllowsRemainingLiteral", Feasibility.Satisfiable, @"\A[a-z-[aeiou]]\z", RegexConstraint.Equal, "b");
+        yield return CreateRegexCase("SmtSolver_ControlCharacterEscapeAllowsExpectedCharacter", Feasibility.Satisfiable, @"\A\cA\z", RegexConstraint.StartsWithAndLength, "\u0001", 1);
+        yield return CreateRegexCase("SmtSolver_ControlCharacterClassEscapeContradictsDifferentCharacter", Feasibility.Unsatisfiable, @"\A[\cA]\z", RegexConstraint.StartsWithAndLength, "\u0002", 1);
+        yield return CreateRegexCase("SmtSolver_OctalRegexEscapeImpliesSpaceLiteral", Feasibility.Unsatisfiable, @"\A\040\z", RegexConstraint.NotEqual, " ");
+        yield return CreateRegexCase("SmtSolver_OctalRegexEscapeConsumesAtMostTwoFollowingDigits", Feasibility.Unsatisfiable, @"\A\0408\z", RegexConstraint.NotEqual, " 8");
+        yield return CreateRegexCase("SmtSolver_OctalRegexClassEscapeContradictsDifferentCharacter", Feasibility.Unsatisfiable, @"\A[\040]\z", RegexConstraint.StartsWith, "A");
+        yield return CreateRegexCase("SmtSolver_PositiveLookaheadRegexContradictsImpossibleSuffix", Feasibility.Unsatisfiable, @"\A(?=AB)A.\z", RegexConstraint.Equal, "AC");
+        yield return CreateRegexCase("SmtSolver_PositiveLookaheadRegexAcceptsMatchingSuffix", Feasibility.Satisfiable, @"\A(?=AB)A.\z", RegexConstraint.Equal, "AB");
+        yield return CreateRegexCase("SmtSolver_NegativeLookaheadRegexRejectsExcludedSuffix", Feasibility.Unsatisfiable, @"\A(?!AB)A.\z", RegexConstraint.Equal, "AB");
+        yield return CreateRegexCase("SmtSolver_NegativeLookaheadRegexAcceptsDifferentSuffix", Feasibility.Satisfiable, @"\A(?!AB)A.\z", RegexConstraint.Equal, "AC");
+        yield return CreateRegexCase("SmtSolver_LookaheadWithoutConsumingSuffix_ReturnsUnknown", Feasibility.Unknown, @"\AA(?=B)");
+        yield return CreateRegexCase("SmtSolver_PositiveLookbehindRegexContradictsImpossiblePrefix", Feasibility.Unsatisfiable, @"\A[AB]{2}(?<=AB)C\z", RegexConstraint.Equal, "AAC");
+        yield return CreateRegexCase("SmtSolver_PositiveLookbehindRegexAcceptsMatchingPrefix", Feasibility.Satisfiable, @"\A[AB]{2}(?<=AB)C\z", RegexConstraint.Equal, "ABC");
+        yield return CreateRegexCase("SmtSolver_NegativeLookbehindRegexRejectsExcludedPrefix", Feasibility.Unsatisfiable, @"\A[AB]{2}(?<!AB)C\z", RegexConstraint.Equal, "ABC");
+        yield return CreateRegexCase("SmtSolver_NegativeLookbehindRegexAcceptsDifferentPrefix", Feasibility.Satisfiable, @"\A[AB]{2}(?<!AB)C\z", RegexConstraint.Equal, "AAC");
+        yield return CreateRegexCase("SmtSolver_LookbehindWithoutParsedPrefix_ReturnsUnknown", Feasibility.Unknown, @"\A(?<=A)B\z");
+        yield return CreateRegexCase("SmtSolver_AtomicGroupRegexContradictsWrongPrefix", Feasibility.Unsatisfiable, @"\A(?>A*)A\z", RegexConstraint.StartsWith, "B");
+        yield return CreateRegexCase("SmtSolver_AtomicGroupApproximateSatisfiableResult_ReturnsUnknown", Feasibility.Unknown, @"\A(?>A*)A\z", RegexConstraint.StartsWith, "A");
+        yield return CreateRegexCase("SmtSolver_NegatedApproximateRegexWithLength_ReturnsUnknown", Feasibility.Unknown, @"\A(?>A*)A\z", RegexConstraint.NegatedMatchAndLength, length: 1);
+        yield return CreateRegexCase("SmtSolver_WordBoundaryRegexSatisfiableResult_IsUnknown", Feasibility.Unknown, @"\A\bA\z", RegexConstraint.StartsWith, "A");
+        yield return CreateRegexCase("SmtSolver_WordBoundaryBetweenWordsIsUnsatisfiable", Feasibility.Unsatisfiable, @"\AA\bB\z", RegexConstraint.StartsWith, "AB");
+        yield return CreateRegexCase("SmtSolver_NonWordBoundaryBetweenWordsIsUnknown", Feasibility.Unknown, @"\AA\BB\z", RegexConstraint.StartsWith, "AB");
+        yield return CreateRegexCase("SmtSolver_NonWordBoundaryBetweenWordAndPunctuationIsUnsatisfiable", Feasibility.Unsatisfiable, @"\AA\B!\z", RegexConstraint.StartsWith, "A!");
+        yield return CreateRegexCase("SmtSolver_DigitRegexContradictsNonDigitPrefix", Feasibility.Unsatisfiable, @"\A\d\z", RegexConstraint.StartsWith, "A");
+        yield return CreateRegexCase("SmtSolver_NonDigitRegexContradictsSingleDigitPrefix", Feasibility.Unsatisfiable, @"\A\D\z", RegexConstraint.StartsWithAndLength, "5", 1);
+        yield return CreateRegexCase("SmtSolver_NegatedDigitClassContradictsSingleDigitPrefix", Feasibility.Unsatisfiable, @"\A[^\d]\z", RegexConstraint.StartsWithAndLength, "5", 1);
+        yield return CreateRegexCase("SmtSolver_WhitespaceRegexContradictsNonWhitespacePrefix", Feasibility.Unsatisfiable, @"\A\s\z", RegexConstraint.StartsWith, "A", extendedTimeout: true);
+        yield return CreateRegexCase("SmtSolver_NonWhitespaceRegexContradictsNewlinePrefix", Feasibility.Unsatisfiable, @"\A\S\z", RegexConstraint.StartsWithAndLength, "\n", 1, extendedTimeout: true);
+        yield return CreateRegexCase("SmtSolver_WordRegexContradictsPunctuationPrefix", Feasibility.Unsatisfiable, @"\A\w\z", RegexConstraint.StartsWith, "!", extendedTimeout: true);
+        yield return CreateRegexCase("SmtSolver_NonWordRegexContradictsUnderscorePrefix", Feasibility.Unsatisfiable, @"\A\W\z", RegexConstraint.StartsWithAndLength, "_", 1, extendedTimeout: true);
+        yield return CreateRegexCase("SmtSolver_UnicodeCategoryRegexContradictsLetterPrefix", Feasibility.Unsatisfiable, @"\A\p{P}\z", RegexConstraint.StartsWith, "A", extendedTimeout: true);
     }
 
-    [Test]
-    public void SmtSolver_UnsupportedRegexOptionsWithoutConcreteInput_ReturnsUnknown()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unknown,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\Aab\z", RegexOptions.IgnoreCase)
-            });
+    private static IEnumerable<TestCaseData> RegexImplicationCases() {
+        yield return CreateRegexImplicationCase("SmtSolver_MultilineOptionStrictAnchorsRemainExact", @"\AAB\z", RegexConclusion.Equal, "AB", options: RegexOptions.Multiline);
+        yield return CreateRegexImplicationCase("SmtSolver_CultureInvariantIgnoreCaseRegexImpliesLiteralLength", @"\Aab\z", RegexConclusion.LengthEqual, length: 2, options: RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+        yield return CreateRegexImplicationCase("SmtSolver_FinalNewlineRegexAnchorImpliesBoundedLength", @"\AAB\Z", RegexConclusion.LengthAtMost, length: 3);
+        yield return CreateRegexImplicationCase("SmtSolver_InlineOptionBeforeStrictAnchorsImpliesLiteralLength", @"(?i)\Aab\z", RegexConclusion.LengthEqual, length: 2, options: RegexOptions.CultureInvariant);
+        yield return CreateRegexImplicationCase("SmtSolver_InlineOptionBeforeDollarAnchorImpliesBoundedFinalNewlineLength", "(?x)^ A $", RegexConclusion.LengthAtMost, length: 2);
     }
 
-    [Test]
-    public void SmtSolver_UnsupportedRegexOptionsConcreteMismatchUsesDotNetOptions()
-    {
+    [TestCaseSource(nameof(RegexSatisfiabilityCases))]
+    public void SmtSolver_RegexSatisfiabilityMatrix(RegexCase testCase) {
         var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\Aab\z", RegexOptions.IgnoreCase),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("CD"))
-            });
+        var match = new SmtRegexMatchFormula(text, testCase.Pattern, testCase.Options);
+        var length = new SmtStringLengthTerm(text);
+        var formulas = testCase.Constraint switch {
+            RegexConstraint.None => new SmtFormula[] { match },
+            RegexConstraint.Equal => [match, Compare(SmtBinaryOperator.Equal, text, testCase.Value!)],
+            RegexConstraint.NotEqual => [match, Compare(SmtBinaryOperator.NotEqual, text, testCase.Value!)],
+            RegexConstraint.StartsWith => [match, StartsWith(text, testCase.Value!)],
+            RegexConstraint.LengthEqual => [match, Compare(SmtBinaryOperator.Equal, length, testCase.Length)],
+            RegexConstraint.StartsWithAndLength =>
+                [match, StartsWith(text, testCase.Value!), Compare(SmtBinaryOperator.Equal, length, testCase.Length)],
+            RegexConstraint.NegatedMatchAndLength =>
+                [new SmtUnaryFormula(SmtUnaryOperator.Not, match),
+                    Compare(SmtBinaryOperator.Equal, length, testCase.Length)],
+            _ => throw new ArgumentOutOfRangeException()
+        };
+        AssertSatisfiability(testCase.Expected, formulas,
+            testCase.ExtendedTimeout ? TimeSpan.FromMilliseconds(250) : null);
     }
 
-    [Test]
-    public void SmtSolver_MultilineOptionStrictAnchorsRemainExact()
-    {
+    [TestCaseSource(nameof(RegexImplicationCases))]
+    public void SmtSolver_RegexImplicationMatrix(RegexImplicationCase testCase) {
         var text = new SmtVariable("text", SmtValueKind.String);
-        var textIsAb = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            text,
-            new SmtStringConstant("AB"));
-
-        AssertImplication(
-            Feasibility.Unsatisfiable,
-            new[]
-            {
-                new SmtRegexMatchFormula(text, @"\AAB\z", RegexOptions.Multiline)
-            },
-            textIsAb);
+        var conclusion = testCase.Conclusion switch {
+            RegexConclusion.Equal => Compare(SmtBinaryOperator.Equal, text, testCase.Value!),
+            RegexConclusion.LengthEqual => Compare(
+                SmtBinaryOperator.Equal, new SmtStringLengthTerm(text), testCase.Length),
+            RegexConclusion.LengthAtMost => Compare(
+                SmtBinaryOperator.LessThanOrEqual, new SmtStringLengthTerm(text), testCase.Length),
+            _ => throw new ArgumentOutOfRangeException()
+        };
+        AssertImplication(Feasibility.Unsatisfiable,
+            [new SmtRegexMatchFormula(text, testCase.Pattern, testCase.Options)], conclusion);
     }
 
-    [Test]
-    public void SmtSolver_MultilineCaretAnchorWithoutConcreteInput_ReturnsUnknown()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unknown,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, "^AB", RegexOptions.Multiline)
-            });
-    }
-
-    [Test]
-    public void SmtSolver_LeadingContiguousAnchorRegexAcceptsInitialMatch()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\GAB"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("AB"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_LeadingContiguousAnchorRegexContradictsLaterMatch()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\GAB"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("XAB"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_InternalContiguousAnchorRegexWithoutConcreteInput_ReturnsUnknown()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unknown,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\AA\GB\z")
-            });
-    }
-
-    [Test]
-    public void SmtSolver_CultureInvariantIgnoreCaseRegexImpliesLiteralLength()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var lengthIsTwo = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            new SmtStringLengthTerm(text),
-            new SmtIntegerConstant(2));
-
-        AssertImplication(
-            Feasibility.Unsatisfiable,
-            new[]
-            {
-                new SmtRegexMatchFormula(text, @"\Aab\z", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)
-            },
-            lengthIsTwo);
-    }
-
-    [Test]
-    public void SmtSolver_CultureInvariantIgnoreCaseRegexAcceptsCaseVariantLiteral()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\Aab\z", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AB"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_CultureInvariantIgnoreCaseCharClassAcceptsUppercaseVariant()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A[a-c]\z", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("B"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_InvalidRegexCategoryWithoutConcreteInput_ReturnsUnknown()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unknown,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A\p{NotARealCategory}\z"),
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    new SmtStringLengthTerm(text),
-                    new SmtIntegerConstant(1))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_FinalNewlineRegexAnchorImpliesBoundedLength()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var boundedLength = new SmtBinaryFormula(
-            SmtBinaryOperator.LessThanOrEqual,
-            new SmtStringLengthTerm(text),
-            new SmtIntegerConstant(3));
-
-        AssertImplication(
-            Feasibility.Unsatisfiable,
-            new[]
-            {
-                new SmtRegexMatchFormula(text, @"\AAB\Z")
-            },
-            boundedLength);
-    }
-
-    [Test]
-    public void SmtSolver_InlineOptionBeforeStrictAnchorsImpliesLiteralLength()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var lengthIsTwo = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            new SmtStringLengthTerm(text),
-            new SmtIntegerConstant(2));
-
-        AssertImplication(
-            Feasibility.Unsatisfiable,
-            new[]
-            {
-                new SmtRegexMatchFormula(text, @"(?i)\Aab\z", RegexOptions.CultureInvariant)
-            },
-            lengthIsTwo);
-    }
-
-    [Test]
-    public void SmtSolver_IgnorePatternWhitespaceBeforeStrictStartAnchorSkipsTrivia()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var pattern = "(?x) # leading trivia\n \\A A B \\z";
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, pattern),
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant("AB"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_InlineSinglelineBeforeCaretAnchorAllowsNewlineDot()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"(?s)^.\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("\n"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_InlineOptionBeforeDollarAnchorImpliesBoundedFinalNewlineLength()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var boundedLength = new SmtBinaryFormula(
-            SmtBinaryOperator.LessThanOrEqual,
-            new SmtStringLengthTerm(text),
-            new SmtIntegerConstant(2));
-
-        AssertImplication(
-            Feasibility.Unsatisfiable,
-            new[]
-            {
-                new SmtRegexMatchFormula(text, "(?x)^ A $")
-            },
-            boundedLength);
-    }
-
-    [Test]
-    public void SmtSolver_IgnorePatternWhitespaceGroupSkipsWhitespaceAndComments()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var pattern = "\\A(?x:A B # ignored comment\n C)\\z";
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, pattern),
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant("ABC"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_IgnorePatternWhitespaceGroupKeepsEscapedSpaceLiteral()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, "\\A(?x:A\\ B)\\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant("A B"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_DefaultDotRejectsNewline()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A.\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("\n"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_InlineSinglelineDotAllowsNewline()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A(?s:.)\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("\n"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_ScopedSinglelineDisableDotRejectsNewline()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A(?s:A(?-s:.)C)\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("A\nC"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_InlineIgnoreCaseOptionGroupAffectsFollowingLiterals()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A(?i)ab\z", RegexOptions.CultureInvariant),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AB"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_InlineIgnoreCaseDisableMakesFollowingLiteralCaseSensitive()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A(?i)ab(?-i)c\z", RegexOptions.CultureInvariant),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("ABC"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_InlineIgnorePatternWhitespaceOptionSkipsRemainderTrivia()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var pattern = "\\A(?x)A B # ignored comment\n C\\z";
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, pattern),
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant("ABC"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_InlineSinglelineDisableMakesFollowingDotRejectsNewline()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A(?s).(?-s).\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("\n\n"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_InlineRegexCommentBeforeQuantifierPreservesPreviousAtom()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\AA(?# repeat previous atom)*\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AA"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_LeadingInlineRegexCommentBeforeStartAnchorKeepsAnchorStrict()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"(?# leading comment)\AAB\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("XAB"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_EscapedRegexClassLiteralContradictsPrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A[\.\]]\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("A"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_LeadingBracketRegexClassLiteralContradictsPrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A[]]\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("A"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_CharacterClassSubtractionRejectsExcludedLiteral()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A[a-z-[aeiou]]\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("a"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_CharacterClassSubtractionAllowsRemainingLiteral()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A[a-z-[aeiou]]\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("b"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_ControlCharacterEscapeAllowsExpectedCharacter()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A\cA\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("\u0001")),
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    new SmtStringLengthTerm(text),
-                    new SmtIntegerConstant(1))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_ControlCharacterClassEscapeContradictsDifferentCharacter()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A[\cA]\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("\u0002")),
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    new SmtStringLengthTerm(text),
-                    new SmtIntegerConstant(1))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_OctalRegexEscapeImpliesSpaceLiteral()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A\040\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant(" "))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_OctalRegexEscapeConsumesAtMostTwoFollowingDigits()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A\0408\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant(" 8"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_OctalRegexClassEscapeContradictsDifferentCharacter()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A[\040]\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("A"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_PositiveLookaheadRegexContradictsImpossibleSuffix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A(?=AB)A.\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AC"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_PositiveLookaheadRegexAcceptsMatchingSuffix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A(?=AB)A.\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AB"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_NegativeLookaheadRegexRejectsExcludedSuffix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A(?!AB)A.\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AB"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_NegativeLookaheadRegexAcceptsDifferentSuffix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A(?!AB)A.\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AC"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_LookaheadWithoutConsumingSuffix_ReturnsUnknown()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unknown,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\AA(?=B)")
-            });
-    }
-
-    [Test]
-    public void SmtSolver_PositiveLookbehindRegexContradictsImpossiblePrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A[AB]{2}(?<=AB)C\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AAC"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_PositiveLookbehindRegexAcceptsMatchingPrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A[AB]{2}(?<=AB)C\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("ABC"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_NegativeLookbehindRegexRejectsExcludedPrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A[AB]{2}(?<!AB)C\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("ABC"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_NegativeLookbehindRegexAcceptsDifferentPrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Satisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A[AB]{2}(?<!AB)C\z"),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AAC"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_LookbehindWithoutParsedPrefix_ReturnsUnknown()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unknown,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A(?<=A)B\z")
-            });
-    }
-
-    [Test]
-    public void SmtSolver_AtomicGroupRegexContradictsWrongPrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A(?>A*)A\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("B"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_AtomicGroupApproximateSatisfiableResult_ReturnsUnknown()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unknown,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A(?>A*)A\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("A"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_NegatedApproximateRegexWithLength_ReturnsUnknown()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unknown,
-            new SmtFormula[]
-            {
-                new SmtUnaryFormula(
-                    SmtUnaryOperator.Not,
-                    new SmtRegexMatchFormula(text, @"\A(?>A*)A\z")),
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    new SmtStringLengthTerm(text),
-                    new SmtIntegerConstant(1))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_WordBoundaryRegexSatisfiableResult_IsUnknown()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unknown,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A\bA\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("A"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_WordBoundaryBetweenWordsIsUnsatisfiable()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\AA\bB\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("AB"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_NonWordBoundaryBetweenWordsIsUnknown()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unknown,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\AA\BB\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("AB"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_NonWordBoundaryBetweenWordAndPunctuationIsUnsatisfiable()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\AA\B!\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("A!"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_DigitRegexContradictsNonDigitPrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A\d\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("A"))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_NonDigitRegexContradictsSingleDigitPrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A\D\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("5")),
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    new SmtStringLengthTerm(text),
-                    new SmtIntegerConstant(1))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_NegatedDigitClassContradictsSingleDigitPrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A[^\d]\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("5")),
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    new SmtStringLengthTerm(text),
-                    new SmtIntegerConstant(1))
-            });
-    }
-
-    [Test]
-    public void SmtSolver_WhitespaceRegexContradictsNonWhitespacePrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A\s\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("A"))
-            },
-            TimeSpan.FromMilliseconds(250));
-    }
-
-    [Test]
-    public void SmtSolver_NonWhitespaceRegexContradictsNewlinePrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A\S\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("\n")),
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    new SmtStringLengthTerm(text),
-                    new SmtIntegerConstant(1))
-            },
-            TimeSpan.FromMilliseconds(250));
-    }
-
-    [Test]
-    public void SmtSolver_WordRegexContradictsPunctuationPrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A\w\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("!"))
-            },
-            TimeSpan.FromMilliseconds(250));
-    }
-
-    [Test]
-    public void SmtSolver_NonWordRegexContradictsUnderscorePrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A\W\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("_")),
-                new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    new SmtStringLengthTerm(text),
-                    new SmtIntegerConstant(1))
-            },
-            TimeSpan.FromMilliseconds(250));
-    }
-
-    [Test]
-    public void SmtSolver_UnicodeCategoryRegexContradictsLetterPrefix()
-    {
-        var text = new SmtVariable("text", SmtValueKind.String);
-
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[]
-            {
-                new SmtRegexMatchFormula(text, @"\A\p{P}\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("A"))
-            },
-            TimeSpan.FromMilliseconds(250));
-    }
-
+    private static TestCaseData CreateRegexCase(
+        string name,
+        Feasibility expected,
+        string pattern,
+        RegexConstraint constraint = RegexConstraint.None,
+        string? value = null,
+        int length = 0,
+        RegexOptions options = RegexOptions.None,
+        bool extendedTimeout = false) => new TestCaseData(
+        new RegexCase(expected, pattern, constraint, value, length, options, extendedTimeout)).SetName(name);
+
+    private static TestCaseData CreateRegexImplicationCase(
+        string name,
+        string pattern,
+        RegexConclusion conclusion,
+        string? value = null,
+        int length = 0,
+        RegexOptions options = RegexOptions.None) => new TestCaseData(
+        new RegexImplicationCase(pattern, conclusion, value, length, options)).SetName(name);
+
+    private static SmtBinaryFormula Compare(SmtBinaryOperator operation, SmtFormula left, string right) =>
+        new(operation, left, new SmtStringConstant(right));
+
+    private static SmtBinaryFormula Compare(SmtBinaryOperator operation, SmtFormula left, int right) =>
+        new(operation, left, new SmtIntegerConstant(right));
+
+    private static SmtStringStartsWithFormula StartsWith(SmtFormula text, string prefix) =>
+        new(text, new SmtStringConstant(prefix));
     [TestCase(@"\A.\z")]
     [TestCase(@"\A\d\z")]
     [TestCase(@"\A\p{Lu}\z")]

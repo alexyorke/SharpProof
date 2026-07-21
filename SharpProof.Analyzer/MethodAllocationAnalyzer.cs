@@ -22,7 +22,4 @@ internal static class MethodAllocationAnalyzer {
                 method.Name));
         }
     }
-
-    internal static bool HasVisibleAllocationSites(MethodBodyAnalysisContext context) =>
-        context.State.GetMethodEffects(context.CancellationToken).AllocationFree != SharpProofVerdict.Proven;
 }
