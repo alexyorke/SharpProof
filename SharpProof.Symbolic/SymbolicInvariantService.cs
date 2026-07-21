@@ -37,11 +37,9 @@ internal sealed class SymbolicInvariantService {
             includeCurrentStatementCompletionFacts,
             initialState);
         return CreateAnalysis(
-            point.Position,
             point.Formulas,
             point.PathState,
             smtAnalysis,
-            site,
             point.Truncation);
     }
 
@@ -58,11 +56,9 @@ internal sealed class SymbolicInvariantService {
         var formulas = EncodePathState(pathState);
 
         return CreateAnalysis(
-            forStatement.SpanStart,
             formulas,
             pathState,
             smtAnalysis,
-            forStatement,
             limitScope.Snapshot());
     }
 
@@ -94,11 +90,9 @@ internal sealed class SymbolicInvariantService {
     }
 
     private static SymbolicProgramPointAnalysis CreateAnalysis(
-        int spanStart,
         IReadOnlyList<SmtFormula> formulas,
         SymbolicState pathState,
         SmtAnalysisService? smtAnalysis,
-        SyntaxNode sourceNode,
         SymbolicAnalysisTruncationInfo truncation) {
         formulas = FlattenProjectedConjunctions(formulas);
         if (formulas.Count == 0 &&
@@ -111,48 +105,36 @@ internal sealed class SymbolicInvariantService {
             : new SymbolicProofService(smtAnalysis).ClassifyReachability(pathState);
         if (stateProof?.Status == SymbolicProofStatus.Unreachable)
             return new SymbolicProgramPointAnalysis(
-                spanStart,
                 formulas,
                 pathState,
                 SymbolicReachability.Unreachable,
                 stateProof.Reason,
-                SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                sourceNode,
                 truncation,
                 stateProof.RawResult);
 
         if (formulas.Count == 0) {
             if (stateProof != null)
                 return new SymbolicProgramPointAnalysis(
-                    spanStart,
                     formulas,
                     pathState,
                     MapReachability(stateProof.Status),
                     stateProof.Reason,
-                    SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                    sourceNode,
                     truncation,
                     stateProof.RawResult);
 
             return new SymbolicProgramPointAnalysis(
-                spanStart,
                 formulas,
                 pathState,
                 SymbolicReachability.Reachable,
                 "no_path_conditions",
-                SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                sourceNode,
                 truncation);
         }
 
         return new SymbolicProgramPointAnalysis(
-            spanStart,
             formulas,
             pathState,
             stateProof == null ? SymbolicReachability.NotChecked : MapReachability(stateProof.Status),
             stateProof?.Reason ?? "reachability_not_checked",
-            SymbolicSmtDiagnostics.FromService(smtAnalysis),
-            sourceNode,
             truncation,
             stateProof?.RawResult);
     }
@@ -224,96 +206,12 @@ internal sealed record SymbolicInvariantFactSummary(IReadOnlyList<string> Facts)
 }
 
 internal sealed record SymbolicProgramPointAnalysis(
-    int SpanStart,
     IReadOnlyList<SmtFormula> PathConditions,
     SymbolicState PathState,
     SymbolicReachability Reachability,
     string ReachabilityReason,
-    SymbolicSmtDiagnostics SmtDiagnostics,
-    SyntaxNode SourceNode,
     SymbolicAnalysisTruncationInfo AnalysisTruncation,
-    AnalysisProofResult? ReachabilityProof = null) {
-    internal SymbolicProgramPointAnalysis(
-        int spanStart,
-        IReadOnlyList<SmtFormula> pathConditions,
-        SymbolicState pathState,
-        SymbolicReachability reachability,
-        string reachabilityReason,
-        SymbolicSmtDiagnostics smtDiagnostics,
-        SyntaxNode sourceNode)
-        : this(spanStart, pathConditions, pathState, reachability, reachabilityReason, smtDiagnostics, sourceNode,
-            SymbolicAnalysisTruncationInfo.None) {
-    }
-
-    public IReadOnlyList<string> Facts { get; } = PathConditions.Select(SymbolicFormulaDisplay.Format).ToArray();
-
-    public string MergedInvariantText { get; } = SymbolicFormulaDisplay.FormatMergedInvariant(PathConditions);
-
-    public SymbolicAnalysisTruncationInfo Truncation => AnalysisTruncation;
-
-}
-
-internal sealed record SymbolicSmtDiagnostics(
-    bool IsConfigured,
-    SmtAnalysisMode Mode,
-    bool IsEnabled,
-    int QueryTimeoutMs,
-    int MethodBudgetMs,
-    int MaxPathConditions,
-    int MaxExpressionNodes,
-    int ExecutedQueryCount,
-    int CacheEntryCount,
-    SmtAnalysisHealth Health,
-    SmtSolverLifecycleOptions Lifecycle) {
-    public static readonly SymbolicSmtDiagnostics NotConfigured = new(
-        false,
-        SmtAnalysisMode.Off,
-        false,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        new SmtAnalysisHealth(
-            SmtAnalysisHealthState.Disabled,
-            string.Empty,
-            0,
-            0,
-            0,
-            0,
-            0),
-        SmtSolverLifecycleOptions.Default);
-
-    internal SymbolicSmtDiagnostics Snapshot => this;
-
-    public static SymbolicSmtDiagnostics FromService(SmtAnalysisService? smtAnalysis) {
-        if (smtAnalysis == null) return NotConfigured;
-
-        return new SymbolicSmtDiagnostics(
-            true,
-            smtAnalysis.Options.Mode,
-            smtAnalysis.Options.IsEnabled,
-            ToBoundedMilliseconds(smtAnalysis.Options.QueryTimeout),
-            ToBoundedMilliseconds(smtAnalysis.Options.MethodBudget),
-            smtAnalysis.Options.MaxPathConditions,
-            smtAnalysis.Options.MaxExpressionNodes,
-            smtAnalysis.ExecutedQueryCount,
-            smtAnalysis.CacheEntryCount,
-            smtAnalysis.Health,
-            smtAnalysis.Options.Lifecycle);
-    }
-
-    internal static int ToBoundedMilliseconds(TimeSpan value) {
-        var totalMilliseconds = value.TotalMilliseconds;
-        if (totalMilliseconds >= int.MaxValue) return int.MaxValue;
-
-        if (totalMilliseconds <= int.MinValue) return int.MinValue;
-
-        return (int)totalMilliseconds;
-    }
-
-}
+    AnalysisProofResult? ReachabilityProof = null);
 
 internal enum SymbolicReachability {
     NotChecked,

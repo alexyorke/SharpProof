@@ -446,8 +446,11 @@ internal static class NullableFlowFacts {
                 : NullableFlowFactState.Unknown;
     }
 
-    private static NullableFlowFactState GetMethodReturnContractState(IMethodSymbol method) {
-        var attributes = GetReturnAttributes(method).ToArray();
+    private static NullableFlowFactState GetMethodReturnContractState(IMethodSymbol method) =>
+        GetAttributeState(GetReturnAttributes(method));
+
+    private static NullableFlowFactState GetAttributeState(IEnumerable<AttributeData> source) {
+        var attributes = source.ToArray();
         if (HasAttribute(attributes, MaybeNullAttributeName))
             return NullableFlowFactState.MaybeNull;
 
@@ -456,14 +459,8 @@ internal static class NullableFlowFacts {
             : NullableFlowFactState.Unknown;
     }
 
-    private static NullableFlowFactState GetPropertyReadContractState(IPropertySymbol property) {
-        var attributes = GetReadAttributes(property).ToArray();
-        if (HasAttribute(attributes, MaybeNullAttributeName)) return NullableFlowFactState.MaybeNull;
-
-        return HasAttribute(attributes, NotNullAttributeName)
-            ? NullableFlowFactState.NotNull
-            : NullableFlowFactState.Unknown;
-    }
+    private static NullableFlowFactState GetPropertyReadContractState(IPropertySymbol property) =>
+        GetAttributeState(GetReadAttributes(property));
 
     private static NullableFlowFactState GetFieldReadContractState(IFieldSymbol field) {
         if (field is {
@@ -474,12 +471,7 @@ internal static class NullableFlowFacts {
             })
             return NullableFlowFactState.NotNull;
 
-        var attributes = GetAttributes(field).ToArray();
-        if (HasAttribute(attributes, MaybeNullAttributeName)) return NullableFlowFactState.MaybeNull;
-
-        return HasAttribute(attributes, NotNullAttributeName)
-            ? NullableFlowFactState.NotNull
-            : NullableFlowFactState.Unknown;
+        return GetAttributeState(GetAttributes(field));
     }
 
     private static NullableFlowFactState FromAnnotation(NullableAnnotation annotation) {

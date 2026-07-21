@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic.Smt;
 
 internal enum SmtAnalysisMode {
-    Off,
     Bounded,
     Deep
 }
@@ -33,10 +32,7 @@ internal sealed record SmtAnalysisOptions(
             SmtSolverLifecycleOptions.Default) {
     }
 
-    public bool IsEnabled => Mode != SmtAnalysisMode.Off;
-
     public static SmtAnalysisOptions ForMode(SmtAnalysisMode mode) => mode switch {
-        SmtAnalysisMode.Off => CreateBoundedDefaults(SmtAnalysisMode.Off),
         SmtAnalysisMode.Deep => new SmtAnalysisOptions(
                             SmtAnalysisMode.Deep,
                             TimeSpan.FromMilliseconds(2000),
@@ -44,11 +40,11 @@ internal sealed record SmtAnalysisOptions(
                             512,
                             8192,
                             false),
-        _ => CreateBoundedDefaults(SmtAnalysisMode.Bounded),
+        _ => CreateBoundedDefaults(),
     };
 
-    private static SmtAnalysisOptions CreateBoundedDefaults(SmtAnalysisMode mode) => new SmtAnalysisOptions(
-            mode,
+    private static SmtAnalysisOptions CreateBoundedDefaults() => new SmtAnalysisOptions(
+            SmtAnalysisMode.Bounded,
             TimeSpan.FromMilliseconds(750),
             TimeSpan.FromMilliseconds(5000),
             192,

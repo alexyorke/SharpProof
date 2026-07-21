@@ -354,7 +354,7 @@ public sealed class NotNullIfNotNullIndexer
         var snapshot = SharedInvariantService.AnalyzeAt(statement, context.SemanticModel,
             cancellationToken: CancellationToken.None);
 
-        return snapshot.Facts.ToArray();
+        return snapshot.PathConditions.Select(SymbolicFormulaDisplay.Format).ToArray();
     }
 
     internal static string[] CollectCompletedLoopExitFacts(string source, string loopPrefix) {
@@ -387,8 +387,7 @@ public sealed class NotNullIfNotNullIndexer
             source,
             "SymbolicFactsTest",
             ImmutableArray.Create<MetadataReference>(
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location)),
-            parseOptions: null);
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location)));
         var expression = context.Root
             .DescendantNodes()
             .OfType<ExpressionSyntax>()
@@ -396,7 +395,7 @@ public sealed class NotNullIfNotNullIndexer
         var snapshot = SharedInvariantService.AnalyzeAt(expression, context.SemanticModel,
             cancellationToken: CancellationToken.None);
 
-        return snapshot.Facts.ToArray();
+        return snapshot.PathConditions.Select(SymbolicFormulaDisplay.Format).ToArray();
     }
 
     internal static int FindLine(string source, string text) {
@@ -415,8 +414,7 @@ public sealed class NotNullIfNotNullIndexer
             (int)options.QueryTimeout.TotalMilliseconds,
             (int)options.MethodBudget.TotalMilliseconds,
             options.MaxPathConditions,
-            options.MaxExpressionNodes,
-            options.IsEnabled);
+            options.MaxExpressionNodes);
     }
 
     private delegate bool ConditionPredicateDelegate(ExpressionSyntax expression, SemanticModel semanticModel,
@@ -430,6 +428,5 @@ public sealed class NotNullIfNotNullIndexer
         int TimeoutMs,
         int MethodBudgetMs,
         int MaxPathConditions,
-        int MaxExpressionNodes,
-        bool IsEnabled);
+        int MaxExpressionNodes);
 }

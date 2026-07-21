@@ -49,9 +49,10 @@ public sealed class SymbolicQueryWitnessTests {
             options));
 
         var programPoint = point.ProgramPoints.Single();
-        var valueDomain = programPoint.InputDomainSummary.Domains.Single(domain => domain.Name == "value");
-        var textDomain = programPoint.InputDomainSummary.Domains.Single(domain => domain.Name == "text");
-        var indexDomain = programPoint.InputDomainSummary.Domains.Single(domain => domain.Name == "index");
+        var domains = programPoint.ReachabilityWitness.DomainSummary.Domains;
+        var valueDomain = domains.Single(domain => domain.Name == "value");
+        var textDomain = domains.Single(domain => domain.Name == "text");
+        var indexDomain = domains.Single(domain => domain.Name == "index");
         Assert.Multiple(() => {
             Assert.That(programPoint.ReachabilityWitness.IsAvailable, Is.True);
             Assert.That(programPoint.ReachabilityWitness.Assignments, Has.Some.Property("SourceName").EqualTo("value"));
@@ -67,8 +68,8 @@ public sealed class SymbolicQueryWitnessTests {
         });
 
         foreach (var result in new[] { point, lineResult, span, allLines }) {
-            Assert.That(result.ReachabilityWitnesses, Is.Not.Empty);
-            Assert.That(result.InputDomainSummary, Is.Not.Null);
+            Assert.That(result.ProgramPoints, Is.Not.Empty);
+            Assert.That(result.ProgramPoints.Select(static item => item.ReachabilityWitness), Is.Not.Empty);
         }
 
         var proof = service.Prove(new SymbolicQueryContext(
@@ -130,8 +131,8 @@ public sealed class SymbolicQueryWitnessTests {
             Assert.That(divisorAssignment.IntegerValue, Is.EqualTo(0));
             Assert.That(divisorDomain.IntegerRange?.ExactValue, Is.EqualTo(0));
             Assert.That(divisorDomain.Predicates.Count( predicate => predicate.Kind == SymbolicDomainPredicateKind.Range), Is.EqualTo(1));
-            Assert.That(result.TriggerWitnesses, Does.Contain(hazard.TriggerWitness));
-            Assert.That(result.InputDomainSummary.Domains, Has.Some.Property("Name").EqualTo("divisor"));
+            Assert.That(result.Hazards.Select(static item => item.TriggerWitness), Does.Contain(hazard.TriggerWitness));
+            Assert.That(hazard.TriggerWitness.DomainSummary.Domains, Has.Some.Property("Name").EqualTo("divisor"));
         });
     }
 

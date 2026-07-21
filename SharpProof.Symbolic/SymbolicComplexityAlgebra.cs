@@ -37,21 +37,12 @@ internal static class SymbolicComplexityAlgebra {
     internal static SymbolicComplexityDriverInfo CreateDriver(
         string kind,
         string description,
-        SyntaxNode node,
-        SyntaxTree syntaxTree,
-        CancellationToken cancellationToken) {
-        var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
-            syntaxTree,
-            node.SpanStart,
-            cancellationToken,
-            true);
+        SyntaxNode node) {
         return new SymbolicComplexityDriverInfo(
             kind,
             description,
             node.SpanStart,
-            node.Span.Length,
-            lineColumn.Line,
-            lineColumn.Column);
+            node.Span.Length);
     }
 
     internal static SymbolicComplexityCalleeInfo CreateCalleeInfo(

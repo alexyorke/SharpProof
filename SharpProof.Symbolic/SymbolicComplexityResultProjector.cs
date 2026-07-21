@@ -14,8 +14,6 @@ internal static class SymbolicComplexityResultProjector {
             summary.Cost.IsRecursiveUnknown);
 
         return new SymbolicComplexityResult(
-            target.MethodName,
-            target.DeclarationKind,
             complexity,
             DistinctDrivers(summary.Drivers),
             DistinctUnknownReasons(summary.UnknownReasons),

@@ -12,12 +12,6 @@ internal sealed class SymbolicQueryResult(
     internal string MergedInvariantText { get; } =
         mergedInvariantText ?? throw new ArgumentNullException(nameof(mergedInvariantText));
 
-    public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses { get; } =
-        programPoints.Select(static point => point.ReachabilityWitness).ToArray();
-
-    public SymbolicInputDomainSummary InputDomainSummary { get; } = SymbolicInputWitnessFactory.MergeAlternatives(
-        programPoints.Select(static point => point.ReachabilityWitness).ToArray());
-
     internal static SymbolicQueryResult From(SymbolicProgramPointResult point) {
         if (point == null) throw new ArgumentNullException(nameof(point));
 

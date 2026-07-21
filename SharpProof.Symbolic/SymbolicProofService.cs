@@ -328,12 +328,16 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
         return new SymbolicBudgetInfo(
             service.Options.MaxPathConditions,
             service.Options.MaxExpressionNodes,
-            SymbolicSmtDiagnostics.ToBoundedMilliseconds(service.Options.QueryTimeout),
-            SymbolicSmtDiagnostics.ToBoundedMilliseconds(service.Options.MethodBudget),
+            ToBoundedMilliseconds(service.Options.QueryTimeout),
+            ToBoundedMilliseconds(service.Options.MethodBudget),
             service.ExecutedQueryCount,
             cache.Entries,
             cache);
     }
+
+    private static int ToBoundedMilliseconds(TimeSpan value) =>
+        value.TotalMilliseconds >= int.MaxValue ? int.MaxValue :
+        value.TotalMilliseconds <= int.MinValue ? int.MinValue : (int)value.TotalMilliseconds;
 
     private bool TryEncodeState(
         SymbolicState state,

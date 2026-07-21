@@ -30,9 +30,7 @@ internal sealed class SymbolicComplexityCallModel(
             if (targetMethod == null)
                 return ComplexityArtifacts.Unknown(
                     SymbolicComplexityUnknownReason.UnknownCallee,
-                    invocationSyntax,
-                    invocationSyntax.SyntaxTree,
-                    _cancellationToken);
+                    invocationSyntax);
 
             invocationCosts.Add(AnalyzeMethodCall(
                 targetMethod,
@@ -135,9 +133,7 @@ internal sealed class SymbolicComplexityCallModel(
             drivers.Add(SymbolicComplexityAlgebra.CreateDriver(
                 "Call",
                 "call to " + calleeInfo.MethodDisplayName + " contributes " + calleeInfo.ComplexityText,
-                syntax,
-                syntax.SyntaxTree,
-                _cancellationToken));
+                syntax));
 
         return ComplexityArtifacts.FromCost(
             substitutionResult.Cost,
@@ -153,8 +149,7 @@ internal sealed class SymbolicComplexityCallModel(
         return ComplexityArtifacts.Unknown(
             reason,
             syntax,
-            syntax.SyntaxTree,
-            _cancellationToken,
+            parts: null,
             calleeSummaries: new[] {
                 new SymbolicComplexityCalleeInfo(
                     methodSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),

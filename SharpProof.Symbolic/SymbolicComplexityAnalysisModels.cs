@@ -32,18 +32,14 @@ internal sealed record ComplexityArtifacts(
     public static ComplexityArtifacts Unknown(
         SymbolicComplexityUnknownReason reason,
         SyntaxNode syntax,
-        SyntaxTree syntaxTree,
-        CancellationToken cancellationToken,
         params ComplexityArtifacts[] parts) {
-        return Unknown(reason, syntax, syntaxTree, cancellationToken, parts.AsEnumerable());
+        return Unknown(reason, syntax, parts.AsEnumerable());
     }
 
     public static ComplexityArtifacts Unknown(
         SymbolicComplexityUnknownReason reason,
         SyntaxNode syntax,
-        SyntaxTree syntaxTree,
-        CancellationToken cancellationToken,
-        IEnumerable<ComplexityArtifacts>? parts = null,
+        IEnumerable<ComplexityArtifacts>? parts,
         IEnumerable<SymbolicComplexityCalleeInfo>? calleeSummaries = null) {
         var drivers = new List<SymbolicComplexityDriverInfo>();
         var reasons = new List<SymbolicComplexityUnknownReason> { reason };
@@ -57,7 +53,7 @@ internal sealed record ComplexityArtifacts(
 
         if (calleeSummaries != null) callees.AddRange(calleeSummaries);
 
-        drivers.Add(CreateUnknownDriver(reason, syntax, syntaxTree, cancellationToken));
+        drivers.Add(CreateUnknownDriver(reason, syntax));
         return FromCost(SymbolicCostExpression.Unknown(reason), drivers, reasons, callees);
     }
 
@@ -69,21 +65,12 @@ internal sealed record ComplexityArtifacts(
 
     private static SymbolicComplexityDriverInfo CreateUnknownDriver(
         SymbolicComplexityUnknownReason reason,
-        SyntaxNode syntax,
-        SyntaxTree syntaxTree,
-        CancellationToken cancellationToken) {
-        var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
-            syntaxTree,
-            syntax.SpanStart,
-            cancellationToken,
-            true);
+        SyntaxNode syntax) {
         return new SymbolicComplexityDriverInfo(
             "Unknown",
             reason.ToString(),
             syntax.SpanStart,
-            syntax.Span.Length,
-            lineColumn.Line,
-            lineColumn.Column);
+            syntax.Span.Length);
     }
 }
 

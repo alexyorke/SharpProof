@@ -30,9 +30,7 @@ internal sealed class SmtAnalysisService : IDisposable {
         Options = options ?? throw new ArgumentNullException(nameof(options));
         _budget = new SmtAnalysisBudget(Options.MethodBudget);
         _proofSearchSessions = new SmtProofSearchSessionPool(proofSearchFactory);
-        _healthState = (int)(Options.IsEnabled
-            ? SmtAnalysisHealthState.Ready
-            : SmtAnalysisHealthState.Disabled);
+        _healthState = (int)SmtAnalysisHealthState.Ready;
     }
 
     public SmtAnalysisOptions Options { get; }
@@ -47,14 +45,6 @@ internal sealed class SmtAnalysisService : IDisposable {
 
     public long CacheEvictionCount => _proofResults.LocalEvictionCount;
 
-    public static int SharedCacheEntryCount => SmtProofResultCache.SharedEntryCount;
-
-    public static long SharedCacheHitCount => SmtProofResultCache.SharedHitCount;
-
-    public static long SharedCacheMissCount => SmtProofResultCache.SharedMissCount;
-
-    public static long SharedCacheEvictionCount => SmtProofResultCache.SharedEvictionCount;
-
     public bool IsPermanentlyUnavailable =>
         GetHealthState() == SmtAnalysisHealthState.PermanentlyUnavailable;
 
@@ -67,8 +57,7 @@ internal sealed class SmtAnalysisService : IDisposable {
                     _consecutiveTransientFailureCount,
                     _transientRetryCount,
                     _recoveredTransientFailureCount,
-                    _contextRecycleCount,
-                    0);
+                    _contextRecycleCount);
         }
     }
 
@@ -105,8 +94,6 @@ internal sealed class SmtAnalysisService : IDisposable {
 
     internal AnalysisProofResult Classify(AnalysisProofQuery query) {
         if (_disposed) return Unknown("smt_disposed");
-
-        if (!Options.IsEnabled) return Unknown("smt_disabled");
 
         if (IsPermanentlyUnavailable) return Unknown("smt_unavailable");
 
@@ -324,7 +311,7 @@ internal sealed class SmtAnalysisService : IDisposable {
                 _recoveredTransientFailureCount++;
 
             _consecutiveTransientFailureCount = 0;
-            if (!_disposed && Options.IsEnabled &&
+            if (!_disposed &&
                 GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable)
                 SetHealthState(SmtAnalysisHealthState.Ready);
         }

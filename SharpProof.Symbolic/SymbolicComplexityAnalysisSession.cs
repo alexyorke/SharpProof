@@ -154,9 +154,7 @@ internal sealed class SymbolicComplexityAnalysisSession {
             case IDynamicObjectCreationOperation:
                 return ComplexityArtifacts.Unknown(
                     SymbolicComplexityUnknownReason.UnsupportedOperation,
-                    operation.Syntax,
-                    operation.Syntax.SyntaxTree,
-                    _cancellationToken);
+                    operation.Syntax);
 
             default:
                 return SymbolicComplexityAlgebra.CombineSequence(operation.ChildOperations.Select(child =>
@@ -203,8 +201,6 @@ internal sealed class SymbolicComplexityAnalysisSession {
                 ComplexityArtifacts.Unknown(
                     SymbolicComplexityUnknownReason.UnsupportedLoopShape,
                     forLoopOperation.Syntax,
-                    forLoopOperation.Syntax.SyntaxTree,
-                    _cancellationToken,
                     conditionCost,
                     bottomCost,
                     bodyCost));
@@ -214,9 +210,7 @@ internal sealed class SymbolicComplexityAnalysisSession {
         multiplied = multiplied.WithDriver(SymbolicComplexityAlgebra.CreateDriver(
             "ForLoop",
             "for-loop bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
-            forStatement,
-            forStatement.SyntaxTree,
-            _cancellationToken));
+            forStatement));
         return SymbolicComplexityAlgebra.CombineSequence(beforeCost, multiplied);
     }
 
@@ -235,17 +229,13 @@ internal sealed class SymbolicComplexityAnalysisSession {
                 ComplexityArtifacts.Unknown(
                     SymbolicComplexityUnknownReason.UnsupportedLoopShape,
                     forEachLoopOperation.Syntax,
-                    forEachLoopOperation.Syntax.SyntaxTree,
-                    _cancellationToken,
                     bodyCost));
 
         var multiplied = SymbolicComplexityAlgebra.Multiply(bound.Cost, bodyCost);
         multiplied = multiplied.WithDriver(SymbolicComplexityAlgebra.CreateDriver(
             "ForeachLoop",
             "foreach bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
-            foreachSyntax,
-            foreachSyntax.SyntaxTree,
-            _cancellationToken));
+            foreachSyntax));
         return SymbolicComplexityAlgebra.CombineSequence(collectionCost, multiplied);
     }
 
@@ -274,8 +264,6 @@ internal sealed class SymbolicComplexityAnalysisSession {
             return ComplexityArtifacts.Unknown(
                 SymbolicComplexityUnknownReason.UnsupportedWhileLoop,
                 loopOperation.Syntax,
-                loopOperation.Syntax.SyntaxTree,
-                _cancellationToken,
                 conditionCost,
                 bodyCost);
 
@@ -283,9 +271,7 @@ internal sealed class SymbolicComplexityAnalysisSession {
         multiplied = multiplied.WithDriver(SymbolicComplexityAlgebra.CreateDriver(
             driverKind,
             description + " bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
-            loopOperation.Syntax,
-            loopOperation.Syntax.SyntaxTree,
-            _cancellationToken));
+            loopOperation.Syntax));
         return multiplied;
     }
 

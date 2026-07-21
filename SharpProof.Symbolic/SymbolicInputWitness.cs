@@ -115,34 +115,18 @@ internal sealed record SymbolicInputDomain(
     SymbolicIntegerRange? CollectionLengthRange,
     bool IsIndex,
     string? RelatedCollection,
-    IReadOnlyList<SymbolicDomainPredicate> Predicates,
-    int AlternativeCount = 1);
+    IReadOnlyList<SymbolicDomainPredicate> Predicates);
 
 internal sealed record SymbolicInputDomainSummary(
     SymbolicWitnessStatus Status,
     string Reason,
-    IReadOnlyList<SymbolicInputDomain> Domains,
-    int AlternativeCount) {
-    public int DomainCount => Domains.Count;
-
-    public bool HasApproximation =>
-        Status == SymbolicWitnessStatus.Approximate ||
-        Domains.Any(static domain =>
-            domain.Status == SymbolicWitnessStatus.Approximate ||
-            domain.Predicates.Any(static predicate => predicate.Status == SymbolicWitnessStatus.Approximate));
-
-    public bool HasUnsupportedDomains =>
-        Status == SymbolicWitnessStatus.Unsupported ||
-        Domains.Any(static domain => domain.Status == SymbolicWitnessStatus.Unsupported);
-}
+    IReadOnlyList<SymbolicInputDomain> Domains);
 
 internal sealed record SymbolicInputWitness(
     SymbolicWitnessStatus Status,
     string Reason,
     IReadOnlyList<SymbolicSatisfyingAssignment> Assignments,
     SymbolicInputDomainSummary DomainSummary) {
-    public int AssignmentCount => Assignments.Count;
-
     public bool IsAvailable =>
         Status is SymbolicWitnessStatus.Exact or SymbolicWitnessStatus.Approximate;
 }
@@ -193,43 +177,26 @@ internal static class SymbolicInputWitnessFactory {
             status,
             reason,
             assignments,
-            new SymbolicInputDomainSummary(domainStatus, domainReason, domains, 1));
+            new SymbolicInputDomainSummary(domainStatus, domainReason, domains));
     }
 
-    internal static SymbolicInputWitness Unconstrained() {
-        return CreateEmpty(
-            SymbolicWitnessStatus.Exact,
-            "unconstrained_inputs",
-            1);
-    }
+    internal static SymbolicInputWitness Unconstrained() =>
+        CreateEmpty(SymbolicWitnessStatus.Exact, "unconstrained_inputs");
 
     internal static SymbolicInputWitness None(string reason) =>
-        CreateEmpty(SymbolicWitnessStatus.None, reason, 0);
+        CreateEmpty(SymbolicWitnessStatus.None, reason);
 
     internal static SymbolicInputWitness Unsupported(string reason) =>
-        CreateEmpty(SymbolicWitnessStatus.Unsupported, reason, 0);
+        CreateEmpty(SymbolicWitnessStatus.Unsupported, reason);
 
     private static SymbolicInputWitness CreateEmpty(
         SymbolicWitnessStatus status,
-        string reason,
-        int alternativeCount) {
+        string reason) {
         return new SymbolicInputWitness(
             status,
             reason,
             Array.Empty<SymbolicSatisfyingAssignment>(),
-            new SymbolicInputDomainSummary(
-                status,
-                reason,
-                Array.Empty<SymbolicInputDomain>(),
-                alternativeCount));
-    }
-
-    internal static SymbolicInputDomainSummary MergeAlternatives(IEnumerable<SymbolicInputWitness> witnesses) {
-        var alternatives = witnesses
-            .Where(static witness => witness.Status != SymbolicWitnessStatus.None)
-            .ToArray();
-        return SymbolicInputDomainSynthesizer.MergeAlternatives(
-            alternatives.Select(static witness => witness.DomainSummary).ToArray());
+            new SymbolicInputDomainSummary(status, reason, Array.Empty<SymbolicInputDomain>()));
     }
 
     private static SymbolicSatisfyingAssignment CreateAssignment(

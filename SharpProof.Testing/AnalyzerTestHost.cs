@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
@@ -18,9 +17,6 @@ internal static class AnalyzerTestHost {
     private static readonly CSharpCompilationOptions DefaultCompilationOptions =
         new(OutputKind.DynamicallyLinkedLibrary);
 
-    private static readonly CSharpCompilationOptions UnsafeCompilationOptions =
-        DefaultCompilationOptions.WithAllowUnsafe(true);
-
     private static readonly ImmutableArray<DiagnosticAnalyzer> AnalyzerInstances =
         ImmutableArray.Create<DiagnosticAnalyzer>(new SharpProofAnalyzer());
 
@@ -32,39 +28,6 @@ internal static class AnalyzerTestHost {
 
     private static readonly Lazy<ImmutableArray<MetadataReference>> MinimalFrameworkReferences =
         new(CreateMinimalFrameworkReferences);
-
-    private static readonly Lazy<ImmutableArray<MetadataReference>> MinimalFrameworkReferencesWithEnforcePure =
-        new(CreateMinimalFrameworkReferencesWithEnforcePure);
-
-    private static readonly Lazy<CSharpCompilation> TrustedPlatformCompilationTemplate =
-        new(() => CreateCompilationTemplate(
-            TrustedPlatformReferencesWithEnforcePure.Value,
-            DefaultCompilationOptions));
-
-    private static readonly Lazy<CSharpCompilation> TrustedPlatformUnsafeCompilationTemplate =
-        new(() => CreateCompilationTemplate(
-            TrustedPlatformReferencesWithEnforcePure.Value,
-            UnsafeCompilationOptions));
-
-    private static readonly Lazy<CSharpCompilation> MinimalFrameworkCompilationTemplate =
-        new(() => CreateCompilationTemplate(
-            MinimalFrameworkReferences.Value,
-            DefaultCompilationOptions));
-
-    private static readonly Lazy<CSharpCompilation> MinimalFrameworkUnsafeCompilationTemplate =
-        new(() => CreateCompilationTemplate(
-            MinimalFrameworkReferences.Value,
-            UnsafeCompilationOptions));
-
-    private static readonly Lazy<CSharpCompilation> MinimalFrameworkWithEnforcePureCompilationTemplate =
-        new(() => CreateCompilationTemplate(
-            MinimalFrameworkReferencesWithEnforcePure.Value,
-            DefaultCompilationOptions));
-
-    private static readonly Lazy<CSharpCompilation> MinimalFrameworkWithEnforcePureUnsafeCompilationTemplate =
-        new(() => CreateCompilationTemplate(
-            MinimalFrameworkReferencesWithEnforcePure.Value,
-            UnsafeCompilationOptions));
 
     private static readonly Lazy<MetadataReference> EnforcePureAttributeReference =
         new(() => MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location));
@@ -82,42 +45,22 @@ internal static class AnalyzerTestHost {
             ImmutableArray<AdditionalText>.Empty,
             new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
 
-    public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
-        string source,
-        ImmutableDictionary<string, string>? globalOptions = null,
-        bool allowUnsafe = false,
-        ImmutableArray<AdditionalText>? additionalFiles = null,
-        string? sourcePath = null,
-        ImmutableArray<MetadataReference>? frameworkReferences = null,
-        bool concurrentAnalysis = false,
-        ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
-        string compilationName = "AnalyzerTestHost") {
+    public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(string source) {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             PreviewParseOptions,
-            sourcePath ?? string.Empty);
-        var references = frameworkReferences.HasValue
-            ? EnsureEnforcePureAttributeReference(frameworkReferences.Value)
-            : TrustedPlatformReferencesWithEnforcePure.Value;
-        if (additionalMetadataReferences.HasValue) references = references.AddRange(additionalMetadataReferences.Value);
-
-        var compilationOptions = allowUnsafe ? UnsafeCompilationOptions : DefaultCompilationOptions;
+            string.Empty);
         var compilation = CreateCompilation(
-            compilationName,
-            references,
-            compilationOptions,
+            "AnalyzerTestHost",
+            TrustedPlatformReferencesWithEnforcePure.Value,
+            DefaultCompilationOptions,
             syntaxTree);
-
-        var analyzerOptions = CreateAnalyzerOptions(
-            globalOptions,
-            additionalFiles);
-
         var compilationWithAnalyzers = compilation.WithAnalyzers(
             AnalyzerInstances,
             new CompilationWithAnalyzersOptions(
-                analyzerOptions,
+                EmptyAnalyzerOptions,
                 null,
-                concurrentAnalysis,
+                false,
                 false,
                 false));
 
@@ -125,16 +68,12 @@ internal static class AnalyzerTestHost {
     }
 
     public static AnalyzerOptions CreateAnalyzerOptions(
-        ImmutableDictionary<string, string>? globalOptions = null,
-        ImmutableArray<AdditionalText>? additionalFiles = null) {
-        var analyzerAdditionalFiles = additionalFiles ?? ImmutableArray<AdditionalText>.Empty;
+        ImmutableDictionary<string, string>? globalOptions = null) {
         var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
-        if (analyzerAdditionalFiles.Length == 0 &&
-            analyzerGlobalOptions.Count == 0)
-            return EmptyAnalyzerOptions;
+        if (analyzerGlobalOptions.Count == 0) return EmptyAnalyzerOptions;
 
         return new AnalyzerOptions(
-            analyzerAdditionalFiles,
+            ImmutableArray<AdditionalText>.Empty,
             new TestAnalyzerConfigOptionsProvider(analyzerGlobalOptions));
     }
 
@@ -187,64 +126,31 @@ internal static class AnalyzerTestHost {
     public static SourceContext CreateSourceContext(
         string source,
         string compilationName,
-        ImmutableArray<MetadataReference>? frameworkReferences = null,
-        bool allowUnsafe = false,
-        string? sourcePath = null,
-        CSharpParseOptions? parseOptions = null,
-        CSharpCompilationOptions? compilationOptions = null,
-        ImmutableArray<MetadataReference>? additionalMetadataReferences = null) {
-        if (CanUseSourceContextCache(
-                frameworkReferences,
-                allowUnsafe,
-                sourcePath,
-                parseOptions,
-                compilationOptions,
-                additionalMetadataReferences))
+        ImmutableArray<MetadataReference>? frameworkReferences = null) {
+        var references = frameworkReferences ?? GetMinimalFrameworkReferences();
+        if (references.SequenceEqual(GetMinimalFrameworkReferences()))
             return SourceContextCache.GetOrAdd(
                 new SourceContextCacheKey(source, compilationName),
                 static key => CreateSourceContextCore(
                     key.Source,
                     key.CompilationName,
-                    sourcePath: null,
-                    frameworkReferences: null,
-                    allowUnsafe: false,
-                    parseOptions: null,
-                    compilationOptions: null,
-                    additionalMetadataReferences: null));
+                    GetMinimalFrameworkReferences()));
 
-        return CreateSourceContextCore(
-            source,
-            compilationName,
-            frameworkReferences,
-            allowUnsafe,
-            sourcePath,
-            parseOptions,
-            compilationOptions,
-            additionalMetadataReferences);
+        return CreateSourceContextCore(source, compilationName, references);
     }
 
     private static SourceContext CreateSourceContextCore(
         string source,
         string compilationName,
-        ImmutableArray<MetadataReference>? frameworkReferences = null,
-        bool allowUnsafe = false,
-        string? sourcePath = null,
-        CSharpParseOptions? parseOptions = null,
-        CSharpCompilationOptions? compilationOptions = null,
-        ImmutableArray<MetadataReference>? additionalMetadataReferences = null) {
+        ImmutableArray<MetadataReference> references) {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
-            parseOptions ?? PreviewParseOptions,
-            sourcePath ?? string.Empty);
-
-        var references = frameworkReferences ?? GetMinimalFrameworkReferences();
-        if (additionalMetadataReferences.HasValue) references = references.AddRange(additionalMetadataReferences.Value);
-
-        var options = compilationOptions ?? (allowUnsafe ? UnsafeCompilationOptions : DefaultCompilationOptions);
+            PreviewParseOptions,
+            string.Empty);
         var compilation = CreateCompilation(
             compilationName,
             references,
-            options,
+            DefaultCompilationOptions,
             syntaxTree);
 
         return new SourceContext(
@@ -291,28 +197,6 @@ internal static class AnalyzerTestHost {
             .ToArray();
 
         return new ConditionImplicationContext(semanticModel, variables[0], variables[1]);
-    }
-
-    private static bool CanUseSourceContextCache(
-        ImmutableArray<MetadataReference>? frameworkReferences,
-        bool allowUnsafe,
-        string? sourcePath,
-        CSharpParseOptions? parseOptions,
-        CSharpCompilationOptions? compilationOptions,
-        ImmutableArray<MetadataReference>? additionalMetadataReferences) {
-        if (allowUnsafe ||
-            !string.IsNullOrEmpty(sourcePath) ||
-            parseOptions is not null ||
-            compilationOptions is not null ||
-            additionalMetadataReferences.HasValue)
-            return false;
-
-        if (!frameworkReferences.HasValue) return true;
-
-        var references = frameworkReferences.Value;
-        var minimalReferences = GetMinimalFrameworkReferences();
-        return references.Length == minimalReferences.Length &&
-               references.SequenceEqual(minimalReferences);
     }
 
     internal static ImmutableArray<MetadataReference> GetTrustedPlatformReferences() {
@@ -383,72 +267,15 @@ internal static class AnalyzerTestHost {
         return references.Values.ToImmutableArray();
     }
 
-    private static ImmutableArray<MetadataReference> CreateMinimalFrameworkReferencesWithEnforcePure() {
-        return MinimalFrameworkReferences.Value.Add(EnforcePureAttributeReference.Value);
-    }
-
-    private static ImmutableArray<MetadataReference> EnsureEnforcePureAttributeReference(
-        ImmutableArray<MetadataReference> references) {
-        if (references == MinimalFrameworkReferences.Value) return MinimalFrameworkReferencesWithEnforcePure.Value;
-
-        var enforcePurePath = EnforcePureAttributeReference.Value.Display;
-        foreach (var reference in references)
-            if (string.Equals(reference.Display, enforcePurePath, StringComparison.OrdinalIgnoreCase))
-                return references;
-
-        return references.Add(EnforcePureAttributeReference.Value);
-    }
-
     private static CSharpCompilation CreateCompilation(
         string assemblyName,
         ImmutableArray<MetadataReference> references,
         CSharpCompilationOptions options,
-        SyntaxTree syntaxTree) {
-        var template = GetCompilationTemplate(references, options);
-        if (template != null)
-            return template.Value
-                .WithAssemblyName(assemblyName)
-                .AddSyntaxTrees(syntaxTree);
-
-        return CSharpCompilation.Create(
+        SyntaxTree syntaxTree) => CSharpCompilation.Create(
             assemblyName,
             new[] { syntaxTree },
             references,
             options);
-    }
-
-    private static Lazy<CSharpCompilation>? GetCompilationTemplate(
-        ImmutableArray<MetadataReference> references,
-        CSharpCompilationOptions options) {
-        if (!options.SpecificDiagnosticOptions.IsEmpty) return null;
-
-        var allowUnsafe = options.AllowUnsafe;
-        if (references == TrustedPlatformReferencesWithEnforcePure.Value)
-            return allowUnsafe
-                ? TrustedPlatformUnsafeCompilationTemplate
-                : TrustedPlatformCompilationTemplate;
-
-        if (references == MinimalFrameworkReferences.Value)
-            return allowUnsafe
-                ? MinimalFrameworkUnsafeCompilationTemplate
-                : MinimalFrameworkCompilationTemplate;
-
-        if (references == MinimalFrameworkReferencesWithEnforcePure.Value)
-            return allowUnsafe
-                ? MinimalFrameworkWithEnforcePureUnsafeCompilationTemplate
-                : MinimalFrameworkWithEnforcePureCompilationTemplate;
-
-        return null;
-    }
-
-    private static CSharpCompilation CreateCompilationTemplate(
-        ImmutableArray<MetadataReference> references,
-        CSharpCompilationOptions options) {
-        return CSharpCompilation.Create(
-            "AnalyzerTestHost.Template",
-            references: references,
-            options: options);
-    }
 
     internal readonly record struct ConditionContext(
         SemanticModel SemanticModel,
@@ -466,21 +293,6 @@ internal static class AnalyzerTestHost {
         SyntaxNode Root);
 
     private readonly record struct SourceContextCacheKey(string Source, string CompilationName);
-
-    internal sealed class InMemoryAdditionalText : AdditionalText {
-        private readonly string _text;
-
-        public InMemoryAdditionalText(string path, string text) {
-            Path = path;
-            _text = text;
-        }
-
-        public override string Path { get; }
-
-        public override SourceText GetText(CancellationToken cancellationToken = default) {
-            return SourceText.From(_text);
-        }
-    }
 
     private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider {
         private readonly AnalyzerConfigOptions _emptyOptions =

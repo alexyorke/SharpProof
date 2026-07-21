@@ -100,29 +100,17 @@ internal sealed record SymbolicComplexityDriverInfo(
     string Kind,
     string Description,
     int SourceSpanStart,
-    int SourceSpanLength,
-    int SourceLine,
-    int SourceColumn);
+    int SourceSpanLength);
 
 internal sealed record SymbolicComplexityCalleeInfo(
     string MethodDisplayName,
     string ComplexityText,
     SymbolicComplexityKind Kind,
     bool IsConservative,
-    SymbolicComplexityUnknownReason UnknownReason) {
-    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; } =
-        SymbolicUnknownReasonTaxonomy.ForComplexity(UnknownReason);
-}
+    SymbolicComplexityUnknownReason UnknownReason);
 
 internal sealed record SymbolicComplexityResult(
-    string MethodName,
-    string DeclarationKind,
     SymbolicComplexityInfo Complexity,
     IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,
     IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons,
-    IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries) {
-    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; } =
-        UnknownReasons
-        .Select(SymbolicUnknownReasonTaxonomy.ForComplexity)
-        .ToArray();
-}
+    IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries);

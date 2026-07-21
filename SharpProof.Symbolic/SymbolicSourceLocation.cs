@@ -56,19 +56,4 @@ internal static class SymbolicSourceLocation {
         return text.Lines[line - 1];
     }
 
-    public static LineColumn GetLineAndColumn(
-        SyntaxTree syntaxTree,
-        int position,
-        CancellationToken cancellationToken,
-        bool validatePosition = false) {
-        var text = syntaxTree.GetText(cancellationToken);
-        if (validatePosition && (position < 0 || position > text.Length))
-            throw new ArgumentOutOfRangeException(nameof(position), "--position must be within the source text span.");
-
-        var line = text.Lines.GetLineFromPosition(position);
-        return new LineColumn(line.LineNumber + 1, position - line.Start + 1);
-    }
-
 }
-
-internal readonly record struct LineColumn(int Line, int Column);

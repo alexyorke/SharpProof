@@ -14,8 +14,6 @@ public sealed class SymbolicComplexityTests {
         string? Driver = null,
         string? Callee = null,
         SymbolicComplexityUnknownReason? CalleeUnknown = null,
-        string? Method = null,
-        string? DeclarationKind = null,
         bool UseLineTarget = false,
         bool ExactUnknowns = false,
         int? UnknownDriverCount = null,
@@ -85,16 +83,16 @@ public sealed class SymbolicComplexityTests {
             "Second(n-1)", SymbolicComplexityKind.RecursiveUnknown);
         yield return Case("LineTarget_ResolvesContainingMethod",
             """public static class C { public static int Work(int n){var sum=0; for(var i=0;i<n;i++){sum+=i;} return sum;} }""",
-            "sum+=i;", SymbolicComplexityKind.Linear, "O(n)", method: "Work", useLineTarget: true);
+            "sum+=i;", SymbolicComplexityKind.Linear, "O(n)", useLineTarget: true);
         yield return Case("NodeTarget_ResolvesContainingLocalFunction",
             """public static class C { public static int Work(int n){int Local(int m){for(var i=0;i<m;i++) { } return m;} return Local(n);} }""",
-            "int Local", SymbolicComplexityKind.Linear, "O(m)", method: "Local");
+            "int Local", SymbolicComplexityKind.Linear, "O(m)");
         yield return Case("NodeTarget_ResolvesPropertyGetter",
             """public sealed class C { public int Count { get { var sum=0; for(var i=0;i<10;i++)sum+=i; return sum; } } }""",
-            "int Count", SymbolicComplexityKind.Constant, method: "get_Count", declarationKind: "property_getter");
+            "int Count", SymbolicComplexityKind.Constant);
         yield return Case("NodeTarget_ResolvesIndexerGetter",
             """public sealed class C { public int this[int n] { get { var sum=0; for(var i=0;i<n;i++)sum+=i; return sum; } } }""",
-            "this[int n]", SymbolicComplexityKind.Linear, method: "get_Item", declarationKind: "indexer_getter");
+            "this[int n]", SymbolicComplexityKind.Linear);
         yield return Case("UnsupportedForLoop_AggregatesPreLoopEvidenceOnce",
             """public static class C { private static int Seed(int value)=>value; private static bool KeepGoing(int value)=>value>=0; private static int Step(int value)=>value-1; public static int Work(int n){var result=0; for(var i=Seed(n);KeepGoing(i);i=Step(i)){result+=i;} return result;} }""",
             "return result;", SymbolicComplexityKind.Unknown,
@@ -115,8 +113,6 @@ public sealed class SymbolicComplexityTests {
         if (testCase.Driver != null) Assert.That(result.Drivers.Any(driver => driver.Kind == testCase.Driver), Is.True);
         if (testCase.Callee != null) Assert.That(result.CalleeSummaries.Any(summary => summary.MethodDisplayName.Contains(testCase.Callee, StringComparison.Ordinal)), Is.True);
         if (testCase.CalleeUnknown is { } reason) Assert.That(result.CalleeSummaries.Any(summary => summary.UnknownReason == reason), Is.True);
-        if (testCase.Method != null) Assert.That(result.MethodName, Is.EqualTo(testCase.Method));
-        if (testCase.DeclarationKind != null) Assert.That(result.DeclarationKind, Is.EqualTo(testCase.DeclarationKind));
         if (testCase.UnknownDriverCount is { } driverCount) Assert.That(result.Drivers.Count(driver => driver.Kind == "Unknown"), Is.EqualTo(driverCount));
         if (testCase.NamedCalleeCount is { } calleeCount) Assert.That(result.CalleeSummaries.Count(summary => summary.MethodDisplayName.Contains(testCase.Callee!, StringComparison.Ordinal)), Is.EqualTo(calleeCount));
     }
@@ -124,10 +120,10 @@ public sealed class SymbolicComplexityTests {
     private static TestCaseData Case(
         string name, string source, string marker, SymbolicComplexityKind kind, string? text = null,
         SymbolicComplexityUnknownReason[]? unknowns = null, string? driver = null, string? callee = null,
-        SymbolicComplexityUnknownReason? calleeUnknown = null, string? method = null, string? declarationKind = null,
+        SymbolicComplexityUnknownReason? calleeUnknown = null,
         bool useLineTarget = false, bool exactUnknowns = false, int? unknownDriverCount = null,
         int? namedCalleeCount = null) => new TestCaseData(new ComplexityCase(
-        source, marker, kind, text, unknowns, driver, callee, calleeUnknown, method, declarationKind,
+        source, marker, kind, text, unknowns, driver, callee, calleeUnknown,
         useLineTarget, exactUnknowns, unknownDriverCount, namedCalleeCount)).SetName(name);
 
     private static SymbolicComplexityResult QueryComplexityAtMarker(string source, string marker, bool useLineTarget = false) {

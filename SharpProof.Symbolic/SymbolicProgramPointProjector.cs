@@ -22,6 +22,6 @@ internal static class SymbolicProgramPointProjector {
                 query.Position,
                 query.Analysis.Reachability,
                 query.Analysis.ReachabilityReason),
-            query.Analysis.Truncation);
+            query.Analysis.AnalysisTruncation);
     }
 }

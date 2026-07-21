@@ -68,7 +68,7 @@ internal sealed class SymbolicConditionProofEngine(SymbolicInvariantService _inv
             query.Analysis,
             conditionText,
             symbolicCondition,
-            smtAnalysis).WithAnalysisTruncation(query.Analysis.Truncation);
+            smtAnalysis).WithAnalysisTruncation(query.Analysis.AnalysisTruncation);
     }
 
     private static SymbolicConditionProofResult ProveAtQuery(
@@ -83,7 +83,7 @@ internal sealed class SymbolicConditionProofEngine(SymbolicInvariantService _inv
             query.Analysis,
             conditionText,
             smtAnalysis,
-            cancellationToken).WithAnalysisTruncation(query.Analysis.Truncation);
+            cancellationToken).WithAnalysisTruncation(query.Analysis.AnalysisTruncation);
 
     private static SymbolicConditionProofResult Prove(
         SemanticModel semanticModel,

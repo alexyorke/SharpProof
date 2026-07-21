@@ -423,7 +423,8 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         ImmutableArray<SharpProofUnknownReason>.Builder unknowns,
         CancellationToken cancellationToken) {
         var result = _executor.QueryComplexity(context, cancellationToken);
-        unknowns.AddRange(result.UnknownReasonDetails.Select(static reason => Convert(reason)));
+        unknowns.AddRange(result.UnknownReasons.Select(static reason =>
+            Convert(SymbolicUnknownReasonTaxonomy.ForComplexity(reason))));
         return result.Complexity.Text;
     }
 

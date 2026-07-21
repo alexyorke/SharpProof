@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic.Smt;
 
 internal enum SmtAnalysisHealthState {
-    Disabled,
     Ready,
     Degraded,
     PermanentlyUnavailable,
@@ -29,9 +28,4 @@ internal sealed record SmtAnalysisHealth(
     int ConsecutiveTransientFailureCount,
     int TransientRetryCount,
     int RecoveredTransientFailureCount,
-    int ContextRecycleCount,
-    long ContextGeneration) {
-    public bool IsAvailable => State == SmtAnalysisHealthState.Ready;
-
-    public bool IsPermanentlyUnavailable => State == SmtAnalysisHealthState.PermanentlyUnavailable;
-}
+    int ContextRecycleCount);

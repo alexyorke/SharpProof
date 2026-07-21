@@ -127,26 +127,6 @@ internal sealed record ResolvedMethodLikeTarget(
     SyntaxNode Declaration,
     SyntaxNode? BodyNode,
     IMethodSymbol? MethodSymbol) {
-    internal string MethodName => !string.IsNullOrWhiteSpace(MethodSymbol?.Name)
-        ? MethodSymbol!.Name
-        : Declaration is AnonymousFunctionExpressionSyntax
-            ? "anonymous_function"
-            : Declaration.Kind().ToString();
-
-    internal string DeclarationKind => Declaration switch {
-        MethodDeclarationSyntax => "method",
-        ConstructorDeclarationSyntax => "constructor",
-        DestructorDeclarationSyntax => "destructor",
-        OperatorDeclarationSyntax => "operator",
-        ConversionOperatorDeclarationSyntax => "conversion_operator",
-        AccessorDeclarationSyntax accessor => "accessor:" + accessor.Keyword.ValueText,
-        PropertyDeclarationSyntax => "property_getter",
-        IndexerDeclarationSyntax => "indexer_getter",
-        LocalFunctionStatementSyntax => "local_function",
-        AnonymousFunctionExpressionSyntax => "anonymous_function",
-        _ => Declaration.Kind().ToString()
-    };
-
     internal static ResolvedMethodLikeTarget Create(
         SyntaxNode declaration,
         SemanticModel semanticModel,

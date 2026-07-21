@@ -4,7 +4,6 @@ internal sealed class AnalyzerSession : IDisposable {
     private readonly ConcurrentDictionary<IMethodSymbol, Lazy<MethodBodyAnalysisState>> _methodBodyAnalyses =
         new(SymbolEq.Default);
 
-    private readonly Lazy<AnalyzerProofService> _proofService;
     private readonly MethodEffectAnalysisSession _effectAnalysis;
 
     internal AnalyzerSession(
@@ -14,11 +13,9 @@ internal sealed class AnalyzerSession : IDisposable {
         Configuration = AnalyzerConfiguration.FromOptions(options);
         AttributePolicy = SharpProofAttributeIdentityPolicy.Create();
 
-        _proofService = new Lazy<AnalyzerProofService>(
-            () => new AnalyzerProofService(
-                Configuration.SmtOptions,
-                Configuration.AnalysisLimits),
-            LazyThreadSafetyMode.ExecutionAndPublication);
+        ProofService = new AnalyzerProofService(
+            Configuration.SmtOptions,
+            Configuration.AnalysisLimits);
         var configuredEffects = new ConfiguredEffectContractResolver(
             options.AnalyzerConfigOptionsProvider.GlobalOptions);
         _effectAnalysis = new MethodEffectAnalysisSession(
@@ -33,7 +30,7 @@ internal sealed class AnalyzerSession : IDisposable {
 
     internal SharpProofAttributeIdentityPolicy AttributePolicy { get; }
 
-    internal AnalyzerProofService ProofService => _proofService.Value;
+    internal AnalyzerProofService ProofService { get; }
 
     internal MethodBodyAnalysisState GetOrCreateMethodBodyAnalysis(
         IMethodSymbol methodSymbol,
@@ -66,7 +63,7 @@ internal sealed class AnalyzerSession : IDisposable {
     }
 
     public void Dispose() {
-        if (_proofService.IsValueCreated) _proofService.Value.Dispose();
+        ProofService.Dispose();
         _methodBodyAnalyses.Clear();
     }
 }

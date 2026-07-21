@@ -14,8 +14,6 @@ internal sealed class SymbolicProgramPointResult(
 
     public SymbolicInputWitness ReachabilityWitness { get; } = reachabilityWitness;
 
-    public SymbolicInputDomainSummary InputDomainSummary => ReachabilityWitness.DomainSummary;
-
     public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; } = analysisTruncation;
 
 }

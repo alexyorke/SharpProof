@@ -161,10 +161,9 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             candidate.Site.ToString(),
             candidate.Site.SpanStart,
             candidate.Site.Span.End,
-            SymbolicFormulaDisplay.Format(triggerCondition),
             proofInfo,
             triggerWitness,
-            analysis.Truncation);
+            analysis.AnalysisTruncation);
     }
 
     private static SymbolicInputWitness CreateTriggerWitness(
@@ -211,9 +210,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
 
         if (analysis.Reachability == SymbolicReachability.Unknown)
             return (SymbolicRuntimeHazardStatus.Unknown, analysis.ReachabilityReason, null, null);
-
-        if (!smtAnalysis.Options.IsEnabled)
-            return (SymbolicRuntimeHazardStatus.Unsupported, "smt_disabled", null, null);
 
         if (triggerCondition is SymbolicConstantCondition { Value: true })
             return (SymbolicRuntimeHazardStatus.Proven, "trigger_always_true", null, null);
@@ -263,13 +259,6 @@ internal sealed class SymbolicRuntimeHazardQueryOptions(
 internal sealed record SymbolicRuntimeHazardQueryResult(IReadOnlyList<SymbolicRuntimeHazard> Hazards) {
     public SymbolicAnalysisTruncationInfo AnalysisTruncation =>
         SymbolicAnalysisTruncationInfo.Combine(Hazards.Select(static hazard => hazard.AnalysisTruncation));
-
-    public IReadOnlyList<SymbolicInputWitness> TriggerWitnesses =>
-        Hazards.Select(static hazard => hazard.TriggerWitness).ToArray();
-
-    public SymbolicInputDomainSummary InputDomainSummary =>
-        SymbolicInputWitnessFactory.MergeAlternatives(
-            Hazards.Select(static hazard => hazard.TriggerWitness).ToArray());
 }
 
 internal sealed record SymbolicRuntimeHazard(
@@ -279,10 +268,9 @@ internal sealed record SymbolicRuntimeHazard(
     string OperationText,
     int SpanStart,
     int SpanEnd,
-    string TriggerCondition,
     SymbolicProofInfo? RawProofInfo,
-    SymbolicInputWitness? RawTriggerWitness = null,
-    SymbolicAnalysisTruncationInfo? RawAnalysisTruncation = null) {
+    SymbolicInputWitness TriggerWitness,
+    SymbolicAnalysisTruncationInfo AnalysisTruncation) {
     public SymbolicRuntimeHazardKind Kind => Descriptor.HazardKind;
 
     public string ExceptionType => Descriptor.ExceptionType;
@@ -296,12 +284,6 @@ internal sealed record SymbolicRuntimeHazard(
             SymbolicRuntimeHazardStatus.Unsupported
             ? SymbolicUnknownReasonClassifier.Classify(StatusReason)
             : SymbolicUnknownReason.None));
-
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation =>
-        RawAnalysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
-
-    public SymbolicInputWitness TriggerWitness => RawTriggerWitness ??
-        SymbolicInputWitnessFactory.Unsupported("runtime_hazard_trigger_witness_unavailable");
 
 }
 

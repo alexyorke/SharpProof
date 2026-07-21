@@ -103,9 +103,6 @@ public class SmtAnalysisServiceTests {
 
         var result = service.Classify(CreateSolverQuery("transient_recovery"));
         var health = service.Health;
-        var diagnostics = SymbolicSmtDiagnostics.FromService(service);
-        var snapshot = diagnostics.Snapshot;
-
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(attempts, Is.EqualTo(2));
         Assert.That(disposedSessions, Is.EqualTo(1));
@@ -116,11 +113,6 @@ public class SmtAnalysisServiceTests {
         Assert.That(health.RecoveredTransientFailureCount, Is.EqualTo(1));
         Assert.That(health.ConsecutiveTransientFailureCount, Is.Zero);
         Assert.That(health.ContextRecycleCount, Is.EqualTo(1));
-        Assert.That(diagnostics.Health.State, Is.EqualTo(SmtAnalysisHealthState.Ready));
-        Assert.That(diagnostics.Lifecycle, Is.SameAs(options.Lifecycle));
-        Assert.That(snapshot.Health.TransientRetryCount, Is.EqualTo(1));
-        Assert.That(snapshot.Lifecycle, Is.SameAs(options.Lifecycle));
-        Assert.That(snapshot.Health.RecoveredTransientFailureCount, Is.EqualTo(1));
     }
 
     [Test]
@@ -357,23 +349,6 @@ public class SmtAnalysisServiceTests {
         Assert.That(factoryCalls, Is.EqualTo(threadCount));
         Assert.That(disposedSessions, Is.EqualTo(threadCount));
         Assert.That(service.Health.ContextRecycleCount, Is.EqualTo(threadCount));
-    }
-
-    [Test]
-    public void Classify_OffMode_ReturnsConservativeUnknown() {
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Off,
-            TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromMilliseconds(500),
-            4,
-            16));
-
-        var result = service.Classify(CreateQuery(Array.Empty<SmtFormula>(), Boolean(true)));
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
-        Assert.That(result.Reason, Is.EqualTo("smt_disabled"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
     }
 
     [Test]
@@ -952,7 +927,6 @@ public class SmtAnalysisServiceTests {
             32);
         using var smtAnalysis = new SmtAnalysisService(options);
 
-        var diagnostics = SymbolicSmtDiagnostics.FromService(smtAnalysis);
         var budgetFact = SymbolicFact.Exact(
             new SymbolicRelationAtom(
                 SymbolicRelationOperator.Equal,
@@ -963,8 +937,6 @@ public class SmtAnalysisServiceTests {
         var proof = new SymbolicProofService(smtAnalysis).ClassifyReachability(
             new SymbolicState(pathConditions: new[] { new SymbolicFactCondition(budgetFact) }));
 
-        Assert.That(diagnostics.QueryTimeoutMs, Is.EqualTo(int.MaxValue));
-        Assert.That(diagnostics.MethodBudgetMs, Is.EqualTo(int.MaxValue));
         Assert.That(proof.Budget, Is.Not.Null);
         Assert.That(proof.Budget!.TimeoutMilliseconds, Is.EqualTo(int.MaxValue));
         Assert.That(proof.Budget.MethodBudgetMilliseconds, Is.EqualTo(int.MaxValue));
