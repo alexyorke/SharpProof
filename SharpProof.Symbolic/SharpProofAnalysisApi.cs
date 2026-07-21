@@ -189,7 +189,7 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         string? filePath = null,
         SharpProofAnalysisOptions? options = null) {
         options ??= new SharpProofAnalysisOptions();
-        var smt = options.EnableSmt ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
+        var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
         return new SharpProofAnalysisSession(
             SymbolicSourceInput.FromText(sourceText, filePath),
             CreateQueryOptions(options, smt),
@@ -200,7 +200,7 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         string filePath,
         SharpProofAnalysisOptions? options = null) {
         options ??= new SharpProofAnalysisOptions();
-        var smt = options.EnableSmt ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
+        var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
         return new SharpProofAnalysisSession(
             SymbolicSourceInput.FromFile(filePath),
             CreateQueryOptions(options, smt),
@@ -310,10 +310,10 @@ public sealed class SharpProofAnalysisSession : IDisposable {
             "Method-effect analysis supports point, position, line, or node targets only.",
             "Method-effect node queries require a node target.",
             static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true),
-            static (resolved, compilation, token) => {
+            (resolved, compilation, token) => {
                 if (resolved.MethodSymbol == null)
                     throw new ArgumentException("Could not resolve the target method.");
-                return new MethodEffectAnalysisSession(compilation, token).Analyze(
+                return new MethodEffectAnalysisSession(compilation, token, smtAnalysis: _ownedSmtAnalysis).Analyze(
                     resolved.MethodSymbol,
                     resolved.Declaration,
                     resolved.SemanticModel);

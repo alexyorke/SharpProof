@@ -13,9 +13,9 @@ internal static class DiagnosticPropertyNames {
     internal const string ExceptionSourcesProperty = "sharpproof.exceptions.sources";
     internal const string ExceptionTypesProperty = "sharpproof.exceptions.types";
     internal const string ExpectedComplexityProperty = "sharpproof.complexity.expected";
-    internal const string ImpurityCategoryProperty = "sharpproof.impurity.category";
-    internal const string ImpurityOperationKindProperty = "sharpproof.impurity.operation_kind";
-    internal const string ImpurityRuleProperty = "sharpproof.impurity.rule";
+    internal const string EffectCategoryProperty = "sharpproof.effects.category";
+    internal const string EffectFlagsProperty = "sharpproof.effects.flags";
+    internal const string EffectCapabilitiesProperty = "sharpproof.effects.capabilities";
     internal const string SuggestedContractAttributeProperty = "sharpproof.suggestion.attribute";
     internal const string SuggestedContractKindProperty = "sharpproof.suggestion.contract_kind";
 }

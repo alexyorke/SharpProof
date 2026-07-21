@@ -58,27 +58,34 @@ internal static class FuzzShapeRegistry {
     }
 
     private static FuzzExpectation CreateExpectation(RegistryDefinition definition) {
-        if (!Enum.TryParse<Sp0002ExpectationKind>(definition.Sp0002, out var sp0002) ||
-            !Enum.IsDefined(sp0002) ||
+        if (!Enum.TryParse<SharpProofVerdict>(definition.PurityVerdict, out var purityVerdict) ||
+            !Enum.IsDefined(purityVerdict) ||
             !Enum.TryParse<Sp0010ExpectationKind>(definition.Sp0010, out var sp0010) ||
             !Enum.IsDefined(sp0010))
             throw new InvalidOperationException($"Fuzz shape '{definition.Id}' has an invalid expectation.");
         return new FuzzExpectation(
-            sp0002,
+            purityVerdict,
+            (definition.RequiredEffects ?? []).Select(ParseEffect).ToImmutableArray(),
+            (definition.RequiredUnknownCategories ?? []).ToImmutableArray(),
             sp0010,
-            definition.RequiredSp0002Properties.ToImmutableArray(),
             definition.RequiredSp0010Properties.ToImmutableArray(),
             definition.RequiredAnySp0010Properties.ToImmutableArray());
     }
+
+    private static SharpProofEffect ParseEffect(string value) =>
+        Enum.TryParse<SharpProofEffect>(value, out var effect) && Enum.IsDefined(effect)
+            ? effect
+            : throw new InvalidOperationException("Invalid fuzz effect expectation: " + value);
 
     private sealed record RegistryDefinition(
         string Id,
         string[] PrimaryShapes,
         string[] OperationKinds,
         string[] SyntaxKinds,
-        string Sp0002,
+        string PurityVerdict,
         string Sp0010,
-        string[] RequiredSp0002Properties,
+        string[]? RequiredEffects,
+        string[]? RequiredUnknownCategories,
         string[] RequiredSp0010Properties,
         string[] RequiredAnySp0010Properties,
         bool AllowUnsafe,

@@ -1,7 +1,7 @@
 namespace SharpProof.Analyzer;
 
-internal static class MethodPurityAnalyzer {
-    internal static void AnalyzeSymbolForPurity(
+internal static class EnforcePureContractAnalyzer {
+    internal static void Analyze(
         MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
@@ -22,9 +22,9 @@ internal static class MethodPurityAnalyzer {
         var outcome = effects.Purity == SharpProofVerdict.Unknown ? "unknown" : "violated";
         var reason = firstSite?.Reason ?? effects.UnknownReasons.FirstOrDefault()?.Message ?? "method_effects";
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(DiagnosticPropertyNames.ImpurityCategoryProperty, reason)
-            .Add("sharpproof.effects.flags", effects.Effects.ToString())
-            .Add("sharpproof.effects.capabilities", effects.Capabilities.ToString());
+            .Add(DiagnosticPropertyNames.EffectCategoryProperty, reason)
+            .Add(DiagnosticPropertyNames.EffectFlagsProperty, effects.Effects.ToString())
+            .Add(DiagnosticPropertyNames.EffectCapabilitiesProperty, effects.Capabilities.ToString());
         properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             properties,
             method,

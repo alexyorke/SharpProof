@@ -656,11 +656,17 @@ public class TestClass
         return new SymbolicQueryExecutor().ProveConditionAtSource(
             source,
             "StringLengthSmtTests.cs",
-            SemanticOracleSmtTests.FindLine(source, sourceLine),
+            FindLine(source, sourceLine),
             20,
             condition,
             new SmtAnalysisService(SmtAnalysisOptions.Default),
             AnalyzerTestHost.GetTrustedPlatformReferences());
+    }
+
+    private static int FindLine(string source, string text) {
+        var position = source.IndexOf(text, StringComparison.Ordinal);
+        if (position < 0) throw new InvalidOperationException("Source marker was not found: " + text);
+        return source[..position].Count(static character => character == '\n') + 1;
     }
 
     private static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression)

@@ -32,7 +32,8 @@ internal sealed class AnalyzerSession : IDisposable {
         _effectAnalysis = new MethodEffectAnalysisSession(
             compilation,
             cancellationToken,
-            configuredEffects.Resolve);
+            configuredEffects.Resolve,
+            ProofService.SmtAnalysis);
 
     }
 

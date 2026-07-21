@@ -34,15 +34,6 @@ internal sealed class MethodBodyAnalysisState {
                 Snapshot.SemanticModel));
     }
 
-    internal AnalyzerQueryOutcome<SymbolicCapabilityResult> GetCapabilityOutcome(
-        CancellationToken cancellationToken) {
-        return GetOrCreateSymbolicQueryResult(
-            "capability",
-            () => AnalyzerSymbolicQueryBoundary.TryExecute(() => QueryExecutor.QueryCapabilities(
-                new SymbolicQueryContext(Snapshot.Source, new SharpProofTarget(SharpProofTargetKind.Node)),
-                cancellationToken)));
-    }
-
     internal AnalyzerQueryOutcome<SymbolicComplexityResult> GetComplexityOutcome(
         CancellationToken cancellationToken) {
         return GetOrCreateSymbolicQueryResult(

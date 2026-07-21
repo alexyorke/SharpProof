@@ -2,7 +2,6 @@ namespace SharpProof.Symbolic;
 
 internal enum SymbolicUnknownReasonSource {
     Proof,
-    Capability,
     Complexity,
     RuntimeHazard,
     Ensures
@@ -40,9 +39,6 @@ internal sealed record SymbolicUnknownReasonInfo(
 internal static class SymbolicUnknownReasonTaxonomy {
     internal static SymbolicUnknownReasonInfo ForProof(SymbolicUnknownReason reason, string? rawReason = null) =>
         Create(SymbolicUnknownReasonSource.Proof, "proof", Describe(reason), rawReason);
-
-    internal static SymbolicUnknownReasonInfo ForCapability(SymbolicCapabilityUnknownReason reason) =>
-        Create(SymbolicUnknownReasonSource.Capability, "capability", Describe(reason), reason.ToString());
 
     internal static SymbolicUnknownReasonInfo ForComplexity(SymbolicComplexityUnknownReason reason) =>
         Create(SymbolicUnknownReasonSource.Complexity, "complexity", Describe(reason), reason.ToString());
@@ -111,25 +107,6 @@ internal static class SymbolicUnknownReasonTaxonomy {
             true),
         SymbolicUnknownReason.EncodingFailure => new(SymbolicUnknownReasonCategory.SolverEncodingFailure,
             "solver_encoding_failure"),
-        _ => new(SymbolicUnknownReasonCategory.Unknown, "unknown")
-    };
-
-    private static ReasonDescriptor Describe(SymbolicCapabilityUnknownReason reason) => reason switch {
-        SymbolicCapabilityUnknownReason.None => new(SymbolicUnknownReasonCategory.None, "none"),
-        SymbolicCapabilityUnknownReason.UnsupportedTarget => Syntax("unsupported_target"),
-        SymbolicCapabilityUnknownReason.NoContainingMethodLikeBody => Syntax("no_containing_method_body"),
-        SymbolicCapabilityUnknownReason.DynamicDispatch => new(SymbolicUnknownReasonCategory.DynamicDispatch,
-            "dynamic_dispatch"),
-        SymbolicCapabilityUnknownReason.MetadataClassificationUnavailable =>
-            new(SymbolicUnknownReasonCategory.UnsupportedLibraryModel, "library_model_unavailable"),
-        SymbolicCapabilityUnknownReason.UnsupportedOperation =>
-            new(SymbolicUnknownReasonCategory.UnsupportedOperation, "unsupported_operation"),
-        SymbolicCapabilityUnknownReason.RecursiveSourceCycle =>
-            new(SymbolicUnknownReasonCategory.RecursiveAnalysis, "recursive_source_cycle"),
-        SymbolicCapabilityUnknownReason.ExternalSourceBoundary =>
-            new(SymbolicUnknownReasonCategory.ExternalBoundary, "external_source_boundary"),
-        SymbolicCapabilityUnknownReason.CancellationRequested =>
-            new(SymbolicUnknownReasonCategory.Cancellation, "canceled", true),
         _ => new(SymbolicUnknownReasonCategory.Unknown, "unknown")
     };
 

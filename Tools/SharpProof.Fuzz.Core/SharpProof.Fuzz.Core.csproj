@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
     <ProjectReference Include="..\..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
+    <ProjectReference Include="..\..\SharpProof.Symbolic\SharpProof.Symbolic.csproj" />
     <ProjectReference Include="..\..\SharpProof.Tooling.Core\SharpProof.Tooling.Core.csproj" />
   </ItemGroup>
 </Project>

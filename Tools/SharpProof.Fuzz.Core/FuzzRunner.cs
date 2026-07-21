@@ -180,6 +180,7 @@ public static class FuzzRunner {
                 ImmutableSortedDictionary<string, int>.Empty,
                 CollectSyntaxKinds(syntaxTree),
                 ImmutableArray<Diagnostic>.Empty,
+                null,
                 ImmutableArray<string>.Empty,
                 compilerErrors,
                 normalizedSourceHash,
@@ -193,8 +194,9 @@ public static class FuzzRunner {
 
         var operationKinds = CollectOperationKinds(compilation, syntaxTree, cancellationToken);
         var syntaxKinds = CollectSyntaxKinds(syntaxTree);
+        var effects = AnalyzeEffects(fuzzCase, syntaxTree, cancellationToken);
         var firstDiagnostics = await GetAnalyzerDiagnosticsAsync(compilation, cancellationToken);
-        var findings = Evaluate(fuzzCase, firstDiagnostics.Diagnostics, firstDiagnostics.Exceptions);
+        var findings = Evaluate(fuzzCase, effects, firstDiagnostics.Diagnostics, firstDiagnostics.Exceptions);
         var diagnosticSignatures = ToDiagnosticSignatures(firstDiagnostics.Diagnostics);
 
         if (repeatAnalyzer) {
@@ -208,6 +210,7 @@ public static class FuzzRunner {
             if (diagnosticsDiffer || exceptionsDiffer) {
                 var secondFindings = Evaluate(
                     fuzzCase,
+                    effects,
                     secondDiagnostics.Diagnostics,
                     secondDiagnostics.Exceptions);
                 var stableFindings = findings
@@ -251,6 +254,7 @@ public static class FuzzRunner {
             operationKinds,
             syntaxKinds,
             firstDiagnostics.Diagnostics,
+            effects,
             diagnosticSignatures,
             ImmutableArray<string>.Empty,
             normalizedSourceHash,
@@ -314,6 +318,7 @@ public static class FuzzRunner {
 
     internal static ImmutableArray<FuzzFinding>.Builder Evaluate(
         FuzzCase fuzzCase,
+        SharpProofAnalysisResult effects,
         ImmutableArray<Diagnostic> diagnostics,
         ImmutableArray<string> analyzerExceptions) {
         var findings = ImmutableArray.CreateBuilder<FuzzFinding>();
@@ -328,35 +333,7 @@ public static class FuzzRunner {
 
         if (!analyzerExceptions.IsEmpty) return findings;
 
-        var sp0002Diagnostics = EvaluateDiagnosticExpectation(
-            fuzzCase,
-            diagnostics,
-            new DiagnosticExpectationPolicy(
-                "SP0002",
-                fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit,
-                fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustEmit,
-                true,
-                fuzzCase.Expectation.RequiredSp0002Properties,
-                "pure_sp0002",
-                "A definitely-pure generated case produced SP0002.",
-                "impure_missing_sp0002",
-                "A definitely-impure generated case did not produce SP0002.",
-                "missing_sp0002_evidence",
-                "SP0002 did not include stable category/rule/operation evidence."),
-            findings);
-
-        foreach (var diagnostic in sp0002Diagnostics) {
-            if (fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit &&
-                diagnostic.Properties.TryGetValue(DiagnosticPropertyNames.ImpurityCategoryProperty, out var category) &&
-                string.Equals(category, "unsupported_operation", StringComparison.Ordinal))
-                findings.Add(new FuzzFinding(
-                    fuzzCase.Name,
-                    fuzzCase.Family,
-                    "pure_unsupported_operation",
-                    "A definitely-pure generated case hit unsupported_operation.",
-                    null,
-                    ImmutableArray.Create(ToDiagnosticSignature(diagnostic))));
-        }
+        EvaluateEffectExpectation(fuzzCase, effects, diagnostics, findings);
 
         var sp0010Diagnostics = EvaluateDiagnosticExpectation(
             fuzzCase,
@@ -390,6 +367,67 @@ public static class FuzzRunner {
         }
 
         return findings;
+    }
+
+    private static SharpProofAnalysisResult AnalyzeEffects(
+        FuzzCase fuzzCase,
+        SyntaxTree syntaxTree,
+        CancellationToken cancellationToken) {
+        var method = syntaxTree.GetRoot(cancellationToken)
+            .DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .First(node => node.Identifier.ValueText == "TestMethod");
+        var line = syntaxTree.GetLineSpan(method.Span, cancellationToken).StartLinePosition.Line + 1;
+        using var session = SharpProofAnalysisSession.FromText(fuzzCase.Source, fuzzCase.Name + ".cs");
+        return session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Line, Line: line),
+            SharpProofAnalysisFacet.Effects), cancellationToken);
+    }
+
+    private static void EvaluateEffectExpectation(
+        FuzzCase fuzzCase,
+        SharpProofAnalysisResult result,
+        ImmutableArray<Diagnostic> diagnostics,
+        ImmutableArray<FuzzFinding>.Builder findings) {
+        if (result.Purity != fuzzCase.Expectation.PurityVerdict)
+            findings.Add(new FuzzFinding(
+                fuzzCase.Name,
+                fuzzCase.Family,
+                "unexpected_purity_verdict",
+                $"Expected {fuzzCase.Expectation.PurityVerdict}, observed {result.Purity}.",
+                null,
+                result.UnknownReasons.Select(static reason => reason.Category + ":" + reason.Code).ToImmutableArray()));
+
+        var observed = result.MethodEffects?.Effects ?? SharpProofEffect.None;
+        foreach (var expected in fuzzCase.Expectation.RequiredEffects)
+            if ((observed & expected) != expected)
+                findings.Add(new FuzzFinding(
+                    fuzzCase.Name,
+                    fuzzCase.Family,
+                    "missing_expected_effect",
+                    "Expected effect was not observed: " + expected,
+                    null,
+                    ImmutableArray.Create("observed=" + observed)));
+
+        foreach (var category in fuzzCase.Expectation.RequiredUnknownCategories)
+            if (!result.UnknownReasons.Any(reason => string.Equals(reason.Category, category, StringComparison.Ordinal)))
+                findings.Add(new FuzzFinding(
+                    fuzzCase.Name,
+                    fuzzCase.Family,
+                    "missing_unknown_reason",
+                    "Expected unknown category was not observed: " + category,
+                    null,
+                    result.UnknownReasons.Select(static reason => reason.Category).ToImmutableArray()));
+
+        var enforcePureFailure = diagnostics.Any(static diagnostic => diagnostic.Id == "SP0002");
+        if ((result.Purity == SharpProofVerdict.Proven) == enforcePureFailure)
+            findings.Add(new FuzzFinding(
+                fuzzCase.Name,
+                fuzzCase.Family,
+                "enforce_pure_projection_mismatch",
+                "[EnforcePure] diagnostic did not match the canonical purity verdict.",
+                null,
+                ImmutableArray.Create("verdict=" + result.Purity, "diagnostic=" + enforcePureFailure)));
     }
 
     private static ImmutableArray<Diagnostic> EvaluateDiagnosticExpectation(

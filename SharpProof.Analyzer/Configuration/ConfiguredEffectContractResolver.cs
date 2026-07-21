@@ -42,7 +42,10 @@ internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions opt
             return new MethodEffects(
                 effects,
                 capabilities,
-                exceptions.ToImmutable(),
+                exceptions.Select(static type => MethodExceptionFact.Boundary(
+                    type,
+                    MethodExceptionSource.Contract,
+                    "configured_effect_contract")).ToImmutableArray(),
                 ImmutableArray<MethodEffectSite>.Empty,
                 complete
                     ? ImmutableArray<SharpProofUnknownReason>.Empty
@@ -72,7 +75,11 @@ internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions opt
     private static MethodEffects Unknown(string reason) => new(
         SharpProofEffect.Unknown,
         SharpProofCapability.None,
-        ImmutableArray<string>.Empty,
+        ImmutableArray.Create(MethodExceptionFact.Boundary(
+            "System.Exception",
+            MethodExceptionSource.Contract,
+            reason,
+            SharpProofVerdict.Unknown)),
         ImmutableArray<MethodEffectSite>.Empty,
         ImmutableArray.Create(Reason(reason)));
 

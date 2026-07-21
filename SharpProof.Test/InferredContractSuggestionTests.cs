@@ -46,16 +46,20 @@ public sealed class InferredContractSuggestionTests
 
         var capabilities = SingleSuggestion(
             await GetSuggestionsAsync(
-                "using System; public static class C { public static void Write() => Console.WriteLine(1); }",
+                "public static class C { public static void Guard(object gate) { lock (gate) { } } }",
                 "capabilities"),
             "SP0035");
         AssertSuggestion(
             capabilities,
             "capabilities",
             "global::SharpProof.Attributes.AllowedCapabilities(" +
-            "global::SharpProof.Attributes.SharpProofCapability.IO | " +
-            "global::SharpProof.Attributes.SharpProofCapability.Console)",
+            "global::SharpProof.Attributes.SharpProofCapability.Synchronization)",
             "high");
+
+        Assert.That(await GetSuggestionsAsync(
+            "using System; public static class C { public static void Write() => Console.WriteLine(1); }",
+            "capabilities"), Is.Empty,
+            "Framework APIs require source, IL, or an exact effect contract; names are not a capability catalog.");
 
         var complexity = SingleSuggestion(
             await GetSuggestionsAsync(

@@ -42,7 +42,7 @@ internal static partial class ExceptionFlowAnalyzer {
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         ImmutableArray<ExceptionContract> contracts,
-        ExceptionFlowEngine.ExceptionFlowResult? queryResult,
+        ImmutableArray<ExceptionFactView> facts,
         DiagnosticBaseline baseline) {
         if (contracts.Length == 0) return;
 
@@ -51,33 +51,33 @@ internal static partial class ExceptionFlowAnalyzer {
             context,
             methodSymbol,
             baseline);
-        if (validContracts.Length == 0 || queryResult == null) return;
+        if (validContracts.Length == 0) return;
 
         var effectiveContracts = CreateEffectiveExceptionContracts(validContracts);
         foreach (var contract in effectiveContracts)
-            AnalyzeExceptionContract(context, methodSymbol, contract, queryResult.Sites, baseline);
+            AnalyzeExceptionContract(context, methodSymbol, contract, facts, baseline);
     }
 
     private static void AnalyzeExceptionContract(
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         EffectiveExceptionContract contract,
-        ImmutableArray<ExceptionFlowEngine.ExceptionFlowSite> siteEntries,
+        ImmutableArray<ExceptionFactView> siteEntries,
         DiagnosticBaseline baseline) {
-        foreach (var siteGroup in siteEntries.GroupBy(entry => CreateExceptionSiteKey(entry.Site),
-                     StringComparer.Ordinal)) {
+        foreach (var siteGroup in siteEntries.GroupBy(static entry => entry.Site.Span)) {
             var firstEntry = siteGroup.First();
             var disallowedSites = siteGroup.Where(site => !IsAllowedByExceptionContract(contract, site)).ToArray();
-            var disallowedEvidence = new ExceptionFlowEngine.ExceptionEvidenceProjection(disallowedSites);
-
-            if (disallowedEvidence.Count == 0) continue;
+            if (disallowedSites.Length == 0) continue;
 
             var siteLocation = GetExceptionSiteLocation(firstEntry.Site);
             if (siteLocation == null) continue;
 
-            var operationDisplay = GetExceptionSiteDisplay(firstEntry.Site, firstEntry.Method);
-            var exceptionList = string.Join(", ", disallowedEvidence.Types);
-            var properties = CreateExceptionProperties(disallowedEvidence)
+            var operationDisplay = firstEntry.Site.ToString();
+            var exceptionList = string.Join(", ", disallowedSites
+                .Select(static site => site.ExceptionType)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static type => type, StringComparer.Ordinal));
+            var properties = CreateExceptionProperties(disallowedSites)
                 .Add("sharpproof.exception_contract.attribute", contract.AttributeDisplay)
                 .Add("sharpproof.exception_contract.allowed_types", FormatAllowedTypes(contract))
                 .Add("sharpproof.exception_contract.disallowed_types", exceptionList);
@@ -88,8 +88,8 @@ internal static partial class ExceptionFlowAnalyzer {
                 "ExceptionContract",
                 operationDisplay,
                 CreateExceptionEvidenceKey(
-                    contract.AttributeDisplay + ":" + CreateExceptionSiteKey(firstEntry.Site),
-                    disallowedEvidence),
+                    contract.AttributeDisplay + ":" + firstEntry.Site.SpanStart,
+                    disallowedSites),
                 siteLocation,
                 operationDisplay,
                 "exception_contract_violation",
@@ -257,7 +257,7 @@ internal static partial class ExceptionFlowAnalyzer {
 
     private static bool IsAllowedByExceptionContract(
         EffectiveExceptionContract contract,
-        ExceptionFlowEngine.ExceptionFlowSite exception) {
+        ExceptionFactView exception) {
         if (contract.Kind == ExceptionContractKind.DoesNotThrow) return false;
 
         if (exception.Type == null) return false;

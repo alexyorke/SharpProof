@@ -128,7 +128,10 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         return new MethodEffects(
             effects,
             SharpProofCapability.None,
-            exceptions.ToImmutable(),
+            exceptions.Select(static type => MethodExceptionFact.Boundary(
+                type,
+                MethodExceptionSource.Metadata,
+                "metadata_throw")).ToImmutableArray(),
             ImmutableArray<MethodEffectSite>.Empty,
             unknowns.Distinct().ToImmutableArray());
     }
@@ -183,7 +186,11 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     private static MethodEffects Unknown(string code) => new(
         SharpProofEffect.Unknown,
         SharpProofCapability.None,
-        ImmutableArray<string>.Empty,
+        ImmutableArray.Create(MethodExceptionFact.Boundary(
+            "System.Exception",
+            MethodExceptionSource.Metadata,
+            code,
+            SharpProofVerdict.Unknown)),
         ImmutableArray<MethodEffectSite>.Empty,
         ImmutableArray.Create(Reason(code)));
 

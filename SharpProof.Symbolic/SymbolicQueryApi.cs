@@ -1,7 +1,6 @@
 namespace SharpProof.Symbolic;
 
 internal sealed partial class SymbolicQueryExecutor {
-    private readonly SymbolicCapabilityService _capabilityService;
     private readonly SymbolicConditionProofEngine _conditionProofEngine;
     private readonly SymbolicInvariantService _invariantService;
     private readonly SymbolicRuntimeHazardQueryService _runtimeHazardService;
@@ -16,7 +15,6 @@ internal sealed partial class SymbolicQueryExecutor {
             _conditionProofEngine);
         _rangeQueryExecutor = new SymbolicSourceRangeQueryExecutor(_programPointExecutor);
         _runtimeHazardService = new SymbolicRuntimeHazardQueryService(_invariantService);
-        _capabilityService = new SymbolicCapabilityService();
     }
 
     public SymbolicQueryResult Query(
@@ -74,13 +72,6 @@ internal sealed partial class SymbolicQueryExecutor {
 
         var summary = new SymbolicComplexityAnalysisSession(compilation, cancellationToken).Analyze(target);
         return SymbolicComplexityResultProjector.Project(target, summary, cancellationToken);
-    }
-
-    public SymbolicCapabilityResult QueryCapabilities(
-        SymbolicQueryContext context,
-        CancellationToken cancellationToken = default) {
-        return ExecuteWithLimits(context, cancellationToken, (request, token) =>
-            _capabilityService.Query(request, token));
     }
 
     private static TResult ExecuteWithLimits<TResult>(

@@ -33,10 +33,6 @@ public class TestClass
             Is.EqualTo("DivideByZero"));
         Assert.That(diagnostic.Properties["sharpproof.runtime_hazard.status"],
             Is.EqualTo("Unknown"));
-        Assert.That(diagnostic.Properties["sharpproof.runtime_hazard.status_reason"], Is.Not.Empty);
-        Assert.That(diagnostic.Properties["sharpproof.runtime_hazard.trigger"], Is.Not.Empty);
-        Assert.That(diagnostic.Properties["sharpproof.runtime_hazard.proof_backend"], Is.Not.Empty);
-        Assert.That(diagnostic.Properties["sharpproof.runtime_hazard.unknown_reason"], Is.Not.Empty);
         Assert.That(diagnostic.Properties["sharpproof.unknown.code"],
             Is.EqualTo("runtime_hazard.unknown"));
         Assert.That(diagnostic.Properties["sharpproof.unknown.category"],

@@ -46,7 +46,7 @@ internal static class AnalyzerFeaturePipeline {
             TrustedBoundaryReviewAnalyzer.Analyze(context, session);
 
             if (features.Includes(AnalyzerFeatures.Purity))
-                MethodPurityAnalyzer.AnalyzeSymbolForPurity(
+                EnforcePureContractAnalyzer.Analyze(
                     context,
                     session.Baseline,
                     session.AttributePolicy);
@@ -86,7 +86,6 @@ internal static class AnalyzerFeaturePipeline {
             if (features.Includes(AnalyzerFeatures.Exceptions))
                 ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(
                     context,
-                    session.ProofService,
                     session.Baseline,
                     session.AttributePolicy);
 

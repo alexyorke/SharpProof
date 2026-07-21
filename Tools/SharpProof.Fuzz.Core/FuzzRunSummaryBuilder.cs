@@ -110,8 +110,8 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
             manifestSurfaceCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
             manifestClassificationCounts,
             registryExpectationCounts,
-            registryExpectationCounts[FuzzExpectation.DefinitelyPureBucket] +
-            registryExpectationCounts[FuzzExpectation.DefinitelyImpureBucket],
+            registryExpectationCounts[FuzzExpectation.ProvenBucket] +
+            registryExpectationCounts[FuzzExpectation.DisprovenBucket],
             conservativeRegistryFamilies.Length,
             conservativeRegistryFamilies,
             RoslynShapeManifest.GeneratorBackedShapeIds.Length,
@@ -124,8 +124,8 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
     private static ImmutableSortedDictionary<string, int> CreateRegistryExpectationCounts() {
         var buckets = new[] {
             FuzzExpectation.ConservativeBucket,
-            FuzzExpectation.DefinitelyImpureBucket,
-            FuzzExpectation.DefinitelyPureBucket
+            FuzzExpectation.DisprovenBucket,
+            FuzzExpectation.ProvenBucket
         };
         return buckets.ToImmutableSortedDictionary(
             static bucket => bucket,

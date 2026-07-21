@@ -118,38 +118,35 @@ internal static class InferredContractSuggestionAnalyzer {
             session.AttributePolicy.HasAttribute(context.MethodSymbol, "AllowedCapabilitiesAttribute"))
             return;
 
-        var outcome = context.State.GetCapabilityOutcome(context.CancellationToken);
-        if (!outcome.IsSuccess) {
-            context.CancellationToken.ThrowIfCancellationRequested();
+        var effects = context.State.GetMethodEffects(context.CancellationToken);
+        var capabilities = SharpProofCapabilityFacts.NormalizeMask((int)effects.Capabilities);
+        if (!effects.UnknownReasons.IsDefaultOrEmpty ||
+            (effects.Effects & SharpProof.Attributes.SharpProofEffect.Unknown) != 0 ||
+            (capabilities & ~SharpProofCapabilityFacts.AllKnownMask) != 0)
             return;
-        }
 
-        var result = outcome.Value!;
-        var capabilities = SymbolicCapabilityFacts.NormalizeMask(SymbolicCapabilityFacts.GetMask(result));
-        if (result.HasUnknowns || (capabilities & ~SymbolicCapabilityFacts.AllKnownMask) != 0) return;
-
-        var flagExpressions = SymbolicCapabilityFacts.OrderedMasks
-            .Where(capability => capability != SymbolicCapabilityFacts.NoneMask && (capabilities & capability) != 0)
+        var flagExpressions = SharpProofCapabilityFacts.OrderedMasks
+            .Where(capability => capability != SharpProofCapabilityFacts.NoneMask && (capabilities & capability) != 0)
             .Select(capability => AttributeNamespace + "SharpProofCapability." +
-                                  SymbolicCapabilityFacts.GetName(capability))
+                                  SharpProofCapabilityFacts.GetName(capability))
             .ToArray();
         var argument = flagExpressions.Length == 0
             ? AttributeNamespace + "SharpProofCapability.None"
             : string.Join(" | ", flagExpressions);
-        var displayArgument = capabilities == SymbolicCapabilityFacts.NoneMask
+        var displayArgument = capabilities == SharpProofCapabilityFacts.NoneMask
             ? "SharpProofCapability.None"
             : string.Join(
                 " | ",
-                SymbolicCapabilityFacts.OrderedMasks
+                SharpProofCapabilityFacts.OrderedMasks
                     .Where(capability => (capabilities & capability) != 0)
-                    .Select(capability => "SharpProofCapability." + SymbolicCapabilityFacts.GetName(capability)));
-        var displaySet = capabilities == SymbolicCapabilityFacts.NoneMask
+                    .Select(capability => "SharpProofCapability." + SharpProofCapabilityFacts.GetName(capability)));
+        var displaySet = capabilities == SharpProofCapabilityFacts.NoneMask
             ? "no capabilities"
             : "the exact capability set " + string.Join(
                 ", ",
-                SymbolicCapabilityFacts.OrderedMasks
+                SharpProofCapabilityFacts.OrderedMasks
                     .Where(capability => (capabilities & capability) != 0)
-                    .Select(SymbolicCapabilityFacts.GetName));
+                    .Select(SharpProofCapabilityFacts.GetName));
 
         Report(
             context,
@@ -209,19 +206,11 @@ internal static class InferredContractSuggestionAnalyzer {
             session.AttributePolicy.HasAttribute(context.MethodSymbol, "AllowedExceptionsAttribute"))
             return;
 
-        var result = context.State.GetOrCreateSymbolicQueryResult(
-            "exception-flow",
-            () => ExceptionFlowEngine.AnalyzeMethod(
-                context.MethodSymbol,
-                context.Node,
-                context.SemanticModel,
-                context.CancellationToken,
-                session.ProofService.SmtAnalysis,
-                session.AttributePolicy));
+        var result = context.State.GetMethodEffects(context.CancellationToken);
 
-        if (result.Evidence.Count == 0) {
+        if (result.DoesNotThrow == SharpProofVerdict.Proven) {
             const InferredContractConfidence confidence = InferredContractConfidence.High;
-            if (!options.Includes(kind, confidence) || !IsTriviallyNonThrowingBody(context)) return;
+            if (!options.Includes(kind, confidence)) return;
 
             Report(
                 context,
@@ -230,7 +219,7 @@ internal static class InferredContractSuggestionAnalyzer {
                 kind,
                 AttributeNamespace + "DoesNotThrow",
                 "[DoesNotThrow]",
-                "a trivial closed body with no exception evidence",
+                "canonical method effects prove that no exception escapes",
                 confidence);
             return;
         }
@@ -396,22 +385,22 @@ internal static class InferredContractSuggestionAnalyzer {
     }
 
     private static bool TryGetFiniteExceptionTypes(
-        ExceptionFlowEngine.ExceptionFlowResult result,
+        MethodEffects result,
         out string[] exceptionTypes,
         out string[] displayTypes) {
-        var symbols = result.Sites
-            .Select(static entry => entry.Type as INamedTypeSymbol)
+        var symbols = result.ExceptionFacts
+            .Where(static entry => entry.Escape == SharpProofVerdict.Proven)
             .ToArray();
-        if (symbols.Length == 0 || symbols.Any(static symbol => symbol == null)) {
+        if (symbols.Length == 0) {
             exceptionTypes = Array.Empty<string>();
             displayTypes = Array.Empty<string>();
             return false;
         }
 
         var distinctSymbols = symbols
-            .Select(static symbol => symbol!)
-            .Distinct<INamedTypeSymbol>(SymbolEq.Default)
-            .OrderBy(static symbol => symbol.ToDisplayString(), StringComparer.Ordinal)
+            .Select(static fact => fact.ExceptionType)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
         if (distinctSymbols.Length is < 1 or > 4) {
             exceptionTypes = Array.Empty<string>();
@@ -419,40 +408,9 @@ internal static class InferredContractSuggestionAnalyzer {
             return false;
         }
 
-        exceptionTypes = distinctSymbols
-            .Select(static symbol => symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
-            .ToArray();
-        displayTypes = distinctSymbols
-            .Select(static symbol => symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat))
-            .ToArray();
+        exceptionTypes = distinctSymbols.Select(static name => "global::" + name).ToArray();
+        displayTypes = distinctSymbols.Select(static name => name.Split('.').Last()).ToArray();
         return true;
-    }
-
-    private static bool IsTriviallyNonThrowingBody(MethodBodyAnalysisContext context) {
-        if (CSharpSyntaxFacts.TryGetExpressionBody(context.Node, out var expressionBody))
-            return IsTriviallyNonThrowingExpression(context, expressionBody);
-
-        var body = CSharpSyntaxFacts.GetBlockBody(context.Node);
-        if (body == null || body.Statements.Count == 0) return body != null;
-
-        return body.Statements.Count == 1 &&
-               body.Statements[0] is ReturnStatementSyntax { Expression: { } returnExpression } &&
-               IsTriviallyNonThrowingExpression(context, returnExpression);
-    }
-
-    private static bool IsTriviallyNonThrowingExpression(
-        MethodBodyAnalysisContext context,
-        ExpressionSyntax expression) {
-        expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
-        if (expression is LiteralExpressionSyntax or DefaultExpressionSyntax or TypeOfExpressionSyntax) return true;
-
-        if (expression is InvocationExpressionSyntax {
-                Expression: IdentifierNameSyntax { Identifier.ValueText: "nameof" }
-            })
-            return true;
-
-        return expression is IdentifierNameSyntax identifier &&
-               context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol is IParameterSymbol;
     }
 
     private static IEnumerable<ExpressionSyntax> GetReturnExpressions(SyntaxNode node) {
