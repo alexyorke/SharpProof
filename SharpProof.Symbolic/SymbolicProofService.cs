@@ -7,6 +7,8 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
     public SymbolicProofInfo ClassifyReachability(SymbolicState state) {
         if (state == null) throw new ArgumentNullException(nameof(state));
 
+        if (!state.IsExact) return SymbolicProofInfo.Unknown(state.UnknownReason);
+
         state = SymbolicProofStateFacts.NormalizeState(state);
         if (state.IsContradictory)
             return SymbolicProofInfo.Syntactic(
@@ -34,6 +36,8 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
         if (state == null) throw new ArgumentNullException(nameof(state));
 
         if (fact == null) throw new ArgumentNullException(nameof(fact));
+
+        if (!state.IsExact) return SymbolicProofInfo.Unknown(state.UnknownReason);
 
         state = SymbolicProofStateFacts.NormalizeState(state);
         fact = SymbolicProofStateFacts.RewriteQueryFactToCurrentVersions(fact, state);
@@ -78,6 +82,8 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
         if (state == null) throw new ArgumentNullException(nameof(state));
 
         if (branchCondition == null) throw new ArgumentNullException(nameof(branchCondition));
+
+        if (!state.IsExact) return SymbolicProofInfo.Unknown(state.UnknownReason);
 
         state = SymbolicProofStateFacts.NormalizeState(state);
         branchCondition = SymbolicProofStateFacts.RewriteQueryConditionToCurrentVersions(branchCondition, state);
@@ -187,6 +193,10 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
 
         normalizedState = SymbolicProofStateFacts.NormalizeState(state);
         rewrittenCondition = SymbolicProofStateFacts.RewriteQueryConditionToCurrentVersions(condition, normalizedState);
+        if (!normalizedState.IsExact) {
+            result = SymbolicProofInfo.Unknown(normalizedState.UnknownReason);
+            return true;
+        }
         if (normalizedState.IsContradictory) {
             result = SymbolicProofInfo.Syntactic(
                 mode == ConditionClassificationMode.Implication
@@ -240,6 +250,8 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
         if (state == null) throw new ArgumentNullException(nameof(state));
 
         if (triggerPrecondition == null) throw new ArgumentNullException(nameof(triggerPrecondition));
+
+        if (!state.IsExact) return SymbolicProofInfo.Unknown(state.UnknownReason);
 
         state = SymbolicProofStateFacts.NormalizeState(state);
         triggerPrecondition = SymbolicProofStateFacts.RewriteQueryFactToCurrentVersions(triggerPrecondition, state);

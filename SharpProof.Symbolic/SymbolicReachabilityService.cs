@@ -72,10 +72,7 @@ internal static class SymbolicReachabilityService {
             cancellationToken);
         return cfgState is { IsExact: true, Value: { } exactState }
             ? exactState
-            : SymbolicProgramPointFacts.CollectForInitialEntryState(
-                forStatement,
-                semanticModel,
-                cancellationToken);
+            : UnsupportedState(cfgState);
     }
 
     private static SymbolicState BuildStructuralPathStateSnapshot(
@@ -92,20 +89,15 @@ internal static class SymbolicReachabilityService {
             includeCurrentStatementCompletionFacts);
         if (cfgState is { IsExact: true, Value: { } exactState })
             return exactState;
-
-        var state = SymbolicProgramPointFacts.CollectAncestorReachabilityState(
-            site,
-            semanticModel,
-            cancellationToken);
-        return SymbolicProgramPointFacts.MergeStates(
-            state,
-            SymbolicProgramPointFacts.CollectPriorAssignmentState(
-                site,
-                semanticModel,
-                cancellationToken,
-                includeCurrentStatementCompletionFacts,
-                initialState));
+        return UnsupportedState(cfgState);
     }
+
+    private static SymbolicState UnsupportedState(SymbolicLoweringResult<SymbolicState> result) => new(
+        support: result.Support,
+        unknownReason: result.UnknownReason == SymbolicUnknownReason.None
+            ? SymbolicUnknownReason.UnsupportedIrEncoding
+            : result.UnknownReason,
+        provenance: result.Provenance);
 
     private readonly record struct PathStateCacheKey(
         int SiteStart, int SiteLength, int SiteRawKind, bool IncludeCurrentStatementCompletionFacts);

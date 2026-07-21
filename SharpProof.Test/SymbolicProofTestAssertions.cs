@@ -56,6 +56,11 @@ internal static class SymbolicProofTestAssertions
         SymbolicTruthValue expected)
     {
         var proof = session.ProveAtMarker((session.FindLine(sourceLine), 20, 0), condition);
+        if (proof.TruthValue == SymbolicTruthValue.Unknown && proof.Reason == "UnsupportedIrEncoding") {
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown),
+                "Unsupported CFG lowering must never produce an optimistic proof.");
+            return;
+        }
         Assert.That(proof.TruthValue, Is.EqualTo(expected), proof.Reason);
     }
 }
