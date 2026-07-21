@@ -50,8 +50,6 @@ internal static class SymbolicMemberLowerer {
         MemberAccessExpressionSyntax memberAccess,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
-        term = null!;
-
         var memberName = memberAccess.Name.Identifier.ValueText;
         if (SymbolicKnownApiLowerer.TryLowerKnownStaticValueMember(memberAccess, context, out term)) return true;
 

@@ -16,8 +16,6 @@ internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull 
         _entries = new Dictionary<TKey, TValue>(comparer ?? EqualityComparer<TKey>.Default);
     }
 
-    internal int Capacity => _capacity;
-
     internal int Count {
         get {
             lock (_gate)

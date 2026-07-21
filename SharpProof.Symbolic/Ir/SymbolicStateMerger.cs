@@ -173,13 +173,6 @@ internal static class SymbolicStateMerger {
         }
     }
 
-    internal static bool ExactAliasComponentFactAny(
-        SymbolicTerm root,
-        IReadOnlyList<SymbolicFact> facts,
-        Func<SymbolicFact, SymbolicTerm, bool> predicate) =>
-        EnumerateExactAliasComponent(root, facts).Any(term => facts.Any(fact =>
-            fact.Polarity && fact.Confidence == SymbolicFactConfidence.Exact && predicate(fact, term)));
-
     private static ImmutableArray<SymbolicFact> MergeResourceStateFacts(
         ImmutableArray<SymbolicFact> commonFacts,
         IReadOnlyList<SymbolicState> states) {

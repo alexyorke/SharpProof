@@ -404,8 +404,6 @@ internal sealed partial class SmtConcreteFactIndex {
             var leftRoot = FindBooleanCanonical(left, out var leftNegated);
             var rightRoot = FindBooleanCanonical(right, out var rightNegated);
             var rootDiffers = differs ^ leftNegated ^ rightNegated;
-            hasContradiction = false;
-
             if (leftRoot.Equals(rightRoot)) {
                 hasContradiction = rootDiffers;
                 return hasContradiction;

@@ -219,7 +219,6 @@ internal static class SymbolicStringLowerer {
         BinaryExpressionSyntax comparison,
         SymbolicLoweringContext context,
         out SymbolicCondition condition) {
-        condition = null!;
         var comparisonKind = comparison.Kind();
         if (TryLowerStringSearchComparisonOperand(
                 comparison.Left,

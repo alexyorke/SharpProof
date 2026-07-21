@@ -309,7 +309,6 @@ internal static class SymbolicNullableLowerer {
         SymbolicLoweringContext context,
         out SymbolicTerm hasValue,
         out SymbolicTerm value) {
-        hasValue = null!;
         value = null!;
         return TryLowerNullableHasValueTerm(expression, context, out hasValue) &&
                TryLowerNullableValueTerm(expression, context, out value);

@@ -1,40 +1,6 @@
 namespace SharpProof.Analyzer;
 
 internal static class RequiresEntryStateBuilder {
-    internal static SymbolicState Create(
-        IMethodSymbol methodSymbol,
-        SyntaxNode methodNode,
-        SemanticModel semanticModel,
-        SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken) {
-        var state = new SymbolicState();
-        var contracts = RequiresContractHelpers.ValidContracts(
-            methodSymbol,
-            attributePolicy,
-            cancellationToken);
-        if (contracts.IsDefaultOrEmpty) return state;
-
-        var position = RequiresContractHelpers.GetMethodEntrySpeculativePosition(methodNode);
-        foreach (var contract in contracts) {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!RequiresContractHelpers.TryCreateCondition(
-                    semanticModel,
-                    position,
-                    contract.Condition,
-                    cancellationToken,
-                    out var conditionExpression,
-                    out _,
-                    out var condition,
-                    out _) ||
-                RequiresContractHelpers.ContainsResultReference(conditionExpression))
-                continue;
-
-            state = state.AddPathCondition(condition);
-        }
-
-        return state;
-    }
-
     internal static SymbolicState? CreateStable(
         SyntaxNode methodNode,
         SemanticModel semanticModel,

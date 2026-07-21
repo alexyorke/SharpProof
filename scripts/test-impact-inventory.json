@@ -3184,15 +3184,6 @@
       "referencedTokens": []
     },
     {
-      "path": "SharpProof.Symbolic/SymbolicSourceMap.cs",
-      "module": "Symbolic",
-      "declaredTypes": [
-        "SymbolicSourceMap"
-      ],
-      "referencingFixtureCount": 0,
-      "referencedTokens": []
-    },
-    {
       "path": "SharpProof.Symbolic/SymbolicSourceProgramPointExecutor.cs",
       "module": "Symbolic",
       "declaredTypes": [

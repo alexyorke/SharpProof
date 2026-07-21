@@ -68,7 +68,7 @@ internal static class BaselineSchemaContract {
             return !required;
         }
 
-        var version = 0;
+        int version;
         if (!(versionElement.ValueKind == JsonValueKind.Number && versionElement.TryGetInt32(out version) ||
               allowStringVersion &&
               versionElement.ValueKind == JsonValueKind.String &&
@@ -79,8 +79,7 @@ internal static class BaselineSchemaContract {
 
         if (version != SharpProofEvidenceSchema.CurrentVersion) {
             failure = new BaselineSchemaValidationFailure(
-                BaselineSchemaValidationFailureKind.UnsupportedVersion,
-                version);
+                BaselineSchemaValidationFailureKind.UnsupportedVersion);
             return false;
         }
 
@@ -89,7 +88,6 @@ internal static class BaselineSchemaContract {
     }
 
     internal static BaselineEntryFields ReadEntryFields(JsonElement element) => new(
-        HasAnyProperty(element, "id", "symbol", "path"),
         ReadString(element, "id"),
         ReadString(element, "symbol"),
         ReadString(element, "path"),
@@ -221,9 +219,6 @@ internal static class BaselineSchemaContract {
         return prefix + string.Join("/", segments);
     }
 
-    private static bool HasAnyProperty(JsonElement element, params string[] names) =>
-        names.Any(name => element.TryGetProperty(name, out _));
-
     private static bool TryGetPropertyIgnoreCase(
         JsonElement element,
         string propertyName,
@@ -275,7 +270,6 @@ internal static class BaselineSchemaContract {
 }
 
 internal readonly record struct BaselineEntryFields(
-    bool HasCandidateProperty,
     string? Id,
     string? Symbol,
     string? Path,
@@ -293,7 +287,6 @@ internal readonly record struct BaselineEntryFields(
 
 internal readonly record struct BaselineSchemaValidationFailure(
     BaselineSchemaValidationFailureKind Kind,
-    int Version = 0,
     bool IsRoot = false);
 
 internal enum BaselineSchemaValidationFailureKind {

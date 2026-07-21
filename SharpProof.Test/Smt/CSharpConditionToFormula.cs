@@ -267,8 +267,6 @@ internal static class CSharpConditionToFormula
         [NotNullWhen(true)] out SmtFormula? formula)
     {
         expression = UnwrapExpression(expression);
-        formula = null;
-
         var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
         if (constantValue.HasValue)
         {

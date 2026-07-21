@@ -14,7 +14,6 @@ internal static class SymbolicIndexingLowerer {
         ElementAccessExpressionSyntax elementAccess,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
-        term = null!;
         if (TryLowerFiniteArrayElementAccessTerm(elementAccess, context, out term)) return true;
 
         var receiverTypeInfo = context.SemanticModel.GetTypeInfo(
@@ -401,7 +400,6 @@ internal static class SymbolicIndexingLowerer {
         int dimension,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
-        term = null!;
         if (dimension != 0 ||
             arrayType.Rank != 1 ||
             arrayExpression is not ImplicitArrayCreationExpressionSyntax implicitArrayCreation ||
@@ -951,7 +949,6 @@ internal static class SymbolicIndexingLowerer {
         ExpressionSyntax sourceExpression,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
-        term = null!;
         if (TryCreateDirectRangeLengthTerm(rangeExpression, sourceExpression, context, out term)) return true;
 
         if (!TryResolveBuiltInRangeLengthShape(rangeExpression, context, out var rangeShape)) return false;
@@ -1170,7 +1167,6 @@ internal static class SymbolicIndexingLowerer {
         SymbolicLoweringContext context,
         out SymbolicTerm start,
         out SymbolicTerm end) {
-        start = null!;
         end = null!;
         return TryLowerRangeEndpointTerm(
                    rangeShape,

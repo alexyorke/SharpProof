@@ -249,7 +249,6 @@ internal sealed record ResolvedMethodLikeTarget(
     SemanticModel SemanticModel,
     SyntaxNode Declaration,
     SyntaxNode? BodyNode,
-    ISymbol? DeclaredSymbol,
     IMethodSymbol? MethodSymbol,
     NodeSourceSpan SourceSpan) {
     internal string MethodName => !string.IsNullOrWhiteSpace(MethodSymbol?.Name)
@@ -284,7 +283,6 @@ internal sealed record ResolvedMethodLikeTarget(
             semanticModel,
             declaration,
             SymbolicMethodSourceResolver.GetBodyNode(declaration),
-            semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
             SymbolicMethodLikeDeclaration.GetMethodSymbol(declaration, semanticModel, cancellationToken),
             SymbolicSourceLocation.GetNodeSourceSpan(
                 declaration.SyntaxTree,

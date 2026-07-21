@@ -1,8 +1,6 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal readonly record struct SymbolicDeconstructionTarget(IOperation Operation, ISymbol? Symbol) {
-    internal bool IsDiscard => Symbol == null;
-}
+internal readonly record struct SymbolicDeconstructionTarget(ISymbol? Symbol);
 
 internal static class SymbolicDeconstructionPlan {
     internal static bool TryCollectTargets(
@@ -32,7 +30,7 @@ internal static class SymbolicDeconstructionPlan {
 
         var symbol = target is IDiscardOperation ? null : resolveTarget(target)?.OriginalDefinition;
         if (symbol == null && target is not IDiscardOperation) return false;
-        targets.Add(new SymbolicDeconstructionTarget(target, symbol));
+        targets.Add(new SymbolicDeconstructionTarget(symbol));
         return true;
     }
 

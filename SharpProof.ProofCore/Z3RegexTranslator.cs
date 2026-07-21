@@ -29,20 +29,19 @@ internal sealed class Z3RegexTranslator {
 
 
     internal static Z3RegexTranslationResult Translate(Context context, string pattern, RegexOptions options) {
-        var fallback = Z3RegexTranslationValidator.Validate(pattern, options);
-        if (fallback != RegexTranslationFallback.None)
-            return Z3RegexTranslationResult.Failed(fallback);
+        if (Z3RegexTranslationValidator.Validate(pattern, options) != RegexTranslationFallback.None)
+            return Z3RegexTranslationResult.Failed();
 
         if (!Z3RegexPatternNormalizer.TryNormalize(pattern, options, out var normalized))
-            return Z3RegexTranslationResult.Failed(RegexTranslationFallback.NormalizationFailed);
+            return Z3RegexTranslationResult.Failed();
 
         var translator = new Z3RegexTranslator(context, normalized.Body, options);
         if (!translator.TryParseExpression(out var body))
-            return Z3RegexTranslationResult.Failed(RegexTranslationFallback.UnsupportedFragment);
+            return Z3RegexTranslationResult.Failed();
 
         translator.SkipIgnoredPatternTrivia();
         if (translator._position != translator._pattern.Length)
-            return Z3RegexTranslationResult.Failed(RegexTranslationFallback.UnsupportedFragment);
+            return Z3RegexTranslationResult.Failed();
 
         var regex = body;
         if (!normalized.StartAnchored) regex = context.MkConcat(translator._expressions.AnyString(), regex);

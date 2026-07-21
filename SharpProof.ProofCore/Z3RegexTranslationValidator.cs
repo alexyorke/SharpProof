@@ -21,6 +21,4 @@ internal enum RegexTranslationFallback {
     None,
     PatternTooLong,
     InvalidPattern,
-    NormalizationFailed,
-    UnsupportedFragment
 }

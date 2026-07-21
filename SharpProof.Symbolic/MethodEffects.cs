@@ -820,27 +820,6 @@ internal sealed class MethodEffectAnalysisSession(
                 kind));
         }
 
-        internal void AddException(
-            string exceptionType,
-            IOperation operation,
-            MethodExceptionSource source,
-            SharpProofVerdict escape,
-            string reason,
-            string kind = "") {
-            if (escape == SharpProofVerdict.Proven) _effects |= SharpProofEffect.Throws;
-            _exceptions.Add(new MethodExceptionFact(
-                exceptionType,
-                escape,
-                source,
-                operation.Syntax.ToString(),
-                exceptionType,
-                operation.Syntax.SpanStart,
-                operation.Syntax.Span.Length,
-                false,
-                reason,
-                kind));
-        }
-
         internal void AddUnknown(IOperation operation, string reason, ISymbol? symbol = null) {
             Add(SharpProofEffect.Unknown, operation, symbol, reason);
             _unknowns.Add(CreateUnknownReason(reason));

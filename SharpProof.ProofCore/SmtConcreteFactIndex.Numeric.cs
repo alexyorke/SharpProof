@@ -44,7 +44,6 @@ internal sealed partial class SmtConcreteFactIndex {
         private bool TryAddIntegerIntervalFact(
             SmtFormula formula,
             out bool hasContradiction) {
-            hasContradiction = false;
             if (!SmtComparisonOperatorFacts.TryGetIntegerComparison(
                     formula,
                     out var term,

@@ -414,9 +414,6 @@ internal sealed record SymbolicRuntimeHazard(
     public SymbolicInputWitness TriggerWitness => RawTriggerWitness ??
         SymbolicInputWitnessFactory.Unsupported("runtime_hazard_trigger_witness_unavailable");
 
-    public string GetDisplayStatusReason() =>
-        SymbolicReasonDisplay.Format(StatusReason);
-
     private static SymbolicProofInfo CreateProofInfo(
         SymbolicRuntimeHazardStatus status,
         string statusReason,

@@ -8,8 +8,7 @@ internal sealed record SymbolicSourceInput(
     Compilation? Compilation = null,
     SyntaxNode? Node = null,
     SemanticModel? SemanticModel = null,
-    SymbolicSourceCompilationProfile? CompilationProfile = null,
-    SymbolicSourceMap? SourceMap = null) {
+    SymbolicSourceCompilationProfile? CompilationProfile = null) {
     internal const string DefaultFilePath = "SharpProof.Symbolic.Query.cs";
 
     public static SymbolicSourceInput FromFile(

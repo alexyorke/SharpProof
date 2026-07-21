@@ -33,7 +33,6 @@ internal static class SymbolicRegexLowerer {
         BinaryExpressionSyntax comparison,
         SymbolicLoweringContext context,
         out SymbolicCondition condition) {
-        condition = null!;
         if (TryLowerRegexMatchesCountComparisonOperand(
                 comparison.Left,
                 comparison.Right,

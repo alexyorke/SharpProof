@@ -66,8 +66,6 @@ internal static class SymbolicRuntimeExceptionFacts {
     internal static class ExceptionCategories {
         internal const string DirectThrow = "direct_throw";
         internal const string Rethrow = "rethrow";
-        internal const string SourceCallee = "source_callee";
-        internal const string DynamicDispatch = "dynamic_dispatch";
         internal const string DefiniteThrowNull = "definite_throw_null";
         internal const string DefiniteDivideByZero = "definite_divide_by_zero";
         internal const string DefiniteModuloByZero = "definite_modulo_by_zero";

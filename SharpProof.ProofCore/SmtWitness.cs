@@ -21,8 +21,6 @@ internal sealed record SmtSatisfyingWitness(
     SmtWitnessStatus Status,
     string Reason,
     IReadOnlyList<SmtModelAssignment> Assignments) {
-    public bool IsAvailable => Status is SmtWitnessStatus.Exact or SmtWitnessStatus.Approximate;
-
     internal static SmtSatisfyingWitness None(string reason) =>
         Absent(SmtWitnessStatus.None, reason);
 

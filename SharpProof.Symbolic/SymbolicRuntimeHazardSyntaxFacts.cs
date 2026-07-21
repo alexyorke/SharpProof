@@ -126,9 +126,6 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
         out ExpressionSyntax? countExpression,
         out bool oneArgumentUpperBoundIsInclusive,
         out string category) {
-        sourceExpression = null!;
-        startExpression = null!;
-        countExpression = null;
         oneArgumentUpperBoundIsInclusive = true;
         category = string.Empty;
 
