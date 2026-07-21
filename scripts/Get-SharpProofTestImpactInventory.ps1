@@ -173,8 +173,8 @@ try
     $fixtureDependencies = New-Object System.Collections.Generic.List[object]
     $highFanoutFiles = New-Object System.Collections.Generic.List[object]
     foreach ($entry in @(
-        [ordered]@{ path = 'SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs'; reason = 'high-fanout analyzer core' },
-        [ordered]@{ path = 'SharpProof.Analyzer/Engine/CompilationPurityService.cs'; reason = 'high-fanout analyzer core' },
+        [ordered]@{ path = 'SharpProof.Symbolic/MethodEffects.cs'; reason = 'high-fanout effect analysis core' },
+        [ordered]@{ path = 'SharpProof.Analyzer/AnalyzerSession.cs'; reason = 'high-fanout analyzer session' },
         [ordered]@{ path = 'SharpProof.Analyzer/Engine/Rules/RuleRegistry.cs'; reason = 'high-fanout analyzer core' }
     ))
     {
@@ -269,7 +269,7 @@ try
             throw 'Inventory module count is unexpectedly low.'
         }
 
-        if ($parsed.testFixtures.Count -lt 50)
+        if ($parsed.testFixtures.Count -lt 40)
         {
             throw 'Inventory discovered too few test fixtures.'
         }

@@ -5,17 +5,16 @@ static contracts, but it is not a whole-program execution engine.
 
 ## What Coverage Means
 
-Coverage is evidence-backed and member-level. SharpProof should not claim a
-single percent of the .NET SDK as covered until the effect-summary and BCL
-classification data can report that number directly.
+Coverage is evidence-backed and member-level. SharpProof does not infer SDK
+coverage from namespace or member-name catalogs.
 
 The analyzer combines:
 
 - Roslyn operation and control-flow analysis
 - symbolic IR facts
-- generated build-time effect summaries
+- lazy metadata/IL effect analysis and exact effect contracts
 - bounded SMT/Z3 proof queries
-- conservative fallback for unsupported behavior
+- explicit unknown results for unsupported behavior
 
 ## Current Limits
 

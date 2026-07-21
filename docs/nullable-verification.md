@@ -22,10 +22,10 @@ SP0046 suggestions for `[NotNull]` and return `[NotNull]` annotations by enablin
 `sharpproof_suggest_inferred_contracts` and including `nullability` in
 `sharpproof_suggest_inferred_contracts_kinds`.
 
-Member facts are invalidated across calls unless the existing purity policy
-proves the call pure. Locals remain stable after capture. Repeated property reads
+Member facts are invalidated across calls unless canonical method effects prove
+the call cannot mutate them. Locals remain stable after capture. Repeated property reads
 are not treated as identical unless stability can be established; current
 verification therefore reports unstable getter contracts as inconclusive.
 
-Effect-summary schema v5 accepts an optional `NullableContracts` object. Missing
-objects mean unknown, preserving compatibility with existing v5 artifacts.
+External behavior is supplied through exact effect contracts or established by
+lazy metadata analysis. Unavailable metadata remains unknown.

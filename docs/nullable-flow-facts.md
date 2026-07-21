@@ -67,7 +67,7 @@ CodeAnalysis attributes and enabled nullable annotations are contracts. They
 are assumptions supplied by the analyzed program or referenced metadata, not
 proofs that the annotated implementation honors them. A contradictory body can
 therefore make a caller proof unsound in the same way that an incorrect
-`[Requires]`, `[Pure]`, or external effect summary can.
+`[Requires]` or a complete exact `[EffectContract]` can.
 
 `MaybeNull` and `AllowNull` are conservative overrides; they never prove that a
 value is null. Dynamic dispatch, ambiguous member names, unsupported expression

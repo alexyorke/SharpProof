@@ -14,9 +14,6 @@ param(
     [switch]$Full,
 
     [Parameter()]
-    [switch]$WithEffectSummaries,
-
-    [Parameter()]
     [ValidateRange(0, 1048576)]
     [int]$MemoryLimitMb = 0,
 
@@ -74,13 +71,6 @@ else
     # that the server is cleaned up when the build exits.
     $buildArguments.Add('-p:UseSharedCompilation=true')
 
-    # Regenerating the built-in effect summaries dominates a cold build after
-    # the generator changes. Ordinary compile checks do not execute the
-    # analyzer, so keep that work in test/full builds unless explicitly asked.
-    if (-not $WithTests -and -not $WithEffectSummaries)
-    {
-        $buildArguments.Add('-p:SharpProofSkipGeneratedEffectSummaries=true')
-    }
 }
 
 Push-Location $repoRoot

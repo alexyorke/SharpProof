@@ -49,13 +49,7 @@
       "name": "SymbolicCli",
       "layer": 4,
       "pathPrefixes": [ "Tools/SharpProof.SymbolicCli/" ],
-      "allowedProjectReferences": [ "Analyzer", "Attributes", "Symbolic", "SymbolicCliCore", "ToolingCore" ]
-    },
-    {
-      "name": "SymbolicCliCore",
-      "layer": 4,
-      "pathPrefixes": [ "Tools/SharpProof.SymbolicCli.Core/" ],
-      "allowedProjectReferences": [ "Symbolic" ]
+      "allowedProjectReferences": [ "Attributes", "Symbolic" ]
     },
     {
       "name": "FuzzCore",
@@ -133,7 +127,7 @@
       "name": "TestInfrastructure",
       "layer": 5,
       "pathPrefixes": [ "SharpProof.Testing/", "SharpProof.Test/", "SharpProof.ToolingTest/" ],
-      "allowedProjectReferences": [ "Analyzer", "Attributes", "BaselineCore", "CodeFixes", "Contracts", "CorpusReportCore", "FuzzCore", "ProofCore", "Symbolic", "SymbolicCliCore", "ToolingCore" ]
+      "allowedProjectReferences": [ "Analyzer", "Attributes", "BaselineCore", "CodeFixes", "Contracts", "CorpusReportCore", "FuzzCore", "ProofCore", "Symbolic", "ToolingCore" ]
     }
   ]
 }

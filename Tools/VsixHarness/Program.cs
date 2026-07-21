@@ -79,6 +79,8 @@ internal static class Program {
         "SharpProof.Attributes.pdb",
         "SharpProof.CodeFixes.dll",
         "SharpProof.CodeFixes.pdb",
+        "SharpProof.Contracts.dll",
+        "SharpProof.Contracts.pdb",
         "SharpProof.ProofCore.dll",
         "SharpProof.ProofCore.pdb",
         "SharpProof.Symbolic.dll",
@@ -113,7 +115,7 @@ internal static class Program {
         var configuration = GetConfiguration(args);
         var vsixPath = args.Length > 0
             ? args[0]
-            : Path.Combine(solutionRoot, "SharpProof.Vsix", "bin", configuration, "SharpProof.Vsix.vsix");
+            : Path.Combine(solutionRoot, "SharpProof.Vsix", "bin", configuration, "net472", "SharpProof.Vsix.vsix");
 
         string? simulatedVsixDirectory = null;
         if (!File.Exists(vsixPath)) {
