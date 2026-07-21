@@ -14,8 +14,6 @@ runtime hazards, capability summaries, complexity, and conservative unknowns.
 
 One query can show the merged invariant at a program point, whether the point is reachable, and whether the current facts imply another condition.
 
-Backed by test: `ReadmeGeneratedExamplesTests.InvariantsCliExample_MatchesSnapshot`.
-
 Command:
 
 ```powershell
@@ -81,8 +79,6 @@ Facts:
 
 The symbolic CLI can report a concrete hazard at a specific operation without executing the method.
 
-Backed by test: `ReadmeGeneratedExamplesTests.RuntimeHazardCliExample_MatchesSnapshot`.
-
 Command:
 
 ```powershell
@@ -140,8 +136,6 @@ SMT:
 
 Capability queries classify proven side-effect categories such as `Console` and the derived umbrella category `IO`.
 
-Backed by test: `ReadmeGeneratedExamplesTests.CapabilitiesCliExample_MatchesSnapshot`.
-
 Command:
 
 ```powershell
@@ -175,8 +169,6 @@ IO, Console: invocation at 7:9 - System.Console.WriteLine(System.String? value)
 ### Conservative complexity classification
 
 Complexity queries report the best proven Big-O plus the structural drivers that justify it.
-
-Backed by test: `ReadmeGeneratedExamplesTests.ComplexityCliExample_MatchesSnapshot`.
 
 Command:
 
@@ -216,8 +208,6 @@ Driver: ForLoop at 6:9 - for-loop bound O(n) from n
 ### Conservative unknown for dynamic dispatch
 
 When the engine cannot prove a capability set because of dynamic dispatch, the CLI reports an explicit unknown instead of inventing a stronger answer.
-
-Backed by test: `ReadmeGeneratedExamplesTests.SymbolicUnknownCapabilitiesCliExample_MatchesSnapshot`.
 
 Command:
 

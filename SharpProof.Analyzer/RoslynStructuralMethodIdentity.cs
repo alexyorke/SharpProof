@@ -1,4 +1,4 @@
-namespace SharpProof.Analyzer;
+namespace SharpProof.Symbolic;
 
 internal static class RoslynStructuralMethodIdentity {
     internal static StructuralMethodIdentity Create(IMethodSymbol method) {

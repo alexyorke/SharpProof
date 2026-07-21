@@ -1,23 +1,14 @@
 namespace SharpProof.Analyzer.Configuration;
 
 internal sealed record AnalyzerConfiguration(
-    ImmutableHashSet<string> ExtraKnownImpureMethods,
-    ImmutableHashSet<string> ExtraKnownPureMethods,
-    ImmutableHashSet<string> ExtraKnownImpureNamespaces,
-    ImmutableHashSet<string> ExtraKnownImpureTypes,
     ImmutableHashSet<string> AttributeStubNamespaces,
-    bool SuggestMissingEnforcePure,
-    MissingPuritySuggestionOptions MissingPuritySuggestions,
     InferredContractSuggestionOptions InferredContractSuggestions,
     bool EmitExplanations,
-    bool ReportBclFallbackGuesses,
     RuntimeHazardMode RuntimeHazardMode,
     ProvenDiagnosticSuppressionOptions ProvenDiagnosticSuppressions,
     bool ReportExceptions,
     bool CheckedExceptions,
     bool ReportNullableInconclusive,
-    bool EnableEffectSummaryJson,
-    string PurityProfile,
     TrustedBoundaryReviewMode TrustedBoundaryReviewMode,
     SmtAnalysisOptions SmtOptions,
     SharpProofAnalysisBudget AnalysisLimits,
@@ -27,21 +18,8 @@ internal sealed record AnalyzerConfiguration(
 
     public static AnalyzerConfiguration FromOptions(AnalyzerOptions options) {
         var optionSource = new ConfigurationOptionSource(options);
-        var impureMethods = GetConfiguredMemberKeys(optionSource, ConfigKeys.KnownImpureMethods);
-        var pureMethods = GetConfiguredMemberKeys(optionSource, ConfigKeys.KnownPureMethods);
-        var impureNamespaces = GetValues(optionSource, ConfigKeys.KnownImpureNamespaces, EmptyValues);
-        var impureTypes = GetValues(optionSource, ConfigKeys.KnownImpureTypes, EmptyValues);
         var attributeStubNamespaces = GetValues(optionSource, ConfigKeys.AttributeStubNamespaces, EmptyValues);
         var invalidConfigurationValues = GetInvalidGlobalConfigurationValues(options);
-        var suggestMissing = GetBoolOrDefault(optionSource, ConfigKeys.SuggestMissingEnforcePure, true);
-        var missingPuritySuggestions = new MissingPuritySuggestionOptions(
-            suggestMissing,
-            GetSuggestionScope(optionSource, ConfigKeys.SuggestMissingEnforcePureScope,
-                MissingPuritySuggestionScope.All),
-            GetBoolOrDefault(optionSource, ConfigKeys.SuggestMissingEnforcePureExcludeGenerated, false),
-            GetBoolOrDefault(optionSource, ConfigKeys.SuggestMissingEnforcePureExcludeTests, false),
-            GetNonNegativeInt(optionSource, ConfigKeys.SuggestMissingEnforcePureMinComplexity, 0),
-            GetValues(optionSource, ConfigKeys.SuggestMissingEnforcePureNamespaceFilters, EmptyValues));
         var inferredContractSuggestions = new InferredContractSuggestionOptions(
             GetBoolOrDefault(optionSource, ConfigKeys.SuggestInferredContracts, false),
             GetSuggestionScope(optionSource, ConfigKeys.SuggestInferredContractsScope,
@@ -50,7 +28,6 @@ internal sealed record AnalyzerConfiguration(
             GetInferredContractConfidence(optionSource, ConfigKeys.SuggestInferredContractsMinimumConfidence,
                 InferredContractConfidence.High));
         var emitExplanations = GetBoolOrDefault(optionSource, ConfigKeys.EmitExplanations, false);
-        var reportBclFallbackGuesses = GetBoolOrDefault(optionSource, ConfigKeys.ReportBclFallbackGuesses, false);
         var runtimeHazardMode = GetRuntimeHazardMode(optionSource, RuntimeHazardMode.Off);
         var provenDiagnosticSuppressions = new ProvenDiagnosticSuppressionOptions(
             GetBoolOrDefault(optionSource, ConfigKeys.SuppressProvenDiagnostics, false),
@@ -61,26 +38,16 @@ internal sealed record AnalyzerConfiguration(
         var checkedExceptions = GetBoolOrDefault(optionSource, ConfigKeys.CheckedExceptions, false);
         var reportNullableInconclusive =
             GetBoolOrDefault(optionSource, ConfigKeys.ReportNullableInconclusive, false);
-        var enableEffectSummaryJson = GetBoolOrDefault(optionSource, ConfigKeys.EnableEffectSummaryJson, false);
         var symbolicConfiguration = SymbolicProjectConfiguration.FromAnalyzerOptions(options);
         return new AnalyzerConfiguration(
-            impureMethods,
-            pureMethods,
-            impureNamespaces,
-            impureTypes,
             attributeStubNamespaces,
-            suggestMissing,
-            missingPuritySuggestions,
             inferredContractSuggestions,
             emitExplanations,
-            reportBclFallbackGuesses,
             runtimeHazardMode,
             provenDiagnosticSuppressions,
             reportExceptions,
             checkedExceptions,
             reportNullableInconclusive,
-            enableEffectSummaryJson,
-            GetPurityProfile(optionSource),
             GetTrustedBoundaryReviewMode(optionSource),
             symbolicConfiguration.SmtOptions,
             symbolicConfiguration.AnalysisLimits,
@@ -92,10 +59,8 @@ internal sealed record AnalyzerConfiguration(
         SyntaxTree syntaxTree,
         AnalyzerConfiguration fallback) {
         var global = new AnalyzerTreeConfiguration(
-            fallback.MissingPuritySuggestions,
             fallback.InferredContractSuggestions,
             fallback.EmitExplanations,
-            fallback.ReportBclFallbackGuesses,
             fallback.RuntimeHazardMode,
             fallback.ProvenDiagnosticSuppressions,
             fallback.ReportExceptions,
@@ -103,24 +68,6 @@ internal sealed record AnalyzerConfiguration(
             fallback.ReportNullableInconclusive);
         return GetTreeOptions(options, syntaxTree, global, treeOptions => {
             var optionSource = new ConfigurationOptionSource(treeOptions);
-            var suggestMissing = GetBoolOrDefault(
-                optionSource,
-                ConfigKeys.SuggestMissingEnforcePure,
-                fallback.MissingPuritySuggestions.Enabled);
-            var missingPuritySuggestions = new MissingPuritySuggestionOptions(
-                suggestMissing,
-                GetSuggestionScope(
-                    optionSource,
-                    ConfigKeys.SuggestMissingEnforcePureScope,
-                    fallback.MissingPuritySuggestions.Scope),
-                GetBoolOrDefault(optionSource, ConfigKeys.SuggestMissingEnforcePureExcludeGenerated,
-                    fallback.MissingPuritySuggestions.ExcludeGeneratedFiles),
-                GetBoolOrDefault(optionSource, ConfigKeys.SuggestMissingEnforcePureExcludeTests,
-                    fallback.MissingPuritySuggestions.ExcludeTestFiles),
-                GetNonNegativeInt(optionSource, ConfigKeys.SuggestMissingEnforcePureMinComplexity,
-                    fallback.MissingPuritySuggestions.MinimumComplexity),
-                GetValues(optionSource, ConfigKeys.SuggestMissingEnforcePureNamespaceFilters,
-                    fallback.MissingPuritySuggestions.NamespaceFilters));
             var inferredContracts = new InferredContractSuggestionOptions(
                     GetBoolOrDefault(
                         optionSource,
@@ -144,13 +91,8 @@ internal sealed record AnalyzerConfiguration(
                         optionSource,
                         fallback.ProvenDiagnosticSuppressions.DiagnosticIds));
             return new AnalyzerTreeConfiguration(
-                missingPuritySuggestions,
                 inferredContracts,
                 GetBoolOrDefault(optionSource, ConfigKeys.EmitExplanations, fallback.EmitExplanations),
-                GetBoolOrDefault(
-                    optionSource,
-                    ConfigKeys.ReportBclFallbackGuesses,
-                    fallback.ReportBclFallbackGuesses),
                 GetRuntimeHazardMode(optionSource, fallback.RuntimeHazardMode),
                 suppressions,
                 GetBoolOrDefault(optionSource, ConfigKeys.ReportExceptions, fallback.ReportExceptions),
@@ -174,10 +116,6 @@ internal sealed record AnalyzerConfiguration(
             return fallback;
         }
     }
-
-    private static ImmutableHashSet<string> GetConfiguredMemberKeys(ConfigurationOptionSource options, string key) => GetValues(options, key, EmptyValues)
-            .Where(static value => ConfiguredMemberKey.TryParse(value, out _))
-            .ToImmutableHashSet(StringComparer.Ordinal);
 
     private static IEnumerable<string> SplitValues(string value) {
         foreach (var token in value.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries)) {
@@ -247,11 +185,6 @@ internal sealed record AnalyzerConfiguration(
         }
     }
 
-    private static string GetPurityProfile(ConfigurationOptionSource options) => options.TryGetValue(ConfigKeys.PurityProfile, out var value)
-            ? ParseNormalizedValue(value, "balanced", ("strict", "strict"), ("balanced", "balanced"),
-                ("pragmatic", "pragmatic"))
-            : "balanced";
-
     private static TrustedBoundaryReviewMode GetTrustedBoundaryReviewMode(ConfigurationOptionSource options) {
         if (!options.TryGetValue(ConfigKeys.TrustedBoundaryReviewMode, out var value))
             return TrustedBoundaryReviewMode.Off;
@@ -305,11 +238,6 @@ internal sealed record AnalyzerConfiguration(
         return fallback;
     }
 
-    private static int GetNonNegativeInt(ConfigurationOptionSource options, string key, int fallback) => options.TryGetValue(key, out var value) &&
-               AnalyzerConfigurationValueReader.TryParseInteger(value, 0, out var parsed)
-            ? parsed
-            : fallback;
-
     private static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidGlobalConfigurationValues(
         AnalyzerOptions options) {
         var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
@@ -357,14 +285,11 @@ internal sealed record AnalyzerConfiguration(
         var reason = option.ValueKind switch {
             AnalyzerConfigurationValueKind.Bool when !TryParseBool(value, out _) =>
                 "expected a boolean value",
-            AnalyzerConfigurationValueKind.StructuralMemberKeyList =>
-                GetStructuralMemberKeyListError(value),
             AnalyzerConfigurationValueKind.NonNegativeInteger =>
                 GetIntegerError(value, 0, "expected a non-negative integer"),
             AnalyzerConfigurationValueKind.PositiveInteger =>
                 GetIntegerError(value, 1, "expected a positive integer"),
-            AnalyzerConfigurationValueKind.PurityProfile or
-                AnalyzerConfigurationValueKind.MissingPuritySuggestionScope or
+            AnalyzerConfigurationValueKind.MissingPuritySuggestionScope or
                 AnalyzerConfigurationValueKind.RuntimeHazardMode or
                 AnalyzerConfigurationValueKind.SmtMode or
                 AnalyzerConfigurationValueKind.AllowedValue
@@ -419,10 +344,6 @@ internal sealed record AnalyzerConfiguration(
               string.Join(", ", option.AllowedValues);
     }
 
-    private static string? GetStructuralMemberKeyListError(string value) => SplitValues(value).Any(static item => !ConfiguredMemberKey.TryParse(item, out _))
-            ? "expected canonical structural method keys (spm1|...); property accessors require matching .get or .set suffixes"
-            : null;
-
     private static string? GetIntegerError(string value, int minimum, string reason) => int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
                parsed >= minimum
             ? null
@@ -475,10 +396,8 @@ internal readonly record struct InvalidAnalyzerConfigurationValue(
     string Reason);
 
 internal sealed record AnalyzerTreeConfiguration(
-    MissingPuritySuggestionOptions MissingPuritySuggestions,
     InferredContractSuggestionOptions InferredContractSuggestions,
     bool EmitExplanations,
-    bool ReportBclFallbackGuesses,
     RuntimeHazardMode RuntimeHazardMode,
     ProvenDiagnosticSuppressionOptions ProvenDiagnosticSuppressions,
     bool ReportExceptions,
@@ -541,14 +460,4 @@ internal enum TrustedBoundaryReviewMode {
     Off,
     Used,
     All
-}
-
-internal sealed record MissingPuritySuggestionOptions(
-    bool Enabled,
-    MissingPuritySuggestionScope Scope,
-    bool ExcludeGeneratedFiles,
-    bool ExcludeTestFiles,
-    int MinimumComplexity,
-    ImmutableHashSet<string> NamespaceFilters) {
-    public bool IsEnabled => Enabled && Scope != MissingPuritySuggestionScope.Off;
 }

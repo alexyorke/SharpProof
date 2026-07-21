@@ -119,10 +119,6 @@ internal sealed class SymbolicProjectQueryContext(
     public bool HasBaseline => _additionalFilePaths.Any(static path =>
         string.Equals(Path.GetFileName(path), "SharpProof.Baseline.json", StringComparison.OrdinalIgnoreCase));
 
-    public int EffectSummaryFileCount => _additionalFilePaths.Count(static path =>
-        Path.GetFileName(path).EndsWith(".SharpProof.EffectSummary.json", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(Path.GetFileName(path), "SharpProof.EffectSummary.json", StringComparison.OrdinalIgnoreCase));
-
     public SymbolicQueryOptions CreateQueryOptions(
         SmtAnalysisService? smtAnalysis = null,
         IEnumerable<string>? impliedConditions = null,

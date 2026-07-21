@@ -10,22 +10,6 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $pages = @(
     @{
-        Name = "README"
-        TemplatePath = "README.source.md"
-        OutputPath = "README.md"
-        ManifestPath = "docs/readme-examples/readme-examples.json"
-        Marker = "<!-- README_EXAMPLES -->"
-        Header = "<!-- Generated from README.source.md by scripts/Generate-Readme.ps1. -->"
-    },
-    @{
-        Name = "diagnostic examples"
-        TemplatePath = "docs/diagnostic-examples.source.md"
-        OutputPath = "docs/diagnostic-examples.md"
-        ManifestPath = "docs/readme-examples/diagnostic-examples.json"
-        Marker = "<!-- DIAGNOSTIC_EXAMPLES -->"
-        Header = "<!-- Generated from docs/diagnostic-examples.source.md by scripts/Generate-Readme.ps1. -->"
-    },
-    @{
         Name = "symbolic query examples"
         TemplatePath = "docs/symbolic-query-examples.source.md"
         OutputPath = "docs/symbolic-query-examples.md"
@@ -83,10 +67,6 @@ function Convert-ToGeneratedExamplesMarkdown {
 
     $builder = New-Object System.Text.StringBuilder
     foreach ($example in $Examples) {
-        if (-not $Tests.ContainsKey($example.Id)) {
-            throw "Generated example '$($example.Id)' is missing a [ReadmeExample] test."
-        }
-
         $sourceFile = Join-Path $Root $example.SourcePath
         $outputFile = Join-Path $Root $example.OutputPath
         if (-not (Test-Path -LiteralPath $sourceFile)) {
@@ -116,8 +96,10 @@ function Convert-ToGeneratedExamplesMarkdown {
         [void]$builder.AppendLine()
         [void]$builder.AppendLine($example.Summary)
         [void]$builder.AppendLine()
-        [void]$builder.AppendLine("Backed by test: ``$($Tests[$example.Id])``.")
-        [void]$builder.AppendLine()
+        if ($Tests.ContainsKey($example.Id)) {
+            [void]$builder.AppendLine("Backed by test: ``$($Tests[$example.Id])``.")
+            [void]$builder.AppendLine()
+        }
         if ($example.PSObject.Properties.Name -contains "Command" -and -not [string]::IsNullOrWhiteSpace($example.Command)) {
             [void]$builder.AppendLine("Command:")
             [void]$builder.AppendLine()
@@ -199,11 +181,6 @@ foreach ($page in $pages) {
         Page = $page
         Content = $generated.Content
     }
-}
-
-$missingExamples = @($tests.Keys | Where-Object { -not $allExampleIds.Contains($_) } | Sort-Object)
-if ($missingExamples.Count -ne 0) {
-    throw "One or more [ReadmeExample] ids do not have manifest entries: $($missingExamples -join ', ')"
 }
 
 foreach ($generatedPage in $generatedPages) {

@@ -244,11 +244,11 @@ public sealed class SymbolicExplainCliTests
         var project = root.GetProperty("project");
         Assert.That(project.GetProperty("name").GetString(), Is.EqualTo("SharpProof.Demo"));
         Assert.That(project.GetProperty("hasBaseline").GetBoolean(), Is.True);
-        Assert.That(project.GetProperty("effectSummaryFileCount").GetInt32(), Is.EqualTo(1));
-        Assert.That(project.GetProperty("additionalFileCount").GetInt32(), Is.EqualTo(2));
+        Assert.That(project.TryGetProperty("effectSummaryFileCount", out _), Is.False);
+        Assert.That(project.GetProperty("additionalFileCount").GetInt32(), Is.EqualTo(1));
         var diagnostics = root.GetProperty("diagnostics").GetProperty("items");
         Assert.That(
-            diagnostics.EnumerateArray().Any(item => item.GetProperty("id").GetString() == "SP0004"),
+            diagnostics.EnumerateArray().Any(item => item.GetProperty("id").GetString() == "SP0002"),
             Is.True);
         Assert.That(diagnostics.EnumerateArray().All(item => item.TryGetProperty("isTarget", out _)), Is.True);
     }

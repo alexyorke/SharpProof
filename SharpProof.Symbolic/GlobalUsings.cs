@@ -12,6 +12,7 @@ global using Microsoft.CodeAnalysis.FlowAnalysis;
 global using Microsoft.CodeAnalysis.Operations;
 global using Microsoft.CodeAnalysis.Text;
 global using SharpProof.ProofCore.Collections;
+global using SharpProof.Identity;
 global using SharpProof.ProofCore.Purity;
 global using SharpProof.ProofCore.Smt;
 global using SharpProof.Symbolic.Ir;

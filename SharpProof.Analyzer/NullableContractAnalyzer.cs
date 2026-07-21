@@ -242,12 +242,11 @@ internal static class NullableContractAnalyzer {
             var memberFactInvalidated = HasPotentiallyInvalidatingCallBefore(
                 suppression,
                 operand,
-                context,
-                session);
+                context);
             var proof = context.State.ProveAtNode(
                 suppression,
                 condition,
-                session.PurityService.SmtAnalysis,
+                session.ProofService.SmtAnalysis,
                 false,
                 context.CancellationToken);
             if (memberFactInvalidated && proof.TruthValue == SymbolicTruthValue.ProvenTrue) {
@@ -378,7 +377,7 @@ internal static class NullableContractAnalyzer {
         bool counterexampleIsViolation) {
         var proof = MethodCompletionAnalysis.Prove(
             context,
-            session.PurityService.SmtAnalysis,
+            session.ProofService.SmtAnalysis,
             completion,
             condition);
         if (proof.TruthValue is SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable) return;
@@ -448,8 +447,7 @@ internal static class NullableContractAnalyzer {
     private static bool HasPotentiallyInvalidatingCallBefore(
         PostfixUnaryExpressionSyntax suppression,
         ExpressionSyntax operand,
-        MethodBodyAnalysisContext context,
-        AnalyzerSession session) {
+        MethodBodyAnalysisContext context) {
         if (context.SemanticModel.GetSymbolInfo(operand, context.CancellationToken).Symbol is not
             (IFieldSymbol or IPropertySymbol))
             return false;
@@ -458,12 +456,7 @@ internal static class NullableContractAnalyzer {
                      .OfType<IInvocationOperation>()
                      .Where(invocation => invocation.Syntax.SpanStart < suppression.SpanStart)) {
             context.CancellationToken.ThrowIfCancellationRequested();
-            var policy = PurityPolicyResolver.ResolveInvocation(
-                invocation.TargetMethod,
-                invocation,
-                context.SemanticModel.Compilation,
-                session.AttributePolicy);
-            if (policy.Decision != PurityPolicyDecision.Pure) return true;
+            if (invocation.TargetMethod.DeclaringSyntaxReferences.IsDefaultOrEmpty) return true;
         }
 
         return false;

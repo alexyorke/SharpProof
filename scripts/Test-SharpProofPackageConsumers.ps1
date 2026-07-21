@@ -199,10 +199,10 @@ try {
         throw 'The packaged analyzer reported an analyzer/generator load failure.'
     }
     $sharpProofDiagnostics = @($analyzerSarif.runs | ForEach-Object { $_.results } | Where-Object {
-        $_.ruleId -eq 'SP0004'
+        $_.ruleId -eq 'SP0019'
     })
     if ($sharpProofDiagnostics.Count -eq 0) {
-        throw 'The analyzer consumer did not report SP0004, so analyzer loading was not proven.'
+        throw 'The analyzer consumer did not report SP0019, so analyzer loading was not proven.'
     }
 
     $runtimeDescription = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription + '/' +

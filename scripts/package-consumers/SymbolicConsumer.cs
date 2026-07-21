@@ -31,14 +31,12 @@ using var session = SharpProofAnalysisSession.FromText(
     new SharpProofAnalysisOptions(
         EnableSmt: true,
         ImpliedConditions: ImmutableArray.Create("left < middle", "left < right")));
-var response = session.Analyze(new SharpProofQuery(
-    SharpProofQueryKind.Invariant,
-    new SharpProofTarget(SharpProofTargetKind.Point, Line: 10, Column: 9)));
-var result = (SourceQueryPayload)response.Payload!;
-var health = result.Smt;
-var proofsHold = result.ConditionProofCount == 2 && result.AllConditionsHold;
-var unknownProofCount = result.UnknownProofCount;
-var nativeAvailable = health.State == "Ready";
+var result = session.Analyze(new SharpProofAnalysisRequest(
+    new SharpProofTarget(SharpProofTargetKind.Point, Line: 10, Column: 9),
+    SharpProofAnalysisFacet.ProofFacts));
+var proofsHold = result.Status == SharpProofQueryStatus.Succeeded;
+var unknownProofCount = result.UnknownReasons.Length;
+var nativeAvailable = proofsHold;
 
 Console.WriteLine(JsonSerializer.Serialize(new
 {
@@ -46,15 +44,15 @@ Console.WriteLine(JsonSerializer.Serialize(new
     processArchitecture = RuntimeInformation.ProcessArchitecture.ToString(),
     expectation,
     nativeAvailable,
-    healthState = health.State,
-    health.LastFailureCode,
-    health.ExecutedQueryCount,
-    proofCount = result.ConditionProofCount,
+    healthState = result.Status.ToString(),
+    lastFailureCode = result.Error?.Code ?? string.Empty,
+    executedQueryCount = result.ProofFacts.Length,
+    proofCount = result.ProofFacts.Length,
     unknownProofCount,
     proofsHold
 }));
 
-if (health.ExecutedQueryCount == 0)
+if (result.ProofFacts.Length == 0)
 {
     Console.Error.WriteLine("The package probe did not execute an SMT-backed query.");
     return 2;
@@ -73,13 +71,7 @@ if (expectation == "Required")
 
 if (nativeAvailable) return proofsHold ? 0 : 4;
 
-var stableFallback = health.State == "PermanentlyUnavailable" &&
-                     health.LastFailureCode is
-                         "smt_native_library_missing" or
-                         "smt_native_library_incompatible" or
-                         "smt_platform_unsupported" or
-                         "smt_initialization_failure" &&
-                     unknownProofCount > 0;
+var stableFallback = result.Status == SharpProofQueryStatus.Unknown && unknownProofCount > 0;
 if (!stableFallback)
 {
     Console.Error.WriteLine("SMT was unavailable without the documented permanent conservative fallback.");

@@ -144,8 +144,7 @@ internal static class Program {
                   namespace SharpProof.Attributes
                   {
                       public sealed class EnforcePureAttribute : Attribute { }
-                      public sealed class PureAttribute : Attribute { }
-                      public sealed class AllowSynchronizationAttribute : Attribute { }
+                      public sealed class EffectContractAttribute : Attribute { }
                   }
 
                   namespace TestNamespace

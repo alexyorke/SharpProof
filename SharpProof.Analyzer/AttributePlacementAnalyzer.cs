@@ -8,14 +8,6 @@ internal static class AttributePlacementAnalyzer {
                 AnalyzerDiagnosticCatalog.Get("MisplacedAttributeRule"),
                 AttributeTargetPolicy.PurityOrGetterAlias),
             new AttributePlacementRule(
-                "PureAttribute", "Pure",
-                AnalyzerDiagnosticCatalog.Get("MisplacedAttributeRule"),
-                AttributeTargetPolicy.PurityOrGetterAlias),
-            new AttributePlacementRule(
-                "AllowSynchronizationAttribute", "AllowSynchronization",
-                AnalyzerDiagnosticCatalog.Get("MisplacedAllowSynchronizationAttributeRule"),
-                AttributeTargetPolicy.PurityOnly),
-            new AttributePlacementRule(
                 "ZeroAllocationsAttribute", "ZeroAllocations",
                 AnalyzerDiagnosticCatalog.Get("MisplacedZeroAllocationsAttributeRule"),
                 AttributeTargetPolicy.PurityOrGetterAlias),

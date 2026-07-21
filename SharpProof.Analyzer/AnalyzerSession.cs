@@ -7,7 +7,8 @@ internal sealed class AnalyzerSession : IDisposable {
     private readonly ConcurrentDictionary<string, TrustedBoundaryReviewFinding> _trustedBoundaryFindings =
         new(StringComparer.Ordinal);
 
-    private readonly Lazy<CompilationPurityService> _purityService;
+    private readonly Lazy<AnalyzerProofService> _proofService;
+    private readonly MethodEffectAnalysisSession _effectAnalysis;
 
     internal AnalyzerSession(
         Compilation compilation,
@@ -17,30 +18,22 @@ internal sealed class AnalyzerSession : IDisposable {
         Features = AnalyzerFeatureDependencies.Expand(requestedFeatures);
         Configuration = AnalyzerConfiguration.FromOptions(options);
         AttributePolicy = SharpProofAttributeIdentityPolicy.Create(Configuration.AttributeStubNamespaces);
-        EffectSummaryCompatibilityReporter = new EffectSummaryCompatibilityReporter();
         Baseline = DiagnosticBaseline.FromOptions(
             options,
-            cancellationToken,
-            EffectSummaryCompatibilityReporter);
+            cancellationToken);
 
-        _purityService = new Lazy<CompilationPurityService>(
-            () => new CompilationPurityService(
-                compilation,
+        _proofService = new Lazy<AnalyzerProofService>(
+            () => new AnalyzerProofService(
                 Configuration.SmtOptions,
-                AttributePolicy,
                 Configuration.AnalysisLimits),
             LazyThreadSafetyMode.ExecutionAndPublication);
-
-        var needsEffectSummaries = Configuration.EnableEffectSummaryJson &&
-                                   (Features.Includes(AnalyzerFeatures.Exceptions) ||
-                                    Features.Includes(AnalyzerFeatures.Suggestions) ||
-                                    Features.Includes(AnalyzerFeatures.Purity) ||
-                                    Configuration.TrustedBoundaryReviewMode != TrustedBoundaryReviewMode.Off);
-        EffectSummaryCatalog = EffectSummaryCatalog.FromOptionsWithCompatibilityReporter(
-            options,
+        var configuredEffects = new ConfiguredEffectContractResolver(
+            options.AnalyzerConfigOptionsProvider.GlobalOptions);
+        _effectAnalysis = new MethodEffectAnalysisSession(
+            compilation,
             cancellationToken,
-            EffectSummaryCompatibilityReporter,
-            needsEffectSummaries);
+            configuredEffects.Resolve);
+
     }
 
     internal AnalyzerFeatures Features { get; }
@@ -51,11 +44,7 @@ internal sealed class AnalyzerSession : IDisposable {
 
     internal DiagnosticBaseline Baseline { get; }
 
-    internal EffectSummaryCompatibilityReporter EffectSummaryCompatibilityReporter { get; }
-
-    internal EffectSummaryCatalog EffectSummaryCatalog { get; }
-
-    internal CompilationPurityService PurityService => _purityService.Value;
+    internal AnalyzerProofService ProofService => _proofService.Value;
 
     internal int MethodBodyAnalysisCount => _methodBodyAnalyses.Count;
 
@@ -91,7 +80,8 @@ internal sealed class AnalyzerSession : IDisposable {
                         declaration,
                         semanticModel,
                         operationBlocks,
-                        cancellationToken)),
+                        cancellationToken),
+                    _effectAnalysis),
                 LazyThreadSafetyMode.ExecutionAndPublication));
         try {
             return lazy.Value;
@@ -106,7 +96,7 @@ internal sealed class AnalyzerSession : IDisposable {
     }
 
     public void Dispose() {
-        if (_purityService.IsValueCreated) _purityService.Value.Dispose();
+        if (_proofService.IsValueCreated) _proofService.Value.Dispose();
         _methodBodyAnalyses.Clear();
         _trustedBoundaryFindings.Clear();
     }

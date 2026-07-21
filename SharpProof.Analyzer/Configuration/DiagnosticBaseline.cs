@@ -11,24 +11,16 @@ internal sealed class DiagnosticBaseline {
 
     public static DiagnosticBaseline FromOptions(
         AnalyzerOptions options,
-        CancellationToken cancellationToken,
-        EffectSummaryCompatibilityReporter? reporter = null) {
+        CancellationToken cancellationToken) {
         var builder = ImmutableArray.CreateBuilder<ResolvedBaselineEntry>();
         foreach (var additionalFile in options.AdditionalFiles) {
             if (!string.Equals(Path.GetFileName(additionalFile.Path), BaselineFileName,
                     StringComparison.OrdinalIgnoreCase)) continue;
 
-            string? text;
-            if (reporter != null) {
-                if (!AnalyzerAdditionalFileText.TryRead(additionalFile, cancellationToken, reporter, out text))
-                    continue;
-            }
-            else {
-                text = additionalFile.GetText(cancellationToken)?.ToString();
-                if (string.IsNullOrWhiteSpace(text)) continue;
-            }
+            var text = additionalFile.GetText(cancellationToken)?.ToString();
+            if (string.IsNullOrWhiteSpace(text)) continue;
 
-            foreach (var entry in ParseEntries(text!, additionalFile.Path, reporter)) builder.Add(entry);
+            foreach (var entry in ParseEntries(text!, additionalFile.Path)) builder.Add(entry);
         }
 
         return builder.Count == 0 ? Empty : new DiagnosticBaseline(builder.ToImmutable());
@@ -80,37 +72,18 @@ internal sealed class DiagnosticBaseline {
 
     private static ImmutableArray<ResolvedBaselineEntry> ParseEntries(
         string json,
-        string baselinePath,
-        EffectSummaryCompatibilityReporter? reporter) {
+        string baselinePath) {
         var builder = ImmutableArray.CreateBuilder<ResolvedBaselineEntry>();
         var baseDirectory = GetBaseDirectory(baselinePath);
         try {
             using var document = JsonDocument.Parse(json, BaselineSchemaContract.DocumentOptions);
             if (document.RootElement.ValueKind != JsonValueKind.Object) {
-                reporter?.Report(baselinePath, "unsupported baseline root; evidence v2 requires an object");
                 return builder.ToImmutable();
             }
 
             if (!BaselineSchemaContract.TryValidateTree(document.RootElement, out var failure)) {
-                reporter?.Report(baselinePath, BaselineSchemaContract.FormatValidationIssue(
-                    failure,
-                    "evidenceSchemaVersion",
-                    failure.IsRoot ? "baseline" : "baseline entry"));
                 return builder.ToImmutable();
             }
-
-            var counts = BaselineSchemaContract.CountEntries(document.RootElement);
-            if (counts.CandidateCount == 0)
-                reporter?.Report(baselinePath, "baseline contains no diagnostic entries");
-            else if (counts.ValidCount == 0)
-                reporter?.Report(
-                    baselinePath,
-                    "baseline contains no usable entries; each entry needs id, symbol, and path");
-            if (counts.InvalidCount != 0)
-                reporter?.Report(
-                    baselinePath,
-                    $"baseline partially ignored {counts.InvalidCount} malformed " +
-                    (counts.InvalidCount == 1 ? "entry" : "entries"));
 
             if (document.RootElement.TryGetProperty("diagnostics", out var diagnostics) &&
                 diagnostics.ValueKind == JsonValueKind.Array)
@@ -125,9 +98,7 @@ internal sealed class DiagnosticBaseline {
                         }
                     }
         }
-        catch (JsonException) {
-            reporter?.Report(baselinePath, "malformed baseline JSON");
-        }
+        catch (JsonException) { }
 
         return builder.ToImmutable();
     }

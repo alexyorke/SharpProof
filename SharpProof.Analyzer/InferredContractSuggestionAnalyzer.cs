@@ -94,7 +94,7 @@ internal static class InferredContractSuggestionAnalyzer {
         const InferredContractConfidence confidence = InferredContractConfidence.High;
         if (!options.Includes(kind, confidence) ||
             session.AttributePolicy.HasAttribute(context.MethodSymbol, "ZeroAllocationsAttribute") ||
-            MethodAllocationAnalyzer.HasVisibleAllocationSites(context.Snapshot))
+            MethodAllocationAnalyzer.HasVisibleAllocationSites(context))
             return;
 
         Report(
@@ -216,8 +216,7 @@ internal static class InferredContractSuggestionAnalyzer {
                 context.Node,
                 context.SemanticModel,
                 context.CancellationToken,
-                session.EffectSummaryCatalog,
-                session.PurityService.SmtAnalysis,
+                session.ProofService.SmtAnalysis,
                 session.AttributePolicy));
 
         if (result.Evidence.Count == 0) {

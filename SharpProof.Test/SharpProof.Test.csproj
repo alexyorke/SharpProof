@@ -18,15 +18,7 @@
     <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" />
     <ProjectReference Include="..\SharpProof.Testing\SharpProof.Testing.csproj" />
     <ProjectReference Include="..\Tools\SharpProof.SymbolicCli.Core\SharpProof.SymbolicCli.Core.csproj" />
-    <ProjectReference Include="..\Tools\SharpProof.EffectSummary\SharpProof.EffectSummary.csproj"
-                      ReferenceOutputAssembly="false"
-                      PrivateAssets="all" />
   </ItemGroup>
-
-  <Target Name="CopyEffectSummaryTestDependency" AfterTargets="Build">
-    <Copy SourceFiles="..\Tools\SharpProof.EffectSummary\bin\$(Configuration)\net8.0\SharpProof.EffectSummary.dll"
-          DestinationFolder="$(OutDir)" />
-  </Target>
 
   <ItemGroup>
   </ItemGroup>

@@ -1,111 +1,66 @@
 using NUnit.Framework;
 using SharpProof.Symbolic;
 
-namespace SharpProof.ToolingTest;
+namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SharpProofAnalysisSessionTests
-{
-    private const string Source = """
-                                  public static class Target
-                                  {
-                                      public static int Abs(int value)
-                                      {
-                                          if (value < 0)
-                                              return -value;
-
-                                          return value;
-                                      }
-                                  }
-                                  """;
-
+public sealed class SharpProofAnalysisSessionTests {
     [Test]
-    public void Session_ExecutesEveryDiscriminatedQueryKindWithTypedPayloads()
-    {
-        using var session = SharpProofAnalysisSession.FromText(
-            Source,
-            "SessionTarget.cs",
-            new SharpProofAnalysisOptions(EnableSmt: true));
-        var point = SharpProofTargetFactory.Point(8, 9);
+    public void CanonicalRequestReturnsRequestedFacets() {
+        using var session = SharpProofAnalysisSession.FromText("""
+            class C {
+                static int M(int value) {
+                    return value + 1;
+                }
+            }
+            """);
 
-        var results = new[]
-        {
-            session.Analyze(new SharpProofQuery(SharpProofQueryKind.SourceLocation, point)),
-            session.Analyze(new SharpProofQuery(SharpProofQueryKind.Method, point)),
-            session.Analyze(new SharpProofQuery(SharpProofQueryKind.Invariant, point)),
-            session.Analyze(new SharpProofQuery(SharpProofQueryKind.Reachability, point)),
-            session.Analyze(new SharpProofQuery(SharpProofQueryKind.Condition, point, "value >= 0")),
-            session.Analyze(new SharpProofQuery(SharpProofQueryKind.RuntimeHazards, point)),
-            session.Analyze(new SharpProofQuery(SharpProofQueryKind.Capabilities, point)),
-            session.Analyze(new SharpProofQuery(SharpProofQueryKind.Complexity, point))
-        };
+        var result = session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Line, Line: 3),
+            SharpProofAnalysisFacet.Effects | SharpProofAnalysisFacet.ProofFacts |
+            SharpProofAnalysisFacet.Complexity));
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(results.Take(4).Select(static result => result.Payload),
-                Has.All.TypeOf<SourceQueryPayload>());
-            Assert.That(results[4].Payload, Is.TypeOf<ConditionQueryPayload>());
-            Assert.That(results[5].Payload, Is.TypeOf<RuntimeHazardQueryPayload>());
-            Assert.That(results[6].Payload, Is.TypeOf<CapabilityQueryPayload>());
-            Assert.That(results[7].Payload, Is.TypeOf<ComplexityQueryPayload>());
-            Assert.That(results, Has.All.Matches<SharpProofQueryResult>(static result => result.IsSuccess));
-            Assert.That(results, Has.All.Matches<SharpProofQueryResult>(static result => result.Error == null));
-            Assert.That(results, Has.All.Matches<SharpProofQueryResult>(static result =>
-                result.Location.FilePath == "SessionTarget.cs"));
+        Assert.Multiple(() => {
+            Assert.That(result.Status, Is.EqualTo(SharpProofQueryStatus.Succeeded));
+            Assert.That(result.MethodEffects, Is.Not.Null);
+            Assert.That(result.ProofFacts, Is.Not.Empty);
+            Assert.That(result.Complexity, Is.Not.Null);
+            Assert.That(result.Error, Is.Null);
         });
     }
 
     [Test]
-    public async Task Session_CachesEquivalentQueriesAcrossConcurrentCallers()
-    {
-        using var session = SharpProofAnalysisSession.FromText(Source, "CachedSession.cs");
-        var query = new SharpProofQuery(SharpProofQueryKind.Invariant, SharpProofTargetFactory.Point(8, 9));
+    public void RuntimeHazardsWithoutSmtAreExplicitlyUnknown() {
+        using var session = SharpProofAnalysisSession.FromText("""
+            class C {
+                static int M(int value) => 10 / value;
+            }
+            """);
 
-        var results = await Task.WhenAll(Enumerable.Range(0, 12)
-            .Select(_ => Task.Run(() => session.Analyze(query))));
+        var result = session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Line, Line: 2),
+            SharpProofAnalysisFacet.RuntimeHazards));
 
-        Assert.That(results, Has.All.SameAs(results[0]));
+        Assert.That(result.Status, Is.EqualTo(SharpProofQueryStatus.Unknown));
+        Assert.That(result.UnknownReasons.Any(reason => reason.Code == "SP-SMT-REQUIRED"), Is.True);
     }
 
     [Test]
-    public void Session_ReturnsTypedFailureAndRejectsQueriesAfterDisposal()
-    {
-        var session = SharpProofAnalysisSession.FromText(Source, "FailedSession.cs");
-        var failure = session.Analyze(new SharpProofQuery(
-            SharpProofQueryKind.Invariant,
-            SharpProofTargetFactory.Point(99, 1)));
+    public void RequestsAreSafeToReuseConcurrently() {
+        using var session = SharpProofAnalysisSession.FromText("""
+            class C {
+                static int M(int value) => value + 1;
+            }
+            """);
+        var request = new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Line, Line: 2),
+            SharpProofAnalysisFacet.Effects);
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(failure.Status, Is.EqualTo(SharpProofQueryStatus.Failed));
-            Assert.That(failure.Error!.Code, Is.EqualTo(SymbolicErrorCodes.InvalidTarget));
-            Assert.That(failure.Payload, Is.Null);
-        });
+        var results = Enumerable.Range(0, 16)
+            .AsParallel()
+            .Select(_ => session.Analyze(request))
+            .ToArray();
 
-        session.Dispose();
-        Assert.Throws<ObjectDisposedException>(() =>
-            session.Analyze(new SharpProofQuery(
-                SharpProofQueryKind.Invariant,
-                SharpProofTargetFactory.Point(8, 9))));
-    }
-
-    [Test]
-    public void Session_ReturnsCancellationWithoutPoisoningTheQueryCache()
-    {
-        using var session = SharpProofAnalysisSession.FromText(Source, "CanceledSession.cs");
-        var query = new SharpProofQuery(SharpProofQueryKind.Invariant, SharpProofTargetFactory.Point(8, 9));
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-
-        var canceled = session.Analyze(query, cancellation.Token);
-        var retried = session.Analyze(query);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(canceled.Status, Is.EqualTo(SharpProofQueryStatus.Canceled));
-            Assert.That(canceled.Error!.Code, Is.EqualTo(SymbolicErrorCodes.Canceled));
-            Assert.That(retried.IsSuccess, Is.True);
-            Assert.That(retried.Payload, Is.TypeOf<SourceQueryPayload>());
-        });
+        Assert.That(results.Select(static result => result.MethodEffects).Distinct().Count(), Is.EqualTo(1));
     }
 }

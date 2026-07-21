@@ -168,10 +168,8 @@ internal enum AnalyzerConfigurationScope {
 internal enum AnalyzerConfigurationValueKind {
     Bool,
     StringList,
-    StructuralMemberKeyList,
     NonNegativeInteger,
     PositiveInteger,
-    PurityProfile,
     MissingPuritySuggestionScope,
     RuntimeHazardMode,
     SmtMode,

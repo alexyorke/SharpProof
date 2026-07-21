@@ -3,8 +3,7 @@ namespace SharpProof.Analyzer;
 internal static partial class ExceptionFlowAnalyzer {
     public static void AnalyzeSymbolForExceptions(
         MethodBodyAnalysisContext context,
-        EffectSummaryCatalog exceptionSummaryCatalog,
-        CompilationPurityService purityService,
+        AnalyzerProofService purityService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var runtimeHazardMode = context.Configuration.RuntimeHazardMode;
@@ -17,7 +16,7 @@ internal static partial class ExceptionFlowAnalyzer {
 
         var methodSymbol = context.MethodSymbol;
 
-        if (PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return;
+        if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
 
         var exceptionContracts = CollectExceptionContracts(methodSymbol, context.SemanticModel, attributePolicy,
             context.CancellationToken);
@@ -42,7 +41,6 @@ internal static partial class ExceptionFlowAnalyzer {
                         context.Node,
                         context.SemanticModel,
                         context.CancellationToken,
-                        exceptionSummaryCatalog,
                         purityService.SmtAnalysis,
                         attributePolicy));
 
@@ -333,7 +331,7 @@ internal static partial class ExceptionFlowAnalyzer {
             invocation.Syntax,
             semanticModel,
             cancellationToken,
-            exactType => PurityConcreteReceiverResolver.ResolveMethodTargetForConcreteReceiver(
+            exactType => ConcreteReceiverResolver.ResolveMethodTargetForConcreteReceiver(
                 invocation.TargetMethod, exactType));
         if (method.MethodKind != MethodKind.DelegateInvoke)
             yield return new MethodCallCandidate(invocation.Syntax, method);
@@ -367,7 +365,7 @@ internal static partial class ExceptionFlowAnalyzer {
                     property.Syntax,
                     semanticModel,
                     cancellationToken,
-                    exactType => PurityConcreteReceiverResolver.ResolvePropertyAccessorTargetForConcreteReceiver(
+                    exactType => ConcreteReceiverResolver.ResolvePropertyAccessorTargetForConcreteReceiver(
                         propertySymbol, exactType, setter)));
 
         if (TryCreateDynamicDispatchCandidate(
@@ -398,7 +396,7 @@ internal static partial class ExceptionFlowAnalyzer {
         candidate = null!;
         if (method == null ||
             method.OriginalDefinition.DeclaringSyntaxReferences.Length == 0 ||
-            PurityConcreteReceiverResolver.TryResolveExactConcreteType(
+            ConcreteReceiverResolver.TryResolveExactConcreteType(
                 receiver, callSite, semanticModel, cancellationToken, out _) ||
             !SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(method, operation))
             return false;
@@ -428,7 +426,7 @@ internal static partial class ExceptionFlowAnalyzer {
         CancellationToken cancellationToken,
         Func<INamedTypeSymbol, IMethodSymbol?> resolveExactTarget) {
         if (!SymbolicDispatchFacts.IsBaseReference(receiver) &&
-            PurityConcreteReceiverResolver.TryResolveExactConcreteType(
+            ConcreteReceiverResolver.TryResolveExactConcreteType(
                 receiver,
                 callSite,
                 semanticModel,

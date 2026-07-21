@@ -10,7 +10,6 @@ internal enum InferredPurity {
 
 internal enum InferredSummarySource {
     SymbolicBody,
-    EffectSummary,
     MetadataContract,
     ManualOverride
 }
@@ -140,107 +139,6 @@ internal sealed class InferredMethodSummary {
     internal ImmutableArray<string> BlockingCallChain { get; }
 
     internal InferredSummaryUnknownReason UnknownReason { get; }
-
-    internal static InferredMethodSummary FromEffectSummary(
-        StructuralMethodIdentity identity,
-        string? classification,
-        IEnumerable<string> effects,
-        string? freshness,
-        string? effectVisibility,
-        IEnumerable<string>? thrownExceptionTypes,
-        IEnumerable<string>? blockingCallChain,
-        IEnumerable<string>? categories) {
-        if (effects == null) throw new ArgumentNullException(nameof(effects));
-
-        var effectValues = effects.ToImmutableArray();
-        var categoryValues = categories?.ToImmutableArray() ?? ImmutableArray<string>.Empty;
-        var inferredEffects = GetEffects(effectValues);
-        var purity = classification switch {
-            "pure" => InferredPurity.Pure,
-            "impure" => InferredPurity.Impure,
-            _ => InferredPurity.Unknown
-        };
-        if (inferredEffects.HasFlag(InferredMethodEffects.Unknown)) purity = InferredPurity.Unknown;
-        return new InferredMethodSummary(
-            identity,
-            InferredSummarySource.EffectSummary,
-            purity,
-            inferredEffects,
-            GetFreshness(freshness),
-            GetEffectVisibility(effectVisibility),
-            thrownExceptionTypes,
-            blockingCallChain,
-            purity == InferredPurity.Unknown
-                ? inferredEffects.HasFlag(InferredMethodEffects.Unknown)
-                    ? InferredSummaryUnknownReason.UnsupportedOperation
-                    : GetUnknownReason(effectValues, categoryValues)
-                : InferredSummaryUnknownReason.None);
-    }
-
-    private static InferredMethodEffects GetEffects(ImmutableArray<string> effects) {
-        var result = InferredMethodEffects.None;
-        foreach (var effect in effects)
-            result |= effect switch {
-                "allocates_object" => InferredMethodEffects.AllocatesObject,
-                "allocates_array" => InferredMethodEffects.AllocatesArray,
-                "allocates_box" => InferredMethodEffects.Boxes,
-                "calls_method" => InferredMethodEffects.CallsMethod,
-                "virtual_call" => InferredMethodEffects.DynamicDispatch,
-                "indirect_call" => InferredMethodEffects.IndirectCall,
-                "reads_instance_field" => InferredMethodEffects.ReadsInstanceField,
-                "reads_static_field" => InferredMethodEffects.ReadsStaticField,
-                "writes_instance_field" => InferredMethodEffects.WritesInstanceField,
-                "writes_static_field" => InferredMethodEffects.WritesStaticField,
-                "writes_indirect_memory" => InferredMethodEffects.WritesIndirectMemory,
-                "block_memory_write" => InferredMethodEffects.BlockMemoryWrite,
-                "loads_method_pointer" => InferredMethodEffects.LoadsMethodPointer,
-                "throws" => InferredMethodEffects.Throws,
-                "native_or_internal_call" or "pinvoke" => InferredMethodEffects.NativeOrInternalCall,
-                "no_il_body" or "abstract" => InferredMethodEffects.MissingBody,
-                _ when effect.StartsWith("unknown_opcode_at_", StringComparison.Ordinal) =>
-                    InferredMethodEffects.Unknown,
-                _ => InferredMethodEffects.Unknown
-            };
-
-        return result;
-    }
-
-    private static InferredFreshness GetFreshness(string? freshness) {
-        return freshness switch {
-            "none" => InferredFreshness.None,
-            "fresh_owned_array_write" or "direct_fresh_array_allocation" =>
-                InferredFreshness.FreshOwnedArray,
-            "fresh_owned_object_write" => InferredFreshness.FreshOwnedObject,
-            _ => InferredFreshness.Unknown
-        };
-    }
-
-    private static InferredEffectVisibility GetEffectVisibility(string? visibility) {
-        return visibility switch {
-            "none" => InferredEffectVisibility.None,
-            "internal_only" => InferredEffectVisibility.InternalOnly,
-            "caller_visible" => InferredEffectVisibility.CallerVisible,
-            _ => InferredEffectVisibility.Unknown
-        };
-    }
-
-    private static InferredSummaryUnknownReason GetUnknownReason(
-        ImmutableArray<string> effects,
-        ImmutableArray<string> categories) {
-        if (categories.Contains("recursive_cycle", StringComparer.Ordinal))
-            return InferredSummaryUnknownReason.RecursiveCycle;
-        if (categories.Contains("dynamic_dispatch", StringComparer.Ordinal) ||
-            effects.Contains("virtual_call", StringComparer.Ordinal) ||
-            effects.Contains("indirect_call", StringComparer.Ordinal))
-            return InferredSummaryUnknownReason.UnresolvedDispatch;
-        if (effects.Contains("no_il_body", StringComparer.Ordinal) ||
-            effects.Contains("abstract", StringComparer.Ordinal))
-            return InferredSummaryUnknownReason.MissingBody;
-        if (effects.Any(static effect => effect.StartsWith("unknown_opcode_at_", StringComparison.Ordinal)))
-            return InferredSummaryUnknownReason.UnsupportedOperation;
-
-        return InferredSummaryUnknownReason.MissingSummary;
-    }
 
     private static ImmutableArray<string> Normalize(IEnumerable<string>? values) {
         return values == null

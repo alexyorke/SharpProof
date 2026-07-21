@@ -41,8 +41,6 @@ internal static class AnalyzerFeaturePipeline {
     private static void AnalyzeCallable(
         MethodBodyAnalysisContext context,
         AnalyzerSession session) {
-        using (EffectSummaryCatalog.UseCurrent(session.EffectSummaryCatalog))
-        using (ImpurityCatalog.UseConfiguredOverrides(session.Configuration))
         using (SymbolicAnalysisLimitContext.Push(session.Configuration.AnalysisLimits, context.Node)) {
             var features = session.Features;
             TrustedBoundaryReviewAnalyzer.Analyze(context, session);
@@ -50,7 +48,6 @@ internal static class AnalyzerFeaturePipeline {
             if (features.Includes(AnalyzerFeatures.Purity))
                 MethodPurityAnalyzer.AnalyzeSymbolForPurity(
                     context,
-                    session.PurityService,
                     session.Baseline,
                     session.AttributePolicy);
 
@@ -69,14 +66,14 @@ internal static class AnalyzerFeaturePipeline {
             if (features.Includes(AnalyzerFeatures.Requires))
                 MethodRequiresAnalyzer.AnalyzeSymbolForRequires(
                     context,
-                    session.PurityService,
+                    session.ProofService,
                     session.Baseline,
                     session.AttributePolicy);
 
             if (features.Includes(AnalyzerFeatures.Ensures))
                 MethodEnsuresAnalyzer.AnalyzeSymbolForEnsures(
                     context,
-                    session.PurityService,
+                    session.ProofService,
                     session.Baseline,
                     session.AttributePolicy);
 
@@ -89,8 +86,7 @@ internal static class AnalyzerFeaturePipeline {
             if (features.Includes(AnalyzerFeatures.Exceptions))
                 ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(
                     context,
-                    session.EffectSummaryCatalog,
-                    session.PurityService,
+                    session.ProofService,
                     session.Baseline,
                     session.AttributePolicy);
 
@@ -100,8 +96,6 @@ internal static class AnalyzerFeaturePipeline {
             if (features.Includes(AnalyzerFeatures.Nullability))
                 NullableContractAnalyzer.Analyze(context, session);
 
-            if (features.Includes(AnalyzerFeatures.CommonBugs))
-                CommonBugAnalyzer.AnalyzeCallable(context, session);
         }
     }
 
@@ -110,7 +104,7 @@ internal static class AnalyzerFeaturePipeline {
         AnalyzerSession session,
         out MethodBodyAnalysisContext methodContext) {
         methodContext = null!;
-        if (context.OwningSymbol is not IMethodSymbol methodSymbol || PurityAnalysisEngine.IsMetadataSymbol(methodSymbol))
+        if (context.OwningSymbol is not IMethodSymbol methodSymbol || methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty)
             return false;
 
         var declaration = FindDeclaration(methodSymbol, context.OperationBlocks, context.CancellationToken);
@@ -148,7 +142,7 @@ internal static class AnalyzerFeaturePipeline {
                 IndexerDeclarationSyntax { ExpressionBody: not null })
             methodSymbol = propertySymbol.GetMethod;
 
-        if (methodSymbol == null || PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return false;
+        if (methodSymbol == null || methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return false;
 
         var state = session.GetOrCreateMethodBodyAnalysis(
             methodSymbol,

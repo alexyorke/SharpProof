@@ -1,6 +1,5 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using SharpProof.Analyzer.Engine.Rules;
 
 namespace SharpProof.Tools.Fuzz;
 
@@ -28,7 +27,7 @@ public sealed record RoslynShapeManifestEntry(
 
 public static class RoslynShapeManifest {
     private static readonly ImmutableHashSet<OperationKind> RegisteredRuleKinds =
-        RuleRegistry.GetDefaultRules().Keys.ToImmutableHashSet();
+        ImmutableHashSet<OperationKind>.Empty;
 
     private static readonly ImmutableHashSet<string> GeneratorBackedOperationShapeIds =
         FuzzCaseGenerator.RegistryEntries

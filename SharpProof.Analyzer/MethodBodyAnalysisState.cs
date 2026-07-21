@@ -9,14 +9,30 @@ internal sealed class MethodBodyAnalysisState {
         new(StringComparer.Ordinal);
     private readonly SymbolicConditionProofEngine _conditionProofEngine =
         new(new SymbolicInvariantService());
+    private readonly MethodEffectAnalysisSession _effectAnalysis;
 
-    internal MethodBodyAnalysisState(MethodAnalysisSnapshot snapshot) {
+    internal MethodBodyAnalysisState(
+        MethodAnalysisSnapshot snapshot,
+        MethodEffectAnalysisSession? effectAnalysis = null) {
         Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
+        _effectAnalysis = effectAnalysis ?? new MethodEffectAnalysisSession(
+            snapshot.SemanticModel.Compilation,
+            CancellationToken.None);
     }
 
     internal MethodAnalysisSnapshot Snapshot { get; }
 
     internal SymbolicQueryExecutor QueryExecutor { get; } = new();
+
+    internal MethodEffects GetMethodEffects(CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        return GetOrCreateSymbolicQueryResult(
+            "effects",
+            () => _effectAnalysis.Analyze(
+                Snapshot.MethodSymbol,
+                Snapshot.Declaration,
+                Snapshot.SemanticModel));
+    }
 
     internal AnalyzerQueryOutcome<SymbolicCapabilityResult> GetCapabilityOutcome(
         CancellationToken cancellationToken) {

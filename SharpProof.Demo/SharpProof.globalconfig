@@ -3,4 +3,3 @@ is_global = true
 sharpproof_smt_mode = bounded
 sharpproof_smt_timeout_ms = 321
 sharpproof_analysis_max_merged_if_else_facts = 17
-sharpproof_enable_effect_summary_json = true

@@ -1,283 +1,77 @@
-# SharpProof - Symbolic C# Contracts Backed By Bounded Proof
+# SharpProof
 
-SharpProof is a beta Roslyn analyzer for enforceable C# contracts. You add
-attributes such as `[EnforcePure]`, `[Requires]`, `[Ensures]`,
-`[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`,
-`[AllowedExceptions]`, or `[ExpectedComplexity]`; the analyzer reports build
-diagnostics; the CLI and .NET API let you inspect the bounded proof evidence.
+SharpProof is a Roslyn analyzer and bounded symbolic-analysis library for C#.
 
-## Preview Status
+The analyzer now computes one composable `MethodEffects` result per method. Purity, allocation freedom, capability compliance, and exception contracts are projections over those facts rather than separate analysis engines.
 
-> [!WARNING]
-> SharpProof is still preview software. Treat the current branch and packages
-> as alpha/beta quality rather than production-hardened tooling.
->
-> The project has also been developed through rapid AI-assisted iteration, or
-> "vibe-coded" development in the informal sense: broad feature growth, fast
-> refactoring, and heavy test coverage, but not the kind of long-lived
-> stabilization and compatibility discipline you would expect from a mature
-> analysis platform.
->
-> Expect rough edges:
-> - analyzer false positives and false negatives
-> - unsupported C# or library shapes that stay conservative or unknown
-> - public API, CLI, configuration, and diagnostic-surface changes between preview releases
->
-> The analyzer does not execute user code and does not attempt unbounded
-> whole-program proof. When it cannot prove a fact within the implemented rules
-> and budgets, it stays conservative.
-
-## What SharpProof Does
-
-SharpProof is more than just a purity checker. Its intended developer workflow
-is:
-
-```text
-Write contracts -> build gets diagnostics -> inspect proof/evidence -> query deeper with CLI/API
-```
-
-The analyzer answers contract questions during normal builds:
-
-- can this method be proven pure?
-- do calls satisfy declared `[Requires("...")]` preconditions?
-- which direct allocation sites violate `[ZeroAllocations]`?
-- which capability categories does this method use?
-- does every return satisfy `[Ensures("...")]`?
-- can this method only throw its declared exception set?
-- is the method within the declared `[ExpectedComplexity(...)]` bound?
-
-The CLI and library API answer proof-inspection questions:
-
-- what facts hold at this line?
-- is this branch reachable?
-- can this operation provably throw at runtime?
-- what asymptotic complexity can be justified conservatively?
-
-Under the hood the intended spine is:
-
-```text
-Roslyn/C# -> Symbolic IR -> normalized symbolic state -> proof service -> Z3-backed conclusions -> analyzer/API/CLI outputs
-```
-
-## Who It Is For
-
-SharpProof is for .NET developers who want static guarantees or conservative
-evidence around behavior without running the code:
-
-- library authors enforcing purity or low-allocation contracts
-- teams auditing runtime hazards and side effects during builds
-- engineers exploring invariants and proof results from a CLI or .NET API
-- contributors expanding symbolic reasoning over C# and the .NET SDK
-
-Use something else if you need whole-program execution prediction, exact
-performance profiling, or a full borrow checker today.
-
-## Quick Start
-
-The intended public packages are `SharpProof`, `SharpProof.Attributes`, and
-`SharpProof.Symbolic`, all at `0.1.0-preview.1`, but they are not published to
-NuGet.org yet.
-
-For local preview use, build a local feed from this repo and install from it:
-
-```powershell
-.\build-nuget.ps1 -Configuration Release
-dotnet add package SharpProof --version 0.1.0-preview.1 --source .\artifacts\nuget
-```
-
-The main analyzer package already includes the attributes assembly for normal
-consumers. Add `SharpProof.Attributes` separately only when you want the
-attributes without the analyzer package:
-
-```powershell
-dotnet add package SharpProof.Attributes --version 0.1.0-preview.1 --source .\artifacts\nuget
-```
-
-The VSIX supplies the Visual Studio analyzer and code-fix experience, but it
-does not add compile-time references to a project. VSIX users must still add
-the `SharpProof` package (or `SharpProof.Attributes` for attributes only) to
-projects that use SharpProof attributes.
-
-Minimal source example:
+## Contracts
 
 ```csharp
-using System;
 using SharpProof.Attributes;
 
-public sealed class Calculator
-{
+sealed class Example {
     [EnforcePure]
     public int Add(int left, int right) => left + right;
 
-    [EnforcePure]
-    public int ReadClock() => DateTime.Now.Second; // SP0002
+    [ZeroAllocations]
+    public int Twice(int value) => value * 2;
+
+    [AllowedCapabilities(SharpProofCapability.Synchronization)]
+    public void Guarded() {
+        lock (this) { }
+    }
+
+    [EffectContract(
+        SharpProofEffect.ReadsAmbientState,
+        Complete = true,
+        IsDeterministic = true)]
+    public static extern int ReadExternalState();
 }
 ```
 
-## Selected Examples
+`[EnforcePure]` is the only purity-facing attribute. Fresh allocation and deterministic exceptions do not by themselves make a method observably impure. Writes to pre-existing reachable state, ambient reads, I/O, synchronization, native interaction, nondeterminism, capabilities, and unresolved transitive effects prevent a proven-pure verdict.
 
-These curated blocks are generated from committed example inputs and committed
-output snapshots. Each example is backed by a regression test so the README can
-fail fast when the public behavior or documentation drifts.
+`[EffectContract]` is the generic trusted-boundary contract. It can declare primitive effects, capabilities, exception types, determinism, and completeness. Assembly-level contracts additionally identify an external method using its exact canonical structural key.
 
-<!-- README_EXAMPLES -->
-
-For the full generated galleries:
-
-- [Diagnostic example gallery](docs/diagnostic-examples.md)
-- [Symbolic query examples](docs/symbolic-query-examples.md)
-
-## How To Inspect Proof Results
-
-Use analyzer diagnostics for build enforcement, then use the symbolic CLI when
-you need the reason behind a result:
-
-```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- explain --file Example.cs --line 42
-```
-
-The `explain` mode summarizes nearby invariants, reachability, runtime hazards,
-capabilities, and complexity for the selected line or position. Add `--json`,
-`--sarif`, or `--markdown` for one bounded report that combines project
-analyzer diagnostics with the canonical analysis results. Lower-level
-query modes such as `--runtime-hazards`, `--capabilities`, `--complexity`,
-`--check-reachability`, and `--implies` remain available for focused output and
-JSON automation.
-
-For applications and tooling that need direct queries, install the supported
-library package:
-
-```powershell
-dotnet add package SharpProof.Symbolic --version 0.1.0-preview.1
-```
+## .NET API
 
 ```csharp
 using SharpProof.Symbolic;
 
-using var session = SharpProofAnalysisSession.FromText(sourceText, "Example.cs");
-var response = session.Analyze(
-    new SharpProofQuery(
-        SharpProofQueryKind.Invariant,
-        new SharpProofTarget(SharpProofTargetKind.Point, Line: 42, Column: 1)));
-var result = (SourceQueryPayload)response.Payload!;
+using var session = SharpProofAnalysisSession.FromText(source);
+var result = session.Analyze(new SharpProofAnalysisRequest(
+    new SharpProofTarget(SharpProofTargetKind.Line, Line: 12),
+    SharpProofAnalysisFacet.All,
+    Condition: "value >= 0"));
+
+Console.WriteLine(result.Purity);
+Console.WriteLine(result.MethodEffects?.Effects);
 ```
 
-The package includes XML documentation, nullable API annotations, portable
-Source Link symbols, and an executable sample under
-`samples/SharpProof.Symbolic`.
+The canonical entry point is:
 
-Native SMT is bundled for Windows x64 and macOS x64. Linux, arm64, and other
-unsupported package/RID combinations remain usable with conservative unknown
-results when no compatible host-provided Z3 library is available.
+```text
+SharpProofAnalysisSession.Analyze(SharpProofAnalysisRequest)
+    -> SharpProofAnalysisResult
+```
 
-## What It Can Prove Today
+The result contains method effects, derived three-state verdicts, proof facts, runtime hazards, complexity, unknown reasons, evidence, and budget/truncation metadata.
 
-- Analyzer contracts:
-  `[EnforcePure]`, `[Pure]`, `[ZeroAllocations]`,
-  `[AllowedCapabilities(...)]`, `[Requires(...)]`, `[Ensures(...)]`,
-  `[DoesNotThrow]`, `[AllowedExceptions(...)]`, `[ExpectedComplexity(...)]`,
-  and related diagnostics from `SP0002` through `SP0076`.
-- Profile-enabled common C# checks:
-  async/task lifecycle, collection mutation, closure capture, shared-state races,
-  resource ownership, LINQ execution, serialization, attribute semantics,
-  nullable adoption, and allocation-size overflow.
-- Symbolic queries:
-  line/position invariants, implication checks, reachability checks, runtime
-  hazards, capability summaries, and conservative complexity queries.
-- Runtime hazards:
-  direct throws, divide-by-zero, null dereference, nullable value access,
-  index/range issues, checked overflow, negative lengths, and other bounded
-  source-visible hazards when the current evidence supports them.
-- Summary-backed metadata reasoning:
-  generated built-in effect summaries embedded during build/test plus optional
-  external `*.SharpProof.EffectSummary.json` additional files.
-- Conservative fallback behavior:
-  unsupported library shapes, unknown external calls, unsupported regex or
-  pattern shapes, and budget/time-limit cases stay unknown or unproven rather
-  than being upgraded optimistically.
+## Metadata analysis
 
-## Deeper Docs
+Referenced methods are inspected lazily from the exact compilation reference. Metadata results are cached in memory by module MVID, method token, and generic context. Analysis is bounded by call depth, visited-method count, and IL-instruction count. Missing paths, missing bodies, malformed IL, unresolved dispatch, recursion, and exhausted budgets produce explicit unknown evidence.
 
-- [Contracts and analyzer diagnostics](docs/contracts.md)
-- [Purity classification policy, precedence, and audit](docs/purity-policy.md)
-- [Opt-in trusted-boundary review diagnostics](docs/trusted-boundary-review.md)
-- [Opt-in exact-proof suppression of external diagnostics](docs/proven-diagnostic-suppression.md)
-- [Complete analyzer configuration reference](docs/configuration-reference.md)
-- [Migration, audit, CI, and strict configuration profiles](docs/configuration-profiles.md)
-- [Common C# bug coverage and delegated platform rules](docs/common-bug-coverage.md)
-- [Proof query CLI and API workflow](docs/proof-queries.md)
-- [Machine-readable JSON, SARIF, and Markdown explain reports](docs/explain-reports.md)
-- [Project-aware MSBuild proof queries](docs/project-aware-queries.md)
-- [Standalone editor, stdin, and JSON query inputs](docs/standalone-query-inputs.md)
-- [CI exit-code gates for symbolic queries](docs/ci-exit-gates.md)
-- [Typed symbolic API/CLI errors and JSON envelopes](docs/error-model.md)
-- [Configurable bounded-analysis limits and truncation evidence](docs/analysis-limits.md)
-- [SMT solver lifecycle, recovery, and health](docs/smt-lifecycle.md)
-- [Native Z3 packaging and Windows/Linux/macOS support](docs/native-smt-packaging.md)
-- [Solver witnesses and conservative input domains](docs/input-witnesses.md)
-- [Stable unknown-reason taxonomy](docs/unknown-reasons.md)
-- [Shared nullable-flow facts and CodeAnalysis contracts](docs/nullable-flow-facts.md)
-- [Nullable contract verification and null-forgiving audits](docs/nullable-verification.md)
-- [Proof/evidence schema and compatibility policy](docs/evidence-schema.md)
-- [Semantic pipeline preview migration and breaking changes](docs/semantic-pipeline-migration.md)
-- [Symbolic query preview API migration](docs/symbolic-query-api-migration.md)
-- [Coverage, limits, and conservative fallback](docs/coverage-and-limits.md)
-- [Modern C# language-surface tracking matrix](docs/modern-csharp-surface.md)
-- [Diagnostic example gallery](docs/diagnostic-examples.md)
-- [Symbolic query examples](docs/symbolic-query-examples.md)
-- [Symbolic invariants and runtime-hazard query behavior](docs/symbolic-invariants.md)
-- [Capability analysis and `[AllowedCapabilities]`](docs/capability-analysis.md)
-- [Complexity query behavior](docs/complexity-queries.md)
-- [Effect summaries and generated metadata behavior](docs/effect-summary.md)
+SharpProof does not generate or consume effect-summary JSON, scan whole assemblies eagerly, write disk caches, or fall back to namespace/type/member-name purity catalogs.
 
-## Current Limits
+## Build and test
 
-- SharpProof is bounded and conservative, not a whole-program execution engine.
-- There is no meaningful "percent of the .NET SDK covered" claim yet; coverage
-  is member-level and evidence-backed.
-- Regex support is partial.
-- Ownership and mutation reasoning is useful but still local; there is no full
-  Rust-style borrow checker.
-- Deep dispatch, hidden runtime behavior, reflection-heavy flows, dynamic
-  behavior, and unsupported Roslyn shapes can remain conservative.
-
-## Development And Validation
-
-Use the repo wrappers for local validation so long-running .NET work runs under
-the expected Windows Job Object:
+Use the repository wrapper so .NET processes remain inside the configured Windows Job Object:
 
 ```powershell
-.\scripts\Invoke-SharpProofBuild.ps1
-.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All
+.\scripts\Invoke-SharpProofDotnet.ps1 build SharpProof.Dev.slnf -c Release
+.\scripts\Invoke-SharpProofDotnet.ps1 test SharpProof.Dev.Tests.slnf -c Release
 ```
 
-The default Debug developer build compiles the analyzer, code fixes, symbolic
-engine, proof core, and attributes, but skips generated effect summaries, the
-large test assemblies, standalone applications, package generation, and VSIX
-generation. Use `-WithEffectSummaries` when the developer artifact must embed
-the generated catalogs, `-WithTests` to compile both test graphs,
-`-Configuration Release` to match CI output, or `-Full` for the complete
-solution and release artifacts:
+The repository contains the analyzer, attributes, code fixes, symbolic API, CLI, NuGet packaging, VSIX packaging, and net472 smoke project.
 
-```powershell
-.\scripts\Invoke-SharpProofBuild.ps1 -WithTests
-.\scripts\Invoke-SharpProofBuild.ps1 -WithEffectSummaries
-.\scripts\Invoke-SharpProofBuild.ps1 -Configuration Release -Full
-```
-
-The impacted-test wrapper can accelerate local loops, but full CI remains the
-truth source before merge:
-
-```powershell
-.\scripts\Invoke-SharpProofImpactedTests.ps1 -NoBuild -ListOnly -Explain
-.\scripts\Invoke-SharpProofImpactedTests.ps1 -NoBuild
-```
-
-## Help And Feedback
-
-- Open a bug report or feature request in the
-  [GitHub issue tracker](https://github.com/alexyorke/SharpProof/issues).
-- Use pull requests for fixes, test additions, and analyzer/symbolic
-  improvements.
-- Treat the current README as a landing page; the linked docs are the better
-  place for detailed behavior and edge-case reference.
+See [the supported modern C# surface](docs/modern-csharp-surface.md) for language-version coverage.

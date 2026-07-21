@@ -4,7 +4,7 @@ namespace SharpProof;
     [Shared]
     public sealed partial class SharpProofCodeFixProvider : CodeFixProvider {
         private static readonly ImmutableArray<string> AllFixableDiagnosticIds = new[]
-            { 2, 3, 5, 7, 8, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 4, 6, 29, 34, 35, 36, 37, 38, 39, 46, 45 }
+            { 2, 3, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 29, 34, 35, 36, 37, 38, 39, 46, 45 }
             .Select(static number => $"SP{number:0000}")
             .ToImmutableArray();
 
@@ -28,12 +28,6 @@ namespace SharpProof;
 
             if (!int.TryParse(diagnostic.Id.Substring(2), out var diagnosticNumber)) return;
             switch (diagnosticNumber) {
-                case 4:
-                    RegisterAddPurityCodeFix(context, document, root, diagnostic, attributePolicy);
-                    break;
-                case 6:
-                    RegisterSynchronizationCodeFix(context, document, root, diagnostic, attributePolicy);
-                    break;
                 case 29:
                     RegisterMisplacedRequiresCodeFix(context, document, root, diagnostic);
                     break;
@@ -48,11 +42,8 @@ namespace SharpProof;
 
         private static bool TryGetSimpleRemoval(string diagnosticId, out SimpleRemovalRegistration registration) {
             registration = diagnosticId switch {
-                "SP0002" => new(diagnosticId, "Remove [EnforcePure] and [Pure] attributes", SimpleRemovalOperation.DeclarationAndAccessors, "RemoveAttributesMatchingAsyncSP0002", "EnforcePureAttribute", "PureAttribute"),
+                "SP0002" => new(diagnosticId, "Remove [EnforcePure] attribute", SimpleRemovalOperation.DeclarationAndAccessors, "RemoveAttributesMatchingAsyncSP0002", "EnforcePureAttribute"),
                 "SP0003" => new(diagnosticId, "Remove misplaced purity attribute", SimpleRemovalOperation.MisplacedAttribute, "RemoveMisplacedAttributeAsync"),
-                "SP0005" => new(diagnosticId, "Remove conflicting purity boundary attributes", SimpleRemovalOperation.DeclarationAndAccessors, "RemoveAttributesMatchingAsyncSP0005", "PureAttribute", "PureExternalAttribute", "ImpureAttribute"),
-                "SP0007" => new(diagnosticId, "Remove misplaced [AllowSynchronization] attribute", SimpleRemovalOperation.MisplacedAttribute, "RemoveMisplacedAttributeAsyncSP0007"),
-                "SP0008" => new(diagnosticId, "Remove [AllowSynchronization] attribute", SimpleRemovalOperation.DeclarationAndAccessors, "RemoveAttributesMatchingAsyncSP0008", "AllowSynchronizationAttribute"),
                 "SP0013" => new(diagnosticId, "Remove [ZeroAllocations] attribute", SimpleRemovalOperation.DiagnosticContract, "RemoveContractAttributeAsyncSP0013", "ZeroAllocationsAttribute"),
                 "SP0014" => new(diagnosticId, "Remove misplaced [ZeroAllocations] attribute", SimpleRemovalOperation.MisplacedAttribute, "RemoveMisplacedAttributeAsyncSP0014"),
                 "SP0015" => new(diagnosticId, "Remove [AllowedCapabilities] attribute", SimpleRemovalOperation.DiagnosticContract, "RemoveContractAttributeAsyncSP0015", "AllowedCapabilitiesAttribute"),
@@ -81,36 +72,6 @@ namespace SharpProof;
             SimpleRemovalOperation Operation,
             string EquivalenceKey,
             params string[] AttributeTypeNames);
-
-        private void RegisterAddPurityCodeFix(
-            CodeFixContext context, Document document, SyntaxNode root, Diagnostic diagnostic,
-            SharpProofAttributeIdentityPolicy attributePolicy) {
-            if (!TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declaration) ||
-                declaration is PropertyDeclarationSyntax or IndexerDeclarationSyntax)
-                return;
-
-            Register(context, diagnostic, "Add [EnforcePure] attribute",
-                cancellationToken => AddEnforcePureAttributeAsync(
-                    document, root, declaration, attributePolicy, cancellationToken),
-                "AddEnforcePureAttributeAsync");
-        }
-
-        private void RegisterSynchronizationCodeFix(
-            CodeFixContext context, Document document, SyntaxNode root, Diagnostic diagnostic,
-            SharpProofAttributeIdentityPolicy attributePolicy) {
-            if (!TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declaration))
-                return;
-
-            Register(context, diagnostic, "Add [EnforcePure] attribute",
-                cancellationToken => AddEnforcePureAttributeAsync(
-                    document, root, declaration, attributePolicy, cancellationToken),
-                "AddEnforcePureAttributeAsyncSP0006a");
-            Register(context, diagnostic, "Remove [AllowSynchronization] attribute",
-                cancellationToken => RemoveAttributesMatchingAsync(
-                    document, root, declaration,
-                    AcceptedAttribute(attributePolicy, "AllowSynchronizationAttribute"), cancellationToken),
-                "RemoveAttributesMatchingAsyncSP0006b");
-        }
 
         private static void RegisterMisplacedRequiresCodeFix(
             CodeFixContext context, Document document, SyntaxNode root, Diagnostic diagnostic) {

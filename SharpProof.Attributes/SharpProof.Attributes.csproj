@@ -11,7 +11,7 @@
     
     
     <PackageId>SharpProof.Attributes</PackageId>
-    <Description>Contains SharpProof contract attributes for bounded symbolic C# analysis, including EnforcePureAttribute, PureAttribute, PureExternalAttribute, ImpureAttribute, AllowSynchronizationAttribute, ZeroAllocationsAttribute, AllowedCapabilitiesAttribute, DoesNotThrowAttribute, AllowedExceptionsAttribute, ExpectedComplexityAttribute, ComplexityKind, and SharpProofCapability.</Description>
+    <Description>Contains SharpProof contracts for composable method effects, including EnforcePureAttribute, EffectContractAttribute, ZeroAllocationsAttribute, AllowedCapabilitiesAttribute, DoesNotThrowAttribute, AllowedExceptionsAttribute, ExpectedComplexityAttribute, SharpProofEffect, and SharpProofCapability.</Description>
     <PackageTags>SharpProof;Attributes;Roslyn;Analyzer;Purity;StaticAnalysis;SymbolicAnalysis;Capabilities;ZeroAllocations;Exceptions;Complexity</PackageTags>
     <Title>SharpProof Attributes</Title>
     <PackageReleaseNotes>Public preview release of the SharpProof contract attributes package, including purity, synchronization, zero-allocation, capability-contract, exception-contract, symbolic postcondition, and complexity-contract attributes.</PackageReleaseNotes>

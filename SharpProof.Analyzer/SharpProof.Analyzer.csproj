@@ -6,39 +6,23 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <LangVersion>12.0</LangVersion>
-    <!-- Descriptor metadata is loaded from the validated catalog, which RS2002/RS2003 cannot inspect syntactically. -->
     <NoWarn>$(NoWarn);RS2002;RS2003</NoWarn>
-    <GeneratedPurityBuiltInSummaryDirectory Condition="'$(GeneratedPurityBuiltInSummaryDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\GeneratedPurity</GeneratedPurityBuiltInSummaryDirectory>
-    <GeneratedPurityArtifactSpecSourcePath Condition="'$(GeneratedPurityArtifactSpecSourcePath)' == ''">$(MSBuildThisFileDirectory)BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityArtifactSpecSourcePath>
-    <GeneratedPurityArtifactSpecPath Condition="'$(GeneratedPurityArtifactSpecPath)' == ''">$(GeneratedPurityBuiltInSummaryDirectory)\BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityArtifactSpecPath>
-    <GeneratedPurityToolProjectPath Condition="'$(GeneratedPurityToolProjectPath)' == ''">$(MSBuildThisFileDirectory)..\Tools\SharpProof.EffectSummary\SharpProof.EffectSummary.csproj</GeneratedPurityToolProjectPath>
-    <GeneratedPurityToolDllPath Condition="'$(GeneratedPurityToolDllPath)' == ''">$(MSBuildThisFileDirectory)..\Tools\SharpProof.EffectSummary\bin\$(Configuration)\net8.0\SharpProof.EffectSummary.dll</GeneratedPurityToolDllPath>
-    <GeneratedPurityGenerationStampPath Condition="'$(GeneratedPurityGenerationStampPath)' == ''">$(GeneratedPurityBuiltInSummaryDirectory)\generation.$(NETCoreSdkVersion).stamp</GeneratedPurityGenerationStampPath>
-    <GeneratedPurityBuiltInSummaryStagingDirectory Condition="'$(GeneratedPurityBuiltInSummaryStagingDirectory)' == ''">$(GeneratedPurityBuiltInSummaryDirectory).staging</GeneratedPurityBuiltInSummaryStagingDirectory>
-    <GeneratedPurityStagingArtifactSpecPath Condition="'$(GeneratedPurityStagingArtifactSpecPath)' == ''">$(GeneratedPurityBuiltInSummaryStagingDirectory)\BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityStagingArtifactSpecPath>
-    <GeneratedPurityDependencyManifestDirectory Condition="'$(GeneratedPurityDependencyManifestDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)</GeneratedPurityDependencyManifestDirectory>
-    <GeneratedPurityInputManifestPath Condition="'$(GeneratedPurityInputManifestPath)' == ''">$(GeneratedPurityDependencyManifestDirectory)\GeneratedPurity.inputs.txt</GeneratedPurityInputManifestPath>
-    <GeneratedPurityOutputManifestPath Condition="'$(GeneratedPurityOutputManifestPath)' == ''">$(GeneratedPurityDependencyManifestDirectory)\GeneratedPurity.outputs.txt</GeneratedPurityOutputManifestPath>
-    <SharpProofSkipGeneratedEffectSummaries Condition="'$(SharpProofSkipGeneratedEffectSummaries)' == ''">false</SharpProofSkipGeneratedEffectSummaries>
     <MicrosoftZ3ManagedDllPath Condition="'$(MicrosoftZ3ManagedDllPath)' == ''">$(PkgMicrosoft_Z3)\lib\netstandard2.0\Microsoft.Z3.dll</MicrosoftZ3ManagedDllPath>
   </PropertyGroup>
 
   <ItemGroup>
-    
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="4.14.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
     <PackageReference Include="Microsoft.Z3" Version="$(MicrosoftZ3PackageVersion)" GeneratePathProperty="true" PrivateAssets="all" />
-
-    
-    <PackageReference Include="System.Collections.Immutable" Version="9.0.0" /> 
+    <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
     <PackageReference Include="System.Text.Json" Version="9.0.0" />
   </ItemGroup>
 
-  
   <ItemGroup>
+    <Compile Remove="RoslynStructuralMethodIdentity.cs" />
     <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
     <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
     <EmbeddedResource Include="AnalyzerDiagnosticCatalog.json" LogicalName="SharpProof.Analyzer.DiagnosticCatalog.json" />
@@ -51,100 +35,5 @@
     <ProjectReference Include="..\SharpProof.Contracts\SharpProof.Contracts.csproj" />
     <None Include="$(MicrosoftZ3ManagedDllPath)" CopyToOutputDirectory="PreserveNewest" Link="Microsoft.Z3.dll" />
   </ItemGroup>
-  
-  <Target Name="BuildBuiltInEffectSummaryTool"
-          Condition="'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'">
-    <MSBuild Projects="$(GeneratedPurityToolProjectPath)"
-             Targets="Build"
-             Properties="Configuration=$(Configuration)" />
-  </Target>
 
-  <Target Name="ResolveBuiltInEffectSummaryDependencies"
-          DependsOnTargets="BuildBuiltInEffectSummaryTool"
-          Condition="'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'">
-    <MakeDir Directories="$(GeneratedPurityDependencyManifestDirectory)" />
-
-    <Exec Command='dotnet &quot;$(GeneratedPurityToolDllPath)&quot; --artifact-spec-dependencies &quot;$(GeneratedPurityArtifactSpecSourcePath)&quot; --input-manifest &quot;$(GeneratedPurityInputManifestPath)&quot; --output-manifest &quot;$(GeneratedPurityOutputManifestPath)&quot; --dependency-output-root &quot;$(GeneratedPurityBuiltInSummaryDirectory)&quot;'
-          IgnoreExitCode="true"
-          ConsoleToMSBuild="true">
-      <Output TaskParameter="ExitCode" PropertyName="_SharpProofEffectSummaryDependencyExitCode" />
-    </Exec>
-
-    <Error Condition="'$(_SharpProofEffectSummaryDependencyExitCode)' != '0'"
-           Code="SPB0001"
-           Text="SharpProof could not resolve effect-summary dependencies from artifact spec '$(GeneratedPurityArtifactSpecSourcePath)' (exit code $(_SharpProofEffectSummaryDependencyExitCode)). Verify framework/runtime availability, package restore state, and artifact source paths." />
-
-    <ReadLinesFromFile File="$(GeneratedPurityInputManifestPath)">
-      <Output TaskParameter="Lines" ItemName="_GeneratedPuritySummaryInputs" />
-    </ReadLinesFromFile>
-    <ReadLinesFromFile File="$(GeneratedPurityOutputManifestPath)">
-      <Output TaskParameter="Lines" ItemName="_GeneratedPurityExpectedOutputs" />
-    </ReadLinesFromFile>
-
-    <Error Condition="'@(_GeneratedPuritySummaryInputs)' == '' or '@(_GeneratedPurityExpectedOutputs)' == ''"
-           Code="SPB0001"
-           Text="SharpProof effect-summary dependency resolution produced an empty input or output manifest. Check '$(GeneratedPurityInputManifestPath)' and '$(GeneratedPurityOutputManifestPath)'." />
-  </Target>
-
-  <Target Name="GenerateBuiltInEffectSummaries"
-          BeforeTargets="AssignTargetPaths"
-          DependsOnTargets="ResolveBuiltInEffectSummaryDependencies"
-          Condition="'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'"
-          Inputs="$(GeneratedPurityArtifactSpecSourcePath);$(GeneratedPurityToolDllPath);$(GeneratedPurityInputManifestPath);$(GeneratedPurityOutputManifestPath);@(_GeneratedPuritySummaryInputs)"
-          Outputs="$(GeneratedPurityGenerationStampPath);$(GeneratedPurityArtifactSpecPath);@(_GeneratedPurityExpectedOutputs)">
-    <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryStagingDirectory)"
-               Condition="Exists('$(GeneratedPurityBuiltInSummaryStagingDirectory)')" />
-    <MakeDir Directories="$(GeneratedPurityBuiltInSummaryStagingDirectory)" />
-
-    <Copy SourceFiles="$(GeneratedPurityArtifactSpecSourcePath)"
-          DestinationFiles="$(GeneratedPurityStagingArtifactSpecPath)" />
-
-    <Exec Command='dotnet &quot;$(GeneratedPurityToolDllPath)&quot; --artifact-spec &quot;$(GeneratedPurityStagingArtifactSpecPath)&quot;' IgnoreExitCode="true" ConsoleToMSBuild="true">
-      <Output TaskParameter="ExitCode" PropertyName="_SharpProofEffectSummaryExitCode" />
-    </Exec>
-
-    <Error Condition="'$(_SharpProofEffectSummaryExitCode)' != '0'"
-           Code="SPB0002"
-           Text="SharpProof effect-summary generation failed with exit code $(_SharpProofEffectSummaryExitCode). Check artifact spec '$(GeneratedPurityStagingArtifactSpecPath)' and tool '$(GeneratedPurityToolDllPath)'. The previous generated summaries were left untouched." />
-
-    <ItemGroup>
-      <_SharpProofStagedSummaryFiles Include="$(GeneratedPurityBuiltInSummaryStagingDirectory)\*.SharpProof.EffectSummary.json" />
-    </ItemGroup>
-
-    <Error Condition="'@(_SharpProofStagedSummaryFiles)' == ''"
-           Code="SPB0003"
-           Text="SharpProof effect-summary generation produced no summary resources from '$(GeneratedPurityStagingArtifactSpecPath)'. The previous generated summaries were left untouched." />
-
-    <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)"
-               Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')" />
-    <MakeDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)" />
-
-    <Copy SourceFiles="$(GeneratedPurityStagingArtifactSpecPath)"
-          DestinationFiles="$(GeneratedPurityArtifactSpecPath)" />
-    <Touch Files="$(GeneratedPurityArtifactSpecPath)" />
-
-    <Copy SourceFiles="@(_SharpProofStagedSummaryFiles)"
-          DestinationFolder="$(GeneratedPurityBuiltInSummaryDirectory)" />
-
-    <WriteLinesToFile Condition="'$(_SharpProofEffectSummaryExitCode)' == '0'"
-                      File="$(GeneratedPurityGenerationStampPath)"
-                      Lines="$(NETCoreSdkVersion)"
-                      Overwrite="true" />
-
-    <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryStagingDirectory)"
-               Condition="Exists('$(GeneratedPurityBuiltInSummaryStagingDirectory)')" />
-  </Target>
-
-  <Target Name="IncludeGeneratedPurityBuiltInSummaries"
-          BeforeTargets="AssignTargetPaths"
-          DependsOnTargets="GenerateBuiltInEffectSummaries"
-          Condition="'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'">
-    <ItemGroup Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')">
-      <_GeneratedPurityBuiltInSummary Include="$(GeneratedPurityBuiltInSummaryDirectory)\*.SharpProof.EffectSummary.json" />
-      <EmbeddedResource Include="@(_GeneratedPurityBuiltInSummary)">
-        <LogicalName>SharpProof.Analyzer.GeneratedPurity.%(Filename)%(Extension)</LogicalName>
-      </EmbeddedResource>
-    </ItemGroup>
-  </Target>
-
-</Project> 
+</Project>

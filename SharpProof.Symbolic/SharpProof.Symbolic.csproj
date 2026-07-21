@@ -27,7 +27,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
     <PackageReference Include="Microsoft.Z3" Version="$(MicrosoftZ3PackageVersion)" GeneratePathProperty="true" />
     <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
   </ItemGroup>
@@ -39,8 +38,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
-    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+    <Compile Include="..\SharpProof.Analyzer\RoslynStructuralMethodIdentity.cs"
+             Link="Identity\RoslynStructuralMethodIdentity.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\samples\SharpProof.Symbolic\README.md" Pack="true" PackagePath="samples/SharpProof.Symbolic/README.md" />
     <None Include="..\samples\SharpProof.Symbolic\Program.cs" Pack="true" PackagePath="samples/SharpProof.Symbolic/Program.cs" />

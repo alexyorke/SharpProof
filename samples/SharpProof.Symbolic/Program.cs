@@ -14,10 +14,9 @@ const string source = """
                       """;
 
 using var session = SharpProofAnalysisSession.FromText(source, "Sample.cs");
-var response = session.Analyze(new SharpProofQuery(
-    SharpProofQueryKind.Invariant,
-    new SharpProofTarget(SharpProofTargetKind.Point, Line: 8)));
-var result = (SourceQueryPayload)response.Payload!;
+var result = session.Analyze(new SharpProofAnalysisRequest(
+    new SharpProofTarget(SharpProofTargetKind.Point, Line: 8),
+    SharpProofAnalysisFacet.ProofFacts));
 
-Console.WriteLine($"Program points: {result.ProgramPointCount}");
-Console.WriteLine($"Invariant: {result.Invariant}");
+Console.WriteLine($"Status: {result.Status}");
+Console.WriteLine($"Facts: {string.Join("; ", result.ProofFacts)}");

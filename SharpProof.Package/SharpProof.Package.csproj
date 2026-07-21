@@ -16,7 +16,7 @@
     <PackageId>SharpProof</PackageId>
     <Title>$(SharpProofProductName)</Title>
     <Description>$(SharpProofProductDescription)</Description>
-    <PackageReleaseNotes>Public preview release with the canonical typed semantic pipeline. Adds profile-enabled SP0048-SP0076 diagnostics for common C# correctness, async, ownership, concurrency, LINQ, serialization, nullability-policy, and deployment hazards. Existing compiler and .NET SDK rules are integrated through the shipped policy profiles rather than duplicated.</PackageReleaseNotes>
+    <PackageReleaseNotes>Breaking preview release with one composable MethodEffects pipeline, derived contract verdicts, lazy bounded metadata analysis, and a unified .NET analysis result.</PackageReleaseNotes>
     <Copyright>Copyright (c) Alex Yorke</Copyright>
     <PackageTags>SharpProof;Roslyn;Analyzer;CodeFix;Purity;StaticAnalysis;SymbolicAnalysis;SMT;Z3;Invariants;RuntimeHazards;Capabilities;Complexity;Async;Concurrency;LINQ;Serialization</PackageTags>
     <NoPackageAnalysis>true</NoPackageAnalysis>

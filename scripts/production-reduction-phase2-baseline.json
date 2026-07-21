@@ -12,7 +12,6 @@
   "currentCeilingLines": 84934,
   "scriptRoot": "scripts/",
   "specificationPaths": [
-    "SharpProof.Analyzer/BuiltInEffectSummaryArtifactSpec.json",
     "scripts/architecture-modules.json",
     "scripts/package-projects.json"
   ]

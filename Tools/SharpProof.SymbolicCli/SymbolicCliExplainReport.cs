@@ -225,7 +225,6 @@ internal sealed record SymbolicCliExplainReport(
         builder.AppendLine($"Analyzer config files: {project.AnalyzerConfigCount}")
             .AppendLine($"Additional files: {project.AdditionalFileCount}")
             .AppendLine($"Baseline loaded: {project.HasBaseline}")
-            .AppendLine($"Effect summaries: {project.EffectSummaryFileCount}")
             .AppendLine($"Workspace diagnostics: {project.WorkspaceDiagnosticCount}");
     }
 
@@ -317,7 +316,6 @@ internal sealed record SymbolicCliExplainProject(
     string? ProjectFilePath,
     string? SolutionFilePath,
     bool HasBaseline,
-    int EffectSummaryFileCount,
     int AnalyzerConfigCount,
     IReadOnlyList<string> AnalyzerConfigPaths,
     int AdditionalFileCount,
@@ -339,7 +337,6 @@ internal sealed record SymbolicCliExplainProject(
             context.ProjectFilePath,
             context.SolutionFilePath,
             context.HasBaseline,
-            context.EffectSummaryFileCount,
             analyzerConfigs.TotalCount,
             analyzerConfigs.Items,
             additionalFiles.TotalCount,

@@ -9,14 +9,11 @@ internal sealed class SharpProofAttributeIdentityPolicy {
             StringComparer.Ordinal,
             "AllowedCapabilitiesAttribute",
             "AllowedExceptionsAttribute",
-            "AllowSynchronizationAttribute",
             "DoesNotThrowAttribute",
+            "EffectContractAttribute",
             "EnforcePureAttribute",
             "EnsuresAttribute",
             "ExpectedComplexityAttribute",
-            "ImpureAttribute",
-            "PureAttribute",
-            "PureExternalAttribute",
             "RequiresAttribute",
             "ZeroAllocationsAttribute");
 
@@ -111,16 +108,7 @@ internal sealed class SharpProofAttributeIdentityPolicy {
             !SharpProofAttributeNames.Contains(attributeClass.Name))
             return false;
 
-        if (IsRecognizedExternalPureAttribute(attributeClass)) return false;
-
         return !IsAccepted(attributeClass, attributeClass.Name);
-    }
-
-    internal static bool IsRecognizedExternalPureAttribute(INamedTypeSymbol attributeClass) {
-        return string.Equals(attributeClass.Name, "PureAttribute", StringComparison.Ordinal) &&
-               (string.Equals(GetNamespaceName(attributeClass), "JetBrains.Annotations", StringComparison.Ordinal) ||
-                string.Equals(GetNamespaceName(attributeClass), "System.Diagnostics.Contracts",
-                    StringComparison.Ordinal));
     }
 
     internal static string GetDisplayName(INamedTypeSymbol attributeClass) {
@@ -138,9 +126,6 @@ internal sealed class SharpProofAttributeIdentityPolicy {
     }
 
     private static AssociatedAttributePolicy GetAssociatedAttributePolicy(string attributeTypeName) {
-        if (attributeTypeName == "ImpureAttribute")
-            return AssociatedAttributePolicy.PropertyForAnyAccessor;
-
         return attributeTypeName is
             "AllowedCapabilitiesAttribute" or
             "AllowedExceptionsAttribute" or
@@ -148,8 +133,7 @@ internal sealed class SharpProofAttributeIdentityPolicy {
             "EnforcePureAttribute" or
             "EnsuresAttribute" or
             "ExpectedComplexityAttribute" or
-            "PureAttribute" or
-            "PureExternalAttribute" or
+            "EffectContractAttribute" or
             "ZeroAllocationsAttribute"
             ? AssociatedAttributePolicy.PropertyForGetter
             : AssociatedAttributePolicy.None;

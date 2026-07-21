@@ -5,7 +5,6 @@ internal static partial class ExceptionFlowEngine {
         ExceptionFlowAnalyzer.MethodCallCandidate call,
         Compilation compilation,
         CancellationToken cancellationToken,
-        EffectSummaryCatalog exceptionSummaryCatalog,
         HashSet<IMethodSymbol> visitedMethods,
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy) {
@@ -25,7 +24,6 @@ internal static partial class ExceptionFlowEngine {
                 syntax,
                 semanticModel,
                 cancellationToken,
-                exceptionSummaryCatalog,
                 smtAnalysis,
                 attributePolicy,
                 visitedMethods);
@@ -65,48 +63,18 @@ internal static partial class ExceptionFlowEngine {
         ExceptionFlowAnalyzer.MethodCallCandidate call,
         Compilation compilation,
         CancellationToken cancellationToken,
-        EffectSummaryCatalog exceptionSummaryCatalog,
         HashSet<IMethodSymbol> visitedMethods,
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var invokedMethod = call.Method;
-        foreach (var exception in CollectSourceCalleeExceptionSites(call, compilation, cancellationToken,
-                     exceptionSummaryCatalog, visitedMethods, smtAnalysis, attributePolicy)) yield return exception;
-
-        if (!exceptionSummaryCatalog.TryGetExceptionInfos(invokedMethod, compilation, out var summaryExceptions))
-            yield break;
-
-        var fallbackSource = invokedMethod.OriginalDefinition.ToDisplayString();
-        foreach (var summaryException in summaryExceptions) {
-            var sources = summaryException.Sources.IsDefaultOrEmpty
-                ? ImmutableArray.Create(fallbackSource)
-                : summaryException.Sources;
-            foreach (var source in sources) {
-                var matchingEdges = summaryException.Edges.IsDefaultOrEmpty
-                    ? ImmutableArray<ExceptionFlowEdge>.Empty
-                    : summaryException.Edges
-                        .Where(edge => edge.SourcePath == null ||
-                                       string.Equals(edge.SourcePath, source, StringComparison.Ordinal))
-                        .Select(edge => new ExceptionFlowEdge(
-                            summaryException.ExceptionType,
-                            ExceptionCategories.EffectSummary,
-                            edge.SourcePath,
-                            edge.CallChain.Select(static identity => identity.ToCanonicalKey()).ToArray(),
-                            edge.CalleeIdentity?.ToCanonicalKey(),
-                            edge.Depth ?? 0))
-                        .ToImmutableArray();
-
-                yield return new ExceptionFlowSite(
-                    call.CallSite,
-                    invokedMethod,
-                    TryResolveExceptionType(compilation, summaryException.ExceptionType),
-                    summaryException.ExceptionType,
-                    ExceptionCategories.EffectSummary,
-                    source,
-                    invokedMethod.OriginalDefinition.ToDisplayString(),
-                    matchingEdges);
-            }
-        }
+        foreach (var exception in CollectSourceCalleeExceptionSites(
+                     call,
+                     compilation,
+                     cancellationToken,
+                     visitedMethods,
+                     smtAnalysis,
+                     attributePolicy))
+            yield return exception;
     }
 
     private static ImmutableArray<string> CreatePrefixedCalleeChain(string invokedMethodDisplay, string qualifiedSource) {

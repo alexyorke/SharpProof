@@ -5,12 +5,12 @@ namespace SharpProof.Analyzer;
 internal static class MethodRequiresAnalyzer {
     internal static void AnalyzeSymbolForRequires(
         MethodBodyAnalysisContext context,
-        CompilationPurityService purityService,
+        AnalyzerProofService purityService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
 
-        if (PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return;
+        if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
 
         var contracts =
             RequiresContractHelpers.CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);
@@ -57,7 +57,7 @@ internal static class MethodRequiresAnalyzer {
 
     private static void AnalyzeCallSitesForRequires(
         MethodBodyAnalysisContext context,
-        CompilationPurityService purityService,
+        AnalyzerProofService purityService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         foreach (var callSite in context.Snapshot.VisibleOperations.SelectMany(static operation =>

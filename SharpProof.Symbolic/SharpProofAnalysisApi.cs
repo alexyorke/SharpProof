@@ -1,21 +1,20 @@
 namespace SharpProof.Symbolic;
 
-public enum SharpProofQueryKind {
-    SourceLocation,
-    Method,
-    Invariant,
-    Reachability,
-    Condition,
-    RuntimeHazards,
-    Capabilities,
-    Complexity
-}
-
 public enum SharpProofQueryStatus {
     Succeeded,
     Unknown,
     Failed,
     Canceled
+}
+
+[Flags]
+public enum SharpProofAnalysisFacet {
+    None = 0,
+    Effects = 1,
+    ProofFacts = 2,
+    RuntimeHazards = 4,
+    Complexity = 8,
+    All = Effects | ProofFacts | RuntimeHazards | Complexity
 }
 
 public enum SharpProofTargetKind {
@@ -95,20 +94,10 @@ public sealed record SharpProofAnalysisBudget(
     }
 }
 
-public sealed record SharpProofQuery(
-    SharpProofQueryKind Kind,
+public sealed record SharpProofAnalysisRequest(
     SharpProofTarget Target,
-    string? Condition = null,
-    bool IncludeUnprovenHazards = false,
-    ImmutableArray<string> HazardKinds = default);
-
-public sealed record SharpProofLocation(
-    string FilePath,
-    int? Line,
-    int? Column,
-    int? Position,
-    int? SpanStart,
-    int? SpanEnd);
+    SharpProofAnalysisFacet Facets = SharpProofAnalysisFacet.All,
+    string? Condition = null);
 
 public sealed record SharpProofUnknownReason(
     string Code,
@@ -129,25 +118,7 @@ public sealed record SharpProofBudgetMetadata(
     public bool IsExhausted => !Truncations.IsDefaultOrEmpty;
 }
 
-public abstract record SharpProofQueryPayload {
-    internal SharpProofPayloadMetadata Metadata { get; init; } = null!;
-}
-
-public sealed record SourceQueryPayload(
-    int ProgramPointCount,
-    string Invariant,
-    int ConditionProofCount,
-    int UnknownProofCount,
-    bool AllConditionsHold,
-    int ConservativeUnknownCount,
-    int ReachabilityUnknownCount,
-    SharpProofSmtMetadata Smt) : SharpProofQueryPayload;
-
-public sealed record ConditionQueryPayload(
-    string Condition,
-    string Truth,
-    string Reason,
-    bool IsSolverBacked) : SharpProofQueryPayload;
+public sealed record SharpProofEvidence(string Status, string Reason);
 
 public sealed record SharpProofHazard(
     string Kind,
@@ -155,182 +126,11 @@ public sealed record SharpProofHazard(
     string Reason,
     string ExceptionType,
     string Operation,
-    SharpProofLocation Location);
-
-public sealed record RuntimeHazardQueryPayload(
-    ImmutableArray<SharpProofHazard> Hazards,
-    SharpProofSmtMetadata Smt) : SharpProofQueryPayload;
-
-public sealed record CapabilityQueryPayload(
-    string Method,
-    string Capabilities,
-    ImmutableArray<string> Sites,
-    bool HasUnknowns,
-    int UnknownCount) : SharpProofQueryPayload;
-
-public sealed record ComplexityQueryPayload(
-    string Method,
-    string Complexity,
-    string Kind,
-    bool IsConservative,
-    bool IsUnknown,
-    bool IsRecursiveUnknown,
-    int UnknownCount,
-    ImmutableArray<string> Drivers,
-    ImmutableArray<string> CalleeSummaries) : SharpProofQueryPayload;
-
-internal static class SharpProofPayloadProjector {
-    internal static SourceQueryPayload From(SymbolicQueryResult value) {
-        var proofs = value.ProgramPoints.SelectMany(static point => point.ConditionProofs).ToArray();
-        return new(
-            value.ProgramPointCount,
-            value.InvariantInfo.MergedText,
-            proofs.Select(static proof => proof.Condition).Distinct(StringComparer.Ordinal).Count(),
-            value.Metrics.ProofUnknownCount,
-            proofs.GroupBy(static proof => proof.Condition, StringComparer.Ordinal).All(static group =>
-                group.Any(static proof => proof.TruthValue == SymbolicTruthValue.ProvenTrue) &&
-                group.All(static proof => proof.TruthValue is
-                    SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable)),
-            value.MergedPathFacts.ConservativeUnknownCount,
-            value.Metrics.ReachabilityUnknownCount,
-            SharpProofSmtMetadata.From(value.SmtDiagnostics))
-        { Metadata = SharpProofPayloadMetadata.From(value) };
-    }
-
-    internal static ConditionQueryPayload From(SymbolicConditionProofResult value) => new(
-        value.Condition,
-        value.TruthValue.ToString(),
-        value.Reason,
-        value.IsSolverBacked)
-    { Metadata = SharpProofPayloadMetadata.From(value) };
-
-    internal static RuntimeHazardQueryPayload From(SymbolicRuntimeHazardQueryResult value) => new(
-        value.Hazards.Select(static hazard => new SharpProofHazard(
-            hazard.Kind.ToString(),
-            hazard.Status.ToString(),
-            hazard.StatusReason,
-            hazard.ExceptionType,
-            hazard.OperationText,
-            new SharpProofLocation(hazard.FilePath, hazard.Line, hazard.Column, null,
-                hazard.SpanStart, hazard.SpanEnd))).ToImmutableArray(),
-        SharpProofSmtMetadata.From(value.SmtDiagnostics))
-    { Metadata = SharpProofPayloadMetadata.From(value) };
-
-    internal static CapabilityQueryPayload From(SymbolicCapabilityResult value) => new(
-        value.MethodDisplayName,
-        value.CapabilityText,
-        value.Sites.Select(static site => site.OperationText).ToImmutableArray(),
-        value.HasUnknowns,
-        Math.Max(value.UnknownReasons.Count, value.Sites.Count(static site => site.IsUnknown)))
-    { Metadata = SharpProofPayloadMetadata.From(value) };
-
-    internal static ComplexityQueryPayload From(SymbolicComplexityResult value) => new(
-        value.MethodDisplayName,
-        value.Complexity.Text,
-        value.Complexity.Kind.ToString(),
-        value.Complexity.IsConservative,
-        value.Complexity.IsUnknown,
-        value.Complexity.IsRecursiveUnknown,
-        Math.Max(value.UnknownReasons.Count,
-            value.Complexity.IsUnknown || value.Complexity.IsRecursiveUnknown ? 1 : 0),
-        value.Drivers.Select(static driver => driver.Description).ToImmutableArray(),
-        value.CalleeSummaries.Select(static callee =>
-            $"{callee.MethodDisplayName}: {callee.ComplexityText}").ToImmutableArray())
-    { Metadata = SharpProofPayloadMetadata.From(value) };
-}
-
-internal sealed record SharpProofPayloadMetadata(
-    SharpProofLocation Location,
-    ImmutableArray<SharpProofUnknownReason> UnknownReasons,
-    SymbolicAnalysisTruncationInfo Truncation,
-    ImmutableArray<SharpProofEvidence> Evidence) {
-    internal static SharpProofPayloadMetadata From(SymbolicQueryResult value) => new(
-        new SharpProofLocation(value.FilePath, value.Line, value.Column, value.Position, value.SpanStart, value.SpanEnd),
-        ConvertUnknownReasons(GetSourceUnknownReasons(value)),
-        value.AnalysisTruncation,
-        ConvertEvidence(value.ReachabilityWitnesses));
-
-    internal static SharpProofPayloadMetadata From(SymbolicConditionProofResult value) => new(
-        new SharpProofLocation(value.FilePath ?? string.Empty, value.Line, value.Column, value.Position,
-            value.NodeSpanStart, value.NodeSpanEnd),
-        value.TruthValue == SymbolicTruthValue.Unknown
-            ? ConvertUnknownReasons(new[] {
-                SymbolicUnknownReasonTaxonomy.ForProof(SymbolicUnknownReason.Unknown, value.Reason)
-            })
-            : ImmutableArray<SharpProofUnknownReason>.Empty,
-        value.AnalysisTruncation,
-        ConvertEvidence(ImmutableArray.Create(value.Witness, value.CounterexampleWitness)));
-
-    internal static SharpProofPayloadMetadata From(SymbolicRuntimeHazardQueryResult value) => new(
-        new SharpProofLocation(value.FilePath, value.Line, null, null, value.ScopeStart, value.ScopeEnd),
-        ConvertUnknownReasons(value.Hazards
-            .Where(static hazard => hazard.Status is SymbolicRuntimeHazardStatus.Unknown or
-                SymbolicRuntimeHazardStatus.Unsupported)
-            .Select(static hazard => hazard.UnknownReasonInfo)),
-        value.AnalysisTruncation,
-        ConvertEvidence(value.TriggerWitnesses));
-
-    internal static SharpProofPayloadMetadata From(SymbolicCapabilityResult value) => new(
-        FromMethodResult(value),
-        ConvertUnknownReasons(value.UnknownReasonDetails),
-        SymbolicAnalysisTruncationInfo.None,
-        ImmutableArray<SharpProofEvidence>.Empty);
-
-    internal static SharpProofPayloadMetadata From(SymbolicComplexityResult value) => new(
-        FromMethodResult(value),
-        ConvertUnknownReasons(value.UnknownReasonDetails),
-        SymbolicAnalysisTruncationInfo.None,
-        ImmutableArray<SharpProofEvidence>.Empty);
-
-    private static IEnumerable<SymbolicUnknownReasonInfo> GetSourceUnknownReasons(SymbolicQueryResult result) {
-        foreach (var proof in result.ProgramPoints.SelectMany(static point => point.ConditionProofs))
-            if (proof.TruthValue == SymbolicTruthValue.Unknown)
-                yield return SymbolicUnknownReasonTaxonomy.ForProof(
-                    SymbolicUnknownReason.Unknown,
-                    proof.Reason);
-
-        foreach (var point in result.ProgramPoints)
-            if (point.Reachability == SymbolicReachability.Unknown)
-                yield return SymbolicUnknownReasonTaxonomy.ForProof(
-                    SymbolicUnknownReason.Unknown,
-                    point.ReachabilityReason);
-    }
-
-    private static ImmutableArray<SharpProofUnknownReason> ConvertUnknownReasons(
-        IEnumerable<SymbolicUnknownReasonInfo> reasons) => reasons
-        .Where(static reason => reason.IsUnknown)
-        .Select(static reason => new SharpProofUnknownReason(
-            reason.Code,
-            reason.Category.ToString(),
-            reason.RawReason,
-            reason.IsRetryable,
-            reason.IsConfigurationRelated))
-        .Distinct()
-        .ToImmutableArray();
-
-    private static ImmutableArray<SharpProofEvidence> ConvertEvidence(IEnumerable<SymbolicInputWitness> evidence) =>
-        evidence.Select(static witness =>
-            new SharpProofEvidence(witness.Status.ToString(), witness.Reason)).ToImmutableArray();
-
-    private static SharpProofLocation FromMethodResult(SymbolicMethodResult result) => new(
-        result.FilePath,
-        result.StartLine,
-        result.StartColumn,
-        result.SpanStart,
-        result.SpanStart,
-        result.SpanEnd);
-}
-
-public sealed record SharpProofSmtMetadata(
-    string State,
-    string LastFailureCode,
-    int ExecutedQueryCount) {
-    internal static SharpProofSmtMetadata From(SymbolicSmtDiagnostics diagnostics) =>
-        new(diagnostics.Health.State.ToString(), diagnostics.Health.LastFailureCode,
-            diagnostics.ExecutedQueryCount);
-}
-
-public sealed record SharpProofEvidence(string Status, string Reason);
+    string FilePath,
+    int? Line,
+    int? Column,
+    int? SpanStart,
+    int? SpanEnd);
 
 public enum SharpProofErrorCategory {
     Usage,
@@ -352,21 +152,24 @@ public sealed record SharpProofError(
     bool IsRetryable,
     ImmutableDictionary<string, string> Details);
 
-public sealed record SharpProofQueryResult(
+public sealed record SharpProofAnalysisResult(
+    SharpProofTarget Target,
     SharpProofQueryStatus Status,
-    SharpProofQuery Query,
-    SharpProofLocation Location,
+    MethodEffects? MethodEffects,
+    SharpProofVerdict Purity,
+    SharpProofVerdict AllocationFree,
+    SharpProofVerdict DoesNotThrow,
+    ImmutableArray<string> ProofFacts,
+    ImmutableArray<SharpProofHazard> Hazards,
+    string? Complexity,
     ImmutableArray<SharpProofUnknownReason> UnknownReasons,
-    SharpProofBudgetMetadata Budget,
     ImmutableArray<SharpProofEvidence> Evidence,
-    SharpProofQueryPayload? Payload,
-    SharpProofError? Error) {
-    public bool IsSuccess => Status is SharpProofQueryStatus.Succeeded or SharpProofQueryStatus.Unknown;
-}
+    SharpProofBudgetMetadata Budget,
+    SharpProofError? Error);
 
 public sealed class SharpProofAnalysisSession : IDisposable {
-    private readonly ConcurrentDictionary<SharpProofQuery, Lazy<SharpProofQueryResult>> _results = new();
-    private readonly SymbolicQueryExecutor _executor;
+    private readonly ConcurrentDictionary<SharpProofAnalysisRequest, Lazy<SharpProofAnalysisResult>> _results = new();
+    private readonly SymbolicQueryExecutor _executor = new();
     private readonly SmtAnalysisService? _ownedSmtAnalysis;
     private readonly SymbolicSourceInput _source;
     private readonly SymbolicQueryOptions _options;
@@ -376,10 +179,9 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         SymbolicSourceInput source,
         SymbolicQueryOptions options,
         SmtAnalysisService? ownedSmtAnalysis = null) {
-        _source = source ?? throw new ArgumentNullException(nameof(source));
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _source = source;
+        _options = options;
         _ownedSmtAnalysis = ownedSmtAnalysis;
-        _executor = new SymbolicQueryExecutor();
     }
 
     public static SharpProofAnalysisSession FromText(
@@ -387,46 +189,40 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         string? filePath = null,
         SharpProofAnalysisOptions? options = null) {
         options ??= new SharpProofAnalysisOptions();
-        var smtAnalysis = options.EnableSmt
-            ? new SmtAnalysisService(SmtAnalysisOptions.Default)
-            : null;
+        var smt = options.EnableSmt ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
         return new SharpProofAnalysisSession(
             SymbolicSourceInput.FromText(sourceText, filePath),
-            CreateQueryOptions(options, smtAnalysis),
-            smtAnalysis);
+            CreateQueryOptions(options, smt),
+            smt);
     }
 
     public static SharpProofAnalysisSession FromFile(
         string filePath,
         SharpProofAnalysisOptions? options = null) {
         options ??= new SharpProofAnalysisOptions();
-        var smtAnalysis = options.EnableSmt
-            ? new SmtAnalysisService(SmtAnalysisOptions.Default)
-            : null;
+        var smt = options.EnableSmt ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
         return new SharpProofAnalysisSession(
             SymbolicSourceInput.FromFile(filePath),
-            CreateQueryOptions(options, smtAnalysis),
-            smtAnalysis);
+            CreateQueryOptions(options, smt),
+            smt);
     }
 
-    public SharpProofQueryResult Analyze(
-        SharpProofQuery query,
+    public SharpProofAnalysisResult Analyze(
+        SharpProofAnalysisRequest request,
         CancellationToken cancellationToken = default) {
-        if (query == null) throw new ArgumentNullException(nameof(query));
+        if (request == null) throw new ArgumentNullException(nameof(request));
         if (_disposed) throw new ObjectDisposedException(nameof(SharpProofAnalysisSession));
-        if (cancellationToken.CanBeCanceled) return Execute(query, cancellationToken);
+        if (cancellationToken.CanBeCanceled) return Execute(request, cancellationToken);
 
-        var lazy = _results.GetOrAdd(
-            query,
-            request => new Lazy<SharpProofQueryResult>(
-                () => Execute(request, cancellationToken),
-                LazyThreadSafetyMode.ExecutionAndPublication));
+        var lazy = _results.GetOrAdd(request, value => new Lazy<SharpProofAnalysisResult>(
+            () => Execute(value, cancellationToken),
+            LazyThreadSafetyMode.ExecutionAndPublication));
         try {
             return lazy.Value;
         }
         catch {
-            if (_results.TryGetValue(query, out var current) && ReferenceEquals(current, lazy))
-                _results.TryRemove(query, out _);
+            if (_results.TryGetValue(request, out var current) && ReferenceEquals(current, lazy))
+                _results.TryRemove(request, out _);
             throw;
         }
     }
@@ -437,106 +233,210 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         _ownedSmtAnalysis?.Dispose();
     }
 
-    private SharpProofQueryResult Execute(SharpProofQuery query, CancellationToken cancellationToken) {
+    private SharpProofAnalysisResult Execute(
+        SharpProofAnalysisRequest request,
+        CancellationToken cancellationToken) {
         try {
-            var context = new SymbolicQueryContext(_source, query.Target, _options);
-            return query.Kind switch {
-                SharpProofQueryKind.Condition => FromPayload(
-                    query,
-                    SharpProofPayloadProjector.From(
-                        _executor.Prove(context, RequireCondition(query), cancellationToken))),
-                SharpProofQueryKind.RuntimeHazards => FromPayload(
-                    query,
-                    SharpProofPayloadProjector.From(
-                        _executor.QueryRuntimeHazards(
-                            context,
-                            new SymbolicRuntimeHazardQueryOptions(
-                                query.IncludeUnprovenHazards,
-                                query.HazardKinds.IsDefaultOrEmpty
-                                    ? null
-                                    : query.HazardKinds.Select(static kind =>
-                                        (SymbolicRuntimeHazardKind)Enum.Parse(
-                                            typeof(SymbolicRuntimeHazardKind), kind, true))),
-                            cancellationToken))),
-                SharpProofQueryKind.Capabilities => FromPayload(
-                    query,
-                    SharpProofPayloadProjector.From(_executor.QueryCapabilities(context, cancellationToken))),
-                SharpProofQueryKind.Complexity => FromPayload(
-                    query,
-                    SharpProofPayloadProjector.From(_executor.QueryComplexity(context, cancellationToken))),
-                _ => FromPayload(
-                    query,
-                    SharpProofPayloadProjector.From(_executor.Query(context, cancellationToken)))
-            };
+            MethodEffects? effects = null;
+            var unknowns = ImmutableArray.CreateBuilder<SharpProofUnknownReason>();
+            var evidence = ImmutableArray.CreateBuilder<SharpProofEvidence>();
+            var proofFacts = ImmutableArray.CreateBuilder<string>();
+            var hazards = ImmutableArray.CreateBuilder<SharpProofHazard>();
+            var truncations = ImmutableArray.CreateBuilder<SharpProofTruncationReason>();
+            string? complexity = null;
+            var context = new SymbolicQueryContext(_source, request.Target, _options);
+
+            if ((request.Facets & SharpProofAnalysisFacet.Effects) != 0) {
+                effects = AnalyzeMethodEffects(context, cancellationToken);
+                unknowns.AddRange(effects.UnknownReasons);
+                evidence.AddRange(effects.Sites.Select(static site =>
+                    new SharpProofEvidence(site.Reason, site.Operation)));
+            }
+
+            if ((request.Facets & SharpProofAnalysisFacet.ProofFacts) != 0)
+                AnalyzeProofFacts(request, context, proofFacts, unknowns, evidence, truncations, cancellationToken);
+
+            if ((request.Facets & SharpProofAnalysisFacet.RuntimeHazards) != 0)
+                AnalyzeHazards(context, hazards, unknowns, evidence, truncations, cancellationToken);
+
+            if ((request.Facets & SharpProofAnalysisFacet.Complexity) != 0)
+                complexity = AnalyzeComplexity(context, unknowns, cancellationToken);
+
+            return new SharpProofAnalysisResult(
+                request.Target,
+                unknowns.Count == 0 && truncations.Count == 0
+                    ? SharpProofQueryStatus.Succeeded
+                    : SharpProofQueryStatus.Unknown,
+                effects,
+                effects?.Purity ?? SharpProofVerdict.Unknown,
+                effects?.AllocationFree ?? SharpProofVerdict.Unknown,
+                effects?.DoesNotThrow ?? SharpProofVerdict.Unknown,
+                proofFacts.ToImmutable(),
+                hazards.ToImmutable(),
+                complexity,
+                unknowns.Distinct().ToImmutableArray(),
+                evidence.ToImmutable(),
+                new SharpProofBudgetMetadata(truncations.ToImmutable()),
+                null);
         }
         catch (Exception exception) when (!SymbolicErrorClassifier.IsFatal(exception)) {
             var error = SymbolicErrorClassifier.FromException(exception);
-            return new SharpProofQueryResult(
+            return new SharpProofAnalysisResult(
+                request.Target,
                 error.Category == SharpProofErrorCategory.Cancellation
                     ? SharpProofQueryStatus.Canceled
                     : SharpProofQueryStatus.Failed,
-                query,
-                CreateLocation(query.Target),
-                ImmutableArray<SharpProofUnknownReason>.Empty,
-                new SharpProofBudgetMetadata(ImmutableArray<SharpProofTruncationReason>.Empty),
-                ImmutableArray<SharpProofEvidence>.Empty,
                 null,
+                SharpProofVerdict.Unknown,
+                SharpProofVerdict.Unknown,
+                SharpProofVerdict.Unknown,
+                ImmutableArray<string>.Empty,
+                ImmutableArray<SharpProofHazard>.Empty,
+                null,
+                ImmutableArray<SharpProofUnknownReason>.Empty,
+                ImmutableArray<SharpProofEvidence>.Empty,
+                new SharpProofBudgetMetadata(ImmutableArray<SharpProofTruncationReason>.Empty),
                 error);
         }
     }
 
-    private static string RequireCondition(SharpProofQuery query) {
-        if (string.IsNullOrWhiteSpace(query.Condition))
-            throw new ArgumentException("Condition text is required.", nameof(query));
-        return query.Condition!;
+    private MethodEffects AnalyzeMethodEffects(
+        SymbolicQueryContext context,
+        CancellationToken cancellationToken) =>
+        SymbolicMethodLikeQueryDispatcher.Execute(
+            context,
+            SymbolicSourceCompilationKind.Query,
+            "Method-effect source kind is not supported.",
+            "Method-effect analysis supports point, position, line, or node targets only.",
+            "Method-effect node queries require a node target.",
+            static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true),
+            static (resolved, compilation, token) => {
+                if (resolved.MethodSymbol == null)
+                    throw new ArgumentException("Could not resolve the target method.");
+                return new MethodEffectAnalysisSession(compilation, token).Analyze(
+                    resolved.MethodSymbol,
+                    resolved.Declaration,
+                    resolved.SemanticModel);
+            },
+            cancellationToken);
+
+    private void AnalyzeProofFacts(
+        SharpProofAnalysisRequest request,
+        SymbolicQueryContext context,
+        ImmutableArray<string>.Builder facts,
+        ImmutableArray<SharpProofUnknownReason>.Builder unknowns,
+        ImmutableArray<SharpProofEvidence>.Builder evidence,
+        ImmutableArray<SharpProofTruncationReason>.Builder truncations,
+        CancellationToken cancellationToken) {
+        if (!string.IsNullOrWhiteSpace(request.Condition)) {
+            var proof = _executor.Prove(context, request.Condition!, cancellationToken);
+            facts.Add($"{proof.Condition}: {proof.TruthValue} ({proof.Reason})");
+            if (proof.TruthValue == SymbolicTruthValue.Unknown)
+                unknowns.Add(Convert(SymbolicUnknownReasonTaxonomy.ForProof(
+                    SymbolicUnknownReason.Unknown,
+                    proof.Reason)));
+            AddEvidence(evidence, proof.Witness, proof.CounterexampleWitness);
+            AddTruncations(truncations, proof.AnalysisTruncation);
+            return;
+        }
+
+        var result = _executor.Query(context, cancellationToken);
+        facts.Add(result.InvariantInfo.MergedText);
+        foreach (var proof in result.ProgramPoints.SelectMany(static point => point.ConditionProofs))
+            if (proof.TruthValue == SymbolicTruthValue.Unknown)
+                unknowns.Add(Convert(SymbolicUnknownReasonTaxonomy.ForProof(
+                    SymbolicUnknownReason.Unknown,
+                    proof.Reason)));
+        foreach (var point in result.ProgramPoints)
+            if (point.Reachability == SymbolicReachability.Unknown)
+                unknowns.Add(Convert(SymbolicUnknownReasonTaxonomy.ForProof(
+                    SymbolicUnknownReason.Unknown,
+                    point.ReachabilityReason)));
+        evidence.AddRange(result.ReachabilityWitnesses.Select(static witness =>
+            new SharpProofEvidence(witness.Status.ToString(), witness.Reason)));
+        AddTruncations(truncations, result.AnalysisTruncation);
     }
 
-    private SharpProofQueryResult FromPayload(SharpProofQuery query, SharpProofQueryPayload payload) {
-        var unknownReasons = payload.Metadata.UnknownReasons;
-        var truncation = payload.Metadata.Truncation;
-        var status = unknownReasons.IsDefaultOrEmpty && !truncation.IsTruncated
-            ? SharpProofQueryStatus.Succeeded
-            : SharpProofQueryStatus.Unknown;
-        return new SharpProofQueryResult(
-            status,
-            query,
-            GetLocation(query.Target, payload.Metadata.Location),
-            unknownReasons,
-            new SharpProofBudgetMetadata(
-                truncation.Events.Select(static item => new SharpProofTruncationReason(
-                    item.Code,
-                    item.Limit,
-                    item.Observed,
-                    item.Provenance,
-                    item.SourceSpanStart)).ToImmutableArray()),
-            payload.Metadata.Evidence,
-            payload,
-            null);
+    private void AnalyzeHazards(
+        SymbolicQueryContext context,
+        ImmutableArray<SharpProofHazard>.Builder hazards,
+        ImmutableArray<SharpProofUnknownReason>.Builder unknowns,
+        ImmutableArray<SharpProofEvidence>.Builder evidence,
+        ImmutableArray<SharpProofTruncationReason>.Builder truncations,
+        CancellationToken cancellationToken) {
+        if (_options.SmtAnalysis == null) {
+            unknowns.Add(new SharpProofUnknownReason(
+                "SP-SMT-REQUIRED",
+                "Configuration",
+                "Runtime-hazard analysis requires EnableSmt.",
+                false,
+                true));
+            return;
+        }
+
+        var result = _executor.QueryRuntimeHazards(
+            context,
+            new SymbolicRuntimeHazardQueryOptions(true),
+            cancellationToken);
+        hazards.AddRange(result.Hazards.Select(static hazard => new SharpProofHazard(
+            hazard.Kind.ToString(),
+            hazard.Status.ToString(),
+            hazard.StatusReason,
+            hazard.ExceptionType,
+            hazard.OperationText,
+            hazard.FilePath,
+            hazard.Line,
+            hazard.Column,
+            hazard.SpanStart,
+            hazard.SpanEnd)));
+        unknowns.AddRange(result.Hazards
+            .Where(static hazard => hazard.Status is SymbolicRuntimeHazardStatus.Unknown or
+                SymbolicRuntimeHazardStatus.Unsupported)
+            .Select(static hazard => Convert(hazard.UnknownReasonInfo)));
+        evidence.AddRange(result.TriggerWitnesses.Select(static witness =>
+            new SharpProofEvidence(witness.Status.ToString(), witness.Reason)));
+        AddTruncations(truncations, result.AnalysisTruncation);
     }
 
-    private SharpProofLocation GetLocation(SharpProofTarget target, SharpProofLocation location) {
-        if (!string.IsNullOrEmpty(location.FilePath)) return location;
-        return location with { FilePath = _source.FilePath ?? CreateLocation(target).FilePath };
+    private string AnalyzeComplexity(
+        SymbolicQueryContext context,
+        ImmutableArray<SharpProofUnknownReason>.Builder unknowns,
+        CancellationToken cancellationToken) {
+        var result = _executor.QueryComplexity(context, cancellationToken);
+        unknowns.AddRange(result.UnknownReasonDetails.Select(static reason => Convert(reason)));
+        return result.Complexity.Text;
     }
 
-    private SharpProofLocation CreateLocation(SharpProofTarget target) {
-        return new SharpProofLocation(
-            _source.FilePath ?? string.Empty,
-            target.Line ?? target.StartLine,
-            target.Column ?? target.StartColumn,
-            target.Position,
-            target.SpanStart,
-            target.SpanEnd);
-    }
+    private static SharpProofUnknownReason Convert(SymbolicUnknownReasonInfo reason) => new(
+        reason.Code,
+        reason.Category.ToString(),
+        reason.RawReason,
+        reason.IsRetryable,
+        reason.IsConfigurationRelated);
+
+    private static void AddEvidence(
+        ImmutableArray<SharpProofEvidence>.Builder evidence,
+        params SymbolicInputWitness[] witnesses) =>
+        evidence.AddRange(witnesses.Select(static witness =>
+            new SharpProofEvidence(witness.Status.ToString(), witness.Reason)));
+
+    private static void AddTruncations(
+        ImmutableArray<SharpProofTruncationReason>.Builder target,
+        SymbolicAnalysisTruncationInfo truncation) =>
+        target.AddRange(truncation.Events.Select(static item => new SharpProofTruncationReason(
+            item.Code,
+            item.Limit,
+            item.Observed,
+            item.Provenance,
+            item.SourceSpanStart)));
 
     private static SymbolicQueryOptions CreateQueryOptions(
         SharpProofAnalysisOptions options,
-        SmtAnalysisService? smtAnalysis) {
-        return new SymbolicQueryOptions(
-                smtAnalysis: smtAnalysis,
-                impliedConditions: options.ImpliedConditions.IsDefault
-                    ? ImmutableArray<string>.Empty
-                    : options.ImpliedConditions,
-                analysisLimits: options.AnalysisBudget);
-    }
+        SmtAnalysisService? smt) =>
+        new(
+            smtAnalysis: smt,
+            impliedConditions: options.ImpliedConditions.IsDefault
+                ? ImmutableArray<string>.Empty
+                : options.ImpliedConditions,
+            analysisLimits: options.AnalysisBudget);
 }

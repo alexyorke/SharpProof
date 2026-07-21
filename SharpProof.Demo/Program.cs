@@ -6,8 +6,8 @@ public class Demo
 {
     private int _counter;
 
-    // Impure under [Pure] (mutates instance state) -> SP0002
-    [Pure]
+    // Impure under [EnforcePure] (mutates instance state) -> SP0002
+    [EnforcePure]
     public int AddImpure(int a, int b)
     {
         _counter++;
@@ -20,8 +20,8 @@ public class Demo
         return a + b;
     }
 
-    // Pure and correctly annotated (using [Pure]) -> no diagnostic
-    [Pure]
+    // Pure and correctly annotated -> no diagnostic
+    [EnforcePure]
     public static int ProperPureAdd(int a, int b)
     {
         return a + b;
@@ -32,23 +32,23 @@ public static class ImpureScenarios
 {
     private static int _global;
 
-    // I/O under [Pure] -> SP0002
-    [Pure]
+    // I/O under [EnforcePure] -> SP0002
+    [EnforcePure]
     public static void Log(string message)
     {
         Console.WriteLine(message);
     }
 
-    // Static state mutation under [Pure] -> SP0002
-    [Pure]
+    // Static state mutation under [EnforcePure] -> SP0002
+    [EnforcePure]
     public static int IncrementGlobal(int delta)
     {
         _global += delta;
         return _global;
     }
 
-    // Using [Pure] as enforcement, still impure -> SP0002
-    [Pure]
+    // Enforced but still impure -> SP0002
+    [EnforcePure]
     public static void MutateThroughPureAlias()
     {
         _global++;
@@ -74,8 +74,8 @@ public class PureScenarios
         return a + b;
     }
 
-    // Properly annotated pure method (using [Pure]) -> no diagnostic
-    [Pure]
+    // Properly annotated pure method -> no diagnostic
+    [EnforcePure]
     public static bool IsEven(int v)
     {
         return (v & 1) == 0;

@@ -35,9 +35,6 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
                         if (!session.Baseline.IsSuppressed(diagnostic)) endContext.ReportDiagnostic(diagnostic);
                     }
 
-                    foreach (var compatibilityIssue in session.EffectSummaryCompatibilityReporter.GetIssues())
-                        endContext.ReportDiagnostic(CreateInvalidAdditionalFileDiagnostic(compatibilityIssue));
-
                     TrustedBoundaryReviewAnalyzer.ReportDiagnostics(endContext, session);
                 }
                 finally {
@@ -71,17 +68,6 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
                         session.Baseline,
                         session.AttributePolicy),
                     SyntaxKind.AttributeList);
-
-            if (session.Features.Includes(AnalyzerFeatures.CommonBugs)) {
-                startContext.RegisterSymbolAction(
-                    c => CommonBugAnalyzer.AnalyzeNamedType(c, session),
-                    SymbolKind.NamedType);
-                startContext.RegisterSyntaxNodeAction(
-                    c => CommonBugAnalyzer.AnalyzeSuppressionAttribute(c, session),
-                    SyntaxKind.Attribute);
-                startContext.RegisterSyntaxTreeAction(
-                    c => CommonBugAnalyzer.AnalyzeSyntaxTree(c, session));
-            }
 
             startContext.RegisterSyntaxTreeAction(c => AnalyzeTreeConfiguration(c, session.Baseline));
         });
@@ -136,19 +122,4 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
             });
     }
 
-    private static Diagnostic CreateInvalidAdditionalFileDiagnostic(
-        AnalyzerAdditionalFileIssue issue) {
-        var path = string.IsNullOrWhiteSpace(issue.Path) ? "<unknown>" : issue.Path;
-        var properties = ImmutableDictionary<string, string?>.Empty
-            .Add("sharpproof.additional_file.path", path)
-            .Add("sharpproof.additional_file.reason", issue.Reason)
-            .Add("sharpproof.additional_file.reason_code", issue.ReasonCode);
-
-        return Diagnostic.Create(
-            AnalyzerDiagnosticCatalog.Get("InvalidAdditionalFileRule"),
-            Location.None,
-            null,
-            properties,
-            new object[] { path, issue.Reason });
-    }
 }

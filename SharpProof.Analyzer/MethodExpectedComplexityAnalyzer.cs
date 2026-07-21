@@ -9,7 +9,7 @@ internal static class MethodExpectedComplexityAnalyzer {
 
         var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
 
-        if (Engine.PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return;
+        if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
 
         if (!TryGetExpectedComplexity(
                 methodSymbol,

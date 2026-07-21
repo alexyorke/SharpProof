@@ -6,7 +6,6 @@ internal static partial class ExceptionFlowEngine {
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        EffectSummaryCatalog exceptionSummaryCatalog,
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy,
         HashSet<IMethodSymbol>? visitedMethods = null) {
@@ -27,7 +26,6 @@ internal static partial class ExceptionFlowEngine {
                 semanticModel,
                 cancellationToken,
                 methodSymbol,
-                exceptionSummaryCatalog,
                 visitedMethods,
                 smtAnalysis,
                 attributePolicy,

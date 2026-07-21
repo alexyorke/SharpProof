@@ -12,13 +12,12 @@
 
 	<!-- Keep intentional teaching diagnostics visible for direct demo builds while the repository solution gate stays warning-free. -->
 	<PropertyGroup Condition="'$(BuildingSolutionFile)' == 'true'">
-		<NoWarn>$(NoWarn);SP0002;SP0004</NoWarn>
+		<NoWarn>$(NoWarn);SP0002</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<GlobalAnalyzerConfigFiles Include="SharpProof.globalconfig" />
 		<AdditionalFiles Include="SharpProof.Baseline.json" />
-		<AdditionalFiles Include="Demo.SharpProof.EffectSummary.json" />
 	</ItemGroup>
 
 	<ItemGroup>

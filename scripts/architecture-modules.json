@@ -46,12 +46,6 @@
       "allowedProjectReferences": [ "Analyzer", "Attributes" ]
     },
     {
-      "name": "EffectSummary",
-      "layer": 4,
-      "pathPrefixes": [ "Tools/SharpProof.EffectSummary/" ],
-      "allowedProjectReferences": [ "Contracts", "ToolingCore" ]
-    },
-    {
       "name": "SymbolicCli",
       "layer": 4,
       "pathPrefixes": [ "Tools/SharpProof.SymbolicCli/" ],

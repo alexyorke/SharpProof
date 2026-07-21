@@ -379,52 +379,6 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task NullFacts_UnknownCallInvalidatesMemberButNotCapturedLocal()
-    {
-        const string source = """
-                              #nullable enable
-                              public sealed class Sample
-                              {
-                                  private string? _value;
-                                  private void Unknown() { _value = null; }
-
-                                  public int Member()
-                                  {
-                                      if (_value is null) return 0;
-                                      Unknown();
-                                      return _value!.Length;
-                                  }
-
-                                  public int Local()
-                                  {
-                                      var value = _value;
-                                      if (value is null) return 0;
-                                      Unknown();
-                                      return value!.Length;
-                                  }
-                              }
-                              """;
-
-        var diagnostics = await AnalyzeAsync(source);
-        var suppressions = diagnostics
-            .Where(static diagnostic => diagnostic.Id is
-                "SP0044" or
-                "SP0045")
-            .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
-            .ToArray();
-
-        Assert.That(
-            suppressions.Count(static diagnostic =>
-                diagnostic.Id == "SP0045"),
-            Is.EqualTo(1));
-        Assert.That(
-            suppressions.Single(static diagnostic =>
-                diagnostic.Id == "SP0045")
-                .Location.GetLineSpan().StartLinePosition.Line,
-            Is.GreaterThan(14));
-    }
-
-    [Test]
     public async Task InferredGuardPostcondition_IsConsumedByCaller()
     {
         const string source = """

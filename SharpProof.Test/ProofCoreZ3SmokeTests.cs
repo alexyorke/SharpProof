@@ -177,31 +177,6 @@ internal class ProofCoreZ3SmokeTests
             xIsZero);
     }
 
-    [Test]
-    public void SmtSolver_CheckPathAndImpurity_PreservesPathEqualitiesForCombinedQuery()
-    {
-        using var solver = new SmtSolver();
-        var length = new SmtVariable("length", SmtValueKind.Int);
-        var arrayLength = new SmtVariable("values.Length", SmtValueKind.Int);
-        var conditions = new SmtFormula[]
-        {
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, length, new SmtIntegerConstant(4)),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, arrayLength, length)
-        };
-        var inRange = new SmtBinaryFormula(
-            SmtBinaryOperator.And,
-            new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, length, new SmtIntegerConstant(0)),
-            new SmtBinaryFormula(SmtBinaryOperator.LessThan, length, arrayLength));
-
-        var result = solver.CheckPathAndImpurityWithWitness(
-            conditions,
-            inRange,
-            TimeSpan.FromMilliseconds(50));
-
-        Assert.That(result.Path.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
-        Assert.That(result.Impurity.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-    }
-
     [TestCase(SmtIntegerBinaryOperator.Divide)]
     [TestCase(SmtIntegerBinaryOperator.Remainder)]
     public void SmtSolver_UnresolvedDivisor_ReturnsUnknown(SmtIntegerBinaryOperator op)

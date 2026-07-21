@@ -3,14 +3,14 @@ namespace SharpProof.Analyzer;
 internal static class MethodEnsuresAnalyzer {
     internal static void AnalyzeSymbolForEnsures(
         MethodBodyAnalysisContext context,
-        CompilationPurityService purityService,
+        AnalyzerProofService purityService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
 
         var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
 
-        if (PurityAnalysisEngine.IsMetadataSymbol(methodSymbol)) return;
+        if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
 
         var contracts = CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);
         if (contracts.Length == 0) return;

@@ -2151,11 +2151,10 @@ internal class TestClass
 
         Assert.That(exitCode, Is.Zero, standardError);
         Assert.That(standardOutput, Does.Contain("Project: SharpProof.Demo"));
-        Assert.That(standardOutput, Does.Contain("Additional files: 2"));
+        Assert.That(standardOutput, Does.Contain("Additional files: 1"));
         Assert.That(standardOutput, Does.Contain("Baseline loaded: True"));
-        Assert.That(standardOutput, Does.Contain("Effect summaries: 1"));
         Assert.That(standardOutput, Does.Contain("Build diagnostics"));
-        Assert.That(standardOutput, Does.Contain("SP0004 Warning"));
+        Assert.That(standardOutput, Does.Contain("SP0002 Warning"));
         Assert.That(standardOutput, Does.Contain("Query timeout ms: 321"));
     }
 

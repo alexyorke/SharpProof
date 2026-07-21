@@ -5,7 +5,6 @@ internal static class SymbolicRuntimeExceptionFacts {
         return string.Equals(category, ExceptionCategories.DirectThrow, StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.Rethrow, StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.SourceCallee, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.EffectSummary, StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DynamicDispatch, StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DefiniteDivideByZero, StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DefiniteModuloByZero, StringComparison.Ordinal) ||
@@ -115,7 +114,6 @@ internal static class SymbolicRuntimeExceptionFacts {
         internal const string DirectThrow = "direct_throw";
         internal const string Rethrow = "rethrow";
         internal const string SourceCallee = "source_callee";
-        internal const string EffectSummary = "effect_summary";
         internal const string DynamicDispatch = "dynamic_dispatch";
         internal const string DefiniteThrowNull = "definite_throw_null";
         internal const string DefiniteDivideByZero = "definite_divide_by_zero";

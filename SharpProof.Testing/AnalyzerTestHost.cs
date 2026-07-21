@@ -89,14 +89,6 @@ internal static class AnalyzerTestHost
             ImmutableArray<AdditionalText>.Empty,
             new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
 
-    private static readonly ImmutableDictionary<string, ReportDiagnostic> CommonBugDiagnosticOptions =
-        Enumerable.Range(48, 29).ToImmutableDictionary(
-            static number => $"SP{number:0000}",
-            static number => number is 55 or 58 or 62 or 63 or 65 or 67 or 68 or 70 or 72 or 73
-                ? ReportDiagnostic.Info
-                : ReportDiagnostic.Warn,
-            StringComparer.Ordinal);
-
     public static string CreateExpressionBodiedPropertyContractSource(
         string attributeText,
         bool disablePurityPlacementDiagnostic = false)
@@ -157,7 +149,7 @@ internal static class AnalyzerTestHost
         bool allowUnsafe = false,
         ImmutableArray<AdditionalText>? additionalFiles = null,
         string? sourcePath = null,
-        bool autoEnableEffectSummaryJsonForAdditionalFiles = true,
+        bool acceptAdditionalFiles = true,
         ImmutableArray<MetadataReference>? frameworkReferences = null,
         bool concurrentAnalysis = false,
         string compilationName = "AnalyzerTestHost",
@@ -169,7 +161,7 @@ internal static class AnalyzerTestHost
             allowUnsafe,
             additionalFiles,
             sourcePath,
-            autoEnableEffectSummaryJsonForAdditionalFiles,
+            acceptAdditionalFiles,
             frameworkReferences,
             concurrentAnalysis,
             null,
@@ -183,7 +175,7 @@ internal static class AnalyzerTestHost
         bool allowUnsafe,
         ImmutableArray<AdditionalText>? additionalFiles,
         string? sourcePath,
-        bool autoEnableEffectSummaryJsonForAdditionalFiles,
+        bool acceptAdditionalFiles,
         ImmutableArray<MetadataReference>? frameworkReferences = null,
         bool concurrentAnalysis = false,
         ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
@@ -200,9 +192,6 @@ internal static class AnalyzerTestHost
         if (additionalMetadataReferences.HasValue) references = references.AddRange(additionalMetadataReferences.Value);
 
         var compilationOptions = allowUnsafe ? UnsafeCompilationOptions : DefaultCompilationOptions;
-        if (analyzerFeatures == AnalyzerFeatures.CommonBugs)
-            compilationOptions = compilationOptions.WithSpecificDiagnosticOptions(
-                compilationOptions.SpecificDiagnosticOptions.SetItems(CommonBugDiagnosticOptions));
         var compilation = CreateCompilation(
             compilationName,
             references,
@@ -212,7 +201,7 @@ internal static class AnalyzerTestHost
         var analyzerOptions = CreateAnalyzerOptions(
             ApplyFileLevelDiagnosticOptions(source, globalOptions),
             additionalFiles,
-            autoEnableEffectSummaryJsonForAdditionalFiles);
+            acceptAdditionalFiles);
 
         var compilationWithAnalyzers = compilation.WithAnalyzers(
             GetAnalyzers(analyzerFeatures),
@@ -237,17 +226,11 @@ internal static class AnalyzerTestHost
     public static AnalyzerOptions CreateAnalyzerOptions(
         ImmutableDictionary<string, string>? globalOptions = null,
         ImmutableArray<AdditionalText>? additionalFiles = null,
-        bool autoEnableEffectSummaryJsonForAdditionalFiles = true)
+        bool acceptAdditionalFiles = true)
     {
+        _ = acceptAdditionalFiles;
         var analyzerAdditionalFiles = additionalFiles ?? ImmutableArray<AdditionalText>.Empty;
         var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
-        if (autoEnableEffectSummaryJsonForAdditionalFiles &&
-            analyzerAdditionalFiles.Length > 0 &&
-            !analyzerGlobalOptions.ContainsKey("sharpproof_enable_effect_summary_json"))
-            analyzerGlobalOptions = analyzerGlobalOptions.Add(
-                "sharpproof_enable_effect_summary_json",
-                "true");
-
         if (analyzerAdditionalFiles.Length == 0 &&
             analyzerGlobalOptions.Count == 0)
             return EmptyAnalyzerOptions;
