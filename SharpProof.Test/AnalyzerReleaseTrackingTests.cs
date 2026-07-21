@@ -5,15 +5,13 @@ using SharpProof.Analyzer;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class AnalyzerReleaseTrackingTests
-{
+public sealed class AnalyzerReleaseTrackingTests {
     private static readonly Regex ReleaseRuleRow = new(
         @"^(SP\d{4})\s*\|",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
     [Test]
-    public void SupportedDiagnosticsAndReleaseFiles_StayInSync()
-    {
+    public void SupportedDiagnosticsAndReleaseFiles_StayInSync() {
         var repositoryRoot = FindRepositoryRoot();
         var analyzerDirectory = Path.Combine(repositoryRoot, "SharpProof.Analyzer");
         var newRuleIds = Directory
@@ -37,8 +35,7 @@ public sealed class AnalyzerReleaseTrackingTests
     }
 
     [Test]
-    public void AnalyzerProject_DoesNotSuppressReleaseTrackingRules()
-    {
+    public void AnalyzerProject_DoesNotSuppressReleaseTrackingRules() {
         var project = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
             "SharpProof.Analyzer",
@@ -48,16 +45,13 @@ public sealed class AnalyzerReleaseTrackingTests
         Assert.That(project, Does.Not.Contain("RS2008"));
     }
 
-    private static IEnumerable<string> GetNewRuleIds(string path)
-    {
+    private static IEnumerable<string> GetNewRuleIds(string path) {
         var inNewRulesSection = false;
-        foreach (var line in File.ReadLines(path))
-        {
+        foreach (var line in File.ReadLines(path)) {
             var trimmed = line.Trim();
             if (trimmed.StartsWith("## ", StringComparison.Ordinal)) inNewRulesSection = false;
 
-            if (trimmed.StartsWith("### ", StringComparison.Ordinal))
-            {
+            if (trimmed.StartsWith("### ", StringComparison.Ordinal)) {
                 inNewRulesSection = trimmed == "### New Rules";
                 continue;
             }
@@ -69,11 +63,9 @@ public sealed class AnalyzerReleaseTrackingTests
         }
     }
 
-    private static string FindRepositoryRoot()
-    {
+    private static string FindRepositoryRoot() {
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
+        while (directory != null) {
             if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
 
             directory = directory.Parent;

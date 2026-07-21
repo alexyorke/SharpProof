@@ -7,48 +7,41 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Test.Smt;
 
-internal static class CSharpConditionToFormula
-{
+internal static class CSharpConditionToFormula {
     public static bool TryTranslate(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out SmtFormula? formula)
-    {
+        [NotNullWhen(true)] out SmtFormula? formula) {
         expression = UnwrapExpression(expression);
 
         var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
-        if (constantValue.HasValue && constantValue.Value is bool booleanValue)
-        {
+        if (constantValue.HasValue && constantValue.Value is bool booleanValue) {
             formula = new SmtBooleanConstant(booleanValue);
             return true;
         }
 
         if (TryTranslateValue(expression, semanticModel, cancellationToken, out var directValue) &&
-            directValue.Kind == SmtValueKind.Bool)
-        {
+            directValue.Kind == SmtValueKind.Bool) {
             formula = directValue;
             return true;
         }
 
         if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
             prefixUnary.IsKind(SyntaxKind.LogicalNotExpression) &&
-            TryTranslate(prefixUnary.Operand, semanticModel, cancellationToken, out var operand))
-        {
+            TryTranslate(prefixUnary.Operand, semanticModel, cancellationToken, out var operand)) {
             formula = new SmtUnaryFormula(SmtUnaryOperator.Not, operand);
             return true;
         }
 
         if (expression is ConditionalExpressionSyntax conditionalExpression &&
             TryTranslateValue(conditionalExpression, semanticModel, cancellationToken, out var conditionalValue) &&
-            conditionalValue.Kind == SmtValueKind.Bool)
-        {
+            conditionalValue.Kind == SmtValueKind.Bool) {
             formula = conditionalValue;
             return true;
         }
 
-        if (expression is BinaryExpressionSyntax binaryExpression)
-        {
+        if (expression is BinaryExpressionSyntax binaryExpression) {
             if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
                 binaryExpression.Right is TypeSyntax testedType &&
                 IsNonNullEquivalentTypeTest(
@@ -57,32 +50,28 @@ internal static class CSharpConditionToFormula
                     semanticModel,
                     cancellationToken) &&
                 TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var typeTestValue) &&
-                typeTestValue.Kind == SmtValueKind.Reference)
-            {
+                typeTestValue.Kind == SmtValueKind.Reference) {
                 formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, typeTestValue, new SmtNullConstant());
                 return true;
             }
 
             if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression) &&
                 TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftAnd) &&
-                TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightAnd))
-            {
+                TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightAnd)) {
                 formula = new SmtBinaryFormula(SmtBinaryOperator.And, leftAnd, rightAnd);
                 return true;
             }
 
             if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression) &&
                 TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftOr) &&
-                TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightOr))
-            {
+                TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightOr)) {
                 formula = new SmtBinaryFormula(SmtBinaryOperator.Or, leftOr, rightOr);
                 return true;
             }
 
             if (TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue) &&
                 TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue) &&
-                TryTranslateComparison(binaryExpression.Kind(), leftValue, rightValue, out var comparison))
-            {
+                TryTranslateComparison(binaryExpression.Kind(), leftValue, rightValue, out var comparison)) {
                 formula = comparison;
                 return true;
             }
@@ -90,8 +79,7 @@ internal static class CSharpConditionToFormula
 
         if (expression is IsPatternExpressionSyntax isPatternExpression &&
             TryTranslatePatternExpression(isPatternExpression, semanticModel, cancellationToken,
-                out var patternFormula))
-        {
+                out var patternFormula)) {
             formula = patternFormula;
             return true;
         }
@@ -104,8 +92,7 @@ internal static class CSharpConditionToFormula
         ExpressionSyntax value,
         TypeSyntax testedType,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var valueType = semanticModel.GetTypeInfo(value, cancellationToken).Type;
         var targetType = semanticModel.GetTypeInfo(testedType, cancellationToken).Type;
         if (valueType == null || targetType == null || !valueType.IsReferenceType) return false;
@@ -118,8 +105,7 @@ internal static class CSharpConditionToFormula
         IsPatternExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out SmtFormula? formula)
-    {
+        [NotNullWhen(true)] out SmtFormula? formula) {
         formula = null;
         if (!TryTranslateValue(expression.Expression, semanticModel, cancellationToken, out var value)) return false;
 
@@ -131,8 +117,7 @@ internal static class CSharpConditionToFormula
         PatternSyntax pattern,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out SmtFormula? formula)
-    {
+        [NotNullWhen(true)] out SmtFormula? formula) {
         formula = null;
 
         if (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
@@ -142,8 +127,7 @@ internal static class CSharpConditionToFormula
         if (pattern is ConstantPatternSyntax constantPattern &&
             TryTranslateValue(constantPattern.Expression, semanticModel, cancellationToken, out var constantValue) &&
             constantValue != null &&
-            AreComparable(value, constantValue))
-        {
+            AreComparable(value, constantValue)) {
             formula = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, constantValue);
             return true;
         }
@@ -152,8 +136,7 @@ internal static class CSharpConditionToFormula
             unaryPattern.OperatorToken.IsKind(SyntaxKind.NotKeyword) &&
             TryTranslatePattern(value, unaryPattern.Pattern, semanticModel, cancellationToken,
                 out var negatedPattern) &&
-            negatedPattern != null)
-        {
+            negatedPattern != null) {
             formula = new SmtUnaryFormula(SmtUnaryOperator.Not, negatedPattern);
             return true;
         }
@@ -162,16 +145,13 @@ internal static class CSharpConditionToFormula
             TryTranslatePattern(value, binaryPattern.Left, semanticModel, cancellationToken, out var leftPattern) &&
             TryTranslatePattern(value, binaryPattern.Right, semanticModel, cancellationToken, out var rightPattern) &&
             leftPattern != null &&
-            rightPattern != null)
-        {
-            if (binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword))
-            {
+            rightPattern != null) {
+            if (binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword)) {
                 formula = new SmtBinaryFormula(SmtBinaryOperator.And, leftPattern, rightPattern);
                 return true;
             }
 
-            if (binaryPattern.OperatorToken.IsKind(SyntaxKind.OrKeyword))
-            {
+            if (binaryPattern.OperatorToken.IsKind(SyntaxKind.OrKeyword)) {
                 formula = new SmtBinaryFormula(SmtBinaryOperator.Or, leftPattern, rightPattern);
                 return true;
             }
@@ -182,8 +162,7 @@ internal static class CSharpConditionToFormula
             TryTranslateValue(relationalPattern.Expression, semanticModel, cancellationToken,
                 out var relationalValue) &&
             relationalValue is { Kind: SmtValueKind.Int })
-            switch (relationalPattern.OperatorToken.Kind())
-            {
+            switch (relationalPattern.OperatorToken.Kind()) {
                 case SyntaxKind.GreaterThanToken:
                     formula = new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, value, relationalValue);
                     return true;
@@ -205,22 +184,18 @@ internal static class CSharpConditionToFormula
         SyntaxKind kind,
         SmtFormula left,
         SmtFormula right,
-        [NotNullWhen(true)] out SmtFormula? formula)
-    {
+        [NotNullWhen(true)] out SmtFormula? formula) {
         formula = null;
-        switch (kind)
-        {
+        switch (kind) {
             case SyntaxKind.EqualsExpression:
-                if (AreComparable(left, right))
-                {
+                if (AreComparable(left, right)) {
                     formula = new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right);
                     return true;
                 }
 
                 return false;
             case SyntaxKind.NotEqualsExpression:
-                if (AreComparable(left, right))
-                {
+                if (AreComparable(left, right)) {
                     formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, left, right);
                     return true;
                 }
@@ -243,8 +218,7 @@ internal static class CSharpConditionToFormula
         SmtBinaryOperator comparison,
         SmtFormula left,
         SmtFormula right,
-        [NotNullWhen(true)] out SmtFormula? formula)
-    {
+        [NotNullWhen(true)] out SmtFormula? formula) {
         formula = null;
         if (left.Kind != SmtValueKind.Int || right.Kind != SmtValueKind.Int) return false;
 
@@ -252,8 +226,7 @@ internal static class CSharpConditionToFormula
         return true;
     }
 
-    private static bool AreComparable(SmtFormula left, SmtFormula right)
-    {
+    private static bool AreComparable(SmtFormula left, SmtFormula right) {
         if (left.Kind == right.Kind) return true;
 
         return (left is SmtNullConstant && right.Kind == SmtValueKind.Reference) ||
@@ -264,26 +237,21 @@ internal static class CSharpConditionToFormula
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out SmtFormula? formula)
-    {
+        [NotNullWhen(true)] out SmtFormula? formula) {
         expression = UnwrapExpression(expression);
         var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
-        if (constantValue.HasValue)
-        {
-            if (constantValue.Value is bool booleanValue)
-            {
+        if (constantValue.HasValue) {
+            if (constantValue.Value is bool booleanValue) {
                 formula = new SmtBooleanConstant(booleanValue);
                 return true;
             }
 
-            if (constantValue.Value == null)
-            {
+            if (constantValue.Value == null) {
                 formula = new SmtNullConstant();
                 return true;
             }
 
-            if (TryGetIntegralConstant(constantValue.Value, out var integralValue))
-            {
+            if (TryGetIntegralConstant(constantValue.Value, out var integralValue)) {
                 formula = new SmtIntegerConstant(integralValue);
                 return true;
             }
@@ -295,8 +263,7 @@ internal static class CSharpConditionToFormula
                 out var whenTrueFormula) &&
             TryTranslateValue(conditionalExpression.WhenFalse, semanticModel, cancellationToken,
                 out var whenFalseFormula) &&
-            whenTrueFormula.Kind == whenFalseFormula.Kind)
-        {
+            whenTrueFormula.Kind == whenFalseFormula.Kind) {
             formula = new SmtConditionalFormula(conditionFormula, whenTrueFormula, whenFalseFormula,
                 whenTrueFormula.Kind);
             return true;
@@ -307,8 +274,7 @@ internal static class CSharpConditionToFormula
             TryTranslateValue(coalesceExpression.Left, semanticModel, cancellationToken, out var coalesceLeft) &&
             coalesceLeft.Kind == SmtValueKind.Reference &&
             TryTranslateValue(coalesceExpression.Right, semanticModel, cancellationToken, out var coalesceRight) &&
-            coalesceRight.Kind == SmtValueKind.Reference)
-        {
+            coalesceRight.Kind == SmtValueKind.Reference) {
             formula = new SmtConditionalFormula(
                 new SmtBinaryFormula(SmtBinaryOperator.NotEqual, coalesceLeft, new SmtNullConstant()),
                 coalesceLeft,
@@ -325,20 +291,17 @@ internal static class CSharpConditionToFormula
         var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
         if (type == null) return false;
 
-        if (type.SpecialType == SpecialType.System_Boolean)
-        {
+        if (type.SpecialType == SpecialType.System_Boolean) {
             formula = new SmtVariable(GetVariableName(symbol), SmtValueKind.Bool);
             return true;
         }
 
-        if (IsIntegralType(type))
-        {
+        if (IsIntegralType(type)) {
             formula = new SmtVariable(GetVariableName(symbol), SmtValueKind.Int);
             return true;
         }
 
-        if (type.IsReferenceType)
-        {
+        if (type.IsReferenceType) {
             formula = new SmtVariable(GetVariableName(symbol), SmtValueKind.Reference);
             return true;
         }
@@ -350,34 +313,29 @@ internal static class CSharpConditionToFormula
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out SmtFormula? formula)
-    {
+        [NotNullWhen(true)] out SmtFormula? formula) {
         formula = null;
         if (!HasSupportedIntegralType(expression, semanticModel, cancellationToken)) return false;
 
-        if (expression is PrefixUnaryExpressionSyntax prefixUnary)
-        {
+        if (expression is PrefixUnaryExpressionSyntax prefixUnary) {
             if (prefixUnary.IsKind(SyntaxKind.UnaryPlusExpression))
                 return TryTranslateValue(prefixUnary.Operand, semanticModel, cancellationToken, out formula) &&
                        formula.Kind == SmtValueKind.Int;
 
             if (prefixUnary.IsKind(SyntaxKind.UnaryMinusExpression) &&
                 TryTranslateValue(prefixUnary.Operand, semanticModel, cancellationToken, out var operand) &&
-                operand.Kind == SmtValueKind.Int)
-            {
+                operand.Kind == SmtValueKind.Int) {
                 formula = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operand);
                 return true;
             }
         }
 
-        if (expression is BinaryExpressionSyntax binaryExpression)
-        {
+        if (expression is BinaryExpressionSyntax binaryExpression) {
             if (binaryExpression.IsKind(SyntaxKind.AddExpression) &&
                 TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var addLeft) &&
                 TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var addRight) &&
                 addLeft.Kind == SmtValueKind.Int &&
-                addRight.Kind == SmtValueKind.Int)
-            {
+                addRight.Kind == SmtValueKind.Int) {
                 formula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, addLeft, addRight);
                 return true;
             }
@@ -386,8 +344,7 @@ internal static class CSharpConditionToFormula
                 TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var subtractLeft) &&
                 TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var subtractRight) &&
                 subtractLeft.Kind == SmtValueKind.Int &&
-                subtractRight.Kind == SmtValueKind.Int)
-            {
+                subtractRight.Kind == SmtValueKind.Int) {
                 formula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, subtractLeft, subtractRight);
                 return true;
             }
@@ -397,8 +354,7 @@ internal static class CSharpConditionToFormula
                 TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var multiplyRight) &&
                 multiplyLeft.Kind == SmtValueKind.Int &&
                 multiplyRight.Kind == SmtValueKind.Int &&
-                (multiplyLeft is SmtIntegerConstant || multiplyRight is SmtIntegerConstant))
-            {
+                (multiplyLeft is SmtIntegerConstant || multiplyRight is SmtIntegerConstant)) {
                 formula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, multiplyLeft, multiplyRight);
                 return true;
             }
@@ -407,14 +363,12 @@ internal static class CSharpConditionToFormula
         return false;
     }
 
-    private static string GetVariableName(ISymbol symbol)
-    {
+    private static string GetVariableName(ISymbol symbol) {
         var start = symbol.Locations.FirstOrDefault()?.SourceSpan.Start ?? 0;
         return symbol.Name + "#" + start.ToString(CultureInfo.InvariantCulture);
     }
 
-    private static bool IsIntegralType(ITypeSymbol typeSymbol)
-    {
+    private static bool IsIntegralType(ITypeSymbol typeSymbol) {
         return typeSymbol.SpecialType is
             SpecialType.System_SByte or
             SpecialType.System_Byte or
@@ -426,10 +380,8 @@ internal static class CSharpConditionToFormula
             SpecialType.System_UInt64;
     }
 
-    private static bool TryGetIntegralConstant(object value, out long integralValue)
-    {
-        switch (value)
-        {
+    private static bool TryGetIntegralConstant(object value, out long integralValue) {
+        switch (value) {
             case sbyte signedByte:
                 integralValue = signedByte;
                 return true;
@@ -463,25 +415,20 @@ internal static class CSharpConditionToFormula
     private static bool HasSupportedIntegralType(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) {
         var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
         return type != null && IsIntegralType(type);
     }
 
-    private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
-    {
-        while (true)
-        {
-            if (expression is ParenthesizedExpressionSyntax parenthesizedExpression)
-            {
+    private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression) {
+        while (true) {
+            if (expression is ParenthesizedExpressionSyntax parenthesizedExpression) {
                 expression = parenthesizedExpression.Expression;
                 continue;
             }
 
             if (expression is PostfixUnaryExpressionSyntax postfixUnary &&
-                postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression))
-            {
+                postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression)) {
                 expression = postfixUnary.Operand;
                 continue;
             }

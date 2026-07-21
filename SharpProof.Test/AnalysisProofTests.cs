@@ -5,11 +5,9 @@ using SharpProof.ProofCore.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-internal class AnalysisProofTests
-{
+internal class AnalysisProofTests {
     [Test]
-    public void FormulaTraversal_Contains_VisitsNestedConditionalBranches()
-    {
+    public void FormulaTraversal_Contains_VisitsNestedConditionalBranches() {
         var target = new SmtVariable("target", SmtValueKind.String);
         var root = new SmtConditionalFormula(
             new SmtBooleanConstant(true),
@@ -22,8 +20,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void RewriteBottomUp_StructurallyEquivalentReplacementIsUnchanged()
-    {
+    public void RewriteBottomUp_StructurallyEquivalentReplacementIsUnchanged() {
         var root = new SmtBinaryFormula(
             SmtBinaryOperator.And,
             new SmtBooleanConstant(true),
@@ -41,8 +38,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void FormulaTraversal_MapChildren_PreservesNodeMetadata()
-    {
+    public void FormulaTraversal_MapChildren_PreservesNodeMetadata() {
         var root = new SmtRegexMatchFormula(
             new SmtVariable("old", SmtValueKind.String),
             "a+",
@@ -52,8 +48,7 @@ internal class AnalysisProofTests
             root,
             static _ => new SmtVariable("new", SmtValueKind.String));
 
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(mapped.Value, Is.EqualTo(new SmtVariable("new", SmtValueKind.String)));
             Assert.That(mapped.Pattern, Is.EqualTo(root.Pattern));
             Assert.That(mapped.Options, Is.EqualTo(root.Options));
@@ -61,8 +56,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_FalseHazardCondition_IsProven()
-    {
+    public void AnalysisProof_FalseHazardCondition_IsProven() {
         using var search = new AnalysisProofSearch();
 
         var result = search.Classify(
@@ -74,8 +68,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_TrueHazardCondition_IsDisproven()
-    {
+    public void AnalysisProof_TrueHazardCondition_IsDisproven() {
         using var search = new AnalysisProofSearch();
 
         var result = search.Classify(
@@ -87,8 +80,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_ContradictoryPath_IsProven()
-    {
+    public void AnalysisProof_ContradictoryPath_IsProven() {
         using var search = new AnalysisProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
 
@@ -106,8 +98,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_ReachableHazardGuard_IsDisproven()
-    {
+    public void AnalysisProof_ReachableHazardGuard_IsDisproven() {
         using var search = new AnalysisProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
@@ -125,8 +116,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_ApproximateRegexPathDoesNotProveHazardReachable()
-    {
+    public void AnalysisProof_ApproximateRegexPathDoesNotProveHazardReachable() {
         using var search = new AnalysisProofSearch();
         var text = new SmtVariable("text", SmtValueKind.String);
 
@@ -149,8 +139,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_NullReceiverCondition_IsDisproven()
-    {
+    public void AnalysisProof_NullReceiverCondition_IsDisproven() {
         using var search = new AnalysisProofSearch();
         var s = new SmtVariable("s", SmtValueKind.Reference);
         var sIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, s, new SmtNullConstant());
@@ -166,8 +155,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_NonZeroGuard_MakesDivideByZeroProven()
-    {
+    public void AnalysisProof_NonZeroGuard_MakesDivideByZeroProven() {
         using var search = new AnalysisProofSearch();
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var divisorNotZero = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, divisor, new SmtIntegerConstant(0));
@@ -187,8 +175,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_ReachableEffectViolation_IsDisproven()
-    {
+    public void AnalysisProof_ReachableEffectViolation_IsDisproven() {
         using var search = new AnalysisProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsNonNegative = new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(0));
@@ -204,8 +191,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_InternalOnlyEffectViolation_IsConservativeUnknown()
-    {
+    public void AnalysisProof_InternalOnlyEffectViolation_IsConservativeUnknown() {
         using var search = new AnalysisProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
@@ -228,8 +214,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_SafeStaticCacheRead_IsProven()
-    {
+    public void AnalysisProof_SafeStaticCacheRead_IsProven() {
         using var search = new AnalysisProofSearch();
 
         var result = search.Classify(
@@ -243,8 +228,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_FreshOwnedObjectWrite_IsProven()
-    {
+    public void AnalysisProof_FreshOwnedObjectWrite_IsProven() {
         using var search = new AnalysisProofSearch();
 
         var result = search.Classify(
@@ -258,8 +242,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_FreshOwnedArrayWrite_IsProven()
-    {
+    public void AnalysisProof_FreshOwnedArrayWrite_IsProven() {
         using var search = new AnalysisProofSearch();
 
         var result = search.Classify(
@@ -273,8 +256,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_CallerVisibleMemoryWrite_IsDisproven()
-    {
+    public void AnalysisProof_CallerVisibleMemoryWrite_IsDisproven() {
         using var search = new AnalysisProofSearch();
         var memoryWrite = new SmtBooleanConstant(true);
 
@@ -289,8 +271,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_QueryBranchReachability_ContradictoryGuard_IsProven()
-    {
+    public void AnalysisProof_QueryBranchReachability_ContradictoryGuard_IsProven() {
         using var search = new AnalysisProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
         var query = new AnalysisProofQuery(
@@ -309,8 +290,7 @@ internal class AnalysisProofTests
     }
 
     [Test]
-    public void AnalysisProof_NullPathConditionsDefaultToEmpty()
-    {
+    public void AnalysisProof_NullPathConditionsDefaultToEmpty() {
         using var search = new AnalysisProofSearch();
         var query = new AnalysisProofQuery(
             null!,
@@ -325,8 +305,7 @@ internal class AnalysisProofTests
     }
 }
 
-internal static class AnalysisProofSearchTestExtensions
-{
+internal static class AnalysisProofSearchTestExtensions {
     internal static AnalysisProofResult Classify(
         this AnalysisProofSearch search,
         SmtFormula impurityCondition,

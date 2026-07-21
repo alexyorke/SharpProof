@@ -4,17 +4,14 @@ using SharpProof.ProofCore.Collections;
 namespace SharpProof.Test;
 
 [TestFixture]
-public class BoundedConcurrentCacheTests
-{
+public class BoundedConcurrentCacheTests {
     [Test]
-    public void ConcurrentUniqueAdds_StayBoundedAndExposeTelemetry()
-    {
+    public void ConcurrentUniqueAdds_StayBoundedAndExposeTelemetry() {
         const int capacity = 32;
         const int valueCount = 4096;
         var cache = new BoundedConcurrentCache<int, int>(capacity);
 
-        Parallel.For(0, valueCount, value =>
-        {
+        Parallel.For(0, valueCount, value => {
             cache.TryAdd(value, value * 2);
             if (cache.TryGetValue(value, out var cached))
                 Assert.That(cached, Is.EqualTo(value * 2));
@@ -31,8 +28,7 @@ public class BoundedConcurrentCacheTests
     }
 
     [Test]
-    public void Eviction_PreservesResultsComparedWithNoCache()
-    {
+    public void Eviction_PreservesResultsComparedWithNoCache() {
         var cache = new BoundedConcurrentCache<int, int>(4);
         var inputs = Enumerable.Range(0, 64).Concat(Enumerable.Range(0, 64)).ToArray();
 
@@ -45,16 +41,13 @@ public class BoundedConcurrentCacheTests
     }
 
     [Test]
-    public void GetOrAdd_ConcurrentRequestsComputeOnceAndReuseValue()
-    {
+    public void GetOrAdd_ConcurrentRequestsComputeOnceAndReuseValue() {
         var cache = new BoundedConcurrentCache<int, object>(4);
         var factoryCalls = 0;
         var results = new object[128];
 
-        Parallel.For(0, results.Length, index =>
-        {
-            results[index] = cache.GetOrAdd(1, _ =>
-            {
+        Parallel.For(0, results.Length, index => {
+            results[index] = cache.GetOrAdd(1, _ => {
                 Interlocked.Increment(ref factoryCalls);
                 return new object();
             });
@@ -66,8 +59,7 @@ public class BoundedConcurrentCacheTests
         Assert.That(cache.HitCount, Is.EqualTo(results.Length - 1));
     }
 
-    private static int GetOrCompute(BoundedConcurrentCache<int, int> cache, int input)
-    {
+    private static int GetOrCompute(BoundedConcurrentCache<int, int> cache, int input) {
         if (cache.TryGetValue(input, out var value)) return value;
 
         value = checked(input * input);

@@ -2,12 +2,10 @@ using System.Xml.Linq;
 
 namespace SharpProof.Test;
 
-internal sealed class MsBuildPropertyTestResolver
-{
+internal sealed class MsBuildPropertyTestResolver {
     private readonly IReadOnlyDictionary<string, string> _properties;
 
-    public MsBuildPropertyTestResolver(params XDocument[] documents)
-    {
+    public MsBuildPropertyTestResolver(params XDocument[] documents) {
         _properties = documents
             .SelectMany(static document => document.Descendants("PropertyGroup").Elements())
             .GroupBy(static element => element.Name.LocalName, StringComparer.Ordinal)
@@ -17,15 +15,12 @@ internal sealed class MsBuildPropertyTestResolver
                 StringComparer.Ordinal);
     }
 
-    public string Get(string name)
-    {
+    public string Get(string name) {
         return Expand(_properties[name]);
     }
 
-    public string Expand(string value)
-    {
-        for (var iteration = 0; iteration < _properties.Count; iteration++)
-        {
+    public string Expand(string value) {
+        for (var iteration = 0; iteration < _properties.Count; iteration++) {
             var expanded = _properties.Aggregate(
                 value,
                 static (current, pair) => current.Replace(

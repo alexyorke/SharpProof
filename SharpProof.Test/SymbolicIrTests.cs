@@ -11,13 +11,11 @@ using SharpProof.Symbolic.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicIrTests
-{
+public sealed class SymbolicIrTests {
     private static readonly CSharpParseOptions PreviewParseOptions = new(LanguageVersion.Preview);
 
     [Test]
-    public void LowerCondition_EncodesIntegerRange()
-    {
+    public void LowerCondition_EncodesIntegerRange() {
         var context = CreateExpressionContext(
             "int x",
             "x > 0 && x < 10");
@@ -29,8 +27,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_StringConcatLengthIdentityFoldsWithoutStringSolver()
-    {
+    public void LowerCondition_StringConcatLengthIdentityFoldsWithoutStringSolver() {
         var concatContext = CreateExpressionContext(
             "string first, string second",
             "string.Concat(first, \"-\", second).Length == first.Length + 1 + second.Length");
@@ -56,8 +53,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void ConditionTruth_EqualOldSnapshotPreservesUncheckedAdditionIdentity()
-    {
+    public void ConditionTruth_EqualOldSnapshotPreservesUncheckedAdditionIdentity() {
         var context = CreateExpressionContext(
             "int value, int oldValue",
             "value + 1 == oldValue + 1");
@@ -90,8 +86,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void MetadataSymbolsWithTheSameNameHaveDistinctVariableNames()
-    {
+    public void MetadataSymbolsWithTheSameNameHaveDistinctVariableNames() {
         var context = CreateExpressionContext("int value", "value > 0");
         var intMax = context.SemanticModel.Compilation.GetSpecialType(SpecialType.System_Int32)
             .GetMembers("MaxValue").Single();
@@ -110,8 +105,7 @@ public sealed class SymbolicIrTests
     [TestCase("value + other")]
     [TestCase("value - other")]
     [TestCase("value * other")]
-    public void LowerTerm_BoundedIntegralArithmeticIsOverflowSensitive(string expression)
-    {
+    public void LowerTerm_BoundedIntegralArithmeticIsOverflowSensitive(string expression) {
         var context = CreateExpressionContext(
             "int value, int other",
             expression);
@@ -123,21 +117,18 @@ public sealed class SymbolicIrTests
         var conditional = (SymbolicConditionalTerm)term;
         Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicBinaryTerm>());
         Assert.That(((SymbolicBinaryTerm)conditional.WhenTrue).MayOverflow, Is.False);
-        if (expression.Contains('*'))
-        {
+        if (expression.Contains('*')) {
             Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicBinaryTerm>());
             Assert.That(((SymbolicBinaryTerm)conditional.WhenFalse).MayOverflow, Is.True);
         }
-        else
-        {
+        else {
             Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicConditionalTerm>());
         }
     }
 
     [TestCase("value / other")]
     [TestCase("value % other")]
-    public void LowerTerm_IntegralDivisionKeepsNormalCompletionSemantics(string expression)
-    {
+    public void LowerTerm_IntegralDivisionKeepsNormalCompletionSemantics(string expression) {
         var context = CreateExpressionContext(
             "int value, int other",
             expression);
@@ -150,8 +141,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_UserDefinedArithmeticOperatorIsNotLoweredAsIntegerArithmetic()
-    {
+    public void LowerTerm_UserDefinedArithmeticOperatorIsNotLoweredAsIntegerArithmetic() {
         var context = CreateExpressionContext(
             "Number left, Number right",
             "left + right",
@@ -163,8 +153,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_RepresentsStringLengthAsSharedLengthAtom()
-    {
+    public void LowerCondition_RepresentsStringLengthAsSharedLengthAtom() {
         var context = CreateExpressionContext(
             "string s, int n",
             "s.Length == n");
@@ -181,8 +170,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_IdentityPreservingAsValueEncodes()
-    {
+    public void LowerCondition_IdentityPreservingAsValueEncodes() {
         var context = CreateExpressionContext(
             "string text",
             "(text as object) == text");
@@ -194,8 +182,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_IdentityPreservingReferenceCastEncodes()
-    {
+    public void LowerCondition_IdentityPreservingReferenceCastEncodes() {
         var context = CreateExpressionContext(
             "string text",
             "((object)text) == text");
@@ -207,8 +194,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_StringLiteralEqualityEmitsNullSafeContentFacts()
-    {
+    public void LowerCondition_StringLiteralEqualityEmitsNullSafeContentFacts() {
         var context = CreateExpressionContext(
             "string s",
             "s == \"A\"");
@@ -229,8 +215,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_TupleEqualityEmitsElementFacts()
-    {
+    public void LowerCondition_TupleEqualityEmitsElementFacts() {
         var context = CreateExpressionContext(
             "(int A, int B) left, (int A, int B) right",
             "left == right");
@@ -250,8 +235,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_UncheckedEnumCastEqualityUsesIntegralEnumTerm()
-    {
+    public void LowerCondition_UncheckedEnumCastEqualityUsesIntegralEnumTerm() {
         var context = CreateExpressionContext(
             "Mode mode",
             "unchecked((int)mode) == 1",
@@ -270,8 +254,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_TypePatternUsesSharedTypeTestAtom()
-    {
+    public void LowerCondition_TypePatternUsesSharedTypeTestAtom() {
         var context = CreateExpressionContext(
             "object value",
             "value is string");
@@ -292,8 +275,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_DeclarationPatternUsesSharedTypeTestAtom()
-    {
+    public void LowerCondition_DeclarationPatternUsesSharedTypeTestAtom() {
         var context = CreateExpressionContext(
             "object value",
             "value is string text");
@@ -320,8 +302,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_NegatedTypePatternNegatesSharedTypeTestFacts()
-    {
+    public void LowerCondition_NegatedTypePatternNegatesSharedTypeTestFacts() {
         var context = CreateExpressionContext(
             "object value",
             "value is not string");
@@ -341,8 +322,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_NullPatternUsesSharedNullRelation()
-    {
+    public void LowerCondition_NullPatternUsesSharedNullRelation() {
         var context = CreateExpressionContext(
             "object value",
             "value is null");
@@ -359,8 +339,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_NegatedNullPatternUsesSharedNullRelation()
-    {
+    public void LowerCondition_NegatedNullPatternUsesSharedNullRelation() {
         var context = CreateExpressionContext(
             "object value",
             "value is not null");
@@ -377,8 +356,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_IntegerConstantPatternUsesSharedRelation()
-    {
+    public void LowerCondition_IntegerConstantPatternUsesSharedRelation() {
         var context = CreateExpressionContext(
             "int value",
             "value is 42");
@@ -395,8 +373,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_NegatedIntegerConstantPatternUsesSharedRelation()
-    {
+    public void LowerCondition_NegatedIntegerConstantPatternUsesSharedRelation() {
         var context = CreateExpressionContext(
             "int value",
             "value is not 42");
@@ -413,8 +390,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_BooleanConstantPatternUsesSharedRelation()
-    {
+    public void LowerCondition_BooleanConstantPatternUsesSharedRelation() {
         var context = CreateExpressionContext(
             "bool value",
             "value is true");
@@ -431,8 +407,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_RelationalPatternUsesSharedRelation()
-    {
+    public void LowerCondition_RelationalPatternUsesSharedRelation() {
         var context = CreateExpressionContext(
             "int value",
             "value is > 42");
@@ -449,8 +424,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_NegatedRelationalPatternInvertsRelation()
-    {
+    public void LowerCondition_NegatedRelationalPatternInvertsRelation() {
         var context = CreateExpressionContext(
             "int value",
             "value is not >= 42");
@@ -477,8 +451,7 @@ public sealed class SymbolicIrTests
     public void RelationalPatternOperatorMapping_IsCanonical(
         SyntaxKind tokenKind,
         bool negate,
-        string expected)
-    {
+        string expected) {
         Assert.That(SymbolicOperatorLowerer.TryGetRelationalPatternOperator(
             tokenKind,
             negate,
@@ -487,8 +460,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_EmptyRecursivePatternUsesSharedNullRelation()
-    {
+    public void LowerCondition_EmptyRecursivePatternUsesSharedNullRelation() {
         var context = CreateExpressionContext(
             "object value",
             "value is { }");
@@ -505,8 +477,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_NegatedEmptyRecursivePatternUsesSharedNullRelation()
-    {
+    public void LowerCondition_NegatedEmptyRecursivePatternUsesSharedNullRelation() {
         var context = CreateExpressionContext(
             "object value",
             "value is not { }");
@@ -523,8 +494,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_AndPatternComposesSharedRelations()
-    {
+    public void LowerCondition_AndPatternComposesSharedRelations() {
         var context = CreateExpressionContext(
             "int value",
             "value is > 0 and < 10");
@@ -544,8 +514,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_OrPatternComposesSharedRelations()
-    {
+    public void LowerCondition_OrPatternComposesSharedRelations() {
         var context = CreateExpressionContext(
             "int value",
             "value is < 0 or > 10");
@@ -565,8 +534,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_UnaryPatternNegatesComposedPattern()
-    {
+    public void LowerCondition_UnaryPatternNegatesComposedPattern() {
         var context = CreateExpressionContext(
             "int value",
             "value is not (> 0 and < 10)");
@@ -588,8 +556,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_StringStartsWithEmitsDeclarativeStringPredicate()
-    {
+    public void KnownApiLowering_StringStartsWithEmitsDeclarativeStringPredicate() {
         var context = CreateExpressionContext(
             "string s",
             """s.StartsWith("A")""");
@@ -608,8 +575,7 @@ public sealed class SymbolicIrTests
     [TestCase("Contains")]
     [TestCase("StartsWith")]
     [TestCase("EndsWith")]
-    public void KnownApiLowering_StringCharPredicateUsesDeclarativeStringPredicate(string methodName)
-    {
+    public void KnownApiLowering_StringCharPredicateUsesDeclarativeStringPredicate(string methodName) {
         var context = CreateExpressionContext(
             "string s",
             $"s.{methodName}('A')");
@@ -626,8 +592,7 @@ public sealed class SymbolicIrTests
     [TestCase("Contains")]
     [TestCase("StartsWith")]
     [TestCase("EndsWith")]
-    public void KnownApiLowering_StringOrdinalPredicateUsesDeclarativeStringPredicate(string methodName)
-    {
+    public void KnownApiLowering_StringOrdinalPredicateUsesDeclarativeStringPredicate(string methodName) {
         var context = CreateExpressionContext(
             "string s",
             $"""s.{methodName}("A", System.StringComparison.Ordinal)""");
@@ -642,8 +607,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_StringConcatPredicateUsesSharedConcatTerm()
-    {
+    public void KnownApiLowering_StringConcatPredicateUsesSharedConcatTerm() {
         var context = CreateExpressionContext(
             "string suffix",
             """("pre" + suffix).StartsWith("pre")""");
@@ -659,8 +623,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_InterpolatedStringPredicateUsesSharedConcatTerm()
-    {
+    public void KnownApiLowering_InterpolatedStringPredicateUsesSharedConcatTerm() {
         var context = CreateExpressionContext(
             "string suffix",
             "$\"pre{suffix}\".StartsWith(\"pre\")");
@@ -675,8 +638,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_StaticStringEqualsUsesSharedEqualityFacts()
-    {
+    public void KnownApiLowering_StaticStringEqualsUsesSharedEqualityFacts() {
         var context = CreateExpressionContext(
             "string left, string right",
             "string.Equals(left, right)");
@@ -689,8 +651,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_StaticStringEqualsOrdinalUsesSharedEqualityFacts()
-    {
+    public void KnownApiLowering_StaticStringEqualsOrdinalUsesSharedEqualityFacts() {
         var context = CreateExpressionContext(
             "string left, string right",
             "string.Equals(left, right, System.StringComparison.Ordinal)");
@@ -703,8 +664,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_InstanceStringEqualsUsesSharedEqualityFacts()
-    {
+    public void KnownApiLowering_InstanceStringEqualsUsesSharedEqualityFacts() {
         var context = CreateExpressionContext(
             "string left, string right",
             "left.Equals(right)");
@@ -717,8 +677,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_InstanceStringEqualsOrdinalUsesSharedEqualityFacts()
-    {
+    public void KnownApiLowering_InstanceStringEqualsOrdinalUsesSharedEqualityFacts() {
         var context = CreateExpressionContext(
             "string left, string right",
             "left.Equals(right, System.StringComparison.Ordinal)");
@@ -731,8 +690,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_InstanceStringEqualsIgnoreCaseStaysOnLegacyPath()
-    {
+    public void KnownApiLowering_InstanceStringEqualsIgnoreCaseStaysOnLegacyPath() {
         var context = CreateExpressionContext(
             "string left, string right",
             "left.Equals(right, System.StringComparison.OrdinalIgnoreCase)");
@@ -741,8 +699,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_InstanceStringEqualsObjectFallsBackToLegacyTranslator()
-    {
+    public void KnownApiLowering_InstanceStringEqualsObjectFallsBackToLegacyTranslator() {
         var context = CreateExpressionContext(
             "string left, object right",
             "left.Equals(right)");
@@ -751,8 +708,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_StaticStringEqualsIgnoreCaseStaysOnLegacyPath()
-    {
+    public void KnownApiLowering_StaticStringEqualsIgnoreCaseStaysOnLegacyPath() {
         var context = CreateExpressionContext(
             "string left, string right",
             "string.Equals(left, right, System.StringComparison.OrdinalIgnoreCase)");
@@ -761,8 +717,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_ObjectReferenceEqualsUsesReferenceEqualityAtom()
-    {
+    public void KnownApiLowering_ObjectReferenceEqualsUsesReferenceEqualityAtom() {
         var context = CreateExpressionContext(
             "object? left, object? right",
             "object.ReferenceEquals(left, right)");
@@ -779,8 +734,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_RegexIsMatchEmitsDeclarativeRegexPredicate()
-    {
+    public void KnownApiLowering_RegexIsMatchEmitsDeclarativeRegexPredicate() {
         var context = CreateExpressionContext(
             "string s",
             """System.Text.RegularExpressions.Regex.IsMatch(s, @"\A[A-Z]+\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant)""");
@@ -805,8 +759,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_RegexUnrepresentableOptionsRemainUnsupported()
-    {
+    public void KnownApiLowering_RegexUnrepresentableOptionsRemainUnsupported() {
         var context = CreateExpressionContext(
             "string s",
             """System.Text.RegularExpressions.Regex.IsMatch(s, "A", System.Text.RegularExpressions.RegexOptions.RightToLeft)""");
@@ -815,8 +768,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_StringIsNullOrEmptyUsesNullnessAndLengthAtoms()
-    {
+    public void KnownApiLowering_StringIsNullOrEmptyUsesNullnessAndLengthAtoms() {
         var context = CreateExpressionContext(
             "string s",
             "string.IsNullOrEmpty(s)");
@@ -836,8 +788,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_StringIsNullOrWhiteSpaceUsesNullnessAndRegexAtoms()
-    {
+    public void KnownApiLowering_StringIsNullOrWhiteSpaceUsesNullnessAndRegexAtoms() {
         var context = CreateExpressionContext(
             "string s",
             "string.IsNullOrWhiteSpace(s)");
@@ -857,8 +808,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_StringIsNullOrEmptyOverConcatOmitsImpossibleNullBranch()
-    {
+    public void KnownApiLowering_StringIsNullOrEmptyOverConcatOmitsImpossibleNullBranch() {
         var context = CreateExpressionContext(
             "string s",
             """string.IsNullOrEmpty("A" + s)""");
@@ -875,8 +825,7 @@ public sealed class SymbolicIrTests
     [TestCase("Max", false)]
     public void KnownApiLowering_IntegralMathMinMaxUsesTypedConditionalTerm(
         string methodName,
-        bool isMinimum)
-    {
+        bool isMinimum) {
         var context = CreateExpressionContext(
             "int left, int right",
             $"System.Math.{methodName}(left, right) == left");
@@ -898,8 +847,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_IntegralMathMinMapsNamedArgumentsByParameter()
-    {
+    public void KnownApiLowering_IntegralMathMinMapsNamedArgumentsByParameter() {
         var context = CreateExpressionContext(
             "int left, int right",
             "System.Math.Min(val2: right, val1: left) == left");
@@ -914,8 +862,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_FloatingMathMinStaysOnLegacyPath()
-    {
+    public void KnownApiLowering_FloatingMathMinStaysOnLegacyPath() {
         var context = CreateExpressionContext(
             "double left, double right",
             "System.Math.Min(left, right) == left");
@@ -925,8 +872,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_IntegralMathAbsUsesTypedConditionalTerm()
-    {
+    public void KnownApiLowering_IntegralMathAbsUsesTypedConditionalTerm() {
         var context = CreateExpressionContext(
             "int value",
             "System.Math.Abs(value) >= 0");
@@ -949,8 +895,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_FloatingMathAbsStaysOnLegacyPath()
-    {
+    public void KnownApiLowering_FloatingMathAbsStaysOnLegacyPath() {
         var context = CreateExpressionContext(
             "double value",
             "System.Math.Abs(value) >= 0");
@@ -960,8 +905,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_IntegralMathClampWithOrderedBoundsUsesTypedConditionalTerm()
-    {
+    public void KnownApiLowering_IntegralMathClampWithOrderedBoundsUsesTypedConditionalTerm() {
         var context = CreateExpressionContext(
             "int value",
             "System.Math.Clamp(value, 0, 10) >= 0");
@@ -986,8 +930,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_IntegralMathClampMapsNamedArgumentsByParameter()
-    {
+    public void KnownApiLowering_IntegralMathClampMapsNamedArgumentsByParameter() {
         var context = CreateExpressionContext(
             "int value",
             "System.Math.Clamp(max: 10, value: value, min: 0) >= 0");
@@ -1002,8 +945,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_IntegralMathClampWithKnownInvalidBoundsIsUnsupported()
-    {
+    public void KnownApiLowering_IntegralMathClampWithKnownInvalidBoundsIsUnsupported() {
         var context = CreateExpressionContext(
             "int value, int min, int max",
             "System.Math.Clamp(value, 10, 0) >= 0");
@@ -1013,8 +955,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_IntegralMathClampWithVariableBoundsUsesNormalCompletionShape()
-    {
+    public void KnownApiLowering_IntegralMathClampWithVariableBoundsUsesNormalCompletionShape() {
         var context = CreateExpressionContext(
             "int value, int min, int max",
             "System.Math.Clamp(value, min, max) >= 0");
@@ -1025,8 +966,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_FloatingMathClampStaysOnLegacyPath()
-    {
+    public void KnownApiLowering_FloatingMathClampStaysOnLegacyPath() {
         var context = CreateExpressionContext(
             "double value",
             "System.Math.Clamp(value, 0.0, 10.0) >= 0.0");
@@ -1036,8 +976,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_InstanceReferencePropertyUsesSharedMemberTerm()
-    {
+    public void LowerTerm_InstanceReferencePropertyUsesSharedMemberTerm() {
         var context = CreateExpressionContext(
             "Holder holder",
             "holder.Value",
@@ -1056,8 +995,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_InstanceIntegerPropertyUsesSharedMemberTerm()
-    {
+    public void LowerTerm_InstanceIntegerPropertyUsesSharedMemberTerm() {
         var context = CreateExpressionContext(
             "Holder holder",
             "holder.Number",
@@ -1075,8 +1013,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_ImplicitThisStringPropertyUsesSharedMemberReference()
-    {
+    public void LowerTerm_ImplicitThisStringPropertyUsesSharedMemberReference() {
         const string source = """
                               public sealed class C
                               {
@@ -1112,8 +1049,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_ConditionalAccessStringPropertyUsesConditionalReference()
-    {
+    public void LowerTerm_ConditionalAccessStringPropertyUsesConditionalReference() {
         const string source = """
                               public sealed class Holder
                               {
@@ -1156,8 +1092,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_ArrayElementUsesSharedElementTerm()
-    {
+    public void LowerTerm_ArrayElementUsesSharedElementTerm() {
         var context = CreateExpressionContext(
             "int[] values, int index",
             "values[index]");
@@ -1176,8 +1111,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void EncodeTerm_ArrayElementsWithDifferentSymbolicIndicesRemainDistinct()
-    {
+    public void EncodeTerm_ArrayElementsWithDifferentSymbolicIndicesRemainDistinct() {
         var receiver = new SymbolicVariableTerm("values", SmtValueKind.Reference);
         var first = new SymbolicElementTerm(
             receiver,
@@ -1198,8 +1132,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_OrdinalIgnoreCaseStringComparisonIsExact()
-    {
+    public void KnownApiLowering_OrdinalIgnoreCaseStringComparisonIsExact() {
         var context = CreateExpressionContext(
             "string s",
             """s.StartsWith("A", System.StringComparison.OrdinalIgnoreCase)""");
@@ -1214,8 +1147,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_DivisionAndRemainderUseSharedBinaryTerms()
-    {
+    public void LowerCondition_DivisionAndRemainderUseSharedBinaryTerms() {
         var context = CreateExpressionContext(
             "int value, int divisor",
             "value / divisor == value % divisor");
@@ -1234,8 +1166,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_UnaryMinusUsesSharedBinaryTerm()
-    {
+    public void LowerCondition_UnaryMinusUsesSharedBinaryTerm() {
         var context = CreateExpressionContext(
             "int value",
             "-value == 0");
@@ -1250,8 +1181,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_ConditionalExpressionUsesSharedConditionalTerm()
-    {
+    public void LowerCondition_ConditionalExpressionUsesSharedConditionalTerm() {
         var context = CreateExpressionContext(
             "bool flag, int left, int right",
             "(flag ? left : right) == 0");
@@ -1270,8 +1200,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_ReferenceCoalesceUsesSharedConditionalTerm()
-    {
+    public void LowerCondition_ReferenceCoalesceUsesSharedConditionalTerm() {
         var context = CreateExpressionContext(
             "object? left, object? right",
             "(left ?? right) == null");
@@ -1290,8 +1219,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_BigIntegerZeroOneUseIntegralAtoms()
-    {
+    public void LowerCondition_BigIntegerZeroOneUseIntegralAtoms() {
         var context = CreateExpressionContext(
             "System.Numerics.BigInteger value",
             "value >= System.Numerics.BigInteger.MinusOne && value > System.Numerics.BigInteger.Zero && value <= System.Numerics.BigInteger.One");
@@ -1303,8 +1231,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_StringEmptyUsesStaticStringConstantTerm()
-    {
+    public void LowerCondition_StringEmptyUsesStaticStringConstantTerm() {
         var source = """
                      public sealed class C
                      {
@@ -1335,8 +1262,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_StringNonNullHelper_TreatsConcatAsAlwaysNonNull()
-    {
+    public void LowerCondition_StringNonNullHelper_TreatsConcatAsAlwaysNonNull() {
         var context = CreateExpressionContext(
             "string left, string right",
             "left + right");
@@ -1354,8 +1280,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_StringNonNullHelper_LowersCoalesceToOperandDisjunction()
-    {
+    public void LowerCondition_StringNonNullHelper_LowersCoalesceToOperandDisjunction() {
         var context = CreateExpressionContext(
             "string left, string right",
             "left ?? right");
@@ -1377,8 +1302,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_StringNonNullHelper_LowersConditionalToBranchSensitiveCondition()
-    {
+    public void LowerCondition_StringNonNullHelper_LowersConditionalToBranchSensitiveCondition() {
         var context = CreateExpressionContext(
             "bool flag, string first, string second",
             "flag ? first : second");
@@ -1400,8 +1324,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_NullableHasValueUsesSharedNullableTerm()
-    {
+    public void LowerCondition_NullableHasValueUsesSharedNullableTerm() {
         var context = CreateExpressionContext(
             "int? maybe",
             "maybe.HasValue");
@@ -1420,8 +1343,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_NullableValueUsesSharedNullableValueTerm()
-    {
+    public void LowerCondition_NullableValueUsesSharedNullableValueTerm() {
         var context = CreateExpressionContext(
             "int? maybe, int expected",
             "maybe.Value == expected");
@@ -1452,8 +1374,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_NullableGetValueOrDefaultUsesConditionalDefaultTerm()
-    {
+    public void LowerTerm_NullableGetValueOrDefaultUsesConditionalDefaultTerm() {
         var context = CreateExpressionContext(
             "int? maybe",
             "maybe.GetValueOrDefault() == 0");
@@ -1472,8 +1393,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_NullableGetValueOrDefaultFallbackUsesConditionalFallbackTerm()
-    {
+    public void LowerTerm_NullableGetValueOrDefaultFallbackUsesConditionalFallbackTerm() {
         var context = CreateExpressionContext(
             "int? maybe, int fallback",
             "maybe.GetValueOrDefault(fallback) == fallback");
@@ -1493,8 +1413,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_NullableBoolGetValueOrDefaultUsesConditionalDefaultTerm()
-    {
+    public void LowerTerm_NullableBoolGetValueOrDefaultUsesConditionalDefaultTerm() {
         var context = CreateExpressionContext(
             "bool? maybe",
             "maybe.GetValueOrDefault() == false");
@@ -1515,8 +1434,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_NullableCoalesceUnderlyingFallbackUsesConditionalValueTerm()
-    {
+    public void LowerTerm_NullableCoalesceUnderlyingFallbackUsesConditionalValueTerm() {
         var context = CreateExpressionContext(
             "int? maybe, int fallback",
             "(maybe ?? fallback) == fallback");
@@ -1536,8 +1454,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_NullableConditionalAccessCoalesceUsesElementValueTerm()
-    {
+    public void LowerTerm_NullableConditionalAccessCoalesceUsesElementValueTerm() {
         var context = CreateExpressionContext(
             "int[] values, int fallback",
             "(values?[0] ?? fallback) == fallback");
@@ -1557,8 +1474,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_NullableConditionalAccessMultidimensionalArrayLengthUsesDimensionProduct()
-    {
+    public void LowerTerm_NullableConditionalAccessMultidimensionalArrayLengthUsesDimensionProduct() {
         var context = CreateExpressionContext(
             "int[,] values, int fallback",
             "(values?.Length ?? fallback) == fallback");
@@ -1582,8 +1498,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_NullableEnumGetValueOrDefaultUsesIntegralDefaultTerm()
-    {
+    public void LowerTerm_NullableEnumGetValueOrDefaultUsesIntegralDefaultTerm() {
         var context = CreateExpressionContext(
             "Status? maybe",
             "maybe.GetValueOrDefault() == Status.None",
@@ -1605,8 +1520,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void Encoder_ExceptionPreconditionUsesTriggerFormulaWithoutSpecialAnalyzerRule()
-    {
+    public void Encoder_ExceptionPreconditionUsesTriggerFormulaWithoutSpecialAnalyzerRule() {
         var divisor = new SymbolicVariableTerm("d#1", SmtValueKind.Int);
         var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicRelationAtom(
@@ -1631,8 +1545,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void Encoder_BoundsExceptionPreconditionUsesSharedBoundsAtom()
-    {
+    public void Encoder_BoundsExceptionPreconditionUsesSharedBoundsAtom() {
         var index = new SymbolicVariableTerm("i#1", SmtValueKind.Int);
         var length = new SymbolicVariableTerm("values#1.Length", SmtValueKind.Int);
         var inRange = new SymbolicFactCondition(SymbolicFact.Exact(
@@ -1659,8 +1572,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void Encoder_NegativeLengthExceptionPreconditionUsesRelationAtom()
-    {
+    public void Encoder_NegativeLengthExceptionPreconditionUsesRelationAtom() {
         var length = new SymbolicVariableTerm("length#1", SmtValueKind.Int);
         var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicRelationAtom(
@@ -1685,8 +1597,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void Encoder_CheckedOverflowExceptionPreconditionUsesOutOfRangeAtoms()
-    {
+    public void Encoder_CheckedOverflowExceptionPreconditionUsesOutOfRangeAtoms() {
         var result = new SymbolicBinaryTerm(
             SymbolicBinaryTermOperator.Add,
             new SymbolicVariableTerm("left#1", SmtValueKind.Int),
@@ -1725,8 +1636,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void StructuralKey_DistinguishesOverflowSensitiveBinaryTerms()
-    {
+    public void StructuralKey_DistinguishesOverflowSensitiveBinaryTerms() {
         var left = new SymbolicVariableTerm("left#1", SmtValueKind.Int);
         var right = new SymbolicVariableTerm("right#1", SmtValueKind.Int);
         var exact = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, left, right);
@@ -1742,8 +1652,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void Encoder_NullDereferenceExceptionPreconditionUsesNullnessAtom()
-    {
+    public void Encoder_NullDereferenceExceptionPreconditionUsesNullnessAtom() {
         var receiver = new SymbolicVariableTerm("text#1", SmtValueKind.Reference);
         var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicRelationAtom(
@@ -1768,8 +1677,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void Encoder_UnboxNullExceptionPreconditionUsesNullnessAtom()
-    {
+    public void Encoder_UnboxNullExceptionPreconditionUsesNullnessAtom() {
         var value = new SymbolicVariableTerm("value#1", SmtValueKind.Reference);
         var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicRelationAtom(
@@ -1794,8 +1702,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void Encoder_ArgumentNullExceptionPreconditionUsesNullnessAtom()
-    {
+    public void Encoder_ArgumentNullExceptionPreconditionUsesNullnessAtom() {
         var argument = new SymbolicVariableTerm("gate#1", SmtValueKind.Reference);
         var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicRelationAtom(
@@ -1820,8 +1727,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void Encoder_NullableValueExceptionPreconditionUsesHasValueAtom()
-    {
+    public void Encoder_NullableValueExceptionPreconditionUsesHasValueAtom() {
         var hasValue = new SymbolicNullableHasValueTerm("maybe#1");
         var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicTruthAtom(hasValue),
@@ -1842,8 +1748,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void Encoder_InvalidCastExceptionPreconditionUsesTypeTestAtom()
-    {
+    public void Encoder_InvalidCastExceptionPreconditionUsesTypeTestAtom() {
         var value = new SymbolicVariableTerm("value#1", SmtValueKind.Reference);
         var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicTypeTestAtom(value, "System.String"),
@@ -1866,8 +1771,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void Encoder_DirectThrowExceptionPreconditionUsesConstantTrigger()
-    {
+    public void Encoder_DirectThrowExceptionPreconditionUsesConstantTrigger() {
         var condition = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicExceptionPreconditionAtom(
                 SymbolicExceptionPreconditionKind.DirectThrow,
@@ -1881,8 +1785,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void Encoder_OwnershipResourceAtomsStayConservativeUntilProofSemanticsExist()
-    {
+    public void Encoder_OwnershipResourceAtomsStayConservativeUntilProofSemanticsExist() {
         var owner = new SymbolicVariableTerm("owner#1", SmtValueKind.Reference);
         var alias = new SymbolicVariableTerm("alias#1", SmtValueKind.Reference);
         var resource = new SymbolicVariableTerm("resource#1", SmtValueKind.Reference);
@@ -1900,8 +1803,7 @@ public sealed class SymbolicIrTests
             new SymbolicResourceLifetimeAtom(resource, SymbolicResourceLifetimeState.Owned)
         };
 
-        foreach (var atom in atoms)
-        {
+        foreach (var atom in atoms) {
             var condition = new SymbolicFactCondition(SymbolicFact.Exact(atom, source, "test.ownership-resource"));
 
             Assert.That(
@@ -1912,8 +1814,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void OwnershipFactFactory_CreatesConsistentFreshOwnedResourceFacts()
-    {
+    public void OwnershipFactFactory_CreatesConsistentFreshOwnedResourceFacts() {
         var value = new SymbolicVariableTerm("value#1", SmtValueKind.Reference);
         var syntax = SyntaxFactory.ParseExpression("new MutableResource()");
 
@@ -1941,8 +1842,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void OwnershipFactFactory_CreatesFreshOwnedValueFactsWithoutResourceLifetime()
-    {
+    public void OwnershipFactFactory_CreatesFreshOwnedValueFactsWithoutResourceLifetime() {
         var value = new SymbolicVariableTerm("array#1", SmtValueKind.Reference);
         var syntax = SyntaxFactory.ParseExpression("new int[1]");
 
@@ -1968,8 +1868,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void OwnershipFactFactory_CreatesAliasBorrowEscapeMutationAndDisposalFacts()
-    {
+    public void OwnershipFactFactory_CreatesAliasBorrowEscapeMutationAndDisposalFacts() {
         var owner = new SymbolicVariableTerm("owner#1", SmtValueKind.Reference);
         var alias = new SymbolicVariableTerm("alias#1", SmtValueKind.Reference);
         var syntax = SyntaxFactory.ParseExpression("owner");
@@ -2017,8 +1916,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void FormulaEncoder_ArrayDimensionLengthUsesReferenceDimensionLength()
-    {
+    public void FormulaEncoder_ArrayDimensionLengthUsesReferenceDimensionLength() {
         var array = new SymbolicVariableTerm("matrix#1", SmtValueKind.Reference);
         var dimensionLength = new SymbolicArrayDimensionLengthTerm(array, 1);
 
@@ -2029,8 +1927,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_ArrayCreationDimensionLengthUsesSizeExpression()
-    {
+    public void LowerTerm_ArrayCreationDimensionLengthUsesSizeExpression() {
         var context = CreateExpressionContext(
             "int rows, int columns",
             "new int[rows, columns].GetLength(1) == columns");
@@ -2052,8 +1949,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_ArrayGetLengthInvocationUsesDimensionLengthTerm()
-    {
+    public void LowerTerm_ArrayGetLengthInvocationUsesDimensionLengthTerm() {
         var context = CreateExpressionContext(
             "int[,] matrix, int columns",
             "matrix.GetLength(1) == columns");
@@ -2071,8 +1967,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_ArrayGetLongLengthInvocationUsesDimensionLengthTerm()
-    {
+    public void LowerTerm_ArrayGetLongLengthInvocationUsesDimensionLengthTerm() {
         var context = CreateExpressionContext(
             "int[,] matrix, long columns",
             "matrix.GetLongLength(1) == columns");
@@ -2090,8 +1985,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_CastedArrayGetLengthInvocationUsesUnderlyingReferenceTerm()
-    {
+    public void LowerTerm_CastedArrayGetLengthInvocationUsesUnderlyingReferenceTerm() {
         var context = CreateExpressionContext(
             "object value, int columns",
             "((int[,])value).GetLength(1) == columns");
@@ -2109,8 +2003,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_ArrayRankMemberUsesStaticArrayRank()
-    {
+    public void LowerTerm_ArrayRankMemberUsesStaticArrayRank() {
         var context = CreateExpressionContext(
             "int[,] matrix",
             "matrix.Rank == 2");
@@ -2124,8 +2017,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_MultidimensionalArrayLengthUsesDimensionProduct()
-    {
+    public void LowerTerm_MultidimensionalArrayLengthUsesDimensionProduct() {
         var context = CreateExpressionContext(
             "int[,] matrix, int total",
             "matrix.Length == total");
@@ -2145,8 +2037,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_MultidimensionalArrayUsesDimensionProduct()
-    {
+    public void LowerBuiltInLengthTerm_MultidimensionalArrayUsesDimensionProduct() {
         var context = CreateExpressionContext(
             "int[,] matrix, int total",
             "matrix.Length == total");
@@ -2164,8 +2055,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_StringSubstringOneArgumentUsesSourceLengthDelta()
-    {
+    public void LowerBuiltInLengthTerm_StringSubstringOneArgumentUsesSourceLengthDelta() {
         var context = CreateExpressionContext(
             "string text, int start",
             "text.Substring(start).Length == text.Length - start");
@@ -2185,8 +2075,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_StringSubstringTwoArgumentUsesRequestedLength()
-    {
+    public void LowerBuiltInLengthTerm_StringSubstringTwoArgumentUsesRequestedLength() {
         var context = CreateExpressionContext(
             "string text, int start, int length",
             "text.Substring(start, length).Length == length");
@@ -2203,8 +2092,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_ArrayRangeUsesEndpointDifference()
-    {
+    public void LowerBuiltInLengthTerm_ArrayRangeUsesEndpointDifference() {
         var context = CreateExpressionContext(
             "int[] values",
             "values[1..^1].Length == values.Length - 2");
@@ -2224,8 +2112,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_StringRangeUsesEndpointDifference()
-    {
+    public void LowerBuiltInLengthTerm_StringRangeUsesEndpointDifference() {
         var context = CreateExpressionContext(
             "string text",
             "text[1..^1].Length == text.Length - 2");
@@ -2245,8 +2132,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_StringAsSpanOneArgumentUsesSourceLengthDelta()
-    {
+    public void LowerBuiltInLengthTerm_StringAsSpanOneArgumentUsesSourceLengthDelta() {
         var context = CreateMethodExpressionContext(
             "string text, int start",
             string.Empty,
@@ -2267,8 +2153,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_ReadOnlySpanSliceTwoArgumentUsesRequestedLength()
-    {
+    public void LowerBuiltInLengthTerm_ReadOnlySpanSliceTwoArgumentUsesRequestedLength() {
         var context = CreateMethodExpressionContext(
             "ReadOnlySpan<int> values, int start, int length",
             string.Empty,
@@ -2286,8 +2171,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_AssignedRangeElementAccessUsesResolvedEndpoints()
-    {
+    public void LowerBuiltInLengthTerm_AssignedRangeElementAccessUsesResolvedEndpoints() {
         var context = CreateMethodExpressionContext(
             "int[] values",
             """
@@ -2306,8 +2190,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_AssignedRangeStringViewUsesResolvedEndpoints()
-    {
+    public void LowerBuiltInLengthTerm_AssignedRangeStringViewUsesResolvedEndpoints() {
         var context = CreateMethodExpressionContext(
             "string text, Range range",
             """
@@ -2326,8 +2209,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void StringContentReferenceHelper_CreatesReferenceBackedStringTerm()
-    {
+    public void StringContentReferenceHelper_CreatesReferenceBackedStringTerm() {
         var reference = new SymbolicVariableTerm("text#1", SmtValueKind.Reference);
 
         Assert.That(TypedSymbolicTestLowering.TryCreateStringContentReferenceTerm(reference, out var term), Is.True);
@@ -2335,8 +2217,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void SemanticPipeline_BuiltInLengthProjectionSupportsMultidimensionalArrayTargets()
-    {
+    public void SemanticPipeline_BuiltInLengthProjectionSupportsMultidimensionalArrayTargets() {
         var context = CreateLocalDeclarationContext(
             "int[,] values",
             "int[,] copy = values;");
@@ -2359,8 +2240,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void SemanticPipeline_BuiltInLengthValueSupportsAssignedRangeStringViews()
-    {
+    public void SemanticPipeline_BuiltInLengthValueSupportsAssignedRangeStringViews() {
         var context = CreateMethodExpressionContext(
             "string text, Range range",
             """
@@ -2378,8 +2258,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_CountBackedIndexerUsesCountTerm()
-    {
+    public void LowerBuiltInLengthTerm_CountBackedIndexerUsesCountTerm() {
         var context = CreateMethodExpressionContext(
             "System.Collections.Generic.IReadOnlyList<int> values",
             string.Empty,
@@ -2401,8 +2280,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_CountOnlyCollectionUsesCountTerm()
-    {
+    public void LowerBuiltInLengthTerm_CountOnlyCollectionUsesCountTerm() {
         var context = CreateMethodExpressionContext(
             "System.Collections.Generic.IReadOnlyCollection<int> values",
             string.Empty,
@@ -2424,8 +2302,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_SpanParameterUsesReferenceBackedLengthTerm()
-    {
+    public void LowerBuiltInLengthTerm_SpanParameterUsesReferenceBackedLengthTerm() {
         var context = CreateExpressionContext(
             "System.Span<int> span",
             "span.Length == 0");
@@ -2447,8 +2324,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerBuiltInLengthTerm_CollectionExpressionSpreadUsesSummedLengths()
-    {
+    public void LowerBuiltInLengthTerm_CollectionExpressionSpreadUsesSummedLengths() {
         var context = CreateMethodLocalDeclarationContext(
             "System.Collections.Generic.IReadOnlyCollection<int> values",
             "int[] copy = [0, .. values, 1];");
@@ -2467,8 +2343,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void BuiltInElementAccessInRangeCondition_SupportsAssignedIndexShape()
-    {
+    public void BuiltInElementAccessInRangeCondition_SupportsAssignedIndexShape() {
         var context = CreateMethodExpressionContext(
             "int[] values",
             """
@@ -2491,8 +2366,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void BuiltInElementAccessInRangeCondition_SupportsRangeShape()
-    {
+    public void BuiltInElementAccessInRangeCondition_SupportsRangeShape() {
         var context = CreateMethodExpressionContext(
             "int[] values",
             """
@@ -2516,8 +2390,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void SemanticPipeline_BuiltInLengthAssignmentSupportsAssignedRangeStringViews()
-    {
+    public void SemanticPipeline_BuiltInLengthAssignmentSupportsAssignedRangeStringViews() {
         var context = CreateMethodLocalDeclarationContext(
             "string text, Range range",
             """
@@ -2544,8 +2417,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void SemanticPipeline_StringContentAssignmentSupportsStringTargets()
-    {
+    public void SemanticPipeline_StringContentAssignmentSupportsStringTargets() {
         var context = CreateLocalDeclarationContext(
             "string input",
             "string copy = input;");
@@ -2565,8 +2437,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_MultidimensionalArrayCreationLengthUsesSizeProduct()
-    {
+    public void LowerTerm_MultidimensionalArrayCreationLengthUsesSizeProduct() {
         var context = CreateExpressionContext(
             "int rows, int columns",
             "new int[rows, columns].Length == rows * columns");
@@ -2584,8 +2455,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_ArrayGetLowerBoundInvocationUsesZeroTerm()
-    {
+    public void LowerTerm_ArrayGetLowerBoundInvocationUsesZeroTerm() {
         var context = CreateExpressionContext(
             "int[,] matrix",
             "matrix.GetLowerBound(1) == 0");
@@ -2599,8 +2469,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_ArrayGetUpperBoundInvocationUsesDimensionLengthMinusOne()
-    {
+    public void LowerTerm_ArrayGetUpperBoundInvocationUsesDimensionLengthMinusOne() {
         var context = CreateExpressionContext(
             "int[,] matrix, int columns",
             "matrix.GetUpperBound(1) == columns - 1");
@@ -2619,8 +2488,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerTerm_ArrayCreationGetLengthInvocationUsesSizeExpression()
-    {
+    public void LowerTerm_ArrayCreationGetLengthInvocationUsesSizeExpression() {
         var context = CreateExpressionContext(
             "int rows, int columns",
             "new int[rows, columns].GetLength(1) == columns");
@@ -2635,8 +2503,7 @@ public sealed class SymbolicIrTests
     }
 
     private static TAtom AssertFactCondition<TAtom>(SymbolicCondition condition)
-        where TAtom : SymbolicAtom
-    {
+        where TAtom : SymbolicAtom {
         Assert.That(condition, Is.TypeOf<SymbolicFactCondition>());
         var factCondition = (SymbolicFactCondition)condition;
         Assert.That(factCondition.Fact.Confidence, Is.EqualTo(SymbolicFactConfidence.Exact));
@@ -2645,8 +2512,7 @@ public sealed class SymbolicIrTests
     }
 
     private static ExpressionContext CreateExpressionContext(string parameters, string expression,
-        string declarations = "")
-    {
+        string declarations = "") {
         var source = $$"""
                        {{declarations}}
                        public sealed class C
@@ -2670,8 +2536,7 @@ public sealed class SymbolicIrTests
     }
 
     private static ExpressionContext CreateMethodExpressionContext(string parameters, string statements,
-        string expression)
-    {
+        string expression) {
         var source = $$"""
                        using System;
                        public sealed class C
@@ -2696,8 +2561,7 @@ public sealed class SymbolicIrTests
     }
 
     private static LocalDeclarationContext CreateLocalDeclarationContext(string parameters, string declaration,
-        string declarations = "")
-    {
+        string declarations = "") {
         var source = $$"""
                        {{declarations}}
                        public sealed class C
@@ -2721,8 +2585,7 @@ public sealed class SymbolicIrTests
     }
 
     private static LocalDeclarationContext CreateMethodLocalDeclarationContext(string parameters, string statements,
-        string declarations = "")
-    {
+        string declarations = "") {
         var source = $$"""
                        {{declarations}}
                        public sealed class C

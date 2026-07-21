@@ -1,6 +1,6 @@
 root = true
 
-[{SharpProof.Analyzer,SharpProof.Attributes,SharpProof.Contracts,SharpProof.ProofCore,SharpProof.Symbolic,SharpProof.Tooling.Core,Tools}/**/*.cs]
+[{SharpProof.Analyzer,SharpProof.Attributes,SharpProof.ProofCore,SharpProof.Symbolic,Tools}/**/*.cs]
 csharp_new_line_before_open_brace = none
 dotnet_diagnostic.IDE0055.severity = warning
 csharp_prefer_braces = false:warning
@@ -18,3 +18,11 @@ csharp_style_prefer_simple_using_statement = true:warning
 csharp_style_prefer_switch_expression = true:warning
 dotnet_style_collection_initializer = true:warning
 dotnet_style_object_initializer = true:warning
+
+[{SharpProof.Test,SharpProof.Testing,SharpProof.ToolingTest}/*.cs]
+csharp_new_line_before_open_brace = none
+dotnet_diagnostic.IDE0055.severity = warning
+
+[{SharpProof.Test,SharpProof.Testing,SharpProof.ToolingTest}/**/*.cs]
+csharp_new_line_before_open_brace = none
+dotnet_diagnostic.IDE0055.severity = warning

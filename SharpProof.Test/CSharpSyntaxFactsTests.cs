@@ -7,8 +7,7 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 
 [TestFixture]
-public class CSharpSyntaxFactsTests
-{
+public class CSharpSyntaxFactsTests {
     private const ExecutionRootPolicy ExtendedExecutionRoots =
         ExecutionRootPolicy.Callable |
         ExecutionRootPolicy.ExpressionBodiedPropertyOrIndexer |
@@ -29,15 +28,13 @@ public class CSharpSyntaxFactsTests
     [TestCase(SyntaxKind.CoalesceAssignmentExpression, SyntaxKind.CoalesceExpression)]
     public void TryGetCompoundAssignmentBinaryKind_MapsSupportedOperators(
         SyntaxKind assignmentKind,
-        SyntaxKind expectedBinaryKind)
-    {
+        SyntaxKind expectedBinaryKind) {
         Assert.That(CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind(assignmentKind, out var binaryKind), Is.True);
         Assert.That(binaryKind, Is.EqualTo(expectedBinaryKind));
     }
 
     [Test]
-    public void TryGetCompoundAssignmentBinaryKind_RejectsSimpleAssignment()
-    {
+    public void TryGetCompoundAssignmentBinaryKind_RejectsSimpleAssignment() {
         Assert.That(CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind(
             SyntaxKind.SimpleAssignmentExpression, out var binaryKind), Is.False);
         Assert.That(binaryKind, Is.EqualTo(SyntaxKind.None));
@@ -48,8 +45,7 @@ public class CSharpSyntaxFactsTests
     [TestCase("--value", -1)]
     [TestCase("value--", -1)]
     [TestCase("((value++))", 1)]
-    public void TryGetIncrementOrDecrementOperand_ReturnsOperandAndDelta(string text, int expectedDelta)
-    {
+    public void TryGetIncrementOrDecrementOperand_ReturnsOperandAndDelta(string text, int expectedDelta) {
         var expression = SyntaxFactory.ParseExpression(text);
 
         Assert.That(CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(
@@ -59,15 +55,13 @@ public class CSharpSyntaxFactsTests
     }
 
     [Test]
-    public void TryGetIncrementOrDecrementOperand_RejectsNonMutation()
-    {
+    public void TryGetIncrementOrDecrementOperand_RejectsNonMutation() {
         Assert.That(CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(
             SyntaxFactory.ParseExpression("value + 1"), out _, out _), Is.False);
     }
 
     [Test]
-    public void GetContainingExecutionRoot_ExtendedPolicy_SelectsNearestRequestedBoundary()
-    {
+    public void GetContainingExecutionRoot_ExtendedPolicy_SelectsNearestRequestedBoundary() {
         var root = CSharpSyntaxTree.ParseText("""
             System.Console.WriteLine();
 
@@ -96,8 +90,7 @@ public class CSharpSyntaxFactsTests
     }
 
     [Test]
-    public void GetContainingExecutionRoot_DefaultPolicyRetainsSyntaxTreeFallback()
-    {
+    public void GetContainingExecutionRoot_DefaultPolicyRetainsSyntaxTreeFallback() {
         var root = CSharpSyntaxTree.ParseText("public class TestClass { public int Value => 1 + 2; }").GetRoot();
         var expression = root.DescendantNodes().OfType<BinaryExpressionSyntax>().Single();
 
@@ -133,8 +126,7 @@ public class CSharpSyntaxFactsTests
     public void MethodBodyOperationResolver_SelectsSharedBodyOrExpressionTaxonomy(
         string source,
         SyntaxKind declarationKind,
-        SyntaxKind expectedOperationSyntaxKind)
-    {
+        SyntaxKind expectedOperationSyntaxKind) {
         var semanticModel = CreateSemanticModel(source, out var root);
         var declaration = root.DescendantNodes().Single(node => node.IsKind(declarationKind));
 
@@ -153,8 +145,7 @@ public class CSharpSyntaxFactsTests
     public void MethodBodyOperationResolver_RetainsDeclarationFallback(
         string source,
         SyntaxKind declarationKind,
-        bool includeConversionOperators)
-    {
+        bool includeConversionOperators) {
         var semanticModel = CreateSemanticModel(source, out var root);
         var declaration = root.DescendantNodes().Single(node => node.IsKind(declarationKind));
         var expected = semanticModel.GetOperation(declaration);
@@ -169,8 +160,7 @@ public class CSharpSyntaxFactsTests
         Assert.That(actual?.Syntax, Is.SameAs(expected?.Syntax));
     }
 
-    private static SemanticModel CreateSemanticModel(string source, out SyntaxNode root)
-    {
+    private static SemanticModel CreateSemanticModel(string source, out SyntaxNode root) {
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create(
             nameof(CSharpSyntaxFactsTests),

@@ -13,11 +13,9 @@ using SharpProof.Test.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicSemanticPipelineTests
-{
+public sealed class SymbolicSemanticPipelineTests {
     [Test]
-    public void LoweringResult_DistinguishesExactAndUnsupportedWithStableProvenance()
-    {
+    public void LoweringResult_DistinguishesExactAndUnsupportedWithStableProvenance() {
         var exact = CreateExpressionContext("int value", "value > 0");
         var exactResult = SymbolicSemanticPipeline.LowerCondition(exact.Expression, exact.LoweringContext);
 
@@ -39,8 +37,7 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void EnumConversions_PreserveByteLongAndUnsignedIntegralValues()
-    {
+    public void EnumConversions_PreserveByteLongAndUnsignedIntegralValues() {
         const string declarations = """
                                     public enum ByteMode : byte { Max = byte.MaxValue }
                                     public enum LongMode : long { Min = long.MinValue }
@@ -54,8 +51,7 @@ public sealed class SymbolicSemanticPipelineTests
             "(long)UIntMode.Max"
         };
 
-        for (var index = 0; index < expressions.Length; index++)
-        {
+        for (var index = 0; index < expressions.Length; index++) {
             var context = CreateExpressionContext(string.Empty, expressions[index], declarations);
             var result = SymbolicSemanticPipeline.LowerTerm(context.Expression, context.LoweringContext);
 
@@ -69,8 +65,7 @@ public sealed class SymbolicSemanticPipelineTests
     [TestCase("LongMode", "long")]
     [TestCase("UIntMode", "long")]
     [TestCase("UIntMode", "ulong")]
-    public void EnumConversions_PreserveNonConstantIntegralTerms(string enumType, string targetType)
-    {
+    public void EnumConversions_PreserveNonConstantIntegralTerms(string enumType, string targetType) {
         const string declarations = """
                                     public enum ByteMode : byte { Value = 1 }
                                     public enum LongMode : long { Value = 1 }
@@ -89,8 +84,7 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void ExecutionTraversal_StopsAtLambdasAndLocalFunctionsByDefault()
-    {
+    public void ExecutionTraversal_StopsAtLambdasAndLocalFunctionsByDefault() {
         var tree = CSharpSyntaxTree.ParseText("""
                                               using System;
                                               class Target
@@ -120,10 +114,8 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void TestOracle_TypeTestRequiresNonNullEquivalence()
-    {
-        static bool CanTranslate(string valueType, string testedType)
-        {
+    public void TestOracle_TypeTestRequiresNonNullEquivalence() {
+        static bool CanTranslate(string valueType, string testedType) {
             var tree = CSharpSyntaxTree.ParseText(
                 "class Target { bool M(" + valueType + " value) => value is " + testedType + "; }");
             var compilation = CreateCompilation(tree, "TypeTestOracleProbe");
@@ -143,8 +135,7 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void ListPatternElementPosition_TestOnlyAdapterIsAbsent()
-    {
+    public void ListPatternElementPosition_TestOnlyAdapterIsAbsent() {
         Assert.That(
             typeof(CSharpSyntaxFacts).GetMethod(
                 "TryGetListPatternElementPosition",
@@ -153,8 +144,7 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void VariablePrefixScanner_DoesNotConfuseNumericLocationPrefixes()
-    {
+    public void VariablePrefixScanner_DoesNotConfuseNumericLocationPrefixes() {
         static SymbolicFact Fact(string name) => SymbolicFact.Exact(
             new SymbolicRelationAtom(
                 SymbolicRelationOperator.Equal,
@@ -176,8 +166,7 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void InferredNotNullPostcondition_RecognizesSubsequentLeadingParameterGuard()
-    {
+    public void InferredNotNullPostcondition_RecognizesSubsequentLeadingParameterGuard() {
         var tree = CSharpSyntaxTree.ParseText("""
                                               #nullable enable
                                               class Target
@@ -201,8 +190,7 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void RangeShapeWriteDetection_IgnoresUnexecutedLambdaBody()
-    {
+    public void RangeShapeWriteDetection_IgnoresUnexecutedLambdaBody() {
         var tree = CSharpSyntaxTree.ParseText("""
                                               using System;
                                               class Target
@@ -233,8 +221,7 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void FalseTypePatternBranch_ProducesComplementaryTypedFacts()
-    {
+    public void FalseTypePatternBranch_ProducesComplementaryTypedFacts() {
         var context = CreateExpressionContext("object value", "value is string");
 
         var result = SymbolicSemanticPipeline.LowerBranchCondition(
@@ -250,10 +237,8 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void StructuralKeys_AreCultureAndAllocationOrderIndependent()
-    {
-        static SymbolicCondition CreateCondition(bool reverse)
-        {
+    public void StructuralKeys_AreCultureAndAllocationOrderIndependent() {
+        static SymbolicCondition CreateCondition(bool reverse) {
             var left = new SymbolicElementTerm(
                 new SymbolicMemberTerm(
                     new SymbolicVariableTerm("receiver", SmtValueKind.Reference),
@@ -277,8 +262,7 @@ public sealed class SymbolicSemanticPipelineTests
 
         var previousCulture = CultureInfo.CurrentCulture;
         var previousUiCulture = CultureInfo.CurrentUICulture;
-        try
-        {
+        try {
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("ar-SA");
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("tr-TR");
             var first = SymbolicState.CreateProofConditionKey(CreateCondition(false));
@@ -289,16 +273,14 @@ public sealed class SymbolicSemanticPipelineTests
 
             Assert.That(second, Is.EqualTo(first));
         }
-        finally
-        {
+        finally {
             CultureInfo.CurrentCulture = previousCulture;
             CultureInfo.CurrentUICulture = previousUiCulture;
         }
     }
 
     [Test]
-    public void MixedAggregateTrigger_DoesNotUseExactSubsetAsReachabilityProof()
-    {
+    public void MixedAggregateTrigger_DoesNotUseExactSubsetAsReachabilityProof() {
         const string source =
             "static class C { static int Size() => 1; static int[,] M(int first) => new int[first, Size()]; }";
         var fixture = RoslynTestFixture.CreateCompilation(
@@ -319,8 +301,7 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void ExtendedPropertyPattern_LowersIntermediateNonNullCondition()
-    {
+    public void ExtendedPropertyPattern_LowersIntermediateNonNullCondition() {
         var context = CreateExpressionContext(
             "Box box",
             "box is { Child.Value: > 0 }",
@@ -335,8 +316,7 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void ListPatternDesignation_LowersBindingAndLengthConditions()
-    {
+    public void ListPatternDesignation_LowersBindingAndLengthConditions() {
         var context = CreateExpressionContext("int[] values", "values is [var first, ..]");
 
         var lowering = SymbolicSemanticPipeline.LowerCondition(context.Expression, context.LoweringContext);
@@ -348,10 +328,8 @@ public sealed class SymbolicSemanticPipelineTests
         Assert.That(key, Does.Contain("length"));
     }
 
-    private static bool ContainsRuntimeTypeTest(SmtFormula formula)
-    {
-        return formula switch
-        {
+    private static bool ContainsRuntimeTypeTest(SmtFormula formula) {
+        return formula switch {
             SmtRuntimeTypeTestFormula => true,
             SmtUnaryFormula unary => ContainsRuntimeTypeTest(unary.Operand),
             SmtBinaryFormula binary =>
@@ -360,10 +338,8 @@ public sealed class SymbolicSemanticPipelineTests
         };
     }
 
-    private static bool ContainsRuntimeTypeTest(SymbolicCondition condition)
-    {
-        return condition switch
-        {
+    private static bool ContainsRuntimeTypeTest(SymbolicCondition condition) {
+        return condition switch {
             SymbolicFactCondition { Fact.Atom: SymbolicTypeTestAtom } => true,
             SymbolicNotCondition negation => ContainsRuntimeTypeTest(negation.Operand),
             SymbolicBinaryCondition binary =>
@@ -375,8 +351,7 @@ public sealed class SymbolicSemanticPipelineTests
     private static ExpressionContext CreateExpressionContext(
         string parameters,
         string expression,
-        string declarations = "")
-    {
+        string declarations = "") {
         var source = declarations + "\npublic sealed class Probe { public object M(" + parameters + ") => " +
                      expression + "; }";
         var fixture = RoslynTestFixture.CreateSingleNode<ArrowExpressionClauseSyntax>(
@@ -393,8 +368,7 @@ public sealed class SymbolicSemanticPipelineTests
             new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None));
     }
 
-    private static CSharpCompilation CreateCompilation(SyntaxTree tree, string assemblyName)
-    {
+    private static CSharpCompilation CreateCompilation(SyntaxTree tree, string assemblyName) {
         return RoslynTestFixture.CreateCompilation(
             tree,
             assemblyName,

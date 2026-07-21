@@ -6,11 +6,9 @@ using SharpProof.Symbolic.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicQueryWitnessTests
-{
+public sealed class SymbolicQueryWitnessTests {
     [Test]
-    public void QueryScopesAndImplication_ExposeReachabilityWitnessesAndDomains()
-    {
+    public void QueryScopesAndImplication_ExposeReachabilityWitnessesAndDomains() {
         const string source = """
                               public static class WitnessSample
                               {
@@ -54,8 +52,7 @@ public sealed class SymbolicQueryWitnessTests
         var valueDomain = programPoint.InputDomainSummary.Domains.Single(domain => domain.Name == "value");
         var textDomain = programPoint.InputDomainSummary.Domains.Single(domain => domain.Name == "text");
         var indexDomain = programPoint.InputDomainSummary.Domains.Single(domain => domain.Name == "index");
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(programPoint.ReachabilityWitness.IsAvailable, Is.True);
             Assert.That(programPoint.ReachabilityWitness.Assignments, Has.Some.Property("SourceName").EqualTo("value"));
             Assert.That(valueDomain.Role, Is.EqualTo(SymbolicInputRole.Parameter));
@@ -69,8 +66,7 @@ public sealed class SymbolicQueryWitnessTests
             Assert.That(indexDomain.RelatedCollection, Is.EqualTo("values"));
         });
 
-        foreach (var result in new[] { point, lineResult, span, allLines })
-        {
+        foreach (var result in new[] { point, lineResult, span, allLines }) {
             Assert.That(result.ReachabilityWitnesses, Is.Not.Empty);
             Assert.That(result.InputDomainSummary, Is.Not.Null);
         }
@@ -88,8 +84,7 @@ public sealed class SymbolicQueryWitnessTests
             Is.LessThanOrEqualTo(5));
 
         var sourcePath = Path.Combine(Path.GetTempPath(), "SharpProof.ProofQuery." + Guid.NewGuid() + ".cs");
-        try
-        {
+        try {
             File.WriteAllText(sourcePath, source);
             var (fileTree, fileCompilation) = Compile(File.ReadAllText(sourcePath), sourcePath);
             var fileProof = service.Prove(new SymbolicQueryContext(
@@ -99,15 +94,13 @@ public sealed class SymbolicQueryWitnessTests
             Assert.That(fileProof.TruthValue, Is.EqualTo(proof.TruthValue));
             Assert.That(fileProof.CounterexampleWitness.IsAvailable, Is.True);
         }
-        finally
-        {
+        finally {
             File.Delete(sourcePath);
         }
     }
 
     [Test]
-    public void RuntimeHazardQuery_ExposesInputsThatSatisfyTheTrigger()
-    {
+    public void RuntimeHazardQuery_ExposesInputsThatSatisfyTheTrigger() {
         const string source = """
                               public static class HazardWitness
                               {
@@ -132,8 +125,7 @@ public sealed class SymbolicQueryWitnessTests
             .Single(assignment => assignment.SourceName == "divisor");
         var divisorDomain = hazard.TriggerWitness.DomainSummary.Domains
             .Single(domain => domain.Name == "divisor");
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
             Assert.That(hazard.UnknownReasonInfo.Source, Is.EqualTo(SymbolicUnknownReasonSource.RuntimeHazard));
             Assert.That(hazard.UnknownReasonInfo.Code, Is.EqualTo("runtime_hazard.unknown"));
@@ -155,14 +147,12 @@ public sealed class SymbolicQueryWitnessTests
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             default);
 
-    private static int FindLine(string source, string text)
-    {
+    private static int FindLine(string source, string text) {
         var position = source.IndexOf(text, StringComparison.Ordinal);
         return source.Substring(0, position).Count(static character => character == '\n') + 1;
     }
 
-    private static int FindColumn(string source, int position)
-    {
+    private static int FindColumn(string source, int position) {
         var lineStart = source.LastIndexOf('\n', Math.Max(0, position - 1));
         return position - lineStart;
     }

@@ -1,7 +1,6 @@
 namespace SharpProof.Test;
 
-internal static class SemanticOracleTestSources
-{
+internal static class SemanticOracleTestSources {
     internal const string ModeEnum = @"
 public enum Mode
 {

@@ -1,7 +1,6 @@
 namespace SharpProof.Test;
 
-internal static class MutableObjectTestSources
-{
+internal static class MutableObjectTestSources {
     internal const string SystemUsings = "\nusing System;\nusing SharpProof.Attributes;\n\n";
     internal const string AttributeUsings = "\nusing SharpProof.Attributes;\n\n";
 

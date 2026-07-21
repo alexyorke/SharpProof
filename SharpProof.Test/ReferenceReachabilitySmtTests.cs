@@ -9,11 +9,9 @@ namespace SharpProof.Test;
 
 [TestFixture]
 [Category("SmtHeavy")]
-public sealed class ReferenceReachabilitySmtTests
-{
+public sealed class ReferenceReachabilitySmtTests {
     [Test]
-    public void ExecutionVisibility_PriorNullConditionalAccessWhenNotNull_IsUnreachable()
-    {
+    public void ExecutionVisibility_PriorNullConditionalAccessWhenNotNull_IsUnreachable() {
         const string source = @"
 public class TestClass
 {
@@ -28,8 +26,7 @@ public class TestClass
     }
 
     [Test]
-    public void ExecutionVisibility_GuardedNullConditionalAccessWhenNotNull_IsUnreachable()
-    {
+    public void ExecutionVisibility_GuardedNullConditionalAccessWhenNotNull_IsUnreachable() {
         const string source = @"
 public class TestClass
 {
@@ -48,8 +45,7 @@ public class TestClass
     }
 
     [Test]
-    public void ExecutionVisibility_ReassignedConditionalAccessWhenNotNull_RemainsReachable()
-    {
+    public void ExecutionVisibility_ReassignedConditionalAccessWhenNotNull_RemainsReachable() {
         const string source = @"
 public class TestClass
 {
@@ -65,8 +61,7 @@ public class TestClass
     }
 
     [Test]
-    public void ExecutionVisibility_PriorNonNullCoalesceRight_IsUnreachable()
-    {
+    public void ExecutionVisibility_PriorNonNullCoalesceRight_IsUnreachable() {
         const string source = @"
 public class TestClass
 {
@@ -83,8 +78,7 @@ public class TestClass
     }
 
     [Test]
-    public void ExecutionVisibility_GuardedNonNullCoalesceRight_IsUnreachable()
-    {
+    public void ExecutionVisibility_GuardedNonNullCoalesceRight_IsUnreachable() {
         const string source = @"
 public class TestClass
 {
@@ -105,8 +99,7 @@ public class TestClass
     }
 
     [Test]
-    public void ExecutionVisibility_UnknownCoalesceRight_RemainsReachable()
-    {
+    public void ExecutionVisibility_UnknownCoalesceRight_RemainsReachable() {
         const string source = @"
 public class TestClass
 {
@@ -121,8 +114,7 @@ public class TestClass
         Assert.That(IsInvocationUnreachable(source, "Throw()"), Is.False);
     }
 
-    private static bool IsConditionalAccessWhenNotNullUnreachable(string source)
-    {
+    private static bool IsConditionalAccessWhenNotNullUnreachable(string source) {
         var (semanticModel, root) = CreateSemanticModel(source);
         var memberBinding = root
             .DescendantNodes()
@@ -132,8 +124,7 @@ public class TestClass
         return IsUnreachable(memberBinding, semanticModel);
     }
 
-    private static bool IsInvocationUnreachable(string source, string invocationText)
-    {
+    private static bool IsInvocationUnreachable(string source, string invocationText) {
         var (semanticModel, root) = CreateSemanticModel(source);
         var invocation = root
             .DescendantNodes()
@@ -143,8 +134,7 @@ public class TestClass
         return IsUnreachable(invocation, semanticModel);
     }
 
-    private static bool IsUnreachable(SyntaxNode node, SemanticModel semanticModel)
-    {
+    private static bool IsUnreachable(SyntaxNode node, SemanticModel semanticModel) {
         var method = typeof(SharpProofAnalyzer).Assembly
             .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", true)!
             .GetMethod(
@@ -158,8 +148,7 @@ public class TestClass
         return (bool)method.Invoke(null, new object?[] { node, semanticModel, CancellationToken.None, null })!;
     }
 
-    private static (SemanticModel SemanticModel, SyntaxNode Root) CreateSemanticModel(string source)
-    {
+    private static (SemanticModel SemanticModel, SyntaxNode Root) CreateSemanticModel(string source) {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(LanguageVersion.Preview),

@@ -1,7 +1,6 @@
 namespace SharpProof.Test;
 
-internal static class EqualityTestSources
-{
+internal static class EqualityTestSources {
     internal const string ImpureEquatableMutableRecord = """
         public sealed class MutableRecord : IEquatable<MutableRecord>
         {

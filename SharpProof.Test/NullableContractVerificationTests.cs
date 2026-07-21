@@ -5,11 +5,9 @@ using SharpProof.Analyzer;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class NullableContractVerificationTests
-{
+public sealed class NullableContractVerificationTests {
     [Test]
-    public async Task AsyncNullableResult_NullReturnDoesNotReportViolation()
-    {
+    public async Task AsyncNullableResult_NullReturnDoesNotReportViolation() {
         const string source = """
                               #nullable enable
                               using System.Threading.Tasks;
@@ -31,8 +29,7 @@ public sealed class NullableContractVerificationTests
 
     [ReadmeExample("sp0041-nullable-return-contract")]
     [Test]
-    public async Task NonNullableReturn_NullLiteral_ReportsViolation()
-    {
+    public async Task NonNullableReturn_NullLiteral_ReportsViolation() {
         const string source = """
                               #nullable enable
                               public static class Sample
@@ -48,8 +45,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task NotNullReturn_ExceptionalOnlyExit_DoesNotReport()
-    {
+    public async Task NotNullReturn_ExceptionalOnlyExit_DoesNotReport() {
         const string source = """
                               #nullable enable
                               using System;
@@ -69,8 +65,7 @@ public sealed class NullableContractVerificationTests
 
     [ReadmeExample("sp0042-nullable-parameter-contract")]
     [Test]
-    public async Task NotNullWhen_TrueWithNullOutValue_ReportsViolation()
-    {
+    public async Task NotNullWhen_TrueWithNullOutValue_ReportsViolation() {
         const string source = """
                               #nullable enable
                               using System.Diagnostics.CodeAnalysis;
@@ -92,8 +87,7 @@ public sealed class NullableContractVerificationTests
 
     [TestCase(true)]
     [TestCase(false)]
-    public async Task NotNullWhen_MatchingBooleanWithNonNullOutValue_DoesNotReport(bool result)
-    {
+    public async Task NotNullWhen_MatchingBooleanWithNonNullOutValue_DoesNotReport(bool result) {
         var source = $$"""
                        #nullable enable
                        using System.Diagnostics.CodeAnalysis;
@@ -114,8 +108,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task NotNullIfNotNull_NullResult_ReportsViolation()
-    {
+    public async Task NotNullIfNotNull_NullResult_ReportsViolation() {
         const string source = """
                               #nullable enable
                               using System.Diagnostics.CodeAnalysis;
@@ -133,8 +126,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task NotNullIfNotNull_ConditionalAccess_DoesNotReport()
-    {
+    public async Task NotNullIfNotNull_ConditionalAccess_DoesNotReport() {
         const string source = """
                               #nullable enable
                               using System.Diagnostics.CodeAnalysis;
@@ -153,8 +145,7 @@ public sealed class NullableContractVerificationTests
 
     [ReadmeExample("sp0043-nullable-member-contract")]
     [Test]
-    public async Task MemberNotNull_EmptyInitializer_ReportsViolation()
-    {
+    public async Task MemberNotNull_EmptyInitializer_ReportsViolation() {
         const string source = """
                               #nullable enable
                               using System.Diagnostics.CodeAnalysis;
@@ -176,8 +167,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task MemberNotNull_AssignedNonNull_DoesNotReport()
-    {
+    public async Task MemberNotNull_AssignedNonNull_DoesNotReport() {
         const string source = """
                               #nullable enable
                               using System.Diagnostics.CodeAnalysis;
@@ -200,8 +190,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task MemberNotNull_ExpressionBodiedConstructorNullAssignment_ReportsViolation()
-    {
+    public async Task MemberNotNull_ExpressionBodiedConstructorNullAssignment_ReportsViolation() {
         const string source = """
                               #nullable enable
                               using System.Diagnostics.CodeAnalysis;
@@ -221,8 +210,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task MemberNotNull_UnstableProperty_RemainsInconclusive()
-    {
+    public async Task MemberNotNull_UnstableProperty_RemainsInconclusive() {
         const string source = """
                               #nullable enable
                               using System.Diagnostics.CodeAnalysis;
@@ -245,8 +233,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task MemberNotNull_AutoPropertyNullAssignment_ReportsViolation()
-    {
+    public async Task MemberNotNull_AutoPropertyNullAssignment_ReportsViolation() {
         const string source = """
                               #nullable enable
                               using System.Diagnostics.CodeAnalysis;
@@ -270,8 +257,7 @@ public sealed class NullableContractVerificationTests
 
     [ReadmeExample("sp0044-unsafe-null-forgiving")]
     [Test]
-    public async Task NullForgivingOperator_ReportsUnsafeUse()
-    {
+    public async Task NullForgivingOperator_ReportsUnsafeUse() {
         const string source = """
                               #nullable enable
                               public static class Sample
@@ -293,8 +279,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task NullForgivingOperator_InsideLambdaIsAudited()
-    {
+    public async Task NullForgivingOperator_InsideLambdaIsAudited() {
         const string source = """
                               #nullable enable
                               using System;
@@ -315,8 +300,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task NullForgivingOperator_InUnreachableCodeIsIgnored()
-    {
+    public async Task NullForgivingOperator_InUnreachableCodeIsIgnored() {
         const string source = """
                               #nullable enable
                               public static class Sample
@@ -340,8 +324,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task InferredGuardPostcondition_IsConsumedByCaller()
-    {
+    public async Task InferredGuardPostcondition_IsConsumedByCaller() {
         const string source = """
                               #nullable enable
                               using System;
@@ -367,8 +350,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task NotNullRef_NullCompletion_ReportsViolation()
-    {
+    public async Task NotNullRef_NullCompletion_ReportsViolation() {
         const string source = """
                               #nullable enable
                               using System.Diagnostics.CodeAnalysis;
@@ -385,8 +367,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task MaybeNullWhen_OppositeBranchMustHonorNonNullAnnotation()
-    {
+    public async Task MaybeNullWhen_OppositeBranchMustHonorNonNullAnnotation() {
         const string source = """
                               #nullable enable
                               using System.Diagnostics.CodeAnalysis;
@@ -407,8 +388,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task MemberNotNullWhen_MatchingNullCompletion_ReportsViolation()
-    {
+    public async Task MemberNotNullWhen_MatchingNullCompletion_ReportsViolation() {
         const string source = """
                               #nullable enable
                               using System.Diagnostics.CodeAnalysis;
@@ -428,8 +408,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task MultipleReturns_ReportOnlyReachableViolatingCompletion()
-    {
+    public async Task MultipleReturns_ReportOnlyReachableViolatingCompletion() {
         const string source = """
                               #nullable enable
                               public static class Sample
@@ -449,8 +428,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task NullableDisabled_DoesNotInventReturnContract()
-    {
+    public async Task NullableDisabled_DoesNotInventReturnContract() {
         const string source = """
                               #nullable disable
                               public static class Sample
@@ -466,8 +444,7 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
-    public async Task GenericReferenceConstraint_NonNullReturnIsAccepted()
-    {
+    public async Task GenericReferenceConstraint_NonNullReturnIsAccepted() {
         const string source = """
                               #nullable enable
                               public static class Sample
@@ -484,8 +461,7 @@ public sealed class NullableContractVerificationTests
 
     private static Task<ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> AnalyzeAsync(
         string source,
-        ImmutableDictionary<string, string>? options = null)
-    {
+        ImmutableDictionary<string, string>? options = null) {
         return AnalyzerTestHost.GetDiagnosticsAsync(
             source,
             globalOptions: options);

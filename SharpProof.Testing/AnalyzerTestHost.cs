@@ -13,8 +13,7 @@ using SharpProof.Attributes;
 
 namespace SharpProof.Test;
 
-internal static class AnalyzerTestHost
-{
+internal static class AnalyzerTestHost {
     private static readonly CSharpParseOptions PreviewParseOptions = new(LanguageVersion.Preview);
 
     private static readonly CSharpCompilationOptions DefaultCompilationOptions =
@@ -96,8 +95,7 @@ internal static class AnalyzerTestHost
         ImmutableArray<MetadataReference>? frameworkReferences = null,
         bool concurrentAnalysis = false,
         ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
-        string compilationName = "AnalyzerTestHost")
-    {
+        string compilationName = "AnalyzerTestHost") {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             PreviewParseOptions,
@@ -132,8 +130,7 @@ internal static class AnalyzerTestHost
 
     public static AnalyzerOptions CreateAnalyzerOptions(
         ImmutableDictionary<string, string>? globalOptions = null,
-        ImmutableArray<AdditionalText>? additionalFiles = null)
-    {
+        ImmutableArray<AdditionalText>? additionalFiles = null) {
         var analyzerAdditionalFiles = additionalFiles ?? ImmutableArray<AdditionalText>.Empty;
         var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
         if (analyzerAdditionalFiles.Length == 0 &&
@@ -150,16 +147,14 @@ internal static class AnalyzerTestHost
             new TestAnalyzerConfigOptionsProvider(analyzerGlobalOptions));
     }
 
-    public static ConditionContext CreateConditionContext(string parameterList, string conditionExpression)
-    {
+    public static ConditionContext CreateConditionContext(string parameterList, string conditionExpression) {
         return CreateConditionContext(parameterList, conditionExpression, "");
     }
 
     public static ConditionContext CreateConditionContext(
         string parameterList,
         string conditionExpression,
-        string extraSource)
-    {
+        string extraSource) {
         var source = $$"""
             {{extraSource}}
             public static class ConditionHost
@@ -176,8 +171,7 @@ internal static class AnalyzerTestHost
             static conditionSource => CreateConditionContextCore(conditionSource));
     }
 
-    private static ConditionContext CreateConditionContextCore(string source)
-    {
+    private static ConditionContext CreateConditionContextCore(string source) {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions);
         var compilation = CreateCompilation(
             "ConditionHost",
@@ -207,8 +201,7 @@ internal static class AnalyzerTestHost
         string? sourcePath = null,
         CSharpParseOptions? parseOptions = null,
         CSharpCompilationOptions? compilationOptions = null,
-        ImmutableArray<MetadataReference>? additionalMetadataReferences = null)
-    {
+        ImmutableArray<MetadataReference>? additionalMetadataReferences = null) {
         if (CanUseSourceContextCache(
                 frameworkReferences,
                 allowUnsafe,
@@ -247,8 +240,7 @@ internal static class AnalyzerTestHost
         string? sourcePath = null,
         CSharpParseOptions? parseOptions = null,
         CSharpCompilationOptions? compilationOptions = null,
-        ImmutableArray<MetadataReference>? additionalMetadataReferences = null)
-    {
+        ImmutableArray<MetadataReference>? additionalMetadataReferences = null) {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             parseOptions ?? PreviewParseOptions,
@@ -274,8 +266,7 @@ internal static class AnalyzerTestHost
     public static ConditionImplicationContext CreateConditionImplicationContext(
         string parameterList,
         string pathCondition,
-        string conclusion)
-    {
+        string conclusion) {
         var source = $$"""
                        public static class ConditionHost
                        {
@@ -293,8 +284,7 @@ internal static class AnalyzerTestHost
             static implicationSource => CreateConditionImplicationContextCore(implicationSource));
     }
 
-    private static ConditionImplicationContext CreateConditionImplicationContextCore(string source)
-    {
+    private static ConditionImplicationContext CreateConditionImplicationContextCore(string source) {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions);
         var compilation = CreateCompilation(
             "ConditionHost",
@@ -318,8 +308,7 @@ internal static class AnalyzerTestHost
         string? sourcePath,
         CSharpParseOptions? parseOptions,
         CSharpCompilationOptions? compilationOptions,
-        ImmutableArray<MetadataReference>? additionalMetadataReferences)
-    {
+        ImmutableArray<MetadataReference>? additionalMetadataReferences) {
         if (allowUnsafe ||
             !string.IsNullOrEmpty(sourcePath) ||
             parseOptions is not null ||
@@ -335,21 +324,17 @@ internal static class AnalyzerTestHost
                references.SequenceEqual(minimalReferences);
     }
 
-    internal static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-    {
+    internal static ImmutableArray<MetadataReference> GetTrustedPlatformReferences() {
         return TrustedPlatformReferences.Value;
     }
 
-    internal static ImmutableArray<MetadataReference> GetMinimalFrameworkReferences()
-    {
+    internal static ImmutableArray<MetadataReference> GetMinimalFrameworkReferences() {
         return MinimalFrameworkReferences.Value;
     }
 
-    internal static string GetRepositoryRoot()
-    {
+    internal static string GetRepositoryRoot() {
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
+        while (directory != null) {
             if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
             directory = directory.Parent;
         }
@@ -357,8 +342,7 @@ internal static class AnalyzerTestHost
         throw new InvalidOperationException("Could not find repository root.");
     }
 
-    private static ImmutableArray<MetadataReference> CreateTrustedPlatformReferences()
-    {
+    private static ImmutableArray<MetadataReference> CreateTrustedPlatformReferences() {
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
         if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
             return ImmutableArray.Create<MetadataReference>(
@@ -372,18 +356,15 @@ internal static class AnalyzerTestHost
             .ToImmutableArray();
     }
 
-    private static ImmutableArray<MetadataReference> CreateTrustedPlatformReferencesWithEnforcePure()
-    {
+    private static ImmutableArray<MetadataReference> CreateTrustedPlatformReferencesWithEnforcePure() {
         var references = TrustedPlatformReferences.Value;
         if (references.IsDefault) references = ImmutableArray<MetadataReference>.Empty;
 
         return references.Add(EnforcePureAttributeReference.Value);
     }
 
-    private static ImmutableArray<MetadataReference> CreateMinimalFrameworkReferences()
-    {
-        var references = new Dictionary<string, MetadataReference>(StringComparer.OrdinalIgnoreCase)
-        {
+    private static ImmutableArray<MetadataReference> CreateMinimalFrameworkReferences() {
+        var references = new Dictionary<string, MetadataReference>(StringComparer.OrdinalIgnoreCase) {
             [typeof(object).Assembly.Location] = MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
             [typeof(Console).Assembly.Location] = MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
             [typeof(Enumerable).Assembly.Location] =
@@ -397,8 +378,7 @@ internal static class AnalyzerTestHost
 
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
         if (!string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            foreach (var path in trustedPlatformAssemblies.Split(Path.PathSeparator))
-            {
+            foreach (var path in trustedPlatformAssemblies.Split(Path.PathSeparator)) {
                 var fileName = Path.GetFileNameWithoutExtension(path);
                 if (string.Equals(fileName, "System.Runtime", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(fileName, "netstandard", StringComparison.OrdinalIgnoreCase) ||
@@ -412,14 +392,12 @@ internal static class AnalyzerTestHost
         return references.Values.ToImmutableArray();
     }
 
-    private static ImmutableArray<MetadataReference> CreateMinimalFrameworkReferencesWithEnforcePure()
-    {
+    private static ImmutableArray<MetadataReference> CreateMinimalFrameworkReferencesWithEnforcePure() {
         return MinimalFrameworkReferences.Value.Add(EnforcePureAttributeReference.Value);
     }
 
     private static ImmutableArray<MetadataReference> EnsureEnforcePureAttributeReference(
-        ImmutableArray<MetadataReference> references)
-    {
+        ImmutableArray<MetadataReference> references) {
         if (references == MinimalFrameworkReferences.Value) return MinimalFrameworkReferencesWithEnforcePure.Value;
 
         var enforcePurePath = EnforcePureAttributeReference.Value.Display;
@@ -434,8 +412,7 @@ internal static class AnalyzerTestHost
         string assemblyName,
         ImmutableArray<MetadataReference> references,
         CSharpCompilationOptions options,
-        SyntaxTree syntaxTree)
-    {
+        SyntaxTree syntaxTree) {
         var template = GetCompilationTemplate(references, options);
         if (template != null)
             return template.Value
@@ -451,8 +428,7 @@ internal static class AnalyzerTestHost
 
     private static Lazy<CSharpCompilation>? GetCompilationTemplate(
         ImmutableArray<MetadataReference> references,
-        CSharpCompilationOptions options)
-    {
+        CSharpCompilationOptions options) {
         if (!options.SpecificDiagnosticOptions.IsEmpty) return null;
 
         var allowUnsafe = options.AllowUnsafe;
@@ -476,19 +452,16 @@ internal static class AnalyzerTestHost
 
     private static CSharpCompilation CreateCompilationTemplate(
         ImmutableArray<MetadataReference> references,
-        CSharpCompilationOptions options)
-    {
+        CSharpCompilationOptions options) {
         return CSharpCompilation.Create(
             "AnalyzerTestHost.Template",
             references: references,
             options: options);
     }
 
-    private static string CreateGlobalOptionsCacheKey(ImmutableDictionary<string, string> analyzerGlobalOptions)
-    {
+    private static string CreateGlobalOptionsCacheKey(ImmutableDictionary<string, string> analyzerGlobalOptions) {
         var builder = new StringBuilder();
-        foreach (var pair in analyzerGlobalOptions.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
-        {
+        foreach (var pair in analyzerGlobalOptions.OrderBy(static pair => pair.Key, StringComparer.Ordinal)) {
             AppendLengthPrefixed(builder, pair.Key);
             AppendLengthPrefixed(builder, pair.Value);
         }
@@ -496,14 +469,12 @@ internal static class AnalyzerTestHost
         return builder.ToString();
     }
 
-    private static AnalyzerOptions CreateAnalyzerOptionsWithoutAdditionalFiles(string cacheKey)
-    {
+    private static AnalyzerOptions CreateAnalyzerOptionsWithoutAdditionalFiles(string cacheKey) {
         if (string.IsNullOrEmpty(cacheKey)) return EmptyAnalyzerOptions;
 
         var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
         var index = 0;
-        while (index < cacheKey.Length)
-        {
+        while (index < cacheKey.Length) {
             if (!TryReadLengthPrefixed(cacheKey, ref index, out var key) ||
                 !TryReadLengthPrefixed(cacheKey, ref index, out var value) ||
                 key.Length == 0)
@@ -517,15 +488,13 @@ internal static class AnalyzerTestHost
             new TestAnalyzerConfigOptionsProvider(builder.ToImmutable()));
     }
 
-    private static void AppendLengthPrefixed(StringBuilder builder, string value)
-    {
+    private static void AppendLengthPrefixed(StringBuilder builder, string value) {
         builder.Append(value.Length);
         builder.Append(':');
         builder.Append(value);
     }
 
-    private static bool TryReadLengthPrefixed(string text, ref int index, out string value)
-    {
+    private static bool TryReadLengthPrefixed(string text, ref int index, out string value) {
         value = string.Empty;
         var separatorIndex = text.IndexOf(':', index);
         if (separatorIndex < index ||
@@ -562,60 +531,49 @@ internal static class AnalyzerTestHost
         string CompilationName,
         string SourcePath);
 
-    internal sealed class InMemoryAdditionalText : AdditionalText
-    {
+    internal sealed class InMemoryAdditionalText : AdditionalText {
         private readonly string _text;
 
-        public InMemoryAdditionalText(string path, string text)
-        {
+        public InMemoryAdditionalText(string path, string text) {
             Path = path;
             _text = text;
         }
 
         public override string Path { get; }
 
-        public override SourceText GetText(CancellationToken cancellationToken = default)
-        {
+        public override SourceText GetText(CancellationToken cancellationToken = default) {
             return SourceText.From(_text);
         }
     }
 
-    private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
-    {
+    private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider {
         private readonly AnalyzerConfigOptions _emptyOptions =
             new TestAnalyzerConfigOptions(ImmutableDictionary<string, string>.Empty);
 
-        public TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string> globalOptions)
-        {
+        public TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string> globalOptions) {
             GlobalOptions = new TestAnalyzerConfigOptions(globalOptions);
         }
 
         public override AnalyzerConfigOptions GlobalOptions { get; }
 
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
-        {
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) {
             return _emptyOptions;
         }
 
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
-        {
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) {
             return _emptyOptions;
         }
     }
 
-    private sealed class TestAnalyzerConfigOptions : AnalyzerConfigOptions
-    {
+    private sealed class TestAnalyzerConfigOptions : AnalyzerConfigOptions {
         private readonly ImmutableDictionary<string, string> _values;
 
-        public TestAnalyzerConfigOptions(ImmutableDictionary<string, string> values)
-        {
+        public TestAnalyzerConfigOptions(ImmutableDictionary<string, string> values) {
             _values = values;
         }
 
-        public override bool TryGetValue(string key, out string value)
-        {
-            if (_values.TryGetValue(key, out var found))
-            {
+        public override bool TryGetValue(string key, out string value) {
+            if (_values.TryGetValue(key, out var found)) {
                 value = found;
                 return true;
             }

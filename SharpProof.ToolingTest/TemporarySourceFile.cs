@@ -2,12 +2,10 @@ using NUnit.Framework;
 
 namespace SharpProof.Test;
 
-internal sealed class TemporarySourceFile(string path) : IDisposable
-{
+internal sealed class TemporarySourceFile(string path) : IDisposable {
     internal string Path { get; } = path;
 
-    internal static TemporarySourceFile Create(string fileNamePrefix, string source)
-    {
+    internal static TemporarySourceFile Create(string fileNamePrefix, string source) {
         var path = System.IO.Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             fileNamePrefix + Guid.NewGuid().ToString("N") + ".cs");
@@ -15,8 +13,7 @@ internal sealed class TemporarySourceFile(string path) : IDisposable
         return new TemporarySourceFile(path);
     }
 
-    public void Dispose()
-    {
+    public void Dispose() {
         File.Delete(Path);
     }
 }

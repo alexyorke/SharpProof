@@ -14,11 +14,9 @@ namespace SharpProof.Test;
 
 [TestFixture]
 [Category("SmtHeavy")]
-public class SmtAnalysisServiceTests
-{
+public class SmtAnalysisServiceTests {
     [Test]
-    public void ProjectConfiguration_HonorsBuildPropertyPrefix()
-    {
+    public void ProjectConfiguration_HonorsBuildPropertyPrefix() {
         var options = new AnalyzerOptions(
             ImmutableArray<AdditionalText>.Empty,
             new ProjectConfigOptionsProvider(
@@ -33,8 +31,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void NativeLibraryBootstrap_RecognizesSupportedX64Platforms()
-    {
+    public void NativeLibraryBootstrap_RecognizesSupportedX64Platforms() {
         Assert.That(
             SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.Windows, Architecture.X64),
             Is.EqualTo("libz3.dll"));
@@ -50,8 +47,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ForMode_Deep_ReturnsExpandedBudgetPreset()
-    {
+    public void ForMode_Deep_ReturnsExpandedBudgetPreset() {
         var options = SmtAnalysisOptions.ForMode(SmtAnalysisMode.Deep);
 
         Assert.That(options.Mode, Is.EqualTo(SmtAnalysisMode.Deep));
@@ -63,14 +59,12 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void DefaultPreset_DisablesSharedResultCache()
-    {
+    public void DefaultPreset_DisablesSharedResultCache() {
         Assert.That(SmtAnalysisOptions.Default.UseSharedResultCache, Is.False);
     }
 
     [Test]
-    public void WithOverrides_PreservesModeAndAppliesExplicitBudgets()
-    {
+    public void WithOverrides_PreservesModeAndAppliesExplicitBudgets() {
         var options = SmtAnalysisOptions.ForMode(SmtAnalysisMode.Deep).WithOverrides(
             TimeSpan.FromMilliseconds(123),
             TimeSpan.FromMilliseconds(456),
@@ -85,8 +79,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void LifecycleOptions_DefaultsAndOverridesAreStable()
-    {
+    public void LifecycleOptions_DefaultsAndOverridesAreStable() {
         var defaults = SmtSolverLifecycleOptions.Default;
 
         Assert.That(defaults.MaxTransientRetries, Is.EqualTo(1));
@@ -105,8 +98,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_TransientFailure_RecyclesRetriesAndRecovers()
-    {
+    public void Classify_TransientFailure_RecyclesRetriesAndRecovers() {
         var attempts = 0;
         var disposedSessions = 0;
         var options = SmtAnalysisOptions.Default.WithLifecycle(
@@ -142,16 +134,14 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_ExhaustedTransientFailure_IsNotCached()
-    {
+    public void Classify_ExhaustedTransientFailure_IsNotCached() {
         var attempts = 0;
         var options = SmtAnalysisOptions.Default.WithLifecycle(
             new SmtSolverLifecycleOptions(maxTransientRetries: 0));
         using var service = new SmtAnalysisService(
             options,
             () => new StubProofSearchSession(
-                (_, _) =>
-                {
+                (_, _) => {
                     Interlocked.Increment(ref attempts);
                     return CreateTransientFailure();
                 }));
@@ -169,13 +159,11 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_NativeLoadFailure_IsPermanentlyUnavailable()
-    {
+    public void Classify_NativeLoadFailure_IsPermanentlyUnavailable() {
         var factoryCalls = 0;
         using var service = new SmtAnalysisService(
             SmtAnalysisOptions.Default,
-            () =>
-            {
+            () => {
                 Interlocked.Increment(ref factoryCalls);
                 throw new DllNotFoundException("missing test solver");
             });
@@ -194,8 +182,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_WrappedNativeFailures_PreserveStableFallbackCodes()
-    {
+    public void Classify_WrappedNativeFailures_PreserveStableFallbackCodes() {
         AssertPermanentFailureCode(
             new TypeInitializationException(
                 "Microsoft.Z3.Native",
@@ -214,8 +201,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void TransientSolverContextRecycle_PreservesLocalAndSharedCaches()
-    {
+    public void TransientSolverContextRecycle_PreservesLocalAndSharedCaches() {
         var attempts = 0;
         var firstFactoryCalls = 0;
         var firstDisposedSessions = 0;
@@ -230,8 +216,7 @@ public class SmtAnalysisServiceTests
         var query = CreateSolverQuery("recycle_cache_" + Guid.NewGuid().ToString("N"));
         using var firstService = new SmtAnalysisService(
             options,
-            () =>
-            {
+            () => {
                 Interlocked.Increment(ref firstFactoryCalls);
                 return new StubProofSearchSession(
                     (_, _) => Interlocked.Increment(ref attempts) == 1
@@ -245,8 +230,7 @@ public class SmtAnalysisServiceTests
         var secondFactoryCalls = 0;
         using var secondService = new SmtAnalysisService(
             options,
-            () =>
-            {
+            () => {
                 Interlocked.Increment(ref secondFactoryCalls);
                 return new StubProofSearchSession((_, _) => CreateImpureResult());
             });
@@ -264,8 +248,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void TransientSolverContextRecycle_DoesNotRecycleAnotherServiceSession()
-    {
+    public void TransientSolverContextRecycle_DoesNotRecycleAnotherServiceSession() {
         var firstAttempts = 0;
         var firstFactoryCalls = 0;
         var firstDisposedSessions = 0;
@@ -274,8 +257,7 @@ public class SmtAnalysisServiceTests
         var options = SmtAnalysisOptions.Default.WithLifecycle(new SmtSolverLifecycleOptions(maxTransientRetries: 1));
         using var firstService = new SmtAnalysisService(
             options,
-            () =>
-            {
+            () => {
                 Interlocked.Increment(ref firstFactoryCalls);
                 return new StubProofSearchSession(
                     (_, _) => Interlocked.Increment(ref firstAttempts) == 1
@@ -285,8 +267,7 @@ public class SmtAnalysisServiceTests
             });
         using var secondService = new SmtAnalysisService(
             options,
-            () =>
-            {
+            () => {
                 Interlocked.Increment(ref secondFactoryCalls);
                 return new StubProofSearchSession(
                     (_, _) => CreateImpureResult(),
@@ -306,16 +287,14 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void PermanentFailureRecycle_IsolatesServiceOwnedSessions()
-    {
+    public void PermanentFailureRecycle_IsolatesServiceOwnedSessions() {
         var firstFactoryCalls = 0;
         var secondFactoryCalls = 0;
         var firstDisposedSessions = 0;
         var secondDisposedSessions = 0;
         using var firstService = new SmtAnalysisService(
             SmtAnalysisOptions.Default,
-            () =>
-            {
+            () => {
                 Interlocked.Increment(ref firstFactoryCalls);
                 return new StubProofSearchSession(
                     (_, _) => throw new DllNotFoundException("missing test solver"),
@@ -323,8 +302,7 @@ public class SmtAnalysisServiceTests
             });
         using var secondService = new SmtAnalysisService(
             SmtAnalysisOptions.Default,
-            () =>
-            {
+            () => {
                 Interlocked.Increment(ref secondFactoryCalls);
                 return new StubProofSearchSession(
                     (_, _) => CreateImpureResult(),
@@ -345,8 +323,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Dispose_DefaultLifecycle_DisposesCurrentThreadContext()
-    {
+    public void Dispose_DefaultLifecycle_DisposesCurrentThreadContext() {
         var disposedSessions = 0;
         var service = new SmtAnalysisService(
             SmtAnalysisOptions.Default,
@@ -363,16 +340,14 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Dispose_ConfiguredLifecycle_DisposesContextsCreatedOnAllThreads()
-    {
+    public void Dispose_ConfiguredLifecycle_DisposesContextsCreatedOnAllThreads() {
         const int threadCount = 4;
         var disposedSessions = 0;
         var factoryCalls = 0;
         var service = new SmtAnalysisService(
             SmtAnalysisOptions.Default.WithLifecycle(
                 new SmtSolverLifecycleOptions(disposeCurrentThreadContextOnServiceDispose: true)),
-            () =>
-            {
+            () => {
                 Interlocked.Increment(ref factoryCalls);
                 return new StubProofSearchSession(
                     (_, _) => CreateImpureResult(),
@@ -395,8 +370,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_OffMode_ReturnsConservativeUnknown()
-    {
+    public void Classify_OffMode_ReturnsConservativeUnknown() {
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Off,
             TimeSpan.FromMilliseconds(50),
@@ -413,8 +387,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_PathConditionBudgetExceeded_ReturnsConservativeUnknownWithoutSolver()
-    {
+    public void Classify_PathConditionBudgetExceeded_ReturnsConservativeUnknownWithoutSolver() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
@@ -438,8 +411,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_ZeroTimeout_ReturnsConservativeTimeoutWithoutSolver()
-    {
+    public void Classify_ZeroTimeout_ReturnsConservativeTimeoutWithoutSolver() {
         var value = new SmtVariable("timeout_value_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var containsNeedle = new SmtStringContainsFormula(value, new SmtStringConstant("needle"));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
@@ -467,8 +439,7 @@ public class SmtAnalysisServiceTests
         TestName = "Classify_EquivalentPathConditionOrder_UsesSameCacheEntry")]
     public void Classify_NormalizedPathConditionsUseSameCacheEntry(
         bool includeDuplicateAndTrueConditions,
-        int maxPathConditions)
-    {
+        int maxPathConditions) {
         var prefix = includeDuplicateAndTrueConditions ? "normalized_" : "ordered_";
         var x = new SmtVariable(prefix + "x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var y = new SmtVariable(prefix + "y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
@@ -506,8 +477,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_SyntacticPathContradiction_BypassesBudgetsAndSolver()
-    {
+    public void Classify_SyntacticPathContradiction_BypassesBudgetsAndSolver() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
@@ -535,8 +505,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_SyntacticIntegerIntervalContradiction_BypassesBudgetsAndSolver()
-    {
+    public void Classify_SyntacticIntegerIntervalContradiction_BypassesBudgetsAndSolver() {
         var x = new SmtVariable("interval_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
@@ -564,8 +533,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_SyntacticDisjunctionOfKnownComparisonComplements_BypassesSolver()
-    {
+    public void Classify_SyntacticDisjunctionOfKnownComparisonComplements_BypassesSolver() {
         var values = new SmtVariable("values_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
         var index = new SmtVariable("index_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var length = new SmtVariable(values.Name + ".Length", SmtValueKind.Int);
@@ -611,8 +579,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_NestedConjunctIntegerContradiction_BypassesSolver()
-    {
+    public void Classify_NestedConjunctIntegerContradiction_BypassesSolver() {
         var x = new SmtVariable("nested_interval_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var nestedBounds = new SmtBinaryFormula(
             SmtBinaryOperator.And,
@@ -632,8 +599,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_DirectPathFact_BypassesSolver()
-    {
+    public void ClassifyImplication_DirectPathFact_BypassesSolver() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -652,8 +618,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_IntegerIntervalEntailment_BypassesSolver()
-    {
+    public void ClassifyImplication_IntegerIntervalEntailment_BypassesSolver() {
         var x = new SmtVariable("interval_entailment_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var xAtMostNine = new SmtBinaryFormula(
             SmtBinaryOperator.LessThanOrEqual,
@@ -676,8 +641,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ExactStringLengthEntailment_BypassesSolver()
-    {
+    public void ClassifyImplication_ExactStringLengthEntailment_BypassesSolver() {
         var text = new SmtVariable("exact_string_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var textIsAbc = new SmtBinaryFormula(
             SmtBinaryOperator.Equal,
@@ -698,8 +662,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ExactStringPredicateEntailment_BypassesSolver()
-    {
+    public void ClassifyImplication_ExactStringPredicateEntailment_BypassesSolver() {
         var text = new SmtVariable("exact_predicate_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var textIsAbc = new SmtBinaryFormula(
             SmtBinaryOperator.Equal,
@@ -717,8 +680,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ExactStringNegatedPredicateEntailment_BypassesSolver()
-    {
+    public void ClassifyImplication_ExactStringNegatedPredicateEntailment_BypassesSolver() {
         var text = new SmtVariable("exact_negated_predicate_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var textIsAbc = new SmtBinaryFormula(
             SmtBinaryOperator.Equal,
@@ -738,8 +700,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_ContradictoryExactStringValues_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_ContradictoryExactStringValues_BypassesSolver() {
         var text = new SmtVariable("exact_contradiction_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
@@ -762,8 +723,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_DivideByZeroContradictedByGuard_BypassesSolver()
-    {
+    public void Classify_DivideByZeroContradictedByGuard_BypassesSolver() {
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var divisorIsNotZero = new SmtBinaryFormula(
             SmtBinaryOperator.NotEqual,
@@ -788,8 +748,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_DivideByZeroContradictedByPositiveInterval_BypassesSolver()
-    {
+    public void Classify_DivideByZeroContradictedByPositiveInterval_BypassesSolver() {
         var divisor = new SmtVariable("positive_divisor_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var divisorIsPositive = new SmtBinaryFormula(
             SmtBinaryOperator.GreaterThan,
@@ -814,8 +773,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_ReusedSolverContext_DistinguishesSameNamedVariablesByKind()
-    {
+    public void Classify_ReusedSolverContext_DistinguishesSameNamedVariablesByKind() {
         var intX = new SmtVariable("x", SmtValueKind.Int);
         var stringX = new SmtVariable("x", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -835,8 +793,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_ExpressionNodeBudgetExceeded_ReturnsConservativeUnknownWithoutSolver()
-    {
+    public void Classify_ExpressionNodeBudgetExceeded_ReturnsConservativeUnknownWithoutSolver() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var trigger = new SmtBinaryFormula(
             SmtBinaryOperator.And,
@@ -858,8 +815,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_DeepPathFormulaOverBudget_ReturnsBeforeNormalization()
-    {
+    public void Classify_DeepPathFormulaOverBudget_ReturnsBeforeNormalization() {
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromMilliseconds(50),
@@ -878,8 +834,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public async Task Classify_MethodBudgetDoesNotExpireBeforeFirstSolverQueryByWallClock()
-    {
+    public async Task Classify_MethodBudgetDoesNotExpireBeforeFirstSolverQueryByWallClock() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
@@ -898,8 +853,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_MethodBudgetExceededAfterSolverTime_ReturnsConservativeUnknownWithoutSolver()
-    {
+    public void Classify_MethodBudgetExceededAfterSolverTime_ReturnsConservativeUnknownWithoutSolver() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
         var xIsPositive = new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0));
@@ -919,8 +873,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_RepeatedEquivalentQuery_UsesCache()
-    {
+    public void Classify_RepeatedEquivalentQuery_UsesCache() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
@@ -941,8 +894,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_CacheHitsBypassExhaustedMethodBudget()
-    {
+    public void Classify_CacheHitsBypassExhaustedMethodBudget() {
         var variableName = "budget_cache_" + Guid.NewGuid().ToString("N");
         var x = new SmtVariable(variableName, SmtValueKind.Int);
         var y = new SmtVariable(variableName + "_other", SmtValueKind.Int);
@@ -977,8 +929,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Classify_SharedResultCacheEnabled_ReusesResultAcrossServices()
-    {
+    public void Classify_SharedResultCacheEnabled_ReusesResultAcrossServices() {
         var variableName = "shared_" + Guid.NewGuid().ToString("N");
         var x = new SmtVariable(variableName, SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
@@ -1004,8 +955,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public async Task Classify_SharedResultCacheEnabled_CoalescesConcurrentQueries()
-    {
+    public async Task Classify_SharedResultCacheEnabled_CoalescesConcurrentQueries() {
         var variableName = "shared_concurrent_" + Guid.NewGuid().ToString("N");
         var x = new SmtVariable(variableName, SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
@@ -1023,11 +973,9 @@ public class SmtAnalysisServiceTests
             .ToArray();
         using var startGate = new Barrier(serviceCount);
 
-        try
-        {
+        try {
             var tasks = services
-                .Select(service => Task.Run(() =>
-                {
+                .Select(service => Task.Run(() => {
                     startGate.SignalAndWait();
                     return service.Classify(query);
                 }))
@@ -1040,15 +988,13 @@ public class SmtAnalysisServiceTests
             Assert.That(services.Sum(service => service.ExecutedQueryCount), Is.EqualTo(1));
             Assert.That(services.Sum(service => service.CacheEntryCount), Is.EqualTo(serviceCount));
         }
-        finally
-        {
+        finally {
             foreach (var service in services) service.Dispose();
         }
     }
 
     [Test]
-    public void SymbolicBudgetDiagnostics_LargeBudgetsClampMilliseconds()
-    {
+    public void SymbolicBudgetDiagnostics_LargeBudgetsClampMilliseconds() {
         var options = new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromMilliseconds((double)int.MaxValue + 1),
@@ -1076,8 +1022,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ProvesFactFromPathConditions()
-    {
+    public void ClassifyImplication_ProvesFactFromPathConditions() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1097,8 +1042,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ReturnsReachableWhenFactDoesNotFollow()
-    {
+    public void ClassifyImplication_ReturnsReachableWhenFactDoesNotFollow() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1118,8 +1062,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ProvesStrictRegexLiteralLengthFact()
-    {
+    public void ClassifyImplication_ProvesStrictRegexLiteralLengthFact() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1138,8 +1081,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_DollarAnchorAllowsTrailingNewline()
-    {
+    public void ClassifyPathFeasibility_DollarAnchorAllowsTrailingNewline() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1154,8 +1096,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_CombinesStrictRegexAndStringEquality()
-    {
+    public void ClassifyPathFeasibility_CombinesStrictRegexAndStringEquality() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1171,8 +1112,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_CombinesNonCapturingRegexGroupAndStringEquality()
-    {
+    public void ClassifyPathFeasibility_CombinesNonCapturingRegexGroupAndStringEquality() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1188,8 +1128,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_CombinesNegatedRegexClassAndStringEquality()
-    {
+    public void ClassifyPathFeasibility_CombinesNegatedRegexClassAndStringEquality() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1205,8 +1144,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_CombinesRegexHexEscapesAndStringEquality()
-    {
+    public void ClassifyPathFeasibility_CombinesRegexHexEscapesAndStringEquality() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1222,8 +1160,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ProvesShorthandRegexLengthFact()
-    {
+    public void ClassifyImplication_ProvesShorthandRegexLengthFact() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1242,8 +1179,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_NegatedShorthandRegexClassConcreteMatchIsSelfVerified()
-    {
+    public void ClassifyPathFeasibility_NegatedShorthandRegexClassConcreteMatchIsSelfVerified() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1258,8 +1194,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_ShorthandRegexConcreteMismatchIsRejectedByDotNetValidation()
-    {
+    public void ClassifyPathFeasibility_ShorthandRegexConcreteMismatchIsRejectedByDotNetValidation() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1276,8 +1211,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ProvesCategoryRegexLengthFact()
-    {
+    public void ClassifyImplication_ProvesCategoryRegexLengthFact() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1296,8 +1230,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_WordBoundaryRegexLengthFactRemainsConservative()
-    {
+    public void ClassifyImplication_WordBoundaryRegexLengthFactRemainsConservative() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1316,8 +1249,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_NegatedCategoryRegexClassConcreteMismatchIsRejectedByDotNetValidation()
-    {
+    public void ClassifyPathFeasibility_NegatedCategoryRegexClassConcreteMismatchIsRejectedByDotNetValidation() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1334,8 +1266,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_InvalidConcreteRegexRemainsUnknown()
-    {
+    public void ClassifyPathFeasibility_InvalidConcreteRegexRemainsUnknown() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1351,12 +1282,10 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ConcreteRegexValidationCache_IsBounded()
-    {
+    public void ConcreteRegexValidationCache_IsBounded() {
         using var solver = new SmtSolver();
         var text = new SmtVariable("text", SmtValueKind.String);
-        for (var index = 0; index < SmtSolver.MaxRegexValidationCacheEntries * 2; index++)
-        {
+        for (var index = 0; index < SmtSolver.MaxRegexValidationCacheEntries * 2; index++) {
             var pathConditions = new SmtFormula[]
             {
                 new SmtRegexMatchFormula(text, "^value[0-9]+$"),
@@ -1374,8 +1303,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_CombinesStringContainsAndEquality()
-    {
+    public void ClassifyPathFeasibility_CombinesStringContainsAndEquality() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1391,8 +1319,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_ConcreteStringStartsWithMismatchIsRejected()
-    {
+    public void ClassifyPathFeasibility_ConcreteStringStartsWithMismatchIsRejected() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1409,8 +1336,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_ConcreteNegatedStringEndsWithMismatchIsRejected()
-    {
+    public void ClassifyPathFeasibility_ConcreteNegatedStringEndsWithMismatchIsRejected() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1429,8 +1355,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_CombinesStringConcatAndEquality()
-    {
+    public void ClassifyPathFeasibility_CombinesStringConcatAndEquality() {
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
@@ -1447,8 +1372,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_ReportsContradictoryPathUnsatisfiable()
-    {
+    public void ClassifyPathFeasibility_ReportsContradictoryPathUnsatisfiable() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -1465,8 +1389,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_BooleanAliasComparisonContradiction_IsUnsatisfiable()
-    {
+    public void ClassifyPathFeasibility_BooleanAliasComparisonContradiction_IsUnsatisfiable() {
         var value = new SmtVariable("value", SmtValueKind.Int);
         var isZero = new SmtVariable("isZero", SmtValueKind.Bool);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -1488,8 +1411,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_TransitiveBooleanEquivalenceEntailment_BypassesSolver()
-    {
+    public void ClassifyImplication_TransitiveBooleanEquivalenceEntailment_BypassesSolver() {
         var left = new SmtVariable("bool_equiv_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var middle = new SmtVariable("bool_equiv_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var right = new SmtVariable("bool_equiv_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
@@ -1511,8 +1433,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_TransitiveBooleanNegationEntailment_BypassesSolver()
-    {
+    public void ClassifyImplication_TransitiveBooleanNegationEntailment_BypassesSolver() {
         var left = new SmtVariable("bool_neg_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var middle = new SmtVariable("bool_neg_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var right = new SmtVariable("bool_neg_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
@@ -1534,8 +1455,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_NegatedBooleanRelationEntailment_BypassesSolver()
-    {
+    public void ClassifyImplication_NegatedBooleanRelationEntailment_BypassesSolver() {
         var left = new SmtVariable("bool_not_rel_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var middle = new SmtVariable("bool_not_rel_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var right = new SmtVariable("bool_not_rel_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
@@ -1560,8 +1480,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_NegatedBooleanRelationParityContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_NegatedBooleanRelationParityContradiction_BypassesSolver() {
         var left = new SmtVariable("bool_not_parity_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var middle = new SmtVariable("bool_not_parity_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var right = new SmtVariable("bool_not_parity_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
@@ -1586,8 +1505,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_BooleanEquivalenceParityContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_BooleanEquivalenceParityContradiction_BypassesSolver() {
         var left = new SmtVariable("bool_parity_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var middle = new SmtVariable("bool_parity_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var right = new SmtVariable("bool_parity_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
@@ -1609,8 +1527,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_IntegerAliasIntervalContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_IntegerAliasIntervalContradiction_BypassesSolver() {
         var x = new SmtVariable("alias_int_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var y = new SmtVariable("alias_int_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -1631,8 +1548,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_IntegerAliasIntervalEntailment_BypassesSolver()
-    {
+    public void ClassifyImplication_IntegerAliasIntervalEntailment_BypassesSolver() {
         var x = new SmtVariable("alias_entail_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var y = new SmtVariable("alias_entail_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -1656,8 +1572,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_AffineOffsetAliasIntervalContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_AffineOffsetAliasIntervalContradiction_BypassesSolver() {
         var x = new SmtVariable("affine_offset_alias_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var y = new SmtVariable("affine_offset_alias_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(2));
@@ -1680,8 +1595,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_AffineOffsetAliasIntervalEntailment_BypassesSolver()
-    {
+    public void ClassifyImplication_AffineOffsetAliasIntervalEntailment_BypassesSolver() {
         var x = new SmtVariable("affine_offset_entail_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var y = new SmtVariable("affine_offset_entail_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(2));
@@ -1707,8 +1621,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_SameBaseAffineEqualityContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_SameBaseAffineEqualityContradiction_BypassesSolver() {
         var x = new SmtVariable("same_base_affine_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(2));
         var xPlusThree = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(3));
@@ -1728,8 +1641,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_SameBaseAffineOrderingContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_SameBaseAffineOrderingContradiction_BypassesSolver() {
         var x = new SmtVariable("same_base_affine_order_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(2));
         var xPlusThree = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(3));
@@ -1749,8 +1661,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_SameBaseAffineOrderingTautology_BypassesSolver()
-    {
+    public void ClassifyImplication_SameBaseAffineOrderingTautology_BypassesSolver() {
         var x = new SmtVariable("same_base_affine_tautology_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(1));
         var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(2));
@@ -1767,8 +1678,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_AffineComparisonAgainstExactTerm_BypassesSolver()
-    {
+    public void ClassifyImplication_AffineComparisonAgainstExactTerm_BypassesSolver() {
         var x = new SmtVariable("affine_exact_compare_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var y = new SmtVariable("affine_exact_compare_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(2));
@@ -1790,8 +1700,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_StringAliasContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_StringAliasContradiction_BypassesSolver() {
         var left = new SmtVariable("alias_text_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var right = new SmtVariable("alias_text_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -1812,8 +1721,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_ReferenceAliasNullContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_ReferenceAliasNullContradiction_BypassesSolver() {
         var left = new SmtVariable("alias_ref_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
         var right = new SmtVariable("alias_ref_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -1834,8 +1742,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_DisjunctionReferenceNullContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_DisjunctionReferenceNullContradiction_BypassesSolver() {
         var value = new SmtVariable("disjunction_ref_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
         var guard = new SmtVariable("disjunction_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var valueIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant());
@@ -1857,8 +1764,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_NegatedDisjunctionReferenceNullContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_NegatedDisjunctionReferenceNullContradiction_BypassesSolver() {
         var value = new SmtVariable("negated_disjunction_ref_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
         var guard = new SmtVariable("negated_disjunction_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var valueIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant());
@@ -1881,8 +1787,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ReferenceAliasNonNullEntailment_BypassesSolver()
-    {
+    public void ClassifyImplication_ReferenceAliasNonNullEntailment_BypassesSolver() {
         var left = new SmtVariable("alias_ref_entail_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
         var right = new SmtVariable("alias_ref_entail_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -1903,8 +1808,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_NullConstantInequality_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_NullConstantInequality_BypassesSolver() {
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
@@ -1921,8 +1825,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_AliasInsideIntegerExpressionIntervalContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_AliasInsideIntegerExpressionIntervalContradiction_BypassesSolver() {
         var x = new SmtVariable("expr_alias_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var y = new SmtVariable("expr_alias_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(1));
@@ -1945,8 +1848,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_SubtractionIntervalContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_SubtractionIntervalContradiction_BypassesSolver() {
         var x = new SmtVariable("subtract_interval_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var xMinusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, x, new SmtIntegerConstant(1));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -1966,8 +1868,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_PositiveConstantMultiplyIntervalEntailment_BypassesSolver()
-    {
+    public void ClassifyImplication_PositiveConstantMultiplyIntervalEntailment_BypassesSolver() {
         var x = new SmtVariable("multiply_interval_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var twiceX = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, x, new SmtIntegerConstant(2));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -1987,8 +1888,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_AliasInsideStringLengthEntailment_BypassesSolver()
-    {
+    public void ClassifyImplication_AliasInsideStringLengthEntailment_BypassesSolver() {
         var left = new SmtVariable("length_alias_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var right = new SmtVariable("length_alias_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var leftLength = new SmtStringLengthTerm(left);
@@ -2011,8 +1911,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_AliasInsideStringConcatContradiction_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_AliasInsideStringConcatContradiction_BypassesSolver() {
         var left = new SmtVariable("concat_alias_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var right = new SmtVariable("concat_alias_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var leftConcat = new SmtStringConcatTerm(left, new SmtStringConstant("!"));
@@ -2035,8 +1934,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_StringConcatKnownOperandLengths_BypassesSolver()
-    {
+    public void ClassifyImplication_StringConcatKnownOperandLengths_BypassesSolver() {
         var left = new SmtVariable("concat_length_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var right = new SmtVariable("concat_length_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var concatLength = new SmtStringLengthTerm(new SmtStringConcatTerm(left, right));
@@ -2067,8 +1965,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_NegativeStringLength_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_NegativeStringLength_BypassesSolver() {
         var text = new SmtVariable("negative_length_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
@@ -2089,8 +1986,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_ConditionalIntegerComparisonWithKnownGuard_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_ConditionalIntegerComparisonWithKnownGuard_BypassesSolver() {
         var guard = new SmtVariable("conditional_int_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var selected = new SmtVariable("conditional_int_selected_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var fallback = new SmtVariable("conditional_int_fallback_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
@@ -2113,8 +2009,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ConditionalReferenceNullFactWithKnownGuard_BypassesSolver()
-    {
+    public void ClassifyImplication_ConditionalReferenceNullFactWithKnownGuard_BypassesSolver() {
         var guard = new SmtVariable("conditional_ref_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var left = new SmtVariable("conditional_ref_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
         var right = new SmtVariable("conditional_ref_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
@@ -2137,8 +2032,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ConditionalReferenceAliasNullStatePropagatesToSelectedBranch_BypassesSolver()
-    {
+    public void ClassifyImplication_ConditionalReferenceAliasNullStatePropagatesToSelectedBranch_BypassesSolver() {
         var guard = new SmtVariable("conditional_ref_alias_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var selected = new SmtVariable("conditional_ref_alias_selected_" + Guid.NewGuid().ToString("N"),
             SmtValueKind.Reference);
@@ -2166,8 +2060,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_ConditionalBooleanWithKnownGuard_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_ConditionalBooleanWithKnownGuard_BypassesSolver() {
         var guard = new SmtVariable("conditional_bool_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var selected = new SmtVariable("conditional_bool_selected_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var fallback = new SmtVariable("conditional_bool_fallback_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
@@ -2190,8 +2083,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_ConditionalWithEqualBranchesCollapsesBeforeSolver()
-    {
+    public void ClassifyPathFeasibility_ConditionalWithEqualBranchesCollapsesBeforeSolver() {
         var guard = new SmtVariable("conditional_equal_branch_guard_" + Guid.NewGuid().ToString("N"),
             SmtValueKind.Bool);
         var value = new SmtVariable("conditional_equal_branch_value_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
@@ -2213,8 +2105,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ConditionalIntegerBranchImplications_BypassesSolver()
-    {
+    public void ClassifyImplication_ConditionalIntegerBranchImplications_BypassesSolver() {
         var guard = new SmtVariable("conditional_branch_int_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var whenTrue = new SmtVariable("conditional_branch_int_true_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var whenFalse = new SmtVariable("conditional_branch_int_false_" + Guid.NewGuid().ToString("N"),
@@ -2247,8 +2138,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_ConditionalReferenceBranchImplications_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_ConditionalReferenceBranchImplications_BypassesSolver() {
         var guard = new SmtVariable("conditional_branch_ref_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var whenTrue = new SmtVariable("conditional_branch_ref_true_" + Guid.NewGuid().ToString("N"),
             SmtValueKind.Reference);
@@ -2279,8 +2169,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_ConditionalBooleanBranchImplications_BypassesSolver()
-    {
+    public void ClassifyPathFeasibility_ConditionalBooleanBranchImplications_BypassesSolver() {
         var guard = new SmtVariable("conditional_branch_bool_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
         var whenTrue = new SmtVariable("conditional_branch_bool_true_" + Guid.NewGuid().ToString("N"),
             SmtValueKind.Bool);
@@ -2311,8 +2200,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_ConditionalSelectedReferenceNullBranchImplication_BypassesSolver()
-    {
+    public void ClassifyImplication_ConditionalSelectedReferenceNullBranchImplication_BypassesSolver() {
         var guard = new SmtVariable("conditional_selected_ref_guard_" + Guid.NewGuid().ToString("N"),
             SmtValueKind.Bool);
         var first = new SmtVariable("conditional_selected_ref_first_" + Guid.NewGuid().ToString("N"),
@@ -2362,8 +2250,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyImplication_RuntimeTypeTestPredicateIsCongruentUnderReferenceEquality()
-    {
+    public void ClassifyImplication_RuntimeTypeTestPredicateIsCongruentUnderReferenceEquality() {
         var x = new SmtVariable("runtime_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
         var y = new SmtVariable("runtime_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
         var xEqualsY = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, y);
@@ -2377,8 +2264,7 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void ClassifyPathFeasibility_RuntimeTypeTestPredicateContradictsItsNegationThroughReferenceEquality()
-    {
+    public void ClassifyPathFeasibility_RuntimeTypeTestPredicateContradictsItsNegationThroughReferenceEquality() {
         var x = new SmtVariable("runtime_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
         var y = new SmtVariable("runtime_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
         var xEqualsY = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, y);
@@ -2395,13 +2281,11 @@ public class SmtAnalysisServiceTests
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
 
-    private static void AssertPermanentFailureCode(Exception exception, string expectedCode)
-    {
+    private static void AssertPermanentFailureCode(Exception exception, string expectedCode) {
         var factoryCalls = 0;
         using var service = new SmtAnalysisService(
             SmtAnalysisOptions.Default,
-            () =>
-            {
+            () => {
                 Interlocked.Increment(ref factoryCalls);
                 throw exception;
             });
@@ -2417,8 +2301,7 @@ public class SmtAnalysisServiceTests
 
     private static AnalysisProofQuery CreateQuery(
         IReadOnlyList<SmtFormula> pathConditions,
-        SmtFormula triggerCondition)
-    {
+        SmtFormula triggerCondition) {
         return new AnalysisProofQuery(
             pathConditions,
             new AnalysisHazard(
@@ -2426,8 +2309,7 @@ public class SmtAnalysisServiceTests
                 triggerCondition));
     }
 
-    private static AnalysisProofQuery CreateSolverQuery(string name)
-    {
+    private static AnalysisProofQuery CreateSolverQuery(string name) {
         var value = new SmtVariable(name, SmtValueKind.Int);
         var valueIsZero = new SmtBinaryFormula(
             SmtBinaryOperator.Equal,
@@ -2436,8 +2318,7 @@ public class SmtAnalysisServiceTests
         return CreateQuery(new[] { valueIsZero }, valueIsZero);
     }
 
-    private static AnalysisProofResult CreateTransientFailure()
-    {
+    private static AnalysisProofResult CreateTransientFailure() {
         return new AnalysisProofResult(
             AnalysisProofOutcome.Unknown,
             new ProofCheckInfo(
@@ -2451,8 +2332,7 @@ public class SmtAnalysisServiceTests
             "path_feasibility_unknown");
     }
 
-    private static AnalysisProofResult CreateImpureResult()
-    {
+    private static AnalysisProofResult CreateImpureResult() {
         return new AnalysisProofResult(
             AnalysisProofOutcome.Disproven,
             new ProofCheckInfo(true, Feasibility.Satisfiable),
@@ -2460,39 +2340,33 @@ public class SmtAnalysisServiceTests
             "impure_call_reachable");
     }
 
-    private sealed class StubProofSearchSession : IAnalysisProofSearchSession
-    {
+    private sealed class StubProofSearchSession : IAnalysisProofSearchSession {
         private readonly Func<AnalysisProofQuery, TimeSpan, AnalysisProofResult> _classify;
         private readonly Action? _dispose;
 
         public StubProofSearchSession(
             Func<AnalysisProofQuery, TimeSpan, AnalysisProofResult> classify,
-            Action? dispose = null)
-        {
+            Action? dispose = null) {
             _classify = classify;
             _dispose = dispose;
         }
 
         public long ConsumedResourceCount => 0;
 
-        public AnalysisProofResult Classify(AnalysisProofQuery query, TimeSpan timeout)
-        {
+        public AnalysisProofResult Classify(AnalysisProofQuery query, TimeSpan timeout) {
             return _classify(query, timeout);
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             _dispose?.Invoke();
         }
     }
 
-    private sealed class ProjectConfigOptionsProvider : AnalyzerConfigOptionsProvider
-    {
+    private sealed class ProjectConfigOptionsProvider : AnalyzerConfigOptionsProvider {
         private readonly AnalyzerConfigOptions _empty = new ProjectConfigOptions(
             ImmutableDictionary<string, string>.Empty);
 
-        internal ProjectConfigOptionsProvider(ImmutableDictionary<string, string> globalOptions)
-        {
+        internal ProjectConfigOptionsProvider(ImmutableDictionary<string, string> globalOptions) {
             GlobalOptions = new ProjectConfigOptions(globalOptions);
         }
 
@@ -2503,19 +2377,15 @@ public class SmtAnalysisServiceTests
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _empty;
     }
 
-    private sealed class ProjectConfigOptions : AnalyzerConfigOptions
-    {
+    private sealed class ProjectConfigOptions : AnalyzerConfigOptions {
         private readonly ImmutableDictionary<string, string> _values;
 
-        internal ProjectConfigOptions(ImmutableDictionary<string, string> values)
-        {
+        internal ProjectConfigOptions(ImmutableDictionary<string, string> values) {
             _values = values;
         }
 
-        public override bool TryGetValue(string key, out string value)
-        {
-            if (_values.TryGetValue(key, out var found))
-            {
+        public override bool TryGetValue(string key, out string value) {
+            if (_values.TryGetValue(key, out var found)) {
                 value = found;
                 return true;
             }
@@ -2525,8 +2395,7 @@ public class SmtAnalysisServiceTests
         }
     }
 
-    private static SmtFormula CreateNestedNegation(int depth)
-    {
+    private static SmtFormula CreateNestedNegation(int depth) {
         SmtFormula formula = new SmtBooleanConstant(true);
         for (var index = 0; index < depth; index++) formula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
 

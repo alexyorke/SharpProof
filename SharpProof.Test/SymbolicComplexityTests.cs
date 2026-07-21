@@ -5,11 +5,9 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicComplexityTests
-{
+public sealed class SymbolicComplexityTests {
     [Test]
-    public void StraightLineMethod_IsConstant()
-    {
+    public void StraightLineMethod_IsConstant() {
         const string source = """
                               public static class C
                               {
@@ -28,8 +26,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void SingleForLoop_ProducesLinearComplexity()
-    {
+    public void SingleForLoop_ProducesLinearComplexity() {
         const string source = """
                               public static class C
                               {
@@ -54,8 +51,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void ForLoopWithConstantFirstIncrement_ProducesLinearComplexity()
-    {
+    public void ForLoopWithConstantFirstIncrement_ProducesLinearComplexity() {
         const string source = """
                               public static class C
                               {
@@ -79,8 +75,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void SequentialLinearLoops_UseAsymptoticMax()
-    {
+    public void SequentialLinearLoops_UseAsymptoticMax() {
         const string source = """
                               public static class C
                               {
@@ -109,8 +104,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void NestedForLoopsOverDistinctBounds_ProduceProduct()
-    {
+    public void NestedForLoopsOverDistinctBounds_ProduceProduct() {
         const string source = """
                               public static class C
                               {
@@ -137,8 +131,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void FieldControlledLoopWithCall_RemainsConservativelyUnknown()
-    {
+    public void FieldControlledLoopWithCall_RemainsConservativelyUnknown() {
         const string source = """
                               public sealed class C
                               {
@@ -167,8 +160,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void NestedForLoopsOverSameBound_ProduceQuadratic()
-    {
+    public void NestedForLoopsOverSameBound_ProduceQuadratic() {
         const string source = """
                               public static class C
                               {
@@ -195,8 +187,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void BranchesUseWorstCaseMaximum()
-    {
+    public void BranchesUseWorstCaseMaximum() {
         const string source = """
                               public static class C
                               {
@@ -227,8 +218,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void ForeachOverString_IsLinearInLength()
-    {
+    public void ForeachOverString_IsLinearInLength() {
         const string source = """
                               public static class C
                               {
@@ -252,8 +242,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void ForeachOverCollectionOutsideAnyNameTable_IsLinearInCount()
-    {
+    public void ForeachOverCollectionOutsideAnyNameTable_IsLinearInCount() {
         // HashSet is deliberately not one of the types the cost model used to name
         // explicitly. It is recognised because it exposes an instance int Count, so
         // any collection of that shape now gets a bound instead of falling to unknown.
@@ -284,8 +273,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void MonotoneWhileLoop_IsLinear()
-    {
+    public void MonotoneWhileLoop_IsLinear() {
         const string source = """
                               public static class C
                               {
@@ -309,8 +297,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void MonotoneDoLoop_IsLinear()
-    {
+    public void MonotoneDoLoop_IsLinear() {
         const string source = """
                               public static class C
                               {
@@ -336,8 +323,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void UnsupportedWhileLoop_IsUnknown()
-    {
+    public void UnsupportedWhileLoop_IsUnknown() {
         const string source = """
                               public static class C
                               {
@@ -363,8 +349,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void KnownSourceCallee_ComposesIntoSurroundingLoop()
-    {
+    public void KnownSourceCallee_ComposesIntoSurroundingLoop() {
         const string source = """
                               public static class C
                               {
@@ -395,8 +380,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void OpenVirtualSourceCallee_IsConservativeUnknown()
-    {
+    public void OpenVirtualSourceCallee_IsConservativeUnknown() {
         const string source = """
                               public class Worker
                               {
@@ -434,8 +418,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void SealedReceiverSourceOverride_ComposesImplementationComplexity()
-    {
+    public void SealedReceiverSourceOverride_ComposesImplementationComplexity() {
         const string source = """
                               public abstract class Worker
                               {
@@ -471,8 +454,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void ExternalUnknownCallee_ProducesUnknown()
-    {
+    public void ExternalUnknownCallee_ProducesUnknown() {
         const string source = """
                               using System;
 
@@ -497,8 +479,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void SelfRecursiveMethod_IsRecursiveUnknown()
-    {
+    public void SelfRecursiveMethod_IsRecursiveUnknown() {
         const string source = """
                               public static class C
                               {
@@ -521,8 +502,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void MutualRecursion_IsRecursiveUnknown()
-    {
+    public void MutualRecursion_IsRecursiveUnknown() {
         const string source = """
                               public static class C
                               {
@@ -544,8 +524,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void LineTarget_ResolvesContainingMethod()
-    {
+    public void LineTarget_ResolvesContainingMethod() {
         const string source = """
                               public static class C
                               {
@@ -569,8 +548,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void NodeTarget_ResolvesContainingLocalFunction()
-    {
+    public void NodeTarget_ResolvesContainingLocalFunction() {
         const string source = """
                               public static class C
                               {
@@ -612,8 +590,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void NodeTarget_ResolvesPropertyGetter()
-    {
+    public void NodeTarget_ResolvesPropertyGetter() {
         const string source = """
                               public sealed class C
                               {
@@ -649,8 +626,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void NodeTarget_ResolvesIndexerGetter()
-    {
+    public void NodeTarget_ResolvesIndexerGetter() {
         const string source = """
                               public sealed class C
                               {
@@ -686,8 +662,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void UnsupportedForLoop_AggregatesPreLoopEvidenceOnce()
-    {
+    public void UnsupportedForLoop_AggregatesPreLoopEvidenceOnce() {
         const string source = """
                               public static class C
                               {
@@ -723,8 +698,7 @@ public sealed class SymbolicComplexityTests
     private static SymbolicComplexityResult QueryComplexityAtMarker(
         string source,
         string marker,
-        bool useLineTarget = false)
-    {
+        bool useLineTarget = false) {
         var position = source.IndexOf(marker, StringComparison.Ordinal);
         if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
 
@@ -739,8 +713,7 @@ public sealed class SymbolicComplexityTests
                 target));
     }
 
-    private static int GetLineNumber(string source, int position)
-    {
+    private static int GetLineNumber(string source, int position) {
         var line = 1;
         for (var index = 0; index < position; index++)
             if (source[index] == '\n')
@@ -750,8 +723,7 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
-    public void QueryComplexity_AllLinesTarget_ThrowsNotSupportedException()
-    {
+    public void QueryComplexity_AllLinesTarget_ThrowsNotSupportedException() {
         var (tree, compilation) = SymbolicSourceCompilation.Create(
             "class C { }", "SymbolicComplexityTests.cs", SymbolicSourceCompilationKind.Query, null, default);
         var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryExecutor().QueryComplexity(

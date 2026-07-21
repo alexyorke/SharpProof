@@ -1,7 +1,6 @@
 namespace SharpProof.Test;
 
-internal static class DisposableTestSources
-{
+internal static class DisposableTestSources {
     internal const string CommonUsings = "\nusing System;\nusing SharpProof.Attributes;\n\n";
     internal const string AsyncUsings =
         "\nusing System;\nusing System.Threading.Tasks;\nusing SharpProof.Attributes;\n\n";

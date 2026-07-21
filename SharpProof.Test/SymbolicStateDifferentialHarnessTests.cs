@@ -8,11 +8,9 @@ using SharpProof.Symbolic.Ir;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicStateDifferentialHarnessTests
-{
+public sealed class SymbolicStateDifferentialHarnessTests {
     [Test]
-    public void Capture_NormalizesEquivalentStatesAndTruncationOrder()
-    {
+    public void Capture_NormalizesEquivalentStatesAndTruncationOrder() {
         var source = SyntaxFactory.ParseExpression("value");
         var value = new SymbolicVariableTerm("value", SmtValueKind.Int);
         var lower = SymbolicFact.Exact(
@@ -70,8 +68,7 @@ public sealed class SymbolicStateDifferentialHarnessTests
     }
 
     [Test]
-    public void Capture_PreservesSupportUnknownReasonProvenanceAndTruncation()
-    {
+    public void Capture_PreservesSupportUnknownReasonProvenanceAndTruncation() {
         var provenance = new SymbolicLoweringProvenance(
             "operation-transfer",
             new TextSpan(12, 4),
@@ -89,8 +86,7 @@ public sealed class SymbolicStateDifferentialHarnessTests
 
         var snapshot = SymbolicStateDifferentialHarness.Capture(result, truncation);
 
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(snapshot.NormalizedStateKey, Is.Null);
             Assert.That(snapshot.Support, Is.EqualTo(SymbolicLoweringSupport.Unsupported));
             Assert.That(snapshot.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));

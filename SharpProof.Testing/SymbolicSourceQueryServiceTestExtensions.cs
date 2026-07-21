@@ -4,8 +4,7 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 
-internal static class SymbolicSourceQueryServiceTestExtensions
-{
+internal static class SymbolicSourceQueryServiceTestExtensions {
     internal static SymbolicConditionProofResult ProveConditionAtSyntaxTree(
         this SymbolicQueryExecutor executor,
         SyntaxTree syntaxTree,
@@ -14,8 +13,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         int column,
         string conditionText,
         SmtAnalysisService smtAnalysis,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default) {
         return executor.Prove(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
@@ -32,8 +30,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         SmtAnalysisService smtAnalysis,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null)
-    {
+        SymbolicRuntimeHazardQueryOptions? options = null) {
         var (syntaxTree, compilation) = Compile(
             sourceText,
             filePath,
@@ -54,8 +51,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         string filePath,
         IEnumerable<MetadataReference>? references,
         CancellationToken cancellationToken,
-        SymbolicSourceCompilationKind compilationKind = SymbolicSourceCompilationKind.Query)
-    {
+        SymbolicSourceCompilationKind compilationKind = SymbolicSourceCompilationKind.Query) {
         return SymbolicSourceCompilation.Create(
             sourceText,
             filePath,

@@ -7,11 +7,9 @@ using SharpProof.Symbolic.Ir;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicLoopTransferLowererTests
-{
+public sealed class SymbolicLoopTransferLowererTests {
     [Test]
-    public void WhileLoop_LowersConditionsInvalidationAndInvariant()
-    {
+    public void WhileLoop_LowersConditionsInvalidationAndInvariant() {
         const string source = "static class C { static int M(bool keepGoing) { int value = 0; while (keepGoing) { value++; } return value; } }";
         var fixture = RoslynTestFixture.CreateCompilation(source, nameof(WhileLoop_LowersConditionsInvalidationAndInvariant));
         var loop = fixture.Root.DescendantNodes().OfType<WhileStatementSyntax>().Single();
@@ -20,8 +18,7 @@ public sealed class SymbolicLoopTransferLowererTests
 
         var result = SymbolicLoopTransferLowerer.Lower(loop, fixture.SemanticModel, CancellationToken.None);
 
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(result.IsExact, Is.True, result.Provenance.Single().Detail);
             Assert.That(result.Value!.EntryCondition, Is.Not.Null);
             Assert.That(result.Value.ExitCondition, Is.Not.Null);
@@ -32,8 +29,7 @@ public sealed class SymbolicLoopTransferLowererTests
     }
 
     [Test]
-    public void ForLoop_ExcludesOneTimeInitializerFromBackEdgeInvalidation()
-    {
+    public void ForLoop_ExcludesOneTimeInitializerFromBackEdgeInvalidation() {
         const string source = "static class C { static int M() { int value = 0; for (int index = 0; index < 3; index++) value += index; return value; } }";
         var fixture = RoslynTestFixture.CreateCompilation(source, nameof(ForLoop_ExcludesOneTimeInitializerFromBackEdgeInvalidation));
         var loop = fixture.Root.DescendantNodes().OfType<ForStatementSyntax>().Single();
@@ -51,8 +47,7 @@ public sealed class SymbolicLoopTransferLowererTests
     }
 
     [Test]
-    public void ForeachLoop_RemainsUnsupportedUntilFiniteDomainLoweringMigrates()
-    {
+    public void ForeachLoop_RemainsUnsupportedUntilFiniteDomainLoweringMigrates() {
         const string source = "static class C { static int M(int[] values) { int total = 0; foreach (var value in values) total += value; return total; } }";
         var fixture = RoslynTestFixture.CreateCompilation(source, nameof(ForeachLoop_RemainsUnsupportedUntilFiniteDomainLoweringMigrates));
         var loop = fixture.Root.DescendantNodes().OfType<ForEachStatementSyntax>().Single();
@@ -63,8 +58,7 @@ public sealed class SymbolicLoopTransferLowererTests
     }
 
     [Test]
-    public void AbruptLoopCompletion_RemainsUnsupportedUntilExitSummariesMigrate()
-    {
+    public void AbruptLoopCompletion_RemainsUnsupportedUntilExitSummariesMigrate() {
         const string source = "static class C { static int M(bool stop) { int value = 0; while (true) { if (stop) break; value++; } return value; } }";
         var fixture = RoslynTestFixture.CreateCompilation(source, nameof(AbruptLoopCompletion_RemainsUnsupportedUntilExitSummariesMigrate));
         var loop = fixture.Root.DescendantNodes().OfType<WhileStatementSyntax>().Single();

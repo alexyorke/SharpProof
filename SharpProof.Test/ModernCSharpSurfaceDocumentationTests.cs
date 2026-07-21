@@ -3,8 +3,7 @@ using NUnit.Framework;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class ModernCSharpSurfaceDocumentationTests
-{
+public sealed class ModernCSharpSurfaceDocumentationTests {
     private static readonly string[] RequiredColumns =
     {
         "Feature",
@@ -46,8 +45,7 @@ public sealed class ModernCSharpSurfaceDocumentationTests
     };
 
     [Test]
-    public void ModernCSharpSurfaceMatrix_CoversRequiredFeaturesAndSurfaces()
-    {
+    public void ModernCSharpSurfaceMatrix_CoversRequiredFeaturesAndSurfaces() {
         var repositoryRoot = FindRepositoryRoot();
         var documentPath = Path.Combine(repositoryRoot, "docs", "modern-csharp-surface.md");
         var document = File.ReadAllText(documentPath);
@@ -56,11 +54,9 @@ public sealed class ModernCSharpSurfaceDocumentationTests
         Assert.That(document, Does.Contain("Status key:"));
         Assert.That(rows.Keys, Is.EquivalentTo(RequiredFeatures));
 
-        foreach (var row in rows)
-        {
+        foreach (var row in rows) {
             Assert.That(row.Value.Length, Is.EqualTo(RequiredColumns.Length), row.Key);
-            for (var columnIndex = 0; columnIndex < row.Value.Length; columnIndex++)
-            {
+            for (var columnIndex = 0; columnIndex < row.Value.Length; columnIndex++) {
                 var cell = row.Value[columnIndex];
                 Assert.That(cell, Is.Not.Empty, $"{row.Key} {RequiredColumns[columnIndex]}");
                 Assert.That(cell, Does.Not.Contain("TBD").IgnoreCase, $"{row.Key} {RequiredColumns[columnIndex]}");
@@ -76,16 +72,14 @@ public sealed class ModernCSharpSurfaceDocumentationTests
     }
 
     [Test]
-    public void ModernCSharpSurfaceMatrix_IsLinkedFromReadme()
-    {
+    public void ModernCSharpSurfaceMatrix_IsLinkedFromReadme() {
         var repositoryRoot = FindRepositoryRoot();
         var readme = File.ReadAllText(Path.Combine(repositoryRoot, "README.md"));
 
         Assert.That(readme, Does.Contain("docs/modern-csharp-surface.md"));
     }
 
-    private static IReadOnlyDictionary<string, string[]> ReadMatrixRows(string document)
-    {
+    private static IReadOnlyDictionary<string, string[]> ReadMatrixRows(string document) {
         var lines = document.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
         var headerIndex = Array.FindIndex(
             lines,
@@ -97,8 +91,7 @@ public sealed class ModernCSharpSurfaceDocumentationTests
         Assert.That(SplitRow(lines[headerIndex]), Is.EqualTo(RequiredColumns));
 
         var rows = new Dictionary<string, string[]>(StringComparer.Ordinal);
-        for (var index = headerIndex + 1; index < lines.Length; index++)
-        {
+        for (var index = headerIndex + 1; index < lines.Length; index++) {
             var line = lines[index].Trim();
             if (!line.StartsWith("|", StringComparison.Ordinal)) break;
 
@@ -112,8 +105,7 @@ public sealed class ModernCSharpSurfaceDocumentationTests
         return rows;
     }
 
-    private static string[] SplitRow(string line)
-    {
+    private static string[] SplitRow(string line) {
         return line
             .Trim()
             .Trim('|')
@@ -122,11 +114,9 @@ public sealed class ModernCSharpSurfaceDocumentationTests
             .ToArray();
     }
 
-    private static string FindRepositoryRoot()
-    {
+    private static string FindRepositoryRoot() {
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
+        while (directory != null) {
             if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
 
             directory = directory.Parent;

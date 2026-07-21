@@ -4,8 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Test;
 
-internal static class RoslynTestFixture
-{
+internal static class RoslynTestFixture {
     private static readonly MetadataReference ObjectReference =
         MetadataReference.CreateFromFile(typeof(object).Assembly.Location);
 
@@ -14,8 +13,7 @@ internal static class RoslynTestFixture
         string assemblyName,
         IEnumerable<MetadataReference>? references = null,
         CSharpParseOptions? parseOptions = null,
-        CSharpCompilationOptions? compilationOptions = null)
-    {
+        CSharpCompilationOptions? compilationOptions = null) {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, parseOptions);
         return CreateCompilation(syntaxTree, assemblyName, references, compilationOptions);
     }
@@ -24,8 +22,7 @@ internal static class RoslynTestFixture
         SyntaxTree syntaxTree,
         string assemblyName,
         IEnumerable<MetadataReference>? references = null,
-        CSharpCompilationOptions? compilationOptions = null)
-    {
+        CSharpCompilationOptions? compilationOptions = null) {
         var compilation = CSharpCompilation.Create(
             assemblyName,
             new[] { syntaxTree },
@@ -45,8 +42,7 @@ internal static class RoslynTestFixture
         CSharpParseOptions? parseOptions = null,
         CSharpCompilationOptions? compilationOptions = null,
         Func<IEnumerable<TNode>, TNode>? selectNode = null)
-        where TNode : SyntaxNode
-    {
+        where TNode : SyntaxNode {
         var compilation = CreateCompilation(
             source,
             assemblyName,
@@ -67,8 +63,7 @@ internal static class RoslynTestFixture
     internal readonly record struct NodeFixture<TNode>(
         CompilationFixture Fixture,
         TNode Node)
-        where TNode : SyntaxNode
-    {
+        where TNode : SyntaxNode {
         internal SyntaxTree SyntaxTree => Fixture.SyntaxTree;
 
         internal CSharpCompilation Compilation => Fixture.Compilation;

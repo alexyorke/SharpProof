@@ -5,8 +5,7 @@ using SharpProof.Test.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-internal class ProofCoreRoslynLoweringTests
-{
+internal class ProofCoreRoslynLoweringTests {
     [TestCase(
         "int x",
         "x > 0 && x < 0",
@@ -53,8 +52,7 @@ internal class ProofCoreRoslynLoweringTests
         string conclusion,
         int hazardKind,
         AnalysisProofOutcome expectedOutcome,
-        string expectedReason)
-    {
+        string expectedReason) {
         var context = AnalyzerTestHost.CreateConditionImplicationContext(
             parameters,
             pathCondition,

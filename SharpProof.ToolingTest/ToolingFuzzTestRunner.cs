@@ -3,13 +3,11 @@ using SharpProof.Tools.Fuzz;
 
 namespace SharpProof.Test;
 
-internal static class ToolingFuzzTestRunner
-{
+internal static class ToolingFuzzTestRunner {
     internal static Task<FuzzRunSummary> RunCasesAsync(
         IEnumerable<FuzzCase> fuzzCases,
         FuzzOptions options,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default) {
         var cases = fuzzCases.ToImmutableArray();
         var startedUtc = DateTimeOffset.UtcNow;
         return FuzzRunner.RunCoreAsync(
@@ -26,8 +24,7 @@ internal static class ToolingFuzzTestRunner
         IEnumerable<FuzzCase> fuzzCases,
         bool repeatAnalyzer = true,
         int? parallelism = null,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default) {
         var cases = fuzzCases.ToImmutableArray();
         var degree = parallelism is > 0 ? parallelism.Value : FuzzOptions.DefaultParallelism;
         return FuzzRunner.AnalyzeCasesCoreAsync(cases, repeatAnalyzer, degree, cancellationToken);

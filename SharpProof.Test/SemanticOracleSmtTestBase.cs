@@ -9,8 +9,7 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 
-public abstract class SemanticOracleSmtTestBase
-{
+public abstract class SemanticOracleSmtTestBase {
     protected const string GeneratedRegexFactorySource = @"
 using System.Text.RegularExpressions;
 
@@ -304,21 +303,18 @@ public sealed class NotNullIfNotNullIndexer
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
 
     protected static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression,
-        string extraSource = "")
-    {
+        string extraSource = "") {
         var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
         return IsConditionAlwaysFalseFunc(context.Expression, context.SemanticModel, CancellationToken.None, null);
     }
 
     protected static bool IsConditionAlwaysTrue(string parameterList, string conditionExpression,
-        string extraSource = "")
-    {
+        string extraSource = "") {
         var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
         return IsConditionAlwaysTrueFunc(context.Expression, context.SemanticModel, CancellationToken.None, null);
     }
 
-    protected static bool IsStatementUnreachable(string source, string statementText)
-    {
+    protected static bool IsStatementUnreachable(string source, string statementText) {
         var context = AnalyzerTestHost.CreateSourceContext(
             source,
             "StatementReachabilityHost",
@@ -331,8 +327,7 @@ public sealed class NotNullIfNotNullIndexer
         return IsInStaticallyUnreachableBranchFunc(statement, context.SemanticModel, CancellationToken.None, null);
     }
 
-    protected static bool IsExpressionUnreachable(string source, string expressionText)
-    {
+    protected static bool IsExpressionUnreachable(string source, string expressionText) {
         var context = AnalyzerTestHost.CreateSourceContext(
             source,
             "ExpressionReachabilityHost",
@@ -347,8 +342,7 @@ public sealed class NotNullIfNotNullIndexer
         return IsInStaticallyUnreachableBranchFunc(expression, context.SemanticModel, CancellationToken.None, null);
     }
 
-    protected static string[] CollectProgramPointFacts(string source, string statementPrefix)
-    {
+    protected static string[] CollectProgramPointFacts(string source, string statementPrefix) {
         var context = AnalyzerTestHost.CreateSourceContext(
             source,
             "ProgramPointFactHost",
@@ -363,8 +357,7 @@ public sealed class NotNullIfNotNullIndexer
         return snapshot.Facts.ToArray();
     }
 
-    internal static string[] CollectCompletedLoopExitFacts(string source, string loopPrefix)
-    {
+    internal static string[] CollectCompletedLoopExitFacts(string source, string loopPrefix) {
         var context = AnalyzerTestHost.CreateSourceContext(
             source,
             "CompletedLoopFactHost",
@@ -389,8 +382,7 @@ public sealed class NotNullIfNotNullIndexer
             .ToArray();
     }
 
-    protected static string[] CollectExpressionProgramPointFacts(string source, string expressionPrefix)
-    {
+    protected static string[] CollectExpressionProgramPointFacts(string source, string expressionPrefix) {
         var context = AnalyzerTestHost.CreateSourceContext(
             source,
             "SymbolicFactsTest",
@@ -407,8 +399,7 @@ public sealed class NotNullIfNotNullIndexer
         return snapshot.Facts.ToArray();
     }
 
-    internal static int FindLine(string source, string text)
-    {
+    internal static int FindLine(string source, string text) {
         var lines = source.Split('\n');
         for (var index = 0; index < lines.Length; index++)
             if (lines[index].Contains(text, StringComparison.Ordinal))
@@ -417,8 +408,7 @@ public sealed class NotNullIfNotNullIndexer
         throw new InvalidOperationException("Text was not found in source.");
     }
 
-    protected static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)
-    {
+    protected static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions) {
         var options = AnalyzerConfigurationTestAccessor.Read(globalOptions).SmtOptions;
         return new SmtOptionsSnapshot(
             options.Mode.ToString(),

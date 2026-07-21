@@ -8,23 +8,19 @@ using NUnit.Framework;
 
 namespace SharpProof.Test;
 
-internal static class ReadmeExampleFixture
-{
+internal static class ReadmeExampleFixture {
     private static readonly Lazy<string> RepositoryRoot = new(SymbolicCliTestHost.FindRepositoryRoot);
 
-    public static string GetRepositoryRoot()
-    {
+    public static string GetRepositoryRoot() {
         return RepositoryRoot.Value;
     }
 
-    public static string GetRelativeExamplePath(string exampleId, string fileName)
-    {
+    public static string GetRelativeExamplePath(string exampleId, string fileName) {
         return Path.Combine("docs", "readme-examples", exampleId, fileName)
             .Replace('\\', '/');
     }
 
-    public static string GetAbsoluteExamplePath(string exampleId, string fileName)
-    {
+    public static string GetAbsoluteExamplePath(string exampleId, string fileName) {
         return Path.Combine(
             RepositoryRoot.Value,
             "docs",
@@ -33,17 +29,14 @@ internal static class ReadmeExampleFixture
             fileName);
     }
 
-    public static string LoadExampleSource(string exampleId)
-    {
+    public static string LoadExampleSource(string exampleId) {
         return Normalize(File.ReadAllText(GetAbsoluteExamplePath(exampleId, "input.cs")));
     }
 
-    public static void AssertOutputMatchesSnapshot(string exampleId, string actual)
-    {
+    public static void AssertOutputMatchesSnapshot(string exampleId, string actual) {
         var normalizedActual = NormalizeForSnapshot(actual);
         var outputPath = GetAbsoluteExamplePath(exampleId, "output.txt");
-        if (ShouldRegenerateSnapshots())
-        {
+        if (ShouldRegenerateSnapshots()) {
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
             File.WriteAllText(outputPath, normalizedActual);
             Assert.Pass("Regenerated README example snapshot: " + exampleId);
@@ -53,13 +46,11 @@ internal static class ReadmeExampleFixture
         Assert.That(normalizedActual, Is.EqualTo(expected));
     }
 
-    public static string FormatDiagnostics(ImmutableArray<Diagnostic> diagnostics)
-    {
+    public static string FormatDiagnostics(ImmutableArray<Diagnostic> diagnostics) {
         var builder = new StringBuilder();
         foreach (var diagnostic in diagnostics
                      .OrderBy(static item => item.Location.SourceSpan.Start)
-                     .ThenBy(static item => item.Id, StringComparer.Ordinal))
-        {
+                     .ThenBy(static item => item.Id, StringComparer.Ordinal)) {
             var lineSpan = diagnostic.Location.GetLineSpan();
             var path = string.IsNullOrWhiteSpace(lineSpan.Path)
                 ? "<no-location>"
@@ -83,10 +74,8 @@ internal static class ReadmeExampleFixture
     }
 
     public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunReadmeGeneratorAsync(
-        bool verifyOnly)
-    {
-        var startInfo = new ProcessStartInfo
-        {
+        bool verifyOnly) {
+        var startInfo = new ProcessStartInfo {
             FileName = ResolvePowerShellPath(),
             WorkingDirectory = RepositoryRoot.Value,
             RedirectStandardOutput = true,
@@ -102,12 +91,10 @@ internal static class ReadmeExampleFixture
                             throw new InvalidOperationException("Failed to start README generator.");
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
-        try
-        {
+        try {
             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60)).ConfigureAwait(false);
         }
-        catch (TimeoutException)
-        {
+        catch (TimeoutException) {
             process.Kill(true);
             await process.WaitForExitAsync().ConfigureAwait(false);
             await Task.WhenAll(outputTask, errorTask).ConfigureAwait(false);
@@ -120,14 +107,12 @@ internal static class ReadmeExampleFixture
             Normalize(await errorTask.ConfigureAwait(false)));
     }
 
-    public static string Normalize(string text)
-    {
+    public static string Normalize(string text) {
         var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal);
         return normalized.TrimEnd('\n') + "\n";
     }
 
-    public static string NormalizeForSnapshot(string text)
-    {
+    public static string NormalizeForSnapshot(string text) {
         var normalized = Normalize(text);
         var root = RepositoryRoot.Value.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         normalized = normalized.Replace(root + Path.DirectorySeparatorChar, string.Empty,
@@ -142,8 +127,7 @@ internal static class ReadmeExampleFixture
         return normalized;
     }
 
-    private static string ResolvePowerShellPath()
-    {
+    private static string ResolvePowerShellPath() {
         var candidates = new[]
         {
             Path.Combine(
@@ -159,10 +143,8 @@ internal static class ReadmeExampleFixture
             "powershell.exe"
         };
 
-        foreach (var candidate in candidates)
-        {
-            if (Path.IsPathRooted(candidate))
-            {
+        foreach (var candidate in candidates) {
+            if (Path.IsPathRooted(candidate)) {
                 if (File.Exists(candidate)) return candidate;
 
                 continue;
@@ -174,8 +156,7 @@ internal static class ReadmeExampleFixture
         throw new FileNotFoundException("Could not locate PowerShell.");
     }
 
-    private static bool ShouldRegenerateSnapshots()
-    {
+    private static bool ShouldRegenerateSnapshots() {
         var value = Environment.GetEnvironmentVariable("SHARPPROOF_REGENERATE_EXAMPLE_OUTPUTS");
         return string.Equals(value, "1", StringComparison.Ordinal) ||
                string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);

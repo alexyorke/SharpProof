@@ -5,11 +5,9 @@ using SharpProof.Symbolic.Ir;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SmtFormulaVersionRewriterTests
-{
+public sealed class SmtFormulaVersionRewriterTests {
     [Test]
-    public void RewriteSymbolVersions_DoesNotRewritePrefixSiblingVariableName()
-    {
+    public void RewriteSymbolVersions_DoesNotRewritePrefixSiblingVariableName() {
         var source = new SymbolicVariableTerm("myField", SmtValueKind.Int);
         var sibling = new SymbolicVariableTerm("myFieldB", SmtValueKind.Int);
 
@@ -22,8 +20,7 @@ public sealed class SmtFormulaVersionRewriterTests
     }
 
     [Test]
-    public void RewriteSymbolVersions_RewritesElementAccessForTargetVariable()
-    {
+    public void RewriteSymbolVersions_RewritesElementAccessForTargetVariable() {
         var source = new SymbolicVariableTerm("myField", SmtValueKind.Reference);
         var element = new SymbolicElementTerm(
             source,

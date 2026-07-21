@@ -9,11 +9,9 @@ using SharpProof.Symbolic.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicAnalysisLimitsTests
-{
+public sealed class SymbolicAnalysisLimitsTests {
     [Test]
-    public void AnalysisLimits_DefaultsAndOverridesAreStable()
-    {
+    public void AnalysisLimits_DefaultsAndOverridesAreStable() {
         var defaults = SharpProofAnalysisBudget.Default;
 
         Assert.That(defaults.MaxMergedIfElseFacts, Is.EqualTo(16));
@@ -28,8 +26,7 @@ public sealed class SymbolicAnalysisLimitsTests
         Assert.That(defaults.MaxFactChoiceCombinationsPerTarget, Is.EqualTo(64));
         Assert.That(defaults.MaxGuardFactsPerTargetPerState, Is.EqualTo(6));
 
-        var overridden = defaults with
-        {
+        var overridden = defaults with {
             MaxMergedIfElseFacts = 3,
             MaxFiniteForeachElementFacts = 5,
             MaxStructuralNullStateDepth = 7,
@@ -44,8 +41,7 @@ public sealed class SymbolicAnalysisLimitsTests
     }
 
     [Test]
-    public void AnalysisLimits_RejectNonPositiveValues()
-    {
+    public void AnalysisLimits_RejectNonPositiveValues() {
         Assert.That(
             () => new SharpProofAnalysisBudget(MaxMergedIfElseFacts: 0).Validate(),
             Throws.TypeOf<ArgumentOutOfRangeException>());
@@ -55,8 +51,7 @@ public sealed class SymbolicAnalysisLimitsTests
     }
 
     [Test]
-    public void AnalysisLimitEvent_UnknownKindRemainsExplicit()
-    {
+    public void AnalysisLimitEvent_UnknownKindRemainsExplicit() {
         var item = new SymbolicAnalysisTruncationEvent(
             (SymbolicAnalysisLimitKind)int.MaxValue, 1, 2, "test", null);
 
@@ -64,8 +59,7 @@ public sealed class SymbolicAnalysisLimitsTests
     }
 
     [Test]
-    public void AnalysisLimitScope_DeduplicatesEventsAndPreservesNestedSourceLocations()
-    {
+    public void AnalysisLimitScope_DeduplicatesEventsAndPreservesNestedSourceLocations() {
         var sourceNode = CSharpSyntaxTree.ParseText("class C { void M() { } }")
             .GetRoot()
             .DescendantNodes()
@@ -111,11 +105,9 @@ public sealed class SymbolicAnalysisLimitsTests
     }
 
     [Test]
-    public void AnalysisLimitScope_IsolatedEventsDoNotPropagateToParent()
-    {
+    public void AnalysisLimitScope_IsolatedEventsDoNotPropagateToParent() {
         using var outer = SymbolicAnalysisLimitContext.Push();
-        using (var isolated = SymbolicAnalysisLimitContext.PushIsolated())
-        {
+        using (var isolated = SymbolicAnalysisLimitContext.PushIsolated()) {
             SymbolicAnalysisLimitContext.Record(
                 SymbolicAnalysisLimitKind.IfElseFactMerge,
                 1,
@@ -129,8 +121,7 @@ public sealed class SymbolicAnalysisLimitsTests
     }
 
     [Test]
-    public void TruncationCombination_UsesMaximumObservationAndCanonicalOrdering()
-    {
+    public void TruncationCombination_UsesMaximumObservationAndCanonicalOrdering() {
         var combined = SymbolicAnalysisTruncationInfo.Combine(new[]
         {
             new SymbolicAnalysisTruncationInfo(new[]
@@ -172,8 +163,7 @@ public sealed class SymbolicAnalysisLimitsTests
     }
 
     [Test]
-    public void PathConditionMerger_ReportsEveryStateMergeCap()
-    {
+    public void PathConditionMerger_ReportsEveryStateMergeCap() {
         var source = SyntaxFactory.ParseExpression("source");
         IReadOnlyList<SymbolicCondition> first = new[]
         {
@@ -189,8 +179,7 @@ public sealed class SymbolicAnalysisLimitsTests
         };
 
         using var scope = SymbolicAnalysisLimitContext.Push(
-            SharpProofAnalysisBudget.Default with
-            {
+            SharpProofAnalysisBudget.Default with {
                 MaxMergedPathConditions = 1,
                 MaxMergeableFactsPerTargetPerState = 2,
                 MaxFactChoiceCombinationsPerTarget = 1,
@@ -221,8 +210,7 @@ public sealed class SymbolicAnalysisLimitsTests
     }
 
     [Test]
-    public void PathConditionMerger_GroupsNegatedBooleanAndComparisonTargets()
-    {
+    public void PathConditionMerger_GroupsNegatedBooleanAndComparisonTargets() {
         var source = SyntaxFactory.ParseExpression("source");
         var flag = new SymbolicVariableTerm("flag", SmtValueKind.Bool);
         var value = new SymbolicVariableTerm("value", SmtValueKind.Int);

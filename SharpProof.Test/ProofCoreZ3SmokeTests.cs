@@ -6,20 +6,17 @@ using SharpProof.ProofCore.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-internal class ProofCoreZ3SmokeTests
-{
+internal class ProofCoreZ3SmokeTests {
     private static readonly TimeSpan SolverTimeout = TimeSpan.FromMilliseconds(50);
 
     [TestCase("^[a-z]+$", RegexTranslationFallback.None)]
     [TestCase("[", RegexTranslationFallback.InvalidPattern)]
-    public void RegexTranslationValidator_ClassifiesInput(string pattern, RegexTranslationFallback expected)
-    {
+    public void RegexTranslationValidator_ClassifiesInput(string pattern, RegexTranslationFallback expected) {
         Assert.That(Z3RegexTranslationValidator.Validate(pattern, RegexOptions.CultureInvariant), Is.EqualTo(expected));
     }
 
     [Test]
-    public void RegexTranslationValidator_ClassifiesOversizedPatternBeforeParsing()
-    {
+    public void RegexTranslationValidator_ClassifiesOversizedPatternBeforeParsing() {
         Assert.That(
             Z3RegexTranslationValidator.Validate(new string('a', 257), RegexOptions.None),
             Is.EqualTo(RegexTranslationFallback.PatternTooLong));
@@ -28,8 +25,7 @@ internal class ProofCoreZ3SmokeTests
     private static void AssertSatisfiability(
         Feasibility expected,
         IEnumerable<SmtFormula> pathConditions,
-        TimeSpan? timeout = null)
-    {
+        TimeSpan? timeout = null) {
         using var solver = new SmtSolver();
         Assert.That(
             solver.CheckSatisfiability(pathConditions, timeout ?? SolverTimeout).Feasibility,
@@ -40,8 +36,7 @@ internal class ProofCoreZ3SmokeTests
         Feasibility expected,
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula conclusion,
-        TimeSpan? timeout = null)
-    {
+        TimeSpan? timeout = null) {
         using var solver = new SmtSolver();
         Assert.That(
             solver.CheckSatisfiability(
@@ -52,8 +47,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_TrueAndFalseConjunction_IsUnsatisfiable()
-    {
+    public void SmtSolver_TrueAndFalseConjunction_IsUnsatisfiable() {
         AssertSatisfiability(
             Feasibility.Unsatisfiable,
             new SmtFormula[]
@@ -64,8 +58,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_CheckSatisfiability_ExposesTypedExactAssignments()
-    {
+    public void SmtSolver_CheckSatisfiability_ExposesTypedExactAssignments() {
         using var solver = new SmtSolver();
         var count = new SmtVariable("count", SmtValueKind.Int);
         var enabled = new SmtVariable("enabled", SmtValueKind.Bool);
@@ -84,8 +77,7 @@ internal class ProofCoreZ3SmokeTests
 
         Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
         Assert.That(result.Witness.Status, Is.EqualTo(SmtWitnessStatus.Exact));
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "count").IntegerValue,
                 Is.EqualTo(3));
             Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "enabled").BooleanValue,
@@ -98,8 +90,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_CheckSatisfiability_ExposesRangeModel()
-    {
+    public void SmtSolver_CheckSatisfiability_ExposesRangeModel() {
         using var solver = new SmtSolver();
         var index = new SmtVariable("index", SmtValueKind.Int);
 
@@ -117,8 +108,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_CheckSatisfiability_MarksOpaqueReferenceModelApproximate()
-    {
+    public void SmtSolver_CheckSatisfiability_MarksOpaqueReferenceModelApproximate() {
         using var solver = new SmtSolver();
         var receiver = new SmtVariable("receiver", SmtValueKind.Reference);
 
@@ -135,8 +125,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_CheckSatisfiability_PreservesApproximateRegexCandidateModel()
-    {
+    public void SmtSolver_CheckSatisfiability_PreservesApproximateRegexCandidateModel() {
         using var solver = new SmtSolver();
         var text = new SmtVariable("text", SmtValueKind.String);
 
@@ -153,8 +142,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_NonZeroGuardDoesNotImplyZero_IsSatisfiable()
-    {
+    public void SmtSolver_NonZeroGuardDoesNotImplyZero_IsSatisfiable() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xNotZero = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, x, new SmtIntegerConstant(0));
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
@@ -166,8 +154,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_ZeroGuardImpliesZero_IsUnsatisfiable()
-    {
+    public void SmtSolver_ZeroGuardImpliesZero_IsUnsatisfiable() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
 
@@ -179,8 +166,7 @@ internal class ProofCoreZ3SmokeTests
 
     [TestCase(SmtIntegerBinaryOperator.Divide)]
     [TestCase(SmtIntegerBinaryOperator.Remainder)]
-    public void SmtSolver_UnresolvedDivisor_ReturnsUnknown(SmtIntegerBinaryOperator op)
-    {
+    public void SmtSolver_UnresolvedDivisor_ReturnsUnknown(SmtIntegerBinaryOperator op) {
         var dividend = new SmtVariable("dividend", SmtValueKind.Int);
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var term = new SmtIntegerBinaryTerm(op, dividend, divisor);
@@ -195,8 +181,7 @@ internal class ProofCoreZ3SmokeTests
 
     [TestCase(SmtIntegerBinaryOperator.Divide)]
     [TestCase(SmtIntegerBinaryOperator.Remainder)]
-    public void SmtSolver_DivisorRangeIncludingZero_ReturnsUnknown(SmtIntegerBinaryOperator op)
-    {
+    public void SmtSolver_DivisorRangeIncludingZero_ReturnsUnknown(SmtIntegerBinaryOperator op) {
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var term = new SmtIntegerBinaryTerm(op, new SmtIntegerConstant(10), divisor);
 
@@ -217,8 +202,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_AffineEqualityAndConflictingInequality_IsUnsatisfiable()
-    {
+    public void SmtSolver_AffineEqualityAndConflictingInequality_IsUnsatisfiable() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(1));
         var affineEquality = new SmtBinaryFormula(SmtBinaryOperator.Equal, xPlusOne, new SmtIntegerConstant(0));
@@ -387,8 +371,7 @@ internal class ProofCoreZ3SmokeTests
     [TestCase(@"\A\p{Lu}\z")]
     [TestCase(@"\A\P{Ll}\z")]
     [TestCase(@"\A\p{Lu}\P{Ll}\z")]
-    public void SmtSolver_CharacterClassFallback_DoesNotRejectAValidLanguage(string pattern)
-    {
+    public void SmtSolver_CharacterClassFallback_DoesNotRejectAValidLanguage(string pattern) {
         using var solver = new SmtSolver();
         var text = new SmtVariable("text", SmtValueKind.String);
 
@@ -403,8 +386,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_NegatedUnicodeCategoryRegexContradictsPunctuationPrefix()
-    {
+    public void SmtSolver_NegatedUnicodeCategoryRegexContradictsPunctuationPrefix() {
         var text = new SmtVariable("text", SmtValueKind.String);
 
         AssertSatisfiability(
@@ -422,8 +404,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_NegatedUnicodeCategoryClassContradictsPunctuationPrefix()
-    {
+    public void SmtSolver_NegatedUnicodeCategoryClassContradictsPunctuationPrefix() {
         var text = new SmtVariable("text", SmtValueKind.String);
 
         AssertSatisfiability(
@@ -441,8 +422,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_LargeUnicodeCategoryConclusionDoesNotBecomeProof()
-    {
+    public void SmtSolver_LargeUnicodeCategoryConclusionDoesNotBecomeProof() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var lengthIsOne = new SmtBinaryFormula(
             SmtBinaryOperator.Equal,
@@ -458,8 +438,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_WordBoundaryRegexPathProvesLengthImplication()
-    {
+    public void SmtSolver_WordBoundaryRegexPathProvesLengthImplication() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var lengthIsOne = new SmtBinaryFormula(
             SmtBinaryOperator.Equal,
@@ -476,8 +455,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_WordBoundaryRegexConclusionRemainsUnknown()
-    {
+    public void SmtSolver_WordBoundaryRegexConclusionRemainsUnknown() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var lengthIsOne = new SmtBinaryFormula(
             SmtBinaryOperator.Equal,
@@ -492,8 +470,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_NonPositiveTimeout_ReturnsUnknown()
-    {
+    public void SmtSolver_NonPositiveTimeout_ReturnsUnknown() {
         var x = new SmtVariable("x", SmtValueKind.Int);
 
         AssertSatisfiability(
@@ -506,8 +483,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_MismatchedEqualitySorts_ReturnsUnknown()
-    {
+    public void SmtSolver_MismatchedEqualitySorts_ReturnsUnknown() {
         var intValue = new SmtVariable("mixed", SmtValueKind.Int);
         var stringValue = new SmtVariable("mixed", SmtValueKind.String);
 
@@ -520,8 +496,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_ConditionalIntegerTermHonorsSelectedBranch()
-    {
+    public void SmtSolver_ConditionalIntegerTermHonorsSelectedBranch() {
         var useFirstBranch = new SmtVariable("useFirstBranch", SmtValueKind.Bool);
         var selectedValue = new SmtConditionalFormula(
             useFirstBranch,
@@ -542,8 +517,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_AffineGuardImpliesExactValue_IsUnsatisfiable()
-    {
+    public void SmtSolver_AffineGuardImpliesExactValue_IsUnsatisfiable() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xMinusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, x, new SmtIntegerConstant(1));
         var guard = new SmtBinaryFormula(SmtBinaryOperator.Equal, xMinusOne, new SmtIntegerConstant(0));
@@ -556,8 +530,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_MultiplicationByConstantContradictsRange()
-    {
+    public void SmtSolver_MultiplicationByConstantContradictsRange() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var twiceX = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, x, new SmtIntegerConstant(2));
 
@@ -571,8 +544,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_StringPrefixSuffixAndLengthFactsCombine()
-    {
+    public void SmtSolver_StringPrefixSuffixAndLengthFactsCombine() {
         var text = new SmtVariable("text", SmtValueKind.String);
 
         AssertSatisfiability(
@@ -589,8 +561,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_StringContainsAndConcatFactsCombine()
-    {
+    public void SmtSolver_StringContainsAndConcatFactsCombine() {
         var left = new SmtVariable("left", SmtValueKind.String);
         var right = new SmtVariable("right", SmtValueKind.String);
         var combined = new SmtStringConcatTerm(left, right);
@@ -608,8 +579,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_StringContainsLongerThanKnownLength_IsUnsatisfiable()
-    {
+    public void SmtSolver_StringContainsLongerThanKnownLength_IsUnsatisfiable() {
         var text = new SmtVariable("text", SmtValueKind.String);
 
         AssertSatisfiability(
@@ -625,8 +595,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_StringContainsWithExactLengthInfersValue()
-    {
+    public void SmtSolver_StringContainsWithExactLengthInfersValue() {
         var text = new SmtVariable("text", SmtValueKind.String);
 
         AssertSatisfiability(
@@ -643,8 +612,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_NegativeStringLengthBound_IsUnsatisfiable()
-    {
+    public void SmtSolver_NegativeStringLengthBound_IsUnsatisfiable() {
         var text = new SmtVariable("text", SmtValueKind.String);
 
         AssertSatisfiability(
@@ -659,8 +627,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_DivideByConcreteZero_ReturnsUnknown()
-    {
+    public void SmtSolver_DivideByConcreteZero_ReturnsUnknown() {
         var division = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Divide,
             new SmtIntegerConstant(10),
@@ -675,8 +642,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_DivideByZeroFromEquality_ReturnsUnknown()
-    {
+    public void SmtSolver_DivideByZeroFromEquality_ReturnsUnknown() {
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var division = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Divide,
@@ -693,8 +659,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_DivisionWithNonZeroGuard_RemainsUsable()
-    {
+    public void SmtSolver_DivisionWithNonZeroGuard_RemainsUsable() {
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var division = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Divide,
@@ -711,8 +676,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_DivisionWithExplicitNonZeroGuard_RemainsUsable()
-    {
+    public void SmtSolver_DivisionWithExplicitNonZeroGuard_RemainsUsable() {
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var division = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Divide,
@@ -735,8 +699,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_StrictBoundBeyondInt64Range_IsUnsatisfiableBeforeDivision()
-    {
+    public void SmtSolver_StrictBoundBeyondInt64Range_IsUnsatisfiableBeforeDivision() {
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var division = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Divide,
@@ -759,8 +722,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_RemainderWithRelationalNonZeroGuard_RemainsUsable()
-    {
+    public void SmtSolver_RemainderWithRelationalNonZeroGuard_RemainsUsable() {
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var remainder = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Remainder,
@@ -778,8 +740,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_NegativeDividendDivision_UsesCSharpTruncation()
-    {
+    public void SmtSolver_NegativeDividendDivision_UsesCSharpTruncation() {
         var dividend = new SmtVariable("dividend", SmtValueKind.Int);
         var division = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Divide,
@@ -797,8 +758,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_NegativeDividendRemainder_UsesCSharpSign()
-    {
+    public void SmtSolver_NegativeDividendRemainder_UsesCSharpSign() {
         var dividend = new SmtVariable("dividend", SmtValueKind.Int);
         var remainder = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Remainder,
@@ -816,8 +776,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_NegativeDivisorDivision_UsesCSharpTruncation()
-    {
+    public void SmtSolver_NegativeDivisorDivision_UsesCSharpTruncation() {
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var division = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Divide,
@@ -835,8 +794,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_NonNegativeRemainderWithPositiveDivisor_ProvesRange()
-    {
+    public void SmtSolver_NonNegativeRemainderWithPositiveDivisor_ProvesRange() {
         var dividend = new SmtVariable("dividend", SmtValueKind.Int);
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var remainder = new SmtIntegerBinaryTerm(
@@ -860,8 +818,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_SelectedConditionalSkipsUnsafeUnselectedIntegerBranch()
-    {
+    public void SmtSolver_SelectedConditionalSkipsUnsafeUnselectedIntegerBranch() {
         var useSafeBranch = new SmtVariable("useSafeBranch", SmtValueKind.Bool);
         var unsafeBranch = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Divide,
@@ -883,8 +840,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_NegatedComparisonGuardKeepsDivisionUsable()
-    {
+    public void SmtSolver_NegatedComparisonGuardKeepsDivisionUsable() {
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var division = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Divide,
@@ -906,8 +862,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_AffineRangeGuardKeepsDerivedDivisorUsable()
-    {
+    public void SmtSolver_AffineRangeGuardKeepsDerivedDivisorUsable() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var divisor = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Subtract,
@@ -928,8 +883,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_AffineEqualityPropagatesSolvedValue()
-    {
+    public void SmtSolver_AffineEqualityPropagatesSolvedValue() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xPlusTwo = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Add,
@@ -946,8 +900,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_ConflictingStringPrefixesAreUnsatisfiable()
-    {
+    public void SmtSolver_ConflictingStringPrefixesAreUnsatisfiable() {
         var text = new SmtVariable("text", SmtValueKind.String);
 
         AssertSatisfiability(
@@ -960,8 +913,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_ExactLengthPrefixSuffixOverlapInfersString()
-    {
+    public void SmtSolver_ExactLengthPrefixSuffixOverlapInfersString() {
         var text = new SmtVariable("text", SmtValueKind.String);
 
         AssertSatisfiability(
@@ -979,8 +931,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_SelectedConditionalStringConcatSimplifiesPredicate()
-    {
+    public void SmtSolver_SelectedConditionalStringConcatSimplifiesPredicate() {
         var usePrefix = new SmtVariable("usePrefix", SmtValueKind.Bool);
         var selected = new SmtConditionalFormula(
             usePrefix,
@@ -1001,8 +952,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_BooleanAliasChainContradiction_IsPreprocessedWithoutZ3()
-    {
+    public void SmtSolver_BooleanAliasChainContradiction_IsPreprocessedWithoutZ3() {
         var first = new SmtVariable("first", SmtValueKind.Bool);
         var second = new SmtVariable("second", SmtValueKind.Bool);
 
@@ -1018,8 +968,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_IntegerAliasIntervalContradiction_IsPreprocessedWithoutZ3()
-    {
+    public void SmtSolver_IntegerAliasIntervalContradiction_IsPreprocessedWithoutZ3() {
         var alias = new SmtVariable("alias", SmtValueKind.Int);
         var source = new SmtVariable("source", SmtValueKind.Int);
         var aliasPlusOne = new SmtIntegerBinaryTerm(
@@ -1039,8 +988,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_StringAliasPredicateContradiction_IsPreprocessedWithoutZ3()
-    {
+    public void SmtSolver_StringAliasPredicateContradiction_IsPreprocessedWithoutZ3() {
         var copy = new SmtVariable("copy", SmtValueKind.String);
         var text = new SmtVariable("text", SmtValueKind.String);
 
@@ -1058,8 +1006,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_ReferenceAliasNullContradiction_IsPreprocessedWithoutZ3()
-    {
+    public void SmtSolver_ReferenceAliasNullContradiction_IsPreprocessedWithoutZ3() {
         var source = new SmtVariable("source", SmtValueKind.Reference);
         var target = new SmtVariable("target", SmtValueKind.Reference);
 
@@ -1075,8 +1022,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_DistinctNonNullReferencesRemainUnknownWithoutZ3()
-    {
+    public void SmtSolver_DistinctNonNullReferencesRemainUnknownWithoutZ3() {
         var left = new SmtVariable("left", SmtValueKind.Reference);
         var right = new SmtVariable("right", SmtValueKind.Reference);
 
@@ -1092,8 +1038,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_IdenticalConditionalBranchesSimplifyWithoutZ3()
-    {
+    public void SmtSolver_IdenticalConditionalBranchesSimplifyWithoutZ3() {
         var flag = new SmtVariable("flag", SmtValueKind.Bool);
         var value = new SmtVariable("value", SmtValueKind.Int);
         var valuePlusOne = new SmtIntegerBinaryTerm(
@@ -1116,8 +1061,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_ConcatLengthNegativeComparison_IsPreprocessedWithoutZ3()
-    {
+    public void SmtSolver_ConcatLengthNegativeComparison_IsPreprocessedWithoutZ3() {
         var left = new SmtVariable("left", SmtValueKind.String);
         var right = new SmtVariable("right", SmtValueKind.String);
         var combined = new SmtStringConcatTerm(left, right);
@@ -1135,8 +1079,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void SmtSolver_ReferenceNullAndNonNullConjunction_IsUnsatisfiable()
-    {
+    public void SmtSolver_ReferenceNullAndNonNullConjunction_IsUnsatisfiable() {
         var reference = new SmtVariable("reference", SmtValueKind.Reference);
         var isNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, reference, new SmtNullConstant());
         var isNotNull = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, reference, new SmtNullConstant());
@@ -1147,8 +1090,7 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void AnalysisProof_NonNullGuard_MakesNullDereferenceProven()
-    {
+    public void AnalysisProof_NonNullGuard_MakesNullDereferenceProven() {
         using var search = new AnalysisProofSearch();
         var s = new SmtVariable("s", SmtValueKind.Reference);
         var sIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, s, new SmtNullConstant());

@@ -5,11 +5,9 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class ControlFlowExitFactsTests
-{
+public sealed class ControlFlowExitFactsTests {
     [Test]
-    public void SharedExitFacts_DoesNotReturnCallInSingleStatementBlock_DefinitelyExits()
-    {
+    public void SharedExitFacts_DoesNotReturnCallInSingleStatementBlock_DefinitelyExits() {
         var fixture = RoslynTestFixture.CreateCompilation(
             """
             using System;

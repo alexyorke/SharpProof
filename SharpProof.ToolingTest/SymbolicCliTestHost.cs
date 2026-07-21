@@ -4,8 +4,7 @@ using NUnit.Framework;
 
 namespace SharpProof.Test;
 
-internal static class SymbolicCliTestHost
-{
+internal static class SymbolicCliTestHost {
     private static readonly SemaphoreSlim BuildGate = new(1, 1);
     private static readonly Lazy<string> RepositoryRoot = new(FindRepositoryRoot);
     private static readonly Lazy<string> BuildConfiguration = new(FindBuildConfiguration);
@@ -14,8 +13,7 @@ internal static class SymbolicCliTestHost
         new(() => EnsureCliAssemblyPathAsync(RepositoryRoot.Value));
 
     public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
-        params string[] arguments)
-    {
+        params string[] arguments) {
         return await RunWithInputAsync(null, arguments).ConfigureAwait(false);
     }
 
@@ -24,8 +22,7 @@ internal static class SymbolicCliTestHost
 
     public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunWithInputAsync(
         string? standardInput,
-        params string[] arguments)
-    {
+        params string[] arguments) {
         return await RunOutOfProcessAsync(standardInput, arguments).ConfigureAwait(false);
     }
 
@@ -35,12 +32,10 @@ internal static class SymbolicCliTestHost
 
     private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunOutOfProcessAsync(
         string? standardInput,
-        params string[] arguments)
-    {
+        params string[] arguments) {
         var repositoryRoot = RepositoryRoot.Value;
         var cliAssemblyPath = await CliAssemblyPath.Value.ConfigureAwait(false);
-        var startInfo = new ProcessStartInfo
-        {
+        var startInfo = new ProcessStartInfo {
             FileName = "dotnet",
             WorkingDirectory = repositoryRoot,
             RedirectStandardInput = standardInput != null,
@@ -59,20 +54,17 @@ internal static class SymbolicCliTestHost
             .ConfigureAwait(false);
     }
 
-    private static async Task<string> EnsureCliAssemblyPathAsync(string repositoryRoot)
-    {
+    private static async Task<string> EnsureCliAssemblyPathAsync(string repositoryRoot) {
         var existingPath = FindExistingCliAssemblyPath(repositoryRoot);
         if (existingPath != null) return existingPath;
 
         await BuildGate.WaitAsync().ConfigureAwait(false);
-        try
-        {
+        try {
             existingPath = FindExistingCliAssemblyPath(repositoryRoot);
             if (existingPath != null) return existingPath;
 
             var buildConfiguration = FindBuildConfiguration();
-            var startInfo = new ProcessStartInfo
-            {
+            var startInfo = new ProcessStartInfo {
                 FileName = "dotnet",
                 WorkingDirectory = repositoryRoot,
                 RedirectStandardOutput = true,
@@ -103,8 +95,7 @@ internal static class SymbolicCliTestHost
             existingPath = FindExistingCliAssemblyPath(repositoryRoot);
             if (existingPath != null) return existingPath;
         }
-        finally
-        {
+        finally {
             BuildGate.Release();
         }
 
@@ -113,8 +104,7 @@ internal static class SymbolicCliTestHost
             Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli"));
     }
 
-    private static string? FindExistingCliAssemblyPath(string repositoryRoot)
-    {
+    private static string? FindExistingCliAssemblyPath(string repositoryRoot) {
         var targetFramework = Path.GetFileName(TestContext.CurrentContext.TestDirectory);
         var configurations = new[]
             {
@@ -125,8 +115,7 @@ internal static class SymbolicCliTestHost
             .Where(static configuration => !string.IsNullOrWhiteSpace(configuration))
             .Distinct(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var configuration in configurations)
-        {
+        foreach (var configuration in configurations) {
             var candidate = Path.Combine(
                 repositoryRoot,
                 "Tools",
@@ -145,22 +134,18 @@ internal static class SymbolicCliTestHost
         ProcessStartInfo startInfo,
         TimeSpan timeout,
         string startFailureMessage,
-        string? standardInput = null)
-    {
+        string? standardInput = null) {
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException(startFailureMessage);
-        if (standardInput != null)
-        {
+        if (standardInput != null) {
             await process.StandardInput.WriteAsync(standardInput).ConfigureAwait(false);
             process.StandardInput.Close();
         }
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
-        try
-        {
+        try {
             await process.WaitForExitAsync().WaitAsync(timeout).ConfigureAwait(false);
         }
-        catch (TimeoutException)
-        {
+        catch (TimeoutException) {
             process.Kill(true);
             throw;
         }
@@ -168,11 +153,9 @@ internal static class SymbolicCliTestHost
         return (process.ExitCode, await outputTask.ConfigureAwait(false), await errorTask.ConfigureAwait(false));
     }
 
-    private static string FindBuildConfiguration()
-    {
+    private static string FindBuildConfiguration() {
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
+        while (directory != null) {
             if (string.Equals(directory.Name, "Release", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(directory.Name, "Debug", StringComparison.OrdinalIgnoreCase))
                 return directory.Name;
@@ -183,11 +166,9 @@ internal static class SymbolicCliTestHost
         return "Debug";
     }
 
-    internal static string FindRepositoryRoot()
-    {
+    internal static string FindRepositoryRoot() {
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
+        while (directory != null) {
             if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
 
             directory = directory.Parent;

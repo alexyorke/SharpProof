@@ -6,11 +6,9 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicMutationInventoryTests
-{
+public sealed class SymbolicMutationInventoryTests {
     [Test]
-    public void InvalidationPlan_PreservesDirectThenDuplicateExposureOrder()
-    {
+    public void InvalidationPlan_PreservesDirectThenDuplicateExposureOrder() {
         const string source = """
             sealed class C
             {
@@ -31,8 +29,7 @@ public sealed class SymbolicMutationInventoryTests
         var plan = SymbolicMutationInventory.Create(assignment, fixture.SemanticModel, CancellationToken.None)
             .ToInvalidationPlan();
 
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(plan.HasUnsupportedMutation, Is.False);
             Assert.That(plan.Steps.Select(static step => step.Provenance), Is.EqualTo(new[]
             {
@@ -51,8 +48,7 @@ public sealed class SymbolicMutationInventoryTests
     }
 
     [Test]
-    public void Inventory_ExcludesNestedCallableBodiesButIncludesPassedCaptures()
-    {
+    public void Inventory_ExcludesNestedCallableBodiesButIncludesPassedCaptures() {
         const string source = """
             using System;
             static class C
@@ -75,8 +71,7 @@ public sealed class SymbolicMutationInventoryTests
         var plan = SymbolicMutationInventory.Create(block, fixture.SemanticModel, CancellationToken.None)
             .ToInvalidationPlan();
 
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(plan.HasUnsupportedMutation, Is.False);
             Assert.That(plan.Steps.Length, Is.EqualTo(1));
             Assert.That(plan.Steps[0].Targets.Single().Key,
@@ -85,8 +80,7 @@ public sealed class SymbolicMutationInventoryTests
     }
 
     [Test]
-    public void Inventory_PreservesUnsupportedTupleAndStrictSpanSemantics()
-    {
+    public void Inventory_PreservesUnsupportedTupleAndStrictSpanSemantics() {
         const string source = """
             static class C
             {
@@ -105,8 +99,7 @@ public sealed class SymbolicMutationInventoryTests
             fixture.Root.DescendantNodes().OfType<ParameterSyntax>().First())!;
         var inventory = SymbolicMutationInventory.Create(block, fixture.SemanticModel, CancellationToken.None);
 
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(inventory.ToInvalidationPlan().HasUnsupportedMutation, Is.True);
             Assert.That(inventory.MutatesBetween(
                 assignments[0].SpanStart,
@@ -120,8 +113,7 @@ public sealed class SymbolicMutationInventoryTests
     }
 
     [Test]
-    public void ExposurePolicy_FiltersImmutableReferencesOnlyWhenRequested()
-    {
+    public void ExposurePolicy_FiltersImmutableReferencesOnlyWhenRequested() {
         const string source = "static class C { static void Use(object value) { } static void M(string text) { Use(text); } }";
         var fixture = RoslynTestFixture.CreateCompilation(source, nameof(ExposurePolicy_FiltersImmutableReferencesOnlyWhenRequested));
         var invocation = fixture.Root.DescendantNodes().OfType<InvocationExpressionSyntax>()
@@ -130,8 +122,7 @@ public sealed class SymbolicMutationInventoryTests
             fixture.Root.DescendantNodes().OfType<ParameterSyntax>().Single(parameter => parameter.Identifier.ValueText == "text"))!;
         var inventory = SymbolicMutationInventory.Create(invocation, fixture.SemanticModel, CancellationToken.None);
 
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(inventory.ExposesSymbol(text, mutableOnly: false), Is.True);
             Assert.That(inventory.ExposesSymbol(text, mutableOnly: true), Is.False);
         });

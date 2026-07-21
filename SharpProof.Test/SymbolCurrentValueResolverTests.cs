@@ -7,11 +7,9 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolCurrentValueResolverTests
-{
+public sealed class SymbolCurrentValueResolverTests {
     [Test]
-    public void CapturedValue_DoesNotReplayAssignmentsOutsideLambdaExecutionRoot()
-    {
+    public void CapturedValue_DoesNotReplayAssignmentsOutsideLambdaExecutionRoot() {
         const string source = """
                               using System;
                               static class C
@@ -46,8 +44,7 @@ public sealed class SymbolCurrentValueResolverTests
     }
 
     [Test]
-    public void ExactRuntimeType_LaterLoopMutationInvalidatesPriorIterationValue()
-    {
+    public void ExactRuntimeType_LaterLoopMutationInvalidatesPriorIterationValue() {
         const string source = """
                               public sealed class TestClass
                               {

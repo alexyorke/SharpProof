@@ -7,11 +7,9 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolMutationFactsTests
-{
+public sealed class SymbolMutationFactsTests {
     [Test]
-    public void ExpressionReferencesSymbol_TracksFieldsButNotNestedCallableBodies()
-    {
+    public void ExpressionReferencesSymbol_TracksFieldsButNotNestedCallableBodies() {
         const string source = """
                               class Sample
                               {
@@ -38,8 +36,7 @@ public sealed class SymbolMutationFactsTests
         var assignments = root.DescendantNodes().OfType<AssignmentExpressionSyntax>().ToArray();
         var invocation = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
 
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(SymbolMutationFacts.ExpressionReferencesSymbol(
                 assignments[0].Right,
                 field,

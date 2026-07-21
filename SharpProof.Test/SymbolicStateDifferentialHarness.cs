@@ -12,12 +12,10 @@ internal sealed record SymbolicStateDifferentialSnapshot(
     string ProvenanceKey,
     string TruncationKey);
 
-internal static class SymbolicStateDifferentialHarness
-{
+internal static class SymbolicStateDifferentialHarness {
     internal static SymbolicStateDifferentialSnapshot Capture(
         SymbolicLoweringResult<SymbolicState> result,
-        SymbolicAnalysisTruncationInfo? truncation = null)
-    {
+        SymbolicAnalysisTruncationInfo? truncation = null) {
         if (result == null) throw new ArgumentNullException(nameof(result));
 
         return Capture(
@@ -33,8 +31,7 @@ internal static class SymbolicStateDifferentialHarness
         SymbolicLoweringSupport support,
         SymbolicUnknownReason unknownReason,
         IEnumerable<SymbolicLoweringProvenance>? provenance = null,
-        SymbolicAnalysisTruncationInfo? truncation = null)
-    {
+        SymbolicAnalysisTruncationInfo? truncation = null) {
         return new SymbolicStateDifferentialSnapshot(
             state?.Normalize().NormalizedProofKey,
             support,
@@ -46,10 +43,8 @@ internal static class SymbolicStateDifferentialHarness
     internal static void AssertEquivalent(
         SymbolicStateDifferentialSnapshot expected,
         SymbolicStateDifferentialSnapshot actual,
-        string context)
-    {
-        Assert.Multiple(() =>
-        {
+        string context) {
+        Assert.Multiple(() => {
             Assert.That(actual.NormalizedStateKey, Is.EqualTo(expected.NormalizedStateKey), context + ": state");
             Assert.That(actual.Support, Is.EqualTo(expected.Support), context + ": support");
             Assert.That(actual.UnknownReason, Is.EqualTo(expected.UnknownReason), context + ": unknown reason");
@@ -58,8 +53,7 @@ internal static class SymbolicStateDifferentialHarness
         });
     }
 
-    private static string CreateProvenanceKey(IEnumerable<SymbolicLoweringProvenance>? provenance)
-    {
+    private static string CreateProvenanceKey(IEnumerable<SymbolicLoweringProvenance>? provenance) {
         return string.Join(
             "\n",
             provenance?.Select(static item => string.Join(
@@ -70,8 +64,7 @@ internal static class SymbolicStateDifferentialHarness
                 Encode(item.Detail))) ?? Enumerable.Empty<string>());
     }
 
-    private static string CreateTruncationKey(SymbolicAnalysisTruncationInfo? truncation)
-    {
+    private static string CreateTruncationKey(SymbolicAnalysisTruncationInfo? truncation) {
         if (truncation == null || !truncation.IsTruncated) return string.Empty;
 
         var normalized = SymbolicAnalysisTruncationInfo.Combine(new[] { truncation });
@@ -86,8 +79,7 @@ internal static class SymbolicStateDifferentialHarness
                 item.SourceSpanStart?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)));
     }
 
-    private static string Encode(string value)
-    {
+    private static string Encode(string value) {
         value ??= string.Empty;
         return value.Length.ToString(CultureInfo.InvariantCulture) + ":" + value;
     }

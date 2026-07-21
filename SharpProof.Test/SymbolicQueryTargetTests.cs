@@ -5,11 +5,9 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SharpProofTargetTests
-{
+public sealed class SharpProofTargetTests {
     [Test]
-    public void SourceCompilation_NullReferenceEntry_Throws()
-    {
+    public void SourceCompilation_NullReferenceEntry_Throws() {
         var exception = Assert.Throws<ArgumentException>(() => SymbolicSourceCompilation.Create(
             "public sealed class Sample { }",
             "Sample.cs",

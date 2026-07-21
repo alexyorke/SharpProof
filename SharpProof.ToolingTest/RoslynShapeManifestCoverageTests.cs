@@ -7,11 +7,9 @@ using SharpProof.Tools.Fuzz;
 namespace SharpProof.Test;
 
 [TestFixture]
-public class RoslynShapeManifestCoverageTests
-{
+public class RoslynShapeManifestCoverageTests {
     [Test]
-    public void AllSyntaxKindsHaveCoverageDecision()
-    {
+    public void AllSyntaxKindsHaveCoverageDecision() {
         var syntaxShapeIds = RoslynShapeManifest.SyntaxEntries
             .Select(entry => entry.ShapeId)
             .ToImmutableHashSet(StringComparer.Ordinal);
@@ -25,8 +23,7 @@ public class RoslynShapeManifestCoverageTests
     }
 
     [Test]
-    public void EveryGeneratorBackedShapeHasRegistryEntry()
-    {
+    public void EveryGeneratorBackedShapeHasRegistryEntry() {
         var registryShapeIds = FuzzCaseGenerator.RegistryEntries
             .SelectMany(entry => entry.PrimaryShapeIds)
             .ToImmutableHashSet(StringComparer.Ordinal);
@@ -40,8 +37,7 @@ public class RoslynShapeManifestCoverageTests
     }
 
     [Test]
-    public void EveryRegistryEntryReferencesKnownManifestShapes()
-    {
+    public void EveryRegistryEntryReferencesKnownManifestShapes() {
         var knownShapeIds = RoslynShapeManifest.EntriesByShapeId.Keys.ToImmutableHashSet(StringComparer.Ordinal);
         var unknown = FuzzCaseGenerator.RegistryEntries
             .SelectMany(entry => entry.PrimaryShapeIds
@@ -55,8 +51,7 @@ public class RoslynShapeManifestCoverageTests
     }
 
     [Test]
-    public void EveryRegistryEntryReferencesKnownRoslynKinds()
-    {
+    public void EveryRegistryEntryReferencesKnownRoslynKinds() {
         var operationKinds = Enum.GetNames<OperationKind>().ToImmutableHashSet(StringComparer.Ordinal);
         var syntaxKinds = Enum.GetNames<SyntaxKind>().ToImmutableHashSet(StringComparer.Ordinal);
         var unknownOperationKinds = FuzzCaseGenerator.RegistryEntries
@@ -79,12 +74,10 @@ public class RoslynShapeManifestCoverageTests
     }
 
     [Test]
-    public async Task EveryRegistryEntryEmitsDeclaredOperationKinds()
-    {
+    public async Task EveryRegistryEntryEmitsDeclaredOperationKinds() {
         var analyses = await AnalyzeRegistryEntriesAsync();
 
-        foreach (var entry in FuzzCaseGenerator.RegistryEntries)
-        {
+        foreach (var entry in FuzzCaseGenerator.RegistryEntries) {
             var analysis = analyses[entry.Id];
             Assert.That(analysis.CompilationErrors, Is.Empty, entry.Id);
 
@@ -97,12 +90,10 @@ public class RoslynShapeManifestCoverageTests
     }
 
     [Test]
-    public async Task EveryRegistryEntryEmitsDeclaredSyntaxKinds()
-    {
+    public async Task EveryRegistryEntryEmitsDeclaredSyntaxKinds() {
         var analyses = await AnalyzeRegistryEntriesAsync();
 
-        foreach (var entry in FuzzCaseGenerator.RegistryEntries)
-        {
+        foreach (var entry in FuzzCaseGenerator.RegistryEntries) {
             if (entry.ExpectedSyntaxKinds.IsDefaultOrEmpty) continue;
 
             var analysis = analyses[entry.Id];
@@ -117,13 +108,11 @@ public class RoslynShapeManifestCoverageTests
     }
 
     [Test]
-    public void DeterministicSampler_CoversAllGeneratorBackedShapesWithoutRandomSearch()
-    {
+    public void DeterministicSampler_CoversAllGeneratorBackedShapesWithoutRandomSearch() {
         var generator = new FuzzCaseGenerator(20260614);
         var observed = new HashSet<string>(StringComparer.Ordinal);
 
-        for (var index = 0; index < RoslynShapeManifest.GeneratorBackedShapeIds.Length; index++)
-        {
+        for (var index = 0; index < RoslynShapeManifest.GeneratorBackedShapeIds.Length; index++) {
             var fuzzCase = generator.Next(index);
             Assert.That(fuzzCase.PrimaryShapeIds.IsDefaultOrEmpty, Is.False, fuzzCase.Family);
 
@@ -139,8 +128,7 @@ public class RoslynShapeManifestCoverageTests
             "Deterministic sampler missed generator-backed shapes: " + string.Join(", ", missing));
     }
 
-    private static async Task<ImmutableDictionary<string, FuzzCaseAnalysis>> AnalyzeRegistryEntriesAsync()
-    {
+    private static async Task<ImmutableDictionary<string, FuzzCaseAnalysis>> AnalyzeRegistryEntriesAsync() {
         return await ToolingFuzzAnalysisCache.GetRegistryEntryAnalysesAsync();
     }
 }

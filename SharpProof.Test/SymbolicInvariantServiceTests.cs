@@ -9,11 +9,9 @@ using SharpProof.Symbolic.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicInvariantServiceTests
-{
+public sealed class SymbolicInvariantServiceTests {
     [Test]
-    public void ProveImplicationAt_ProvesConditionFromPathFacts()
-    {
+    public void ProveImplicationAt_ProvesConditionFromPathFacts() {
         const string source = @"
 public class TestClass
 {
@@ -41,8 +39,7 @@ public class TestClass
     }
 
     [Test]
-    public void ProveImplicationAt_ProvesNegatedConditionFalseFromPathFacts()
-    {
+    public void ProveImplicationAt_ProvesNegatedConditionFalseFromPathFacts() {
         const string source = @"
 public class TestClass
 {
@@ -71,8 +68,7 @@ public class TestClass
     }
 
     [Test]
-    public void ProveImplicationAt_ReturnsUnreachableWhenProgramPointIsUnsatisfiable()
-    {
+    public void ProveImplicationAt_ReturnsUnreachableWhenProgramPointIsUnsatisfiable() {
         const string source = @"
 public class TestClass
 {
@@ -100,8 +96,7 @@ public class TestClass
     }
 
     [Test]
-    public void ProveImplicationAt_ReturnsUnknownWithoutSmtService()
-    {
+    public void ProveImplicationAt_ReturnsUnknownWithoutSmtService() {
         const string source = @"
 public class TestClass
 {
@@ -129,8 +124,7 @@ public class TestClass
     }
 
     [Test]
-    public void ProveImplicationAt_ProvesBooleanLocalAliasInitializer()
-    {
+    public void ProveImplicationAt_ProvesBooleanLocalAliasInitializer() {
         const string source = @"
 public class TestClass
 {
@@ -180,8 +174,7 @@ public class TestClass
     }
 
     [Test]
-    public void RuntimeHazards_ProveDivideByZeroThroughBooleanLocalAlias()
-    {
+    public void RuntimeHazards_ProveDivideByZeroThroughBooleanLocalAlias() {
         const string source = @"
 public class TestClass
 {
@@ -213,8 +206,7 @@ public class TestClass
     }
 
     [Test]
-    public void RuntimeHazards_RejectZeroAfterNonZeroCompoundAssignment()
-    {
+    public void RuntimeHazards_RejectZeroAfterNonZeroCompoundAssignment() {
         const string source = @"
 public class TestClass
 {
@@ -243,8 +235,7 @@ public class TestClass
     }
 
     [Test]
-    public void RuntimeHazards_ProveMemorySliceOutOfRangeThroughLengthAlias()
-    {
+    public void RuntimeHazards_ProveMemorySliceOutOfRangeThroughLengthAlias() {
         const string source = @"
 using System;
 
@@ -277,8 +268,7 @@ public class TestClass
     }
 
     [Test]
-    public void RuntimeHazards_RetainNullableLoopCarriedMissingValue()
-    {
+    public void RuntimeHazards_RetainNullableLoopCarriedMissingValue() {
         const string source = @"
 public class TestClass
 {
@@ -310,8 +300,7 @@ public class TestClass
     }
 
     [Test]
-    public void ProveImplicationAt_RejectsZeroAfterNonZeroCompoundAssignment()
-    {
+    public void ProveImplicationAt_RejectsZeroAfterNonZeroCompoundAssignment() {
         const string source = @"
 public class TestClass
 {
@@ -352,8 +341,7 @@ public class TestClass
 
     private static (ReturnStatementSyntax ReturnStatement, SemanticModel SemanticModel, SymbolicCondition GuardCondition
         )
-        CreateGuardedReturnContext(string source, string returnMarker)
-    {
+        CreateGuardedReturnContext(string source, string returnMarker) {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(LanguageVersion.Preview),
@@ -386,8 +374,7 @@ public class TestClass
         SyntaxNode node,
         SemanticModel semanticModel,
         SymbolicCondition condition,
-        SmtAnalysisService smtAnalysis)
-    {
+        SmtAnalysisService smtAnalysis) {
         return new SymbolicConditionProofEngine(new SymbolicInvariantService()).ProveAtSyntaxNode(
             semanticModel,
             node,

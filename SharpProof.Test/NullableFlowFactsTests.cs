@@ -7,11 +7,9 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class NullableFlowFactsTests
-{
+public sealed class NullableFlowFactsTests {
     [Test]
-    public void NullableFlowFacts_CentralizesRoslynStateAndCodeAnalysisContracts()
-    {
+    public void NullableFlowFacts_CentralizesRoslynStateAndCodeAnalysisContracts() {
         const string source = @"
 #nullable enable
 using System;
@@ -162,8 +160,7 @@ public sealed class ContractFixture
             Is.EqualTo(NullableFlowFactState.MaybeNull));
     }
 
-    private static (CompilationUnitSyntax Root, SemanticModel SemanticModel) CreateSemanticModel(string source)
-    {
+    private static (CompilationUnitSyntax Root, SemanticModel SemanticModel) CreateSemanticModel(string source) {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(LanguageVersion.Preview),

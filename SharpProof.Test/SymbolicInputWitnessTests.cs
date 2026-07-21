@@ -8,11 +8,9 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicInputWitnessTests
-{
+public sealed class SymbolicInputWitnessTests {
     [Test]
-    public void InputDomainSynthesis_ProjectsRolesRangesStringsCollectionsAndIndexes()
-    {
+    public void InputDomainSynthesis_ProjectsRolesRangesStringsCollectionsAndIndexes() {
         const string source = """
                               class C
                               {
@@ -100,8 +98,7 @@ public sealed class SymbolicInputWitnessTests
         var indexDomain = result.DomainSummary.Domains.Single(domain => domain.Name == "index");
         var localDomain = result.DomainSummary.Domains.Single(domain => domain.Name == "local");
         var receiverDomain = result.DomainSummary.Domains.Single(domain => domain.Name == "this._state");
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(valueDomain.Role, Is.EqualTo(SymbolicInputRole.Parameter));
             Assert.That(valueDomain.IntegerRange?.Minimum, Is.EqualTo(2));
             Assert.That(valueDomain.IntegerRange?.Maximum, Is.EqualTo(9));
@@ -124,8 +121,7 @@ public sealed class SymbolicInputWitnessTests
     }
 
     [Test]
-    public void InputDomainSynthesis_MarksDisjunctionAndUnsupportedTermShapes()
-    {
+    public void InputDomainSynthesis_MarksDisjunctionAndUnsupportedTermShapes() {
         var value = new SmtVariable("value", SmtValueKind.Int);
         var flag = new SmtVariable("flag", SmtValueKind.Bool);
         var formulas = new SmtFormula[]
@@ -154,16 +150,14 @@ public sealed class SymbolicInputWitnessTests
             .Any(predicate => predicate.Kind == SymbolicDomainPredicateKind.Unsupported), Is.True);
     }
 
-    private static string GetSymbolicName(SemanticModel semanticModel, ParameterSyntax parameter)
-    {
+    private static string GetSymbolicName(SemanticModel semanticModel, ParameterSyntax parameter) {
         return SymbolicFactFactory.GetSmtVariableName(semanticModel.GetDeclaredSymbol(parameter)!);
     }
 
     private static SmtBinaryFormula Compare(
         SmtBinaryOperator op,
         SmtFormula left,
-        SmtFormula right)
-    {
+        SmtFormula right) {
         return new SmtBinaryFormula(op, left, right);
     }
 }

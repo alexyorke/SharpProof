@@ -7,11 +7,9 @@ using SharpProof.Symbolic.Ir;
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class SymbolicStateMergerTests
-{
+public sealed class SymbolicStateMergerTests {
     [Test]
-    public void ConditionalMerge_UsesStructuralLimitAndRecordsTruncation()
-    {
+    public void ConditionalMerge_UsesStructuralLimitAndRecordsTruncation() {
         var source = SyntaxFactory.ParseExpression("select");
         var select = new SymbolicVariableTerm("select", SmtValueKind.Bool);
         var first = new SymbolicVariableTerm("first", SmtValueKind.Int);
@@ -29,8 +27,7 @@ public sealed class SymbolicStateMergerTests
             Equal(second, 4, source)
         });
         using var scope = SymbolicAnalysisLimitContext.Push(
-            SharpProofAnalysisBudget.Default with
-            {
+            SharpProofAnalysisBudget.Default with {
                 MaxMergedPathConditions = 1,
                 MaxGuardFactsPerTargetPerState = 1
             });
@@ -50,8 +47,7 @@ public sealed class SymbolicStateMergerTests
                 item.Observed == 2));
     }
 
-    private static SymbolicCondition Truth(SymbolicTerm value, Microsoft.CodeAnalysis.SyntaxNode source)
-    {
+    private static SymbolicCondition Truth(SymbolicTerm value, Microsoft.CodeAnalysis.SyntaxNode source) {
         return new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicTruthAtom(value),
             source,
@@ -61,8 +57,7 @@ public sealed class SymbolicStateMergerTests
     private static SymbolicCondition Equal(
         SymbolicTerm value,
         long constant,
-        Microsoft.CodeAnalysis.SyntaxNode source)
-    {
+        Microsoft.CodeAnalysis.SyntaxNode source) {
         return new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicRelationAtom(
                 SymbolicRelationOperator.Equal,

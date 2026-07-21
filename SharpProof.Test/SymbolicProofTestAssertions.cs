@@ -4,12 +4,10 @@ using SharpProof.Symbolic;
 
 namespace SharpProof.Test;
 
-internal static class SymbolicProofTestAssertions
-{
+internal static class SymbolicProofTestAssertions {
     internal static SymbolicSourceQueryTestSession CreateSession(
         string source,
-        [CallerFilePath] string callerFilePath = "")
-    {
+        [CallerFilePath] string callerFilePath = "") {
         return new SymbolicSourceQueryTestSession(source, Path.GetFileName(callerFilePath));
     }
 
@@ -17,8 +15,7 @@ internal static class SymbolicProofTestAssertions
         string source,
         string sourceLine,
         string condition,
-        [CallerFilePath] string callerFilePath = "")
-    {
+        [CallerFilePath] string callerFilePath = "") {
         using var session = CreateSession(source, callerFilePath);
         AssertConditionProven(session, sourceLine, condition);
     }
@@ -27,8 +24,7 @@ internal static class SymbolicProofTestAssertions
         string source,
         string sourceLine,
         string condition,
-        [CallerFilePath] string callerFilePath = "")
-    {
+        [CallerFilePath] string callerFilePath = "") {
         using var session = CreateSession(source, callerFilePath);
         AssertConditionUnknown(session, sourceLine, condition);
     }
@@ -36,16 +32,14 @@ internal static class SymbolicProofTestAssertions
     internal static void AssertConditionProven(
         SymbolicSourceQueryTestSession session,
         string sourceLine,
-        string condition)
-    {
+        string condition) {
         AssertTruthValue(session, sourceLine, condition, SymbolicTruthValue.ProvenTrue);
     }
 
     internal static void AssertConditionUnknown(
         SymbolicSourceQueryTestSession session,
         string sourceLine,
-        string condition)
-    {
+        string condition) {
         AssertTruthValue(session, sourceLine, condition, SymbolicTruthValue.Unknown);
     }
 
@@ -53,8 +47,7 @@ internal static class SymbolicProofTestAssertions
         SymbolicSourceQueryTestSession session,
         string sourceLine,
         string condition,
-        SymbolicTruthValue expected)
-    {
+        SymbolicTruthValue expected) {
         var proof = session.ProveAtMarker((session.FindLine(sourceLine), 20, 0), condition);
         if (proof.TruthValue == SymbolicTruthValue.Unknown && proof.Reason == "UnsupportedIrEncoding") {
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown),

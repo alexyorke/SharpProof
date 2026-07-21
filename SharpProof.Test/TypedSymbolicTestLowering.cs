@@ -6,29 +6,25 @@ using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Test;
 
-internal static class TypedSymbolicTestLowering
-{
+internal static class TypedSymbolicTestLowering {
     internal static bool TryLowerCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
+        out SymbolicCondition condition) {
         return TryGetExact(SymbolicSemanticPipeline.LowerCondition(expression, context), out condition);
     }
 
     internal static bool TryLowerTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         return TryGetExact(SymbolicSemanticPipeline.LowerTerm(expression, context), out term);
     }
 
     internal static bool TryLowerBuiltInLengthTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         return TryGetExact(SymbolicSemanticPipeline.LowerBuiltInLengthTerm(expression, context), out term);
     }
 
@@ -36,8 +32,7 @@ internal static class TypedSymbolicTestLowering
         ExpressionSyntax expression,
         int dimension,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         return TryGetExact(
             SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(expression, dimension, context),
             out term);
@@ -46,31 +41,27 @@ internal static class TypedSymbolicTestLowering
     internal static bool TryLowerNullableHasValueTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         return TryGetExact(SymbolicSemanticPipeline.LowerNullableHasValueTerm(expression, context), out term);
     }
 
     internal static bool TryLowerStringNonNullCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
+        out SymbolicCondition condition) {
         return TryGetExact(SymbolicSemanticPipeline.LowerStringNonNullCondition(expression, context), out condition);
     }
 
     internal static bool TryLowerStringTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         return TryGetExact(SymbolicSemanticPipeline.LowerStringTerm(expression, context), out term);
     }
 
     internal static bool TryCreateStringContentReferenceTerm(
         SymbolicTerm reference,
-        out SymbolicTerm term)
-    {
+        out SymbolicTerm term) {
         var source = SyntaxFactory.IdentifierName("string-content");
         return TryGetExact(SymbolicSemanticPipeline.ProjectStringContentTerm(reference, source), out term);
     }
@@ -81,8 +72,7 @@ internal static class TypedSymbolicTestLowering
         SyntaxNode source,
         string provenance,
         SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
+        out SymbolicCondition condition) {
         _ = provenance;
         return TryGetExact(
             SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(
@@ -97,8 +87,7 @@ internal static class TypedSymbolicTestLowering
         ElementAccessExpressionSyntax elementAccess,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out SmtFormula formula)
-    {
+        out SmtFormula formula) {
         var lowering = SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(
             elementAccess,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
@@ -114,14 +103,12 @@ internal static class TypedSymbolicTestLowering
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out SmtFormula? formula)
-    {
+        out SmtFormula? formula) {
         var lowering = SymbolicSemanticPipeline.LowerCondition(
             expression,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
         if (lowering is { IsExact: true, Value: { } condition } &&
-            SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded))
-        {
+            SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded)) {
             formula = encoded;
             return true;
         }
@@ -135,8 +122,7 @@ internal static class TypedSymbolicTestLowering
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         IEnumerable<SmtFormula> pathConditions,
-        out SmtFormula? formula)
-    {
+        out SmtFormula? formula) {
         _ = pathConditions;
         return TryTranslateValue(expression, semanticModel, cancellationToken, out formula, null);
     }
@@ -146,14 +132,12 @@ internal static class TypedSymbolicTestLowering
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SmtFormula? formula,
-        Func<ISymbol, int>? getSymbolVersion = null)
-    {
+        Func<ISymbol, int>? getSymbolVersion = null) {
         var lowering = SymbolicSemanticPipeline.LowerTerm(
             expression,
             new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion));
         if (lowering is { IsExact: true, Value: { } term } &&
-            SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encoded))
-        {
+            SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encoded)) {
             formula = encoded;
             return true;
         }
@@ -168,8 +152,7 @@ internal static class TypedSymbolicTestLowering
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         ICollection<SmtFormula> formulas,
-        Func<ISymbol, int>? getSymbolVersion = null)
-    {
+        Func<ISymbol, int>? getSymbolVersion = null) {
         var lowering = SymbolicSemanticPipeline.LowerBranchCondition(
             expression,
             branchWhenTrue,
@@ -187,8 +170,7 @@ internal static class TypedSymbolicTestLowering
         bool branchWhenTrue,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        ICollection<SmtFormula> formulas)
-    {
+        ICollection<SmtFormula> formulas) {
         return TryCollectBranchAssumptions(
             expression,
             branchWhenTrue,
@@ -198,8 +180,7 @@ internal static class TypedSymbolicTestLowering
     }
 
     private static bool TryGetExact<T>(SymbolicLoweringResult<T> lowering, out T value)
-        where T : class
-    {
+        where T : class {
         value = lowering.Value!;
         return lowering is { IsExact: true, Value: not null };
     }
