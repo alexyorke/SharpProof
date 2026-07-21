@@ -789,19 +789,20 @@ try
             continue
         }
 
+        # These two paths used to map to ArchitectureReductionTests and
+        # ImpactedTestSelectionScriptTests respectively. Both fixtures were deleted, so
+        # naming them selected nothing at all — the same silent-empty failure mode the
+        # test lanes had. Nothing covers either path today, so fall back to the full
+        # suite until a fixture does.
         if ($path -match '^scripts/Get-SharpProofProductionMetrics\.ps1$')
         {
-            $before = @($testClasses | Sort-Object)
-            Add-TestClasses $testClasses @('ArchitectureReductionTests')
-            Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'path-map' 'Production metrics script change' $before $testClasses
+            Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path has no covering fixture"
             continue
         }
 
         if ($path -match '^scripts/(Get-SharpProofTestImpactInventory\.ps1|TestImpactPolicy\.ps1|test-impact-inventory\.json)$')
         {
-            $before = @($testClasses | Sort-Object)
-            Add-TestClasses $testClasses @('ImpactedTestSelectionScriptTests')
-            Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'path-map' 'Impacted-test metadata change' $before $testClasses
+            Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path has no covering fixture"
             continue
         }
 

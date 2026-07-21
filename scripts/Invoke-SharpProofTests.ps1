@@ -18,7 +18,7 @@ param(
     [string]$Filter = '',
 
     [Parameter()]
-    [ValidateSet('All', 'Main', 'MainSmt', 'MainSmtOracle', 'MainSmtAnalyzer', 'MainSmtFlow', 'MainSmtCore', 'MainGeneral', 'Tooling')]
+    [ValidateSet('All', 'Main', 'MainSmt', 'MainGeneral', 'Tooling')]
     [string]$TestLane = 'All',
 
     [Parameter()]
@@ -116,11 +116,86 @@ function Write-SlowestTestsFromTrx
     Write-Host $slowestFixtures
 }
 
+function Get-SharpProofTrxTestCount
+{
+    <#
+    .SYNOPSIS
+    Number of test results recorded in a TRX file, or -1 when it cannot be read.
+
+    .DESCRIPTION
+    A lane's own output cannot be inspected from here: Invoke-ProcessUnderJobObject
+    launches dotnet through CreateProcess with inherited console handles, so the child
+    writes straight to the console and never enters this pipeline. Counting the TRX is
+    both reliable and independent of message wording.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$TrxPath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($TrxPath) -or -not (Test-Path -LiteralPath $TrxPath))
+    {
+        return -1
+    }
+
+    try
+    {
+        [xml]$trx = Get-Content -LiteralPath $TrxPath
+        $namespaceManager = New-Object System.Xml.XmlNamespaceManager($trx.NameTable)
+        $namespaceManager.AddNamespace('t', 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
+        return @($trx.SelectNodes('//t:UnitTestResult', $namespaceManager)).Count
+    }
+    catch
+    {
+        return -1
+    }
+}
+
+function Test-SharpProofLaneRanTests
+{
+    <#
+    .SYNOPSIS
+    Returns $false when a lane ran no tests because its own filter selected nothing.
+
+    .DESCRIPTION
+    `dotnet test` treats a filter matching nothing as success and exits 0, which is how
+    four fixture-name lanes here rotted into running nothing while still reporting green.
+    Only the lane's own filter is judged. A user-supplied -Filter that misses a lane is
+    legitimate — filtering to one fixture necessarily empties the other lanes — so the
+    caller suppresses this check whenever the user passed a filter.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$TrxPath
+    )
+
+    return (Get-SharpProofTrxTestCount -TrxPath $TrxPath) -ne 0
+}
+
+function Write-SharpProofEmptyLaneError
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LaneName,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$LaneFilter
+    )
+
+    Write-Host ''
+    Write-Host "The $LaneName lane ran no tests. Its filter no longer selects anything:" -ForegroundColor Red
+    Write-Host "  $LaneFilter" -ForegroundColor Red
+    Write-Host 'Update the lane so the partition covers the fixtures that exist.' -ForegroundColor Red
+}
+
 function Resolve-SharpProofTestProjects
 {
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('All', 'Main', 'MainSmt', 'MainSmtOracle', 'MainSmtAnalyzer', 'MainSmtFlow', 'MainSmtCore', 'MainGeneral', 'Tooling')]
+        [ValidateSet('All', 'Main', 'MainSmt', 'MainGeneral', 'Tooling')]
         [string]$RequestedLane,
 
         [Parameter(Mandatory = $true)]
@@ -129,25 +204,23 @@ function Resolve-SharpProofTestProjects
     )
 
     $mainPath = 'SharpProof.Test\SharpProof.Test.csproj'
+    # MainSmt and MainGeneral are exact complements over the SmtHeavy category, so this
+    # partition stays correct as fixtures are added and removed. Do not shard by fixture
+    # name again: four such lanes previously decayed into matching nothing at all when
+    # the fixtures they listed were deleted, and the run still reported success.
     $lanes = [ordered]@{
         Main = [ordered]@{ Name = 'Main'; ProjectPath = $mainPath; LaneFilter = '' }
         MainSmt = [ordered]@{ Name = 'MainSmt'; ProjectPath = $mainPath; LaneFilter = 'TestCategory=SmtHeavy' }
-        MainSmtOracle = [ordered]@{ Name = 'MainSmtOracle'; ProjectPath = $mainPath; LaneFilter = '(FullyQualifiedName~SemanticOracleSmtTests|FullyQualifiedName~PatternSmtInvariantTests|FullyQualifiedName~ExceptionReachabilitySmtTests)' }
-        MainSmtAnalyzer = [ordered]@{ Name = 'MainSmtAnalyzer'; ProjectPath = $mainPath; LaneFilter = '(FullyQualifiedName~SemanticOracleAnalyzerSmtTests|FullyQualifiedName~DiagnosticEvidenceTests)' }
-        MainSmtFlow = [ordered]@{ Name = 'MainSmtFlow'; ProjectPath = $mainPath; LaneFilter = '(FullyQualifiedName~ExceptionFlowPathFactStressTests|FullyQualifiedName~SemanticOracleRuntimeHazardAnalyzerSmtTests)' }
-        MainSmtCore = [ordered]@{ Name = 'MainSmtCore'; ProjectPath = $mainPath; LaneFilter = '(FullyQualifiedName~PathSensitiveSmtInvariantTests|FullyQualifiedName~SmtAnalysisServiceTests|FullyQualifiedName~ExpressionAtomSmtTests|FullyQualifiedName~StringLengthSmtTests|FullyQualifiedName~ForeachSmtInvariantTests|FullyQualifiedName~ElementAccessSmtTests|FullyQualifiedName~LoopExitSmtInvariantTests|FullyQualifiedName~ReferenceReachabilitySmtTests)' }
         MainGeneral = [ordered]@{ Name = 'MainGeneral'; ProjectPath = $mainPath; LaneFilter = 'TestCategory!=SmtHeavy' }
         Tooling = [ordered]@{ Name = 'Tooling'; ProjectPath = 'SharpProof.ToolingTest\SharpProof.ToolingTest.csproj'; LaneFilter = '' }
     }
-    $smtShards = @('MainSmtOracle', 'MainSmtAnalyzer', 'MainSmtFlow', 'MainSmtCore') |
-        ForEach-Object { $lanes[$_] }
-    $mainShards = @($smtShards) + @($lanes.MainGeneral)
+    $mainShards = @($lanes.MainSmt, $lanes.MainGeneral)
 
     if ([string]::IsNullOrWhiteSpace($Filter))
     {
         if ($RequestedLane -eq 'All') { return $mainShards + @($lanes.Tooling) }
         if ($RequestedLane -eq 'Main') { return $mainShards }
-        if ($RequestedLane -eq 'MainSmt') { return @($smtShards) }
+        if ($RequestedLane -eq 'MainSmt') { return @($lanes.MainSmt) }
     }
     if ($RequestedLane -notin @('All', 'Main', 'MainSmt')) { return @($lanes[$RequestedLane]) }
 
@@ -168,7 +241,7 @@ function Get-SharpProofDefaultWorkerCount
 {
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Main', 'MainSmt', 'MainSmtOracle', 'MainSmtAnalyzer', 'MainSmtFlow', 'MainSmtCore', 'MainGeneral', 'Tooling')]
+        [ValidateSet('Main', 'MainSmt', 'MainGeneral', 'Tooling')]
         [string]$LaneName
     )
 
@@ -235,11 +308,20 @@ function New-SharpProofRunSettings
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $laneSettingsPaths = New-Object System.Collections.Generic.List[string]
 
+# Every lane writes a TRX so its test count can be checked; a lane whose filter selects
+# nothing must fail rather than pass silently. When the caller did not ask to keep
+# results, the directory is temporary and removed on the way out.
 $effectiveResultsDirectory = $ResultsDirectory
-if ($Profile -and [string]::IsNullOrWhiteSpace($effectiveResultsDirectory))
+$temporaryResultsDirectory = ''
+if ([string]::IsNullOrWhiteSpace($effectiveResultsDirectory))
 {
-    $effectiveResultsDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('sharpproof-test-profile-' + [guid]::NewGuid().ToString('N'))
+    $temporaryResultsDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('sharpproof-test-results-' + [guid]::NewGuid().ToString('N'))
+    $effectiveResultsDirectory = $temporaryResultsDirectory
 }
+
+# A user-supplied filter legitimately empties lanes it does not select, so the
+# empty-lane check only judges the lane filters the script itself owns.
+$enforceNonEmptyLanes = [string]::IsNullOrWhiteSpace($Filter)
 
 if (-not [string]::IsNullOrWhiteSpace($effectiveResultsDirectory))
 {
@@ -273,7 +355,7 @@ try
         else
         {
             if ($requestedLane -eq 'All' -and
-                ($project.Name -eq 'MainSmtCore' -or $project.Name -eq 'Tooling'))
+                ($project.Name -eq 'MainSmt' -or $project.Name -eq 'Tooling'))
             {
                 [Math]::Max(1, [Math]::Min([Environment]::ProcessorCount, 2))
             }
@@ -332,11 +414,9 @@ try
             $testArgs.Add($projectResultsDirectory)
         }
 
-        if ($Profile)
-        {
-            $testArgs.Add('--logger')
-            $testArgs.Add('trx;LogFileName=profile.trx')
-        }
+        # One TRX serves both the empty-lane check and -Profile.
+        $testArgs.Add('--logger')
+        $testArgs.Add('trx;LogFileName=lane.trx')
 
         foreach ($argument in $DotnetTestArgs)
         {
@@ -348,7 +428,9 @@ try
             ProjectPath = [string]$project.ProjectPath
             WorkerCount = $projectWorkers
             TestArgs = $testArgs
+            Filter = $project.LaneFilter
             ResultsDirectory = $projectResultsDirectory
+            TrxPath = (Join-Path $projectResultsDirectory 'lane.trx')
             SettingsPath = $projectSettingsPath
         }
     })
@@ -440,7 +522,16 @@ try
         Write-Host "Running the $($foregroundSpec.Name) lane ($($foregroundSpec.WorkerCount) workers) with $($backgroundLanes.Count) lane(s) in the background: $backgroundLaneSummary"
         $foregroundArgs = $foregroundSpec.TestArgs
         & $wrapperPath -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds @foregroundArgs
-        $laneExitCodes = @{ ($foregroundSpec.Name) = $LASTEXITCODE }
+        $foregroundExitCode = $LASTEXITCODE
+        if ($foregroundExitCode -eq 0 -and
+            $enforceNonEmptyLanes -and
+            -not (Test-SharpProofLaneRanTests -TrxPath $foregroundSpec.TrxPath))
+        {
+            Write-SharpProofEmptyLaneError -LaneName $foregroundSpec.Name -LaneFilter $foregroundSpec.Filter
+            $foregroundExitCode = 1
+        }
+
+        $laneExitCodes = @{ ($foregroundSpec.Name) = $foregroundExitCode }
 
         foreach ($backgroundLane in $backgroundLanes)
         {
@@ -456,6 +547,14 @@ try
                 {
                     Get-Content -LiteralPath $outputPath | Write-Host
                 }
+            }
+
+            if ($laneExitCodes[$backgroundLane.Spec.Name] -eq 0 -and
+                $enforceNonEmptyLanes -and
+                -not (Test-SharpProofLaneRanTests -TrxPath $backgroundLane.Spec.TrxPath))
+            {
+                Write-SharpProofEmptyLaneError -LaneName $backgroundLane.Spec.Name -LaneFilter $backgroundLane.Spec.Filter
+                $laneExitCodes[$backgroundLane.Spec.Name] = 1
             }
 
             Remove-Item -LiteralPath $backgroundLane.ScriptPath, $backgroundLane.StdoutPath, $backgroundLane.StderrPath -Force -ErrorAction SilentlyContinue
@@ -474,7 +573,7 @@ try
         {
             foreach ($spec in $laneSpecs)
             {
-                $trxPath = Join-Path $spec.ResultsDirectory 'profile.trx'
+                $trxPath = $spec.TrxPath
                 if (Test-Path -LiteralPath $trxPath)
                 {
                     Write-Host ''
@@ -483,7 +582,7 @@ try
                 }
                 else
                 {
-                    Write-Warning "TRX profile was requested, but no profile.trx file was produced in $($spec.ResultsDirectory)."
+                    Write-Warning "TRX profile was requested, but no lane.trx file was produced in $($spec.ResultsDirectory)."
                 }
             }
         }
@@ -496,6 +595,14 @@ try
             Write-Host "Running the $($spec.Name) lane with $($spec.WorkerCount) workers"
             & $wrapperPath -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds @laneArgs
             $projectExitCode = $LASTEXITCODE
+            if ($projectExitCode -eq 0 -and
+                $enforceNonEmptyLanes -and
+                -not (Test-SharpProofLaneRanTests -TrxPath $spec.TrxPath))
+            {
+                Write-SharpProofEmptyLaneError -LaneName $spec.Name -LaneFilter $spec.Filter
+                $projectExitCode = 1
+            }
+
             if ($projectExitCode -ne 0)
             {
                 $exitCode = $projectExitCode
@@ -504,7 +611,7 @@ try
 
             if ($Profile)
             {
-                $trxPath = Join-Path $spec.ResultsDirectory 'profile.trx'
+                $trxPath = $spec.TrxPath
                 if (Test-Path -LiteralPath $trxPath)
                 {
                     Write-Host ''
@@ -513,7 +620,7 @@ try
                 }
                 else
                 {
-                    Write-Warning "TRX profile was requested, but no profile.trx file was produced in $($spec.ResultsDirectory)."
+                    Write-Warning "TRX profile was requested, but no lane.trx file was produced in $($spec.ResultsDirectory)."
                 }
             }
         }
@@ -528,6 +635,11 @@ finally
         {
             Remove-Item -LiteralPath $laneSettingsPath -Force -ErrorAction SilentlyContinue
         }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($temporaryResultsDirectory))
+    {
+        Remove-Item -LiteralPath $temporaryResultsDirectory -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
