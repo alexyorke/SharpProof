@@ -912,18 +912,29 @@ Tests are excluded from the metric and must not be deleted.
 
 ## Current evidence
 
-- Phase-two maintained production: 80,863 lines (76,901 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,571-line reduction from the
-  84,434-line phase-two baseline. Another 16,429 lines remain to the 64,434
-  completion ceiling.
-- The test-preservation check finds all 4,469 baseline attributed test methods
-  among 4,474 current methods, unchanged parameterized-case counts, and no new
-  disable markers.
+Measured 2026-07-20 with `scripts/Get-SharpProofProductionReduction.ps1`. Treat
+the script, not this file, as the source of current numbers.
+
+- Phase-two maintained production: 52,201 lines (49,072 C#, 2,988 scripts, and
+  141 maintained specification lines), a 32,233-line reduction from the
+  84,434-line phase-two baseline. The 64,434-line completion ceiling is met with
+  roughly 12,200 lines to spare.
+- Test suite: 757 tests in `SharpProof.Test` and 26 in `SharpProof.ToolingTest`,
+  all passing with zero skipped. The suite shrank with the semantic owners it
+  covered; the earlier 6,204-test figure predates the method-effects
+  consolidation.
 - Release solution build: zero warnings and errors.
-- Latest six-lane run: 6,204 passing and zero reported skipped, run sequentially
-  with one NUnit worker: Oracle 573, Analyzer 487, Flow 257, Core 258,
-  MainGeneral 4,014, and Tooling 615. The warning-as-error Release solution
-  build also completes with zero warnings and errors.
+
+Two caveats for whoever plans the next tranche:
+
+- Three lanes in `scripts/Invoke-SharpProofTests.ps1` filter on fixtures that no
+  longer exist and match zero tests while the script still reports success.
+  Verify changes with an unfiltered `dotnet test` per project.
+- Several entries in "Current tranche" below describe owners that have since been
+  deleted outright, including the EffectSummary subsystem and its artifact
+  manifest, the comparer invocation dispatch tables, and the analyzer's BCL
+  invocation overrides. Those entries are retained as a record of the reasoning,
+  not as a description of the current tree.
 
 ## Milestones
 
