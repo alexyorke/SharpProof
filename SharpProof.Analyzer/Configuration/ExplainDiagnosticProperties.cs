@@ -27,7 +27,7 @@ internal static class ExplainDiagnosticProperties {
                     .SetItem("sharpproof.explain.line", line.ToString(CultureInfo.InvariantCulture))
                     .SetItem("sharpproof.explain.column", column.ToString(CultureInfo.InvariantCulture))
                     .SetItem("sharpproof.explain.query",
-                        CreateExplainQuery(explainPath, line, column, impliedConditionText));
+                        CreateAnalysisQuery(explainPath, line, column, impliedConditionText));
             }
         }
 
@@ -70,20 +70,21 @@ internal static class ExplainDiagnosticProperties {
         return builder.ToString().Trim('_');
     }
 
-    private static string CreateExplainQuery(
+    private static string CreateAnalysisQuery(
         string path,
         int line,
         int column,
         string? contractText) {
         var builder = new StringBuilder();
-        builder.Append("SharpProof.SymbolicCli explain --file ");
+        builder.Append("SharpProof.SymbolicCli analyze --file ");
         builder.Append(Quote(path));
-        builder.Append(" --line ");
+        builder.Append(" --target line:");
         builder.Append(line.ToString(CultureInfo.InvariantCulture));
-        builder.Append(" --column ");
+        builder.Append(':');
         builder.Append(column.ToString(CultureInfo.InvariantCulture));
+        builder.Append(" --facets effects,proofs,hazards,complexity");
         if (!string.IsNullOrWhiteSpace(contractText)) {
-            builder.Append(" --implies ");
+            builder.Append(" --condition ");
             builder.Append(Quote(contractText!.Trim()));
         }
 

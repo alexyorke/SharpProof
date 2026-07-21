@@ -17,7 +17,6 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" />
     <ProjectReference Include="..\SharpProof.Testing\SharpProof.Testing.csproj" />
-    <ProjectReference Include="..\Tools\SharpProof.SymbolicCli.Core\SharpProof.SymbolicCli.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

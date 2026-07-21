@@ -49,8 +49,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Tooling.Core", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Testing", "SharpProof.Testing\SharpProof.Testing.csproj", "{0AF46B70-DE0B-462D-AB12-B88E3A69A7B7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.SymbolicCli.Core", "Tools\SharpProof.SymbolicCli.Core\SharpProof.SymbolicCli.Core.csproj", "{AA48E623-CECE-4D85-9DC8-8DE645FB6445}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -325,18 +323,6 @@ Global
 		{0AF46B70-DE0B-462D-AB12-B88E3A69A7B7}.Release|x64.Build.0 = Release|Any CPU
 		{0AF46B70-DE0B-462D-AB12-B88E3A69A7B7}.Release|x86.ActiveCfg = Release|Any CPU
 		{0AF46B70-DE0B-462D-AB12-B88E3A69A7B7}.Release|x86.Build.0 = Release|Any CPU
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445}.Debug|x64.Build.0 = Debug|Any CPU
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445}.Debug|x86.Build.0 = Debug|Any CPU
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445}.Release|Any CPU.Build.0 = Release|Any CPU
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445}.Release|x64.ActiveCfg = Release|Any CPU
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445}.Release|x64.Build.0 = Release|Any CPU
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445}.Release|x86.ActiveCfg = Release|Any CPU
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -349,7 +335,6 @@ Global
 		{B64F4757-7E59-42AE-A0CF-5442554A563C} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 		{FE7FD6D3-DCBC-449A-893E-DD2A6D75932D} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 		{D29D89F4-B614-4508-A5C9-923D3A9BA6C7} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
-		{AA48E623-CECE-4D85-9DC8-8DE645FB6445} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {4A1AC67A-F693-4406-8377-D9F03947D973}

@@ -7,7 +7,6 @@
     <ProjectReference Include="..\Tools\SharpProof.CorpusReport.Core\SharpProof.CorpusReport.Core.csproj" />
     <ProjectReference Include="..\Tools\SharpProof.Fuzz.Core\SharpProof.Fuzz.Core.csproj" />
     <ProjectReference Include="..\SharpProof.Testing\SharpProof.Testing.csproj" />
-    <ProjectReference Include="..\Tools\SharpProof.SymbolicCli.Core\SharpProof.SymbolicCli.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
