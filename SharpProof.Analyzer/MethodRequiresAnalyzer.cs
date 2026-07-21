@@ -1,12 +1,9 @@
-using static SharpProof.Analyzer.AnalyzerDiagnosticReporter;
-
 namespace SharpProof.Analyzer;
 
 internal static class MethodRequiresAnalyzer {
     internal static void AnalyzeSymbolForRequires(
         MethodBodyAnalysisContext context,
         AnalyzerProofService proofService,
-        DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
 
@@ -20,18 +17,13 @@ internal static class MethodRequiresAnalyzer {
                     RequiresContractHelpers.AttributeDisplayName,
                     contract.Argument,
                     contract.InvalidReason,
-                    contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
-                    methodSymbol,
-                    context.Node.SyntaxTree);
-                ReportIfNotSuppressed(context, baseline, invalidDiagnostic);
+                    contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node));
+                context.ReportDiagnostic(invalidDiagnostic);
                 continue;
             }
 
             if (!ContractConditionHelpers.TryParse(contract.Condition, out _, out var conditionExpression)) {
-                ReportIfNotSuppressed(
-                    context,
-                    baseline,
-                    CreateUnsupportedDiagnostic(
+                context.ReportDiagnostic(CreateUnsupportedDiagnostic(
                         methodSymbol,
                         contract.Condition,
                         contract.Location,
@@ -41,10 +33,7 @@ internal static class MethodRequiresAnalyzer {
             }
 
             if (RequiresContractHelpers.ContainsResultReference(conditionExpression))
-                ReportIfNotSuppressed(
-                    context,
-                    baseline,
-                    CreateUnsupportedDiagnostic(
+                context.ReportDiagnostic(CreateUnsupportedDiagnostic(
                         methodSymbol,
                         contract.Condition,
                         contract.Location,
@@ -52,13 +41,12 @@ internal static class MethodRequiresAnalyzer {
                         null));
         }
 
-        AnalyzeCallSitesForRequires(context, proofService, baseline, attributePolicy);
+        AnalyzeCallSitesForRequires(context, proofService, attributePolicy);
     }
 
     private static void AnalyzeCallSitesForRequires(
         MethodBodyAnalysisContext context,
         AnalyzerProofService proofService,
-        DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         foreach (var callSite in context.Snapshot.VisibleOperations.SelectMany(static operation =>
                      CreateCallSites(operation))) {
@@ -81,27 +69,11 @@ internal static class MethodRequiresAnalyzer {
                         callSite.Method,
                         callSite.Arguments,
                         out var rewrittenCondition)) {
-                    ReportIfNotSuppressed(
-                        context,
-                        baseline,
-                        CreateUnsupportedDiagnostic(
+                    context.ReportDiagnostic(CreateUnsupportedDiagnostic(
                             callSite.Method,
                             contract.Condition,
                             location,
                             "condition rewrite failure",
-                            AdditionalLocations(contract.Location)));
-                    continue;
-                }
-
-                if (!proofService.SmtAnalysis.Options.IsEnabled) {
-                    ReportIfNotSuppressed(
-                        context,
-                        baseline,
-                        CreateUnsupportedDiagnostic(
-                            callSite.Method,
-                            contract.Condition,
-                            location,
-                            "SMT is disabled for [Requires] verification",
                             AdditionalLocations(contract.Location)));
                     continue;
                 }
@@ -122,24 +94,20 @@ internal static class MethodRequiresAnalyzer {
                 if (!seen.Add(key)) continue;
 
                 if (proof.TruthValue == SymbolicTruthValue.ProvenFalse) {
-                    ReportIfNotSuppressed(
-                        context,
-                        baseline,
-                        CreateNotProvenDiagnostic(callSite.Method, contract.Condition, location, contract.Location,
-                            proof));
+                    context.ReportDiagnostic(CreateNotProvenDiagnostic(
+                        callSite.Method,
+                        contract.Condition,
+                        location,
+                        contract.Location));
                     continue;
                 }
 
-                ReportIfNotSuppressed(
-                    context,
-                    baseline,
-                    CreateUnsupportedDiagnostic(
+                context.ReportDiagnostic(CreateUnsupportedDiagnostic(
                         callSite.Method,
                         contract.Condition,
                         location,
                         ContractDiagnosticSupport.FormatUnknownReason(proof, "Requires"),
-                        AdditionalLocations(contract.Location),
-                        proof.AnalysisTruncation));
+                        AdditionalLocations(contract.Location)));
             }
         }
     }
@@ -322,27 +290,12 @@ internal static class MethodRequiresAnalyzer {
         IMethodSymbol methodSymbol,
         string condition,
         Location location,
-        Location? contractLocation,
-        SymbolicConditionProofResult proof) {
+        Location? contractLocation) {
         var callee = methodSymbol.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        var properties = ContractDiagnosticSupport.CreateProofProperties(
-            ContractDiagnosticSupport.EvidenceFamily.Requires,
-            methodSymbol,
-            "RequiresCallSite",
-            condition,
-            proof.Proof.Status.ToString(),
-            proof.Reason,
-            RequiresContractHelpers.CreateEvidenceKey("not_proven", condition, location, proof.Reason),
-            location,
-            ContractDiagnosticSupport.FormatUnknownReason(proof, "Requires"),
-            proof.AnalysisTruncation,
-            callee: callee);
-
         return Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("RequiresNotProvenRule"),
             location,
             AdditionalLocations(contractLocation),
-            properties,
             callee,
             condition);
     }
@@ -352,28 +305,12 @@ internal static class MethodRequiresAnalyzer {
         string condition,
         Location? location,
         string reason,
-        IEnumerable<Location>? additionalLocations,
-        SymbolicAnalysisTruncationInfo? analysisTruncation = null) {
+        IEnumerable<Location>? additionalLocations) {
         var callee = methodSymbol.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        var properties = ContractDiagnosticSupport.CreateProofProperties(
-            ContractDiagnosticSupport.EvidenceFamily.Requires,
-            methodSymbol,
-            "RequiresUnsupported",
-            condition,
-            SymbolicProofStatus.Unknown.ToString(),
-            reason,
-            RequiresContractHelpers.CreateEvidenceKey("unsupported", condition, location, reason),
-            location,
-            reason,
-            analysisTruncation ?? SymbolicAnalysisTruncationInfo.None,
-            reason,
-            callee);
-
         return Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("RequiresUnsupportedRule"),
             location,
             additionalLocations,
-            properties,
             callee,
             condition,
             reason);

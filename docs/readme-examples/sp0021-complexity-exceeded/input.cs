@@ -1,4 +1,3 @@
-#pragma warning disable SP0004
 using SharpProof.Attributes;
 
 public static class TestClass

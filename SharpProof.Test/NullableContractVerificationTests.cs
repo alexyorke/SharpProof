@@ -268,36 +268,9 @@ public sealed class NullableContractVerificationTests
             Does.Contain("SP0043"));
     }
 
-    [ReadmeExample("sp0047-nullable-inconclusive")]
-    [Test]
-    public async Task InconclusiveNullableProof_CanBeEnabledExplicitly()
-    {
-        const string source = """
-                              #nullable enable
-                              using System.Diagnostics.CodeAnalysis;
-                              public sealed class Sample
-                              {
-                                  private int _reads;
-                                  private string? Current => _reads++ == 0 ? "value" : null;
-
-                                  [MemberNotNull(nameof(Current))]
-                                  public void Initialize() { }
-                              }
-                              """;
-
-        var diagnostics = await AnalyzeAsync(
-            source,
-            ImmutableDictionary<string, string>.Empty.Add(
-                "sharpproof_report_nullable_inconclusive",
-                "true"));
-
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain("SP0047"));
-    }
-
     [ReadmeExample("sp0044-unsafe-null-forgiving")]
     [Test]
-    public async Task NullForgivingOperator_TracksUnsafeAndUnnecessaryUses()
+    public async Task NullForgivingOperator_ReportsUnsafeUse()
     {
         const string source = """
                               #nullable enable
@@ -314,21 +287,9 @@ public sealed class NullableContractVerificationTests
                               """;
 
         var diagnostics = await AnalyzeAsync(source);
-        var ids = diagnostics.Select(static diagnostic => diagnostic.Id).ToArray();
-        var unnecessary = diagnostics.Single(static diagnostic =>
-            diagnostic.Id == "SP0045");
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(ids, Does.Contain("SP0044"));
-            Assert.That(ids, Does.Contain("SP0045"));
-            Assert.That(
-                unnecessary.Properties["sharpproof.explain.contract"],
-                Is.EqualTo("value"));
-            Assert.That(
-                unnecessary.Properties["sharpproof.explain.proof_status"],
-                Is.EqualTo("proven"));
-        });
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0044"));
     }
 
     [Test]
@@ -401,8 +362,6 @@ public sealed class NullableContractVerificationTests
 
         var diagnostics = await AnalyzeAsync(source);
 
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain("SP0045"));
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Does.Not.Contain("SP0044"));
     }

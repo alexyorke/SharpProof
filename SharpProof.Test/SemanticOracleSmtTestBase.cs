@@ -303,15 +303,6 @@ public sealed class NotNullIfNotNullIndexer
                 .GetMethod("IsInStaticallyUnreachableBranchUsingSmt",
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
 
-    protected static Task<ImmutableArray<Diagnostic>> GetExceptionDiagnosticsAsync(string source)
-    {
-        return AnalyzerTestHost.GetDiagnosticsAsync(
-            source,
-            ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"),
-            frameworkReferences: AnalyzerTestHost.GetMinimalFrameworkReferences(),
-            concurrentAnalysis: true);
-    }
-
     protected static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression,
         string extraSource = "")
     {

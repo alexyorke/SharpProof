@@ -35,7 +35,12 @@ public sealed class EffectArchitectureTests {
             "SharpProof.Demo/SharpProof.Demo.csproj",
             "scripts/Test-SharpProofTestPreservation.ps1",
             "scripts/Generate-ConfigurationReference.ps1",
-            "docs/configuration-reference.md"
+            "docs/configuration-reference.md",
+            "SharpProof.Analyzer/InferredContractSuggestionAnalyzer.cs",
+            "SharpProof.Analyzer/SharpProofDiagnosticSuppressor.cs",
+            "SharpProof.Analyzer/AttributePlacementAnalyzer.cs",
+            "SharpProof.Analyzer/TrustedBoundaryReviewAnalyzer.cs",
+            "SharpProof.Analyzer/Configuration/DiagnosticBaseline.cs"
         };
         foreach (var relativePath in removedFiles)
             Assert.That(File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))),
@@ -78,10 +83,16 @@ public sealed class EffectArchitectureTests {
             "With" + "EffectSummaries",
             "SharpProofSkipGenerated" + "EffectSummaries",
             "Allow" + "Synchronization",
-            "Pure" + "External"
+            "Pure" + "External",
+            "sharpproof_suggest_inferred_contracts",
+            "sharpproof_runtime_hazard_mode",
+            "sharpproof_report_exceptions",
+            "Diagnostic" + "Baseline",
+            "InferredContract" + "SuggestionAnalyzer",
+            "TrustedBoundary" + "ReviewAnalyzer"
         };
         var legacyDiagnostic = new System.Text.RegularExpressions.Regex(
-            @"SP00(?:4[89]|5[0-9]|6[0-9]|7[0-6])",
+            @"SP(?:000[3-9]|001[0-247]|002[0369]|003[1-9]|004[0567]|00(?:4[89]|5[0-9]|6[0-9]|7[0-6]))",
             System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
         foreach (var relativeRoot in roots) {
@@ -109,5 +120,21 @@ public sealed class EffectArchitectureTests {
             Assert.That(text, Does.Not.Contain("JsonIgnore"),
                 $"Symbolic JSON property filtering returned in {file}");
         }
+    }
+
+    [Test]
+    public void AnalyzerCannotDisableOrBypassZ3ProofService() {
+        var root = SymbolicCliTestHost.FindRepositoryRoot();
+        Assert.That(File.Exists(Path.Combine(root, "SharpProof.ProofCore", "SharpProof.ProofCore.csproj")), Is.True);
+        Assert.That(File.Exists(Path.Combine(root, "SharpProof.ProofCore", "Z3FormulaEncoder.cs")), Is.True);
+
+        var configuration = File.ReadAllText(Path.Combine(
+            root, "SharpProof.Analyzer", "Configuration", "AnalyzerConfigurationOptions.json"));
+        Assert.That(configuration, Does.Contain("sharpproof_smt_mode"));
+        Assert.That(configuration, Does.Not.Contain("disabled"));
+
+        var session = File.ReadAllText(Path.Combine(root, "SharpProof.Analyzer", "AnalyzerSession.cs"));
+        Assert.That(session, Does.Contain("ProofService.SmtAnalysis"));
+        Assert.That(session, Does.Contain("MethodEffectAnalysisSession"));
     }
 }

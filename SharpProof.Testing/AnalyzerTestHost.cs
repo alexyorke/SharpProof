@@ -190,9 +190,9 @@ internal static class AnalyzerTestHost
     private static ImmutableArray<DiagnosticAnalyzer> GetAnalyzers(AnalyzerFeatures features)
     {
         return AnalyzerInstances.GetOrAdd(
-            AnalyzerFeatureDependencies.Expand(features),
-            static expandedFeatures => ImmutableArray.Create<DiagnosticAnalyzer>(
-                new SharpProofAnalyzer(expandedFeatures)));
+            features,
+            static requestedFeatures => ImmutableArray.Create<DiagnosticAnalyzer>(
+                new SharpProofAnalyzer(requestedFeatures)));
     }
 
     public static AnalyzerOptions CreateAnalyzerOptions(

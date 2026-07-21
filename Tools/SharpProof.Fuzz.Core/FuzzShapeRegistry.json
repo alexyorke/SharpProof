@@ -1,72 +1,1696 @@
 [
-  {"Id":"Arithmetic","PrimaryShapes":["operation:Binary"],"OperationKinds":["Binary"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":"PureArithmetic","SourceTemplate":null},
-  {"Id":"StringConcat","PrimaryShapes":["operation:Binary"],"OperationKinds":["Binary"],"SyntaxKinds":["AddExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":"PureStringConcat","SourceTemplate":null},
-  {"Id":"ListPattern","PrimaryShapes":["operation:ListPattern"],"OperationKinds":["ListPattern"],"SyntaxKinds":["ListPattern"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":"PureListPattern","SourceTemplate":null},
-  {"Id":"CollectionExpression","PrimaryShapes":["operation:CollectionExpression"],"OperationKinds":["CollectionExpression"],"SyntaxKinds":["CollectionExpression"],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            int[] values = [1, x, 3];\r\n            return values.Length;\r\n        }\n}"},
-  {"Id":"InterpolatedString","PrimaryShapes":["operation:InterpolatedString"],"OperationKinds":["InterpolatedString"],"SyntaxKinds":["InterpolatedStringExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":"PureInterpolatedString","SourceTemplate":null},
-  {"Id":"Utf8String","PrimaryShapes":["operation:Utf8String"],"OperationKinds":["Utf8String"],"SyntaxKinds":["Utf8StringLiteralExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            return \"abc\"u8.Length;\r\n        }\n}"},
-  {"Id":"ArrayCreation","PrimaryShapes":["operation:ArrayCreation"],"OperationKinds":["ArrayCreation"],"SyntaxKinds":["ArrayCreationExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            var values = new int[] { 1, x, 3 };\r\n            return values[1];\r\n        }\n}"},
-  {"Id":"NestedOwnershipChain","PrimaryShapes":["operation:PropertyReference"],"OperationKinds":["PropertyReference","SimpleAssignment","ObjectCreation"],"SyntaxKinds":["SimpleMemberAccessExpression","SimpleAssignmentExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using SharpProof.Attributes;\n\npublic sealed class __CLASS__Box\n{\n    public int Value;\n}\n\npublic sealed class __CLASS__Middle\n{\n    public __CLASS__Box Value { get; init; }\n}\n\npublic sealed class __CLASS__Outer\n{\n    public __CLASS__Middle Value { get; init; }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod()\n    {\n        var outer = new __CLASS__Outer { Value = new __CLASS__Middle { Value = new __CLASS__Box() } };\n        outer.Value.Value.Value = 1;\n        return outer.Value.Value.Value;\n    }\n}"},
-  {"Id":"OwnershipEscapeChain","PrimaryShapes":["operation:ObjectCreation"],"OperationKinds":["ObjectCreation","PropertyReference","Return"],"SyntaxKinds":["ObjectCreationExpression"],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using SharpProof.Attributes;\n\npublic sealed class __CLASS__Box\n{\n    public int Value;\n}\n\npublic sealed class __CLASS__Middle\n{\n    public __CLASS__Box Value { get; init; }\n}\n\npublic sealed class __CLASS__Outer\n{\n    public __CLASS__Middle Value { get; init; }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public __CLASS__Outer TestMethod()\n    {\n        return new __CLASS__Outer { Value = new __CLASS__Middle { Value = new __CLASS__Box() } };\n    }\n}"},
-  {"Id":"ConsoleWrite","PrimaryShapes":["operation:Invocation"],"OperationKinds":["Invocation"],"SyntaxKinds":[],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public void TestMethod()\r\n        {\r\n            Console.WriteLine(\"impure\");\r\n        }\n}"},
-  {"Id":"DynamicDispatch","PrimaryShapes":["operation:DynamicInvocation"],"OperationKinds":["DynamicInvocation"],"SyntaxKinds":[],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public string TestMethod(dynamic value)\r\n        {\r\n            return value.ToString();\r\n        }\n}"},
-  {"Id":"DelegateInvoke","PrimaryShapes":["operation:Invocation"],"OperationKinds":["Invocation"],"SyntaxKinds":[],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public void TestMethod(Action action)\r\n        {\r\n            action();\r\n        }\n}"},
-  {"Id":"ThrowExpression","PrimaryShapes":["operation:Throw"],"OperationKinds":["Throw"],"SyntaxKinds":["ThrowStatement"],"PurityVerdict":"Proven","RequiredEffects":["Throws"],"Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            throw new InvalidOperationException(\"fuzz\");\r\n        }\n}"},
-  {"Id":"ExceptionDirectThrowInvalidOperation","PrimaryShapes":["operation:Throw"],"OperationKinds":["Throw"],"SyntaxKinds":["ThrowStatement"],"PurityVerdict":"Proven","RequiredEffects":["Throws"],"Sp0010":"MustEmit","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            throw new InvalidOperationException(\"fuzz\");\r\n        }\n}"},
-  {"Id":"ExceptionGuardedThrowArgumentNull","PrimaryShapes":["operation:Throw"],"OperationKinds":["Throw"],"SyntaxKinds":["ThrowStatement"],"PurityVerdict":"Proven","RequiredEffects":["Throws"],"Sp0010":"MustEmit","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            if (text == null)\r\n            {\r\n                throw new ArgumentNullException(nameof(text));\r\n            }\r\n\r\n            return text.Length;\r\n        }\n}"},
-  {"Id":"ExceptionThrowExpressionFormatException","PrimaryShapes":["operation:Throw"],"OperationKinds":["Throw"],"SyntaxKinds":["ThrowExpression"],"PurityVerdict":"Proven","RequiredEffects":["Throws"],"Sp0010":"MustEmit","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            return string.IsNullOrWhiteSpace(text)\r\n                ? throw new FormatException(\"fuzz\")\r\n                : text.Length;\r\n        }\n}"},
-  {"Id":"ExceptionCaughtInternalThrow","PrimaryShapes":["operation:Try","operation:CatchClause"],"OperationKinds":["Try","CatchClause","Throw"],"SyntaxKinds":["TryStatement","CatchClause","ThrowStatement"],"PurityVerdict":"Unknown","Sp0010":"MustNotEmit","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            try\r\n            {\r\n                throw new InvalidOperationException(\"fuzz\");\r\n            }\r\n            catch (InvalidOperationException)\r\n            {\r\n                return 1;\r\n            }\r\n        }\n}"},
-  {"Id":"ExceptionDeadBranchThrow","PrimaryShapes":["operation:Throw"],"OperationKinds":["Conditional","Throw"],"SyntaxKinds":["IfStatement","ThrowStatement"],"PurityVerdict":"Proven","Sp0010":"MustNotEmit","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            if (false)\r\n            {\r\n                throw new InvalidOperationException(\"fuzz\");\r\n            }\r\n\r\n            return 1;\r\n        }\n}"},
-  {"Id":"ExceptionGuardedSafeDivideByZeroExcluded","PrimaryShapes":["operation:Binary"],"OperationKinds":["Conditional","Binary"],"SyntaxKinds":["IfStatement","DivideExpression"],"PurityVerdict":"Proven","Sp0010":"MustNotEmit","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int divisor)\r\n        {\r\n            if (divisor != 0)\r\n            {\r\n                return 10 / divisor;\r\n            }\r\n\r\n            return 1;\r\n        }\n}"},
-  {"Id":"ExceptionGuardedNullDereferenceExcluded","PrimaryShapes":["operation:PropertyReference"],"OperationKinds":["Conditional","PropertyReference"],"SyntaxKinds":["IfStatement"],"PurityVerdict":"Proven","Sp0010":"MustNotEmit","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            if (text == null)\r\n            {\r\n                return 0;\r\n            }\r\n\r\n            return text.Length;\r\n        }\n}"},
-  {"Id":"ExceptionDefiniteDivideByZero","PrimaryShapes":["operation:Binary"],"OperationKinds":["Binary"],"SyntaxKinds":["DivideExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            var zero = 0;\r\n            return 10 / zero;\r\n        }\n}"},
-  {"Id":"ExceptionDefiniteNullReference","PrimaryShapes":["operation:PropertyReference"],"OperationKinds":["PropertyReference"],"SyntaxKinds":["SimpleMemberAccessExpression"],"PurityVerdict":"Proven","RequiredEffects":["Throws"],"Sp0010":"MustEmit","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            string text = null;\r\n            return text.Length;\r\n        }\n}"},
-  {"Id":"ExceptionUsingDisposeThrows","PrimaryShapes":["operation:UsingDeclaration"],"OperationKinds":["UsingDeclaration"],"SyntaxKinds":["LocalDeclarationStatement"],"PurityVerdict":"Unknown","Sp0010":"MustEmit","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        private sealed class ThrowingDisposable : IDisposable\r\n        {\r\n            public void Dispose()\r\n            {\r\n                throw new ObjectDisposedException(\"fuzz\");\r\n            }\r\n        }\r\n\r\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            using var disposable = new ThrowingDisposable();\r\n            return 1;\r\n        }\n}"},
-  {"Id":"ExceptionInvokedLocalFunctionThrow","PrimaryShapes":["operation:LocalFunction","operation:Throw"],"OperationKinds":["LocalFunction","Throw"],"SyntaxKinds":["LocalFunctionStatement","ThrowStatement"],"PurityVerdict":"Unknown","RequiredEffects":["Throws"],"Sp0010":"MustEmit","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            int Local()\r\n            {\r\n                throw new InvalidOperationException(\"fuzz\");\r\n            }\r\n\r\n            return Local();\r\n        }\n}"},
-  {"Id":"ExceptionInvokedLambdaThrow","PrimaryShapes":["operation:AnonymousFunction","operation:Throw"],"OperationKinds":["AnonymousFunction","Throw"],"SyntaxKinds":["ParenthesizedLambdaExpression","ThrowExpression"],"PurityVerdict":"Unknown","RequiredEffects":["Throws"],"Sp0010":"MustEmit","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            Func\u003cint\u003e local = () =\u003e throw new FormatException(\"fuzz\");\r\n            return local();\r\n        }\n}"},
-  {"Id":"FieldWrite","PrimaryShapes":["operation:SimpleAssignment","operation:FieldReference"],"OperationKinds":["SimpleAssignment","FieldReference"],"SyntaxKinds":["SimpleAssignmentExpression"],"PurityVerdict":"Disproven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        private int _value;\r\n\r\n        [EnforcePure]\r\n        public void TestMethod(int value)\r\n        {\r\n            _value = value;\r\n        }\n}"},
-  {"Id":"AmbientDateTime","PrimaryShapes":["operation:PropertyReference"],"OperationKinds":["PropertyReference"],"SyntaxKinds":["SimpleMemberAccessExpression"],"PurityVerdict":"Disproven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":"ImpureAmbientDateTime","SourceTemplate":null},
-  {"Id":"AwaitTaskDelay","PrimaryShapes":["operation:Await"],"OperationKinds":["Await"],"SyntaxKinds":["AwaitExpression"],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing System.Threading.Tasks;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public async Task\u003cint\u003e TestMethod()\n    {\n        await Task.Delay(1);\n        return 1;\n    }\n}"},
-  {"Id":"LockSection","PrimaryShapes":["operation:Lock"],"OperationKinds":["Lock"],"SyntaxKinds":["LockStatement"],"PurityVerdict":"Disproven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        private readonly object _gate = new object();\r\n\r\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            lock (_gate)\r\n            {\r\n                return 1;\r\n            }\r\n        }\n}"},
-  {"Id":"UsingStandardOutput","PrimaryShapes":["operation:UsingDeclaration"],"OperationKinds":["UsingDeclaration"],"SyntaxKinds":["LocalDeclarationStatement"],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            using var stream = Console.OpenStandardOutput();\r\n            return 1;\r\n        }\n}"},
-  {"Id":"TryCatch","PrimaryShapes":["operation:Try","operation:CatchClause"],"OperationKinds":["Try","CatchClause"],"SyntaxKinds":["TryStatement","CatchClause"],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            try\r\n            {\r\n                if (x \u003c 0)\r\n                {\r\n                    throw new ArgumentOutOfRangeException(nameof(x));\r\n                }\r\n\r\n                return x + 1;\r\n            }\r\n            catch (ArgumentOutOfRangeException)\r\n            {\r\n                return 0;\r\n            }\r\n        }\n}"},
-  {"Id":"ConditionalAccessCoalesce","PrimaryShapes":["operation:ConditionalAccess","operation:Coalesce"],"OperationKinds":["ConditionalAccess","Coalesce"],"SyntaxKinds":["ConditionalAccessExpression","CoalesceExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text, string fallback)\r\n        {\r\n            return text?.Trim().Length ?? fallback.Length;\r\n        }\n}"},
-  {"Id":"IsTypeCheck","PrimaryShapes":["operation:IsType"],"OperationKinds":["IsType"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(object value)\r\n        {\r\n            return value is string ? 1 : 0;\r\n        }\n}"},
-  {"Id":"NegatedPattern","PrimaryShapes":["operation:NegatedPattern"],"OperationKinds":["NegatedPattern"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(object value)\r\n        {\r\n            return value is not int ? 1 : 0;\r\n        }\n}"},
-  {"Id":"SwitchStatement","PrimaryShapes":["operation:Switch"],"OperationKinds":["Switch","SwitchCase"],"SyntaxKinds":["SwitchStatement"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int value)\r\n        {\r\n            switch (value)\r\n            {\r\n                case 0:\r\n                    return 0;\r\n                case 1:\r\n                case 2:\r\n                    return 1;\r\n                default:\r\n                    return value;\r\n            }\r\n        }\n}"},
-  {"Id":"UsingStatement","PrimaryShapes":["operation:Using"],"OperationKinds":["Using"],"SyntaxKinds":["UsingStatement"],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            using (var writer = new System.IO.StringWriter())\r\n            {\r\n                return 1;\r\n            }\r\n        }\n}"},
-  {"Id":"CompoundAssignment","PrimaryShapes":["operation:CompoundAssignment"],"OperationKinds":["CompoundAssignment"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            var value = x;\r\n            value += 2;\r\n            return value;\r\n        }\n}"},
-  {"Id":"CoalesceAssignment","PrimaryShapes":["operation:CoalesceAssignment"],"OperationKinds":["CoalesceAssignment"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public string TestMethod(string value)\r\n        {\r\n            value ??= \"fallback\";\r\n            return value;\r\n        }\n}"},
-  {"Id":"DeconstructionAssignment","PrimaryShapes":["operation:DeconstructionAssignment"],"OperationKinds":["DeconstructionAssignment"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x, int y)\r\n        {\r\n            var left = x;\r\n            var right = y;\r\n            (left, right) = (right, left);\r\n            return left - right;\r\n        }\n}"},
-  {"Id":"Increment","PrimaryShapes":["operation:Increment"],"OperationKinds":["Increment"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            var value = x;\r\n            value++;\r\n            return value;\r\n        }\n}"},
-  {"Id":"Decrement","PrimaryShapes":["operation:Decrement"],"OperationKinds":["Decrement"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            var value = x;\r\n            value--;\r\n            return value;\r\n        }\n}"},
-  {"Id":"DeclarationExpression","PrimaryShapes":["operation:DeclarationExpression"],"OperationKinds":["DeclarationExpression"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            return int.TryParse(text, out var value) ? value : 0;\r\n        }\n}"},
-  {"Id":"DeclarationPattern","PrimaryShapes":["operation:DeclarationPattern"],"OperationKinds":["DeclarationPattern"],"SyntaxKinds":["DeclarationPattern"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(object value)\r\n        {\r\n            return value is int number ? number : 0;\r\n        }\n}"},
-  {"Id":"TypeParameterObjectCreation","PrimaryShapes":["operation:TypeParameterObjectCreation"],"OperationKinds":["TypeParameterObjectCreation"],"SyntaxKinds":[],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public T TestMethod\u003cT\u003e() where T : new()\r\n        {\r\n            return new T();\r\n        }\n}"},
-  {"Id":"EventAssignment","PrimaryShapes":["operation:EventAssignment"],"OperationKinds":["EventAssignment","EventReference"],"SyntaxKinds":[],"PurityVerdict":"Disproven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic sealed class __CLASS__Source\n{\n    public event EventHandler Changed\n    {\n        add { }\n        remove { }\n    }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public void TestMethod(__CLASS__Source source)\n    {\n        source.Changed += Handle;\n    }\n\n    private static void Handle(object sender, EventArgs args) { }\n}"},
-  {"Id":"AnonymousObjectCreation","PrimaryShapes":["operation:AnonymousObjectCreation"],"OperationKinds":["AnonymousObjectCreation"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            var item = new { Value = x, Next = x + 1 };\r\n            return item.Value + item.Next;\r\n        }\n}"},
-  {"Id":"DefaultValue","PrimaryShapes":["operation:DefaultValue"],"OperationKinds":["DefaultValue"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            return default(int);\r\n        }\n}"},
-  {"Id":"SizeOf","PrimaryShapes":["operation:SizeOf"],"OperationKinds":["SizeOf"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            return sizeof(int);\r\n        }\n}"},
-  {"Id":"TypeOf","PrimaryShapes":["operation:TypeOf"],"OperationKinds":["TypeOf"],"SyntaxKinds":[],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            return typeof(int).Name.Length;\r\n        }\n}"},
-  {"Id":"NameOf","PrimaryShapes":["operation:NameOf"],"OperationKinds":["NameOf"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int value)\r\n        {\r\n            return nameof(value).Length;\r\n        }\n}"},
-  {"Id":"DynamicIndexerAccess","PrimaryShapes":["operation:DynamicIndexerAccess"],"OperationKinds":["DynamicIndexerAccess"],"SyntaxKinds":[],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(dynamic values)\r\n        {\r\n            return values[0];\r\n        }\n}"},
-  {"Id":"DynamicObjectCreation","PrimaryShapes":["operation:DynamicObjectCreation"],"OperationKinds":["DynamicObjectCreation"],"SyntaxKinds":[],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using SharpProof.Attributes;\n\npublic sealed class __CLASS__Widget\n{\n    public __CLASS__Widget(int value)\n    {\n    }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod(dynamic value)\n    {\n        var widget = new __CLASS__Widget(value);\n        return 1;\n    }\n}"},
-  {"Id":"Tuple","PrimaryShapes":["operation:Tuple"],"OperationKinds":["Tuple"],"SyntaxKinds":["TupleExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            var pair = (Left: x, Right: x + 1);\r\n            return pair.Left + pair.Right;\r\n        }\n}"},
-  {"Id":"InterfaceGetter","PrimaryShapes":["operation:PropertyReference"],"OperationKinds":["PropertyReference"],"SyntaxKinds":[],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using SharpProof.Attributes;\n\npublic interface I__CLASS__Value\n{\n    int Value { get; }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod(I__CLASS__Value value)\n    {\n        return value.Value;\n    }\n}"},
-  {"Id":"RecursivePattern","PrimaryShapes":["operation:RecursivePattern"],"OperationKinds":["RecursivePattern"],"SyntaxKinds":["RecursivePattern"],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using SharpProof.Attributes;\n\npublic sealed class __CLASS__Node\n{\n    public __CLASS__Node? Next { get; set; }\n    public int Value { get; set; }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod(__CLASS__Node node)\n    {\n        return node is { Next: { Value: \u003e 0 } } ? 1 : 0;\n    }\n}"},
-  {"Id":"SpreadCollectionExpression","PrimaryShapes":["operation:CollectionExpression","operation:Spread"],"OperationKinds":["CollectionExpression","Spread"],"SyntaxKinds":["CollectionExpression"],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int[] values)\r\n        {\r\n            int[] copy = [0, .. values, 9];\r\n            return copy.Length;\r\n        }\n}"},
-  {"Id":"SwitchExpression","PrimaryShapes":["operation:SwitchExpression"],"OperationKinds":["SwitchExpression"],"SyntaxKinds":["SwitchExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            return x switch\r\n            {\r\n                \u003c 0 =\u003e -1,\r\n                0 =\u003e 0,\r\n                _ =\u003e 1\r\n            };\r\n        }\n}"},
-  {"Id":"RangeSlice","PrimaryShapes":["operation:Range"],"OperationKinds":["Range"],"SyntaxKinds":["RangeExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            return text[1..^1].Length;\r\n        }\n}"},
-  {"Id":"YieldReturn","PrimaryShapes":["operation:YieldReturn"],"OperationKinds":["YieldReturn"],"SyntaxKinds":["YieldReturnStatement"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System.Collections.Generic;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public IEnumerable\u003cint\u003e TestMethod(int x)\n    {\n        yield return x + 1;\n        yield break;\n    }\n}"},
-  {"Id":"WithExpression","PrimaryShapes":["operation:With"],"OperationKinds":["With"],"SyntaxKinds":["WithExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic record __CLASS__Data(int Value, int Other);\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod(__CLASS__Data data, int x)\n    {\n        var updated = data with { Value = x };\n        return updated.Value;\n    }\n}"},
-  {"Id":"AnonymousFunction","PrimaryShapes":["operation:AnonymousFunction"],"OperationKinds":["AnonymousFunction"],"SyntaxKinds":["SimpleLambdaExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            Func\u003cint, int\u003e project = static value =\u003e value + 1;\r\n            return project(x);\r\n        }\n}"},
-  {"Id":"DelegateCreation","PrimaryShapes":["operation:DelegateCreation"],"OperationKinds":["DelegateCreation"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            Func\u003cint, int\u003e project = Project;\r\n            return project(x);\r\n        }\r\n\r\n        private static int Project(int value)\r\n        {\r\n            return value + 1;\r\n        }\n}"},
-  {"Id":"ImplicitIndexerReference","PrimaryShapes":["operation:ImplicitIndexerReference"],"OperationKinds":["ImplicitIndexerReference"],"SyntaxKinds":["ElementAccessExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic sealed class __CLASS__Bag\n{\n    public int Length =\u003e 3;\n    public int this[int index] =\u003e index + 10;\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod(__CLASS__Bag bag)\n    {\n        return bag[^1];\n    }\n}"},
-  {"Id":"InterpolatedStringHandler","PrimaryShapes":["operation:InterpolatedStringHandlerCreation","operation:InterpolatedStringAddition","operation:InterpolatedStringAppendLiteral","operation:InterpolatedStringAppendFormatted","operation:InterpolatedStringHandlerArgumentPlaceholder"],"OperationKinds":["InterpolatedStringHandlerCreation","InterpolatedStringAddition","InterpolatedStringAppendLiteral","InterpolatedStringAppendFormatted","InterpolatedStringHandlerArgumentPlaceholder"],"SyntaxKinds":["InterpolatedStringExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing System.Runtime.CompilerServices;\nusing SharpProof.Attributes;\n\n[InterpolatedStringHandler]\npublic ref struct __CLASS__Handler\n{\n    public __CLASS__Handler(int literalLength, int formattedCount, int value) { }\n    public void AppendLiteral(string value) { }\n    public void AppendFormatted\u003cT\u003e(T value) { }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public void TestMethod(int value)\n    {\n        Log(value, $\"left={value}\" + $\"right={value}\");\n    }\n\n    private void Log(int value, [InterpolatedStringHandlerArgument(\"value\")] __CLASS__Handler handler) { }\n}"},
-  {"Id":"AddressOf","PrimaryShapes":["operation:AddressOf"],"OperationKinds":["AddressOf"],"SyntaxKinds":[],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":true,"Generator":null,"SourceTemplate":"using SharpProof.Attributes;\n\npublic unsafe class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod()\n    {\n        int value = 1;\n        int* pointer = \u0026value;\n        return *pointer;\n    }\n}"},
-  {"Id":"InlineArrayAccess","PrimaryShapes":["operation:InlineArrayAccess"],"OperationKinds":["InlineArrayAccess"],"SyntaxKinds":["ElementAccessExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System.Runtime.CompilerServices;\nusing SharpProof.Attributes;\n\n[InlineArray(4)]\npublic struct __CLASS__Buffer\n{\n    private int _element0;\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod()\n    {\n        __CLASS__Buffer buffer = default;\n        return buffer[0];\n    }\n}"},
-  {"Id":"FunctionPointer","PrimaryShapes":["operation:FunctionPointerInvocation"],"OperationKinds":["FunctionPointerInvocation"],"SyntaxKinds":["FunctionPointerType"],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":true,"Generator":null,"SourceTemplate":"using SharpProof.Attributes;\n\npublic unsafe class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod(delegate*\u003cint, int\u003e pointer)\n    {\n        return pointer(1);\n    }\n}"},
-  {"Id":"NestedLambdaLocalFunction","PrimaryShapes":["operation:AnonymousFunction","operation:LocalFunction"],"OperationKinds":["AnonymousFunction","LocalFunction"],"SyntaxKinds":["SimpleLambdaExpression","LocalFunctionStatement"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            int Outer(int seed)\r\n            {\r\n                Func\u003cint, int\u003e addSeed = value =\u003e\r\n                {\r\n                    Func\u003cint, int\u003e inner = local =\u003e local + seed;\r\n                    return inner(value);\r\n                };\r\n\r\n                return addSeed(x);\r\n            }\r\n\r\n            return Outer(1);\r\n        }\n}"},
-  {"Id":"TuplePatternSwitch","PrimaryShapes":["operation:Tuple","operation:SwitchExpression"],"OperationKinds":["Tuple","SwitchExpression"],"SyntaxKinds":["TupleExpression","SwitchExpression"],"PurityVerdict":"Proven","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x, int y)\r\n        {\r\n            var pair = (x, y);\r\n            return pair switch\r\n            {\r\n                (\u003e 0, \u003e 0) =\u003e 1,\r\n                (0, _) =\u003e 0,\r\n                _ =\u003e -1\r\n            };\r\n        }\n}"},
-  {"Id":"UsingAwaitDelegateFlow","PrimaryShapes":["operation:UsingDeclaration","operation:Await","operation:AnonymousFunction"],"OperationKinds":["UsingDeclaration","Await","AnonymousFunction"],"SyntaxKinds":["LocalDeclarationStatement","AwaitExpression","ParenthesizedLambdaExpression"],"PurityVerdict":"Unknown","Sp0010":"Ignore","RequiredSp0010Properties":["sharpproof.exceptions.types","sharpproof.exceptions.categories","sharpproof.exceptions.sources"],"RequiredAnySp0010Properties":[],"AllowUnsafe":false,"Generator":null,"SourceTemplate":"using System;\nusing System.Threading.Tasks;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public async Task\u003cint\u003e TestMethod()\n    {\n        using var stream = Console.OpenStandardOutput();\n        Func\u003cTask\u003cint\u003e\u003e factory = async () =\u003e\n        {\n            await Task.Delay(1);\n            return stream.CanWrite ? 1 : 0;\n        };\n\n        return await factory();\n    }\n}"}
+  {
+    "Id": "Arithmetic",
+    "PrimaryShapes": [
+      "operation:Binary"
+    ],
+    "OperationKinds": [
+      "Binary"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": "PureArithmetic",
+    "SourceTemplate": null
+  },
+  {
+    "Id": "StringConcat",
+    "PrimaryShapes": [
+      "operation:Binary"
+    ],
+    "OperationKinds": [
+      "Binary"
+    ],
+    "SyntaxKinds": [
+      "AddExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": "PureStringConcat",
+    "SourceTemplate": null
+  },
+  {
+    "Id": "ListPattern",
+    "PrimaryShapes": [
+      "operation:ListPattern"
+    ],
+    "OperationKinds": [
+      "ListPattern"
+    ],
+    "SyntaxKinds": [
+      "ListPattern"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": "PureListPattern",
+    "SourceTemplate": null
+  },
+  {
+    "Id": "CollectionExpression",
+    "PrimaryShapes": [
+      "operation:CollectionExpression"
+    ],
+    "OperationKinds": [
+      "CollectionExpression"
+    ],
+    "SyntaxKinds": [
+      "CollectionExpression"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            int[] values = [1, x, 3];\r\n            return values.Length;\r\n        }\n}"
+  },
+  {
+    "Id": "InterpolatedString",
+    "PrimaryShapes": [
+      "operation:InterpolatedString"
+    ],
+    "OperationKinds": [
+      "InterpolatedString"
+    ],
+    "SyntaxKinds": [
+      "InterpolatedStringExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": "PureInterpolatedString",
+    "SourceTemplate": null
+  },
+  {
+    "Id": "Utf8String",
+    "PrimaryShapes": [
+      "operation:Utf8String"
+    ],
+    "OperationKinds": [
+      "Utf8String"
+    ],
+    "SyntaxKinds": [
+      "Utf8StringLiteralExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            return \"abc\"u8.Length;\r\n        }\n}"
+  },
+  {
+    "Id": "ArrayCreation",
+    "PrimaryShapes": [
+      "operation:ArrayCreation"
+    ],
+    "OperationKinds": [
+      "ArrayCreation"
+    ],
+    "SyntaxKinds": [
+      "ArrayCreationExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            var values = new int[] { 1, x, 3 };\r\n            return values[1];\r\n        }\n}"
+  },
+  {
+    "Id": "NestedOwnershipChain",
+    "PrimaryShapes": [
+      "operation:PropertyReference"
+    ],
+    "OperationKinds": [
+      "PropertyReference",
+      "SimpleAssignment",
+      "ObjectCreation"
+    ],
+    "SyntaxKinds": [
+      "SimpleMemberAccessExpression",
+      "SimpleAssignmentExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using SharpProof.Attributes;\n\npublic sealed class __CLASS__Box\n{\n    public int Value;\n}\n\npublic sealed class __CLASS__Middle\n{\n    public __CLASS__Box Value { get; init; }\n}\n\npublic sealed class __CLASS__Outer\n{\n    public __CLASS__Middle Value { get; init; }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod()\n    {\n        var outer = new __CLASS__Outer { Value = new __CLASS__Middle { Value = new __CLASS__Box() } };\n        outer.Value.Value.Value = 1;\n        return outer.Value.Value.Value;\n    }\n}"
+  },
+  {
+    "Id": "OwnershipEscapeChain",
+    "PrimaryShapes": [
+      "operation:ObjectCreation"
+    ],
+    "OperationKinds": [
+      "ObjectCreation",
+      "PropertyReference",
+      "Return"
+    ],
+    "SyntaxKinds": [
+      "ObjectCreationExpression"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using SharpProof.Attributes;\n\npublic sealed class __CLASS__Box\n{\n    public int Value;\n}\n\npublic sealed class __CLASS__Middle\n{\n    public __CLASS__Box Value { get; init; }\n}\n\npublic sealed class __CLASS__Outer\n{\n    public __CLASS__Middle Value { get; init; }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public __CLASS__Outer TestMethod()\n    {\n        return new __CLASS__Outer { Value = new __CLASS__Middle { Value = new __CLASS__Box() } };\n    }\n}"
+  },
+  {
+    "Id": "ConsoleWrite",
+    "PrimaryShapes": [
+      "operation:Invocation"
+    ],
+    "OperationKinds": [
+      "Invocation"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public void TestMethod()\r\n        {\r\n            Console.WriteLine(\"impure\");\r\n        }\n}"
+  },
+  {
+    "Id": "DynamicDispatch",
+    "PrimaryShapes": [
+      "operation:DynamicInvocation"
+    ],
+    "OperationKinds": [
+      "DynamicInvocation"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public string TestMethod(dynamic value)\r\n        {\r\n            return value.ToString();\r\n        }\n}"
+  },
+  {
+    "Id": "DelegateInvoke",
+    "PrimaryShapes": [
+      "operation:Invocation"
+    ],
+    "OperationKinds": [
+      "Invocation"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public void TestMethod(Action action)\r\n        {\r\n            action();\r\n        }\n}"
+  },
+  {
+    "Id": "ThrowExpression",
+    "PrimaryShapes": [
+      "operation:Throw"
+    ],
+    "OperationKinds": [
+      "Throw"
+    ],
+    "SyntaxKinds": [
+      "ThrowStatement"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      "Throws"
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            throw new InvalidOperationException(\"fuzz\");\r\n        }\n}"
+  },
+  {
+    "Id": "ExceptionDirectThrowInvalidOperation",
+    "PrimaryShapes": [
+      "operation:Throw"
+    ],
+    "OperationKinds": [
+      "Throw"
+    ],
+    "SyntaxKinds": [
+      "ThrowStatement"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      "Throws"
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            throw new InvalidOperationException(\"fuzz\");\r\n        }\n}"
+  },
+  {
+    "Id": "ExceptionGuardedThrowArgumentNull",
+    "PrimaryShapes": [
+      "operation:Throw"
+    ],
+    "OperationKinds": [
+      "Throw"
+    ],
+    "SyntaxKinds": [
+      "ThrowStatement"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      "Throws"
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            if (text == null)\r\n            {\r\n                throw new ArgumentNullException(nameof(text));\r\n            }\r\n\r\n            return text.Length;\r\n        }\n}"
+  },
+  {
+    "Id": "ExceptionThrowExpressionFormatException",
+    "PrimaryShapes": [
+      "operation:Throw"
+    ],
+    "OperationKinds": [
+      "Throw"
+    ],
+    "SyntaxKinds": [
+      "ThrowExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      "Throws"
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            return string.IsNullOrWhiteSpace(text)\r\n                ? throw new FormatException(\"fuzz\")\r\n                : text.Length;\r\n        }\n}"
+  },
+  {
+    "Id": "ExceptionCaughtInternalThrow",
+    "PrimaryShapes": [
+      "operation:Try",
+      "operation:CatchClause"
+    ],
+    "OperationKinds": [
+      "Try",
+      "CatchClause",
+      "Throw"
+    ],
+    "SyntaxKinds": [
+      "TryStatement",
+      "CatchClause",
+      "ThrowStatement"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [
+      "Throws"
+    ],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            try\r\n            {\r\n                throw new InvalidOperationException(\"fuzz\");\r\n            }\r\n            catch (InvalidOperationException)\r\n            {\r\n                return 1;\r\n            }\r\n        }\n}"
+  },
+  {
+    "Id": "ExceptionDeadBranchThrow",
+    "PrimaryShapes": [
+      "operation:Throw"
+    ],
+    "OperationKinds": [
+      "Conditional",
+      "Throw"
+    ],
+    "SyntaxKinds": [
+      "IfStatement",
+      "ThrowStatement"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [
+      "Throws"
+    ],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            if (false)\r\n            {\r\n                throw new InvalidOperationException(\"fuzz\");\r\n            }\r\n\r\n            return 1;\r\n        }\n}"
+  },
+  {
+    "Id": "ExceptionGuardedSafeDivideByZeroExcluded",
+    "PrimaryShapes": [
+      "operation:Binary"
+    ],
+    "OperationKinds": [
+      "Conditional",
+      "Binary"
+    ],
+    "SyntaxKinds": [
+      "IfStatement",
+      "DivideExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [
+      "Throws"
+    ],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int divisor)\r\n        {\r\n            if (divisor != 0)\r\n            {\r\n                return 10 / divisor;\r\n            }\r\n\r\n            return 1;\r\n        }\n}"
+  },
+  {
+    "Id": "ExceptionGuardedNullDereferenceExcluded",
+    "PrimaryShapes": [
+      "operation:PropertyReference"
+    ],
+    "OperationKinds": [
+      "Conditional",
+      "PropertyReference"
+    ],
+    "SyntaxKinds": [
+      "IfStatement"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [
+      "Throws"
+    ],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            if (text == null)\r\n            {\r\n                return 0;\r\n            }\r\n\r\n            return text.Length;\r\n        }\n}"
+  },
+  {
+    "Id": "ExceptionDefiniteDivideByZero",
+    "PrimaryShapes": [
+      "operation:Binary"
+    ],
+    "OperationKinds": [
+      "Binary"
+    ],
+    "SyntaxKinds": [
+      "DivideExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            var zero = 0;\r\n            return 10 / zero;\r\n        }\n}"
+  },
+  {
+    "Id": "ExceptionDefiniteNullReference",
+    "PrimaryShapes": [
+      "operation:PropertyReference"
+    ],
+    "OperationKinds": [
+      "PropertyReference"
+    ],
+    "SyntaxKinds": [
+      "SimpleMemberAccessExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      "Throws"
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            string text = null;\r\n            return text.Length;\r\n        }\n}"
+  },
+  {
+    "Id": "ExceptionUsingDisposeThrows",
+    "PrimaryShapes": [
+      "operation:UsingDeclaration"
+    ],
+    "OperationKinds": [
+      "UsingDeclaration"
+    ],
+    "SyntaxKinds": [
+      "LocalDeclarationStatement"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null,
+      "Throws"
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        private sealed class ThrowingDisposable : IDisposable\r\n        {\r\n            public void Dispose()\r\n            {\r\n                throw new ObjectDisposedException(\"fuzz\");\r\n            }\r\n        }\r\n\r\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            using var disposable = new ThrowingDisposable();\r\n            return 1;\r\n        }\n}"
+  },
+  {
+    "Id": "ExceptionInvokedLocalFunctionThrow",
+    "PrimaryShapes": [
+      "operation:LocalFunction",
+      "operation:Throw"
+    ],
+    "OperationKinds": [
+      "LocalFunction",
+      "Throw"
+    ],
+    "SyntaxKinds": [
+      "LocalFunctionStatement",
+      "ThrowStatement"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      "Throws"
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            int Local()\r\n            {\r\n                throw new InvalidOperationException(\"fuzz\");\r\n            }\r\n\r\n            return Local();\r\n        }\n}"
+  },
+  {
+    "Id": "ExceptionInvokedLambdaThrow",
+    "PrimaryShapes": [
+      "operation:AnonymousFunction",
+      "operation:Throw"
+    ],
+    "OperationKinds": [
+      "AnonymousFunction",
+      "Throw"
+    ],
+    "SyntaxKinds": [
+      "ParenthesizedLambdaExpression",
+      "ThrowExpression"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      "Throws"
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            Func<int> local = () => throw new FormatException(\"fuzz\");\r\n            return local();\r\n        }\n}"
+  },
+  {
+    "Id": "FieldWrite",
+    "PrimaryShapes": [
+      "operation:SimpleAssignment",
+      "operation:FieldReference"
+    ],
+    "OperationKinds": [
+      "SimpleAssignment",
+      "FieldReference"
+    ],
+    "SyntaxKinds": [
+      "SimpleAssignmentExpression"
+    ],
+    "PurityVerdict": "Disproven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        private int _value;\r\n\r\n        [EnforcePure]\r\n        public void TestMethod(int value)\r\n        {\r\n            _value = value;\r\n        }\n}"
+  },
+  {
+    "Id": "AmbientDateTime",
+    "PrimaryShapes": [
+      "operation:PropertyReference"
+    ],
+    "OperationKinds": [
+      "PropertyReference"
+    ],
+    "SyntaxKinds": [
+      "SimpleMemberAccessExpression"
+    ],
+    "PurityVerdict": "Disproven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": "ImpureAmbientDateTime",
+    "SourceTemplate": null
+  },
+  {
+    "Id": "AwaitTaskDelay",
+    "PrimaryShapes": [
+      "operation:Await"
+    ],
+    "OperationKinds": [
+      "Await"
+    ],
+    "SyntaxKinds": [
+      "AwaitExpression"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing System.Threading.Tasks;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public async Task<int> TestMethod()\n    {\n        await Task.Delay(1);\n        return 1;\n    }\n}"
+  },
+  {
+    "Id": "LockSection",
+    "PrimaryShapes": [
+      "operation:Lock"
+    ],
+    "OperationKinds": [
+      "Lock"
+    ],
+    "SyntaxKinds": [
+      "LockStatement"
+    ],
+    "PurityVerdict": "Disproven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        private readonly object _gate = new object();\r\n\r\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            lock (_gate)\r\n            {\r\n                return 1;\r\n            }\r\n        }\n}"
+  },
+  {
+    "Id": "UsingStandardOutput",
+    "PrimaryShapes": [
+      "operation:UsingDeclaration"
+    ],
+    "OperationKinds": [
+      "UsingDeclaration"
+    ],
+    "SyntaxKinds": [
+      "LocalDeclarationStatement"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            using var stream = Console.OpenStandardOutput();\r\n            return 1;\r\n        }\n}"
+  },
+  {
+    "Id": "TryCatch",
+    "PrimaryShapes": [
+      "operation:Try",
+      "operation:CatchClause"
+    ],
+    "OperationKinds": [
+      "Try",
+      "CatchClause"
+    ],
+    "SyntaxKinds": [
+      "TryStatement",
+      "CatchClause"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            try\r\n            {\r\n                if (x < 0)\r\n                {\r\n                    throw new ArgumentOutOfRangeException(nameof(x));\r\n                }\r\n\r\n                return x + 1;\r\n            }\r\n            catch (ArgumentOutOfRangeException)\r\n            {\r\n                return 0;\r\n            }\r\n        }\n}"
+  },
+  {
+    "Id": "ConditionalAccessCoalesce",
+    "PrimaryShapes": [
+      "operation:ConditionalAccess",
+      "operation:Coalesce"
+    ],
+    "OperationKinds": [
+      "ConditionalAccess",
+      "Coalesce"
+    ],
+    "SyntaxKinds": [
+      "ConditionalAccessExpression",
+      "CoalesceExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text, string fallback)\r\n        {\r\n            return text?.Trim().Length ?? fallback.Length;\r\n        }\n}"
+  },
+  {
+    "Id": "IsTypeCheck",
+    "PrimaryShapes": [
+      "operation:IsType"
+    ],
+    "OperationKinds": [
+      "IsType"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(object value)\r\n        {\r\n            return value is string ? 1 : 0;\r\n        }\n}"
+  },
+  {
+    "Id": "NegatedPattern",
+    "PrimaryShapes": [
+      "operation:NegatedPattern"
+    ],
+    "OperationKinds": [
+      "NegatedPattern"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(object value)\r\n        {\r\n            return value is not int ? 1 : 0;\r\n        }\n}"
+  },
+  {
+    "Id": "SwitchStatement",
+    "PrimaryShapes": [
+      "operation:Switch"
+    ],
+    "OperationKinds": [
+      "Switch",
+      "SwitchCase"
+    ],
+    "SyntaxKinds": [
+      "SwitchStatement"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int value)\r\n        {\r\n            switch (value)\r\n            {\r\n                case 0:\r\n                    return 0;\r\n                case 1:\r\n                case 2:\r\n                    return 1;\r\n                default:\r\n                    return value;\r\n            }\r\n        }\n}"
+  },
+  {
+    "Id": "UsingStatement",
+    "PrimaryShapes": [
+      "operation:Using"
+    ],
+    "OperationKinds": [
+      "Using"
+    ],
+    "SyntaxKinds": [
+      "UsingStatement"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            using (var writer = new System.IO.StringWriter())\r\n            {\r\n                return 1;\r\n            }\r\n        }\n}"
+  },
+  {
+    "Id": "CompoundAssignment",
+    "PrimaryShapes": [
+      "operation:CompoundAssignment"
+    ],
+    "OperationKinds": [
+      "CompoundAssignment"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            var value = x;\r\n            value += 2;\r\n            return value;\r\n        }\n}"
+  },
+  {
+    "Id": "CoalesceAssignment",
+    "PrimaryShapes": [
+      "operation:CoalesceAssignment"
+    ],
+    "OperationKinds": [
+      "CoalesceAssignment"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public string TestMethod(string value)\r\n        {\r\n            value ??= \"fallback\";\r\n            return value;\r\n        }\n}"
+  },
+  {
+    "Id": "DeconstructionAssignment",
+    "PrimaryShapes": [
+      "operation:DeconstructionAssignment"
+    ],
+    "OperationKinds": [
+      "DeconstructionAssignment"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x, int y)\r\n        {\r\n            var left = x;\r\n            var right = y;\r\n            (left, right) = (right, left);\r\n            return left - right;\r\n        }\n}"
+  },
+  {
+    "Id": "Increment",
+    "PrimaryShapes": [
+      "operation:Increment"
+    ],
+    "OperationKinds": [
+      "Increment"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            var value = x;\r\n            value++;\r\n            return value;\r\n        }\n}"
+  },
+  {
+    "Id": "Decrement",
+    "PrimaryShapes": [
+      "operation:Decrement"
+    ],
+    "OperationKinds": [
+      "Decrement"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            var value = x;\r\n            value--;\r\n            return value;\r\n        }\n}"
+  },
+  {
+    "Id": "DeclarationExpression",
+    "PrimaryShapes": [
+      "operation:DeclarationExpression"
+    ],
+    "OperationKinds": [
+      "DeclarationExpression"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            return int.TryParse(text, out var value) ? value : 0;\r\n        }\n}"
+  },
+  {
+    "Id": "DeclarationPattern",
+    "PrimaryShapes": [
+      "operation:DeclarationPattern"
+    ],
+    "OperationKinds": [
+      "DeclarationPattern"
+    ],
+    "SyntaxKinds": [
+      "DeclarationPattern"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(object value)\r\n        {\r\n            return value is int number ? number : 0;\r\n        }\n}"
+  },
+  {
+    "Id": "TypeParameterObjectCreation",
+    "PrimaryShapes": [
+      "operation:TypeParameterObjectCreation"
+    ],
+    "OperationKinds": [
+      "TypeParameterObjectCreation"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public T TestMethod<T>() where T : new()\r\n        {\r\n            return new T();\r\n        }\n}"
+  },
+  {
+    "Id": "EventAssignment",
+    "PrimaryShapes": [
+      "operation:EventAssignment"
+    ],
+    "OperationKinds": [
+      "EventAssignment",
+      "EventReference"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Disproven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic sealed class __CLASS__Source\n{\n    public event EventHandler Changed\n    {\n        add { }\n        remove { }\n    }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public void TestMethod(__CLASS__Source source)\n    {\n        source.Changed += Handle;\n    }\n\n    private static void Handle(object sender, EventArgs args) { }\n}"
+  },
+  {
+    "Id": "AnonymousObjectCreation",
+    "PrimaryShapes": [
+      "operation:AnonymousObjectCreation"
+    ],
+    "OperationKinds": [
+      "AnonymousObjectCreation"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            var item = new { Value = x, Next = x + 1 };\r\n            return item.Value + item.Next;\r\n        }\n}"
+  },
+  {
+    "Id": "DefaultValue",
+    "PrimaryShapes": [
+      "operation:DefaultValue"
+    ],
+    "OperationKinds": [
+      "DefaultValue"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            return default(int);\r\n        }\n}"
+  },
+  {
+    "Id": "SizeOf",
+    "PrimaryShapes": [
+      "operation:SizeOf"
+    ],
+    "OperationKinds": [
+      "SizeOf"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            return sizeof(int);\r\n        }\n}"
+  },
+  {
+    "Id": "TypeOf",
+    "PrimaryShapes": [
+      "operation:TypeOf"
+    ],
+    "OperationKinds": [
+      "TypeOf"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            return typeof(int).Name.Length;\r\n        }\n}"
+  },
+  {
+    "Id": "NameOf",
+    "PrimaryShapes": [
+      "operation:NameOf"
+    ],
+    "OperationKinds": [
+      "NameOf"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int value)\r\n        {\r\n            return nameof(value).Length;\r\n        }\n}"
+  },
+  {
+    "Id": "DynamicIndexerAccess",
+    "PrimaryShapes": [
+      "operation:DynamicIndexerAccess"
+    ],
+    "OperationKinds": [
+      "DynamicIndexerAccess"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(dynamic values)\r\n        {\r\n            return values[0];\r\n        }\n}"
+  },
+  {
+    "Id": "DynamicObjectCreation",
+    "PrimaryShapes": [
+      "operation:DynamicObjectCreation"
+    ],
+    "OperationKinds": [
+      "DynamicObjectCreation"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using SharpProof.Attributes;\n\npublic sealed class __CLASS__Widget\n{\n    public __CLASS__Widget(int value)\n    {\n    }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod(dynamic value)\n    {\n        var widget = new __CLASS__Widget(value);\n        return 1;\n    }\n}"
+  },
+  {
+    "Id": "Tuple",
+    "PrimaryShapes": [
+      "operation:Tuple"
+    ],
+    "OperationKinds": [
+      "Tuple"
+    ],
+    "SyntaxKinds": [
+      "TupleExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            var pair = (Left: x, Right: x + 1);\r\n            return pair.Left + pair.Right;\r\n        }\n}"
+  },
+  {
+    "Id": "InterfaceGetter",
+    "PrimaryShapes": [
+      "operation:PropertyReference"
+    ],
+    "OperationKinds": [
+      "PropertyReference"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using SharpProof.Attributes;\n\npublic interface I__CLASS__Value\n{\n    int Value { get; }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod(I__CLASS__Value value)\n    {\n        return value.Value;\n    }\n}"
+  },
+  {
+    "Id": "RecursivePattern",
+    "PrimaryShapes": [
+      "operation:RecursivePattern"
+    ],
+    "OperationKinds": [
+      "RecursivePattern"
+    ],
+    "SyntaxKinds": [
+      "RecursivePattern"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using SharpProof.Attributes;\n\npublic sealed class __CLASS__Node\n{\n    public __CLASS__Node? Next { get; set; }\n    public int Value { get; set; }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod(__CLASS__Node node)\n    {\n        return node is { Next: { Value: > 0 } } ? 1 : 0;\n    }\n}"
+  },
+  {
+    "Id": "SpreadCollectionExpression",
+    "PrimaryShapes": [
+      "operation:CollectionExpression",
+      "operation:Spread"
+    ],
+    "OperationKinds": [
+      "CollectionExpression",
+      "Spread"
+    ],
+    "SyntaxKinds": [
+      "CollectionExpression"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int[] values)\r\n        {\r\n            int[] copy = [0, .. values, 9];\r\n            return copy.Length;\r\n        }\n}"
+  },
+  {
+    "Id": "SwitchExpression",
+    "PrimaryShapes": [
+      "operation:SwitchExpression"
+    ],
+    "OperationKinds": [
+      "SwitchExpression"
+    ],
+    "SyntaxKinds": [
+      "SwitchExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            return x switch\r\n            {\r\n                < 0 => -1,\r\n                0 => 0,\r\n                _ => 1\r\n            };\r\n        }\n}"
+  },
+  {
+    "Id": "RangeSlice",
+    "PrimaryShapes": [
+      "operation:Range"
+    ],
+    "OperationKinds": [
+      "Range"
+    ],
+    "SyntaxKinds": [
+      "RangeExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            return text[1..^1].Length;\r\n        }\n}"
+  },
+  {
+    "Id": "YieldReturn",
+    "PrimaryShapes": [
+      "operation:YieldReturn"
+    ],
+    "OperationKinds": [
+      "YieldReturn"
+    ],
+    "SyntaxKinds": [
+      "YieldReturnStatement"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System.Collections.Generic;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public IEnumerable<int> TestMethod(int x)\n    {\n        yield return x + 1;\n        yield break;\n    }\n}"
+  },
+  {
+    "Id": "WithExpression",
+    "PrimaryShapes": [
+      "operation:With"
+    ],
+    "OperationKinds": [
+      "With"
+    ],
+    "SyntaxKinds": [
+      "WithExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic record __CLASS__Data(int Value, int Other);\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod(__CLASS__Data data, int x)\n    {\n        var updated = data with { Value = x };\n        return updated.Value;\n    }\n}"
+  },
+  {
+    "Id": "AnonymousFunction",
+    "PrimaryShapes": [
+      "operation:AnonymousFunction"
+    ],
+    "OperationKinds": [
+      "AnonymousFunction"
+    ],
+    "SyntaxKinds": [
+      "SimpleLambdaExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            Func<int, int> project = static value => value + 1;\r\n            return project(x);\r\n        }\n}"
+  },
+  {
+    "Id": "DelegateCreation",
+    "PrimaryShapes": [
+      "operation:DelegateCreation"
+    ],
+    "OperationKinds": [
+      "DelegateCreation"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            Func<int, int> project = Project;\r\n            return project(x);\r\n        }\r\n\r\n        private static int Project(int value)\r\n        {\r\n            return value + 1;\r\n        }\n}"
+  },
+  {
+    "Id": "ImplicitIndexerReference",
+    "PrimaryShapes": [
+      "operation:ImplicitIndexerReference"
+    ],
+    "OperationKinds": [
+      "ImplicitIndexerReference"
+    ],
+    "SyntaxKinds": [
+      "ElementAccessExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic sealed class __CLASS__Bag\n{\n    public int Length => 3;\n    public int this[int index] => index + 10;\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod(__CLASS__Bag bag)\n    {\n        return bag[^1];\n    }\n}"
+  },
+  {
+    "Id": "InterpolatedStringHandler",
+    "PrimaryShapes": [
+      "operation:InterpolatedStringHandlerCreation",
+      "operation:InterpolatedStringAddition",
+      "operation:InterpolatedStringAppendLiteral",
+      "operation:InterpolatedStringAppendFormatted",
+      "operation:InterpolatedStringHandlerArgumentPlaceholder"
+    ],
+    "OperationKinds": [
+      "InterpolatedStringHandlerCreation",
+      "InterpolatedStringAddition",
+      "InterpolatedStringAppendLiteral",
+      "InterpolatedStringAppendFormatted",
+      "InterpolatedStringHandlerArgumentPlaceholder"
+    ],
+    "SyntaxKinds": [
+      "InterpolatedStringExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing System.Runtime.CompilerServices;\nusing SharpProof.Attributes;\n\n[InterpolatedStringHandler]\npublic ref struct __CLASS__Handler\n{\n    public __CLASS__Handler(int literalLength, int formattedCount, int value) { }\n    public void AppendLiteral(string value) { }\n    public void AppendFormatted<T>(T value) { }\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public void TestMethod(int value)\n    {\n        Log(value, $\"left={value}\" + $\"right={value}\");\n    }\n\n    private void Log(int value, [InterpolatedStringHandlerArgument(\"value\")] __CLASS__Handler handler) { }\n}"
+  },
+  {
+    "Id": "AddressOf",
+    "PrimaryShapes": [
+      "operation:AddressOf"
+    ],
+    "OperationKinds": [
+      "AddressOf"
+    ],
+    "SyntaxKinds": [],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": true,
+    "Generator": null,
+    "SourceTemplate": "using SharpProof.Attributes;\n\npublic unsafe class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod()\n    {\n        int value = 1;\n        int* pointer = &value;\n        return *pointer;\n    }\n}"
+  },
+  {
+    "Id": "InlineArrayAccess",
+    "PrimaryShapes": [
+      "operation:InlineArrayAccess"
+    ],
+    "OperationKinds": [
+      "InlineArrayAccess"
+    ],
+    "SyntaxKinds": [
+      "ElementAccessExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System.Runtime.CompilerServices;\nusing SharpProof.Attributes;\n\n[InlineArray(4)]\npublic struct __CLASS__Buffer\n{\n    private int _element0;\n}\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod()\n    {\n        __CLASS__Buffer buffer = default;\n        return buffer[0];\n    }\n}"
+  },
+  {
+    "Id": "FunctionPointer",
+    "PrimaryShapes": [
+      "operation:FunctionPointerInvocation"
+    ],
+    "OperationKinds": [
+      "FunctionPointerInvocation"
+    ],
+    "SyntaxKinds": [
+      "FunctionPointerType"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": true,
+    "Generator": null,
+    "SourceTemplate": "using SharpProof.Attributes;\n\npublic unsafe class __CLASS__\n{\n    [EnforcePure]\n    public int TestMethod(delegate*<int, int> pointer)\n    {\n        return pointer(1);\n    }\n}"
+  },
+  {
+    "Id": "NestedLambdaLocalFunction",
+    "PrimaryShapes": [
+      "operation:AnonymousFunction",
+      "operation:LocalFunction"
+    ],
+    "OperationKinds": [
+      "AnonymousFunction",
+      "LocalFunction"
+    ],
+    "SyntaxKinds": [
+      "SimpleLambdaExpression",
+      "LocalFunctionStatement"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x)\r\n        {\r\n            int Outer(int seed)\r\n            {\r\n                Func<int, int> addSeed = value =>\r\n                {\r\n                    Func<int, int> inner = local => local + seed;\r\n                    return inner(value);\r\n                };\r\n\r\n                return addSeed(x);\r\n            }\r\n\r\n            return Outer(1);\r\n        }\n}"
+  },
+  {
+    "Id": "TuplePatternSwitch",
+    "PrimaryShapes": [
+      "operation:Tuple",
+      "operation:SwitchExpression"
+    ],
+    "OperationKinds": [
+      "Tuple",
+      "SwitchExpression"
+    ],
+    "SyntaxKinds": [
+      "TupleExpression",
+      "SwitchExpression"
+    ],
+    "PurityVerdict": "Proven",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(int x, int y)\r\n        {\r\n            var pair = (x, y);\r\n            return pair switch\r\n            {\r\n                (> 0, > 0) => 1,\r\n                (0, _) => 0,\r\n                _ => -1\r\n            };\r\n        }\n}"
+  },
+  {
+    "Id": "UsingAwaitDelegateFlow",
+    "PrimaryShapes": [
+      "operation:UsingDeclaration",
+      "operation:Await",
+      "operation:AnonymousFunction"
+    ],
+    "OperationKinds": [
+      "UsingDeclaration",
+      "Await",
+      "AnonymousFunction"
+    ],
+    "SyntaxKinds": [
+      "LocalDeclarationStatement",
+      "AwaitExpression",
+      "ParenthesizedLambdaExpression"
+    ],
+    "PurityVerdict": "Unknown",
+    "RequiredEffects": [
+      null
+    ],
+    "ForbiddenEffects": [],
+    "RequiredUnknownCategories": [
+      null
+    ],
+    "RequiredDiagnosticIds": [],
+    "AllowUnsafe": false,
+    "Generator": null,
+    "SourceTemplate": "using System;\nusing System.Threading.Tasks;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n    [EnforcePure]\n    public async Task<int> TestMethod()\n    {\n        using var stream = Console.OpenStandardOutput();\n        Func<Task<int>> factory = async () =>\n        {\n            await Task.Delay(1);\n            return stream.CanWrite ? 1 : 0;\n        };\n\n        return await factory();\n    }\n}"
+  }
 ]

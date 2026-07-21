@@ -17,7 +17,6 @@ global using SharpProof.Analyzer.Engine;
 global using SharpProof.Analyzer.Engine.Analysis;
 global using SharpProof.Identity;
 global using SharpProof.ProofCore.Smt;
-global using SharpProof.Schema;
 global using SharpProof.Symbolic;
 global using SharpProof.Symbolic.Ir;
 global using SharpProof.Symbolic.Smt;

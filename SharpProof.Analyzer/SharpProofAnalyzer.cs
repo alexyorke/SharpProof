@@ -7,7 +7,7 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
     }
 
     internal SharpProofAnalyzer(AnalyzerFeatures features) {
-        Features = AnalyzerFeatureDependencies.Expand(features);
+        Features = features;
     }
 
     internal AnalyzerFeatures Features { get; }
@@ -32,10 +32,8 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
                 try {
                     foreach (var invalidConfigurationValue in session.Configuration.InvalidConfigurationValues) {
                         var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue);
-                        if (!session.Baseline.IsSuppressed(diagnostic)) endContext.ReportDiagnostic(diagnostic);
+                        endContext.ReportDiagnostic(diagnostic);
                     }
-
-                    TrustedBoundaryReviewAnalyzer.ReportDiagnostics(endContext, session);
                 }
                 finally {
                     session.Dispose();
@@ -61,65 +59,31 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
                     SyntaxKind.LocalFunctionStatement);
             }
 
-            if (session.Features.Includes(AnalyzerFeatures.Placement))
-                startContext.RegisterSyntaxNodeAction(
-                    c => AttributePlacementAnalyzer.AnalyzeNonMethodDeclaration(
-                        c,
-                        session.Baseline,
-                        session.AttributePolicy),
-                    SyntaxKind.AttributeList);
-
-            startContext.RegisterSyntaxTreeAction(c => AnalyzeTreeConfiguration(c, session.Baseline));
+            startContext.RegisterSyntaxTreeAction(AnalyzeTreeConfiguration);
         });
     }
 
-    private static void AnalyzeTreeConfiguration(
-        SyntaxTreeAnalysisContext context,
-        DiagnosticBaseline baseline) {
+    private static void AnalyzeTreeConfiguration(SyntaxTreeAnalysisContext context) {
         var options = context.Options.AnalyzerConfigOptionsProvider.GetOptions(context.Tree);
         var invalidConfigurationValues = AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
             options,
             context.Options.AnalyzerConfigOptionsProvider.GlobalOptions);
         var location = Location.Create(context.Tree, new TextSpan(0, 0));
         foreach (var invalidConfigurationValue in invalidConfigurationValues) {
-            var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue, location, context.Tree);
-            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
+            var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue, location);
+            context.ReportDiagnostic(diagnostic);
         }
     }
 
     private static Diagnostic CreateInvalidConfigurationDiagnostic(
         InvalidAnalyzerConfigurationValue invalidConfigurationValue,
-        Location? location = null,
-        SyntaxTree? syntaxTree = null) {
-        var path = syntaxTree?.FilePath ?? "<global>";
-        var properties = BaselineDiagnosticProperties.Add(
-            ImmutableDictionary<string, string?>.Empty
-                .Add("sharpproof.config.key", invalidConfigurationValue.Key)
-                .Add("sharpproof.config.value", invalidConfigurationValue.Value)
-                .Add("sharpproof.config.invalid_reason", invalidConfigurationValue.Reason),
-            "<configuration>",
-            path,
-            "AnalyzerConfiguration",
-            invalidConfigurationValue.Key,
-            invalidConfigurationValue.Key + ":" + invalidConfigurationValue.Value + ":" +
-            invalidConfigurationValue.Reason);
-        properties = ExplainDiagnosticProperties.Add(
-            properties,
-            location,
-            invalidConfigurationValue.Key,
-            "invalid",
-            invalidConfigurationValue.Reason);
-
+        Location? location = null) {
         return Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("InvalidAnalyzerConfigurationRule"),
             location ?? Location.None,
-            null,
-            properties,
-            new object[] {
-                invalidConfigurationValue.Key,
-                invalidConfigurationValue.Value,
-                invalidConfigurationValue.Reason
-            });
+            invalidConfigurationValue.Key,
+            invalidConfigurationValue.Value,
+            invalidConfigurationValue.Reason);
     }
 
 }

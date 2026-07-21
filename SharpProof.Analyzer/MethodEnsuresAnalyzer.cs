@@ -4,11 +4,10 @@ internal static class MethodEnsuresAnalyzer {
     internal static void AnalyzeSymbolForEnsures(
         MethodBodyAnalysisContext context,
         AnalyzerProofService proofService,
-        DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
 
-        var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
+        Action<Diagnostic> report = context.ReportDiagnostic;
 
         if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
 
@@ -17,9 +16,7 @@ internal static class MethodEnsuresAnalyzer {
 
         contracts = ReportAndFilterInvalidContracts(
             contracts,
-            context,
-            methodSymbol,
-            baseline);
+            context);
         if (contracts.Length == 0) return;
 
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) {
@@ -115,18 +112,6 @@ internal static class MethodEnsuresAnalyzer {
             }
 
             foreach (var completionSite in completionSites) {
-                if (!proofService.SmtAnalysis.Options.IsEnabled) {
-                    var diagnostic = CreateUnsupportedDiagnostic(
-                        methodSymbol,
-                        contract.Condition,
-                        completionSite.Location,
-                        "SMT is disabled for [Ensures] verification",
-                        contract.Location == null ? null : [contract.Location]);
-                    report(diagnostic);
-
-                    continue;
-                }
-
                 if (!TryRewriteConditionForCompletionSite(
                         contract.Condition,
                         completionSite,
@@ -170,8 +155,7 @@ internal static class MethodEnsuresAnalyzer {
                         methodSymbol,
                         contract.Condition,
                         completionSite,
-                        contract.Location,
-                        proof);
+                        contract.Location);
                     report(diagnostic);
 
                     continue;
@@ -182,8 +166,7 @@ internal static class MethodEnsuresAnalyzer {
                     contract.Condition,
                     completionSite.Location,
                     ContractDiagnosticSupport.FormatUnknownReason(proof, "Ensures"),
-                    contract.Location == null ? null : [contract.Location],
-                    proof.AnalysisTruncation);
+                    contract.Location == null ? null : [contract.Location]);
                 report(unsupportedDiagnostic);
             }
         }
@@ -218,9 +201,7 @@ internal static class MethodEnsuresAnalyzer {
 
     private static ImmutableArray<EnsuresContract> ReportAndFilterInvalidContracts(
         ImmutableArray<EnsuresContract> contracts,
-        MethodBodyAnalysisContext context,
-        IMethodSymbol methodSymbol,
-        DiagnosticBaseline baseline) {
+        MethodBodyAnalysisContext context) {
         var validContracts = ImmutableArray.CreateBuilder<EnsuresContract>(contracts.Length);
         foreach (var contract in contracts) {
             if (contract.InvalidReason == null) {
@@ -232,10 +213,8 @@ internal static class MethodEnsuresAnalyzer {
                 "[Ensures]",
                 contract.Argument,
                 contract.InvalidReason,
-                contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
-                methodSymbol,
-                context.Node.SyntaxTree);
-            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(context, baseline, diagnostic);
+                contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node));
+            context.ReportDiagnostic(diagnostic);
         }
 
         return validContracts.ToImmutable();
@@ -379,38 +358,11 @@ internal static class MethodEnsuresAnalyzer {
         IMethodSymbol methodSymbol,
         string condition,
         MethodNormalCompletion completionSite,
-        Location? contractLocation,
-        SymbolicConditionProofResult proof) {
-        var unknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForEnsures(
-            proof.Reason,
-            proof.Proof.UnknownReason);
-        var properties = ContractDiagnosticSupport.CreateProofProperties(
-            ContractDiagnosticSupport.EvidenceFamily.Ensures,
-            methodSymbol,
-            "EnsuresReturnSite",
-            condition,
-            proof.Proof.Status.ToString(),
-            proof.Reason,
-            "not_proven:" +
-            condition +
-            "@" +
-            completionSite.QueryNode.SpanStart.ToString(CultureInfo.InvariantCulture) +
-            ":" +
-            completionSite.QueryNode.Span.End.ToString(CultureInfo.InvariantCulture) +
-            "|" +
-            proof.Proof.Status +
-            "|" +
-            proof.Reason,
-            completionSite.Location,
-            ContractDiagnosticSupport.FormatUnknownReason(proof, "Ensures"),
-            proof.AnalysisTruncation,
-            structuredUnknownReason: unknownReasonInfo);
-
+        Location? contractLocation) {
         return Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("EnsuresNotProvenRule"),
             completionSite.Location,
             contractLocation == null ? null : [contractLocation],
-            properties,
             completionSite.DisplayText,
             methodSymbol.Name,
             condition);
@@ -421,27 +373,11 @@ internal static class MethodEnsuresAnalyzer {
         string condition,
         Location? location,
         string reason,
-        IEnumerable<Location>? additionalLocations,
-        SymbolicAnalysisTruncationInfo? analysisTruncation = null) {
-        var properties = ContractDiagnosticSupport.CreateProofProperties(
-            ContractDiagnosticSupport.EvidenceFamily.Ensures,
-            methodSymbol,
-            "EnsuresUnsupported",
-            condition,
-            SymbolicProofStatus.Unknown.ToString(),
-            reason,
-            "unsupported:" + condition + "@" + ContractDiagnosticSupport.FormatLocationKey(location) + "|" + reason,
-            location,
-            reason,
-            analysisTruncation ?? SymbolicAnalysisTruncationInfo.None,
-            reason,
-            structuredUnknownReason: SymbolicUnknownReasonTaxonomy.ForEnsures(reason));
-
+        IEnumerable<Location>? additionalLocations) {
         return Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("EnsuresUnsupportedRule"),
             location,
             additionalLocations,
-            properties,
             condition,
             methodSymbol.Name,
             reason);

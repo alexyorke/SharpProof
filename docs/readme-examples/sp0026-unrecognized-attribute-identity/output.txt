@@ -1,1 +1,0 @@
-SP0026 Warning docs/readme-examples/sp0026-unrecognized-attribute-identity/input.cs:13:6 Attribute 'EnforcePureAttribute' looks like a SharpProof contract, but type 'ExternalContracts.EnforcePureAttribute' is not in an accepted SharpProof attribute namespace

@@ -155,16 +155,6 @@ internal static class RequiresContractHelpers {
         }
     }
 
-    internal static string CreateEvidenceKey(string prefix, string condition, Location? location, string reason) {
-        return prefix +
-               ":" +
-               condition +
-               "@" +
-               ContractDiagnosticSupport.FormatLocationKey(location) +
-               "|" +
-               reason;
-    }
-
     sealed class ParameterPlaceholderRewriter : CSharpSyntaxRewriter {
         private readonly IReadOnlyDictionary<string, ExpressionSyntax> _replacements;
         private readonly IReadOnlyDictionary<string, TypeSyntax> _typeReplacements;

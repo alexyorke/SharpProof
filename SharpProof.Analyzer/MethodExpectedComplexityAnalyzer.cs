@@ -3,11 +3,9 @@ namespace SharpProof.Analyzer;
 internal static class MethodExpectedComplexityAnalyzer {
     internal static void AnalyzeSymbolForExpectedComplexity(
         MethodBodyAnalysisContext context,
-        DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
-
-        var report = AnalyzerDiagnosticReporter.CreateBaselineReporter(context, baseline);
+        Action<Diagnostic> report = context.ReportDiagnostic;
 
         if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
 
@@ -26,9 +24,7 @@ internal static class MethodExpectedComplexityAnalyzer {
                 invalidContract.Argument,
                 invalidContract.Reason,
                 attributeLocation ??
-                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken),
-                methodSymbol,
-                context.Node.SyntaxTree);
+                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken));
             report(diagnostic);
 
             return;
@@ -45,9 +41,7 @@ internal static class MethodExpectedComplexityAnalyzer {
                 declaredComplexity,
                 attributeLocation,
                 "complexity query failed: " + error.Message,
-                context.CancellationToken,
-                context.Node.SyntaxTree,
-                SymbolicUnknownReasonTaxonomy.ForComplexityFailure(error.Code + ": " + error.Message));
+                context.CancellationToken);
             report(diagnostic);
 
             return;
@@ -66,8 +60,7 @@ internal static class MethodExpectedComplexityAnalyzer {
                     declaredComplexity,
                     result,
                     attributeLocation,
-                    context.CancellationToken,
-                    context.Node.SyntaxTree);
+                    context.CancellationToken);
                 report(exceededDiagnostic);
 
                 return;
@@ -78,9 +71,7 @@ internal static class MethodExpectedComplexityAnalyzer {
                     declaredComplexity,
                     attributeLocation,
                     classification.Reason,
-                    context.CancellationToken,
-                    context.Node.SyntaxTree,
-                    result.UnknownReasonDetails.FirstOrDefault());
+                    context.CancellationToken);
                 report(unknownDiagnostic);
 
                 return;
@@ -158,27 +149,12 @@ internal static class MethodExpectedComplexityAnalyzer {
         DeclaredComplexity declaredComplexity,
         SymbolicComplexityResult result,
         Location? attributeLocation,
-        CancellationToken cancellationToken,
-        SyntaxTree syntaxTree) {
+        CancellationToken cancellationToken) {
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
-        var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
-            ImmutableDictionary<string, string?>.Empty
-                .Add(DiagnosticPropertyNames.ExpectedComplexityProperty, declaredComplexity.Text)
-                .Add("sharpproof.complexity.actual", result.Complexity.Text),
-            methodSymbol,
-            syntaxTree,
-            "ExpectedComplexity",
-            declaredComplexity.Text,
-            "exceeded:" + declaredComplexity.Text + ":" + result.Complexity.Text,
-            location,
-            declaredComplexity.Text,
-            "exceeded");
-
         return Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("ComplexityExceededRule"),
             location,
             attributeLocation == null ? null : [attributeLocation],
-            properties,
             methodSymbol.Name,
             declaredComplexity.Text,
             result.Complexity.Text);
@@ -189,32 +165,12 @@ internal static class MethodExpectedComplexityAnalyzer {
         DeclaredComplexity declaredComplexity,
         Location? attributeLocation,
         string reason,
-        CancellationToken cancellationToken,
-        SyntaxTree syntaxTree,
-        SymbolicUnknownReasonInfo? unknownReasonInfo) {
+        CancellationToken cancellationToken) {
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
-        var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(DiagnosticPropertyNames.ExpectedComplexityProperty, declaredComplexity.Text)
-            .Add("sharpproof.complexity.unknown_reason", reason);
-        var effectiveUnknownReason = unknownReasonInfo ?? SymbolicUnknownReasonTaxonomy.ForComplexityFailure(reason);
-        properties = UnknownReasonDiagnosticProperties.Add(properties, effectiveUnknownReason);
-        properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
-            properties,
-            methodSymbol,
-            syntaxTree,
-            "ExpectedComplexity",
-            declaredComplexity.Text,
-            "unknown:" + declaredComplexity.Text + ":" + reason,
-            location,
-            declaredComplexity.Text,
-            "unknown",
-            effectiveUnknownReason.Code);
-
         return Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("ComplexityCouldNotBeVerifiedRule"),
             location,
             attributeLocation == null ? null : [attributeLocation],
-            properties,
             methodSymbol.Name,
             declaredComplexity.Text,
             reason);

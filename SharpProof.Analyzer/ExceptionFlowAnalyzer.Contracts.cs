@@ -13,7 +13,6 @@ internal static partial class ExceptionFlowAnalyzer {
                 ExceptionContractKind.DoesNotThrow,
                 ImmutableArray<ITypeSymbol>.Empty,
                 "[DoesNotThrow]",
-                AnalyzerSyntaxHelpers.GetAttributeArgumentListText(attribute, cancellationToken),
                 GetAttributeLocation(attribute, cancellationToken),
                 ImmutableArray<InvalidExceptionContractArgument>.Empty));
         }
@@ -30,7 +29,6 @@ internal static partial class ExceptionFlowAnalyzer {
                 ExceptionContractKind.AllowedExceptions,
                 allowedTypes,
                 "[AllowedExceptions]",
-                AnalyzerSyntaxHelpers.GetAttributeArgumentListText(attribute, cancellationToken),
                 GetAttributeLocation(attribute, cancellationToken),
                 invalidArguments));
         }
@@ -42,77 +40,49 @@ internal static partial class ExceptionFlowAnalyzer {
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         ImmutableArray<ExceptionContract> contracts,
-        ImmutableArray<ExceptionFactView> facts,
-        DiagnosticBaseline baseline) {
+        ImmutableArray<ExceptionFactView> facts) {
         if (contracts.Length == 0) return;
 
         var validContracts = ReportAndFilterInvalidExceptionContracts(
             contracts,
-            context,
-            methodSymbol,
-            baseline);
+            context);
         if (validContracts.Length == 0) return;
 
         var effectiveContracts = CreateEffectiveExceptionContracts(validContracts);
         foreach (var contract in effectiveContracts)
-            AnalyzeExceptionContract(context, methodSymbol, contract, facts, baseline);
+            AnalyzeExceptionContract(context, methodSymbol, contract, facts);
     }
 
     private static void AnalyzeExceptionContract(
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         EffectiveExceptionContract contract,
-        ImmutableArray<ExceptionFactView> siteEntries,
-        DiagnosticBaseline baseline) {
+        ImmutableArray<ExceptionFactView> siteEntries) {
         foreach (var siteGroup in siteEntries.GroupBy(static entry => entry.Site.Span)) {
             var firstEntry = siteGroup.First();
             var disallowedSites = siteGroup.Where(site => !IsAllowedByExceptionContract(contract, site)).ToArray();
             if (disallowedSites.Length == 0) continue;
 
             var siteLocation = GetExceptionSiteLocation(firstEntry.Site);
-            if (siteLocation == null) continue;
-
             var operationDisplay = firstEntry.Site.ToString();
             var exceptionList = string.Join(", ", disallowedSites
                 .Select(static site => site.ExceptionType)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(static type => type, StringComparer.Ordinal));
-            var properties = CreateExceptionProperties(disallowedSites)
-                .Add("sharpproof.exception_contract.attribute", contract.AttributeDisplay)
-                .Add("sharpproof.exception_contract.allowed_types", FormatAllowedTypes(contract))
-                .Add("sharpproof.exception_contract.disallowed_types", exceptionList);
-            properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
-                properties,
-                methodSymbol,
-                context.Node.SyntaxTree,
-                "ExceptionContract",
-                operationDisplay,
-                CreateExceptionEvidenceKey(
-                    contract.AttributeDisplay + ":" + firstEntry.Site.SpanStart,
-                    disallowedSites),
-                siteLocation,
-                operationDisplay,
-                "exception_contract_violation",
-                exceptionList);
-
-            var diagnostic = Diagnostic.Create(
+            context.ReportDiagnostic(Diagnostic.Create(
                 AnalyzerDiagnosticCatalog.Get("ExceptionContractViolationRule"),
                 siteLocation,
                 AdditionalLocations(contract.Location),
-                properties,
                 methodSymbol.Name,
                 contract.AttributeDisplay,
                 operationDisplay,
-                exceptionList);
-            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
+                exceptionList));
         }
     }
 
     private static ImmutableArray<ExceptionContract> ReportAndFilterInvalidExceptionContracts(
         ImmutableArray<ExceptionContract> contracts,
-        MethodBodyAnalysisContext context,
-        IMethodSymbol methodSymbol,
-        DiagnosticBaseline baseline) {
+        MethodBodyAnalysisContext context) {
         var validContracts = ImmutableArray.CreateBuilder<ExceptionContract>(contracts.Length);
         foreach (var contract in contracts) {
             if (contract.InvalidArguments.IsDefaultOrEmpty) {
@@ -126,10 +96,8 @@ internal static partial class ExceptionFlowAnalyzer {
                     invalidArgument.Argument,
                     invalidArgument.Reason,
                     invalidArgument.Location ?? contract.Location ??
-                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
-                    methodSymbol,
-                    context.Node.SyntaxTree);
-                AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
+                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node));
+                context.ReportDiagnostic(diagnostic);
             }
         }
 
@@ -279,12 +247,6 @@ internal static partial class ExceptionFlowAnalyzer {
             SymbolEq.AreEqual(symbol.OriginalDefinition, candidate.OriginalDefinition));
     }
 
-    private static string FormatAllowedTypes(EffectiveExceptionContract contract) {
-        return contract.Kind == ExceptionContractKind.DoesNotThrow
-            ? string.Empty
-            : string.Join(";", contract.AllowedTypes.Select(FormatType).OrderBy(type => type, StringComparer.Ordinal));
-    }
-
     private static string FormatType(ITypeSymbol type) {
         var display = type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         return string.IsNullOrWhiteSpace(display)
@@ -310,7 +272,6 @@ internal static partial class ExceptionFlowAnalyzer {
         ExceptionContractKind Kind,
         ImmutableArray<ITypeSymbol> AllowedTypes,
         string AttributeDisplay,
-        string Argument,
         Location? Location,
         ImmutableArray<InvalidExceptionContractArgument> InvalidArguments);
 

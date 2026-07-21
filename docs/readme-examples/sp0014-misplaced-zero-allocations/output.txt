@@ -1,1 +1,0 @@
-SP0014 Error docs/readme-examples/sp0014-misplaced-zero-allocations/input.cs:4:2 The [ZeroAllocations] attribute can only be applied to method-like declarations or getter-bearing properties and indexers

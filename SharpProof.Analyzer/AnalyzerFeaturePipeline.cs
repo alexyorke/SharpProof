@@ -43,54 +43,43 @@ internal static class AnalyzerFeaturePipeline {
         AnalyzerSession session) {
         using (SymbolicAnalysisLimitContext.Push(session.Configuration.AnalysisLimits, context.Node)) {
             var features = session.Features;
-            TrustedBoundaryReviewAnalyzer.Analyze(context, session);
 
             if (features.Includes(AnalyzerFeatures.Purity))
                 EnforcePureContractAnalyzer.Analyze(
                     context,
-                    session.Baseline,
                     session.AttributePolicy);
 
             if (features.Includes(AnalyzerFeatures.Allocation))
                 MethodAllocationAnalyzer.AnalyzeSymbolForZeroAllocations(
                     context,
-                    session.Baseline,
                     session.AttributePolicy);
 
             if (features.Includes(AnalyzerFeatures.Capability))
                 MethodCapabilityAnalyzer.AnalyzeSymbolForCapabilities(
                     context,
-                    session.Baseline,
                     session.AttributePolicy);
 
             if (features.Includes(AnalyzerFeatures.Requires))
                 MethodRequiresAnalyzer.AnalyzeSymbolForRequires(
                     context,
                     session.ProofService,
-                    session.Baseline,
                     session.AttributePolicy);
 
             if (features.Includes(AnalyzerFeatures.Ensures))
                 MethodEnsuresAnalyzer.AnalyzeSymbolForEnsures(
                     context,
                     session.ProofService,
-                    session.Baseline,
                     session.AttributePolicy);
 
             if (features.Includes(AnalyzerFeatures.Complexity))
                 MethodExpectedComplexityAnalyzer.AnalyzeSymbolForExpectedComplexity(
                     context,
-                    session.Baseline,
                     session.AttributePolicy);
 
             if (features.Includes(AnalyzerFeatures.Exceptions))
                 ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(
                     context,
-                    session.Baseline,
                     session.AttributePolicy);
-
-            if (features.Includes(AnalyzerFeatures.Suggestions))
-                InferredContractSuggestionAnalyzer.Analyze(context, session);
 
             if (features.Includes(AnalyzerFeatures.Nullability))
                 NullableContractAnalyzer.Analyze(context, session);
@@ -119,10 +108,6 @@ internal static class AnalyzerFeaturePipeline {
         Action<Diagnostic> reportDiagnostic = context.ReportDiagnostic;
         methodContext = new MethodBodyAnalysisContext(
             state,
-            AnalyzerConfiguration.GetTreeConfiguration(
-                context.Options,
-                declaration.SyntaxTree,
-                session.Configuration),
             context.CancellationToken,
             reportDiagnostic);
         return true;
@@ -152,10 +137,6 @@ internal static class AnalyzerFeaturePipeline {
         Action<Diagnostic> reportDiagnostic = context.ReportDiagnostic;
         methodContext = new MethodBodyAnalysisContext(
             state,
-            AnalyzerConfiguration.GetTreeConfiguration(
-                context.Options,
-                context.Node.SyntaxTree,
-                session.Configuration),
             context.CancellationToken,
             reportDiagnostic);
         return true;

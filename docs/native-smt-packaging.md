@@ -90,8 +90,9 @@ The script:
 2. packs `SharpProof` and `SharpProof.Symbolic` into a temporary local feed;
 3. restores a clean symbolic consumer and executes a real SMT-backed pair of
    implication proofs;
-4. restores a clean analyzer consumer, requires `SP0004` to prove analyzer
-   execution, and reads the compiler SARIF log to reject analyzer-load failures;
+4. restores a clean analyzer consumer, compiles a retained contract violation to
+   prove analyzer execution, and reads the compiler SARIF log to reject
+   analyzer-load failures;
 5. removes the bounded temporary consumer directory.
 
 `.github/workflows/package-consumers.yml` runs this probe on

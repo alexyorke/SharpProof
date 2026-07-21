@@ -56,18 +56,18 @@ internal static class FuzzShapeRegistry {
 
     private static FuzzExpectation CreateExpectation(RegistryDefinition definition) {
         if (!Enum.TryParse<SharpProofVerdict>(definition.PurityVerdict, out var purityVerdict) ||
-            !Enum.IsDefined(purityVerdict) ||
-            !Enum.TryParse<Sp0010ExpectationKind>(definition.Sp0010, out var sp0010) ||
-            !Enum.IsDefined(sp0010))
+            !Enum.IsDefined(purityVerdict))
             throw new InvalidOperationException($"Fuzz shape '{definition.Id}' has an invalid expectation.");
         return new FuzzExpectation(
             purityVerdict,
-            (definition.RequiredEffects ?? []).Select(ParseEffect).ToImmutableArray(),
-            (definition.RequiredUnknownCategories ?? []).ToImmutableArray(),
-            sp0010,
-            definition.RequiredSp0010Properties.ToImmutableArray(),
-            definition.RequiredAnySp0010Properties.ToImmutableArray());
+            Compact(definition.RequiredEffects).Select(ParseEffect).ToImmutableArray(),
+            Compact(definition.ForbiddenEffects).Select(ParseEffect).ToImmutableArray(),
+            Compact(definition.RequiredUnknownCategories).ToImmutableArray(),
+            Compact(definition.RequiredDiagnosticIds).ToImmutableArray());
     }
+
+    private static IEnumerable<string> Compact(string[]? values) =>
+        (values ?? []).Where(static value => !string.IsNullOrWhiteSpace(value));
 
     private static SharpProofEffect ParseEffect(string value) =>
         Enum.TryParse<SharpProofEffect>(value, out var effect) && Enum.IsDefined(effect)
@@ -80,11 +80,10 @@ internal static class FuzzShapeRegistry {
         string[] OperationKinds,
         string[] SyntaxKinds,
         string PurityVerdict,
-        string Sp0010,
         string[]? RequiredEffects,
+        string[]? ForbiddenEffects,
         string[]? RequiredUnknownCategories,
-        string[] RequiredSp0010Properties,
-        string[] RequiredAnySp0010Properties,
+        string[]? RequiredDiagnosticIds,
         bool AllowUnsafe,
         string? Generator,
         string? SourceTemplate);

@@ -160,11 +160,9 @@ internal sealed class MethodBodyAnalysisContext {
 
     internal MethodBodyAnalysisContext(
         MethodBodyAnalysisState state,
-        AnalyzerTreeConfiguration configuration,
         CancellationToken cancellationToken,
         Action<Diagnostic> reportDiagnostic) {
         State = state ?? throw new ArgumentNullException(nameof(state));
-        Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         CancellationToken = cancellationToken;
         _reportDiagnostic = reportDiagnostic ?? throw new ArgumentNullException(nameof(reportDiagnostic));
     }
@@ -178,8 +176,6 @@ internal sealed class MethodBodyAnalysisContext {
     internal SyntaxNode Node => Snapshot.Declaration;
 
     internal SemanticModel SemanticModel => Snapshot.SemanticModel;
-
-    internal AnalyzerTreeConfiguration Configuration { get; }
 
     internal CancellationToken CancellationToken { get; }
 

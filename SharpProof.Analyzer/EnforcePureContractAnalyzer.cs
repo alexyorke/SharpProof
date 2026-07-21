@@ -3,7 +3,6 @@ namespace SharpProof.Analyzer;
 internal static class EnforcePureContractAnalyzer {
     internal static void Analyze(
         MethodBodyAnalysisContext context,
-        DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var method = context.MethodSymbol;
         if (!attributePolicy.HasAttribute(method, "EnforcePureAttribute")) return;
@@ -19,30 +18,9 @@ internal static class EnforcePureContractAnalyzer {
             : Location.Create(
                 context.Node.SyntaxTree,
                 new TextSpan(firstSite.SpanStart, firstSite.SpanLength));
-        var outcome = effects.Purity == SharpProofVerdict.Unknown ? "unknown" : "violated";
-        var reason = firstSite?.Reason ?? effects.UnknownReasons.FirstOrDefault()?.Message ?? "method_effects";
-        var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(DiagnosticPropertyNames.EffectCategoryProperty, reason)
-            .Add(DiagnosticPropertyNames.EffectFlagsProperty, effects.Effects.ToString())
-            .Add(DiagnosticPropertyNames.EffectCapabilitiesProperty, effects.Capabilities.ToString());
-        properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
-            properties,
-            method,
-            context.Node.SyntaxTree,
-            firstSite?.Operation ?? "MethodEffects",
-            firstSite?.Symbol,
-            $"effects:{firstSite?.SpanStart ?? context.Node.SpanStart}:{reason}",
-            location,
-            "[EnforcePure]",
-            outcome,
-            effects.Purity == SharpProofVerdict.Unknown ? "SP-EFFECT-UNKNOWN" : null);
-
-        var diagnostic = Diagnostic.Create(
+        context.ReportDiagnostic(Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"),
             location,
-            null,
-            properties,
-            new object[] { method.Name });
-        AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
+            method.Name));
     }
 }

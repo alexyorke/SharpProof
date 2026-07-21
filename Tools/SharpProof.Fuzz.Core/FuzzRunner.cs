@@ -16,8 +16,7 @@ public static class FuzzRunner {
     private static readonly AnalyzerOptions SharedAnalyzerOptions =
         new(
             ImmutableArray<AdditionalText>.Empty,
-            new FixedAnalyzerConfigOptionsProvider(
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true")));
+            new FixedAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
 
     private static readonly ImmutableArray<DiagnosticAnalyzer> SharedAnalyzers =
         ImmutableArray.Create<DiagnosticAnalyzer>(new SharpProofAnalyzer());
@@ -332,37 +331,6 @@ public static class FuzzRunner {
 
         EvaluateEffectExpectation(fuzzCase, effects, diagnostics, findings);
 
-        var sp0010Diagnostics = EvaluateDiagnosticExpectation(
-            fuzzCase,
-            diagnostics,
-            new DiagnosticExpectationPolicy(
-                "SP0010",
-                fuzzCase.Expectation.Sp0010 == Sp0010ExpectationKind.MustNotEmit,
-                fuzzCase.Expectation.Sp0010 == Sp0010ExpectationKind.MustEmit,
-                fuzzCase.Expectation.Sp0010 != Sp0010ExpectationKind.Ignore,
-                fuzzCase.Expectation.RequiredSp0010Properties,
-                "unexpected_sp0010",
-                "A generated case unexpectedly produced SP0010.",
-                "missing_sp0010",
-                "A generated case expected to produce SP0010 did not do so.",
-                "missing_sp0010_evidence",
-                "SP0010 did not include stable exception evidence."),
-            findings);
-
-        if (fuzzCase.Expectation.Sp0010 != Sp0010ExpectationKind.Ignore) {
-            if (!fuzzCase.Expectation.RequiredAnySp0010Properties.IsDefaultOrEmpty &&
-                sp0010Diagnostics.Length > 0 &&
-                !sp0010Diagnostics.Any(diagnostic =>
-                    !MissingAnyRequiredProperties(diagnostic, fuzzCase.Expectation.RequiredAnySp0010Properties)))
-                findings.Add(new FuzzFinding(
-                    fuzzCase.Name,
-                    fuzzCase.Family,
-                    "missing_sp0010_edge_evidence",
-                    "No emitted SP0010 included the expected additive exception-edge evidence.",
-                    null,
-                    ToDiagnosticSignatures(sp0010Diagnostics)));
-        }
-
         return findings;
     }
 
@@ -406,6 +374,16 @@ public static class FuzzRunner {
                     null,
                     ImmutableArray.Create("observed=" + observed)));
 
+        foreach (var forbidden in fuzzCase.Expectation.ForbiddenEffects)
+            if ((observed & forbidden) != 0)
+                findings.Add(new FuzzFinding(
+                    fuzzCase.Name,
+                    fuzzCase.Family,
+                    "unexpected_effect",
+                    "Forbidden effect was observed: " + forbidden,
+                    null,
+                    ImmutableArray.Create("observed=" + observed)));
+
         foreach (var category in fuzzCase.Expectation.RequiredUnknownCategories)
             if (!result.UnknownReasons.Any(reason => string.Equals(reason.Category, category, StringComparison.Ordinal)))
                 findings.Add(new FuzzFinding(
@@ -415,6 +393,16 @@ public static class FuzzRunner {
                     "Expected unknown category was not observed: " + category,
                     null,
                     result.UnknownReasons.Select(static reason => reason.Category).ToImmutableArray()));
+
+        foreach (var diagnosticId in fuzzCase.Expectation.RequiredDiagnosticIds)
+            if (!diagnostics.Any(diagnostic => diagnostic.Id == diagnosticId))
+                findings.Add(new FuzzFinding(
+                    fuzzCase.Name,
+                    fuzzCase.Family,
+                    "missing_expected_diagnostic",
+                    "Expected diagnostic was not observed: " + diagnosticId,
+                    null,
+                    ToDiagnosticSignatures(diagnostics)));
 
         var enforcePureFailure = diagnostics.Any(static diagnostic => diagnostic.Id == "SP0002");
         if ((result.Purity == SharpProofVerdict.Proven) == enforcePureFailure)
@@ -426,58 +414,6 @@ public static class FuzzRunner {
                 null,
                 ImmutableArray.Create("verdict=" + result.Purity, "diagnostic=" + enforcePureFailure)));
     }
-
-    private static ImmutableArray<Diagnostic> EvaluateDiagnosticExpectation(
-        FuzzCase fuzzCase,
-        ImmutableArray<Diagnostic> diagnostics,
-        DiagnosticExpectationPolicy policy,
-        ImmutableArray<FuzzFinding>.Builder findings) {
-        var matchingDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == policy.DiagnosticId)
-            .ToImmutableArray();
-
-        if (policy.MustNotEmit && !matchingDiagnostics.IsEmpty)
-            findings.Add(new FuzzFinding(
-                fuzzCase.Name,
-                fuzzCase.Family,
-                policy.UnexpectedCategory,
-                policy.UnexpectedDescription,
-                null,
-                ToDiagnosticSignatures(matchingDiagnostics)));
-
-        if (policy.MustEmit && matchingDiagnostics.IsEmpty)
-            findings.Add(new FuzzFinding(
-                fuzzCase.Name,
-                fuzzCase.Family,
-                policy.MissingCategory,
-                policy.MissingDescription,
-                null,
-                ToDiagnosticSignatures(diagnostics)));
-
-        if (policy.ValidateEvidence)
-            foreach (var diagnostic in matchingDiagnostics)
-                if (MissingAnyRequiredProperties(diagnostic, policy.RequiredProperties))
-                    findings.Add(new FuzzFinding(
-                        fuzzCase.Name,
-                        fuzzCase.Family,
-                        policy.MissingEvidenceCategory,
-                        policy.MissingEvidenceDescription,
-                        null,
-                        ImmutableArray.Create(ToDiagnosticSignature(diagnostic))));
-
-        return matchingDiagnostics;
-    }
-
-    private static bool MissingAnyRequiredProperties(Diagnostic diagnostic, ImmutableArray<string> keys) {
-        foreach (var key in keys)
-            if (MissingProperty(diagnostic, key))
-                return true;
-
-        return false;
-    }
-
-    private static bool MissingProperty(Diagnostic diagnostic, string key) => !diagnostic.Properties.TryGetValue(key, out var value) ||
-               string.IsNullOrWhiteSpace(value);
 
     private static ImmutableSortedDictionary<string, int> CollectOperationKinds(
         Compilation compilation,
@@ -552,13 +488,7 @@ public static class FuzzRunner {
         var lineSpan = diagnostic.Location.GetLineSpan();
         var line = lineSpan.StartLinePosition.Line + 1;
         var character = lineSpan.StartLinePosition.Character + 1;
-        var properties = string.Join(
-            ";",
-            diagnostic.Properties
-                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                .Select(pair => pair.Key + "=" + pair.Value));
-
-        return $"{diagnostic.Id}|{line}:{character}|{diagnostic.GetMessage()}|{properties}";
+        return $"{diagnostic.Id}|{line}:{character}|{diagnostic.GetMessage()}";
     }
 
     private static string CreateCoverageJson(FuzzRunSummary summary) {
@@ -628,16 +558,4 @@ public static class FuzzRunner {
         return new string(chars);
     }
 
-    readonly record struct DiagnosticExpectationPolicy(
-        string DiagnosticId,
-        bool MustNotEmit,
-        bool MustEmit,
-        bool ValidateEvidence,
-        ImmutableArray<string> RequiredProperties,
-        string UnexpectedCategory,
-        string UnexpectedDescription,
-        string MissingCategory,
-        string MissingDescription,
-        string MissingEvidenceCategory,
-        string MissingEvidenceDescription);
 }

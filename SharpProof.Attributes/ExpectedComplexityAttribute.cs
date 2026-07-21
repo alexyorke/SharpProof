@@ -1,6 +1,6 @@
 namespace SharpProof.Attributes;
 
-[AttributeUsage(AttributeTargets.All, Inherited = false)]
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Constructor | AttributeTargets.Property, Inherited = false)]
 public sealed class ExpectedComplexityAttribute : Attribute {
     public ExpectedComplexityAttribute(ComplexityKind maximumComplexity) {
         MaximumComplexity = maximumComplexity;

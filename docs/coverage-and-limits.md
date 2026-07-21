@@ -21,7 +21,7 @@ The analyzer combines:
 - Unsupported C# and library shapes can remain unknown or unproven.
 - Unknown results distinguish unsupported syntax, unsupported operations,
   missing library models, dynamic, external, and recursive boundaries, solver
-  disablement, budgets, timeouts, native failures, cancellation, and invalid
+  budgets, timeouts, native failures, cancellation, and invalid
   contract input through the [stable unknown-reason taxonomy](unknown-reasons.md).
 - Regex and string reasoning are partial.
 - Solver assignments are examples, not exhaustive input sets. Regex domains,
@@ -38,9 +38,6 @@ The analyzer combines:
 - Fact collection, structural null-state inspection, and control-flow/state
   merges have configurable positive caps. Exceeded caps emit stable evidence
   instead of disappearing; see [bounded analysis limits](analysis-limits.md).
-- Known runtime-hazard coverage gaps have explicit acceptance criteria and
-  executable current-behavior regressions in
-  [the runtime-hazard backlog](runtime-hazard-backlog.md).
 - Complexity is asymptotic CPU-work classification for supported method shapes,
   not wall-clock timing, allocation complexity, or JIT/cache behavior.
 - External calls, dynamic dispatch, reflection-heavy flows, native interop, and
@@ -84,13 +81,9 @@ typed IR becomes an `Unsupported` fact, returns `Unknown` with
 `unknown(...)`. Formula provenance is metadata only; it is not proof control
 flow.
 
-Unknown candidates stay opt-in in analyzer builds. Set
-`sharpproof_runtime_hazard_mode = unknowns` for informational `SP0033` only,
-`sites-and-unknowns` for warning-level proven sites plus informational unknowns,
-or `all-and-unknowns` to add method summaries. SP0033 has its own diagnostic ID,
-structured proof and trigger properties, explain metadata, and exact baseline
-evidence, so it can be suppressed with normal `.editorconfig`, pragma, or
-`SharpProof.Baseline.json` controls without hiding proven SP0011 hazards.
+Runtime hazards remain structured facts in the unified analysis result. They
+are consumed by contract proofs and the CLI rather than emitted as standalone
+analyzer diagnostics.
 
 ## Soundness Rule
 

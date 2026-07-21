@@ -5,7 +5,6 @@ namespace SharpProof.Analyzer;
 internal static class MethodCapabilityAnalyzer {
     internal static void AnalyzeSymbolForCapabilities(
         MethodBodyAnalysisContext context,
-        DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         if (!TryGetAllowedCapabilities(context, attributePolicy, out var allowed)) return;
 
@@ -17,24 +16,9 @@ internal static class MethodCapabilityAnalyzer {
 
             var location = Location.Create(context.Node.SyntaxTree, new TextSpan(site.SpanStart, site.SpanLength));
             var text = disallowed.ToString();
-            var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
-                ImmutableDictionary<string, string?>.Empty
-                    .Add("sharpproof.capability.flags", text)
-                    .Add("sharpproof.capability.symbol", site.Symbol),
-                method,
-                context.Node.SyntaxTree,
-                site.Reason,
-                null,
-                DiagnosticEvidenceKey.ForSpanLength(site.Reason, site.SpanStart, site.SpanLength, text, site.Symbol),
-                location,
-                "[AllowedCapabilities]",
-                "violated",
-                text);
-            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(context, baseline, Diagnostic.Create(
+            context.ReportDiagnostic(Diagnostic.Create(
                 AnalyzerDiagnosticCatalog.Get("CapabilityViolationRule"),
                 location,
-                null,
-                properties,
                 site.Operation,
                 method.Name,
                 text));
@@ -43,23 +27,9 @@ internal static class MethodCapabilityAnalyzer {
         if (effects.UnknownReasons.IsDefaultOrEmpty) return;
         var unknown = effects.UnknownReasons[0];
         var declarationLocation = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
-        var unknownProperties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
-            ImmutableDictionary<string, string?>.Empty
-                .Add(DiagnosticPropertyNames.CapabilityUnknownReasonProperty, unknown.Message),
-            method,
-            context.Node.SyntaxTree,
-            "method_effects",
-            null,
-            "effects-unknown:" + unknown.Code,
-            declarationLocation,
-            "[AllowedCapabilities]",
-            "unknown",
-            unknown.Code);
-        AnalyzerDiagnosticReporter.ReportIfNotSuppressed(context, baseline, Diagnostic.Create(
+        context.ReportDiagnostic(Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("CapabilityUnknownRule"),
             declarationLocation,
-            null,
-            unknownProperties,
             "<method body>",
             method.Name,
             unknown.Message));

@@ -62,7 +62,6 @@ internal sealed record SymbolicProjectConfiguration(
                 options, "sharpproof_smt_mode", out var value)) return fallback;
 
         return value.Trim().ToLowerInvariant() switch {
-            "disabled" => SmtAnalysisMode.Off,
             "bounded" => SmtAnalysisMode.Bounded,
             "deep" => SmtAnalysisMode.Deep,
             _ => fallback
