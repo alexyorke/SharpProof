@@ -299,14 +299,14 @@ internal static partial class ExceptionFlowAnalyzer {
     }
 
     private static IEnumerable<Location>? AdditionalLocations(Location? location) =>
-        location == null ? null : new[] { location };
+        location == null ? null : [location];
 
-    private enum ExceptionContractKind {
+    enum ExceptionContractKind {
         DoesNotThrow,
         AllowedExceptions
     }
 
-    private readonly record struct ExceptionContract(
+    readonly record struct ExceptionContract(
         ExceptionContractKind Kind,
         ImmutableArray<ITypeSymbol> AllowedTypes,
         string AttributeDisplay,
@@ -314,12 +314,12 @@ internal static partial class ExceptionFlowAnalyzer {
         Location? Location,
         ImmutableArray<InvalidExceptionContractArgument> InvalidArguments);
 
-    private readonly record struct InvalidExceptionContractArgument(
+    readonly record struct InvalidExceptionContractArgument(
         string Argument,
         string Reason,
         Location? Location);
 
-    private readonly record struct EffectiveExceptionContract(
+    readonly record struct EffectiveExceptionContract(
         ExceptionContractKind Kind,
         ImmutableArray<ITypeSymbol> AllowedTypes,
         string AttributeDisplay,

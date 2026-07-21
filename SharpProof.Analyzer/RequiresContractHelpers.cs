@@ -183,7 +183,7 @@ internal static class RequiresContractHelpers {
                reason;
     }
 
-    private sealed class ParameterPlaceholderRewriter : CSharpSyntaxRewriter {
+    sealed class ParameterPlaceholderRewriter : CSharpSyntaxRewriter {
         private readonly IReadOnlyDictionary<string, ExpressionSyntax> _replacements;
         private readonly IReadOnlyDictionary<string, TypeSyntax> _typeReplacements;
 

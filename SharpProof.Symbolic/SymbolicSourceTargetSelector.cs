@@ -30,7 +30,7 @@ internal static class SymbolicSourceTargetSelector {
         TextSpan span,
         bool includeExpressionProgramPoints,
         CancellationToken cancellationToken) {
-        if (span.Length == 0) return Array.Empty<SyntaxNode>();
+        if (span.Length == 0) return [];
 
         cancellationToken.ThrowIfCancellationRequested();
         var index = QueryNodeIndexes.GetValue(
@@ -59,16 +59,6 @@ internal static class SymbolicSourceTargetSelector {
 
     internal static bool ContainsPosition(SyntaxNode candidate, int targetPosition) =>
         candidate.Span.Contains(targetPosition);
-
-    private static bool IsUsefulLineExpressionProgramPoint(ExpressionSyntax expression) {
-        return expression is AssignmentExpressionSyntax or AwaitExpressionSyntax or BinaryExpressionSyntax
-            or CastExpressionSyntax or
-            ConditionalAccessExpressionSyntax or ConditionalExpressionSyntax or ElementAccessExpressionSyntax
-            or InvocationExpressionSyntax or
-            IsPatternExpressionSyntax or MemberAccessExpressionSyntax or ObjectCreationExpressionSyntax
-            or PrefixUnaryExpressionSyntax or
-            PostfixUnaryExpressionSyntax or RangeExpressionSyntax or SwitchExpressionSyntax or ThrowExpressionSyntax;
-    }
 
     private static SyntaxNode? FindExpressionContextNode(SyntaxToken token, int position) {
         foreach (var node in token.Parent?.AncestorsAndSelf() ?? Enumerable.Empty<SyntaxNode>())
@@ -103,7 +93,7 @@ internal static class SymbolicSourceTargetSelector {
                ?? expression;
     }
 
-    private sealed class QueryNodeIndex {
+    sealed class QueryNodeIndex {
         private readonly IReadOnlyDictionary<int, ImmutableArray<SyntaxNode>> _baseNodesByLine;
         private readonly IReadOnlyDictionary<int, ImmutableArray<SyntaxNode>> _expressionNodesByLine;
         private readonly SourceText _text;
@@ -138,7 +128,13 @@ internal static class SymbolicSourceTargetSelector {
             foreach (var expression in root.DescendantNodes(descendIntoTrivia: false)
                          .OfType<ExpressionSyntax>()
                          .Where(static expression =>
-                             expression.Span.Length > 0 && IsUsefulLineExpressionProgramPoint(expression))) {
+                             expression.Span.Length > 0 && (expression is AssignmentExpressionSyntax or AwaitExpressionSyntax or BinaryExpressionSyntax
+                                 or CastExpressionSyntax or
+                                 ConditionalAccessExpressionSyntax or ConditionalExpressionSyntax or ElementAccessExpressionSyntax
+                                 or InvocationExpressionSyntax or
+                                 IsPatternExpressionSyntax or MemberAccessExpressionSyntax or ObjectCreationExpressionSyntax
+                                 or PrefixUnaryExpressionSyntax or
+                                 PostfixUnaryExpressionSyntax or RangeExpressionSyntax or SwitchExpressionSyntax or ThrowExpressionSyntax))) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var key = (expression.RawKind, expression.SpanStart, expression.Span.End);
                 if (!expressionNodes.ContainsKey(key)) expressionNodes.Add(key, expression);
@@ -154,7 +150,7 @@ internal static class SymbolicSourceTargetSelector {
             TextSpan span,
             bool includeExpressionProgramPoints,
             CancellationToken cancellationToken) {
-            if (span.Length == 0) return Array.Empty<SyntaxNode>();
+            if (span.Length == 0) return [];
 
             var startLine = _text.Lines.GetLineFromPosition(span.Start).LineNumber;
             var endLine = _text.Lines.GetLineFromPosition(span.End - 1).LineNumber;

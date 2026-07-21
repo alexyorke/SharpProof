@@ -461,7 +461,7 @@ internal sealed class Z3FormulaEncoder : IDisposable {
             Status: SmtWitnessStatus.Approximate);
     }
 
-    private enum RegexTranslationPrecision {
+    enum RegexTranslationPrecision {
         Unsupported,
         Exact,
         Approximate

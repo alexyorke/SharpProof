@@ -74,7 +74,7 @@ internal static class FuzzShapeRegistry {
             ? effect
             : throw new InvalidOperationException("Invalid fuzz effect expectation: " + value);
 
-    private sealed record RegistryDefinition(
+    sealed record RegistryDefinition(
         string Id,
         string[] PrimaryShapes,
         string[] OperationKinds,

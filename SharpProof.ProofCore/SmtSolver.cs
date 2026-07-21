@@ -222,7 +222,7 @@ internal sealed class SmtSolver : IDisposable {
         return variables.ToArray();
     }
 
-    private readonly record struct PreparedSmtQuery(
+    readonly record struct PreparedSmtQuery(
         SmtConcreteFactPreparationStatus Status,
         SmtFormula[] OriginalConditions,
         SmtFormula[] Conditions,

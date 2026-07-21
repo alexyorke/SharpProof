@@ -248,7 +248,7 @@ internal static class SymbolicLoopStateTransfer {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         if (expression is not BinaryExpressionSyntax binaryExpression) {
             upperBound = null!;
-            upperBoundSymbols = Array.Empty<ISymbol>();
+            upperBoundSymbols = [];
             return false;
         }
 
@@ -289,7 +289,7 @@ internal static class SymbolicLoopStateTransfer {
         }
 
         upperBound = null!;
-        upperBoundSymbols = Array.Empty<ISymbol>();
+        upperBoundSymbols = [];
         return false;
     }
 
@@ -311,7 +311,7 @@ internal static class SymbolicLoopStateTransfer {
             lowering is not { IsExact: true, Value: { } candidate } ||
             candidate.Kind != SmtValueKind.Int) {
             bound = null!;
-            boundSymbols = Array.Empty<ISymbol>();
+            boundSymbols = [];
             return false;
         }
 
@@ -525,7 +525,7 @@ internal static class SymbolicLoopStateTransfer {
     private static bool IsCompatibleSubtrahend(long subtrahend, MonotonicDirection direction) =>
         direction == MonotonicDirection.NonDecreasing ? subtrahend <= 0 : subtrahend >= 0;
 
-    private enum MonotonicDirection {
+    enum MonotonicDirection {
         NonDecreasing,
         NonIncreasing
     }

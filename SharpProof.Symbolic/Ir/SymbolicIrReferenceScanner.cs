@@ -79,7 +79,7 @@ internal static class SymbolicIrReferenceScanner {
                (index == candidate.Length || candidate[index] is '.' or '[');
     }
 
-    private sealed class VariableReferenceVisitor : SymbolicIrVisitor {
+    sealed class VariableReferenceVisitor : SymbolicIrVisitor {
         private readonly Func<string, bool> _match;
 
         internal VariableReferenceVisitor(Func<string, bool> match) => _match = match;

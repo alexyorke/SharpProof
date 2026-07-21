@@ -26,7 +26,7 @@ public static class SarifCorpusReport {
         return builder.Build();
     }
 
-    private sealed class SummaryBuilder {
+    sealed class SummaryBuilder {
         private readonly ImmutableArray<string>.Builder _inputs = ImmutableArray.CreateBuilder<string>();
         private readonly ImmutableArray<DiagnosticEvidenceItem>.Builder _diagnostics =
             ImmutableArray.CreateBuilder<DiagnosticEvidenceItem>();

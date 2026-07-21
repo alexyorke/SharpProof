@@ -275,7 +275,7 @@ internal static class BaselineSchemaContract {
         string.IsNullOrWhiteSpace(expected) ||
         string.Equals(expected!.Trim(), actual?.Trim(), StringComparison.Ordinal);
 
-    private readonly record struct BaselineEntryKey(
+    readonly record struct BaselineEntryKey(
         string Id,
         string Symbol,
         string Path,

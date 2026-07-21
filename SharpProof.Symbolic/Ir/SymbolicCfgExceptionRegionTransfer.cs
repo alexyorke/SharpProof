@@ -197,13 +197,13 @@ internal static class SymbolicCfgExceptionRegionTransfer {
         SymbolicLoweringResult<SymbolicState>.Unsupported(
             new SymbolicLoweringProvenance("cfg-program-point", source.Span, detail));
 
-    private sealed record CfgExceptionRegionPlan(
+    sealed record CfgExceptionRegionPlan(
         ImmutableArray<CfgCatchRoute> Catches,
         SymbolicNestedMutationInvalidationPlan ProtectedMutations,
         bool HasKnownThrownType,
         ITypeSymbol? KnownThrownType);
 
-    private readonly record struct CfgCatchRoute(
+    readonly record struct CfgCatchRoute(
         CatchClauseSyntax Clause,
         ITypeSymbol? ExceptionType);
 }

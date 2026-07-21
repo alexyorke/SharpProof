@@ -24,18 +24,16 @@ internal sealed record SymbolicAnalysisTruncationEvent(
     [property: JsonPropertyOrder(5)] int? SourceSpanStart) {
     [JsonPropertyOrder(1)]
     public string Code { get; } = GetCode(Kind);
-
-    private static string GetCode(SymbolicAnalysisLimitKind value) => "analysis_limit." +
-        (Enum.IsDefined(typeof(SymbolicAnalysisLimitKind), value) ? ToSnakeCase(value.ToString()) : "unknown");
-
-    private static string ToSnakeCase(string value) {
-        var result = new System.Text.StringBuilder(value.Length + 8);
-        for (var index = 0; index < value.Length; index++) {
-            var character = value[index];
-            if (index != 0 && char.IsUpper(character)) result.Append('_');
-            result.Append(char.ToLowerInvariant(character));
+    private static string GetCode(SymbolicAnalysisLimitKind value) {
+        var text = value.ToString();
+        var snakeBuilder = new System.Text.StringBuilder(text.Length + 8);
+        for (var index = 0; index < text.Length; index++) {
+            var character = text[index];
+            if (index != 0 && char.IsUpper(character)) snakeBuilder.Append('_');
+            snakeBuilder.Append(char.ToLowerInvariant(character));
         }
-        return result.ToString();
+        var snake = snakeBuilder.ToString();
+        return "analysis_limit." + (Enum.IsDefined(typeof(SymbolicAnalysisLimitKind), value) ? snake : "unknown");
     }
 }
 

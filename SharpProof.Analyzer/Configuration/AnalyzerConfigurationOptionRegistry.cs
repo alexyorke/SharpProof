@@ -35,7 +35,7 @@ internal static class AnalyzerConfigurationOptionRegistry {
         }).ToImmutableArray();
     }
 
-    private sealed class ConfigurationOptionDefinition {
+    sealed class ConfigurationOptionDefinition {
         public string Key { get; set; } = string.Empty;
         public string Scope { get; set; } = string.Empty;
         public string ValueKind { get; set; } = string.Empty;
@@ -44,8 +44,8 @@ internal static class AnalyzerConfigurationOptionRegistry {
         public int DeepValue { get; set; }
         public string Unit { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
-        public string[] AllowedValues { get; set; } = Array.Empty<string>();
-        public string[] AcceptedAliases { get; set; } = Array.Empty<string>();
+        public string[] AllowedValues { get; set; } = [];
+        public string[] AcceptedAliases { get; set; } = [];
     }
     internal static bool TryParseRuntimeHazardMode(string? value, out RuntimeHazardMode mode) {
         mode = value?.Trim().ToLowerInvariant() switch {

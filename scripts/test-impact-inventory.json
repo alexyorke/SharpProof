@@ -679,15 +679,6 @@
       "referencedTokens": []
     },
     {
-      "path": "SharpProof.Analyzer/Engine/ConcreteReceiverResolver.cs",
-      "module": "Analyzer",
-      "declaredTypes": [
-        "ConcreteReceiverResolver"
-      ],
-      "referencingFixtureCount": 0,
-      "referencedTokens": []
-    },
-    {
       "path": "SharpProof.Analyzer/Engine/ExecutionVisibility.ConditionTruth.cs",
       "module": "Analyzer",
       "declaredTypes": [
@@ -764,15 +755,6 @@
       "referencedTokens": [
         "ExecutionVisibility"
       ]
-    },
-    {
-      "path": "SharpProof.Analyzer/Engine/Rules/DisposalMemberClassifier.cs",
-      "module": "Analyzer",
-      "declaredTypes": [
-        "DisposalMemberClassifier"
-      ],
-      "referencingFixtureCount": 0,
-      "referencedTokens": []
     },
     {
       "path": "SharpProof.Analyzer/ExceptionFlowAnalyzer.Contracts.cs",
@@ -1405,6 +1387,7 @@
         "SmtStringEndsWithFormula",
         "SmtStringLengthTerm",
         "SmtStringStartsWithFormula",
+        "SmtStringSubstringTerm",
         "SmtUnaryFormula",
         "SmtUnaryOperator",
         "SmtValueKind",
@@ -1819,6 +1802,7 @@
         "SymbolicStringContentTerm",
         "SymbolicStringPredicateAtom",
         "SymbolicStringPredicateKind",
+        "SymbolicStringSliceTerm",
         "SymbolicTerm",
         "SymbolicTruthAtom",
         "SymbolicTypeTestAtom",
@@ -1939,6 +1923,7 @@
       "path": "SharpProof.Symbolic/Ir/SymbolicIrTraversal.cs",
       "module": "Symbolic",
       "declaredTypes": [
+        "SymbolicIrChildren",
         "SymbolicIrRewriter",
         "SymbolicIrVisitor"
       ],

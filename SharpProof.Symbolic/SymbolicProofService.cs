@@ -241,7 +241,7 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
         return false;
     }
 
-    private enum ConditionClassificationMode {
+    enum ConditionClassificationMode {
         Implication,
         Truth
     }

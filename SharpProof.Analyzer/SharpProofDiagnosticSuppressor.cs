@@ -199,7 +199,7 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor {
                 .Hazards;
         }
         catch (Exception ex) when (ex is not OperationCanceledException) {
-            return Array.Empty<SymbolicRuntimeHazard>();
+            return [];
         }
     }
 
@@ -242,16 +242,16 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor {
             hazardKinds.ToImmutableHashSet());
     }
 
-    private readonly record struct SuppressionSpec(
+    readonly record struct SuppressionSpec(
         SuppressionDescriptor Descriptor,
         ImmutableHashSet<SymbolicRuntimeHazardKind> HazardKinds);
 
-    private readonly record struct SuppressionCandidate(
+    readonly record struct SuppressionCandidate(
         Diagnostic Diagnostic,
         SuppressionSpec Spec,
         SyntaxNode QueryRoot);
 
-    private readonly record struct QueryRootKey(
+    readonly record struct QueryRootKey(
         SyntaxTree SyntaxTree,
         int SpanStart,
         int SpanEnd);

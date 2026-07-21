@@ -179,10 +179,7 @@ internal static class AttributePlacementAnalyzer {
             location,
             null,
             properties,
-            new object[] {
-                attributeName,
-                displayName
-            });
+            [attributeName, displayName]);
     }
 
     private static INamedTypeSymbol? GetAttributeClass(
@@ -207,12 +204,12 @@ internal static class AttributePlacementAnalyzer {
                node is LocalFunctionStatementSyntax;
     }
 
-    private enum AttributeTargetPolicy {
+    enum AttributeTargetPolicy {
         PurityOnly,
         PurityOrGetterAlias
     }
 
-    private readonly record struct AttributePlacementRule(
+    readonly record struct AttributePlacementRule(
         string AttributeTypeName,
         string AttributeName,
         DiagnosticDescriptor Descriptor,

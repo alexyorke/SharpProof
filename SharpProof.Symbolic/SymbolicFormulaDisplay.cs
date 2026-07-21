@@ -50,7 +50,7 @@ internal static class SymbolicFormulaDisplay {
             case SmtIntegerBinaryTerm binary:
                 return FormatIntegerBinary(binary);
             case SmtOpaqueIntegerBinaryTerm binary:
-                return FormatOpaqueIntegerBinary(binary);
+                return FormatIntegerBinary(binary.Operator, binary.Left, binary.Right);
             case SmtStringLengthTerm length:
                 return FormatTerm(length.Value) + ".Length";
             case SmtStringConcatTerm concat:
@@ -88,7 +88,14 @@ internal static class SymbolicFormulaDisplay {
             case SmtUnaryFormula unary:
                 return GetMergeTarget(unary.Operand);
             case SmtBinaryFormula binary when IsComparison(binary.Operator):
-                return GetComparisonTarget(binary);
+                {
+                    var leftTarget = TryGetTermTarget(binary.Left);
+                    var rightTarget = TryGetTermTarget(binary.Right);
+                    if (leftTarget != null && IsConstant(binary.Right)) return leftTarget;
+                    if (rightTarget != null && IsConstant(binary.Left)) return rightTarget;
+                    if (leftTarget != null && rightTarget != null) return leftTarget + "," + rightTarget;
+                    return Format(binary);
+                }
             case SmtStringContainsFormula contains:
                 return FormatTerm(contains.Value);
             case SmtStringStartsWithFormula startsWith:
@@ -129,9 +136,6 @@ internal static class SymbolicFormulaDisplay {
     private static string FormatIntegerBinary(SmtIntegerBinaryTerm binary) =>
         FormatIntegerBinary(binary.Operator, binary.Left, binary.Right);
 
-    private static string FormatOpaqueIntegerBinary(SmtOpaqueIntegerBinaryTerm binary) =>
-        FormatIntegerBinary(binary.Operator, binary.Left, binary.Right);
-
     private static string FormatIntegerBinary(
         SmtIntegerBinaryOperator binaryOperator,
         SmtFormula left,
@@ -159,18 +163,6 @@ internal static class SymbolicFormulaDisplay {
             SmtConditionalFormula
             ? "(" + Format(formula) + ")"
             : Format(formula);
-    }
-
-    private static string GetComparisonTarget(SmtBinaryFormula binary) {
-        var leftTarget = TryGetTermTarget(binary.Left);
-        var rightTarget = TryGetTermTarget(binary.Right);
-        if (leftTarget != null && IsConstant(binary.Right)) return leftTarget;
-
-        if (rightTarget != null && IsConstant(binary.Left)) return rightTarget;
-
-        if (leftTarget != null && rightTarget != null) return leftTarget + "," + rightTarget;
-
-        return Format(binary);
     }
 
     private static string? TryGetTermTarget(SmtFormula formula) {

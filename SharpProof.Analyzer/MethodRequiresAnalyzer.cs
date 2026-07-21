@@ -380,9 +380,9 @@ internal static class MethodRequiresAnalyzer {
     }
 
     private static IEnumerable<Location>? AdditionalLocations(Location? location) =>
-        location == null ? null : new[] { location };
+        location == null ? null : [location];
 
-    private readonly record struct RequiresCallSite(
+    readonly record struct RequiresCallSite(
         IMethodSymbol Method,
         ImmutableDictionary<string, ExpressionSyntax> Arguments,
         SyntaxNode Syntax);

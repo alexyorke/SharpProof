@@ -16,7 +16,7 @@ internal static class SymbolicIrSubstitution {
         SymbolicTerm source,
         SymbolicTerm replacement) => new TermSubstitutionRewriter(source, replacement).Rewrite(condition);
 
-    private sealed class TermSubstitutionRewriter : SymbolicIrRewriter {
+    sealed class TermSubstitutionRewriter : SymbolicIrRewriter {
         private readonly SymbolicTerm _replacement;
         private readonly string _sourceKey;
 

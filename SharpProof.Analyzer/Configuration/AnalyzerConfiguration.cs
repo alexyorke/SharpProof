@@ -118,7 +118,7 @@ internal sealed record AnalyzerConfiguration(
     }
 
     private static IEnumerable<string> SplitValues(string value) {
-        foreach (var token in value.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries)) {
+        foreach (var token in value.Split([',', ';', '\n'], StringSplitOptions.RemoveEmptyEntries)) {
             var item = token.Trim();
             if (item.Length > 0) yield return item;
         }
@@ -166,23 +166,17 @@ internal sealed record AnalyzerConfiguration(
     }
 
     internal static bool TryParseBool(string value, out bool parsed) {
-        switch (value.Trim().ToLowerInvariant()) {
-            case "1":
-            case "true":
-            case "yes":
-            case "on":
-                parsed = true;
-                return true;
-            case "0":
-            case "false":
-            case "no":
-            case "off":
-                parsed = false;
-                return true;
-            default:
-                parsed = false;
-                return false;
+        var trimmed = value.Trim().ToLowerInvariant();
+        if (trimmed is "1" or "true" or "yes" or "on") {
+            parsed = true;
+            return true;
         }
+        if (trimmed is "0" or "false" or "no" or "off") {
+            parsed = false;
+            return true;
+        }
+        parsed = false;
+        return false;
     }
 
     private static TrustedBoundaryReviewMode GetTrustedBoundaryReviewMode(ConfigurationOptionSource options) {
@@ -358,7 +352,7 @@ internal sealed record AnalyzerConfiguration(
     private static bool TryGetAnalyzerConfigOption(AnalyzerConfigOptions options, string key, out string value) =>
         AnalyzerConfigurationValueReader.TryGetNonEmpty(options, key, out value);
 
-    private readonly struct ConfigurationOptionSource {
+    readonly struct ConfigurationOptionSource {
         private readonly AnalyzerOptions? _globalOptions;
         private readonly AnalyzerConfigOptions? _treeOptions;
 

@@ -120,7 +120,7 @@ internal static class PathConditionMergeEngine {
         string provenance) =>
         SymbolicAnalysisLimitContext.Record(kind, limit, observed, null, provenance);
 
-    private sealed class StatePathFacts {
+    sealed class StatePathFacts {
         private readonly ImmutableArray<SymbolicCondition> branches;
         private readonly ImmutableArray<PathFact> facts;
         private readonly SharpProofAnalysisBudget limits;
@@ -192,7 +192,7 @@ internal static class PathConditionMergeEngine {
         }
     }
 
-    private sealed record PathFact(
+    sealed record PathFact(
         SymbolicCondition Condition,
         string TargetKey);
 }

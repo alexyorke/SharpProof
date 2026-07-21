@@ -131,8 +131,16 @@ internal sealed partial class SmtConcreteFactIndex {
 
             if (!TryGetAliasComparison(formula, out var left, out var right)) return added;
 
-            var addedAlias = UnionAliases(left, right, out var aliasContradiction);
-            hasContradiction |= aliasContradiction;
+            left = FindCanonical(left);
+            right = FindCanonical(right);
+            var addedAlias = false;
+            if (!left.Equals(right)) {
+                var canonical = SelectCanonical(left, right);
+                var alias = canonical.Equals(left) ? right : left;
+                hasContradiction |= RegisterAlias(alias, canonical);
+                addedAlias = true;
+            }
+
             return added || addedAlias;
         }
 
@@ -213,23 +221,27 @@ internal sealed partial class SmtConcreteFactIndex {
                 if (!SmtIntegerArithmetic.TrySubtract(right.Offset, left.Offset, out offset)) return false;
             }
 
-            var replacement = CreateOffsetTerm(baseTerm, offset);
-            return AddDirectedAlias(alias, replacement, out hasContradiction);
-        }
+            SmtFormula replacement;
+            if (offset == 0) {
+                replacement = baseTerm;
+            }
+            else {
+                replacement = new SmtIntegerBinaryTerm(
+                    SmtIntegerBinaryOperator.Add,
+                    baseTerm,
+                    new SmtIntegerConstant(offset));
+            }
 
-        private bool AddDirectedAlias(
-            SmtFormula alias,
-            SmtFormula canonical,
-            out bool hasContradiction) {
-            hasContradiction = false;
-            alias = NormalizeAliases(alias);
-            canonical = NormalizeAliases(canonical);
-            if (alias.Kind != canonical.Kind ||
-                alias.Equals(canonical) ||
-                ReferencesFormula(canonical, alias))
+            var canonical = NormalizeAliases(replacement);
+            var aliased = NormalizeAliases(alias);
+            if (aliased.Kind != canonical.Kind ||
+                aliased.Equals(canonical) ||
+                ReferencesFormula(canonical, aliased)) {
+                hasContradiction = false;
                 return false;
+            }
 
-            hasContradiction = RegisterAlias(alias, canonical);
+            hasContradiction = RegisterAlias(aliased, canonical);
             return true;
         }
 
@@ -262,15 +274,6 @@ internal sealed partial class SmtConcreteFactIndex {
             catch (OverflowException) {
                 return false;
             }
-        }
-
-        private static SmtFormula CreateOffsetTerm(SmtFormula baseTerm, long offset) {
-            return offset == 0
-                ? baseTerm
-                : new SmtIntegerBinaryTerm(
-                    SmtIntegerBinaryOperator.Add,
-                    baseTerm,
-                    new SmtIntegerConstant(offset));
         }
 
         private static SmtFormula CreateAffineTerm(SmtAffineIntegerTerm term) {
@@ -344,27 +347,52 @@ internal sealed partial class SmtConcreteFactIndex {
                 not SmtNullConstant;
         }
 
-        private bool UnionAliases(
-            SmtFormula left,
-            SmtFormula right,
-            out bool hasContradiction) {
-            left = FindCanonical(left);
-            right = FindCanonical(right);
-            hasContradiction = false;
-            if (left.Equals(right)) return false;
-
-            var canonical = SelectCanonical(left, right);
-            var alias = canonical.Equals(left) ? right : left;
-            hasContradiction = RegisterAlias(alias, canonical);
-            return true;
-        }
-
         private bool RegisterAlias(SmtFormula alias, SmtFormula canonical) {
             _aliases[alias] = (canonical, false);
-            MergeIntegerFacts(canonical, alias, out var integerContradiction);
-            MergeStringFacts(canonical, alias, out var stringContradiction);
-            MergeReferenceFacts(canonical, alias, out var referenceContradiction);
-            return integerContradiction || stringContradiction || referenceContradiction;
+            var hasContradiction = false;
+
+            if (_integerIntervals.TryGetValue(alias, out var aliasInterval)) {
+                var interval = _integerIntervals.TryGetValue(canonical, out var existing)
+                    ? existing.Intersect(aliasInterval)
+                    : aliasInterval;
+                hasContradiction = interval.IsContradictory;
+                _integerIntervals[canonical] = interval;
+                _integerIntervals.Remove(alias);
+            }
+
+            if (_excludedStrings.TryGetValue(alias, out var aliasExcluded)) {
+                if (_excludedStrings.TryGetValue(canonical, out var existingExcluded))
+                    existingExcluded.UnionWith(aliasExcluded);
+                else
+                    _excludedStrings[canonical] = new HashSet<string>(aliasExcluded, StringComparer.Ordinal);
+                _excludedStrings.Remove(alias);
+            }
+
+            if (_exactStrings.TryGetValue(alias, out var aliasExact)) {
+                if (_exactStrings.TryGetValue(canonical, out var existingExact) &&
+                    !string.Equals(existingExact, aliasExact, StringComparison.Ordinal))
+                    hasContradiction = true;
+
+                if (_excludedStrings.TryGetValue(canonical, out var excluded) &&
+                    excluded.Contains(aliasExact))
+                    hasContradiction = true;
+
+                _exactStrings[canonical] = aliasExact;
+                _exactStrings.Remove(alias);
+                AddStringLengthFact(canonical, aliasExact.Length, out var lengthContradiction);
+                hasContradiction |= lengthContradiction;
+            }
+
+            if (_referenceNullStates.TryGetValue(alias, out var aliasIsNull)) {
+                if (_referenceNullStates.TryGetValue(canonical, out var canonicalIsNull))
+                    hasContradiction = canonicalIsNull != aliasIsNull || hasContradiction;
+                else
+                    _referenceNullStates[canonical] = aliasIsNull;
+
+                _referenceNullStates.Remove(alias);
+            }
+
+            return hasContradiction;
         }
 
         private SmtFormula FindCanonical(SmtFormula formula) =>
@@ -389,65 +417,6 @@ internal sealed partial class SmtConcreteFactIndex {
 
         private static SmtFormula SelectCanonical(SmtFormula left, SmtFormula right) =>
             string.CompareOrdinal(left.ToString(), right.ToString()) <= 0 ? left : right;
-
-        private void MergeIntegerFacts(
-            SmtFormula canonical,
-            SmtFormula alias,
-            out bool hasContradiction) {
-            hasContradiction = false;
-            if (!_integerIntervals.TryGetValue(alias, out var aliasInterval)) return;
-
-            var interval = _integerIntervals.TryGetValue(canonical, out var existing)
-                ? existing.Intersect(aliasInterval)
-                : aliasInterval;
-            hasContradiction = interval.IsContradictory;
-            _integerIntervals[canonical] = interval;
-            _integerIntervals.Remove(alias);
-        }
-
-        private void MergeStringFacts(
-            SmtFormula canonical,
-            SmtFormula alias,
-            out bool hasContradiction) {
-            hasContradiction = false;
-            if (_excludedStrings.TryGetValue(alias, out var aliasExcluded)) {
-                if (_excludedStrings.TryGetValue(canonical, out var existingExcluded))
-                    existingExcluded.UnionWith(aliasExcluded);
-                else
-                    _excludedStrings[canonical] = new HashSet<string>(aliasExcluded, StringComparer.Ordinal);
-                _excludedStrings.Remove(alias);
-            }
-
-            if (!_exactStrings.TryGetValue(alias, out var aliasExact)) return;
-
-            if (_exactStrings.TryGetValue(canonical, out var existingExact) &&
-                !string.Equals(existingExact, aliasExact, StringComparison.Ordinal))
-                hasContradiction = true;
-
-            if (_excludedStrings.TryGetValue(canonical, out var excluded) &&
-                excluded.Contains(aliasExact))
-                hasContradiction = true;
-
-            _exactStrings[canonical] = aliasExact;
-            _exactStrings.Remove(alias);
-            AddStringLengthFact(canonical, aliasExact.Length, out var lengthContradiction);
-            hasContradiction |= lengthContradiction;
-        }
-
-        private void MergeReferenceFacts(
-            SmtFormula canonical,
-            SmtFormula alias,
-            out bool hasContradiction) {
-            hasContradiction = false;
-            if (!_referenceNullStates.TryGetValue(alias, out var aliasIsNull)) return;
-
-            if (_referenceNullStates.TryGetValue(canonical, out var canonicalIsNull))
-                hasContradiction = canonicalIsNull != aliasIsNull;
-            else
-                _referenceNullStates[canonical] = aliasIsNull;
-
-            _referenceNullStates.Remove(alias);
-        }
 
         private SmtFormula NormalizeAliases(SmtFormula formula) {
             if (!_workBudget.TryConsume()) return formula;
@@ -483,7 +452,7 @@ internal sealed partial class SmtConcreteFactIndex {
                 : normalized;
         }
 
-        private sealed class SyntacticWorkBudget(int remaining) {
+        sealed class SyntacticWorkBudget(int remaining) {
             private int _remaining = remaining;
 
             internal bool TryConsume() {

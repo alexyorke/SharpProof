@@ -25,7 +25,7 @@ internal static class SymbolicInputDomainSynthesizer {
             return new SymbolicInputDomainSummary(
                 SymbolicWitnessStatus.None,
                 "no_satisfying_alternatives",
-                Array.Empty<SymbolicInputDomain>(),
+                [],
                 0);
 
         if (summaries.Count == 1) return summaries[0];
@@ -147,7 +147,7 @@ internal static class SymbolicInputDomainSynthesizer {
     private static IReadOnlyList<string> IntersectValues(
         IReadOnlyList<IReadOnlyList<string>> alternatives,
         bool coversEveryAlternative) {
-        if (!coversEveryAlternative || alternatives.Count == 0) return Array.Empty<string>();
+        if (!coversEveryAlternative || alternatives.Count == 0) return [];
 
         var values = new HashSet<string>(alternatives[0], StringComparer.Ordinal);
         foreach (var alternative in alternatives.Skip(1)) values.IntersectWith(alternative);
@@ -594,20 +594,20 @@ internal static class SymbolicInputDomainSynthesizer {
         return polarity ? text : "!(" + text + ")";
     }
 
-    private enum RangeKind {
+    enum RangeKind {
         Integer,
         StringLength,
         CollectionLength
     }
 
-    private readonly record struct Target(
+    readonly record struct Target(
         string Key,
         string SourceName,
         SymbolicInputRole Role,
         SymbolicInputValueKind ValueKind,
         SymbolicInputDomainKind DomainKind);
 
-    private sealed class DomainBuilder {
+    sealed class DomainBuilder {
         private readonly HashSet<string> _contains = new(StringComparer.Ordinal);
         private readonly HashSet<string> _prefixes = new(StringComparer.Ordinal);
         private readonly HashSet<string> _predicateKeys = new(StringComparer.Ordinal);
@@ -753,7 +753,7 @@ internal static class SymbolicInputDomainSynthesizer {
         }
     }
 
-    private sealed class RangeBuilder {
+    sealed class RangeBuilder {
         private long? _maximum;
         private bool _maximumInclusive;
         private long? _minimum;

@@ -157,7 +157,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             SymbolicSmtDiagnostics.FromService(smtAnalysis));
     }
 
-    private readonly record struct RuntimeHazardScope(TextSpan? Span, int? RequestedLine) {
+    readonly record struct RuntimeHazardScope(TextSpan? Span, int? RequestedLine) {
         public static RuntimeHazardScope All { get; } = new(null, null);
     }
 

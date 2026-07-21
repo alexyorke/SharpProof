@@ -149,33 +149,6 @@ internal static class AnalyzerTestHost
         bool allowUnsafe = false,
         ImmutableArray<AdditionalText>? additionalFiles = null,
         string? sourcePath = null,
-        bool acceptAdditionalFiles = true,
-        ImmutableArray<MetadataReference>? frameworkReferences = null,
-        bool concurrentAnalysis = false,
-        string compilationName = "AnalyzerTestHost",
-        AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.All)
-    {
-        return await GetDiagnosticsAsync(
-            source,
-            globalOptions,
-            allowUnsafe,
-            additionalFiles,
-            sourcePath,
-            acceptAdditionalFiles,
-            frameworkReferences,
-            concurrentAnalysis,
-            null,
-            compilationName,
-            analyzerFeatures);
-    }
-
-    public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
-        string source,
-        ImmutableDictionary<string, string>? globalOptions,
-        bool allowUnsafe,
-        ImmutableArray<AdditionalText>? additionalFiles,
-        string? sourcePath,
-        bool acceptAdditionalFiles,
         ImmutableArray<MetadataReference>? frameworkReferences = null,
         bool concurrentAnalysis = false,
         ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
@@ -200,8 +173,7 @@ internal static class AnalyzerTestHost
 
         var analyzerOptions = CreateAnalyzerOptions(
             ApplyFileLevelDiagnosticOptions(source, globalOptions),
-            additionalFiles,
-            acceptAdditionalFiles);
+            additionalFiles);
 
         var compilationWithAnalyzers = compilation.WithAnalyzers(
             GetAnalyzers(analyzerFeatures),
@@ -225,10 +197,8 @@ internal static class AnalyzerTestHost
 
     public static AnalyzerOptions CreateAnalyzerOptions(
         ImmutableDictionary<string, string>? globalOptions = null,
-        ImmutableArray<AdditionalText>? additionalFiles = null,
-        bool acceptAdditionalFiles = true)
+        ImmutableArray<AdditionalText>? additionalFiles = null)
     {
-        _ = acceptAdditionalFiles;
         var analyzerAdditionalFiles = additionalFiles ?? ImmutableArray<AdditionalText>.Empty;
         var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
         if (analyzerAdditionalFiles.Length == 0 &&

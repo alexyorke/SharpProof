@@ -106,7 +106,7 @@ internal sealed class SymbolicComplexityCallModel(
                 SymbolicComplexityUnknownReason.DynamicDispatch,
                 syntax);
 
-        if (!IsSourceMethod(methodSymbol))
+        if (!SymbolicMethodSourceResolver.IsBackedBySource(methodSymbol))
             return CreateUnknownCalleeArtifacts(
                 methodSymbol,
                 SymbolicComplexityUnknownReason.ExternalCallee,
@@ -164,9 +164,6 @@ internal sealed class SymbolicComplexityCallModel(
                     reason)
             });
     }
-
-    private static bool IsSourceMethod(IMethodSymbol methodSymbol) =>
-        SymbolicMethodSourceResolver.IsBackedBySource(methodSymbol);
 
     private bool TryResolveSourceMethod(
         IMethodSymbol methodSymbol,

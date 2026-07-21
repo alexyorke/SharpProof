@@ -73,9 +73,6 @@ internal static class SymbolicStateInvalidator {
             "operation-transfer.reference-invalidation").State;
     }
 
-    internal static ISymbol NormalizeMutatedSymbol(ISymbol symbol) =>
-        symbol is IMethodSymbol { AssociatedSymbol: IPropertySymbol property } ? property : symbol;
-
     internal static bool IsCurrentInstanceMemberReference(
         ExpressionSyntax expression,
         SemanticModel semanticModel,

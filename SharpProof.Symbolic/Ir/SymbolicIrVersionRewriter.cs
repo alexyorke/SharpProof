@@ -15,7 +15,7 @@ internal static class SymbolicIrVersionRewriter {
         return symbolVersions.IsEmpty ? fact : new CurrentVersionRewriter(symbolVersions).Rewrite(fact);
     }
 
-    private sealed class CurrentVersionRewriter : SymbolicIrRewriter {
+    sealed class CurrentVersionRewriter : SymbolicIrRewriter {
         private readonly ImmutableDictionary<string, int> _symbolVersions;
 
         internal CurrentVersionRewriter(ImmutableDictionary<string, int> symbolVersions) => _symbolVersions = symbolVersions;

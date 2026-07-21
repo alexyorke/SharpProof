@@ -159,7 +159,7 @@ internal sealed class MethodEffectAnalysisSession(
             var builder = new Builder(IsCaught);
             foreach (var operation in root.DescendantsAndSelf())
                 if (operation is IVariableDeclaratorOperation { Symbol: var local, Initializer.Value: var value }) {
-                    if (IsAllocation(value)) builder.MarkFresh(local);
+                    if (value is IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or IDelegateCreationOperation) builder.MarkFresh(local);
                     builder.MarkExactType(local, value.Type);
                     builder.MarkDelegateTargets(local, value);
                 }
@@ -407,7 +407,20 @@ internal sealed class MethodEffectAnalysisSession(
 
         var syntax = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
         if (syntax == null) {
-            if (IsIntrinsicMetadataMethod(method)) return;
+            if (method is { MethodKind: MethodKind.Constructor, ContainingType.SpecialType: SpecialType.System_Object } ||
+                SymbolicTypeFacts.IsBuiltInIntegralType(method.ContainingType) ||
+                method.ContainingType?.SpecialType is SpecialType.System_String or
+                    SpecialType.System_Boolean or
+                    SpecialType.System_Single or
+                    SpecialType.System_Double or
+                    SpecialType.System_Decimal ||
+                method.ContainingType?.OriginalDefinition.ToDisplayString() is
+                    "System.Span<T>" or
+                    "System.ReadOnlySpan<T>" or
+                    "System.Nullable<T>" or
+                    "System.Index" or
+                    "System.Range")
+                return;
             var metadata = _metadata.Analyze(method);
             if (hasContract && metadata.Effects == SharpProofEffect.Unknown)
                 builder.AddTransitive(contracted, site, method, "complete_effect_contract");
@@ -528,22 +541,6 @@ internal sealed class MethodEffectAnalysisSession(
             unknowns.Distinct().ToImmutableArray());
     }
 
-    private static bool IsIntrinsicMetadataMethod(IMethodSymbol method) =>
-        method is { MethodKind: MethodKind.Constructor, ContainingType.SpecialType: SpecialType.System_Object } ||
-        SymbolicTypeFacts.IsBuiltInIntegralType(method.ContainingType) ||
-        method.ContainingType?.SpecialType is SpecialType.System_String or
-            SpecialType.System_Boolean or
-            SpecialType.System_Single or
-            SpecialType.System_Double or
-            SpecialType.System_Decimal ||
-        // These have no SpecialType, so they are still matched by name.
-        method.ContainingType?.OriginalDefinition.ToDisplayString() is
-            "System.Span<T>" or
-            "System.ReadOnlySpan<T>" or
-            "System.Nullable<T>" or
-            "System.Index" or
-            "System.Range";
-
     private static void AddWrite(IOperation target, Builder builder) {
         if (target.Syntax.Ancestors().Any(static syntax =>
                 syntax is InitializerExpressionSyntax or WithExpressionSyntax or
@@ -648,10 +645,6 @@ internal sealed class MethodEffectAnalysisSession(
         _ => false
     };
 
-    private static bool IsAllocation(IOperation operation) => operation is
-        IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
-        IDelegateCreationOperation;
-
     private static bool IsVisible(
         IOperation operation,
         SyntaxNode declaration,
@@ -713,7 +706,7 @@ internal sealed class MethodEffectAnalysisSession(
         false,
         false);
 
-    private sealed class Builder(Func<IOperation, string, bool> isCaught) {
+    sealed class Builder(Func<IOperation, string, bool> isCaught) {
         private readonly ImmutableArray<MethodExceptionFact>.Builder _exceptions =
             ImmutableArray.CreateBuilder<MethodExceptionFact>();
         private readonly ImmutableArray<MethodEffectSite>.Builder _sites =

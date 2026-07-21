@@ -41,7 +41,7 @@ internal sealed class SmtRegexValidator {
         _cache[key] = result;
     }
 
-    private readonly record struct RegexValidationKey(string Input, string Pattern, RegexOptions Options);
+    readonly record struct RegexValidationKey(string Input, string Pattern, RegexOptions Options);
 
-    private readonly record struct RegexValidationResult(bool IsSupported, bool IsMatch);
+    readonly record struct RegexValidationResult(bool IsSupported, bool IsMatch);
 }

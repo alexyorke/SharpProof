@@ -169,7 +169,7 @@ internal static class SymbolicUnknownReasonTaxonomy {
     private static bool Contains(string? value, string fragment) =>
         value?.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
 
-    private readonly record struct ReasonDescriptor(
+    readonly record struct ReasonDescriptor(
         SymbolicUnknownReasonCategory Category,
         string Suffix,
         bool IsRetryable = false,

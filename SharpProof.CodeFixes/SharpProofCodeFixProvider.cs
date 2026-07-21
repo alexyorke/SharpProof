@@ -60,13 +60,13 @@ namespace SharpProof;
             return registration != null;
         }
 
-        private enum SimpleRemovalOperation {
+        enum SimpleRemovalOperation {
             MisplacedAttribute,
             DeclarationAndAccessors,
             DiagnosticContract
         }
 
-        private sealed record SimpleRemovalRegistration(
+        sealed record SimpleRemovalRegistration(
             string DiagnosticId,
             string Title,
             SimpleRemovalOperation Operation,

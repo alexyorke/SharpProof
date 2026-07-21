@@ -129,7 +129,7 @@ internal sealed class SymbolicMutationInventory(
     internal static ISymbol? GetMutatedSymbol(
         ExpressionSyntax target, SemanticModel semanticModel, CancellationToken cancellationToken) {
         var symbol = semanticModel.GetSymbolInfo(target, cancellationToken).Symbol;
-        if (symbol != null) return SymbolicStateInvalidator.NormalizeMutatedSymbol(symbol);
+        if (symbol != null) return symbol is IMethodSymbol { AssociatedSymbol: IPropertySymbol property } ? property : symbol;
         return semanticModel.GetOperation(target, cancellationToken) switch {
             IFieldReferenceOperation field => field.Field,
             IPropertyReferenceOperation property => property.Property,

@@ -121,7 +121,7 @@ internal static class MethodEnsuresAnalyzer {
                         contract.Condition,
                         completionSite.Location,
                         "SMT is disabled for [Ensures] verification",
-                        contract.Location == null ? null : new[] { contract.Location });
+                        contract.Location == null ? null : [contract.Location]);
                     report(diagnostic);
 
                     continue;
@@ -138,7 +138,7 @@ internal static class MethodEnsuresAnalyzer {
                         contract.Condition,
                         contract.Location,
                         "result placeholder rewrite failed",
-                        new[] { completionSite.Location });
+                        [completionSite.Location]);
                     report(diagnostic);
 
                     continue;
@@ -182,7 +182,7 @@ internal static class MethodEnsuresAnalyzer {
                     contract.Condition,
                     completionSite.Location,
                     ContractDiagnosticSupport.FormatUnknownReason(proof, "Ensures"),
-                    contract.Location == null ? null : new[] { contract.Location },
+                    contract.Location == null ? null : [contract.Location],
                     proof.AnalysisTruncation);
                 report(unsupportedDiagnostic);
             }
@@ -409,7 +409,7 @@ internal static class MethodEnsuresAnalyzer {
         return Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("EnsuresNotProvenRule"),
             completionSite.Location,
-            contractLocation == null ? null : new[] { contractLocation },
+            contractLocation == null ? null : [contractLocation],
             properties,
             completionSite.DisplayText,
             methodSymbol.Name,
@@ -447,7 +447,7 @@ internal static class MethodEnsuresAnalyzer {
             reason);
     }
 
-    private sealed class ResultPlaceholderRewriter : CSharpSyntaxRewriter {
+    sealed class ResultPlaceholderRewriter : CSharpSyntaxRewriter {
         private readonly ExpressionSyntax _replacement;
 
         public ResultPlaceholderRewriter(ExpressionSyntax replacement) {
@@ -465,7 +465,7 @@ internal static class MethodEnsuresAnalyzer {
         }
     }
 
-    private sealed class NullableResultContractRewriter : CSharpSyntaxRewriter {
+    sealed class NullableResultContractRewriter : CSharpSyntaxRewriter {
         public override SyntaxNode? VisitBinaryExpression(BinaryExpressionSyntax node) {
             if ((node.IsKind(SyntaxKind.EqualsExpression) ||
                  node.IsKind(SyntaxKind.NotEqualsExpression)) &&
@@ -500,7 +500,7 @@ internal static class MethodEnsuresAnalyzer {
 
     }
 
-    private sealed class OldValueSnapshotBuilder {
+    sealed class OldValueSnapshotBuilder {
         private readonly CancellationToken _cancellationToken;
         private readonly IMethodSymbol _methodSymbol;
         private readonly SemanticModel _semanticModel;
@@ -589,7 +589,7 @@ internal static class MethodEnsuresAnalyzer {
             new SymbolicState(_snapshotFacts);
     }
 
-    private readonly record struct EnsuresContract(
+    readonly record struct EnsuresContract(
         string Condition,
         Location? Location,
         string Argument,

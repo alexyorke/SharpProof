@@ -384,7 +384,7 @@ internal sealed class SymbolicState {
         return builder.ToImmutable();
     }
 
-    private sealed class IntrinsicDomainTermCollector : SymbolicIrVisitor {
+    sealed class IntrinsicDomainTermCollector : SymbolicIrVisitor {
         internal Dictionary<string, SymbolicTerm> Terms { get; } =
             new(StringComparer.Ordinal);
 
@@ -1360,7 +1360,7 @@ internal sealed class SymbolicState {
             ? SymbolicConditionOperator.Or
             : SymbolicConditionOperator.And;
 
-    private enum SymbolicExclusiveOwnershipState {
+    enum SymbolicExclusiveOwnershipState {
         Owned,
         Escaped
     }

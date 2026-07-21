@@ -57,8 +57,8 @@ internal sealed class SimpleAnalyzerAssemblyLoader : AssemblyLoadContext, IAnaly
     });
 
     private static bool PublicKeyTokensEqual(AssemblyName left, AssemblyName right) {
-        var leftToken = left.GetPublicKeyToken() ?? Array.Empty<byte>();
-        var rightToken = right.GetPublicKeyToken() ?? Array.Empty<byte>();
+        var leftToken = left.GetPublicKeyToken() ?? [];
+        var rightToken = right.GetPublicKeyToken() ?? [];
         return leftToken.AsSpan().SequenceEqual(rightToken);
     }
 }
@@ -356,7 +356,7 @@ internal static class Program {
         }
     }
 
-    private sealed record ExtractedVsixPayload(
+    sealed record ExtractedVsixPayload(
         DirectoryInfo Directory,
         string AnalyzerPath,
         ImmutableArray<string> ManagedAssemblyPaths);

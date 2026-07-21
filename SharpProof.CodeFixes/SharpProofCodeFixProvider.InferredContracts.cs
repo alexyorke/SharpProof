@@ -223,7 +223,7 @@ namespace SharpProof;
             return (AttributeListSyntax)new SharpProofAttributeNameRewriter(attributeNamespace).Visit(attributeList)!;
         }
 
-        private sealed class SharpProofAttributeNameRewriter(string attributeNamespace) : CSharpSyntaxRewriter {
+        sealed class SharpProofAttributeNameRewriter(string attributeNamespace) : CSharpSyntaxRewriter {
             public override SyntaxNode? VisitQualifiedName(QualifiedNameSyntax node) =>
                 Shorten(node) ?? base.VisitQualifiedName(node);
 

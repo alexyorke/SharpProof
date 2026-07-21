@@ -244,12 +244,12 @@ internal static class SymbolicProofEncoder {
         return new SafeDivisorAssumption<SymbolicState>(true, assumedState.IsContradictory, assumedState);
     }
 
-    private readonly record struct SafeDivisorAssumption<TContext>(
+    readonly record struct SafeDivisorAssumption<TContext>(
         bool IsSupported,
         bool IsContradictory,
         TContext Context);
 
-    private sealed class SafeDivisorProofStrategy<TContext>(
+    sealed class SafeDivisorProofStrategy<TContext>(
         Func<SymbolicTerm, TContext, SyntaxNode, bool> isTermProvablyNonZero,
         Func<TContext, SymbolicCondition, bool, SafeDivisorAssumption<TContext>> assumeCondition,
         bool refineShortCircuitConditions) {

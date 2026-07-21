@@ -1553,12 +1553,12 @@ internal static class SymbolicIndexingLowerer {
         return false;
     }
 
-    private readonly record struct IndexLengthShape(
+    readonly record struct IndexLengthShape(
         ExpressionSyntax ValueExpression,
         bool FromEnd,
         bool RequiresNonNegativeValue = false);
 
-    private readonly record struct RangeLengthShape(
+    readonly record struct RangeLengthShape(
         bool HasStart,
         IndexLengthShape Start,
         bool HasEnd,

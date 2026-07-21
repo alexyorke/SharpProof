@@ -628,7 +628,7 @@ public static class FuzzRunner {
         return new string(chars);
     }
 
-    private readonly record struct DiagnosticExpectationPolicy(
+    readonly record struct DiagnosticExpectationPolicy(
         string DiagnosticId,
         bool MustNotEmit,
         bool MustEmit,

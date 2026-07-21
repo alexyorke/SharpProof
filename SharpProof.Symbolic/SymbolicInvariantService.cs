@@ -72,7 +72,7 @@ internal sealed class SymbolicInvariantService {
         pathState = SymbolicProofStateFacts.NormalizeState(pathState);
         return SymbolicProofEncoder.EncodeState(pathState) is { Success: true } encoded
             ? encoded.PathConditions
-            : Array.Empty<SmtFormula>();
+            : [];
     }
 
     private static CollectedProgramPoint CollectProgramPoint(
@@ -107,7 +107,7 @@ internal sealed class SymbolicInvariantService {
             pathState.IsContradictory)
             formulas = new[] { new SmtBooleanConstant(false) };
 
-        var shouldCheckState = HasPathStateFacts(pathState) || formulas.Count != 0;
+        var shouldCheckState = (pathState.Facts.Length != 0 || pathState.PathConditions.Length != 0) || formulas.Count != 0;
         var stateProof = smtAnalysis == null || !shouldCheckState
             ? null
             : new SymbolicProofService(smtAnalysis).ClassifyReachability(pathState);
@@ -180,9 +180,6 @@ internal sealed class SymbolicInvariantService {
         return projected;
     }
 
-    private static bool HasPathStateFacts(SymbolicState pathState) =>
-        pathState.Facts.Length != 0 || pathState.PathConditions.Length != 0;
-
     private static SymbolicReachability MapReachability(SymbolicProofStatus status) {
         return status switch {
             SymbolicProofStatus.Reachable => SymbolicReachability.Reachable,
@@ -192,7 +189,7 @@ internal sealed class SymbolicInvariantService {
         };
     }
 
-    private readonly record struct CollectedProgramPoint(
+    readonly record struct CollectedProgramPoint(
         int Position,
         SymbolicState PathState,
         IReadOnlyList<SmtFormula> Formulas,

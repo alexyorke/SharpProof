@@ -45,13 +45,13 @@ internal static class AnalyzerDiagnosticCatalog {
                 definition.IsEnabledByDefault,
                 definition.Description,
                 definition.HelpLinkUri,
-                definition.CustomTags ?? Array.Empty<string>()));
+                definition.CustomTags ?? []));
         }
 
         return descriptors.ToImmutable();
     }
 
-    private sealed class DiagnosticDefinition {
+    sealed class DiagnosticDefinition {
         public string FieldName { get; set; } = string.Empty;
         public string Id { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;

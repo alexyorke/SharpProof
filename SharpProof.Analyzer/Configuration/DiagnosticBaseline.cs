@@ -130,7 +130,7 @@ internal sealed class DiagnosticBaseline {
         var builder = ImmutableArray.CreateBuilder<string>();
         builder.Add(primarySymbolId);
         if (TryGetProperty(properties, DiagnosticPropertyNames.BaselineSymbolAliasesProperty, out var aliases))
-            foreach (var alias in aliases.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)) {
+            foreach (var alias in aliases.Split(['\n'], StringSplitOptions.RemoveEmptyEntries)) {
                 var trimmed = alias.Trim();
                 if (!string.IsNullOrWhiteSpace(trimmed)) builder.Add(trimmed);
             }
@@ -177,5 +177,5 @@ internal sealed class DiagnosticBaseline {
             ? string.Empty
             : NormalizePath(System.IO.Path.IsPathRooted(path) ? path : System.IO.Path.Combine(baseDirectory, path));
 
-    private readonly record struct ResolvedBaselineEntry(BaselineEntry Entry, string AbsolutePath);
+    readonly record struct ResolvedBaselineEntry(BaselineEntry Entry, string AbsolutePath);
 }

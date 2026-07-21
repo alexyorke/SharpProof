@@ -70,7 +70,7 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
         if (query == null || query.Hazard == null)
             return UnknownWithoutProof("invalid_proof_query");
 
-        var pathConditions = query.PathConditions ?? Array.Empty<SmtFormula>();
+        var pathConditions = query.PathConditions ?? [];
         if (!HazardDescriptors.TryGetValue(query.Hazard.Kind, out var descriptor))
             return UnknownWithoutProof("unsupported_hazard_kind");
 
@@ -183,12 +183,12 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
     private static ProofCheckInfo NotAttempted() =>
         new ProofCheckInfo(false, Feasibility.Unknown);
 
-    private enum HazardClassificationMode {
+    enum HazardClassificationMode {
         Triggered,
         InternalEffect
     }
 
-    private readonly record struct HazardDescriptor(
+    readonly record struct HazardDescriptor(
         HazardClassificationMode Mode,
         string PureReason,
         string ImpureReason,

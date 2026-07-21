@@ -99,6 +99,6 @@ internal static class SymbolicReachabilityService {
             : result.UnknownReason,
         provenance: result.Provenance);
 
-    private readonly record struct PathStateCacheKey(
+    readonly record struct PathStateCacheKey(
         int SiteStart, int SiteLength, int SiteRawKind, bool IncludeCurrentStatementCompletionFacts);
 }

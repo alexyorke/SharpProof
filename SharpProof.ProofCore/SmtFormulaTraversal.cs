@@ -67,7 +67,7 @@ internal static class SmtFormulaTraversal {
             }
 
             var childCount = GetChildren(frame.Formula).Count;
-            var children = childCount == 0 ? Array.Empty<SmtFormula>() : new SmtFormula[childCount];
+            var children = childCount == 0 ? [] : new SmtFormula[childCount];
             for (var index = childCount - 1; index >= 0; index--) children[index] = results.Pop();
 
             var rebuilt = Rebuild(frame.Formula, children);
@@ -183,9 +183,9 @@ internal static class SmtFormulaTraversal {
         };
     }
 
-    private readonly record struct TraversalFrame(SmtFormula Formula, bool Visited);
+    readonly record struct TraversalFrame(SmtFormula Formula, bool Visited);
 
-    private readonly record struct FormulaChildren(
+    readonly record struct FormulaChildren(
         SmtFormula? First,
         SmtFormula? Second = null,
         SmtFormula? Third = null) {

@@ -144,16 +144,13 @@ internal static class MethodExpectedComplexityAnalyzer {
             return ComplexityVerificationClassification.Unknown(
                 "inferred complexity '" + result.Complexity.Text + "' contains conservative alternatives");
 
-        switch (SymbolicComplexityFacts.Compare(result.Complexity.Kind, declaredComplexity.Kind)) {
-                case SymbolicComplexityComparison.Within:
-                    return ComplexityVerificationClassification.Verified;
-                case SymbolicComplexityComparison.Exceeds:
-                    return ComplexityVerificationClassification.Exceeded;
-        }
-
-        return ComplexityVerificationClassification.Unknown(
-            "inferred complexity '" + result.Complexity.Text + "' is not directly comparable to declared bound '" +
-            declaredComplexity.Text + "'");
+        return SymbolicComplexityFacts.Compare(result.Complexity.Kind, declaredComplexity.Kind) switch {
+            SymbolicComplexityComparison.Within => ComplexityVerificationClassification.Verified,
+            SymbolicComplexityComparison.Exceeds => ComplexityVerificationClassification.Exceeded,
+            _ => ComplexityVerificationClassification.Unknown(
+                "inferred complexity '" + result.Complexity.Text + "' is not directly comparable to declared bound '" +
+                declaredComplexity.Text + "'")
+        };
     }
 
     private static Diagnostic CreateExceededDiagnostic(
@@ -180,7 +177,7 @@ internal static class MethodExpectedComplexityAnalyzer {
         return Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("ComplexityExceededRule"),
             location,
-            attributeLocation == null ? null : new[] { attributeLocation },
+            attributeLocation == null ? null : [attributeLocation],
             properties,
             methodSymbol.Name,
             declaredComplexity.Text,
@@ -216,20 +213,20 @@ internal static class MethodExpectedComplexityAnalyzer {
         return Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("ComplexityCouldNotBeVerifiedRule"),
             location,
-            attributeLocation == null ? null : new[] { attributeLocation },
+            attributeLocation == null ? null : [attributeLocation],
             properties,
             methodSymbol.Name,
             declaredComplexity.Text,
             reason);
     }
 
-    private readonly record struct DeclaredComplexity(
+    readonly record struct DeclaredComplexity(
         int Kind,
         string? TextOverride = null) {
         public string Text => TextOverride ?? SymbolicComplexityFacts.GetBoundText(Kind);
     }
 
-    private readonly record struct ComplexityVerificationClassification(
+    readonly record struct ComplexityVerificationClassification(
         ComplexityVerificationKind Kind,
         string Reason) {
         public static readonly ComplexityVerificationClassification Verified =
@@ -242,11 +239,11 @@ internal static class MethodExpectedComplexityAnalyzer {
             new ComplexityVerificationClassification(ComplexityVerificationKind.Unknown, reason);
     }
 
-    private enum ComplexityVerificationKind {
+    enum ComplexityVerificationKind {
         Verified,
         Exceeded,
         Unknown
     }
 
-    private sealed record InvalidContractArgument(string Argument, string Reason);
+    sealed record InvalidContractArgument(string Argument, string Reason);
 }

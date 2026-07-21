@@ -521,7 +521,7 @@ internal sealed class Z3RegexTranslator {
                     _expressions.CharacterRange(startCharacter, endCharacter),
                     null,
                     false,
-                    new[] { new CharacterRange(startCharacter, endCharacter) }));
+                    [new CharacterRange(startCharacter, endCharacter)]));
             }
             else {
                 parts.Add(start);
@@ -635,7 +635,7 @@ internal sealed class Z3RegexTranslator {
             CreateLiteralRegex(value.ToString()),
             value,
             false,
-            new[] { new CharacterRange(value, value) });
+            [new CharacterRange(value, value)]);
     }
 
     private bool TryReadEscapedLiteralCharacter(char escaped, bool inCharacterClass, out char value) {
@@ -879,14 +879,14 @@ internal sealed class Z3RegexTranslator {
     private static bool IsSupportedCaptureNameCharacter(char value) =>
         char.IsLetterOrDigit(value) || value == '_';
 
-    private readonly record struct RegexLookaheadAssertion(ReExpr Regex, bool IsPositive, bool IsExact);
+    readonly record struct RegexLookaheadAssertion(ReExpr Regex, bool IsPositive, bool IsExact);
 
-    private readonly record struct CharacterClassPart(
+    readonly record struct CharacterClassPart(
         ReExpr Regex,
         char? ExactCharacter,
         bool IsApproximation,
         CharacterRange[]? Ranges);
 
-    private readonly record struct RegexClassTranslation(ReExpr Regex, bool IsExact, CharacterRange[]? Ranges);
+    readonly record struct RegexClassTranslation(ReExpr Regex, bool IsExact, CharacterRange[]? Ranges);
 
 }
