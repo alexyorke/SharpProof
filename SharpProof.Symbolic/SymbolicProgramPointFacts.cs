@@ -19,26 +19,6 @@ internal static class SymbolicProgramPointFacts {
             state = transition.State;
     }
 
-    internal static bool TryAddInlineAssignmentReachabilityState(
-        ref SymbolicState state,
-        ExpressionSyntax condition,
-        bool branchWhenTrue,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        if (!SymbolicReachabilityLowerer.TryApplyInlineAssignment(
-                state,
-                condition,
-                branchWhenTrue,
-                semanticModel,
-                cancellationToken,
-                out var transition) ||
-            !transition.IsExact)
-            return false;
-
-        state = transition.State;
-        return true;
-    }
-
     internal static void AddReferenceNullCondition(
         ref SymbolicState state,
         ExpressionSyntax expression,
@@ -84,22 +64,4 @@ internal static class SymbolicProgramPointFacts {
         return SymbolicMutationInventory.Create(statement, semanticModel, cancellationToken)
             .InvalidatesSymbol(symbol, mutableExposures: true);
     }
-
-    internal static bool IsSupportedForeachLengthReceiver(ExpressionSyntax expressionSyntax) {
-        expressionSyntax = UnwrapExpression(expressionSyntax);
-        return expressionSyntax is ArrayCreationExpressionSyntax or
-            ImplicitArrayCreationExpressionSyntax or
-            CollectionExpressionSyntax;
-    }
-
-    internal static bool IsSupportedForeachLengthReceiver(ITypeSymbol? type) {
-        return type is IArrayTypeSymbol { Rank: 1 } ||
-               type?.SpecialType == SpecialType.System_String;
-    }
-
-    internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression) =>
-        CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-
-
-
 }
