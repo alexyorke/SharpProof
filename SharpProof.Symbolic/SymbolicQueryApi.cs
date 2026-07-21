@@ -65,8 +65,7 @@ internal sealed partial class SymbolicQueryExecutor {
         if (target.MethodSymbol == null)
             throw new ArgumentException("Could not resolve the symbol for the requested method-like body.");
 
-        var summary = new SymbolicComplexityAnalysisSession(compilation, cancellationToken).Analyze(target);
-        return SymbolicComplexityResultProjector.Project(target, summary, cancellationToken);
+        return new SymbolicComplexityAnalysisSession(compilation, cancellationToken).Analyze(target);
     }
 
     private static TResult ExecuteWithLimits<TResult>(

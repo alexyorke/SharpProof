@@ -9,7 +9,7 @@ using NUnit.Framework;
 namespace SharpProof.Test;
 
 internal static class ReadmeExampleFixture {
-    private static readonly Lazy<string> RepositoryRoot = new(SymbolicCliTestHost.FindRepositoryRoot);
+    private static readonly Lazy<string> RepositoryRoot = new(AnalyzerTestHost.GetRepositoryRoot);
 
     public static string GetRepositoryRoot() {
         return RepositoryRoot.Value;

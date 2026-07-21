@@ -788,20 +788,13 @@ internal sealed class MethodEffectAnalysisSession(
             IOperation operation,
             MethodExceptionSource source,
             SharpProofVerdict escape,
-            string reason) {
-            var exceptionType = type?.ToDisplayString() ?? "System.Exception";
-            if (escape == SharpProofVerdict.Proven) _effects |= SharpProofEffect.Throws;
-            _exceptions.Add(new MethodExceptionFact(
-                exceptionType,
-                escape,
+            string reason) => AddException(
+                type?.ToDisplayString() ?? "System.Exception",
+                operation.Syntax,
                 source,
-                operation.Syntax.ToString(),
-                type?.ToDisplayString() ?? string.Empty,
-                operation.Syntax.SpanStart,
-                operation.Syntax.Span.Length,
-                false,
-                reason));
-        }
+                escape,
+                reason,
+                symbol: type?.ToDisplayString() ?? string.Empty);
 
         internal void AddRuntimeHazard(
             string exceptionType,
@@ -817,33 +810,33 @@ internal sealed class MethodEffectAnalysisSession(
                             _exceptions[index].SpanStart,
                             _exceptions[index].SpanLength)))
                         _exceptions.RemoveAt(index);
-            if (escape == SharpProofVerdict.Proven) _effects |= SharpProofEffect.Throws;
-            _exceptions.Add(new MethodExceptionFact(
-                exceptionType,
-                escape,
-                source,
-                syntaxSite.ToString(),
-                exceptionType,
-                syntaxSite.SpanStart,
-                syntaxSite.Span.Length,
-                false,
-                reason,
-                kind));
+            AddException(exceptionType, syntaxSite, source, escape, reason, kind, exceptionType);
         }
 
         internal void AddUnknown(IOperation operation, string reason, ISymbol? symbol = null) {
             Add(SharpProofEffect.Unknown, operation, symbol, reason);
             _unknowns.Add(CreateUnknownReason(reason));
-            _exceptions.Add(new MethodExceptionFact(
+            AddException(
                 "System.Exception",
-                SharpProofVerdict.Unknown,
+                operation.Syntax,
                 MethodExceptionSource.Unknown,
-                operation.Syntax.ToString(),
-                symbol?.ToDisplayString() ?? string.Empty,
-                operation.Syntax.SpanStart,
-                operation.Syntax.Span.Length,
-                false,
-                reason));
+                SharpProofVerdict.Unknown,
+                reason,
+                symbol: symbol?.ToDisplayString() ?? string.Empty);
+        }
+
+        private void AddException(
+            string exceptionType,
+            SyntaxNode site,
+            MethodExceptionSource source,
+            SharpProofVerdict escape,
+            string reason,
+            string kind = "",
+            string symbol = "") {
+            if (escape == SharpProofVerdict.Proven) _effects |= SharpProofEffect.Throws;
+            _exceptions.Add(new MethodExceptionFact(
+                exceptionType, escape, source, site.ToString(), symbol,
+                site.SpanStart, site.Span.Length, false, reason, kind));
         }
 
         internal void AddTransitive(

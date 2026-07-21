@@ -364,84 +364,66 @@ public static class FuzzRunner {
         ImmutableArray<Diagnostic> diagnostics,
         ImmutableArray<FuzzFinding>.Builder findings) {
         if (result.MethodEffects!.Purity != fuzzCase.Expectation.PurityVerdict)
-            findings.Add(new FuzzFinding(
-                fuzzCase.Name,
-                fuzzCase.Family,
+            Add(
                 "unexpected_purity_verdict",
                 $"Expected {fuzzCase.Expectation.PurityVerdict}, observed {result.MethodEffects.Purity}.",
-                null,
-                result.UnknownReasons.Select(static reason => reason.Category + ":" + reason.Code).ToImmutableArray()));
+                result.UnknownReasons.Select(static reason => reason.Category + ":" + reason.Code).ToImmutableArray());
 
         var observed = result.MethodEffects?.Effects ?? SharpProofEffect.None;
         foreach (var expected in fuzzCase.Expectation.RequiredEffects)
             if ((observed & expected) != expected)
-                findings.Add(new FuzzFinding(
-                    fuzzCase.Name,
-                    fuzzCase.Family,
+                Add(
                     "missing_expected_effect",
                     "Expected effect was not observed: " + expected,
-                    null,
-                    ImmutableArray.Create("observed=" + observed)));
+                    ImmutableArray.Create("observed=" + observed));
 
         foreach (var forbidden in fuzzCase.Expectation.ForbiddenEffects)
             if ((observed & forbidden) != 0)
-                findings.Add(new FuzzFinding(
-                    fuzzCase.Name,
-                    fuzzCase.Family,
+                Add(
                     "unexpected_effect",
                     "Forbidden effect was observed: " + forbidden,
-                    null,
-                    ImmutableArray.Create("observed=" + observed)));
+                    ImmutableArray.Create("observed=" + observed));
 
         foreach (var category in fuzzCase.Expectation.RequiredUnknownCategories)
             if (!result.UnknownReasons.Any(reason => string.Equals(reason.Category, category, StringComparison.Ordinal)))
-                findings.Add(new FuzzFinding(
-                    fuzzCase.Name,
-                    fuzzCase.Family,
+                Add(
                     "missing_unknown_reason",
                     "Expected unknown category was not observed: " + category,
-                    null,
-                    result.UnknownReasons.Select(static reason => reason.Category).ToImmutableArray()));
+                    result.UnknownReasons.Select(static reason => reason.Category).ToImmutableArray());
 
         foreach (var diagnosticId in fuzzCase.Expectation.RequiredDiagnosticIds)
             if (!diagnostics.Any(diagnostic => diagnostic.Id == diagnosticId))
-                findings.Add(new FuzzFinding(
-                    fuzzCase.Name,
-                    fuzzCase.Family,
+                Add(
                     "missing_expected_diagnostic",
                     "Expected diagnostic was not observed: " + diagnosticId,
-                    null,
-                    ToDiagnosticSignatures(diagnostics)));
+                    ToDiagnosticSignatures(diagnostics));
 
         if (fuzzCase.Expectation.ProofStatus != null) {
             var proof = result.ProofFacts.SingleOrDefault();
             if (proof == null || proof.Status != fuzzCase.Expectation.ProofStatus)
-                findings.Add(new FuzzFinding(
-                    fuzzCase.Name,
-                    fuzzCase.Family,
+                Add(
                     "unexpected_proof_status",
                     $"Expected {fuzzCase.Expectation.ProofStatus}, observed {proof?.Status ?? "missing"}.",
-                    null,
-                    result.ProofFacts.Select(static fact => fact.Condition + ":" + fact.Status).ToImmutableArray()));
+                    result.ProofFacts.Select(static fact => fact.Condition + ":" + fact.Status).ToImmutableArray());
             else if (fuzzCase.Expectation.RequireCounterexample && proof.Counterexample == null)
-                findings.Add(new FuzzFinding(
-                    fuzzCase.Name,
-                    fuzzCase.Family,
+                Add(
                     "missing_counterexample",
                     "The expected compact Z3 counterexample was not produced.",
-                    null,
-                    ImmutableArray.Create(proof.Reason)));
+                    ImmutableArray.Create(proof.Reason));
         }
 
         var enforcePureFailure = diagnostics.Any(static diagnostic => diagnostic.Id == "SP0002");
         if ((result.MethodEffects!.Purity == SharpProofVerdict.Proven) == enforcePureFailure)
-            findings.Add(new FuzzFinding(
-                fuzzCase.Name,
-                fuzzCase.Family,
+            Add(
                 "enforce_pure_projection_mismatch",
                 "[EnforcePure] diagnostic did not match the canonical purity verdict.",
-                null,
-                ImmutableArray.Create("verdict=" + result.MethodEffects.Purity, "diagnostic=" + enforcePureFailure)));
+                ImmutableArray.Create("verdict=" + result.MethodEffects.Purity, "diagnostic=" + enforcePureFailure));
+
+        return;
+
+        void Add(string category, string description, ImmutableArray<string> details) =>
+            findings.Add(new FuzzFinding(
+                fuzzCase.Name, fuzzCase.Family, category, description, null, details));
     }
 
     private static ImmutableSortedDictionary<string, int> CollectOperationKinds(

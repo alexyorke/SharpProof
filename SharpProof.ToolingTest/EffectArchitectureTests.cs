@@ -7,7 +7,7 @@ namespace SharpProof.Test;
 public sealed class EffectArchitectureTests {
     [Test]
     public void RemovedEffectInfrastructureCannotReturnToSupportedSurface() {
-        var root = SymbolicCliTestHost.FindRepositoryRoot();
+        var root = AnalyzerTestHost.GetRepositoryRoot();
         Assert.That( File.Exists(Path.Combine( root, "Tools", "SharpProof." + "Effect" + "Summary", "SharpProof." + "Effect" + "Summary.csproj")), Is.False);
 
         var removedFiles = new[] {
@@ -137,7 +137,7 @@ public sealed class EffectArchitectureTests {
 
     [Test]
     public void AnalyzerCannotDisableOrBypassZ3ProofService() {
-        var root = SymbolicCliTestHost.FindRepositoryRoot();
+        var root = AnalyzerTestHost.GetRepositoryRoot();
         Assert.That(File.Exists(Path.Combine(root, "SharpProof.ProofCore", "SharpProof.ProofCore.csproj")), Is.True);
         Assert.That(File.Exists(Path.Combine(root, "SharpProof.ProofCore", "Z3FormulaEncoder.cs")), Is.True);
 

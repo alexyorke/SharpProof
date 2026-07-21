@@ -43,9 +43,8 @@ internal sealed class MethodBodyAnalysisState {
     private SymbolicComplexityResult AnalyzeComplexity(CancellationToken cancellationToken) {
         var target = ResolvedMethodLikeTarget.Create(
             Snapshot.Declaration, Snapshot.SemanticModel, cancellationToken);
-        var summary = new SymbolicComplexityAnalysisSession(
+        return new SymbolicComplexityAnalysisSession(
             Snapshot.SemanticModel.Compilation, cancellationToken).Analyze(target);
-        return SymbolicComplexityResultProjector.Project(target, summary, cancellationToken);
     }
 
     internal SymbolicConditionProofResult ProveAtNode(

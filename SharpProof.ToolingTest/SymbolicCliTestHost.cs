@@ -1,12 +1,11 @@
 using System.Diagnostics;
-using System.Text.Json;
 using NUnit.Framework;
 
 namespace SharpProof.Test;
 
 internal static class SymbolicCliTestHost {
     private static readonly SemaphoreSlim BuildGate = new(1, 1);
-    private static readonly Lazy<string> RepositoryRoot = new(FindRepositoryRoot);
+    private static readonly Lazy<string> RepositoryRoot = new(AnalyzerTestHost.GetRepositoryRoot);
     private static readonly Lazy<string> BuildConfiguration = new(FindBuildConfiguration);
 
     private static readonly Lazy<Task<string>> CliAssemblyPath =
@@ -14,31 +13,11 @@ internal static class SymbolicCliTestHost {
 
     public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
         params string[] arguments) {
-        return await RunWithInputAsync(null, arguments).ConfigureAwait(false);
-    }
-
-    public static string CreateJsonRequest(params string[] arguments) =>
-        JsonSerializer.Serialize(new { schemaVersion = 2, arguments });
-
-    public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunWithInputAsync(
-        string? standardInput,
-        params string[] arguments) {
-        return await RunOutOfProcessAsync(standardInput, arguments).ConfigureAwait(false);
-    }
-
-    public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunOutOfProcessAsync(
-        params string[] arguments)
-        => await RunOutOfProcessAsync(null, arguments).ConfigureAwait(false);
-
-    private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunOutOfProcessAsync(
-        string? standardInput,
-        params string[] arguments) {
         var repositoryRoot = RepositoryRoot.Value;
         var cliAssemblyPath = await CliAssemblyPath.Value.ConfigureAwait(false);
         var startInfo = new ProcessStartInfo {
             FileName = "dotnet",
             WorkingDirectory = repositoryRoot,
-            RedirectStandardInput = standardInput != null,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false
@@ -49,8 +28,7 @@ internal static class SymbolicCliTestHost {
         return await RunProcessAsync(
                 startInfo,
                 TimeSpan.FromSeconds(90),
-                "Failed to start symbolic CLI.",
-                standardInput)
+                "Failed to start symbolic CLI.")
             .ConfigureAwait(false);
     }
 
@@ -133,13 +111,8 @@ internal static class SymbolicCliTestHost {
     private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunProcessAsync(
         ProcessStartInfo startInfo,
         TimeSpan timeout,
-        string startFailureMessage,
-        string? standardInput = null) {
+        string startFailureMessage) {
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException(startFailureMessage);
-        if (standardInput != null) {
-            await process.StandardInput.WriteAsync(standardInput).ConfigureAwait(false);
-            process.StandardInput.Close();
-        }
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
         try {
@@ -166,14 +139,4 @@ internal static class SymbolicCliTestHost {
         return "Debug";
     }
 
-    internal static string FindRepositoryRoot() {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null) {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
-
-            directory = directory.Parent;
-        }
-
-        throw new InvalidOperationException("Could not find repository root.");
-    }
 }

@@ -551,88 +551,40 @@ public class SmtAnalysisServiceTests {
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
     }
 
-    [Test]
-    public void ClassifyImplication_DirectPathFact_BypassesSolver() {
-        var x = Int("x");
-        var xIsZero = Equal(x, Integer(0));
+    [TestCase("direct", TestName = "ClassifyImplication_DirectPathFact_BypassesSolver")]
+    [TestCase("interval", TestName = "ClassifyImplication_IntegerIntervalEntailment_BypassesSolver")]
+    [TestCase("length", TestName = "ClassifyImplication_ExactStringLengthEntailment_BypassesSolver")]
+    [TestCase("predicate", TestName = "ClassifyImplication_ExactStringPredicateEntailment_BypassesSolver")]
+    [TestCase("negated", TestName = "ClassifyImplication_ExactStringNegatedPredicateEntailment_BypassesSolver")]
+    public void SyntacticImplicationMatrix(string kind) {
+        SmtFormula path;
+        SmtFormula conclusion;
+        if (kind == "direct") {
+            path = conclusion = Equal(Int("x"), Integer(0));
+        }
+        else if (kind == "interval") {
+            var value = Int("interval_entailment_" + Guid.NewGuid().ToString("N"));
+            path = LessThanOrEqual(value, Integer(9));
+            conclusion = LessThan(value, Integer(10));
+        }
+        else {
+            var text = String("exact_string_" + Guid.NewGuid().ToString("N"));
+            path = Equal(text, Text("ABC"));
+            conclusion = kind switch {
+                "length" => new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual,
+                    new SmtStringLengthTerm(text), Integer(3)),
+                "predicate" => new SmtStringStartsWithFormula(text, Text("A")),
+                _ => new SmtUnaryFormula(SmtUnaryOperator.Not, new SmtStringEndsWithFormula(text, Text("Z")))
+            };
+        }
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = service.ClassifyImplication(new[] { xIsZero }, xIsZero);
-
+        var result = service.ClassifyImplication(new[] { path }, conclusion);
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
         Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(
-            service.ClassifyImplication(new[] { xIsZero }, xIsZero).Outcome,
+        Assert.That(service.ClassifyImplication(new[] { path }, conclusion).Outcome,
             Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
-    }
-
-    [Test]
-    public void ClassifyImplication_IntegerIntervalEntailment_BypassesSolver() {
-        var x = Int("interval_entailment_" + Guid.NewGuid().ToString("N"));
-        var xAtMostNine = LessThanOrEqual(x, Integer(9));
-        var xLessThanTen = LessThan(x, Integer(10));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = service.ClassifyImplication(new[] { xAtMostNine }, xLessThanTen);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
-    }
-
-    [Test]
-    public void ClassifyImplication_ExactStringLengthEntailment_BypassesSolver() {
-        var text = String("exact_string_" + Guid.NewGuid().ToString("N"));
-        var textIsAbc = Equal(text, Text("ABC"));
-        var lengthAtLeastThree = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            new SmtStringLengthTerm(text),
-            Integer(3));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = service.ClassifyImplication(new[] { textIsAbc }, lengthAtLeastThree);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
-    }
-
-    [Test]
-    public void ClassifyImplication_ExactStringPredicateEntailment_BypassesSolver() {
-        var text = String("exact_predicate_" + Guid.NewGuid().ToString("N"));
-        var textIsAbc = Equal(text, Text("ABC"));
-        var startsWithA = new SmtStringStartsWithFormula(text, Text("A"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = service.ClassifyImplication(new[] { textIsAbc }, startsWithA);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
-    }
-
-    [Test]
-    public void ClassifyImplication_ExactStringNegatedPredicateEntailment_BypassesSolver() {
-        var text = String("exact_negated_predicate_" + Guid.NewGuid().ToString("N"));
-        var textIsAbc = Equal(text, Text("ABC"));
-        var doesNotEndWithZ = new SmtUnaryFormula(
-            SmtUnaryOperator.Not,
-            new SmtStringEndsWithFormula(text, Text("Z")));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = service.ClassifyImplication(new[] { textIsAbc }, doesNotEndWithZ);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
     }
@@ -660,34 +612,16 @@ public class SmtAnalysisServiceTests {
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
     }
 
-    [Test]
-    public void Classify_DivideByZeroContradictedByGuard_BypassesSolver() {
-        var divisor = Int("divisor");
-        var divisorIsNotZero = NotEqual(divisor, Integer(0));
+    [TestCase(false, TestName = "Classify_DivideByZeroContradictedByGuard_BypassesSolver")]
+    [TestCase(true, TestName = "Classify_DivideByZeroContradictedByPositiveInterval_BypassesSolver")]
+    public void DivideByZeroContradictionMatrix(bool positiveInterval) {
+        var divisor = Int((positiveInterval ? "positive_divisor_" : "divisor_") + Guid.NewGuid().ToString("N"));
+        var guard = positiveInterval ? GreaterThan(divisor, Integer(0)) : NotEqual(divisor, Integer(0));
         var divisorIsZero = Equal(divisor, Integer(0));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
         var result = service.Classify(new AnalysisProofQuery(
-            new[] { divisorIsNotZero },
-            new AnalysisHazard(AnalysisHazardKind.DivideByZero, divisorIsZero)));
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("divide_by_zero_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
-    }
-
-    [Test]
-    public void Classify_DivideByZeroContradictedByPositiveInterval_BypassesSolver() {
-        var divisor = Int("positive_divisor_" + Guid.NewGuid().ToString("N"));
-        var divisorIsPositive = GreaterThan(divisor, Integer(0));
-        var divisorIsZero = Equal(divisor, Integer(0));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = service.Classify(new AnalysisProofQuery(
-            new[] { divisorIsPositive },
+            new[] { guard },
             new AnalysisHazard(AnalysisHazardKind.DivideByZero, divisorIsZero)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));

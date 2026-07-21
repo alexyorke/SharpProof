@@ -22,8 +22,21 @@ internal sealed class SymbolicComplexityAnalysisSession {
             cancellationToken);
     }
 
-    public MethodAnalysisSummary Analyze(ResolvedMethodLikeTarget target) =>
-        AnalyzeMethod(target.MethodSymbol!, target.BodyNode!, target.SemanticModel);
+    public SymbolicComplexityResult Analyze(ResolvedMethodLikeTarget target) {
+        var summary = AnalyzeMethod(target.MethodSymbol!, target.BodyNode!, target.SemanticModel);
+        var cost = summary.Cost;
+        return new SymbolicComplexityResult(
+            new SymbolicComplexityInfo(
+                cost.ToBigOText(target.MethodSymbol!),
+                cost.ToPublicKind(),
+                cost.IsConservative,
+                cost.IsUnknown,
+                cost.IsRecursiveUnknown),
+            summary.Drivers.Distinct().ToArray(),
+            summary.UnknownReasons.Where(static reason => reason != SymbolicComplexityUnknownReason.None)
+                .Distinct().ToArray(),
+            summary.CalleeSummaries.Distinct().ToArray());
+    }
 
     private MethodAnalysisSummary AnalyzeMethod(
         IMethodSymbol methodSymbol,

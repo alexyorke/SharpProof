@@ -1,163 +1,93 @@
 namespace SharpProof.Test;
 
 internal static class SemanticOracleTestSources {
-    internal const string ModeEnum = @"
-public enum Mode
-{
-    None = 0,
-    Ready = 1
-}
+    internal const string ModeEnum = """
+        public enum Mode
+        {
+            None = 0,
+            Ready = 1
+        }
+        """;
 
-";
-
-    internal const string CompoundAssignedNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string CompoundAssignedNonZeroDivisor = Method("", """
         var divisor = 0;
         divisor += 1;
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string IncrementedNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string IncrementedNonZeroDivisor = Method("", """
         var divisor = 0;
         divisor++;
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string TupleAssignedNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string TupleAssignedNonZeroDivisor = Method("", """
         var divisor = 0;
         var other = 0;
         (divisor, other) = (1, 2);
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string TupleDeconstructionDeclaredNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string TupleDeconstructionDeclaredNonZeroDivisor = Method("", """
         var (divisor, other) = (1, 2);
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string InlineFiniteArrayElementNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string InlineFiniteArrayElementNonZeroDivisor = Method("", """
         var divisor = (new[] { 1, 2 })[0];
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string PriorFiniteArrayElementNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string PriorFiniteArrayElementNonZeroDivisor = Method("", """
         var values = new[] { 1, 2 };
         var divisor = values[0];
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string InlineFiniteArrayFromEndElementNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string InlineFiniteArrayFromEndElementNonZeroDivisor = Method("", """
         var divisor = (new[] { 1, 2 })[^1];
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string PriorFiniteArrayFromEndElementNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string PriorFiniteArrayFromEndElementNonZeroDivisor = Method("", """
         var values = new[] { 1, 2 };
         var divisor = values[^1];
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string ConditionalFiniteArrayElementNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod(bool flag)
-    {
+    internal static readonly string ConditionalFiniteArrayElementNonZeroDivisor = Method("bool flag", """
         var values = new[] { 1, 2 };
         var divisor = flag ? values[0] : values[1];
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string TupleElementNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string TupleElementNonZeroDivisor = Method("", """
         var pair = (1, 2);
         var divisor = pair.Item1;
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string NamedTupleElementNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string NamedTupleElementNonZeroDivisor = Method("", """
         var pair = (divisor: 1, other: 2);
         var divisor = pair.divisor;
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string TupleLocalDeconstructionAssignedNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string TupleLocalDeconstructionAssignedNonZeroDivisor = Method("", """
         var pair = (1, 2);
         var divisor = 0;
         var other = 0;
         (divisor, other) = pair;
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string TupleLocalDeconstructionDeclaredNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string TupleLocalDeconstructionDeclaredNonZeroDivisor = Method("", """
         var pair = (1, 2);
         var (divisor, other) = pair;
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string SwitchStatementPatternBoundNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
+    internal static readonly string SwitchStatementPatternBoundNonZeroDivisor = Method("int value", """
         switch (value)
         {
             case > 0 and var divisor:
@@ -165,14 +95,9 @@ public class TestClass
             default:
                 return 0;
         }
-    }
-}";
+        """);
 
-    internal const string SwitchStatementPriorSectionExcludesZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
+    internal static readonly string SwitchStatementPriorSectionExcludesZeroDivisor = Method("int value", """
         switch (value)
         {
             case 0:
@@ -180,111 +105,66 @@ public class TestClass
             case var divisor:
                 return 10 / divisor;
         }
-    }
-}";
+        """);
 
-    internal const string SwitchExpressionPatternBoundNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
+    internal static readonly string SwitchExpressionPatternBoundNonZeroDivisor = Method("int value", """
         return value switch
         {
             > 0 and var divisor => 10 / divisor,
             _ => 0
         };
-    }
-}";
+        """);
 
-    internal const string SwitchExpressionFallbackExcludesZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
+    internal static readonly string SwitchExpressionFallbackExcludesZeroDivisor = Method("int value", """
         return value switch
         {
             0 => 0,
             _ => 10 / value
         };
-    }
-}";
+        """);
 
-    internal const string RelationalPatternBoundNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
+    internal static readonly string RelationalPatternBoundNonZeroDivisor = Method("int value", """
         if (value is > 0 and var divisor)
         {
             return 10 / divisor;
         }
-
         return 0;
-    }
-}";
+        """);
 
-    internal const string PropertyPatternBoundNonZeroLength = @"
-public class TestClass
-{
-    public int TestMethod(string text)
-    {
+    internal static readonly string PropertyPatternBoundNonZeroLength = Method("string text", """
         if (text is { Length: > 0 and var length })
         {
             return 10 / length;
         }
-
         return 0;
-    }
-}";
+        """);
 
-    internal const string ListPatternFirstElementNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
+    internal static readonly string ListPatternFirstElementNonZeroDivisor = Method("int[] values", """
         if (values is [> 0 and var divisor, ..])
         {
             return 10 / divisor;
         }
-
         return 0;
-    }
-}";
+        """);
 
-    internal const string ListPatternTrailingElementNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
+    internal static readonly string ListPatternTrailingElementNonZeroDivisor = Method("int[] values", """
         if (values is [.., > 0 and var divisor])
         {
             return 10 / divisor;
         }
-
         return 0;
-    }
-}";
+        """);
 
-    internal const string ArrayElementReadFromListPatternNonZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod(int[] values)
-    {
+    internal static readonly string ArrayElementReadFromListPatternNonZeroDivisor = Method("int[] values", """
         if (values is [> 0, ..])
         {
             var divisor = values[0];
             return 10 / divisor;
         }
-
         return 0;
-    }
-}";
+        """);
 
-    internal const string IfElseElseExitZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod(int divisor)
-    {
+    internal static readonly string IfElseElseExitZeroDivisor = Method("int divisor", """
         if (divisor == 0)
         {
         }
@@ -292,28 +172,26 @@ public class TestClass
         {
             return 0;
         }
-
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string DefaultIntegralZeroDivisor = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string DefaultIntegralZeroDivisor = Method("", """
         int divisor = default;
         return 10 / divisor;
-    }
-}";
+        """);
 
-    internal const string DefaultReferenceNull = @"
-public class TestClass
-{
-    public int TestMethod()
-    {
+    internal static readonly string DefaultReferenceNull = Method("", """
         string value = default;
         return value.Length;
-    }
-}";
+        """);
+
+    private static string Method(string parameters, string body) => $$"""
+        public class TestClass
+        {
+            public int TestMethod({{parameters}})
+            {
+        {{body}}
+            }
+        }
+        """;
 }
