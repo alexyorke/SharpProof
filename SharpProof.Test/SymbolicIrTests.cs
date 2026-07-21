@@ -1631,37 +1631,34 @@ public sealed class SymbolicIrTests {
         Assert.That(multiply.Right, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
     }
 
-    [Test]
-    public void LowerBuiltInLengthTerm_StringSubstringOneArgumentUsesSourceLengthDelta() {
-        var context = CreateExpressionContext(
-            "string text, int start",
-            "text.Substring(start).Length == text.Length - start");
+    [TestCase("string text, int start", "text.Substring(start).Length == text.Length - start", false, true,
+        TestName = "LowerBuiltInLengthTerm_StringSubstringOneArgumentUsesSourceLengthDelta")]
+    [TestCase("string text, int start, int length", "text.Substring(start, length).Length == length", false, false,
+        TestName = "LowerBuiltInLengthTerm_StringSubstringTwoArgumentUsesRequestedLength")]
+    [TestCase("string text, int start", "text.AsSpan(start).Length == text.Length - start", true, true,
+        TestName = "LowerBuiltInLengthTerm_StringAsSpanOneArgumentUsesSourceLengthDelta")]
+    [TestCase("ReadOnlySpan<int> values, int start, int length", "values.Slice(start, length).Length == length", true, false,
+        TestName = "LowerBuiltInLengthTerm_ReadOnlySpanSliceTwoArgumentUsesRequestedLength")]
+    public void InvocationLengthTermMatrix(string parameters, string expression, bool methodContext, bool difference) {
+        var context = methodContext
+            ? CreateMethodExpressionContext(parameters, string.Empty, expression)
+            : CreateExpressionContext(parameters, expression);
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
-
         Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
-
-        Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
-        var subtract = (SymbolicBinaryTerm)term;
-        Assert.That(subtract.Operator, Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
-        Assert.That(subtract.Left, Is.TypeOf<SymbolicLengthTerm>());
-        Assert.That(subtract.Right, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
-        Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
-    }
-
-    [Test]
-    public void LowerBuiltInLengthTerm_StringSubstringTwoArgumentUsesRequestedLength() {
-        var context = CreateExpressionContext(
-            "string text, int start, int length",
-            "text.Substring(start, length).Length == length");
-        var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
-
-        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
-
-        Assert.That(term, Is.TypeOf<SymbolicVariableTerm>());
-        Assert.That(((SymbolicVariableTerm)term).Name, Does.StartWith("length#"));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
-        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
+        if (difference) {
+            Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
+            var subtract = (SymbolicBinaryTerm)term;
+            Assert.That(subtract.Operator, Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
+            Assert.That(subtract.Left, Is.TypeOf<SymbolicLengthTerm>());
+            Assert.That(subtract.Right, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
+        }
+        else {
+            Assert.That(term, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(((SymbolicVariableTerm)term).Name, Does.StartWith("length#"));
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
+        }
     }
 
     [TestCase("int[] values", "values[1..^1].Length == values.Length - 2",
@@ -1683,70 +1680,14 @@ public sealed class SymbolicIrTests {
         Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
     }
 
-    [Test]
-    public void LowerBuiltInLengthTerm_StringAsSpanOneArgumentUsesSourceLengthDelta() {
-        var context = CreateMethodExpressionContext(
-            "string text, int start",
-            string.Empty,
-            "text.AsSpan(start).Length == text.Length - start");
+    [TestCase("int[] values", "Range range = 1..^1;", "values[range].Length == values.Length - 2",
+        TestName = "LowerBuiltInLengthTerm_AssignedRangeElementAccessUsesResolvedEndpoints")]
+    [TestCase("string text, Range range", "range = 1..^1;", "text.AsSpan(range).Length == text.Length - 2",
+        TestName = "LowerBuiltInLengthTerm_AssignedRangeStringViewUsesResolvedEndpoints")]
+    public void AssignedRangeLengthTermMatrix(string parameters, string statement, string expression) {
+        var context = CreateMethodExpressionContext(parameters, statement, expression);
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
-
         Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
-
-        Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
-        var subtract = (SymbolicBinaryTerm)term;
-        Assert.That(subtract.Operator, Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
-        Assert.That(subtract.Left, Is.TypeOf<SymbolicLengthTerm>());
-        Assert.That(subtract.Right, Is.TypeOf<SymbolicVariableTerm>());
-        Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
-        Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
-    }
-
-    [Test]
-    public void LowerBuiltInLengthTerm_ReadOnlySpanSliceTwoArgumentUsesRequestedLength() {
-        var context = CreateMethodExpressionContext(
-            "ReadOnlySpan<int> values, int start, int length",
-            string.Empty,
-            "values.Slice(start, length).Length == length");
-        var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
-
-        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
-
-        Assert.That(term, Is.TypeOf<SymbolicVariableTerm>());
-        Assert.That(((SymbolicVariableTerm)term).Name, Does.StartWith("length#"));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
-        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
-    }
-
-    [Test]
-    public void LowerBuiltInLengthTerm_AssignedRangeElementAccessUsesResolvedEndpoints() {
-        var context = CreateMethodExpressionContext(
-            "int[] values",
-            """
-            Range range = 1..^1;
-            """,
-            "values[range].Length == values.Length - 2");
-        var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
-
-        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
-
-        Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
-        Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
-        Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
-    }
-
-    [Test]
-    public void LowerBuiltInLengthTerm_AssignedRangeStringViewUsesResolvedEndpoints() {
-        var context = CreateMethodExpressionContext(
-            "string text, Range range",
-            """
-            range = 1..^1;
-            """,
-            "text.AsSpan(range).Length == text.Length - 2");
-        var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
-
-        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
-
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
@@ -1849,46 +1790,23 @@ public sealed class SymbolicIrTests {
         Assert.That(formula.ToString(), Does.Contain(".Count"));
     }
 
-    [Test]
-    public void BuiltInElementAccessInRangeCondition_SupportsAssignedIndexShape() {
+    [TestCase(false, TestName = "BuiltInElementAccessInRangeCondition_SupportsAssignedIndexShape")]
+    [TestCase(true, TestName = "BuiltInElementAccessInRangeCondition_SupportsRangeShape")]
+    public void BuiltInElementAccessInRangeConditionMatrix(bool range) {
         var context = CreateMethodExpressionContext(
             "int[] values",
-            """
-            Index index = ^1;
-            """,
-            "values[index] == 0");
-        var elementAccess = (ElementAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
-
+            range ? "Range slice = 1..^1;" : "Index index = ^1;",
+            range ? "values[slice].Length == values.Length - 2" : "values[index] == 0");
+        var left = ((BinaryExpressionSyntax)context.Expression).Left;
+        var elementAccess = range
+            ? (ElementAccessExpressionSyntax)((MemberAccessExpressionSyntax)left).Expression
+            : (ElementAccessExpressionSyntax)left;
         Assert.That(
             TypedSymbolicTestLowering.TryCreateBuiltInElementAccessInRangeCondition(
                 elementAccess.Expression,
                 elementAccess.ArgumentList.Arguments[0].Expression,
                 elementAccess,
-                "test.element-access.in-range",
-                context.LoweringContext,
-                out var condition),
-            Is.True);
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
-    }
-
-    [Test]
-    public void BuiltInElementAccessInRangeCondition_SupportsRangeShape() {
-        var context = CreateMethodExpressionContext(
-            "int[] values",
-            """
-            Range slice = 1..^1;
-            """,
-            "values[slice].Length == values.Length - 2");
-        var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
-        var elementAccess = (ElementAccessExpressionSyntax)memberAccess.Expression;
-
-        Assert.That(
-            TypedSymbolicTestLowering.TryCreateBuiltInElementAccessInRangeCondition(
-                elementAccess.Expression,
-                elementAccess.ArgumentList.Arguments[0].Expression,
-                elementAccess,
-                "test.range-access.in-range",
+                range ? "test.range-access.in-range" : "test.element-access.in-range",
                 context.LoweringContext,
                 out var condition),
             Is.True);

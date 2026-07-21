@@ -876,40 +876,19 @@ public class SmtAnalysisServiceTests {
         Assert.That(proof.Budget.MethodBudgetMilliseconds, Is.EqualTo(int.MaxValue));
     }
 
-    [Test]
-    public void ClassifyImplication_ProvesFactFromPathConditions() {
+    [TestCase(true, TestName = "ClassifyImplication_ProvesFactFromPathConditions")]
+    [TestCase(false, TestName = "ClassifyImplication_ReturnsReachableWhenFactDoesNotFollow")]
+    public void ImplicationOutcomeMatrix(bool follows) {
         var x = Int("x");
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(x, Integer(0))
-        };
-        var fact = LessThanOrEqual(x, Integer(1));
-
+        var pathConditions = new[] { follows ? Equal(x, Integer(0)) : GreaterThanOrEqual(x, Integer(0)) };
+        var fact = follows ? LessThanOrEqual(x, Integer(1)) : GreaterThan(x, Integer(0));
         var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That( service.ClassifyImplication(pathConditions, fact).Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-    }
-
-    [Test]
-    public void ClassifyImplication_ReturnsReachableWhenFactDoesNotFollow() {
-        var x = Int("x");
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            GreaterThanOrEqual(x, Integer(0))
-        };
-        var fact = GreaterThan(x, Integer(0));
-
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
-        Assert.That( service.ClassifyImplication(pathConditions, fact).Outcome, Is.Not.EqualTo(AnalysisProofOutcome.Proven));
+        var expectedOutcome = follows ? AnalysisProofOutcome.Proven : AnalysisProofOutcome.Disproven;
+        Assert.That(result.Outcome, Is.EqualTo(expectedOutcome));
+        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(follows ? Feasibility.Unknown : Feasibility.Satisfiable));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(follows ? Feasibility.Unsatisfiable : Feasibility.Satisfiable));
+        Assert.That(service.ClassifyImplication(pathConditions, fact).Outcome, Is.EqualTo(expectedOutcome));
     }
 
     private sealed record ServiceRegexCase(
@@ -984,109 +963,26 @@ public class SmtAnalysisServiceTests {
         Assert.That(solver.RegexValidationCacheCount, Is.LessThanOrEqualTo(SmtSolver.MaxRegexValidationCacheEntries));
     }
 
-    [Test]
-    public void ClassifyPathFeasibility_CombinesStringContainsAndEquality() {
-        var text = String("text");
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtStringContainsFormula(text, Text("Z")),
-            Equal(text, Text("ABC"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_ConcreteStringStartsWithMismatchIsRejected() {
-        var text = String("text");
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtStringStartsWithFormula(text, Text("AB")),
-            Equal(text, Text("ZAB"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_ConcreteNegatedStringEndsWithMismatchIsRejected() {
-        var text = String("text");
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtUnaryFormula(
-                SmtUnaryOperator.Not,
-                new SmtStringEndsWithFormula(text, Text("BC"))),
-            Equal(text, Text("ABC"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_CombinesStringConcatAndEquality() {
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtBinaryFormula(
-                SmtBinaryOperator.NotEqual,
-                new SmtStringConcatTerm(Text("A"), new SmtStringConstant("B")),
-                Text("AB"))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_ReportsContradictoryPathUnsatisfiable() {
-        var x = Int("x");
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            GreaterThan(x, Integer(0)),
-            LessThan(x, Integer(0))
-        };
-
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_BooleanAliasComparisonContradiction_IsUnsatisfiable() {
+    [TestCase("contains", TestName = "ClassifyPathFeasibility_CombinesStringContainsAndEquality")]
+    [TestCase("starts", TestName = "ClassifyPathFeasibility_ConcreteStringStartsWithMismatchIsRejected")]
+    [TestCase("ends", TestName = "ClassifyPathFeasibility_ConcreteNegatedStringEndsWithMismatchIsRejected")]
+    [TestCase("concat", TestName = "ClassifyPathFeasibility_CombinesStringConcatAndEquality")]
+    [TestCase("numeric", TestName = "ClassifyPathFeasibility_ReportsContradictoryPathUnsatisfiable")]
+    [TestCase("alias", TestName = "ClassifyPathFeasibility_BooleanAliasComparisonContradiction_IsUnsatisfiable")]
+    public void PathContradictionMatrix(string kind) {
         var value = Int("value");
+        var text = String("text");
         var isZero = Bool("isZero");
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                isZero,
-                Equal(value, Integer(0))),
-            isZero,
-            NotEqual(value, Integer(0))
+        var pathConditions = kind switch {
+            "contains" => new SmtFormula[] { new SmtStringContainsFormula(text, Text("Z")), Equal(text, Text("ABC")) },
+            "starts" => [new SmtStringStartsWithFormula(text, Text("AB")), Equal(text, Text("ZAB"))],
+            "ends" => [Not(new SmtStringEndsWithFormula(text, Text("BC"))), Equal(text, Text("ABC"))],
+            "concat" => [NotEqual(new SmtStringConcatTerm(Text("A"), Text("B")), Text("AB"))],
+            "numeric" => [GreaterThan(value, Integer(0)), LessThan(value, Integer(0))],
+            _ => [Equal(isZero, Equal(value, Integer(0))), isZero, NotEqual(value, Integer(0))]
         };
-
+        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var result = service.ClassifyPathFeasibility(pathConditions);
-
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));

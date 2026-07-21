@@ -55,28 +55,15 @@ internal class AnalysisProofTests {
         });
     }
 
-    [Test]
-    public void AnalysisProof_FalseHazardCondition_IsProven() {
+    [TestCase(false, "impure_call_unreachable", TestName = "AnalysisProof_FalseHazardCondition_IsProven")]
+    [TestCase(true, "impure_call_reachable", TestName = "AnalysisProof_TrueHazardCondition_IsDisproven")]
+    public void ConstantEffectHazardMatrix(bool reachable, string reason) {
         using var search = new AnalysisProofSearch();
-
-        var result = search.Classify(
-            new SmtBooleanConstant(false),
-            TimeSpan.FromSeconds(2));
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.Reason, Is.EqualTo("impure_call_unreachable"));
-    }
-
-    [Test]
-    public void AnalysisProof_TrueHazardCondition_IsDisproven() {
-        using var search = new AnalysisProofSearch();
-
-        var result = search.Classify(
-            new SmtBooleanConstant(true),
-            TimeSpan.FromSeconds(2));
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
-        Assert.That(result.Reason, Is.EqualTo("impure_call_reachable"));
+        var result = search.Classify(new SmtBooleanConstant(reachable), TimeSpan.FromSeconds(2));
+        Assert.That(result.Outcome, Is.EqualTo(reachable
+            ? AnalysisProofOutcome.Disproven
+            : AnalysisProofOutcome.Proven));
+        Assert.That(result.Reason, Is.EqualTo(reason));
     }
 
     [Test]
@@ -213,61 +200,21 @@ internal class AnalysisProofTests {
         Assert.That(result.HazardCheck.Witness, Is.Null);
     }
 
-    [Test]
-    public void AnalysisProof_SafeStaticCacheRead_IsProven() {
+    [TestCase("StaticCacheRead", false, "safe_static_cache_read", TestName = "AnalysisProof_SafeStaticCacheRead_IsProven")]
+    [TestCase("FreshOwnedObjectWrite", false, "fresh_owned_object_write", TestName = "AnalysisProof_FreshOwnedObjectWrite_IsProven")]
+    [TestCase("FreshOwnedArrayWrite", false, "fresh_owned_array_write", TestName = "AnalysisProof_FreshOwnedArrayWrite_IsProven")]
+    [TestCase("CallerVisibleMemoryWrite", true, "caller_visible_memory_write_reachable", TestName = "AnalysisProof_CallerVisibleMemoryWrite_IsDisproven")]
+    public void StructuralEffectClassificationMatrix(string kind, bool disproven, string reason) {
         using var search = new AnalysisProofSearch();
-
         var result = search.Classify(
             new AnalysisProofQuery(
                 Array.Empty<SmtFormula>(),
-                new AnalysisHazard(AnalysisHazardKind.StaticCacheRead, new SmtBooleanConstant(true))),
+                new AnalysisHazard(Enum.Parse<AnalysisHazardKind>(kind), new SmtBooleanConstant(true))),
             TimeSpan.FromSeconds(2));
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.Reason, Is.EqualTo("safe_static_cache_read"));
-    }
-
-    [Test]
-    public void AnalysisProof_FreshOwnedObjectWrite_IsProven() {
-        using var search = new AnalysisProofSearch();
-
-        var result = search.Classify(
-            new AnalysisProofQuery(
-                Array.Empty<SmtFormula>(),
-                new AnalysisHazard(AnalysisHazardKind.FreshOwnedObjectWrite, new SmtBooleanConstant(true))),
-            TimeSpan.FromSeconds(2));
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.Reason, Is.EqualTo("fresh_owned_object_write"));
-    }
-
-    [Test]
-    public void AnalysisProof_FreshOwnedArrayWrite_IsProven() {
-        using var search = new AnalysisProofSearch();
-
-        var result = search.Classify(
-            new AnalysisProofQuery(
-                Array.Empty<SmtFormula>(),
-                new AnalysisHazard(AnalysisHazardKind.FreshOwnedArrayWrite, new SmtBooleanConstant(true))),
-            TimeSpan.FromSeconds(2));
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.Reason, Is.EqualTo("fresh_owned_array_write"));
-    }
-
-    [Test]
-    public void AnalysisProof_CallerVisibleMemoryWrite_IsDisproven() {
-        using var search = new AnalysisProofSearch();
-        var memoryWrite = new SmtBooleanConstant(true);
-
-        var result = search.Classify(
-            new AnalysisProofQuery(
-                Array.Empty<SmtFormula>(),
-                new AnalysisHazard(AnalysisHazardKind.CallerVisibleMemoryWrite, memoryWrite)),
-            TimeSpan.FromSeconds(2));
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
-        Assert.That(result.Reason, Is.EqualTo("caller_visible_memory_write_reachable"));
+        Assert.That(result.Outcome, Is.EqualTo(disproven
+            ? AnalysisProofOutcome.Disproven
+            : AnalysisProofOutcome.Proven));
+        Assert.That(result.Reason, Is.EqualTo(reason));
     }
 
     [Test]
