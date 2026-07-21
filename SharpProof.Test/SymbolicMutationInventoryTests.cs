@@ -31,15 +31,13 @@ public sealed class SymbolicMutationInventoryTests {
 
         Assert.Multiple(() => {
             Assert.That(plan.HasUnsupportedMutation, Is.False);
-            Assert.That(plan.Steps.Select(static step => step.Provenance), Is.EqualTo(new[]
-            {
+            Assert.That(plan.Steps.Select(static step => step.Provenance), Is.EqualTo(new[] {
                 "operation-transfer.mutation-invalidation",
                 "operation-transfer.reference-invalidation",
                 "operation-transfer.reference-invalidation"
             }));
             Assert.That(plan.Steps.SelectMany(static step => step.Targets).Select(static target => target.Key),
-                Is.EqualTo(new[]
-                {
+                Is.EqualTo(new[] {
                     SymbolicStateValueFacts.ImplicitThisVariableName + "._field",
                     SymbolicFactFactory.GetSmtVariableName(value),
                     SymbolicFactFactory.GetSmtVariableName(value)

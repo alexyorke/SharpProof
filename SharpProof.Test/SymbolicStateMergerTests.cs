@@ -14,14 +14,12 @@ public sealed class SymbolicStateMergerTests {
         var select = new SymbolicVariableTerm("select", SmtValueKind.Bool);
         var first = new SymbolicVariableTerm("first", SmtValueKind.Int);
         var second = new SymbolicVariableTerm("second", SmtValueKind.Int);
-        var trueState = new SymbolicState(pathConditions: new[]
-        {
+        var trueState = new SymbolicState(pathConditions: new[] {
             Truth(select, source),
             Equal(first, 1, source),
             Equal(second, 2, source)
         });
-        var falseState = new SymbolicState(pathConditions: new SymbolicCondition[]
-        {
+        var falseState = new SymbolicState(pathConditions: new SymbolicCondition[] {
             new SymbolicNotCondition(Truth(select, source)),
             Equal(first, 3, source),
             Equal(second, 4, source)

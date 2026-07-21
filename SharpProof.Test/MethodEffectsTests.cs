@@ -8,10 +8,7 @@ namespace SharpProof.Test;
 public sealed class MethodEffectsTests {
     [TestCase("return new object();", SharpProofVerdict.Proven, SharpProofVerdict.Disproven)]
     [TestCase("throw null!;", SharpProofVerdict.Proven, SharpProofVerdict.Proven)]
-    public void PurityIsDerivedIndependentlyFromAllocationAndThrows(
-        string statement,
-        SharpProofVerdict expectedPurity,
-        SharpProofVerdict expectedAllocationFree) {
+    public void PurityIsDerivedIndependentlyFromAllocationAndThrows( string statement, SharpProofVerdict expectedPurity, SharpProofVerdict expectedAllocationFree) {
         using var session = SharpProofAnalysisSession.FromText($$"""
             #nullable enable
             class C {
@@ -19,9 +16,7 @@ public sealed class MethodEffectsTests {
             }
             """);
 
-        var result = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Line, Line: 3),
-            SharpProofAnalysisFacet.Effects));
+        var result = session.Analyze(new SharpProofAnalysisRequest( new SharpProofTarget(SharpProofTargetKind.Line, Line: 3), SharpProofAnalysisFacet.Effects));
 
         Assert.Multiple(() => {
             Assert.That(result.Status, Is.EqualTo(SharpProofQueryStatus.Succeeded));
@@ -39,9 +34,7 @@ public sealed class MethodEffectsTests {
             }
             """);
 
-        var result = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Line, Line: 3),
-            SharpProofAnalysisFacet.Effects));
+        var result = session.Analyze(new SharpProofAnalysisRequest( new SharpProofTarget(SharpProofTargetKind.Line, Line: 3), SharpProofAnalysisFacet.Effects));
 
         Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
         Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
@@ -49,9 +42,7 @@ public sealed class MethodEffectsTests {
 
     [TestCase("static int M(int[] values) => values.Length;", SharpProofVerdict.Proven)]
     [TestCase("static int[] M(int x) => [1, x, 3];", SharpProofVerdict.Disproven)]
-    public void ArrayIntrinsicsHaveStructuralEffects(
-        string method,
-        SharpProofVerdict expectedAllocationFree) {
+    public void ArrayIntrinsicsHaveStructuralEffects( string method, SharpProofVerdict expectedAllocationFree) {
         var result = Analyze("class C {\n" + method + "\n}");
 
         Assert.Multiple(() => {
@@ -71,16 +62,11 @@ public sealed class MethodEffectsTests {
             }
             """;
         using var session = SharpProofAnalysisSession.FromText(source);
-        var all = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.AllLines),
-            SharpProofAnalysisFacet.Effects));
+        var all = session.Analyze(new SharpProofAnalysisRequest( new SharpProofTarget(SharpProofTargetKind.AllLines), SharpProofAnalysisFacet.Effects));
         var methodStart = source.IndexOf("static int[]", StringComparison.Ordinal);
         var methodEnd = source.IndexOf(';', methodStart) + 1;
         var span = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(
-                SharpProofTargetKind.Span,
-                SpanStart: methodStart,
-                SpanEnd: methodEnd),
+            new SharpProofTarget( SharpProofTargetKind.Span, SpanStart: methodStart, SpanEnd: methodEnd),
             SharpProofAnalysisFacet.Effects));
 
         Assert.Multiple(() => {
@@ -100,9 +86,7 @@ public sealed class MethodEffectsTests {
             }
             """);
 
-        var result = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Line, Line: 3),
-            SharpProofAnalysisFacet.Effects));
+        var result = session.Analyze(new SharpProofAnalysisRequest( new SharpProofTarget(SharpProofTargetKind.Line, Line: 3), SharpProofAnalysisFacet.Effects));
 
         Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
         Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.True);
@@ -110,10 +94,7 @@ public sealed class MethodEffectsTests {
 
     [TestCase("throw new E();", "E", MethodExceptionSource.ExplicitThrow)]
     [TestCase("return 10 / 0;", "System.DivideByZeroException", MethodExceptionSource.RuntimeHazard)]
-    public void EscapingExceptionsAreCanonicalStructuredFacts(
-        string body,
-        string exceptionType,
-        MethodExceptionSource source) {
+    public void EscapingExceptionsAreCanonicalStructuredFacts( string body, string exceptionType, MethodExceptionSource source) {
         var result = Analyze($$"""
             sealed class E : System.Exception { }
             class C {
@@ -201,8 +182,6 @@ public sealed class MethodEffectsTests {
 
     private static SharpProofAnalysisResult Analyze(string source, int line = 2) {
         using var session = SharpProofAnalysisSession.FromText(source);
-        return session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Line, Line: line),
-            SharpProofAnalysisFacet.Effects));
+        return session.Analyze(new SharpProofAnalysisRequest( new SharpProofTarget(SharpProofTargetKind.Line, Line: line), SharpProofAnalysisFacet.Effects));
     }
 }

@@ -93,8 +93,7 @@ public sealed class SymbolicAnalysisLimitsTests {
         Assert.That(info.Events.All(item => item.SourceSpanStart == sourceNode.SpanStart), Is.True);
         Assert.That(
             info.Events.Select(item => item.Code),
-            Is.EquivalentTo(new[]
-            {
+            Is.EquivalentTo(new[] {
                 "analysis_limit.if_else_fact_merge",
                 "analysis_limit.foreach_element_facts"
             }));
@@ -118,10 +117,8 @@ public sealed class SymbolicAnalysisLimitsTests {
 
     [Test]
     public void TruncationCombination_UsesMaximumObservationAndCanonicalOrdering() {
-        var combined = SymbolicAnalysisTruncationInfo.Combine(new[]
-        {
-            new SymbolicAnalysisTruncationInfo(new[]
-            {
+        var combined = SymbolicAnalysisTruncationInfo.Combine(new[] {
+            new SymbolicAnalysisTruncationInfo(new[] {
                 new SymbolicAnalysisTruncationEvent(
                     SymbolicAnalysisLimitKind.SwitchFactMerge,
                     2,
@@ -135,8 +132,7 @@ public sealed class SymbolicAnalysisLimitsTests {
                     "if.a",
                     10)
             }),
-            new SymbolicAnalysisTruncationInfo(new[]
-            {
+            new SymbolicAnalysisTruncationInfo(new[] {
                 new SymbolicAnalysisTruncationEvent(
                     SymbolicAnalysisLimitKind.SwitchFactMerge,
                     2,
@@ -160,14 +156,12 @@ public sealed class SymbolicAnalysisLimitsTests {
     [Test]
     public void PathConditionMerger_ReportsEveryStateMergeCap() {
         var source = SyntaxFactory.ParseExpression("source");
-        IReadOnlyList<SymbolicCondition> first = new[]
-        {
+        IReadOnlyList<SymbolicCondition> first = new[] {
             Greater("x", 1), Greater("x", 2), Greater("x", 3),
             Greater("y", 10), Greater("y", 11), Greater("y", 12),
             Greater("z", 20), Greater("z", 21), Greater("z", 22)
         };
-        IReadOnlyList<SymbolicCondition> second = new[]
-        {
+        IReadOnlyList<SymbolicCondition> second = new[] {
             Greater("x", 4), Greater("x", 5), Greater("x", 6),
             Greater("y", 13), Greater("y", 14), Greater("y", 15),
             Greater("z", 23), Greater("z", 24), Greater("z", 25)
@@ -186,8 +180,7 @@ public sealed class SymbolicAnalysisLimitsTests {
         Assert.That(merged, Has.Length.EqualTo(1));
         Assert.That(
             info.Events.Select(item => item.Kind),
-            Is.EquivalentTo(new[]
-            {
+            Is.EquivalentTo(new[] {
                 SymbolicAnalysisLimitKind.MergedPathConditions,
                 SymbolicAnalysisLimitKind.MergeableFactsPerTargetPerState,
                 SymbolicAnalysisLimitKind.FactChoiceCombinationsPerTarget,
@@ -210,14 +203,12 @@ public sealed class SymbolicAnalysisLimitsTests {
         var flag = new SymbolicVariableTerm("flag", SmtValueKind.Bool);
         var value = new SymbolicVariableTerm("value", SmtValueKind.Int);
         var other = new SymbolicVariableTerm("other", SmtValueKind.Int);
-        IReadOnlyList<SymbolicCondition> first = new SymbolicCondition[]
-        {
+        IReadOnlyList<SymbolicCondition> first = new SymbolicCondition[] {
             Truth(flag),
             new SymbolicNotCondition(Greater(value, 0)),
             Greater(other, 10)
         };
-        IReadOnlyList<SymbolicCondition> second = new SymbolicCondition[]
-        {
+        IReadOnlyList<SymbolicCondition> second = new SymbolicCondition[] {
             new SymbolicNotCondition(Truth(flag)),
             new SymbolicNotCondition(Greater(value, 1)),
             Greater(other, 11)

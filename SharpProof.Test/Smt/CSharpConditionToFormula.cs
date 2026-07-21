@@ -8,11 +8,7 @@ using SharpProof.ProofCore.Smt;
 namespace SharpProof.Test.Smt;
 
 internal static class CSharpConditionToFormula {
-    public static bool TryTranslate(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        [NotNullWhen(true)] out SmtFormula? formula) {
+    public static bool TryTranslate( ExpressionSyntax expression, SemanticModel semanticModel, CancellationToken cancellationToken, [NotNullWhen(true)] out SmtFormula? formula) {
         expression = UnwrapExpression(expression);
 
         var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
@@ -44,11 +40,7 @@ internal static class CSharpConditionToFormula {
         if (expression is BinaryExpressionSyntax binaryExpression) {
             if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
                 binaryExpression.Right is TypeSyntax testedType &&
-                IsNonNullEquivalentTypeTest(
-                    binaryExpression.Left,
-                    testedType,
-                    semanticModel,
-                    cancellationToken) &&
+                IsNonNullEquivalentTypeTest( binaryExpression.Left, testedType, semanticModel, cancellationToken) &&
                 TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var typeTestValue) &&
                 typeTestValue.Kind == SmtValueKind.Reference) {
                 formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, typeTestValue, new SmtNullConstant());
@@ -88,11 +80,7 @@ internal static class CSharpConditionToFormula {
         return false;
     }
 
-    private static bool IsNonNullEquivalentTypeTest(
-        ExpressionSyntax value,
-        TypeSyntax testedType,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
+    private static bool IsNonNullEquivalentTypeTest( ExpressionSyntax value, TypeSyntax testedType, SemanticModel semanticModel, CancellationToken cancellationToken) {
         var valueType = semanticModel.GetTypeInfo(value, cancellationToken).Type;
         var targetType = semanticModel.GetTypeInfo(testedType, cancellationToken).Type;
         if (valueType == null || targetType == null || !valueType.IsReferenceType) return false;
@@ -180,11 +168,7 @@ internal static class CSharpConditionToFormula {
         return false;
     }
 
-    private static bool TryTranslateComparison(
-        SyntaxKind kind,
-        SmtFormula left,
-        SmtFormula right,
-        [NotNullWhen(true)] out SmtFormula? formula) {
+    private static bool TryTranslateComparison( SyntaxKind kind, SmtFormula left, SmtFormula right, [NotNullWhen(true)] out SmtFormula? formula) {
         formula = null;
         switch (kind) {
             case SyntaxKind.EqualsExpression:
@@ -214,11 +198,7 @@ internal static class CSharpConditionToFormula {
         }
     }
 
-    private static bool TryCreateIntegralComparison(
-        SmtBinaryOperator comparison,
-        SmtFormula left,
-        SmtFormula right,
-        [NotNullWhen(true)] out SmtFormula? formula) {
+    private static bool TryCreateIntegralComparison( SmtBinaryOperator comparison, SmtFormula left, SmtFormula right, [NotNullWhen(true)] out SmtFormula? formula) {
         formula = null;
         if (left.Kind != SmtValueKind.Int || right.Kind != SmtValueKind.Int) return false;
 
@@ -412,10 +392,7 @@ internal static class CSharpConditionToFormula {
         }
     }
 
-    private static bool HasSupportedIntegralType(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
+    private static bool HasSupportedIntegralType( ExpressionSyntax expression, SemanticModel semanticModel, CancellationToken cancellationToken) {
         var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
         return type != null && IsIntegralType(type);
     }

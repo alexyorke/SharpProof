@@ -19,20 +19,15 @@ public sealed class ContractFixture
 {
     private string? _value;
 
-    public void Inputs([AllowNull] string allowed, [DisallowNull] string? disallowed)
-    {
+    public void Inputs([AllowNull] string allowed, [DisallowNull] string? disallowed) {
     }
 
-    public static bool TryRead(
-        [MaybeNullWhen(false)] out string value,
-        [NotNullWhen(true)] string? candidate)
-    {
+    public static bool TryRead( [MaybeNullWhen(false)] out string value, [NotNullWhen(true)] string? candidate) {
         value = string.Empty;
         return candidate is not null;
     }
 
-    public static void Mark([NotNull] string? value)
-    {
+    public static void Mark([NotNull] string? value) {
     }
 
     [return: MaybeNull]
@@ -53,22 +48,18 @@ public sealed class ContractFixture
     [DoesNotReturn]
     public static void Fail() => throw new InvalidOperationException();
 
-    public static void ThrowIf([DoesNotReturnIf(true)] bool condition)
-    {
+    public static void ThrowIf([DoesNotReturnIf(true)] bool condition) {
     }
 
-    public static int Flow(string? value)
-    {
-        if (value is null)
-        {
+    public static int Flow(string? value) {
+        if (value is null) {
             return 0;
         }
 
         return value.Length;
     }
 
-    public static void Reads()
-    {
+    public static void Reads() {
         _ = Always();
         _ = Maybe();
     }
@@ -100,14 +91,10 @@ public sealed class ContractFixture
         Assert.That(parameterName, Is.EqualTo("value"));
 
         var ensureValue = fixture.GetMembers("EnsureValue").OfType<IMethodSymbol>().Single();
-        Assert.That(
-            NullableFlowFacts.GetMemberNotNullTargets(ensureValue),
-            Is.EquivalentTo(new[] { "_value" }));
+        Assert.That(NullableFlowFacts.GetMemberNotNullTargets(ensureValue), Is.EquivalentTo(new[] { "_value" }));
 
         var hasValue = fixture.GetMembers("HasValue").OfType<IMethodSymbol>().Single();
-        Assert.That(
-            NullableFlowFacts.GetMemberNotNullWhenTargets(hasValue, true),
-            Is.EquivalentTo(new[] { "_value" }));
+        Assert.That(NullableFlowFacts.GetMemberNotNullWhenTargets(hasValue, true), Is.EquivalentTo(new[] { "_value" }));
         Assert.That( NullableFlowFacts.TryResolveInstanceMemberTarget(fixture, "_value", out var member), Is.True);
         Assert.That(member.Name, Is.EqualTo("_value"));
 

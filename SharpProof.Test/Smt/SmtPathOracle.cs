@@ -11,22 +11,14 @@ internal sealed class SmtPathOracle : IDisposable {
         _solver.Dispose();
     }
 
-    public Feasibility IsSatisfiable(
-        IEnumerable<ExpressionSyntax> pathConditions,
-        SemanticModel semanticModel,
-        TimeSpan timeout,
-        CancellationToken cancellationToken = default) {
+    public Feasibility IsSatisfiable( IEnumerable<ExpressionSyntax> pathConditions, SemanticModel semanticModel, TimeSpan timeout, CancellationToken cancellationToken = default) {
         if (!TryTranslateAll(pathConditions, semanticModel, cancellationToken, out var formulas))
             return Feasibility.Unknown;
 
         return _solver.CheckSatisfiability(formulas, timeout).Feasibility;
     }
 
-    public Feasibility IsSatisfiable(
-        ExpressionSyntax pathCondition,
-        SemanticModel semanticModel,
-        TimeSpan timeout,
-        CancellationToken cancellationToken = default) {
+    public Feasibility IsSatisfiable( ExpressionSyntax pathCondition, SemanticModel semanticModel, TimeSpan timeout, CancellationToken cancellationToken = default) {
         return IsSatisfiable(new[] { pathCondition }, semanticModel, timeout, cancellationToken);
     }
 
@@ -41,9 +33,7 @@ internal sealed class SmtPathOracle : IDisposable {
                 out var conclusionFormula))
             return Feasibility.Unknown;
 
-        return _solver.CheckSatisfiability(
-            formulas.Concat(new[] { new SmtUnaryFormula(SmtUnaryOperator.Not, conclusionFormula) }),
-            timeout).Feasibility;
+        return _solver.CheckSatisfiability( formulas.Concat(new[] { new SmtUnaryFormula(SmtUnaryOperator.Not, conclusionFormula) }), timeout).Feasibility;
     }
 
     public Feasibility Implies(

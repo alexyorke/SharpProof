@@ -56,8 +56,7 @@ public sealed class SymbolicIrTests {
         var oldValue = new SymbolicVariableTerm(
             SymbolicFactFactory.GetSmtVariableName(parameters.Single(symbol => symbol.Name == "oldValue")),
             SmtValueKind.Int);
-        var state = new SymbolicState(new[]
-        {
+        var state = new SymbolicState(new[] {
             SymbolicFact.Exact(
                 new SymbolicRelationAtom(SymbolicRelationOperator.Equal, oldValue, value),
                 context.Expression,
@@ -1412,8 +1411,7 @@ public sealed class SymbolicIrTests {
         var alias = new SymbolicVariableTerm("alias#1", SmtValueKind.Reference);
         var resource = new SymbolicVariableTerm("resource#1", SmtValueKind.Reference);
         var source = SyntaxFactory.ParseExpression("resource");
-        var atoms = new SymbolicAtom[]
-        {
+        var atoms = new SymbolicAtom[] {
             new SymbolicFreshnessAtom(owner),
             new SymbolicOwnershipAtom(owner, false),
             new SymbolicAliasAtom(owner, alias, true),
@@ -1449,8 +1447,7 @@ public sealed class SymbolicIrTests {
         Assert.That(facts[0].Atom, Is.EqualTo(new SymbolicFreshnessAtom(value)));
         Assert.That(facts[1].Atom, Is.EqualTo(new SymbolicOwnershipAtom(value, false)));
         Assert.That(facts[2].Atom, Is.EqualTo(new SymbolicResourceLifetimeAtom(value, SymbolicResourceLifetimeState.Owned)));
-        Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[]
-        {
+        Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[] {
             "test.ownership.fresh",
             "test.ownership.owned",
             "test.ownership.lifetime"
@@ -1476,8 +1473,7 @@ public sealed class SymbolicIrTests {
         Assert.That(facts[0].Atom, Is.EqualTo(new SymbolicFreshnessAtom(value)));
         Assert.That(facts[1].Atom, Is.EqualTo(new SymbolicOwnershipAtom(value, false)));
         Assert.That(facts.Any(static fact => fact.Atom is SymbolicResourceLifetimeAtom), Is.False);
-        Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[]
-        {
+        Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[] {
             "test.array.fresh",
             "test.array.owned"
         }));
@@ -1490,8 +1486,7 @@ public sealed class SymbolicIrTests {
         var owner = new SymbolicVariableTerm("owner#1", SmtValueKind.Reference);
         var alias = new SymbolicVariableTerm("alias#1", SmtValueKind.Reference);
         var syntax = SyntaxFactory.ParseExpression("owner");
-        var facts = new[]
-        {
+        var facts = new[] {
             SymbolicOperationTransferKernel.TransitionLifetime(
                 new SymbolicState(), owner, SymbolicLifetimeOperationKind.Alias, syntax.Span, "test.alias",
                 relatedSubject: alias).State.Facts.Single(),
@@ -1510,8 +1505,7 @@ public sealed class SymbolicIrTests {
                 new SymbolicResourceLifetimeAtom(owner, SymbolicResourceLifetimeState.Escaped), syntax,
                 "test.lifetime")
         };
-        Assert.That(facts.Select(static fact => fact.Atom.GetType().Name), Is.EqualTo(new[]
-        {
+        Assert.That(facts.Select(static fact => fact.Atom.GetType().Name), Is.EqualTo(new[] {
             nameof(SymbolicAliasAtom),
             nameof(SymbolicBorrowAtom),
             nameof(SymbolicEscapeAtom),
@@ -1520,8 +1514,7 @@ public sealed class SymbolicIrTests {
             nameof(SymbolicDisposalAtom),
             nameof(SymbolicResourceLifetimeAtom)
         }));
-        Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[]
-        {
+        Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[] {
             "test.alias",
             "test.borrow",
             "test.escape",

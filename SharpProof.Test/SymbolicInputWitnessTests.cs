@@ -48,8 +48,7 @@ public sealed class SymbolicInputWitnessTests {
         var index = new SmtVariable(indexName, SmtValueKind.Int);
         var local = new SmtVariable(localName, SmtValueKind.Int);
         var receiverState = new SmtVariable("this._state", SmtValueKind.Int);
-        var formulas = new SmtFormula[]
-        {
+        var formulas = new SmtFormula[] {
             Compare(SmtBinaryOperator.GreaterThanOrEqual, value, new SmtIntegerConstant(2)),
             Compare(SmtBinaryOperator.LessThanOrEqual, value, new SmtIntegerConstant(9)),
             Compare(SmtBinaryOperator.NotEqual, textReference, new SmtNullConstant()),
@@ -70,8 +69,7 @@ public sealed class SymbolicInputWitnessTests {
         var witness = new SmtSatisfyingWitness(
             SmtWitnessStatus.Exact,
             "satisfying_model",
-            new SmtModelAssignment[]
-            {
+            new SmtModelAssignment[] {
                 new(valueName, SmtValueKind.Int, "4", IntegerValue: 4),
                 new(textName, SmtValueKind.Reference, "ref!0", IsNull: false,
                     Status: SmtWitnessStatus.Approximate),
@@ -124,8 +122,7 @@ public sealed class SymbolicInputWitnessTests {
     public void InputDomainSynthesis_MarksDisjunctionAndUnsupportedTermShapes() {
         var value = new SmtVariable("value", SmtValueKind.Int);
         var flag = new SmtVariable("flag", SmtValueKind.Bool);
-        var formulas = new SmtFormula[]
-        {
+        var formulas = new SmtFormula[] {
             new SmtBinaryFormula(
                 SmtBinaryOperator.Or,
                 Compare(SmtBinaryOperator.LessThan, value, new SmtIntegerConstant(0)),

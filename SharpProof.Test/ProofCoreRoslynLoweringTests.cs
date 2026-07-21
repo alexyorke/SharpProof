@@ -53,20 +53,10 @@ internal class ProofCoreRoslynLoweringTests {
         int hazardKind,
         AnalysisProofOutcome expectedOutcome,
         string expectedReason) {
-        var context = AnalyzerTestHost.CreateConditionImplicationContext(
-            parameters,
-            pathCondition,
-            conclusion);
-        var evidence = new AnalyzerPurityEvidence(
-            (AnalyzerAnalysisHazardKind)hazardKind,
-            new[] { context.PathCondition },
-            context.Conclusion);
+        var context = AnalyzerTestHost.CreateConditionImplicationContext( parameters, pathCondition, conclusion);
+        var evidence = new AnalyzerPurityEvidence( (AnalyzerAnalysisHazardKind)hazardKind, new[] { context.PathCondition }, context.Conclusion);
 
-        var lowered = AnalyzerEvidenceToProofCoreLowering.TryLower(
-            evidence,
-            context.SemanticModel,
-            CancellationToken.None,
-            out var query);
+        var lowered = AnalyzerEvidenceToProofCoreLowering.TryLower( evidence, context.SemanticModel, CancellationToken.None, out var query);
 
         Assert.That(lowered, Is.True);
         using var search = new AnalysisProofSearch();

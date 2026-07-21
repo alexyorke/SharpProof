@@ -11,17 +11,10 @@ internal enum AnalyzerAnalysisHazardKind {
     DivideByZero
 }
 
-internal sealed record AnalyzerPurityEvidence(
-    AnalyzerAnalysisHazardKind Kind,
-    IReadOnlyList<ExpressionSyntax> PathConditions,
-    ExpressionSyntax TriggerCondition);
+internal sealed record AnalyzerPurityEvidence( AnalyzerAnalysisHazardKind Kind, IReadOnlyList<ExpressionSyntax> PathConditions, ExpressionSyntax TriggerCondition);
 
 internal static class AnalyzerEvidenceToProofCoreLowering {
-    public static bool TryLower(
-        AnalyzerPurityEvidence evidence,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out AnalysisProofQuery? query) {
+    public static bool TryLower( AnalyzerPurityEvidence evidence, SemanticModel semanticModel, CancellationToken cancellationToken, out AnalysisProofQuery? query) {
         var pathConditions = new List<SmtFormula>(evidence.PathConditions.Count);
         foreach (var pathCondition in evidence.PathConditions) {
             if (!CSharpConditionToFormula.TryTranslate(pathCondition, semanticModel, cancellationToken,
@@ -39,9 +32,7 @@ internal static class AnalyzerEvidenceToProofCoreLowering {
             return false;
         }
 
-        query = new AnalysisProofQuery(
-            pathConditions,
-            new AnalysisHazard(MapKind(evidence.Kind), triggerFormula));
+        query = new AnalysisProofQuery( pathConditions, new AnalysisHazard(MapKind(evidence.Kind), triggerFormula));
         return true;
     }
 

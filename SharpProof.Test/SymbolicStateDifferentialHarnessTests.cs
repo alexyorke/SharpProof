@@ -29,15 +29,13 @@ public sealed class SymbolicStateDifferentialHarnessTests {
             "test.upper");
         var first = new SymbolicState(
             new[] { lower, upper },
-            symbolVersions: new[]
-            {
+            symbolVersions: new[] {
                 new KeyValuePair<string, int>("value", 2),
                 new KeyValuePair<string, int>("other", 1)
             });
         var second = new SymbolicState(
             new[] { upper, lower },
-            symbolVersions: new[]
-            {
+            symbolVersions: new[] {
                 new KeyValuePair<string, int>("other", 1),
                 new KeyValuePair<string, int>("value", 2)
             });
@@ -74,8 +72,7 @@ public sealed class SymbolicStateDifferentialHarnessTests {
             new TextSpan(12, 4),
             "unsupported-shape");
         var result = SymbolicLoweringResult<SymbolicState>.Unsupported(provenance);
-        var truncation = new SymbolicAnalysisTruncationInfo(new[]
-        {
+        var truncation = new SymbolicAnalysisTruncationInfo(new[] {
             new SymbolicAnalysisTruncationEvent(
                 SymbolicAnalysisLimitKind.MergedPathConditions,
                 8,

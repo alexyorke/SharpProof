@@ -58,11 +58,7 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void WithOverrides_PreservesModeAndAppliesExplicitBudgets() {
-        var options = SmtAnalysisOptions.ForMode(SmtAnalysisMode.Deep).WithOverrides(
-            TimeSpan.FromMilliseconds(123),
-            TimeSpan.FromMilliseconds(456),
-            7,
-            89);
+        var options = SmtAnalysisOptions.ForMode(SmtAnalysisMode.Deep).WithOverrides( TimeSpan.FromMilliseconds(123), TimeSpan.FromMilliseconds(456), 7, 89);
 
         Assert.That(options.Mode, Is.EqualTo(SmtAnalysisMode.Deep));
         Assert.That(options.QueryTimeout, Is.EqualTo(TimeSpan.FromMilliseconds(123)));
@@ -91,8 +87,7 @@ public class SmtAnalysisServiceTests {
     public void Classify_TransientFailure_RecyclesRetriesAndRecovers() {
         var attempts = 0;
         var disposedSessions = 0;
-        var options = SmtAnalysisOptions.Default.WithLifecycle(
-            new SmtSolverLifecycleOptions(maxTransientRetries: 1));
+        var options = SmtAnalysisOptions.Default.WithLifecycle( new SmtSolverLifecycleOptions(maxTransientRetries: 1));
         using var service = new SmtAnalysisService(
             options,
             () => new StubProofSearchSession(
@@ -118,8 +113,7 @@ public class SmtAnalysisServiceTests {
     [Test]
     public void Classify_ExhaustedTransientFailure_IsNotCached() {
         var attempts = 0;
-        var options = SmtAnalysisOptions.Default.WithLifecycle(
-            new SmtSolverLifecycleOptions(maxTransientRetries: 0));
+        var options = SmtAnalysisOptions.Default.WithLifecycle( new SmtSolverLifecycleOptions(maxTransientRetries: 0));
         using var service = new SmtAnalysisService(
             options,
             () => new StubProofSearchSession(
@@ -187,13 +181,7 @@ public class SmtAnalysisServiceTests {
         var attempts = 0;
         var firstFactoryCalls = 0;
         var firstDisposedSessions = 0;
-        var options = new SmtAnalysisOptions(
-                SmtAnalysisMode.Bounded,
-                TimeSpan.FromSeconds(2),
-                TimeSpan.FromMilliseconds(1000),
-                4,
-                32,
-                true)
+        var options = new SmtAnalysisOptions( SmtAnalysisMode.Bounded, TimeSpan.FromSeconds(2), TimeSpan.FromMilliseconds(1000), 4, 32, true)
             .WithLifecycle(SmtSolverLifecycleOptions.Default);
         var query = CreateSolverQuery("recycle_cache_" + Guid.NewGuid().ToString("N"));
         using var firstService = new SmtAnalysisService(
@@ -251,9 +239,7 @@ public class SmtAnalysisServiceTests {
             options,
             () => {
                 Interlocked.Increment(ref secondFactoryCalls);
-                return new StubProofSearchSession(
-                    (_, _) => CreateImpureResult(),
-                    () => Interlocked.Increment(ref secondDisposedSessions));
+                return new StubProofSearchSession( (_, _) => CreateImpureResult(), () => Interlocked.Increment(ref secondDisposedSessions));
             });
 
         _ = secondService.Classify(CreateSolverQuery("isolated_second_before"));
@@ -286,9 +272,7 @@ public class SmtAnalysisServiceTests {
             SmtAnalysisOptions.Default,
             () => {
                 Interlocked.Increment(ref secondFactoryCalls);
-                return new StubProofSearchSession(
-                    (_, _) => CreateImpureResult(),
-                    () => Interlocked.Increment(ref secondDisposedSessions));
+                return new StubProofSearchSession( (_, _) => CreateImpureResult(), () => Interlocked.Increment(ref secondDisposedSessions));
             });
 
         var first = firstService.Classify(CreateSolverQuery("first_service_session"));
@@ -327,13 +311,10 @@ public class SmtAnalysisServiceTests {
         var disposedSessions = 0;
         var factoryCalls = 0;
         var service = new SmtAnalysisService(
-            SmtAnalysisOptions.Default.WithLifecycle(
-                new SmtSolverLifecycleOptions(disposeCurrentThreadContextOnServiceDispose: true)),
+            SmtAnalysisOptions.Default.WithLifecycle( new SmtSolverLifecycleOptions(disposeCurrentThreadContextOnServiceDispose: true)),
             () => {
                 Interlocked.Increment(ref factoryCalls);
-                return new StubProofSearchSession(
-                    (_, _) => CreateImpureResult(),
-                    () => Interlocked.Increment(ref disposedSessions));
+                return new StubProofSearchSession( (_, _) => CreateImpureResult(), () => Interlocked.Increment(ref disposedSessions));
             });
         var threads = Enumerable.Range(0, threadCount)
             .Select(index => new Thread(() =>
@@ -354,20 +335,9 @@ public class SmtAnalysisServiceTests {
     [Test]
     public void Classify_PathConditionBudgetExceeded_ReturnsConservativeUnknownWithoutSolver() {
         var x = Int("x");
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromMilliseconds(500),
-            1,
-            32));
+        var service = new SmtAnalysisService(new SmtAnalysisOptions( SmtAnalysisMode.Bounded, TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(500), 1, 32));
 
-        var result = service.Classify(CreateQuery(
-            new SmtFormula[]
-            {
-                GreaterThanOrEqual(x, Integer(0)),
-                LessThan(x, Integer(10))
-            },
-            Boolean(true)));
+        var result = service.Classify(CreateQuery( new SmtFormula[] { GreaterThanOrEqual(x, Integer(0)), LessThan(x, Integer(10)) }, Boolean(true)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo("smt_path_condition_budget_exceeded"));
@@ -379,12 +349,7 @@ public class SmtAnalysisServiceTests {
     public void Classify_ZeroTimeout_ReturnsConservativeTimeoutWithoutSolver() {
         var value = String("timeout_value_" + Guid.NewGuid().ToString("N"));
         var containsNeedle = new SmtStringContainsFormula(value, Text("needle"));
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Bounded,
-            TimeSpan.Zero,
-            TimeSpan.FromMilliseconds(500),
-            4,
-            32));
+        var service = new SmtAnalysisService(new SmtAnalysisOptions( SmtAnalysisMode.Bounded, TimeSpan.Zero, TimeSpan.FromMilliseconds(500), 4, 32));
 
         var result = service.Classify(CreateQuery(Array.Empty<SmtFormula>(), containsNeedle));
 
@@ -402,31 +367,19 @@ public class SmtAnalysisServiceTests {
         false,
         4,
         TestName = "Classify_EquivalentPathConditionOrder_UsesSameCacheEntry")]
-    public void Classify_NormalizedPathConditionsUseSameCacheEntry(
-        bool includeDuplicateAndTrueConditions,
-        int maxPathConditions) {
+    public void Classify_NormalizedPathConditionsUseSameCacheEntry( bool includeDuplicateAndTrueConditions, int maxPathConditions) {
         var prefix = includeDuplicateAndTrueConditions ? "normalized_" : "ordered_";
         var x = Int(prefix + "x_" + Guid.NewGuid().ToString("N"));
         var y = Int(prefix + "y_" + Guid.NewGuid().ToString("N"));
         var xAtLeastZero = GreaterThanOrEqual(x, Integer(0));
         var yAtLeastZero = GreaterThanOrEqual(y, Integer(0));
-        var fact = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, y),
-            Integer(0));
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Bounded,
-            TimeSpan.FromSeconds(2),
-            TimeSpan.FromMilliseconds(1000),
-            maxPathConditions,
-            64));
+        var fact = new SmtBinaryFormula( SmtBinaryOperator.GreaterThanOrEqual, new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, y), Integer(0));
+        var service = new SmtAnalysisService(new SmtAnalysisOptions( SmtAnalysisMode.Bounded, TimeSpan.FromSeconds(2), TimeSpan.FromMilliseconds(1000), maxPathConditions, 64));
 
         var firstPath = includeDuplicateAndTrueConditions
             ? new SmtFormula[] { xAtLeastZero, yAtLeastZero, Boolean(true), xAtLeastZero }
             : new SmtFormula[] { xAtLeastZero, yAtLeastZero };
-        var first = service.ClassifyImplication(
-            firstPath,
-            fact);
+        var first = service.ClassifyImplication( firstPath, fact);
         var second = service.ClassifyImplication(new[] { yAtLeastZero, xAtLeastZero }, fact);
 
         Assert.That(first.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
@@ -438,20 +391,9 @@ public class SmtAnalysisServiceTests {
     [Test]
     public void Classify_SyntacticPathContradiction_BypassesBudgetsAndSolver() {
         var x = Int("x");
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromMilliseconds(500),
-            1,
-            3));
+        var service = new SmtAnalysisService(new SmtAnalysisOptions( SmtAnalysisMode.Bounded, TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(500), 1, 3));
 
-        var result = service.Classify(CreateQuery(
-            new SmtFormula[]
-            {
-                Equal(x, Integer(0)),
-                NotEqual(x, Integer(0))
-            },
-            Boolean(true)));
+        var result = service.Classify(CreateQuery( new SmtFormula[] { Equal(x, Integer(0)), NotEqual(x, Integer(0)) }, Boolean(true)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
@@ -466,20 +408,9 @@ public class SmtAnalysisServiceTests {
     [Test]
     public void Classify_SyntacticIntegerIntervalContradiction_BypassesBudgetsAndSolver() {
         var x = Int("interval_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromMilliseconds(500),
-            1,
-            3));
+        var service = new SmtAnalysisService(new SmtAnalysisOptions( SmtAnalysisMode.Bounded, TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(500), 1, 3));
 
-        var result = service.Classify(CreateQuery(
-            new SmtFormula[]
-            {
-                GreaterThanOrEqual(x, Integer(10)),
-                LessThan(x, Integer(10))
-            },
-            Boolean(true)));
+        var result = service.Classify(CreateQuery( new SmtFormula[] { GreaterThanOrEqual(x, Integer(10)), LessThan(x, Integer(10)) }, Boolean(true)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
@@ -496,10 +427,7 @@ public class SmtAnalysisServiceTests {
         var values = Reference("values_" + Guid.NewGuid().ToString("N"));
         var index = Int("index_" + Guid.NewGuid().ToString("N"));
         var length = Int(values.Name + ".Length");
-        var valuesIsNotNull = new SmtBinaryFormula(
-            SmtBinaryOperator.NotEqual,
-            values,
-            new SmtNullConstant());
+        var valuesIsNotNull = new SmtBinaryFormula( SmtBinaryOperator.NotEqual, values, new SmtNullConstant());
         var indexIsNonNegative = GreaterThanOrEqual(index, Integer(0));
         var indexIsInBounds = LessThan(index, length);
         var contradiction = new SmtBinaryFormula(
@@ -509,15 +437,9 @@ public class SmtAnalysisServiceTests {
                 SmtBinaryOperator.Or,
                 LessThan(index, Integer(0)),
                 GreaterThanOrEqual(index, length)));
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Bounded,
-            TimeSpan.Zero,
-            TimeSpan.FromMilliseconds(1),
-            4,
-            64));
+        var service = new SmtAnalysisService(new SmtAnalysisOptions( SmtAnalysisMode.Bounded, TimeSpan.Zero, TimeSpan.FromMilliseconds(1), 4, 64));
 
-        var result = service.ClassifyPathFeasibility(new SmtFormula[]
-        {
+        var result = service.ClassifyPathFeasibility(new SmtFormula[] {
             valuesIsNotNull,
             indexIsNonNegative,
             indexIsInBounds,
@@ -534,15 +456,10 @@ public class SmtAnalysisServiceTests {
     [Test]
     public void Classify_NestedConjunctIntegerContradiction_BypassesSolver() {
         var x = Int("nested_interval_" + Guid.NewGuid().ToString("N"));
-        var nestedBounds = new SmtBinaryFormula(
-            SmtBinaryOperator.And,
-            GreaterThan(x, Integer(3)),
-            LessThanOrEqual(x, Integer(3)));
+        var nestedBounds = new SmtBinaryFormula( SmtBinaryOperator.And, GreaterThan(x, Integer(3)), LessThanOrEqual(x, Integer(3)));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var result = service.Classify(CreateQuery(
-            new[] { nestedBounds },
-            Boolean(true)));
+        var result = service.Classify(CreateQuery( new[] { nestedBounds }, Boolean(true)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
@@ -592,15 +509,9 @@ public class SmtAnalysisServiceTests {
     [Test]
     public void ClassifyPathFeasibility_ContradictoryExactStringValues_BypassesSolver() {
         var text = String("exact_contradiction_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromMilliseconds(500),
-            1,
-            3));
+        var service = new SmtAnalysisService(new SmtAnalysisOptions( SmtAnalysisMode.Bounded, TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(500), 1, 3));
 
-        var result = service.ClassifyPathFeasibility(new SmtFormula[]
-        {
+        var result = service.ClassifyPathFeasibility(new SmtFormula[] {
             Equal(text, Text("ABC")),
             Equal(text, Text("XYZ"))
         });
@@ -620,9 +531,7 @@ public class SmtAnalysisServiceTests {
         var divisorIsZero = Equal(divisor, Integer(0));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var result = service.Classify(new AnalysisProofQuery(
-            new[] { guard },
-            new AnalysisHazard(AnalysisHazardKind.DivideByZero, divisorIsZero)));
+        var result = service.Classify(new AnalysisProofQuery( new[] { guard }, new AnalysisHazard(AnalysisHazardKind.DivideByZero, divisorIsZero)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
@@ -638,12 +547,10 @@ public class SmtAnalysisServiceTests {
         var stringX = String("x");
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var intResult = service.ClassifyPathFeasibility(new SmtFormula[]
-        {
+        var intResult = service.ClassifyPathFeasibility(new SmtFormula[] {
             Equal(intX, Integer(1))
         });
-        var stringResult = service.ClassifyPathFeasibility(new SmtFormula[]
-        {
+        var stringResult = service.ClassifyPathFeasibility(new SmtFormula[] {
             Equal(stringX, Text("A"))
         });
 
@@ -655,16 +562,8 @@ public class SmtAnalysisServiceTests {
     [Test]
     public void Classify_ExpressionNodeBudgetExceeded_ReturnsConservativeUnknownWithoutSolver() {
         var x = Int("x");
-        var trigger = new SmtBinaryFormula(
-            SmtBinaryOperator.And,
-            GreaterThanOrEqual(x, Integer(0)),
-            LessThan(x, Integer(10)));
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromMilliseconds(500),
-            4,
-            3));
+        var trigger = new SmtBinaryFormula( SmtBinaryOperator.And, GreaterThanOrEqual(x, Integer(0)), LessThan(x, Integer(10)));
+        var service = new SmtAnalysisService(new SmtAnalysisOptions( SmtAnalysisMode.Bounded, TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(500), 4, 3));
 
         var result = service.Classify(CreateQuery(Array.Empty<SmtFormula>(), trigger));
 
@@ -676,16 +575,9 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void Classify_DeepPathFormulaOverBudget_ReturnsBeforeNormalization() {
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromMilliseconds(500),
-            4,
-            128));
+        var service = new SmtAnalysisService(new SmtAnalysisOptions( SmtAnalysisMode.Bounded, TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(500), 4, 128));
 
-        var result = service.Classify(CreateQuery(
-            new[] { CreateNestedNegation(4096) },
-            Boolean(true)));
+        var result = service.Classify(CreateQuery( new[] { CreateNestedNegation(4096) }, Boolean(true)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo("smt_expression_budget_exceeded"));
@@ -697,12 +589,7 @@ public class SmtAnalysisServiceTests {
     public async Task Classify_MethodBudgetDoesNotExpireBeforeFirstSolverQueryByWallClock() {
         var x = Int("x");
         var xIsZero = Equal(x, Integer(0));
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Bounded,
-            TimeSpan.FromSeconds(2),
-            TimeSpan.FromMilliseconds(1),
-            4,
-            32));
+        var service = new SmtAnalysisService(new SmtAnalysisOptions( SmtAnalysisMode.Bounded, TimeSpan.FromSeconds(2), TimeSpan.FromMilliseconds(1), 4, 32));
 
         await Task.Delay(20);
 
@@ -717,12 +604,7 @@ public class SmtAnalysisServiceTests {
         var x = Int("x");
         var xIsZero = Equal(x, Integer(0));
         var xIsPositive = GreaterThan(x, Integer(0));
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Bounded,
-            TimeSpan.FromSeconds(2),
-            TimeSpan.FromTicks(1),
-            4,
-            32));
+        var service = new SmtAnalysisService(new SmtAnalysisOptions( SmtAnalysisMode.Bounded, TimeSpan.FromSeconds(2), TimeSpan.FromTicks(1), 4, 32));
 
         _ = service.Classify(CreateQuery(new[] { xIsZero }, xIsZero));
         var result = service.Classify(CreateQuery(new[] { xIsPositive }, xIsPositive));
@@ -868,8 +750,7 @@ public class SmtAnalysisServiceTests {
                 new SymbolicIntegerConstantTerm(0)),
             SyntaxFactory.ParseExpression("budget_value == 0"),
             "test.budget");
-        var proof = new SymbolicProofService(smtAnalysis).ClassifyReachability(
-            new SymbolicState(pathConditions: new[] { new SymbolicFactCondition(budgetFact) }));
+        var proof = new SymbolicProofService(smtAnalysis).ClassifyReachability( new SymbolicState(pathConditions: new[] { new SymbolicFactCondition(budgetFact) }));
 
         Assert.That(proof.Budget, Is.Not.Null);
         Assert.That(proof.Budget!.TimeoutMilliseconds, Is.EqualTo(int.MaxValue));
@@ -951,8 +832,7 @@ public class SmtAnalysisServiceTests {
         using var solver = new SmtSolver();
         var text = String("text");
         for (var index = 0; index < SmtSolver.MaxRegexValidationCacheEntries * 2; index++) {
-            var pathConditions = new SmtFormula[]
-            {
+            var pathConditions = new SmtFormula[] {
                 new SmtRegexMatchFormula(text, "^value[0-9]+$"),
                 Equal(text, Text("value" + index))
             };
@@ -1066,8 +946,7 @@ public class SmtAnalysisServiceTests {
         AssertPreprocessed(testCase.Conditions, testCase.Conclusion);
     }
 
-    private static TestCaseData CreatePreprocessorCase(
-        string name, SmtFormula[] conditions, SmtFormula? conclusion = null) =>
+    private static TestCaseData CreatePreprocessorCase( string name, SmtFormula[] conditions, SmtFormula? conclusion = null) =>
         new TestCaseData(new PreprocessorCase(conditions, conclusion)).SetName(name);
 
     private static TestCaseData CreateConditionalSelectedReferenceCase() {
@@ -1207,8 +1086,7 @@ public class SmtAnalysisServiceTests {
     }
 
     private sealed class ProjectConfigOptionsProvider : AnalyzerConfigOptionsProvider {
-        private readonly AnalyzerConfigOptions _empty = new ProjectConfigOptions(
-            ImmutableDictionary<string, string>.Empty);
+        private readonly AnalyzerConfigOptions _empty = new ProjectConfigOptions( ImmutableDictionary<string, string>.Empty);
 
         internal ProjectConfigOptionsProvider(ImmutableDictionary<string, string> globalOptions) {
             GlobalOptions = new ProjectConfigOptions(globalOptions);

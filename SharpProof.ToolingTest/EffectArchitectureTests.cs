@@ -57,8 +57,7 @@ public sealed class EffectArchitectureTests {
             "SharpProof.Tooling.Core/SharpProof.Tooling.Core.csproj"
         };
         foreach (var relativePath in removedFiles)
-            Assert.That(File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))),
-                Is.False, $"Removed compatibility file returned: {relativePath}");
+            Assert.That(File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))), Is.False, $"Removed compatibility file returned: {relativePath}");
 
         var roots = new[] {
             "SharpProof.Analyzer", "SharpProof.Attributes",

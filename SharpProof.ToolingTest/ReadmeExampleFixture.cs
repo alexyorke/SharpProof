@@ -128,8 +128,7 @@ internal static class ReadmeExampleFixture {
     }
 
     private static string ResolvePowerShellPath() {
-        var candidates = new[]
-        {
+        var candidates = new[] {
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
                 "PowerShell",

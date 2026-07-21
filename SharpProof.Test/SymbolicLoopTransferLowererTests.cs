@@ -38,8 +38,7 @@ public sealed class SymbolicLoopTransferLowererTests {
         var result = SymbolicLoopTransferLowerer.Lower(loop, fixture.SemanticModel, CancellationToken.None);
 
         Assert.That(result.IsExact, Is.True, result.Provenance.Single().Detail);
-        Assert.That(result.Value!.BackEdgeInvalidations.Select(static target => target.Key), Is.EquivalentTo(new[]
-        {
+        Assert.That(result.Value!.BackEdgeInvalidations.Select(static target => target.Key), Is.EquivalentTo(new[] {
             SymbolicFactFactory.GetSmtVariableName(symbols["index"]),
             SymbolicFactFactory.GetSmtVariableName(symbols["value"])
         }));

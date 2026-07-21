@@ -84,8 +84,7 @@ internal static class SymbolicCliTestHost {
 
     private static string? FindExistingCliAssemblyPath(string repositoryRoot) {
         var targetFramework = Path.GetFileName(TestContext.CurrentContext.TestDirectory);
-        var configurations = new[]
-            {
+        var configurations = new[] {
                 BuildConfiguration.Value,
                 "Release",
                 "Debug"

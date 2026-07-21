@@ -15,8 +15,7 @@ public sealed class ReferenceReachabilitySmtTests {
         const string source = @"
 public class TestClass
 {
-    public int TestMethod()
-    {
+    public int TestMethod() {
         string value = null;
         return value?.Length ?? 0;
     }
@@ -30,10 +29,8 @@ public class TestClass
         const string source = @"
 public class TestClass
 {
-    public int TestMethod(string value)
-    {
-        if (value == null)
-        {
+    public int TestMethod(string value) {
+        if (value == null) {
             return value?.Length ?? 0;
         }
 
@@ -49,8 +46,7 @@ public class TestClass
         const string source = @"
 public class TestClass
 {
-    public int TestMethod(string other)
-    {
+    public int TestMethod(string other) {
         string value = null;
         value = other;
         return value?.Length ?? 0;
@@ -65,8 +61,7 @@ public class TestClass
         const string source = @"
 public class TestClass
 {
-    public string TestMethod()
-    {
+    public string TestMethod() {
         string value = ""safe"";
         return value ?? Throw();
     }
@@ -82,10 +77,8 @@ public class TestClass
         const string source = @"
 public class TestClass
 {
-    public string TestMethod(string value)
-    {
-        if (value != null)
-        {
+    public string TestMethod(string value) {
+        if (value != null) {
             return value ?? Throw();
         }
 
@@ -103,8 +96,7 @@ public class TestClass
         const string source = @"
 public class TestClass
 {
-    public string TestMethod(string value)
-    {
+    public string TestMethod(string value) {
         return value ?? Throw();
     }
 

@@ -44,8 +44,7 @@ public sealed class SymbolicSemanticPipelineTests {
                                     public enum UIntMode : uint { Max = uint.MaxValue }
                                     """;
         var expected = new long[] { byte.MaxValue, long.MinValue, uint.MaxValue };
-        var expressions = new[]
-        {
+        var expressions = new[] {
             "(long)ByteMode.Max",
             "(long)LongMode.Min",
             "(long)UIntMode.Max"
@@ -339,8 +338,7 @@ public sealed class SymbolicSemanticPipelineTests {
         var fixture = RoslynTestFixture.CreateSingleNode<ArrowExpressionClauseSyntax>(
             source,
             "SemanticPipelineProbe",
-            new[]
-            {
+            new[] {
                 MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location)
             });
@@ -354,8 +352,7 @@ public sealed class SymbolicSemanticPipelineTests {
         return RoslynTestFixture.CreateCompilation(
             tree,
             assemblyName,
-            new[]
-            {
+            new[] {
                 MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location)
             }).Compilation;

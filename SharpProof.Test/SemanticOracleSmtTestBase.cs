@@ -55,8 +55,7 @@ public sealed class ConstructorAssignedRegexBox
 {
     public readonly Regex Ab;
 
-    public ConstructorAssignedRegexBox()
-    {
+    public ConstructorAssignedRegexBox() {
         Ab = new Regex(@""\AAB\z"");
     }
 }
@@ -65,8 +64,7 @@ public static class StaticCtorRegexCache
 {
     public static readonly Regex Ab = new Regex(@""\AAB\z"");
 
-    static StaticCtorRegexCache()
-    {
+    static StaticCtorRegexCache() {
         Ab = new Regex(@""\ACD\z"");
     }
 }";
@@ -74,44 +72,36 @@ public static class StaticCtorRegexCache
     protected const string SourcePredicateSource = @"
 public static class SourcePredicates
 {
-    public static bool IsNullOrEmptyLike(string value)
-    {
+    public static bool IsNullOrEmptyLike(string value) {
         return value == null || value.Length == 0;
     }
 
     public static bool HasText(string value) => value != null && value.Length > 0;
 
-    public static bool HasTextWithGuard(string value)
-    {
-        if (value == null)
-        {
+    public static bool HasTextWithGuard(string value) {
+        if (value == null) {
             return false;
         }
 
         return value.Length > 0;
     }
 
-    public static bool HasTextWithIfElse(string value)
-    {
-        if (value == null)
-        {
+    public static bool HasTextWithIfElse(string value) {
+        if (value == null) {
             return false;
         }
-        else
-        {
+        else {
             return value.Length > 0;
         }
     }
 
-    public static bool HasTextViaLocal(string value)
-    {
+    public static bool HasTextViaLocal(string value) {
         var present = value != null;
         var positiveLength = value.Length > 0;
         return present && positiveLength;
     }
 
-    public static bool HasTextViaAssignment(string value)
-    {
+    public static bool HasTextViaAssignment(string value) {
         bool present;
         bool positiveLength;
         present = value != null;
@@ -119,20 +109,16 @@ public static class SourcePredicates
         return present && positiveLength;
     }
 
-    public static bool InRange(int value)
-    {
+    public static bool InRange(int value) {
         return value >= 10 && value <= 20;
     }
 
-    public static bool IsValidIndex(int[] values, int index)
-    {
-        if (values == null)
-        {
+    public static bool IsValidIndex(int[] values, int index) {
+        if (values == null) {
             return false;
         }
 
-        if (index < 0)
-        {
+        if (index < 0) {
             return false;
         }
 
@@ -141,40 +127,33 @@ public static class SourcePredicates
 
     public static bool IsPositive(int value) => value > 0;
 
-    public static bool IsZeroWithGuard(int value)
-    {
-        if (value != 0)
-        {
+    public static bool IsZeroWithGuard(int value) {
+        if (value != 0) {
             return false;
         }
 
         return true;
     }
 
-    public static bool IsZeroViaLocal(int value)
-    {
+    public static bool IsZeroViaLocal(int value) {
         var isZero = value == 0;
         return isZero;
     }
 
-    public static bool IsZeroViaAssignment(int value)
-    {
+    public static bool IsZeroViaAssignment(int value) {
         bool isZero;
         isZero = value == 0;
         return isZero;
     }
 
-    public static bool IsPositiveAfterLocalAssignment(int value)
-    {
+    public static bool IsPositiveAfterLocalAssignment(int value) {
         var adjusted = value;
         adjusted = adjusted + 1;
         return adjusted > 0;
     }
 
-    public static bool IsZeroWithSwitch(int value)
-    {
-        switch (value)
-        {
+    public static bool IsZeroWithSwitch(int value) {
+        switch (value) {
             case 0:
                 return true;
             default:
@@ -182,10 +161,8 @@ public static class SourcePredicates
         }
     }
 
-    public static bool IsZeroWithSwitchFallback(int value)
-    {
-        switch (value)
-        {
+    public static bool IsZeroWithSwitchFallback(int value) {
+        switch (value) {
             case 0:
                 return true;
         }
@@ -193,10 +170,8 @@ public static class SourcePredicates
         return false;
     }
 
-    public static bool IsSmallPositiveWithSwitch(int value)
-    {
-        switch (value)
-        {
+    public static bool IsSmallPositiveWithSwitch(int value) {
+        switch (value) {
             case > 0 and < 10:
                 return true;
             default:
@@ -207,8 +182,7 @@ public static class SourcePredicates
 
 public sealed class SourcePredicateBox
 {
-    public SourcePredicateBox(string value, int divisor)
-    {
+    public SourcePredicateBox(string value, int divisor) {
         Value = value;
         Divisor = divisor;
     }
@@ -230,8 +204,7 @@ public sealed class SourcePredicateBox
         }
     }
 
-    public bool IsZeroDivisorMethod()
-    {
+    public bool IsZeroDivisorMethod() {
         var isZero = Divisor == 0;
         return isZero;
     }
@@ -241,8 +214,7 @@ public sealed class SourcePredicateBox
     protected const string ExtendedPropertyPatternSource = @"
 public sealed class ExtendedPatternBox
 {
-    public ExtendedPatternBox(ExtendedPatternChild child)
-    {
+    public ExtendedPatternBox(ExtendedPatternChild child) {
         Child = child;
     }
 
@@ -251,8 +223,7 @@ public sealed class ExtendedPatternBox
 
 public sealed class ExtendedPatternChild
 {
-    public ExtendedPatternChild(int value)
-    {
+    public ExtendedPatternChild(int value) {
         Value = value;
     }
 
@@ -367,11 +338,7 @@ public sealed class NotNullIfNotNullIndexer
             .OfType<StatementSyntax>()
             .Single(node => node.ToString().StartsWith(loopPrefix, StringComparison.Ordinal));
 
-        var result = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
-            loopStatement,
-            new SymbolicState(),
-            context.SemanticModel,
-            CancellationToken.None);
+        var result = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState( loopStatement, new SymbolicState(), context.SemanticModel, CancellationToken.None);
         if (result is not { IsExact: true, Value: { } state })
             throw new InvalidOperationException(result.Provenance.Single().Detail);
 
@@ -423,10 +390,5 @@ public sealed class NotNullIfNotNullIndexer
     private delegate bool ReachabilityPredicateDelegate(SyntaxNode node, SemanticModel semanticModel,
         CancellationToken cancellationToken, SmtAnalysisService? smtAnalysis);
 
-    protected readonly record struct SmtOptionsSnapshot(
-        string Mode,
-        int TimeoutMs,
-        int MethodBudgetMs,
-        int MaxPathConditions,
-        int MaxExpressionNodes);
+    protected readonly record struct SmtOptionsSnapshot( string Mode, int TimeoutMs, int MethodBudgetMs, int MaxPathConditions, int MaxExpressionNodes);
 }

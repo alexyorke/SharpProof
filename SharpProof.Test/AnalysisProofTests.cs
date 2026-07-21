@@ -21,10 +21,7 @@ internal class AnalysisProofTests {
 
     [Test]
     public void RewriteBottomUp_StructurallyEquivalentReplacementIsUnchanged() {
-        var root = new SmtBinaryFormula(
-            SmtBinaryOperator.And,
-            new SmtBooleanConstant(true),
-            new SmtBooleanConstant(false));
+        var root = new SmtBinaryFormula( SmtBinaryOperator.And, new SmtBooleanConstant(true), new SmtBooleanConstant(false));
 
         var rewritten = SmtFormulaTraversal.RewriteBottomUp(
             root,
@@ -72,8 +69,7 @@ internal class AnalysisProofTests {
         var x = new SmtVariable("x", SmtValueKind.Int);
 
         var result = search.Classify(
-            new SmtFormula[]
-            {
+            new SmtFormula[] {
                 new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0)),
                 new SmtBinaryFormula(SmtBinaryOperator.LessThan, x, new SmtIntegerConstant(0))
             },
@@ -90,10 +86,7 @@ internal class AnalysisProofTests {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
 
-        var result = search.Classify(
-            new[] { xIsZero },
-            xIsZero,
-            TimeSpan.FromSeconds(2));
+        var result = search.Classify( new[] { xIsZero }, xIsZero, TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(result.Reason, Is.EqualTo("impure_call_reachable"));
@@ -108,8 +101,7 @@ internal class AnalysisProofTests {
         var text = new SmtVariable("text", SmtValueKind.String);
 
         var result = search.Classify(
-            new SmtFormula[]
-            {
+            new SmtFormula[] {
                 new SmtBinaryFormula(
                     SmtBinaryOperator.And,
                     new SmtBooleanConstant(true),
@@ -131,11 +123,7 @@ internal class AnalysisProofTests {
         var s = new SmtVariable("s", SmtValueKind.Reference);
         var sIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, s, new SmtNullConstant());
 
-        var result = search.Classify(
-            new AnalysisProofQuery(
-                new[] { sIsNull },
-                new AnalysisHazard(AnalysisHazardKind.NullDereference, sIsNull)),
-            TimeSpan.FromSeconds(2));
+        var result = search.Classify( new AnalysisProofQuery( new[] { sIsNull }, new AnalysisHazard(AnalysisHazardKind.NullDereference, sIsNull)), TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(result.Reason, Is.EqualTo("null_dereference_reachable"));
@@ -149,9 +137,7 @@ internal class AnalysisProofTests {
         var divisorIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, divisor, new SmtIntegerConstant(0));
 
         var result = search.Classify(
-            new AnalysisProofQuery(
-                new[] { divisorNotZero },
-                new AnalysisHazard(AnalysisHazardKind.DivideByZero, divisorIsZero)),
+            new AnalysisProofQuery( new[] { divisorNotZero }, new AnalysisHazard(AnalysisHazardKind.DivideByZero, divisorIsZero)),
             TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
@@ -168,9 +154,7 @@ internal class AnalysisProofTests {
         var xIsNonNegative = new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(0));
 
         var result = search.Classify(
-            new AnalysisProofQuery(
-                new[] { xIsNonNegative },
-                new AnalysisHazard(AnalysisHazardKind.EffectViolationReachability, xIsNonNegative)),
+            new AnalysisProofQuery( new[] { xIsNonNegative }, new AnalysisHazard(AnalysisHazardKind.EffectViolationReachability, xIsNonNegative)),
             TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
@@ -182,12 +166,7 @@ internal class AnalysisProofTests {
         using var search = new AnalysisProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
-        var query = new AnalysisProofQuery(
-            new[] { xIsZero },
-            new AnalysisHazard(
-                AnalysisHazardKind.EffectViolationReachability,
-                xIsZero,
-                AnalysisEffectVisibility.InternalOnly));
+        var query = new AnalysisProofQuery( new[] { xIsZero }, new AnalysisHazard( AnalysisHazardKind.EffectViolationReachability, xIsZero, AnalysisEffectVisibility.InternalOnly));
 
         var result = search.Classify(query, TimeSpan.FromSeconds(2));
 
@@ -207,9 +186,7 @@ internal class AnalysisProofTests {
     public void StructuralEffectClassificationMatrix(string kind, bool disproven, string reason) {
         using var search = new AnalysisProofSearch();
         var result = search.Classify(
-            new AnalysisProofQuery(
-                Array.Empty<SmtFormula>(),
-                new AnalysisHazard(Enum.Parse<AnalysisHazardKind>(kind), new SmtBooleanConstant(true))),
+            new AnalysisProofQuery( Array.Empty<SmtFormula>(), new AnalysisHazard(Enum.Parse<AnalysisHazardKind>(kind), new SmtBooleanConstant(true))),
             TimeSpan.FromSeconds(2));
         Assert.That(result.Outcome, Is.EqualTo(disproven
             ? AnalysisProofOutcome.Disproven
@@ -222,8 +199,7 @@ internal class AnalysisProofTests {
         using var search = new AnalysisProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
         var query = new AnalysisProofQuery(
-            new SmtFormula[]
-            {
+            new SmtFormula[] {
                 new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0))
             },
             new AnalysisHazard(
@@ -239,11 +215,7 @@ internal class AnalysisProofTests {
     [Test]
     public void AnalysisProof_NullPathConditionsDefaultToEmpty() {
         using var search = new AnalysisProofSearch();
-        var query = new AnalysisProofQuery(
-            null!,
-            new AnalysisHazard(
-                AnalysisHazardKind.BranchReachability,
-                new SmtBooleanConstant(true)));
+        var query = new AnalysisProofQuery( null!, new AnalysisHazard( AnalysisHazardKind.BranchReachability, new SmtBooleanConstant(true)));
 
         var result = search.Classify(query, TimeSpan.FromSeconds(2));
 
@@ -253,24 +225,9 @@ internal class AnalysisProofTests {
 }
 
 internal static class AnalysisProofSearchTestExtensions {
-    internal static AnalysisProofResult Classify(
-        this AnalysisProofSearch search,
-        SmtFormula impurityCondition,
-        TimeSpan timeout) =>
-        search.Classify(
-            new AnalysisProofQuery(
-                Array.Empty<SmtFormula>(),
-                new AnalysisHazard(AnalysisHazardKind.EffectViolationReachability, impurityCondition)),
-            timeout);
+    internal static AnalysisProofResult Classify( this AnalysisProofSearch search, SmtFormula impurityCondition, TimeSpan timeout) =>
+        search.Classify( new AnalysisProofQuery( Array.Empty<SmtFormula>(), new AnalysisHazard(AnalysisHazardKind.EffectViolationReachability, impurityCondition)), timeout);
 
-    internal static AnalysisProofResult Classify(
-        this AnalysisProofSearch search,
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula impurityCondition,
-        TimeSpan timeout) =>
-        search.Classify(
-            new AnalysisProofQuery(
-                pathConditions.ToArray(),
-                new AnalysisHazard(AnalysisHazardKind.EffectViolationReachability, impurityCondition)),
-            timeout);
+    internal static AnalysisProofResult Classify( this AnalysisProofSearch search, IEnumerable<SmtFormula> pathConditions, SmtFormula impurityCondition, TimeSpan timeout) =>
+        search.Classify( new AnalysisProofQuery( pathConditions.ToArray(), new AnalysisHazard(AnalysisHazardKind.EffectViolationReachability, impurityCondition)), timeout);
 }

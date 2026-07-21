@@ -26,9 +26,7 @@ public class CSharpSyntaxFactsTests {
     [TestCase(SyntaxKind.RightShiftAssignmentExpression, SyntaxKind.RightShiftExpression)]
     [TestCase(SyntaxKind.UnsignedRightShiftAssignmentExpression, SyntaxKind.UnsignedRightShiftExpression)]
     [TestCase(SyntaxKind.CoalesceAssignmentExpression, SyntaxKind.CoalesceExpression)]
-    public void TryGetCompoundAssignmentBinaryKind_MapsSupportedOperators(
-        SyntaxKind assignmentKind,
-        SyntaxKind expectedBinaryKind) {
+    public void TryGetCompoundAssignmentBinaryKind_MapsSupportedOperators( SyntaxKind assignmentKind, SyntaxKind expectedBinaryKind) {
         Assert.That(CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind(assignmentKind, out var binaryKind), Is.True);
         Assert.That(binaryKind, Is.EqualTo(expectedBinaryKind));
     }
@@ -110,17 +108,11 @@ public class CSharpSyntaxFactsTests {
     [TestCase("class C { int P => 1; }", SyntaxKind.PropertyDeclaration, SyntaxKind.NumericLiteralExpression)]
     [TestCase("class C { int this[int index] => index; }", SyntaxKind.IndexerDeclaration,
         SyntaxKind.IdentifierName)]
-    public void MethodBodyOperationResolver_SelectsSharedBodyOrExpressionTaxonomy(
-        string source,
-        SyntaxKind declarationKind,
-        SyntaxKind expectedOperationSyntaxKind) {
+    public void MethodBodyOperationResolver_SelectsSharedBodyOrExpressionTaxonomy( string source, SyntaxKind declarationKind, SyntaxKind expectedOperationSyntaxKind) {
         var semanticModel = CreateSemanticModel(source, out var root);
         var declaration = root.DescendantNodes().Single(node => node.IsKind(declarationKind));
 
-        var operation = MethodBodyOperationResolver.GetMethodBodyRootOperation(
-            declaration,
-            semanticModel,
-            CancellationToken.None);
+        var operation = MethodBodyOperationResolver.GetMethodBodyRootOperation( declaration, semanticModel, CancellationToken.None);
 
         Assert.That(operation, Is.Not.Null);
         Assert.That(operation!.Syntax.Kind(), Is.EqualTo(expectedOperationSyntaxKind));
@@ -129,19 +121,12 @@ public class CSharpSyntaxFactsTests {
     [TestCase("class C { public static explicit operator int(C value) => 1; }",
         SyntaxKind.ConversionOperatorDeclaration, false)]
     [TestCase("class C { ~C() { } }", SyntaxKind.DestructorDeclaration, true)]
-    public void MethodBodyOperationResolver_RetainsDeclarationFallback(
-        string source,
-        SyntaxKind declarationKind,
-        bool includeConversionOperators) {
+    public void MethodBodyOperationResolver_RetainsDeclarationFallback( string source, SyntaxKind declarationKind, bool includeConversionOperators) {
         var semanticModel = CreateSemanticModel(source, out var root);
         var declaration = root.DescendantNodes().Single(node => node.IsKind(declarationKind));
         var expected = semanticModel.GetOperation(declaration);
 
-        var actual = MethodBodyOperationResolver.GetMethodBodyRootOperation(
-            declaration,
-            semanticModel,
-            CancellationToken.None,
-            includeConversionOperators);
+        var actual = MethodBodyOperationResolver.GetMethodBodyRootOperation( declaration, semanticModel, CancellationToken.None, includeConversionOperators);
 
         Assert.That(actual?.Kind, Is.EqualTo(expected?.Kind));
         Assert.That(actual?.Syntax, Is.SameAs(expected?.Syntax));
