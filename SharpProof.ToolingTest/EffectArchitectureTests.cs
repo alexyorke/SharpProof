@@ -8,13 +8,7 @@ public sealed class EffectArchitectureTests {
     [Test]
     public void RemovedEffectInfrastructureCannotReturnToSupportedSurface() {
         var root = SymbolicCliTestHost.FindRepositoryRoot();
-        Assert.That(
-            File.Exists(Path.Combine(
-                root,
-                "Tools",
-                "SharpProof." + "Effect" + "Summary",
-                "SharpProof." + "Effect" + "Summary.csproj")),
-            Is.False);
+        Assert.That( File.Exists(Path.Combine( root, "Tools", "SharpProof." + "Effect" + "Summary", "SharpProof." + "Effect" + "Summary.csproj")), Is.False);
 
         var removedFiles = new[] {
             "SharpProof.Contracts/BclPurityFallbackHeuristics.cs",

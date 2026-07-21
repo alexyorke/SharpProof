@@ -59,8 +59,7 @@ public sealed class SymbolicInvariantServiceTests {
         var statement = context.Root.DescendantNodes().OfType<ReturnStatementSyntax>()
             .First(node => node.Expression is BinaryExpressionSyntax binary && binary.IsKind(SyntaxKind.DivideExpression));
         var initializer = context.Root.DescendantNodes().OfType<EqualsValueClauseSyntax>().Single().Value;
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(
-            initializer, new SymbolicLoweringContext(context.SemanticModel, default), out var condition), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition( initializer, new SymbolicLoweringContext(context.SemanticModel, default), out var condition), Is.True);
         using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var proof = ProveCondition(statement, context.SemanticModel, condition, smt);
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
@@ -110,8 +109,7 @@ public sealed class SymbolicInvariantServiceTests {
         var context = AnalyzerTestHost.CreateSourceContext(CompoundAssignmentSource, "SymbolicCompoundAssignment");
         var division = context.Root.DescendantNodes().OfType<BinaryExpressionSyntax>()
             .Single(expression => expression.IsKind(SyntaxKind.DivideExpression));
-        Assert.That(TypedSymbolicTestLowering.TryLowerTerm(
-            division.Right, new SymbolicLoweringContext(context.SemanticModel, default), out var divisor), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerTerm( division.Right, new SymbolicLoweringContext(context.SemanticModel, default), out var divisor), Is.True);
         var condition = SymbolicIrLowerer.CreateIntegerZeroCondition(
             divisor, division.Right, "ir.test.compound-assignment.zero");
         using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -127,8 +125,7 @@ public sealed class SymbolicInvariantServiceTests {
         var statement = context.Root.DescendantNodes().OfType<ReturnStatementSyntax>()
             .Single(node => node.SpanStart == position);
         var ifStatement = statement.Ancestors().OfType<IfStatementSyntax>().First();
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(
-            ifStatement.Condition, new SymbolicLoweringContext(context.SemanticModel, default), out var guard), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition( ifStatement.Condition, new SymbolicLoweringContext(context.SemanticModel, default), out var guard), Is.True);
         return (statement, context.SemanticModel, guard);
     }
 

@@ -21,8 +21,8 @@ dotnet_style_object_initializer = true:warning
 
 [{SharpProof.Test,SharpProof.Testing,SharpProof.ToolingTest}/*.cs]
 csharp_new_line_before_open_brace = none
-dotnet_diagnostic.IDE0055.severity = warning
+dotnet_diagnostic.IDE0055.severity = none
 
 [{SharpProof.Test,SharpProof.Testing,SharpProof.ToolingTest}/**/*.cs]
 csharp_new_line_before_open_brace = none
-dotnet_diagnostic.IDE0055.severity = warning
+dotnet_diagnostic.IDE0055.severity = none

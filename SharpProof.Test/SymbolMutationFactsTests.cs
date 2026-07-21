@@ -37,16 +37,8 @@ public sealed class SymbolMutationFactsTests {
         var invocation = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
 
         Assert.Multiple(() => {
-            Assert.That(SymbolMutationFacts.ExpressionReferencesSymbol(
-                assignments[0].Right,
-                field,
-                semanticModel,
-                CancellationToken.None), Is.True);
-            Assert.That(SymbolMutationFacts.ExpressionReferencesSymbol(
-                invocation,
-                field,
-                semanticModel,
-                CancellationToken.None), Is.False);
+            Assert.That(SymbolMutationFacts.ExpressionReferencesSymbol( assignments[0].Right, field, semanticModel, CancellationToken.None), Is.True);
+            Assert.That(SymbolMutationFacts.ExpressionReferencesSymbol( invocation, field, semanticModel, CancellationToken.None), Is.False);
         });
     }
 }

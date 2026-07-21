@@ -122,8 +122,7 @@ public sealed class MethodEffectsTests {
             """, 3);
 
         Assert.Multiple(() => {
-            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
-                string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven), string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
             Assert.That(result.MethodEffects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
             Assert.That(result.MethodEffects!.ExceptionFacts, Has.Some.Matches<MethodExceptionFact>(fact =>
                 fact.ExceptionType == exceptionType && fact.Source == source &&
@@ -146,8 +145,7 @@ public sealed class MethodEffectsTests {
         Assert.That(result.MethodEffects!.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven),
             string.Join(" | ", result.MethodEffects!.ExceptionFacts.Select(static fact =>
                 fact.ExceptionType + ":" + fact.Escape + ":" + fact.Reason)));
-        Assert.That(result.MethodEffects!.ExceptionFacts,
-            Has.Some.Property(nameof(MethodExceptionFact.Escape)).EqualTo(SharpProofVerdict.Disproven));
+        Assert.That(result.MethodEffects!.ExceptionFacts, Has.Some.Property(nameof(MethodExceptionFact.Escape)).EqualTo(SharpProofVerdict.Disproven));
     }
 
     [Test]
@@ -174,8 +172,7 @@ public sealed class MethodEffectsTests {
 
         Assert.Multiple(() => {
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
-            Assert.That(result.UnknownReasons, Has.Some.Property(nameof(SharpProofUnknownReason.Message))
-                .EqualTo("recursive_call"));
+            Assert.That(result.UnknownReasons, Has.Some.Property(nameof(SharpProofUnknownReason.Message)) .EqualTo("recursive_call"));
         });
     }
 

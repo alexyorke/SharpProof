@@ -20,8 +20,7 @@ public sealed class SymbolicIrTests {
             "int x",
             "x > 0 && x < 10");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
@@ -32,23 +31,13 @@ public sealed class SymbolicIrTests {
             "string first, string second",
             "string.Concat(first, \"-\", second).Length == first.Length + 1 + second.Length");
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerCondition(
-                concatContext.Expression,
-                concatContext.LoweringContext,
-                out var condition),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerCondition( concatContext.Expression, concatContext.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.EqualTo(new SymbolicConstantCondition(true)));
 
         var interpolationContext = CreateExpressionContext(
             "string text",
             "$\"{text}:{nameof(C)}\".Length == text.Length + 1 + nameof(C).Length");
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerCondition(
-                interpolationContext.Expression,
-                interpolationContext.LoweringContext,
-                out condition),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerCondition( interpolationContext.Expression, interpolationContext.LoweringContext, out condition), Is.True);
         Assert.That(condition, Is.EqualTo(new SymbolicConstantCondition(true)));
     }
 
@@ -57,12 +46,7 @@ public sealed class SymbolicIrTests {
         var context = CreateExpressionContext(
             "int value, int oldValue",
             "value + 1 == oldValue + 1");
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerCondition(
-                context.Expression,
-                context.LoweringContext,
-                out var condition),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerCondition( context.Expression, context.LoweringContext, out var condition), Is.True);
 
         var parameters = ((IMethodSymbol)context.SemanticModel.GetDeclaredSymbol(
             context.Expression.FirstAncestorOrSelf<MethodDeclarationSyntax>()!)!).Parameters;
@@ -110,9 +94,7 @@ public sealed class SymbolicIrTests {
             "int value, int other",
             expression);
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out var term), Is.True);
         Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
         var conditional = (SymbolicConditionalTerm)term;
         Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicBinaryTerm>());
@@ -133,9 +115,7 @@ public sealed class SymbolicIrTests {
             "int value, int other",
             expression);
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out var term), Is.True);
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         Assert.That(((SymbolicBinaryTerm)term).MayOverflow, Is.False);
     }
@@ -147,9 +127,7 @@ public sealed class SymbolicIrTests {
             "left + right",
             "public readonly struct Number { public static Number operator +(Number left, Number right) => left; }");
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out _),
-            Is.False);
+        Assert.That( TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out _), Is.False);
     }
 
     [Test]
@@ -158,8 +136,7 @@ public sealed class SymbolicIrTests {
             "string s, int n",
             "s.Length == n");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var fact = AssertFactCondition<SymbolicRelationAtom>(condition);
 
         Assert.That(fact.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
@@ -175,8 +152,7 @@ public sealed class SymbolicIrTests {
             "string text",
             "(text as object) == text");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
@@ -187,8 +163,7 @@ public sealed class SymbolicIrTests {
             "string text",
             "((object)text) == text");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
@@ -199,14 +174,12 @@ public sealed class SymbolicIrTests {
             "string s",
             "s == \"A\"");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var conjunction = (SymbolicBinaryCondition)condition;
 
         Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
-        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Operator,
-            Is.EqualTo(SymbolicRelationOperator.NotEqual));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Operator, Is.EqualTo(SymbolicRelationOperator.NotEqual));
         var equality = AssertFactCondition<SymbolicRelationAtom>(conjunction.Right);
         Assert.That(equality.Left, Is.TypeOf<SymbolicStringContentTerm>());
         Assert.That(equality.Right, Is.EqualTo(new SymbolicStringConstantTerm("A")));
@@ -220,8 +193,7 @@ public sealed class SymbolicIrTests {
             "(int A, int B) left, (int A, int B) right",
             "left == right");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var conjunction = (SymbolicBinaryCondition)condition;
 
@@ -241,8 +213,7 @@ public sealed class SymbolicIrTests {
             "unchecked((int)mode) == 1",
             "public enum Mode { None = 0, Ready = 1 }");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var equality = AssertFactCondition<SymbolicRelationAtom>(condition);
 
         Assert.That(equality.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
@@ -259,14 +230,12 @@ public sealed class SymbolicIrTests {
             "object value",
             "value is string");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var conjunction = (SymbolicBinaryCondition)condition;
 
         Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
-        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Operator,
-            Is.EqualTo(SymbolicRelationOperator.NotEqual));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Operator, Is.EqualTo(SymbolicRelationOperator.NotEqual));
         var typeTest = AssertFactCondition<SymbolicTypeTestAtom>(conjunction.Right);
         Assert.That(typeTest.TypeKey, Is.EqualTo("System.String"));
         Assert.That(typeTest.Value, Is.TypeOf<SymbolicVariableTerm>());
@@ -280,8 +249,7 @@ public sealed class SymbolicIrTests {
             "object value",
             "value is string text");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var conjunction = (SymbolicBinaryCondition)condition;
 
@@ -289,10 +257,8 @@ public sealed class SymbolicIrTests {
         Assert.That(conjunction.Left, Is.TypeOf<SymbolicBinaryCondition>());
         var typeCondition = (SymbolicBinaryCondition)conjunction.Left;
         Assert.That(typeCondition.Operator, Is.EqualTo(SymbolicConditionOperator.And));
-        Assert.That(AssertFactCondition<SymbolicRelationAtom>(typeCondition.Left).Right,
-            Is.TypeOf<SymbolicNullTerm>());
-        Assert.That(AssertFactCondition<SymbolicTypeTestAtom>(typeCondition.Right).TypeKey,
-            Is.EqualTo("System.String"));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(typeCondition.Left).Right, Is.TypeOf<SymbolicNullTerm>());
+        Assert.That(AssertFactCondition<SymbolicTypeTestAtom>(typeCondition.Right).TypeKey, Is.EqualTo("System.String"));
         var binding = AssertFactCondition<SymbolicRelationAtom>(conjunction.Right);
         Assert.That(binding.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
         Assert.That(binding.Left, Is.TypeOf<SymbolicVariableTerm>());
@@ -307,8 +273,7 @@ public sealed class SymbolicIrTests {
             "object value",
             "value is not string");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicNotCondition>());
         var negated = (SymbolicNotCondition)condition;
         Assert.That(negated.Operand, Is.TypeOf<SymbolicBinaryCondition>());
@@ -367,10 +332,7 @@ public sealed class SymbolicIrTests {
         SyntaxKind tokenKind,
         bool negate,
         string expected) {
-        Assert.That(SymbolicOperatorLowerer.TryGetRelationalPatternOperator(
-            tokenKind,
-            negate,
-            out var relationOperator), Is.True);
+        Assert.That(SymbolicOperatorLowerer.TryGetRelationalPatternOperator( tokenKind, negate, out var relationOperator), Is.True);
         Assert.That(relationOperator.ToString(), Is.EqualTo(expected));
     }
 
@@ -380,16 +342,13 @@ public sealed class SymbolicIrTests {
             "int value",
             "value is > 0 and < 10");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var conjunction = (SymbolicBinaryCondition)condition;
 
         Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
-        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Operator,
-            Is.EqualTo(SymbolicRelationOperator.GreaterThan));
-        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Right).Operator,
-            Is.EqualTo(SymbolicRelationOperator.LessThan));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThan));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Right).Operator, Is.EqualTo(SymbolicRelationOperator.LessThan));
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
@@ -400,16 +359,13 @@ public sealed class SymbolicIrTests {
             "int value",
             "value is < 0 or > 10");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var disjunction = (SymbolicBinaryCondition)condition;
 
         Assert.That(disjunction.Operator, Is.EqualTo(SymbolicConditionOperator.Or));
-        Assert.That(AssertFactCondition<SymbolicRelationAtom>(disjunction.Left).Operator,
-            Is.EqualTo(SymbolicRelationOperator.LessThan));
-        Assert.That(AssertFactCondition<SymbolicRelationAtom>(disjunction.Right).Operator,
-            Is.EqualTo(SymbolicRelationOperator.GreaterThan));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(disjunction.Left).Operator, Is.EqualTo(SymbolicRelationOperator.LessThan));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(disjunction.Right).Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThan));
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
@@ -420,18 +376,15 @@ public sealed class SymbolicIrTests {
             "int value",
             "value is not (> 0 and < 10)");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicNotCondition>());
         var negated = (SymbolicNotCondition)condition;
         Assert.That(negated.Operand, Is.TypeOf<SymbolicBinaryCondition>());
         var conjunction = (SymbolicBinaryCondition)negated.Operand;
 
         Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
-        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Operator,
-            Is.EqualTo(SymbolicRelationOperator.GreaterThan));
-        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Right).Operator,
-            Is.EqualTo(SymbolicRelationOperator.LessThan));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThan));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Right).Operator, Is.EqualTo(SymbolicRelationOperator.LessThan));
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
@@ -442,8 +395,7 @@ public sealed class SymbolicIrTests {
             "string s",
             """s.StartsWith("A")""");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
 
         Assert.That(fact.Predicate, Is.EqualTo(SymbolicStringPredicateKind.StartsWith));
@@ -461,8 +413,7 @@ public sealed class SymbolicIrTests {
             "string s",
             $"s.{methodName}('A')");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
 
         Assert.That(fact.Argument, Is.EqualTo(new SymbolicStringConstantTerm("A")));
@@ -478,8 +429,7 @@ public sealed class SymbolicIrTests {
             "string s",
             $"""s.{methodName}("A", System.StringComparison.Ordinal)""");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
 
         Assert.That(fact.Argument, Is.EqualTo(new SymbolicStringConstantTerm("A")));
@@ -493,8 +443,7 @@ public sealed class SymbolicIrTests {
             "string suffix",
             """("pre" + suffix).StartsWith("pre")""");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
 
         Assert.That(fact.Value, Is.TypeOf<SymbolicStringConcatTerm>());
@@ -509,8 +458,7 @@ public sealed class SymbolicIrTests {
             "string suffix",
             "$\"pre{suffix}\".StartsWith(\"pre\")");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
 
         Assert.That(fact.Value, Is.TypeOf<SymbolicStringConcatTerm>());
@@ -524,8 +472,7 @@ public sealed class SymbolicIrTests {
             "string left, string right",
             "string.Equals(left, right)");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
@@ -537,8 +484,7 @@ public sealed class SymbolicIrTests {
             "string left, string right",
             "string.Equals(left, right, System.StringComparison.Ordinal)");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
@@ -550,8 +496,7 @@ public sealed class SymbolicIrTests {
             "string left, string right",
             "left.Equals(right)");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
@@ -563,8 +508,7 @@ public sealed class SymbolicIrTests {
             "string left, string right",
             "left.Equals(right, System.StringComparison.Ordinal)");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
@@ -603,8 +547,7 @@ public sealed class SymbolicIrTests {
             "object? left, object? right",
             "object.ReferenceEquals(left, right)");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var fact = AssertFactCondition<SymbolicRelationAtom>(condition);
 
         Assert.That(fact.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
@@ -620,8 +563,7 @@ public sealed class SymbolicIrTests {
             "string s",
             """System.Text.RegularExpressions.Regex.IsMatch(s, @"\A[A-Z]+\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant)""");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var conjunction = (SymbolicBinaryCondition)condition;
         Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
@@ -654,8 +596,7 @@ public sealed class SymbolicIrTests {
             "string s",
             "string.IsNullOrEmpty(s)");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var disjunction = (SymbolicBinaryCondition)condition;
 
@@ -674,8 +615,7 @@ public sealed class SymbolicIrTests {
             "string s",
             "string.IsNullOrWhiteSpace(s)");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var disjunction = (SymbolicBinaryCondition)condition;
 
@@ -694,8 +634,7 @@ public sealed class SymbolicIrTests {
             "string s",
             """string.IsNullOrEmpty("A" + s)""");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var atom = AssertFactCondition<SymbolicRelationAtom>(condition);
 
         Assert.That(atom.Left, Is.TypeOf<SymbolicLengthTerm>());
@@ -763,14 +702,10 @@ public sealed class SymbolicIrTests {
         Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
         var conditional = (SymbolicConditionalTerm)term;
 
-        Assert.That(
-            AssertFactCondition<SymbolicRelationAtom>(conditional.Condition).Operator,
-            Is.EqualTo(SymbolicRelationOperator.GreaterThanOrEqual));
+        Assert.That( AssertFactCondition<SymbolicRelationAtom>(conditional.Condition).Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThanOrEqual));
         Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicBinaryTerm>());
-        Assert.That(
-            ((SymbolicBinaryTerm)conditional.WhenFalse).Operator,
-            Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
+        Assert.That( ((SymbolicBinaryTerm)conditional.WhenFalse).Operator, Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
     }
@@ -796,15 +731,11 @@ public sealed class SymbolicIrTests {
         Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
         var belowMin = (SymbolicConditionalTerm)term;
 
-        Assert.That(
-            AssertFactCondition<SymbolicRelationAtom>(belowMin.Condition).Operator,
-            Is.EqualTo(SymbolicRelationOperator.LessThan));
+        Assert.That( AssertFactCondition<SymbolicRelationAtom>(belowMin.Condition).Operator, Is.EqualTo(SymbolicRelationOperator.LessThan));
         Assert.That(belowMin.WhenTrue, Is.EqualTo(new SymbolicIntegerConstantTerm(0)));
         Assert.That(belowMin.WhenFalse, Is.TypeOf<SymbolicConditionalTerm>());
         var aboveMax = (SymbolicConditionalTerm)belowMin.WhenFalse;
-        Assert.That(
-            AssertFactCondition<SymbolicRelationAtom>(aboveMax.Condition).Operator,
-            Is.EqualTo(SymbolicRelationOperator.GreaterThan));
+        Assert.That( AssertFactCondition<SymbolicRelationAtom>(aboveMax.Condition).Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThan));
         Assert.That(aboveMax.WhenTrue, Is.EqualTo(new SymbolicIntegerConstantTerm(10)));
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
@@ -870,9 +801,7 @@ public sealed class SymbolicIrTests {
         Assert.That(member.MemberName, Is.EqualTo("Value"));
         Assert.That(member.Kind, Is.EqualTo(SmtValueKind.Reference));
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(member, out var formula), Is.True);
-        Assert.That(formula,
-            Is.EqualTo(new SmtVariable(((SymbolicVariableTerm)member.Receiver).Name + ".Value",
-                SmtValueKind.Reference)));
+        Assert.That(formula, Is.EqualTo(new SmtVariable(((SymbolicVariableTerm)member.Receiver).Name + ".Value", SmtValueKind.Reference)));
     }
 
     [Test]
@@ -889,8 +818,7 @@ public sealed class SymbolicIrTests {
         Assert.That(member.MemberName, Is.EqualTo("Number"));
         Assert.That(member.Kind, Is.EqualTo(SmtValueKind.Int));
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(member, out var formula), Is.True);
-        Assert.That(formula,
-            Is.EqualTo(new SmtVariable(((SymbolicVariableTerm)member.Receiver).Name + ".Number", SmtValueKind.Int)));
+        Assert.That(formula, Is.EqualTo(new SmtVariable(((SymbolicVariableTerm)member.Receiver).Name + ".Number", SmtValueKind.Int)));
     }
 
     [Test]
@@ -986,9 +914,7 @@ public sealed class SymbolicIrTests {
         Assert.That(element.Kind, Is.EqualTo(SmtValueKind.Int));
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(element, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtVariable>());
-        Assert.That(
-            ((SmtVariable)formula).Name,
-            Does.StartWith(((SymbolicVariableTerm)element.Receiver).Name + "["));
+        Assert.That( ((SmtVariable)formula).Name, Does.StartWith(((SymbolicVariableTerm)element.Receiver).Name + "["));
     }
 
     [Test]
@@ -1033,8 +959,7 @@ public sealed class SymbolicIrTests {
             "int value, int divisor",
             "value / divisor == value % divisor");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
 
         Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
@@ -1052,8 +977,7 @@ public sealed class SymbolicIrTests {
             "int value",
             "-value == 0");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
         Assert.That(relation.Left, Is.TypeOf<SymbolicConditionalTerm>());
         Assert.That(SymbolicState.CreateProofTermKey(relation.Left), Does.Contain("Subtract"));
@@ -1067,8 +991,7 @@ public sealed class SymbolicIrTests {
             "bool flag, int left, int right",
             "(flag ? left : right) == 0");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
         var conditional = (SymbolicConditionalTerm)relation.Left;
 
@@ -1086,8 +1009,7 @@ public sealed class SymbolicIrTests {
             "object? left, object? right",
             "(left ?? right) == null");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
         var conditional = (SymbolicConditionalTerm)relation.Left;
 
@@ -1105,8 +1027,7 @@ public sealed class SymbolicIrTests {
             "System.Numerics.BigInteger value",
             "value >= System.Numerics.BigInteger.MinusOne && value > System.Numerics.BigInteger.Zero && value <= System.Numerics.BigInteger.One");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
@@ -1148,12 +1069,7 @@ public sealed class SymbolicIrTests {
             "string left, string right",
             "left + right");
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerStringNonNullCondition(
-                context.Expression,
-                context.LoweringContext,
-                out var condition),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerStringNonNullCondition( context.Expression, context.LoweringContext, out var condition), Is.True);
 
         Assert.That(condition, Is.EqualTo(new SymbolicConstantCondition(true)));
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
@@ -1166,12 +1082,7 @@ public sealed class SymbolicIrTests {
             "string left, string right",
             "left ?? right");
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerStringNonNullCondition(
-                context.Expression,
-                context.LoweringContext,
-                out var condition),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerStringNonNullCondition( context.Expression, context.LoweringContext, out var condition), Is.True);
 
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var disjunction = (SymbolicBinaryCondition)condition;
@@ -1188,12 +1099,7 @@ public sealed class SymbolicIrTests {
             "bool flag, string first, string second",
             "flag ? first : second");
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerStringNonNullCondition(
-                context.Expression,
-                context.LoweringContext,
-                out var condition),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerStringNonNullCondition( context.Expression, context.LoweringContext, out var condition), Is.True);
 
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var outerOr = (SymbolicBinaryCondition)condition;
@@ -1210,8 +1116,7 @@ public sealed class SymbolicIrTests {
             "int? maybe",
             "maybe.HasValue");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var atom = AssertFactCondition<SymbolicTruthAtom>(condition);
 
         Assert.That(atom.Condition, Is.TypeOf<SymbolicNullableHasValueTerm>());
@@ -1229,8 +1134,7 @@ public sealed class SymbolicIrTests {
             "int? maybe, int expected",
             "maybe.Value == expected");
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var conjunction = (SymbolicBinaryCondition)condition;
         Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
@@ -1265,8 +1169,7 @@ public sealed class SymbolicIrTests {
 
         Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
         var conditional = (SymbolicConditionalTerm)term;
-        Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition,
-            Is.TypeOf<SymbolicNullableHasValueTerm>());
+        Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition, Is.TypeOf<SymbolicNullableHasValueTerm>());
         Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicNullableValueTerm>());
         Assert.That(conditional.WhenFalse, Is.EqualTo(new SymbolicIntegerConstantTerm(0)));
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
@@ -1284,8 +1187,7 @@ public sealed class SymbolicIrTests {
 
         Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
         var conditional = (SymbolicConditionalTerm)term;
-        Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition,
-            Is.TypeOf<SymbolicNullableHasValueTerm>());
+        Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition, Is.TypeOf<SymbolicNullableHasValueTerm>());
         Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicNullableValueTerm>());
         Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(((SymbolicVariableTerm)conditional.WhenFalse).Name, Does.StartWith("fallback#"));
@@ -1304,8 +1206,7 @@ public sealed class SymbolicIrTests {
 
         Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
         var conditional = (SymbolicConditionalTerm)term;
-        Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition,
-            Is.TypeOf<SymbolicNullableHasValueTerm>());
+        Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition, Is.TypeOf<SymbolicNullableHasValueTerm>());
         Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicNullableValueTerm>());
         Assert.That(conditional.WhenTrue.Kind, Is.EqualTo(SmtValueKind.Bool));
         Assert.That(conditional.WhenFalse, Is.EqualTo(new SymbolicBooleanConstantTerm(false)));
@@ -1325,8 +1226,7 @@ public sealed class SymbolicIrTests {
 
         Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
         var conditional = (SymbolicConditionalTerm)term;
-        Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition,
-            Is.TypeOf<SymbolicNullableHasValueTerm>());
+        Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition, Is.TypeOf<SymbolicNullableHasValueTerm>());
         Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicNullableValueTerm>());
         Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(((SymbolicVariableTerm)conditional.WhenFalse).Name, Does.StartWith("fallback#"));
@@ -1390,8 +1290,7 @@ public sealed class SymbolicIrTests {
 
         Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
         var conditional = (SymbolicConditionalTerm)term;
-        Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition,
-            Is.TypeOf<SymbolicNullableHasValueTerm>());
+        Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition, Is.TypeOf<SymbolicNullableHasValueTerm>());
         Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicNullableValueTerm>());
         Assert.That(conditional.WhenTrue.Kind, Is.EqualTo(SmtValueKind.Int));
         Assert.That(conditional.WhenFalse, Is.EqualTo(new SymbolicIntegerConstantTerm(0)));
@@ -1419,10 +1318,7 @@ public sealed class SymbolicIrTests {
             "test.exception-precondition"));
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            new SmtVariable("d#1", SmtValueKind.Int),
-            new SmtIntegerConstant(0))));
+        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula( SmtBinaryOperator.Equal, new SmtVariable("d#1", SmtValueKind.Int), new SmtIntegerConstant(0))));
     }
 
     [Test]
@@ -1471,10 +1367,7 @@ public sealed class SymbolicIrTests {
             "test.exception-precondition.negative-length"));
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula(
-            SmtBinaryOperator.LessThan,
-            new SmtVariable("length#1", SmtValueKind.Int),
-            new SmtIntegerConstant(0))));
+        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula( SmtBinaryOperator.LessThan, new SmtVariable("length#1", SmtValueKind.Int), new SmtIntegerConstant(0))));
     }
 
     [Test]
@@ -1527,9 +1420,7 @@ public sealed class SymbolicIrTests {
             right,
             MayOverflow: true);
 
-        Assert.That(
-            SymbolicState.CreateProofTermKey(overflowSensitive),
-            Is.Not.EqualTo(SymbolicState.CreateProofTermKey(exact)));
+        Assert.That( SymbolicState.CreateProofTermKey(overflowSensitive), Is.Not.EqualTo(SymbolicState.CreateProofTermKey(exact)));
     }
 
     [Test]
@@ -1551,10 +1442,7 @@ public sealed class SymbolicIrTests {
             "test.exception-precondition.null-dereference"));
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            new SmtVariable("text#1", SmtValueKind.Reference),
-            new SmtNullConstant())));
+        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula( SmtBinaryOperator.Equal, new SmtVariable("text#1", SmtValueKind.Reference), new SmtNullConstant())));
     }
 
     [Test]
@@ -1576,10 +1464,7 @@ public sealed class SymbolicIrTests {
             "test.exception-precondition.unbox-null"));
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            new SmtVariable("value#1", SmtValueKind.Reference),
-            new SmtNullConstant())));
+        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula( SmtBinaryOperator.Equal, new SmtVariable("value#1", SmtValueKind.Reference), new SmtNullConstant())));
     }
 
     [Test]
@@ -1601,10 +1486,7 @@ public sealed class SymbolicIrTests {
             "test.exception-precondition.argument-null"));
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            new SmtVariable("gate#1", SmtValueKind.Reference),
-            new SmtNullConstant())));
+        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula( SmtBinaryOperator.Equal, new SmtVariable("gate#1", SmtValueKind.Reference), new SmtNullConstant())));
     }
 
     [Test]
@@ -1623,9 +1505,7 @@ public sealed class SymbolicIrTests {
             "test.exception-precondition.nullable-value"));
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula, Is.EqualTo(new SmtUnaryFormula(
-            SmtUnaryOperator.Not,
-            new SmtVariable("maybe#1.HasValue", SmtValueKind.Bool))));
+        Assert.That(formula, Is.EqualTo(new SmtUnaryFormula( SmtUnaryOperator.Not, new SmtVariable("maybe#1.HasValue", SmtValueKind.Bool))));
     }
 
     [Test]
@@ -1644,11 +1524,7 @@ public sealed class SymbolicIrTests {
             "test.exception-precondition.invalid-cast"));
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula, Is.EqualTo(new SmtUnaryFormula(
-            SmtUnaryOperator.Not,
-            new SmtRuntimeTypeTestFormula(
-                new SmtVariable("value#1", SmtValueKind.Reference),
-                "System.String"))));
+        Assert.That(formula, Is.EqualTo(new SmtUnaryFormula( SmtUnaryOperator.Not, new SmtRuntimeTypeTestFormula( new SmtVariable("value#1", SmtValueKind.Reference), "System.String"))));
     }
 
     [Test]
@@ -1687,10 +1563,7 @@ public sealed class SymbolicIrTests {
         foreach (var atom in atoms) {
             var condition = new SymbolicFactCondition(SymbolicFact.Exact(atom, source, "test.ownership-resource"));
 
-            Assert.That(
-                SymbolicIrFormulaEncoder.TryEncode(condition, out _),
-                Is.False,
-                atom.GetType().Name + " should not be encoded optimistically.");
+            Assert.That( SymbolicIrFormulaEncoder.TryEncode(condition, out _), Is.False, atom.GetType().Name + " should not be encoded optimistically.");
         }
     }
 
@@ -1710,8 +1583,7 @@ public sealed class SymbolicIrTests {
         Assert.That(facts, Has.Length.EqualTo(3));
         Assert.That(facts[0].Atom, Is.EqualTo(new SymbolicFreshnessAtom(value)));
         Assert.That(facts[1].Atom, Is.EqualTo(new SymbolicOwnershipAtom(value, false)));
-        Assert.That(facts[2].Atom,
-            Is.EqualTo(new SymbolicResourceLifetimeAtom(value, SymbolicResourceLifetimeState.Owned)));
+        Assert.That(facts[2].Atom, Is.EqualTo(new SymbolicResourceLifetimeAtom(value, SymbolicResourceLifetimeState.Owned)));
         Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[]
         {
             "test.ownership.fresh",
@@ -1802,9 +1674,7 @@ public sealed class SymbolicIrTests {
         var dimensionLength = new SymbolicArrayDimensionLengthTerm(array, 1);
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(dimensionLength, out var encoded), Is.True);
-        Assert.That(
-            encoded,
-            Is.EqualTo(new SmtVariable("matrix#1.GetLength(1)", SmtValueKind.Int)));
+        Assert.That( encoded, Is.EqualTo(new SmtVariable("matrix#1.GetLength(1)", SmtValueKind.Int)));
     }
 
     [Test]
@@ -1817,9 +1687,7 @@ public sealed class SymbolicIrTests {
             .OfType<ArrayCreationExpressionSyntax>()
             .Single();
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerArrayDimensionLengthTerm(arrayCreation, 1, context.LoweringContext, out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerArrayDimensionLengthTerm(arrayCreation, 1, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicVariableTerm>());
         var variable = (SymbolicVariableTerm)term;
@@ -1924,9 +1792,7 @@ public sealed class SymbolicIrTests {
             "matrix.Length == total");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         var multiply = (SymbolicBinaryTerm)term;
@@ -1942,9 +1808,7 @@ public sealed class SymbolicIrTests {
             "text.Substring(start).Length == text.Length - start");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         var subtract = (SymbolicBinaryTerm)term;
@@ -1962,9 +1826,7 @@ public sealed class SymbolicIrTests {
             "text.Substring(start, length).Length == length");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(((SymbolicVariableTerm)term).Name, Does.StartWith("length#"));
@@ -1979,9 +1841,7 @@ public sealed class SymbolicIrTests {
             "values[1..^1].Length == values.Length - 2");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         var subtract = (SymbolicBinaryTerm)term;
@@ -1999,9 +1859,7 @@ public sealed class SymbolicIrTests {
             "text[1..^1].Length == text.Length - 2");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         var subtract = (SymbolicBinaryTerm)term;
@@ -2020,9 +1878,7 @@ public sealed class SymbolicIrTests {
             "text.AsSpan(start).Length == text.Length - start");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         var subtract = (SymbolicBinaryTerm)term;
@@ -2041,9 +1897,7 @@ public sealed class SymbolicIrTests {
             "values.Slice(start, length).Length == length");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(((SymbolicVariableTerm)term).Name, Does.StartWith("length#"));
@@ -2061,9 +1915,7 @@ public sealed class SymbolicIrTests {
             "values[range].Length == values.Length - 2");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
@@ -2080,9 +1932,7 @@ public sealed class SymbolicIrTests {
             "text.AsSpan(range).Length == text.Length - 2");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
@@ -2146,12 +1996,7 @@ public sealed class SymbolicIrTests {
             "values.Count > 0");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(
-                memberAccess.Expression,
-                context.LoweringContext,
-                out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm( memberAccess.Expression, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicCountTerm>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
@@ -2168,12 +2013,7 @@ public sealed class SymbolicIrTests {
             "values.Count > 0");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(
-                memberAccess.Expression,
-                context.LoweringContext,
-                out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm( memberAccess.Expression, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicCountTerm>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
@@ -2189,12 +2029,7 @@ public sealed class SymbolicIrTests {
             "span.Length == 0");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(
-                memberAccess.Expression,
-                context.LoweringContext,
-                out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm( memberAccess.Expression, context.LoweringContext, out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicLengthTerm>());
         var lengthTerm = (SymbolicLengthTerm)term;
@@ -2210,12 +2045,7 @@ public sealed class SymbolicIrTests {
             "System.Collections.Generic.IReadOnlyCollection<int> values",
             "int[] copy = [0, .. values, 1];");
 
-        Assert.That(
-            TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(
-                context.ValueExpression,
-                new SymbolicLoweringContext(context.SemanticModel, CancellationToken.None),
-                out var term),
-            Is.True);
+        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm( context.ValueExpression, new SymbolicLoweringContext(context.SemanticModel, CancellationToken.None), out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);

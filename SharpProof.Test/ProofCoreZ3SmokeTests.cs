@@ -18,9 +18,7 @@ internal class ProofCoreZ3SmokeTests {
 
     [Test]
     public void RegexTranslationValidator_ClassifiesOversizedPatternBeforeParsing() {
-        Assert.That(
-            Z3RegexTranslationValidator.Validate(new string('a', 257), RegexOptions.None),
-            Is.EqualTo(RegexTranslationFallback.PatternTooLong));
+        Assert.That( Z3RegexTranslationValidator.Validate(new string('a', 257), RegexOptions.None), Is.EqualTo(RegexTranslationFallback.PatternTooLong));
     }
 
     private static void AssertSatisfiability(
@@ -28,9 +26,7 @@ internal class ProofCoreZ3SmokeTests {
         IEnumerable<SmtFormula> pathConditions,
         TimeSpan? timeout = null) {
         using var solver = new SmtSolver();
-        Assert.That(
-            solver.CheckSatisfiability(pathConditions, timeout ?? SolverTimeout).Feasibility,
-            Is.EqualTo(expected));
+        Assert.That( solver.CheckSatisfiability(pathConditions, timeout ?? SolverTimeout).Feasibility, Is.EqualTo(expected));
     }
 
     private static void AssertImplication(
@@ -79,14 +75,10 @@ internal class ProofCoreZ3SmokeTests {
         Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
         Assert.That(result.Witness.Status, Is.EqualTo(SmtWitnessStatus.Exact));
         Assert.Multiple(() => {
-            Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "count").IntegerValue,
-                Is.EqualTo(3));
-            Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "enabled").BooleanValue,
-                Is.True);
-            Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "text").StringValue,
-                Is.EqualTo("abc"));
-            Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "receiver").IsNull,
-                Is.True);
+            Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "count").IntegerValue, Is.EqualTo(3));
+            Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "enabled").BooleanValue, Is.True);
+            Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "text").StringValue, Is.EqualTo("abc"));
+            Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "receiver").IsNull, Is.True);
         });
     }
 

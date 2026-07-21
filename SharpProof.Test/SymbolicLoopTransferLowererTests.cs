@@ -22,8 +22,7 @@ public sealed class SymbolicLoopTransferLowererTests {
             Assert.That(result.IsExact, Is.True, result.Provenance.Single().Detail);
             Assert.That(result.Value!.EntryCondition, Is.Not.Null);
             Assert.That(result.Value.ExitCondition, Is.Not.Null);
-            Assert.That(result.Value.BackEdgeInvalidations.Select(static target => target.Key),
-                Does.Contain(SymbolicFactFactory.GetSmtVariableName(valueSymbol)));
+            Assert.That(result.Value.BackEdgeInvalidations.Select(static target => target.Key), Does.Contain(SymbolicFactFactory.GetSmtVariableName(valueSymbol)));
             Assert.That(result.Value.Invariants, Is.Not.Empty);
         });
     }

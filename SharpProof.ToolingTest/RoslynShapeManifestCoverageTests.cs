@@ -32,8 +32,7 @@ public class RoslynShapeManifestCoverageTests {
             .OrderBy(shapeId => shapeId, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.That(missing, Is.Empty,
-            "Generator-backed manifest shapes without registry entries: " + string.Join(", ", missing));
+        Assert.That(missing, Is.Empty, "Generator-backed manifest shapes without registry entries: " + string.Join(", ", missing));
     }
 
     [Test]
@@ -46,8 +45,7 @@ public class RoslynShapeManifestCoverageTests {
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.That(unknown, Is.Empty,
-            "Registry entries reference unknown manifest shapes: " + string.Join(", ", unknown));
+        Assert.That(unknown, Is.Empty, "Registry entries reference unknown manifest shapes: " + string.Join(", ", unknown));
     }
 
     [Test]
@@ -67,10 +65,8 @@ public class RoslynShapeManifestCoverageTests {
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.That(unknownOperationKinds, Is.Empty,
-            "Registry entries reference unknown OperationKind values: " + string.Join(", ", unknownOperationKinds));
-        Assert.That(unknownSyntaxKinds, Is.Empty,
-            "Registry entries reference unknown SyntaxKind values: " + string.Join(", ", unknownSyntaxKinds));
+        Assert.That(unknownOperationKinds, Is.Empty, "Registry entries reference unknown OperationKind values: " + string.Join(", ", unknownOperationKinds));
+        Assert.That(unknownSyntaxKinds, Is.Empty, "Registry entries reference unknown SyntaxKind values: " + string.Join(", ", unknownSyntaxKinds));
     }
 
     [Test]
@@ -82,10 +78,7 @@ public class RoslynShapeManifestCoverageTests {
             Assert.That(analysis.CompilationErrors, Is.Empty, entry.Id);
 
             foreach (var operationKind in entry.ExpectedOperationKinds)
-                Assert.That(
-                    analysis.OperationKinds.ContainsKey(operationKind),
-                    Is.True,
-                    entry.Id + " missing operation kind " + operationKind);
+                Assert.That( analysis.OperationKinds.ContainsKey(operationKind), Is.True, entry.Id + " missing operation kind " + operationKind);
         }
     }
 
@@ -100,10 +93,7 @@ public class RoslynShapeManifestCoverageTests {
             Assert.That(analysis.CompilationErrors, Is.Empty, entry.Id);
 
             foreach (var syntaxKind in entry.ExpectedSyntaxKinds)
-                Assert.That(
-                    analysis.SyntaxKinds.ContainsKey(syntaxKind),
-                    Is.True,
-                    entry.Id + " missing syntax kind " + syntaxKind);
+                Assert.That( analysis.SyntaxKinds.ContainsKey(syntaxKind), Is.True, entry.Id + " missing syntax kind " + syntaxKind);
         }
     }
 
@@ -124,8 +114,7 @@ public class RoslynShapeManifestCoverageTests {
             .OrderBy(shapeId => shapeId, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.That(missing, Is.Empty,
-            "Deterministic sampler missed generator-backed shapes: " + string.Join(", ", missing));
+        Assert.That(missing, Is.Empty, "Deterministic sampler missed generator-backed shapes: " + string.Join(", ", missing));
     }
 
     private static async Task<ImmutableDictionary<string, FuzzCaseAnalysis>> AnalyzeRegistryEntriesAsync() {

@@ -23,15 +23,11 @@ public sealed class SmtConcreteFactIndexTests {
         for (var index = 0; index < negationCount; index++)
             formula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
 
-        Assert.That(
-            SmtComparisonOperatorFacts.TryExtract(formula, out var comparison, out var actualNegationCount),
-            Is.True);
+        Assert.That( SmtComparisonOperatorFacts.TryExtract(formula, out var comparison, out var actualNegationCount), Is.True);
         Assert.Multiple(() => {
             Assert.That(comparison.Operator, Is.EqualTo(SmtBinaryOperator.Equal));
             Assert.That(actualNegationCount, Is.EqualTo(negationCount));
-            Assert.That(
-                SmtComparisonOperatorFacts.ApplyNegations(comparison.Operator, actualNegationCount),
-                Is.EqualTo(expectedOperator));
+            Assert.That( SmtComparisonOperatorFacts.ApplyNegations(comparison.Operator, actualNegationCount), Is.EqualTo(expectedOperator));
         });
     }
 
@@ -177,10 +173,7 @@ public sealed class SmtConcreteFactIndexTests {
             Assert.That(interval.IsContradictory, Is.False);
         });
 
-        Assert.That(
-            interval.Intersect(
-                SmtIntegerInterval.Unbounded.Apply(SmtBinaryOperator.Equal, 0)).IsContradictory,
-            Is.True);
+        Assert.That( interval.Intersect( SmtIntegerInterval.Unbounded.Apply(SmtBinaryOperator.Equal, 0)).IsContradictory, Is.True);
     }
 
     [TestCase((int)SmtBinaryOperator.GreaterThan, long.MaxValue)]

@@ -35,8 +35,7 @@ public class CSharpSyntaxFactsTests {
 
     [Test]
     public void TryGetCompoundAssignmentBinaryKind_RejectsSimpleAssignment() {
-        Assert.That(CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind(
-            SyntaxKind.SimpleAssignmentExpression, out var binaryKind), Is.False);
+        Assert.That(CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind( SyntaxKind.SimpleAssignmentExpression, out var binaryKind), Is.False);
         Assert.That(binaryKind, Is.EqualTo(SyntaxKind.None));
     }
 
@@ -48,16 +47,14 @@ public class CSharpSyntaxFactsTests {
     public void TryGetIncrementOrDecrementOperand_ReturnsOperandAndDelta(string text, int expectedDelta) {
         var expression = SyntaxFactory.ParseExpression(text);
 
-        Assert.That(CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(
-            expression, out var operand, out var delta), Is.True);
+        Assert.That(CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand( expression, out var operand, out var delta), Is.True);
         Assert.That(operand.ToString(), Is.EqualTo("value"));
         Assert.That(delta, Is.EqualTo(expectedDelta));
     }
 
     [Test]
     public void TryGetIncrementOrDecrementOperand_RejectsNonMutation() {
-        Assert.That(CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(
-            SyntaxFactory.ParseExpression("value + 1"), out _, out _), Is.False);
+        Assert.That(CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand( SyntaxFactory.ParseExpression("value + 1"), out _, out _), Is.False);
     }
 
     [Test]
@@ -75,18 +72,10 @@ public class CSharpSyntaxFactsTests {
         var invocation = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var binaryExpressions = root.DescendantNodes().OfType<BinaryExpressionSyntax>().ToArray();
 
-        Assert.That(
-            CSharpSyntaxFacts.GetContainingExecutionRoot(invocation, ExtendedExecutionRoots),
-            Is.TypeOf<GlobalStatementSyntax>());
-        Assert.That(
-            CSharpSyntaxFacts.GetContainingExecutionRoot(binaryExpressions[0], ExtendedExecutionRoots),
-            Is.TypeOf<EqualsValueClauseSyntax>());
-        Assert.That(
-            CSharpSyntaxFacts.GetContainingExecutionRoot(binaryExpressions[1], ExtendedExecutionRoots),
-            Is.TypeOf<PropertyDeclarationSyntax>());
-        Assert.That(
-            CSharpSyntaxFacts.GetContainingExecutionRoot(binaryExpressions[2], ExtendedExecutionRoots),
-            Is.TypeOf<MethodDeclarationSyntax>());
+        Assert.That( CSharpSyntaxFacts.GetContainingExecutionRoot(invocation, ExtendedExecutionRoots), Is.TypeOf<GlobalStatementSyntax>());
+        Assert.That( CSharpSyntaxFacts.GetContainingExecutionRoot(binaryExpressions[0], ExtendedExecutionRoots), Is.TypeOf<EqualsValueClauseSyntax>());
+        Assert.That( CSharpSyntaxFacts.GetContainingExecutionRoot(binaryExpressions[1], ExtendedExecutionRoots), Is.TypeOf<PropertyDeclarationSyntax>());
+        Assert.That( CSharpSyntaxFacts.GetContainingExecutionRoot(binaryExpressions[2], ExtendedExecutionRoots), Is.TypeOf<MethodDeclarationSyntax>());
     }
 
     [Test]
@@ -94,9 +83,7 @@ public class CSharpSyntaxFactsTests {
         var root = CSharpSyntaxTree.ParseText("public class TestClass { public int Value => 1 + 2; }").GetRoot();
         var expression = root.DescendantNodes().OfType<BinaryExpressionSyntax>().Single();
 
-        Assert.That(
-            CSharpSyntaxFacts.GetContainingExecutionRoot(expression, ExecutionRootPolicy.Callable),
-            Is.Null);
+        Assert.That( CSharpSyntaxFacts.GetContainingExecutionRoot(expression, ExecutionRootPolicy.Callable), Is.Null);
         Assert.That(CSharpSyntaxFacts.GetContainingExecutionRoot(expression), Is.SameAs(root));
     }
 
@@ -167,8 +154,7 @@ public class CSharpSyntaxFactsTests {
             new[] { tree },
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
-            Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         root = tree.GetRoot();
         return compilation.GetSemanticModel(tree);
     }

@@ -33,18 +33,10 @@ public class SmtAnalysisServiceTests {
 
     [Test]
     public void NativeLibraryBootstrap_RecognizesSupportedX64Platforms() {
-        Assert.That(
-            SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.Windows, Architecture.X64),
-            Is.EqualTo("libz3.dll"));
-        Assert.That(
-            SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.OSX, Architecture.X64),
-            Is.EqualTo("libz3.dylib"));
-        Assert.That(
-            SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.Linux, Architecture.X64),
-            Is.EqualTo("libz3.so"));
-        Assert.That(
-            SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.Linux, Architecture.Arm64),
-            Is.Null);
+        Assert.That( SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.Windows, Architecture.X64), Is.EqualTo("libz3.dll"));
+        Assert.That( SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.OSX, Architecture.X64), Is.EqualTo("libz3.dylib"));
+        Assert.That( SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.Linux, Architecture.X64), Is.EqualTo("libz3.so"));
+        Assert.That( SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.Linux, Architecture.Arm64), Is.Null);
     }
 
     [Test]
@@ -86,16 +78,13 @@ public class SmtAnalysisServiceTests {
         Assert.That(defaults.MaxTransientRetries, Is.EqualTo(1));
         Assert.That(defaults.RecycleContextOnTransientFailure, Is.True);
         Assert.That(defaults.DisposeCurrentThreadContextOnServiceDispose, Is.True);
-        Assert.That(
-            () => new SmtSolverLifecycleOptions(maxTransientRetries: -1),
-            Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That( () => new SmtSolverLifecycleOptions(maxTransientRetries: -1), Throws.TypeOf<ArgumentOutOfRangeException>());
 
         var lifecycle = new SmtSolverLifecycleOptions(3, false, true);
         var options = SmtAnalysisOptions.Default.WithLifecycle(lifecycle);
 
         Assert.That(options.Lifecycle, Is.SameAs(lifecycle));
-        Assert.That(options.WithOverrides(queryTimeout: TimeSpan.FromMilliseconds(123)).Lifecycle,
-            Is.SameAs(lifecycle));
+        Assert.That(options.WithOverrides(queryTimeout: TimeSpan.FromMilliseconds(123)).Lifecycle, Is.SameAs(lifecycle));
     }
 
     [Test]
@@ -944,9 +933,7 @@ public class SmtAnalysisServiceTests {
                 .ToArray();
             var results = await Task.WhenAll(tasks);
 
-            Assert.That(
-                results.Select(result => result.Outcome),
-                Is.All.EqualTo(AnalysisProofOutcome.Disproven));
+            Assert.That( results.Select(result => result.Outcome), Is.All.EqualTo(AnalysisProofOutcome.Disproven));
             Assert.That(services.Sum(service => service.ExecutedQueryCount), Is.EqualTo(1));
             Assert.That(services.Sum(service => service.CacheEntryCount), Is.EqualTo(serviceCount));
         }
@@ -998,9 +985,7 @@ public class SmtAnalysisServiceTests {
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
         Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(
-            service.ClassifyImplication(pathConditions, fact).Outcome,
-            Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That( service.ClassifyImplication(pathConditions, fact).Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -1018,9 +1003,7 @@ public class SmtAnalysisServiceTests {
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
         Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
-        Assert.That(
-            service.ClassifyImplication(pathConditions, fact).Outcome,
-            Is.Not.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That( service.ClassifyImplication(pathConditions, fact).Outcome, Is.Not.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     private sealed record ServiceRegexCase(
@@ -1092,8 +1075,7 @@ public class SmtAnalysisServiceTests {
             _ = solver.CheckSatisfiability(pathConditions, TimeSpan.FromMilliseconds(50));
         }
 
-        Assert.That(solver.RegexValidationCacheCount,
-            Is.LessThanOrEqualTo(SmtSolver.MaxRegexValidationCacheEntries));
+        Assert.That(solver.RegexValidationCacheCount, Is.LessThanOrEqualTo(SmtSolver.MaxRegexValidationCacheEntries));
     }
 
     [Test]
@@ -1339,8 +1321,7 @@ public class SmtAnalysisServiceTests {
             ? service.ClassifyPathFeasibility(pathConditions)
             : service.ClassifyImplication(pathConditions, conclusion);
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(conclusion == null ? result.PathCheck.Feasibility : result.HazardCheck.Feasibility,
-            Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(conclusion == null ? result.PathCheck.Feasibility : result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo(conclusion == null ? "path_unsatisfiable" : "branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));

@@ -30,11 +30,6 @@ public sealed class SmtFormulaVersionRewriterTests {
 
         var rewritten = SymbolicIrSubstitution.ReplaceTerm(element, source, versioned);
 
-        Assert.That(
-            rewritten,
-            Is.EqualTo(new SymbolicElementTerm(
-                versioned,
-                new SymbolicIntegerConstantTerm(0),
-                SmtValueKind.Int)));
+        Assert.That( rewritten, Is.EqualTo(new SymbolicElementTerm( versioned, new SymbolicIntegerConstantTerm(0), SmtValueKind.Int)));
     }
 }

@@ -56,8 +56,7 @@ public sealed class SymbolicSemanticPipelineTests {
             var result = SymbolicSemanticPipeline.LowerTerm(context.Expression, context.LoweringContext);
 
             Assert.That(result.Support, Is.EqualTo(SymbolicLoweringSupport.Exact), expressions[index]);
-            Assert.That(result.Value, Is.EqualTo(new SymbolicIntegerConstantTerm(expected[index])),
-                expressions[index]);
+            Assert.That(result.Value, Is.EqualTo(new SymbolicIntegerConstantTerm(expected[index])), expressions[index]);
         }
     }
 
@@ -136,11 +135,7 @@ public sealed class SymbolicSemanticPipelineTests {
 
     [Test]
     public void ListPatternElementPosition_TestOnlyAdapterIsAbsent() {
-        Assert.That(
-            typeof(CSharpSyntaxFacts).GetMethod(
-                "TryGetListPatternElementPosition",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static),
-            Is.Null);
+        Assert.That( typeof(CSharpSyntaxFacts).GetMethod( "TryGetListPatternElementPosition", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static), Is.Null);
     }
 
     [Test]
@@ -153,16 +148,8 @@ public sealed class SymbolicSemanticPipelineTests {
             SyntaxFactory.IdentifierName(name),
             "test.variable-prefix");
 
-        Assert.That(
-            SymbolicIrReferenceScanner.ContainsVariablePrefix(
-                Fact("x#12"),
-                "x#1"),
-            Is.False);
-        Assert.That(
-            SymbolicIrReferenceScanner.ContainsVariablePrefix(
-                Fact("x#1@v2"),
-                "x#1"),
-            Is.True);
+        Assert.That( SymbolicIrReferenceScanner.ContainsVariablePrefix( Fact("x#12"), "x#1"), Is.False);
+        Assert.That( SymbolicIrReferenceScanner.ContainsVariablePrefix( Fact("x#1@v2"), "x#1"), Is.True);
     }
 
     [Test]
@@ -182,11 +169,7 @@ public sealed class SymbolicSemanticPipelineTests {
         var method = compilation.GetSemanticModel(tree).GetDeclaredSymbol(
             tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
 
-        Assert.That(
-            NullableFlowFacts.HasInferredNotNullNormalCompletionPostcondition(
-                method.Parameters[1],
-                CancellationToken.None),
-            Is.True);
+        Assert.That( NullableFlowFacts.HasInferredNotNullNormalCompletionPostcondition( method.Parameters[1], CancellationToken.None), Is.True);
     }
 
     [Test]
@@ -296,8 +279,7 @@ public sealed class SymbolicSemanticPipelineTests {
         Assert.That(hazard.Confidence, Is.EqualTo(SymbolicFactConfidence.Unsupported));
         Assert.That(hazard.Subject, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(hazard.Trigger, Is.TypeOf<SymbolicFactCondition>());
-        Assert.That(((SymbolicFactCondition)hazard.Trigger).Fact.Provenance,
-            Is.EqualTo("ir.runtime-hazard.array.negative-length.aggregate.unsupported.trigger"));
+        Assert.That(((SymbolicFactCondition)hazard.Trigger).Fact.Provenance, Is.EqualTo("ir.runtime-hazard.array.negative-length.aggregate.unsupported.trigger"));
     }
 
     [Test]

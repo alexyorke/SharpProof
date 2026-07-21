@@ -74,8 +74,7 @@ public sealed class SymbolicMutationInventoryTests {
         Assert.Multiple(() => {
             Assert.That(plan.HasUnsupportedMutation, Is.False);
             Assert.That(plan.Steps.Length, Is.EqualTo(1));
-            Assert.That(plan.Steps[0].Targets.Single().Key,
-                Is.EqualTo(SymbolicFactFactory.GetSmtVariableName(value)));
+            Assert.That(plan.Steps[0].Targets.Single().Key, Is.EqualTo(SymbolicFactFactory.GetSmtVariableName(value)));
         });
     }
 
@@ -101,14 +100,8 @@ public sealed class SymbolicMutationInventoryTests {
 
         Assert.Multiple(() => {
             Assert.That(inventory.ToInvalidationPlan().HasUnsupportedMutation, Is.True);
-            Assert.That(inventory.MutatesBetween(
-                assignments[0].SpanStart,
-                assignments[1].SpanStart,
-                first), Is.False, "window endpoints must remain exclusive");
-            Assert.That(inventory.MutatesBetween(
-                assignments[0].SpanStart - 1,
-                assignments[1].SpanStart,
-                first), Is.True);
+            Assert.That(inventory.MutatesBetween( assignments[0].SpanStart, assignments[1].SpanStart, first), Is.False, "window endpoints must remain exclusive");
+            Assert.That(inventory.MutatesBetween( assignments[0].SpanStart - 1, assignments[1].SpanStart, first), Is.True);
         });
     }
 

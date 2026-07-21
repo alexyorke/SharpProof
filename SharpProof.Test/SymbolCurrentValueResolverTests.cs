@@ -35,12 +35,7 @@ public sealed class SymbolCurrentValueResolverTests {
             .Single(identifier => identifier.Identifier.ValueText == "index" &&
                 identifier.Ancestors().OfType<ParenthesizedLambdaExpressionSyntax>().Any());
 
-        Assert.That(SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
-            use,
-            use,
-            semanticModel,
-            CancellationToken.None,
-            out _), Is.False);
+        Assert.That(SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression( use, use, semanticModel, CancellationToken.None, out _), Is.False);
     }
 
     [Test]

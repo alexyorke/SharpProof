@@ -37,11 +37,6 @@ public sealed class ControlFlowExitFactsTests {
             .Single()
             .Block;
 
-        Assert.That(
-            SymbolicControlFlowFacts.StatementDefinitelyExits(
-                finallyBlock,
-                fixture.SemanticModel,
-                CancellationToken.None),
-            Is.True);
+        Assert.That( SymbolicControlFlowFacts.StatementDefinitelyExits( finallyBlock, fixture.SemanticModel, CancellationToken.None), Is.True);
     }
 }

@@ -42,9 +42,7 @@ public sealed class SymbolicAnalysisLimitsTests {
 
     [Test]
     public void AnalysisLimits_RejectNonPositiveValues() {
-        Assert.That(
-            () => new SharpProofAnalysisBudget(MaxMergedIfElseFacts: 0).Validate(),
-            Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That( () => new SharpProofAnalysisBudget(MaxMergedIfElseFacts: 0).Validate(), Throws.TypeOf<ArgumentOutOfRangeException>());
         Assert.That(
             () => (SharpProofAnalysisBudget.Default with { MaxStructuralNullStateDepth = -1 }).Validate(),
             Throws.TypeOf<ArgumentOutOfRangeException>());
@@ -91,9 +89,7 @@ public sealed class SymbolicAnalysisLimitsTests {
 
         Assert.That(info.IsTruncated, Is.True);
         Assert.That(info.Events, Has.Count.EqualTo(2));
-        Assert.That(
-            info.Events.Single(item => item.Kind == SymbolicAnalysisLimitKind.IfElseFactMerge).Observed,
-            Is.EqualTo(5));
+        Assert.That( info.Events.Single(item => item.Kind == SymbolicAnalysisLimitKind.IfElseFactMerge).Observed, Is.EqualTo(5));
         Assert.That(info.Events.All(item => item.SourceSpanStart == sourceNode.SpanStart), Is.True);
         Assert.That(
             info.Events.Select(item => item.Code),
@@ -158,8 +154,7 @@ public sealed class SymbolicAnalysisLimitsTests {
 
         Assert.That(combined.Events.Select(static item => item.Provenance),
             Is.EqualTo(new[] { "if.a", "switch.a", "switch.z" }));
-        Assert.That(combined.Events.Single(static item => item.Provenance == "switch.z").Observed,
-            Is.EqualTo(7));
+        Assert.That(combined.Events.Single(static item => item.Provenance == "switch.z").Observed, Is.EqualTo(7));
     }
 
     [Test]

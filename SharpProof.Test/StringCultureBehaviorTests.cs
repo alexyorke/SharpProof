@@ -20,13 +20,9 @@ public sealed class StringCultureBehaviorTests {
 
     [Test]
     public void StartsWith_String_DefaultOverload_MatchesExplicitCurrentCulture() {
-        Assert.That(WithCurrentCulture("en-US",
-            () => "encyclop\u00E6dia".StartsWith("encyclopae") ==
-                  "encyclop\u00E6dia".StartsWith("encyclopae", StringComparison.CurrentCulture)), Is.True);
+        Assert.That(WithCurrentCulture("en-US", () => "encyclop\u00E6dia".StartsWith("encyclopae") == "encyclop\u00E6dia".StartsWith("encyclopae", StringComparison.CurrentCulture)), Is.True);
 
-        Assert.That(WithCurrentCulture("da-DK",
-            () => "encyclop\u00E6dia".StartsWith("encyclopae") ==
-                  "encyclop\u00E6dia".StartsWith("encyclopae", StringComparison.CurrentCulture)), Is.True);
+        Assert.That(WithCurrentCulture("da-DK", () => "encyclop\u00E6dia".StartsWith("encyclopae") == "encyclop\u00E6dia".StartsWith("encyclopae", StringComparison.CurrentCulture)), Is.True);
     }
 
     [Test]
@@ -42,13 +38,9 @@ public sealed class StringCultureBehaviorTests {
 
     [Test]
     public void Contains_String_DefaultOverload_MatchesExplicitOrdinalAcrossCultures() {
-        Assert.That(WithCurrentCulture("en-US",
-            () => "encyclop\u00E6dia".Contains("ae") ==
-                  "encyclop\u00E6dia".Contains("ae", StringComparison.Ordinal)), Is.True);
+        Assert.That(WithCurrentCulture("en-US", () => "encyclop\u00E6dia".Contains("ae") == "encyclop\u00E6dia".Contains("ae", StringComparison.Ordinal)), Is.True);
 
-        Assert.That(WithCurrentCulture("da-DK",
-            () => "encyclop\u00E6dia".Contains("ae") ==
-                  "encyclop\u00E6dia".Contains("ae", StringComparison.Ordinal)), Is.True);
+        Assert.That(WithCurrentCulture("da-DK", () => "encyclop\u00E6dia".Contains("ae") == "encyclop\u00E6dia".Contains("ae", StringComparison.Ordinal)), Is.True);
     }
 
     private static T WithCurrentCulture<T>(string cultureName, Func<T> action) {

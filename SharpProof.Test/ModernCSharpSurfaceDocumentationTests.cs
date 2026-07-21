@@ -64,10 +64,7 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
             }
 
             foreach (var cell in row.Value.Skip(2))
-                Assert.That(
-                    SurfaceStatusPrefixes.Any(prefix => cell.StartsWith(prefix, StringComparison.Ordinal)),
-                    Is.True,
-                    row.Key + " has an unrecognized surface status: " + cell);
+                Assert.That( SurfaceStatusPrefixes.Any(prefix => cell.StartsWith(prefix, StringComparison.Ordinal)), Is.True, row.Key + " has an unrecognized surface status: " + cell);
         }
     }
 

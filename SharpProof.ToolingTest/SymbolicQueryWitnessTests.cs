@@ -78,10 +78,7 @@ public sealed class SymbolicQueryWitnessTests {
             "value > 5");
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
         Assert.That(proof.CounterexampleWitness.IsAvailable, Is.True);
-        Assert.That(
-            proof.CounterexampleWitness.Assignments.Single(assignment => assignment.SourceName == "value")
-                .IntegerValue,
-            Is.LessThanOrEqualTo(5));
+        Assert.That( proof.CounterexampleWitness.Assignments.Single(assignment => assignment.SourceName == "value") .IntegerValue, Is.LessThanOrEqualTo(5));
 
         var sourcePath = Path.Combine(Path.GetTempPath(), "SharpProof.ProofQuery." + Guid.NewGuid() + ".cs");
         try {
@@ -132,8 +129,7 @@ public sealed class SymbolicQueryWitnessTests {
             Assert.That(hazard.TriggerWitness.IsAvailable, Is.True);
             Assert.That(divisorAssignment.IntegerValue, Is.EqualTo(0));
             Assert.That(divisorDomain.IntegerRange?.ExactValue, Is.EqualTo(0));
-            Assert.That(divisorDomain.Predicates.Count(
-                predicate => predicate.Kind == SymbolicDomainPredicateKind.Range), Is.EqualTo(1));
+            Assert.That(divisorDomain.Predicates.Count( predicate => predicate.Kind == SymbolicDomainPredicateKind.Range), Is.EqualTo(1));
             Assert.That(result.TriggerWitnesses, Does.Contain(hazard.TriggerWitness));
             Assert.That(result.InputDomainSummary.Domains, Has.Some.Property("Name").EqualTo("divisor"));
         });

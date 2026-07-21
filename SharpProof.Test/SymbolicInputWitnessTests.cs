@@ -144,10 +144,8 @@ public sealed class SymbolicInputWitnessTests {
         Assert.That(result.Status, Is.EqualTo(SymbolicWitnessStatus.Unsupported));
         Assert.That(result.DomainSummary.HasApproximation, Is.True);
         Assert.That(result.DomainSummary.HasUnsupportedDomains, Is.True);
-        Assert.That(result.DomainSummary.Domains.SelectMany(domain => domain.Predicates)
-            .Any(predicate => predicate.Kind == SymbolicDomainPredicateKind.Alternative), Is.True);
-        Assert.That(result.DomainSummary.Domains.SelectMany(domain => domain.Predicates)
-            .Any(predicate => predicate.Kind == SymbolicDomainPredicateKind.Unsupported), Is.True);
+        Assert.That(result.DomainSummary.Domains.SelectMany(domain => domain.Predicates) .Any(predicate => predicate.Kind == SymbolicDomainPredicateKind.Alternative), Is.True);
+        Assert.That(result.DomainSummary.Domains.SelectMany(domain => domain.Predicates) .Any(predicate => predicate.Kind == SymbolicDomainPredicateKind.Unsupported), Is.True);
     }
 
     private static string GetSymbolicName(SemanticModel semanticModel, ParameterSyntax parameter) {
