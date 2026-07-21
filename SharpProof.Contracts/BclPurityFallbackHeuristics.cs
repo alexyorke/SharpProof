@@ -194,17 +194,22 @@ internal static class BclPurityFallbackHeuristics {
                name.Equals("Dispose", StringComparison.Ordinal);
     }
 
-    private static bool IsKnownPrimitiveOrValueAlias(string typeName) =>
-        GetKnownPrimitiveOrValueAliases().Contains(typeName);
-
-    private static ImmutableHashSet<string> GetKnownPrimitiveOrValueAliases() =>
-        KnownPrimitiveOrValueAliases.Value;
+    private static bool IsKnownPrimitiveOrValueAlias(string typeName) => typeName is
+        "System.Boolean" or "System.Byte" or "System.Char" or "System.Decimal" or
+        "System.Double" or "System.Int16" or "System.Int32" or "System.Int64" or
+        "System.IntPtr" or "System.SByte" or "System.Single" or "System.UInt16" or
+        "System.UInt32" or "System.UInt64" or "System.UIntPtr" or "System.Void";
 
     private static bool IsLikelyFrameworkValueTypeName(string typeName) {
         return typeName.StartsWith("System.Nullable<", StringComparison.Ordinal) ||
                typeName.Equals("System.DateTime", StringComparison.Ordinal) ||
+               typeName.Equals("System.DateOnly", StringComparison.Ordinal) ||
                typeName.Equals("System.DateTimeOffset", StringComparison.Ordinal) ||
+               typeName.Equals("System.Half", StringComparison.Ordinal) ||
+               typeName.Equals("System.Int128", StringComparison.Ordinal) ||
                typeName.Equals("System.TimeSpan", StringComparison.Ordinal) ||
+               typeName.Equals("System.TimeOnly", StringComparison.Ordinal) ||
+               typeName.Equals("System.UInt128", StringComparison.Ordinal) ||
                typeName.Equals("System.Guid", StringComparison.Ordinal) ||
                typeName.Equals("System.Decimal", StringComparison.Ordinal) ||
                typeName.Equals("System.Range", StringComparison.Ordinal) ||
@@ -253,40 +258,4 @@ internal static class BclPurityFallbackHeuristics {
         string Reason,
         string Category);
 
-    private static class KnownPrimitiveOrValueAliases {
-        public static readonly ImmutableHashSet<string> Value = ImmutableHashSet.Create(
-            StringComparer.Ordinal,
-            "bool",
-            "byte",
-            "char",
-            "decimal",
-            "double",
-            "float",
-            "int",
-            "long",
-            "nint",
-            "nuint",
-            "sbyte",
-            "short",
-            "uint",
-            "ulong",
-            "ushort",
-            "void",
-            "System.Boolean",
-            "System.Byte",
-            "System.Char",
-            "System.Decimal",
-            "System.Double",
-            "System.Int16",
-            "System.Int32",
-            "System.Int64",
-            "System.IntPtr",
-            "System.SByte",
-            "System.Single",
-            "System.UInt16",
-            "System.UInt32",
-            "System.UInt64",
-            "System.UIntPtr",
-            "System.Void");
-    }
 }

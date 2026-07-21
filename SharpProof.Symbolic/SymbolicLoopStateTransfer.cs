@@ -522,10 +522,20 @@ internal static class SymbolicLoopStateTransfer {
 
     internal static SymbolicState CollectForInitializerState(
         ForStatementSyntax forStatement,
+        SymbolicState state,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
-        var state = new SymbolicState();
+        foreach (var initializerExpression in forStatement.Initializers)
+            SymbolicStateInvalidator.InvalidateNestedMutations(
+                ref state,
+                initializerExpression,
+                semanticModel,
+                cancellationToken);
         foreach (var initializer in EnumerateForLoopInitializers(forStatement, semanticModel, cancellationToken)) {
+            SymbolicStateInvalidator.InvalidateSymbol(
+                ref state,
+                initializer.Symbol,
+                initializer.Value);
             SymbolicStateInvalidator.InvalidateNestedMutations(
                 ref state,
                 initializer.Value,

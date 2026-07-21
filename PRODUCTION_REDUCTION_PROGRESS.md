@@ -896,9 +896,9 @@ Tests are excluded from the metric and must not be deleted.
 - The test-preservation check finds all 4,469 baseline attributed test methods,
   unchanged parameterized-case counts, and no new disable markers.
 - Release solution build: zero warnings and errors.
-- Latest six-lane run: 6,200 passing and zero reported skipped, run sequentially
+- Latest six-lane run: 6,203 passing and zero reported skipped, run sequentially
   with one NUnit worker: Oracle 573, Analyzer 487, Flow 257, Core 258,
-  MainGeneral 4,010, and Tooling 615. The warning-as-error Release solution
+  MainGeneral 4,013, and Tooling 615. The warning-as-error Release solution
   build also completes with zero warnings and errors.
 
 ## Milestones
@@ -977,15 +977,16 @@ Its typed payload projection is not a retained service-specific compatibility
 API: it prevents Roslyn symbols, engine states, and SMT formulas from escaping.
 Do not remove that projection merely because breaking API changes are allowed.
 
-The syntax-based `SymbolicProgramPointFacts` fallback remains a live migration
-target rather than deletable legacy code. Normal prior expression completion
- and expression-statement and declaration-initializer flow captures are now
- canonical, including non-linear `for` initializer entry; remaining families
- include successor/control-flow propagation, current completion, and captures
- that own control-flow outside those statement forms. Move those cases into
-`SymbolicCfgProgramPointStateCollector` in bounded tranches before deleting the
-structural owner; do not convert failures into successful proofs or discard
-truncation metadata.
+The proposed wholesale deletion of `SymbolicProgramPointFacts` is not yet
+sound. A CFG-only characterization left 51 Oracle regressions across expression
+context, conditional access/coalesce reachability, array-element writes, and
+monotonic loop invariants. The structural fallback therefore remains a live
+semantic owner until those families migrate individually. The characterization
+did expose and fix two independent soundness bugs: unknown/out `for`
+initializers no longer preserve stale values, and captured-value replay no
+longer crosses lambda or local-function execution roots. Metadata fallback
+also recognizes modern framework value types without accepting source aliases
+that cannot occur in metadata identities.
 
 Analyzer configuration's declarative option catalog owns documentation,
 validation metadata, defaults, aliases, scopes, and policy impact, while the

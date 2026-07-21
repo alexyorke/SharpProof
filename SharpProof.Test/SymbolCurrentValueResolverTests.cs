@@ -10,6 +10,42 @@ namespace SharpProof.Test;
 public sealed class SymbolCurrentValueResolverTests
 {
     [Test]
+    public void CapturedValue_DoesNotReplayAssignmentsOutsideLambdaExecutionRoot()
+    {
+        const string source = """
+                              using System;
+                              static class C
+                              {
+                                  static void M()
+                                  {
+                                      int index = 5;
+                                      Action action = () => Console.WriteLine(index);
+                                      index = 1;
+                                      action();
+                                  }
+                              }
+                              """;
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+        var compilation = CSharpCompilation.Create(
+            "CapturedValueExecutionRoot",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var use = syntaxTree.GetRoot().DescendantNodes()
+            .OfType<IdentifierNameSyntax>()
+            .Single(identifier => identifier.Identifier.ValueText == "index" &&
+                identifier.Ancestors().OfType<ParenthesizedLambdaExpressionSyntax>().Any());
+
+        Assert.That(SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
+            use,
+            use,
+            semanticModel,
+            CancellationToken.None,
+            out _), Is.False);
+    }
+
+    [Test]
     public void ExactRuntimeType_LaterLoopMutationInvalidatesPriorIterationValue()
     {
         const string source = """

@@ -86,6 +86,10 @@ public partial class ConstantsTests
 
         Assert.That(BclPurityFallbackHeuristics.IsValueLikeTypeName(
             "System.Runtime.InteropServices.SafeHandle"), Is.False);
+        Assert.That(BclPurityFallbackHeuristics.IsValueLikeTypeName("int"), Is.False);
+        Assert.That(BclPurityFallbackHeuristics.IsValueLikeTypeName("System.Half"), Is.True);
+        Assert.That(BclPurityFallbackHeuristics.IsValueLikeTypeName("System.DateOnly"), Is.True);
+        Assert.That(BclPurityFallbackHeuristics.IsValueLikeTypeName("System.UInt128"), Is.True);
     }
 
     [Test]

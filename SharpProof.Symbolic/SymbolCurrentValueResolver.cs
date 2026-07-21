@@ -34,7 +34,9 @@ internal static class SymbolCurrentValueResolver {
             return false;
 
         ExpressionSyntax? currentValue = null;
-        foreach (var (block, containingStatement) in CSharpSyntaxFacts.EnumerateContainingBlocks(useNode).Reverse())
+        foreach (var (block, containingStatement) in CSharpSyntaxFacts
+                     .EnumerateContainingBlocks(useNode, stopAtExecutionRoot: true)
+                     .Reverse())
             foreach (var statement in block.Statements) {
                 if (ReferenceEquals(statement, containingStatement)) break;
                 var mutations = SymbolicMutationInventory.Create(statement, semanticModel, cancellationToken);

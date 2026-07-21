@@ -2014,6 +2014,28 @@ static class C
         }
     }
 
+    [TestCase("static class C { static int Get() => 1; static void M() { int index = 0; for (index = 1, index = Get(); index < 3; index++) { } } }")]
+    [TestCase("static class C { static void Set(out int value) => value = 0; static void M() { int index = 0; for (Set(out index); index < 3; index++) { } } }")]
+    public void UnsupportedForInitialEntry_InvalidatesUnknownInitializerWrites(string source)
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            source,
+            nameof(UnsupportedForInitialEntry_InvalidatesUnknownInitializerWrites));
+        var forStatement = fixture.Root.DescendantNodes().OfType<ForStatementSyntax>().Single();
+        var index = fixture.Root.DescendantNodes()
+            .OfType<VariableDeclaratorSyntax>()
+            .Select(variable => fixture.SemanticModel.GetDeclaredSymbol(variable))
+            .OfType<ILocalSymbol>()
+            .Single(symbol => symbol.Name == "index");
+
+        var state = SymbolicReachabilityService.CollectForInitialEntryState(
+            forStatement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(SymbolicStateValueFacts.TryGetCurrentValue(state, index, out _), Is.False);
+    }
+
     [Test]
     public void CustomPathLimitsForInitialEntry_UseCfg()
     {

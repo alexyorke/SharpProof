@@ -90,10 +90,11 @@ internal static class SymbolicProgramPointFacts {
         state = MergeStates(
             state,
             CollectPriorAssignmentState(forStatement, semanticModel, cancellationToken));
-        state = MergeStates(
+        return SymbolicLoopStateTransfer.CollectForInitializerState(
+            forStatement,
             state,
-            SymbolicLoopStateTransfer.CollectForInitializerState(forStatement, semanticModel, cancellationToken));
-        return state;
+            semanticModel,
+            cancellationToken);
     }
 
     internal static SymbolicState MergeStates(SymbolicState left, SymbolicState right) {
