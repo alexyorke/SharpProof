@@ -886,19 +886,27 @@ Tests are excluded from the metric and must not be deleted.
 - [x] Removed the one-use `PathConditionMergeLimits` carrier. The canonical
   immutable analysis budget now enters path merging directly, preserving all
   four configured thresholds while deleting another 11 production lines.
+- [x] Unified EffectSummary's five fresh-owned write predicates behind one
+  classification rule. Return-value initialization and byref-like view
+  construction now produce the same `internal_only` visibility as the purity
+  classifier, fixing a previously contradictory serialized classification.
+- [x] Removed EffectSummary's unused inferred-summary projection. The retained
+  shared contract now fails closed for unknown effect tags, and its existing
+  test identities remain intact with an added conservative-unknown regression.
 
 ## Current evidence
 
-- Phase-two maintained production: 81,072 lines (77,110 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,362-line reduction from the
-  84,434-line phase-two baseline. Another 16,638 lines remain to the 64,434
+- Phase-two maintained production: 81,044 lines (77,082 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,390-line reduction from the
+  84,434-line phase-two baseline. Another 16,610 lines remain to the 64,434
   completion ceiling.
-- The test-preservation check finds all 4,469 baseline attributed test methods,
-  unchanged parameterized-case counts, and no new disable markers.
+- The test-preservation check finds all 4,469 baseline attributed test methods
+  among 4,474 current methods, unchanged parameterized-case counts, and no new
+  disable markers.
 - Release solution build: zero warnings and errors.
-- Latest six-lane run: 6,203 passing and zero reported skipped, run sequentially
+- Latest six-lane run: 6,204 passing and zero reported skipped, run sequentially
   with one NUnit worker: Oracle 573, Analyzer 487, Flow 257, Core 258,
-  MainGeneral 4,013, and Tooling 615. The warning-as-error Release solution
+  MainGeneral 4,014, and Tooling 615. The warning-as-error Release solution
   build also completes with zero warnings and errors.
 
 ## Milestones

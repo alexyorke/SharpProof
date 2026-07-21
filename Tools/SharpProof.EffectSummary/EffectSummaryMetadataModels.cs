@@ -154,16 +154,6 @@ internal sealed record MethodEffectSummary(
 
     [JsonIgnore] public bool IsStatic { get; init; }
 
-    [JsonIgnore]
-    public InferredMethodSummary InferredSummary => InferredMethodSummary.FromEffectSummary(
-        Identity,
-        PurityClassification?.Classification,
-        Effects,
-        PurityClassification?.FreshnessClassification,
-        PurityClassification?.EffectVisibilityClassification,
-        ThrownExceptionTypes.Concat(TransitiveThrownExceptionTypes),
-        PurityClassification?.FirstBlockingCallChain,
-        PurityClassification?.Categories);
 }
 
 internal sealed record NullableContractSummary(

@@ -183,11 +183,7 @@ internal static class PurityClassificationEngine {
                 continue;
 
             if (string.Equals(root, "caller_visible_memory_write", StringComparison.Ordinal) &&
-                (HasFreshOwnedArrayWritePattern(summary) ||
-                 HasFreshOwnedStringWritePattern(summary) ||
-                 HasReturnValueInitializationPattern(summary) ||
-                 HasLocalScratchMemoryWritePattern(summary) ||
-                 HasByRefLikeViewConstructionPattern(summary)))
+                HasAnyFreshOwnedWritePattern(summary))
                 continue;
 
             if (treatsConstructorReceiverWritesAsFreshOwned &&
@@ -215,11 +211,7 @@ internal static class PurityClassificationEngine {
 
             if (string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal) &&
                 (summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal) ||
-                 HasFreshOwnedArrayWritePattern(summary) ||
-                 HasFreshOwnedStringWritePattern(summary) ||
-                 HasReturnValueInitializationPattern(summary) ||
-                 HasLocalScratchMemoryWritePattern(summary) ||
-                 HasByRefLikeViewConstructionPattern(summary)))
+                 HasAnyFreshOwnedWritePattern(summary)))
                 continue;
 
             if (treatsConstructorReceiverWritesAsFreshOwned &&

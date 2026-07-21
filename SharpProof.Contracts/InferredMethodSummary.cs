@@ -154,22 +154,26 @@ internal sealed class InferredMethodSummary {
 
         var effectValues = effects.ToImmutableArray();
         var categoryValues = categories?.ToImmutableArray() ?? ImmutableArray<string>.Empty;
+        var inferredEffects = GetEffects(effectValues);
         var purity = classification switch {
             "pure" => InferredPurity.Pure,
             "impure" => InferredPurity.Impure,
             _ => InferredPurity.Unknown
         };
+        if (inferredEffects.HasFlag(InferredMethodEffects.Unknown)) purity = InferredPurity.Unknown;
         return new InferredMethodSummary(
             identity,
             InferredSummarySource.EffectSummary,
             purity,
-            GetEffects(effectValues),
+            inferredEffects,
             GetFreshness(freshness),
             GetEffectVisibility(effectVisibility),
             thrownExceptionTypes,
             blockingCallChain,
             purity == InferredPurity.Unknown
-                ? GetUnknownReason(effectValues, categoryValues)
+                ? inferredEffects.HasFlag(InferredMethodEffects.Unknown)
+                    ? InferredSummaryUnknownReason.UnsupportedOperation
+                    : GetUnknownReason(effectValues, categoryValues)
                 : InferredSummaryUnknownReason.None);
     }
 
@@ -195,7 +199,7 @@ internal sealed class InferredMethodSummary {
                 "no_il_body" or "abstract" => InferredMethodEffects.MissingBody,
                 _ when effect.StartsWith("unknown_opcode_at_", StringComparison.Ordinal) =>
                     InferredMethodEffects.Unknown,
-                _ => InferredMethodEffects.None
+                _ => InferredMethodEffects.Unknown
             };
 
         return result;

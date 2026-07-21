@@ -3450,7 +3450,7 @@ public partial class EffectSummaryToolTests
             Is.EqualTo(0));
 
         AssertPurityClassification(summary, "System.Threading.CancellationToken.get_None()", "pure");
-        AssertEffectVisibilityClassification(summary, "System.Threading.CancellationToken.get_None()", "none");
+        AssertEffectVisibilityClassification(summary, "System.Threading.CancellationToken.get_None()", "internal_only");
 
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")

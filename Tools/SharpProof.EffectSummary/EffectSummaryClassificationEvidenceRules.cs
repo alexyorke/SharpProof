@@ -88,6 +88,13 @@ internal static class EffectSummaryClassificationEvidenceRules {
             call.StartsWith("System.Text.ValueStringBuilder.", StringComparison.Ordinal));
     }
 
+    internal static bool HasAnyFreshOwnedWritePattern(MethodEffectSummary? summary) =>
+        HasFreshOwnedArrayWritePattern(summary) ||
+        HasFreshOwnedStringWritePattern(summary) ||
+        HasReturnValueInitializationPattern(summary) ||
+        HasLocalScratchMemoryWritePattern(summary) ||
+        HasByRefLikeViewConstructionPattern(summary);
+
     private static bool HasFreshResultDisqualifyingEffect(
         MethodEffectSummary summary,
         params string[] additionalEffects) =>
@@ -515,9 +522,7 @@ internal static class EffectSummaryClassificationEvidenceRules {
         if (summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("fresh_owned_array_write", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("fresh_owned_object_write", StringComparer.Ordinal) ||
-            HasFreshOwnedArrayWritePattern(summary) ||
-            HasFreshOwnedStringWritePattern(summary) ||
-            HasLocalScratchMemoryWritePattern(summary) ||
+            HasAnyFreshOwnedWritePattern(summary) ||
             summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal))
             return "internal_only";

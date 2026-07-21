@@ -139,6 +139,20 @@ public sealed class InferredMethodSummaryTests
         });
     }
 
+    [Test]
+    public void EffectSummaryProjection_UnknownEffectFailsClosed()
+    {
+        var summary = InferredMethodSummary.FromEffectSummary(
+            CreateIdentity(), "pure", ["future_effect"], "none", "none", [], [], []);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(summary.Purity, Is.EqualTo(InferredPurity.Unknown));
+            Assert.That(summary.UnknownReason, Is.EqualTo(InferredSummaryUnknownReason.UnsupportedOperation));
+            Assert.That(summary.Effects, Is.EqualTo(InferredMethodEffects.Unknown));
+        });
+    }
+
     private static StructuralMethodIdentity CreateIdentity()
     {
         return new StructuralMethodIdentity(
