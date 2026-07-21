@@ -11,9 +11,6 @@
     <ProjectReference Include="$(MSBuildThisFileDirectory)SharpProof.ProofCore\SharpProof.ProofCore.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
-    <ProjectReference Include="$(MSBuildThisFileDirectory)SharpProof.Contracts\SharpProof.Contracts.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll" />
   </ItemGroup>
 

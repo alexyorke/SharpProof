@@ -5,7 +5,10 @@ public sealed record FuzzExpectation(
     ImmutableArray<SharpProofEffect> RequiredEffects,
     ImmutableArray<SharpProofEffect> ForbiddenEffects,
     ImmutableArray<string> RequiredUnknownCategories,
-    ImmutableArray<string> RequiredDiagnosticIds) {
+    ImmutableArray<string> RequiredDiagnosticIds,
+    string? ProofCondition,
+    string? ProofStatus,
+    bool RequireCounterexample) {
     public const string ConservativeBucket = "conservative";
     public const string DisprovenBucket = "disproven";
     public const string ProvenBucket = "proven";
@@ -27,7 +30,10 @@ public sealed record FuzzExpectation(
         ImmutableArray<SharpProofEffect>.Empty,
         ImmutableArray<SharpProofEffect>.Empty,
         ImmutableArray<string>.Empty,
-        ImmutableArray<string>.Empty);
+        ImmutableArray<string>.Empty,
+        null,
+        null,
+        false);
 }
 
 public sealed record ShapeRegistryEntry(

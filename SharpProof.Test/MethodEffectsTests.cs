@@ -47,6 +47,50 @@ public sealed class MethodEffectsTests {
         Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
     }
 
+    [TestCase("static int M(int[] values) => values.Length;", SharpProofVerdict.Proven)]
+    [TestCase("static int[] M(int x) => [1, x, 3];", SharpProofVerdict.Disproven)]
+    public void ArrayIntrinsicsHaveStructuralEffects(
+        string method,
+        SharpProofVerdict expectedAllocationFree) {
+        var result = Analyze("class C {\n" + method + "\n}");
+
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.AllocationFree, Is.EqualTo(expectedAllocationFree));
+            Assert.That(result.UnknownReasons, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void RangeTargetsAggregateOnlySelectedMethods() {
+        const string source = """
+            class C {
+                static int[] Allocate(int x) => [x];
+                static int state;
+                static void Mutate() => state++;
+            }
+            """;
+        using var session = SharpProofAnalysisSession.FromText(source);
+        var all = session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.AllLines),
+            SharpProofAnalysisFacet.Effects));
+        var methodStart = source.IndexOf("static int[]", StringComparison.Ordinal);
+        var methodEnd = source.IndexOf(';', methodStart) + 1;
+        var span = session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(
+                SharpProofTargetKind.Span,
+                SpanStart: methodStart,
+                SpanEnd: methodEnd),
+            SharpProofAnalysisFacet.Effects));
+
+        Assert.Multiple(() => {
+            Assert.That(all.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(all.MethodEffects.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(span.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(span.MethodEffects.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
+        });
+    }
+
     [Test]
     public void UnresolvedDispatchRemainsUnknown() {
         using var session = SharpProofAnalysisSession.FromText("""

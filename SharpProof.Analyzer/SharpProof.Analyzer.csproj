@@ -22,7 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="RoslynStructuralMethodIdentity.cs" />
     <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
     <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
     <EmbeddedResource Include="AnalyzerDiagnosticCatalog.json" LogicalName="SharpProof.Analyzer.DiagnosticCatalog.json" />
@@ -32,7 +31,6 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Symbolic\SharpProof.Symbolic.csproj" />
     <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" />
-    <ProjectReference Include="..\SharpProof.Contracts\SharpProof.Contracts.csproj" />
     <None Include="$(MicrosoftZ3ManagedDllPath)" CopyToOutputDirectory="PreserveNewest" Link="Microsoft.Z3.dll" />
   </ItemGroup>
 

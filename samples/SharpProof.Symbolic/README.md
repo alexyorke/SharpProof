@@ -16,5 +16,5 @@ foreach ($project in $manifest.projects) {
 .\scripts\Invoke-SharpProofDotnet.ps1 run --project .\samples\SharpProof.Symbolic\SharpProof.Symbolic.Sample.csproj --no-restore
 ```
 
-The query analyzes the supplied C# text without executing it and prints the
-number of matching program points and their merged invariant.
+The query analyzes the supplied C# text without executing it and prints compact
+Z3-backed proof facts for the selected source point.

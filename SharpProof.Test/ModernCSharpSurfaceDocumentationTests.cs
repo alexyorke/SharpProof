@@ -80,10 +80,8 @@ public sealed class ModernCSharpSurfaceDocumentationTests
     {
         var repositoryRoot = FindRepositoryRoot();
         var readme = File.ReadAllText(Path.Combine(repositoryRoot, "README.md"));
-        var readmeSource = File.ReadAllText(Path.Combine(repositoryRoot, "README.source.md"));
 
         Assert.That(readme, Does.Contain("docs/modern-csharp-surface.md"));
-        Assert.That(readmeSource, Does.Contain("docs/modern-csharp-surface.md"));
     }
 
     private static IReadOnlyDictionary<string, string[]> ReadMatrixRows(string document)

@@ -19,4 +19,5 @@ var result = session.Analyze(new SharpProofAnalysisRequest(
     SharpProofAnalysisFacet.ProofFacts));
 
 Console.WriteLine($"Status: {result.Status}");
-Console.WriteLine($"Facts: {string.Join("; ", result.ProofFacts)}");
+foreach (var fact in result.ProofFacts)
+    Console.WriteLine($"{fact.Condition}: {fact.Status} ({fact.Reason})");

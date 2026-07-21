@@ -19,6 +19,9 @@ public sealed class EffectArchitectureTests {
         var removedFiles = new[] {
             "SharpProof.Contracts/BclPurityFallbackHeuristics.cs",
             "SharpProof.Contracts/InferredMethodSummary.cs",
+            "SharpProof.Contracts/SharpProof.Contracts.csproj",
+            "README.source.md",
+            "docs/symbolic-query-api-migration.md",
             "SharpProof.Analyzer/Engine/Rules/CompilationSyntaxAccess.cs",
             "SharpProof.Analyzer/Engine/Rules/InvocationEvidence.cs",
             "SharpProof.Analyzer/LowerHexEncoding.cs",
@@ -48,7 +51,7 @@ public sealed class EffectArchitectureTests {
                 Is.False, $"Removed compatibility file returned: {relativePath}");
 
         var roots = new[] {
-            "SharpProof.Analyzer", "SharpProof.Attributes", "SharpProof.Contracts",
+            "SharpProof.Analyzer", "SharpProof.Attributes",
             "SharpProof.Package", "SharpProof.Symbolic", "Tools", "config", "docs"
         };
         var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
@@ -140,6 +143,8 @@ public sealed class EffectArchitectureTests {
 
         var api = File.ReadAllText(Path.Combine(root, "SharpProof.Symbolic", "SharpProofAnalysisApi.cs"));
         Assert.That(api, Does.Contain("new SmtAnalysisService"));
+        Assert.That(api, Does.Contain("CompileSource"));
+        Assert.That(api, Does.Contain("SymbolicSourceInput.FromSyntaxTree"));
         Assert.That(api, Does.Not.Contain("EnableSmt"));
         Assert.That(api, Does.Not.Contain("SharpProofEvidence"));
         Assert.That(api, Does.Not.Contain("SharpProofBudgetMetadata"));

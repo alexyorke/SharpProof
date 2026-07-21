@@ -11,5 +11,5 @@ cancellation, and exhausted analysis budgets. Effect sites retain the operation,
 origin, transitive source, and proof status that produced the reason.
 
 Consumers should branch on the result status and verdict enum. Messages are for
-humans and may improve without changing semantics. Budget truncations are also
-available through `SharpProofAnalysisResult.Budget`.
+humans and may improve without changing semantics. Budget truncations are
+available through `SharpProofAnalysisResult.Truncations`.

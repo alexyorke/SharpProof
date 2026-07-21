@@ -55,6 +55,27 @@ public sealed class UnifiedCliTests {
     }
 
     [Test]
+    public async Task Analyze_AllLines_AggregatesMethodEffects() {
+        var file = CreateSource("""
+            public static class C {
+                static int[] Allocate(int x) => [x];
+                static int state;
+                static void Mutate() => state++;
+            }
+            """);
+        try {
+            var result = await SymbolicCliTestHost.RunAsync(
+                "analyze", "--file", file, "--target", "all-lines", "--facets", "effects", "--format", "text");
+            Assert.Multiple(() => {
+                Assert.That(result.ExitCode, Is.EqualTo(0));
+                Assert.That(result.StandardOutput, Does.Contain("Purity: Disproven"));
+                Assert.That(result.StandardOutput, Does.Contain("Allocation-free: Disproven"));
+            });
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Test]
     public async Task Analyze_RejectsLegacyModes() {
         var result = await SymbolicCliTestHost.RunAsync("--capabilities", "file.cs");
         Assert.That(result.ExitCode, Is.EqualTo(2));

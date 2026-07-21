@@ -273,6 +273,9 @@ internal sealed class MethodEffectAnalysisSession(
             case IArrayCreationOperation array:
                 builder.Add(SharpProofEffect.Allocates, array, array.Type, "array_allocation");
                 break;
+            case { Kind: OperationKind.CollectionExpression, Type: IArrayTypeSymbol } collection:
+                builder.Add(SharpProofEffect.Allocates, collection, collection.Type, "array_collection_allocation");
+                break;
             case IAnonymousObjectCreationOperation anonymousObject:
                 builder.Add(SharpProofEffect.Allocates, anonymousObject, anonymousObject.Type,
                     "anonymous_object_allocation");
@@ -407,20 +410,7 @@ internal sealed class MethodEffectAnalysisSession(
 
         var syntax = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
         if (syntax == null) {
-            if (method is { MethodKind: MethodKind.Constructor, ContainingType.SpecialType: SpecialType.System_Object } ||
-                SymbolicTypeFacts.IsBuiltInIntegralType(method.ContainingType) ||
-                method.ContainingType?.SpecialType is SpecialType.System_String or
-                    SpecialType.System_Boolean or
-                    SpecialType.System_Single or
-                    SpecialType.System_Double or
-                    SpecialType.System_Decimal ||
-                method.ContainingType?.OriginalDefinition.ToDisplayString() is
-                    "System.Span<T>" or
-                    "System.ReadOnlySpan<T>" or
-                    "System.Nullable<T>" or
-                    "System.Index" or
-                    "System.Range")
-                return;
+            if (IsStructurallyEffectFreeIntrinsic(method)) return;
             var metadata = _metadata.Analyze(method);
             if (hasContract && metadata.Effects == SharpProofEffect.Unknown)
                 builder.AddTransitive(contracted, site, method, "complete_effect_contract");
@@ -435,6 +425,27 @@ internal sealed class MethodEffectAnalysisSession(
         builder.AddTransitive(Analyze(method, syntax, model), site, method, "source_call");
         if (hasContract) builder.AddTransitive(contracted, site, method, "effect_contract");
     }
+
+    private static bool IsStructurallyEffectFreeIntrinsic(IMethodSymbol method) =>
+        method is { MethodKind: MethodKind.Constructor, ContainingType.SpecialType: SpecialType.System_Object } ||
+        method is { MethodKind: MethodKind.PropertyGet, AssociatedSymbol: IPropertySymbol {
+            Name: "Length",
+            IsStatic: false,
+            Type.SpecialType: SpecialType.System_Int32,
+            ContainingType.SpecialType: SpecialType.System_Array
+        } } ||
+        SymbolicTypeFacts.IsBuiltInIntegralType(method.ContainingType) ||
+        method.ContainingType?.SpecialType is SpecialType.System_String or
+            SpecialType.System_Boolean or
+            SpecialType.System_Single or
+            SpecialType.System_Double or
+            SpecialType.System_Decimal ||
+        method.ContainingType?.OriginalDefinition.ToDisplayString() is
+            "System.Span<T>" or
+            "System.ReadOnlySpan<T>" or
+            "System.Nullable<T>" or
+            "System.Index" or
+            "System.Range";
 
     private static IMethodSymbol? ResolveExactDispatchTarget(
         IMethodSymbol method,

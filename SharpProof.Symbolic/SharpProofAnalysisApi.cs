@@ -1,3 +1,5 @@
+using SharpProof.Attributes;
+
 namespace SharpProof.Symbolic;
 
 public enum SharpProofQueryStatus {
@@ -171,9 +173,10 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         string? filePath = null,
         SharpProofAnalysisOptions? options = null) {
         options ??= new SharpProofAnalysisOptions();
+        var source = CompileSource(sourceText, filePath ?? SymbolicSourceInput.DefaultFilePath);
         var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
         return new SharpProofAnalysisSession(
-            SymbolicSourceInput.FromText(sourceText, filePath),
+            source,
             CreateQueryOptions(options, smt),
             smt);
     }
@@ -182,9 +185,11 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         string filePath,
         SharpProofAnalysisOptions? options = null) {
         options ??= new SharpProofAnalysisOptions();
+        var fullPath = Path.GetFullPath(filePath);
+        var source = CompileSource(File.ReadAllText(fullPath), fullPath);
         var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
         return new SharpProofAnalysisSession(
-            SymbolicSourceInput.FromFile(filePath),
+            source,
             CreateQueryOptions(options, smt),
             smt);
     }
@@ -273,12 +278,15 @@ public sealed class SharpProofAnalysisSession : IDisposable {
 
     private MethodEffects AnalyzeMethodEffects(
         SymbolicQueryContext context,
-        CancellationToken cancellationToken) =>
-        SymbolicMethodLikeQueryDispatcher.Execute(
+        CancellationToken cancellationToken) {
+        if (context.Target.Kind is SharpProofTargetKind.Span or SharpProofTargetKind.AllLines)
+            return AnalyzeMethodEffectRange(context, cancellationToken);
+
+        return SymbolicMethodLikeQueryDispatcher.Execute(
             context,
             SymbolicSourceCompilationKind.Query,
             "Method-effect source kind is not supported.",
-            "Method-effect analysis supports point, position, line, or node targets only.",
+            "Method-effect analysis supports point, position, line, span, or all-lines targets.",
             static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true),
             (resolved, compilation, token) => {
                 if (resolved.MethodSymbol == null)
@@ -289,6 +297,76 @@ public sealed class SharpProofAnalysisSession : IDisposable {
                     resolved.SemanticModel);
             },
             cancellationToken);
+    }
+
+    private MethodEffects AnalyzeMethodEffectRange(
+        SymbolicQueryContext context,
+        CancellationToken cancellationToken) =>
+        SymbolicSourceInputDispatcher.Execute(
+            context.Source,
+            context.Target,
+            context.Options,
+            SymbolicSourceCompilationKind.Query,
+            "Method-effect source kind is not supported.",
+            AnalyzeSyntaxTree,
+            (node, model, target, token) => AnalyzeSyntaxTree(
+                node.SyntaxTree,
+                model.Compilation,
+                target,
+                token),
+            cancellationToken);
+
+    private MethodEffects AnalyzeSyntaxTree(
+        SyntaxTree syntaxTree,
+        Compilation compilation,
+        SharpProofTarget target,
+        CancellationToken cancellationToken) {
+        var root = syntaxTree.GetRoot(cancellationToken);
+        var declarations = root.DescendantNodesAndSelf()
+            .Where(static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true));
+        if (target.Kind == SharpProofTargetKind.Span) {
+            var start = target.SpanStart ?? throw new ArgumentException("Span start is required.");
+            var end = target.SpanEnd ?? throw new ArgumentException("Span end is required.");
+            if (start < 0 || end < start || end > root.FullSpan.End)
+                throw new ArgumentOutOfRangeException(nameof(target), "The target span must be within the source.");
+            var span = TextSpan.FromBounds(start, end);
+            declarations = declarations.Where(declaration => span.IsEmpty
+                ? declaration.FullSpan.Contains(start)
+                : declaration.FullSpan.OverlapsWith(span));
+        }
+
+        var model = compilation.GetSemanticModel(syntaxTree);
+        var session = new MethodEffectAnalysisSession(compilation, cancellationToken, smtAnalysis: _ownedSmtAnalysis);
+        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var effects = ImmutableArray.CreateBuilder<MethodEffects>();
+        foreach (var declaration in declarations) {
+            cancellationToken.ThrowIfCancellationRequested();
+            var resolved = ResolvedMethodLikeTarget.Create(declaration, model, cancellationToken);
+            if (resolved.BodyNode == null || resolved.MethodSymbol == null ||
+                !seen.Add(resolved.MethodSymbol.OriginalDefinition))
+                continue;
+            effects.Add(session.Analyze(resolved.MethodSymbol, resolved.Declaration, model));
+        }
+
+        var combinedEffects = SharpProofEffect.None;
+        var capabilities = SharpProofCapability.None;
+        var exceptions = ImmutableArray.CreateBuilder<MethodExceptionFact>();
+        var sites = ImmutableArray.CreateBuilder<MethodEffectSite>();
+        var unknowns = ImmutableArray.CreateBuilder<SharpProofUnknownReason>();
+        foreach (var method in effects) {
+            combinedEffects |= method.Effects;
+            capabilities |= method.Capabilities;
+            exceptions.AddRange(method.ExceptionFacts);
+            sites.AddRange(method.Sites);
+            unknowns.AddRange(method.UnknownReasons);
+        }
+        return new MethodEffects(
+            combinedEffects,
+            capabilities,
+            exceptions.Distinct().ToImmutableArray(),
+            sites.Distinct().ToImmutableArray(),
+            unknowns.Distinct().ToImmutableArray());
+    }
 
     private void AnalyzeProofFacts(
         SharpProofAnalysisRequest request,
@@ -404,4 +482,14 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         new(
             smtAnalysis: smt,
             analysisLimits: options.AnalysisBudget);
+
+    private static SymbolicSourceInput CompileSource(string sourceText, string filePath) {
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+            sourceText,
+            filePath,
+            SymbolicSourceCompilationKind.Query,
+            references: null,
+            CancellationToken.None);
+        return SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation);
+    }
 }

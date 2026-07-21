@@ -18,6 +18,7 @@
     "SharpProof.Attributes": "0.1.0-preview.1",
     "Microsoft.CodeAnalysis.CSharp": "4.14.0",
     "Microsoft.Z3": "4.12.2",
-    "System.Collections.Immutable": "9.0.0"
+    "System.Collections.Immutable": "9.0.0",
+    "System.Reflection.Metadata": "9.0.0"
   }
 }

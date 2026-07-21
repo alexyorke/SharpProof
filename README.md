@@ -44,7 +44,7 @@ var result = session.Analyze(new SharpProofAnalysisRequest(
     SharpProofAnalysisFacet.All,
     Condition: "value >= 0"));
 
-Console.WriteLine(result.Purity);
+Console.WriteLine(result.MethodEffects?.Purity);
 Console.WriteLine(result.MethodEffects?.Effects);
 ```
 
@@ -55,7 +55,9 @@ SharpProofAnalysisSession.Analyze(SharpProofAnalysisRequest)
     -> SharpProofAnalysisResult
 ```
 
-The result contains method effects, derived three-state verdicts, proof facts, runtime hazards, complexity, unknown reasons, evidence, and budget/truncation metadata.
+The result contains method effects and their derived three-state verdicts, compact proof facts and counterexamples, runtime hazards, complexity, unified unknown reasons, truncations, and structured errors. Full Z3 models and synthesized input domains remain internal analysis evidence rather than default JSON payloads.
+
+Every session creates a bounded Z3 service. Path feasibility, conditions, contracts, nullable reasoning, exception escape, and runtime hazards use Z3 whenever their formulas are translatable. Unsupported translations, solver failures, timeouts, cancellation, incomplete CFG data, and exhausted budgets produce `Unknown`; there is no public switch that bypasses SMT.
 
 ## CLI
 
@@ -78,8 +80,8 @@ SharpProof does not generate or consume effect-summary JSON, scan whole assembli
 Use the repository wrapper so .NET processes remain inside the configured Windows Job Object:
 
 ```powershell
-.\scripts\Invoke-SharpProofDotnet.ps1 build SharpProof.Dev.slnf -c Release
-.\scripts\Invoke-SharpProofDotnet.ps1 test SharpProof.Dev.Tests.slnf -c Release
+.\scripts\Invoke-SharpProofDotnet.ps1 build SharpProof.sln --configuration Release
+.\scripts\Invoke-SharpProofDotnet.ps1 test SharpProof.sln --configuration Release --no-build
 ```
 
 The repository contains the analyzer, attributes, symbolic API, CLI, NuGet packaging, fuzzing, and net472 smoke project.

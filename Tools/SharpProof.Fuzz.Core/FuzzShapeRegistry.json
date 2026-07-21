@@ -9,14 +9,13 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
+    "ProofCondition": "x > 0",
+    "ProofStatus": "Unknown",
+    "RequireCounterexample": true,
     "AllowUnsafe": false,
     "Generator": "PureArithmetic",
     "SourceTemplate": null
@@ -33,14 +32,13 @@
       "AddExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
+    "ProofCondition": "left == left",
+    "ProofStatus": "ProvenTrue",
+    "RequireCounterexample": false,
     "AllowUnsafe": false,
     "Generator": "PureStringConcat",
     "SourceTemplate": null
@@ -57,13 +55,9 @@
       "ListPattern"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": "PureListPattern",
@@ -80,14 +74,12 @@
     "SyntaxKinds": [
       "CollectionExpression"
     ],
-    "PurityVerdict": "Unknown",
+    "PurityVerdict": "Proven",
     "RequiredEffects": [
-      null
+      "Allocates"
     ],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -105,13 +97,9 @@
       "InterpolatedStringExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": "PureInterpolatedString",
@@ -129,13 +117,9 @@
       "Utf8StringLiteralExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -153,13 +137,9 @@
       "ArrayCreationExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -180,13 +160,9 @@
       "SimpleAssignmentExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -206,13 +182,9 @@
       "ObjectCreationExpression"
     ],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -228,13 +200,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -250,13 +218,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -272,13 +236,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -300,13 +260,11 @@
       "Throws"
     ],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
-    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            throw new InvalidOperationException(\"fuzz\");\r\n        }\n}"
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        private sealed class FuzzException : Exception { }\n\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            throw new FuzzException();\r\n        }\n}"
   },
   {
     "Id": "ExceptionDirectThrowInvalidOperation",
@@ -324,13 +282,11 @@
       "Throws"
     ],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
-    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            throw new InvalidOperationException(\"fuzz\");\r\n        }\n}"
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        private sealed class FuzzException : Exception { }\n\n        [EnforcePure]\r\n        public int TestMethod()\r\n        {\r\n            throw new FuzzException();\r\n        }\n}"
   },
   {
     "Id": "ExceptionGuardedThrowArgumentNull",
@@ -348,13 +304,11 @@
       "Throws"
     ],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
-    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            if (text == null)\r\n            {\r\n                throw new ArgumentNullException(nameof(text));\r\n            }\r\n\r\n            return text.Length;\r\n        }\n}"
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        private sealed class FuzzException : Exception { }\n\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            if (text == null)\r\n            {\r\n                throw new FuzzException();\r\n            }\r\n\r\n            return text.Length;\r\n        }\n}"
   },
   {
     "Id": "ExceptionThrowExpressionFormatException",
@@ -372,13 +326,11 @@
       "Throws"
     ],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
-    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            return string.IsNullOrWhiteSpace(text)\r\n                ? throw new FormatException(\"fuzz\")\r\n                : text.Length;\r\n        }\n}"
+    "SourceTemplate": "using System;\nusing SharpProof.Attributes;\n\npublic class __CLASS__\n{\n        private sealed class FuzzException : Exception { }\n\n        [EnforcePure]\r\n        public int TestMethod(string text)\r\n        {\r\n            return string.IsNullOrWhiteSpace(text)\r\n                ? throw new FuzzException()\r\n                : text.Length;\r\n        }\n}"
   },
   {
     "Id": "ExceptionCaughtInternalThrow",
@@ -397,15 +349,11 @@
       "ThrowStatement"
     ],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [
       "Throws"
     ],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -425,15 +373,11 @@
       "ThrowStatement"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [
       "Throws"
     ],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -453,15 +397,11 @@
       "DivideExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [
       "Throws"
     ],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -480,15 +420,11 @@
       "IfStatement"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [
       "Throws"
     ],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -506,13 +442,9 @@
       "DivideExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -534,9 +466,7 @@
       "Throws"
     ],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -559,9 +489,7 @@
       "Throws"
     ],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -586,9 +514,7 @@
       "Throws"
     ],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -613,9 +539,7 @@
       "Throws"
     ],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -635,13 +559,9 @@
       "SimpleAssignmentExpression"
     ],
     "PurityVerdict": "Disproven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -659,13 +579,9 @@
       "SimpleMemberAccessExpression"
     ],
     "PurityVerdict": "Disproven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": "ImpureAmbientDateTime",
@@ -683,13 +599,9 @@
       "AwaitExpression"
     ],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -707,13 +619,9 @@
       "LockStatement"
     ],
     "PurityVerdict": "Disproven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -731,13 +639,9 @@
       "LocalDeclarationStatement"
     ],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -758,13 +662,9 @@
       "CatchClause"
     ],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -785,13 +685,9 @@
       "CoalesceExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -807,13 +703,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -829,13 +721,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -854,13 +742,9 @@
       "SwitchStatement"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -878,13 +762,9 @@
       "UsingStatement"
     ],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -900,13 +780,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -922,13 +798,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -944,13 +816,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -966,13 +834,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -988,13 +852,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1010,13 +870,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1034,13 +890,9 @@
       "DeclarationPattern"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1056,13 +908,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1079,13 +927,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Disproven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1101,13 +945,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1123,13 +963,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1145,13 +981,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1167,13 +999,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1189,13 +1017,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1211,13 +1035,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1233,13 +1053,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1257,13 +1073,9 @@
       "TupleExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1279,13 +1091,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1303,13 +1111,9 @@
       "RecursivePattern"
     ],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1328,14 +1132,12 @@
     "SyntaxKinds": [
       "CollectionExpression"
     ],
-    "PurityVerdict": "Unknown",
+    "PurityVerdict": "Proven",
     "RequiredEffects": [
-      null
+      "Allocates"
     ],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1353,13 +1155,9 @@
       "SwitchExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1377,13 +1175,9 @@
       "RangeExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1401,13 +1195,9 @@
       "YieldReturnStatement"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1425,13 +1215,9 @@
       "WithExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1449,13 +1235,9 @@
       "SimpleLambdaExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1471,13 +1253,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1495,13 +1273,9 @@
       "ElementAccessExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1527,13 +1301,9 @@
       "InterpolatedStringExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1549,13 +1319,9 @@
     ],
     "SyntaxKinds": [],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": true,
     "Generator": null,
@@ -1573,13 +1339,9 @@
       "ElementAccessExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1597,13 +1359,9 @@
       "FunctionPointerType"
     ],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": true,
     "Generator": null,
@@ -1624,13 +1382,9 @@
       "LocalFunctionStatement"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1651,13 +1405,9 @@
       "SwitchExpression"
     ],
     "PurityVerdict": "Proven",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,
@@ -1681,13 +1431,9 @@
       "ParenthesizedLambdaExpression"
     ],
     "PurityVerdict": "Unknown",
-    "RequiredEffects": [
-      null
-    ],
+    "RequiredEffects": [],
     "ForbiddenEffects": [],
-    "RequiredUnknownCategories": [
-      null
-    ],
+    "RequiredUnknownCategories": [],
     "RequiredDiagnosticIds": [],
     "AllowUnsafe": false,
     "Generator": null,

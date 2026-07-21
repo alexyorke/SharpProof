@@ -342,11 +342,20 @@ public static class FuzzRunner {
             .DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .First(node => node.Identifier.ValueText == "TestMethod");
-        var line = syntaxTree.GetLineSpan(method.Span, cancellationToken).StartLinePosition.Line + 1;
+        SyntaxNode? targetNode = method.Body?.Statements.FirstOrDefault();
+        targetNode ??= method.ExpressionBody?.Expression;
+        targetNode ??= method;
+        var linePosition = syntaxTree.GetLineSpan(targetNode.Span, cancellationToken).StartLinePosition;
         using var session = SharpProofAnalysisSession.FromText(fuzzCase.Source, fuzzCase.Name + ".cs");
         return session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Line, Line: line),
-            SharpProofAnalysisFacet.Effects), cancellationToken);
+            new SharpProofTarget(
+                SharpProofTargetKind.Point,
+                Line: linePosition.Line + 1,
+                Column: linePosition.Character + 1),
+            fuzzCase.Expectation.ProofCondition == null
+                ? SharpProofAnalysisFacet.Effects
+                : SharpProofAnalysisFacet.Effects | SharpProofAnalysisFacet.ProofFacts,
+            fuzzCase.Expectation.ProofCondition), cancellationToken);
     }
 
     private static void EvaluateEffectExpectation(
@@ -403,6 +412,26 @@ public static class FuzzRunner {
                     "Expected diagnostic was not observed: " + diagnosticId,
                     null,
                     ToDiagnosticSignatures(diagnostics)));
+
+        if (fuzzCase.Expectation.ProofStatus != null) {
+            var proof = result.ProofFacts.SingleOrDefault();
+            if (proof == null || proof.Status != fuzzCase.Expectation.ProofStatus)
+                findings.Add(new FuzzFinding(
+                    fuzzCase.Name,
+                    fuzzCase.Family,
+                    "unexpected_proof_status",
+                    $"Expected {fuzzCase.Expectation.ProofStatus}, observed {proof?.Status ?? "missing"}.",
+                    null,
+                    result.ProofFacts.Select(static fact => fact.Condition + ":" + fact.Status).ToImmutableArray()));
+            else if (fuzzCase.Expectation.RequireCounterexample && proof.Counterexample == null)
+                findings.Add(new FuzzFinding(
+                    fuzzCase.Name,
+                    fuzzCase.Family,
+                    "missing_counterexample",
+                    "The expected compact Z3 counterexample was not produced.",
+                    null,
+                    ImmutableArray.Create(proof.Reason)));
+        }
 
         var enforcePureFailure = diagnostics.Any(static diagnostic => diagnostic.Id == "SP0002");
         if ((result.MethodEffects!.Purity == SharpProofVerdict.Proven) == enforcePureFailure)

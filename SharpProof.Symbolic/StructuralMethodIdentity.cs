@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Json.Serialization;
 
 namespace SharpProof.Identity;
 
@@ -16,7 +15,7 @@ internal static class StructuralRefKinds {
 
 }
 
-internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIdentity> {
+internal sealed class StructuralMethodIdentity {
     internal const string KeyPrefix = "spm1";
 
     internal StructuralMethodIdentity(
@@ -47,19 +46,6 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
         ReturnRefKind = returnRefKind.Trim();
     }
 
-    [JsonConstructor]
-    internal StructuralMethodIdentity(
-        string containingMetadataType,
-        string methodKind,
-        string name,
-        int genericArity,
-        ImmutableArray<StructuralParameterIdentity> parameters,
-        string returnType,
-        string returnRefKind)
-        : this(containingMetadataType, methodKind, name, genericArity,
-            (IEnumerable<StructuralParameterIdentity>)parameters, returnType, returnRefKind) {
-    }
-
     public string ContainingMetadataType { get; }
     public string MethodKind { get; }
     public string Name { get; }
@@ -85,42 +71,6 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
         values.Add(Encode(ReturnRefKind));
         values.Add(Encode(ReturnType));
         return string.Join("|", values);
-    }
-
-    public bool Equals(StructuralMethodIdentity? other) {
-        if (ReferenceEquals(this, other)) return true;
-        if (other is null ||
-            GenericArity != other.GenericArity ||
-            !string.Equals(ContainingMetadataType, other.ContainingMetadataType, StringComparison.Ordinal) ||
-            !string.Equals(MethodKind, other.MethodKind, StringComparison.Ordinal) ||
-            !string.Equals(Name, other.Name, StringComparison.Ordinal) ||
-            !string.Equals(ReturnType, other.ReturnType, StringComparison.Ordinal) ||
-            !string.Equals(ReturnRefKind, other.ReturnRefKind, StringComparison.Ordinal) ||
-            Parameters.Length != other.Parameters.Length)
-            return false;
-
-        for (var index = 0; index < Parameters.Length; index++)
-            if (!Parameters[index].Equals(other.Parameters[index]))
-                return false;
-
-        return true;
-    }
-
-    public override bool Equals(object? obj) =>
-        obj is StructuralMethodIdentity other && Equals(other);
-
-    public override int GetHashCode() {
-        unchecked {
-            var hash = 17;
-            hash = hash * 31 + StringComparer.Ordinal.GetHashCode(ContainingMetadataType);
-            hash = hash * 31 + StringComparer.Ordinal.GetHashCode(MethodKind);
-            hash = hash * 31 + StringComparer.Ordinal.GetHashCode(Name);
-            hash = hash * 31 + GenericArity;
-            foreach (var parameter in Parameters) hash = hash * 31 + parameter.GetHashCode();
-            hash = hash * 31 + StringComparer.Ordinal.GetHashCode(ReturnType);
-            hash = hash * 31 + StringComparer.Ordinal.GetHashCode(ReturnRefKind);
-            return hash;
-        }
     }
 
     private static string Encode(string value) =>

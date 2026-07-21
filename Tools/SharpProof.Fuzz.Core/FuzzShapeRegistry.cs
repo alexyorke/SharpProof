@@ -63,7 +63,10 @@ internal static class FuzzShapeRegistry {
             Compact(definition.RequiredEffects).Select(ParseEffect).ToImmutableArray(),
             Compact(definition.ForbiddenEffects).Select(ParseEffect).ToImmutableArray(),
             Compact(definition.RequiredUnknownCategories).ToImmutableArray(),
-            Compact(definition.RequiredDiagnosticIds).ToImmutableArray());
+            Compact(definition.RequiredDiagnosticIds).ToImmutableArray(),
+            definition.ProofCondition,
+            definition.ProofStatus,
+            definition.RequireCounterexample);
     }
 
     private static IEnumerable<string> Compact(string[]? values) =>
@@ -84,6 +87,9 @@ internal static class FuzzShapeRegistry {
         string[]? ForbiddenEffects,
         string[]? RequiredUnknownCategories,
         string[]? RequiredDiagnosticIds,
+        string? ProofCondition,
+        string? ProofStatus,
+        bool RequireCounterexample,
         bool AllowUnsafe,
         string? Generator,
         string? SourceTemplate);
