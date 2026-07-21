@@ -1,6 +1,6 @@
 root = true
 
-[{SharpProof.Analyzer,SharpProof.Attributes,SharpProof.CodeFixes,SharpProof.Contracts,SharpProof.ProofCore,SharpProof.Symbolic,SharpProof.Tooling.Core,Tools}/**/*.cs]
+[{SharpProof.Analyzer,SharpProof.Attributes,SharpProof.Contracts,SharpProof.ProofCore,SharpProof.Symbolic,SharpProof.Tooling.Core,Tools}/**/*.cs]
 csharp_new_line_before_open_brace = none
 dotnet_diagnostic.IDE0055.severity = warning
 csharp_prefer_braces = false:warning

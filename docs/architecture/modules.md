@@ -14,4 +14,4 @@ cached MethodEffects
 unified SharpProofAnalysisResult
 ```
 
-`SharpProof.Symbolic` owns the canonical effects and symbolic result model. `SharpProof.Analyzer` projects diagnostics and contracts. The CLI, NuGet package, and VSIX consume the same result. Referenced IL is resolved lazily and cached in memory; there is no generated summary tool or JSON artifact pipeline.
+`SharpProof.Symbolic` owns the canonical effects and symbolic result model. `SharpProof.Analyzer` projects diagnostics and contracts. The CLI and NuGet package consume the same result. Referenced IL is resolved lazily and cached in memory; there is no generated summary tool or JSON artifact pipeline.

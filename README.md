@@ -82,6 +82,6 @@ Use the repository wrapper so .NET processes remain inside the configured Window
 .\scripts\Invoke-SharpProofDotnet.ps1 test SharpProof.Dev.Tests.slnf -c Release
 ```
 
-The repository contains the analyzer, attributes, code fixes, symbolic API, CLI, NuGet packaging, VSIX packaging, and net472 smoke project.
+The repository contains the analyzer, attributes, symbolic API, CLI, NuGet packaging, fuzzing, and net472 smoke project.
 
 See [the supported modern C# surface](docs/modern-csharp-surface.md) for language-version coverage.

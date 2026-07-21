@@ -1,8 +1,0 @@
-{
-  "solution": {
-    "path": "SharpProof.sln",
-    "projects": [
-      "SharpProof.CodeFixes\\SharpProof.CodeFixes.csproj"
-    ]
-  }
-}

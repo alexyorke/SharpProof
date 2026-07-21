@@ -25,6 +25,14 @@ public sealed class EffectArchitectureTests {
             "SharpProof.Symbolic/SymbolicCapabilityModels.cs",
             "SharpProof.Symbolic/SymbolicQueryTarget.cs",
             "Tools/SharpProof.SymbolicCli.Core/SharpProof.SymbolicCli.Core.csproj",
+            "SharpProof.CodeFixes/SharpProof.CodeFixes.csproj",
+            "SharpProof.Vsix/SharpProof.Vsix.csproj",
+            "Tools/VsixHarness/VsixHarness.csproj",
+            "Tools/SharpProof.Baseline/SharpProof.Baseline.csproj",
+            "Tools/SharpProof.Baseline.Core/SharpProof.Baseline.Core.csproj",
+            "Tools/SharpProof.CorpusReport/SharpProof.CorpusReport.csproj",
+            "Tools/SharpProof.CorpusReport.Core/SharpProof.CorpusReport.Core.csproj",
+            "SharpProof.Demo/SharpProof.Demo.csproj",
             "scripts/Test-SharpProofTestPreservation.ps1",
             "scripts/Generate-ConfigurationReference.ps1",
             "docs/configuration-reference.md"
@@ -34,8 +42,8 @@ public sealed class EffectArchitectureTests {
                 Is.False, $"Removed compatibility file returned: {relativePath}");
 
         var roots = new[] {
-            "SharpProof.Analyzer", "SharpProof.Attributes", "SharpProof.CodeFixes", "SharpProof.Contracts",
-            "SharpProof.Package", "SharpProof.Symbolic", "SharpProof.Vsix", "Tools", "config", "docs"
+            "SharpProof.Analyzer", "SharpProof.Attributes", "SharpProof.Contracts",
+            "SharpProof.Package", "SharpProof.Symbolic", "Tools", "config", "docs"
         };
         var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
             ".cs", ".csproj", ".json", ".props", ".targets", ".md"

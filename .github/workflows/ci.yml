@@ -38,17 +38,6 @@ jobs:
         shell: pwsh
         run: .\scripts\Invoke-SharpProofDotnet.ps1 test SharpProof.sln --configuration Release --no-build
 
-      - name: Build VSIX project
-        run: |
-          dotnet build SharpProof.Vsix/SharpProof.Vsix.csproj --configuration Release /p:EnableVsixPackaging=true
-
-      - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: vsix-package
-          path: SharpProof.Vsix/bin/Release/*.vsix
-          if-no-files-found: warn
-
       - name: Package NuGet packages
         shell: pwsh
         run: |
@@ -92,7 +81,6 @@ jobs:
           $requiredEntries = @(
             "README.md",
             "analyzers/dotnet/cs/SharpProof.Analyzer.dll",
-            "analyzers/dotnet/cs/SharpProof.CodeFixes.dll",
             "analyzers/dotnet/cs/Microsoft.Z3.dll",
             "analyzers/dotnet/cs/libz3.dll",
             "analyzers/dotnet/cs/libz3.dylib",
