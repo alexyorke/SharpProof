@@ -47,8 +47,6 @@ internal sealed class AnalyzerSession : IDisposable {
 
     internal AnalyzerProofService ProofService => _proofService.Value;
 
-    internal int MethodBodyAnalysisCount => _methodBodyAnalyses.Count;
-
     internal void RecordTrustedBoundaryFinding(TrustedBoundaryReviewFinding finding) {
         _trustedBoundaryFindings.AddOrUpdate(
             finding.Key,

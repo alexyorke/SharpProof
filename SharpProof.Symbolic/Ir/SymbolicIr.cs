@@ -1135,7 +1135,7 @@ internal sealed class SymbolicState {
 
     private static string CreateBinaryTermKey(SymbolicBinaryTerm binary) {
         var overflowPrefix = binary.MayOverflow ? "overflow-sensitive:" : string.Empty;
-        if (IsAssociativeCommutativeBinaryTermOperator(binary.Operator)) {
+        if (IsCommutativeBinaryTermOperator(binary.Operator)) {
             var terms = new List<SymbolicTerm>();
             CollectAssociativeBinaryTerms(binary, binary.Operator, binary.MayOverflow, terms);
             var operands = CreateNormalizedAssociativeBinaryTermKeys(binary.Operator, terms);
@@ -1204,9 +1204,6 @@ internal sealed class SymbolicState {
 
     private static bool IsIntegerConstant(SymbolicTerm term, long value) => term is SymbolicIntegerConstantTerm integer &&
                integer.Value == value;
-
-    private static bool IsAssociativeCommutativeBinaryTermOperator(SymbolicBinaryTermOperator binaryOperator) =>
-        binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Multiply;
 
     private static bool IsCommutativeBinaryTermOperator(SymbolicBinaryTermOperator binaryOperator) =>
         binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Multiply;

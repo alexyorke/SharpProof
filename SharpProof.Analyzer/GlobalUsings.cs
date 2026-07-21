@@ -15,7 +15,6 @@ global using Microsoft.CodeAnalysis.Text;
 global using SharpProof.Analyzer.Configuration;
 global using SharpProof.Analyzer.Engine;
 global using SharpProof.Analyzer.Engine.Analysis;
-global using SharpProof.Analyzer.Engine.Rules;
 global using SharpProof.Identity;
 global using SharpProof.ProofCore.Smt;
 global using SharpProof.Schema;

@@ -9,7 +9,6 @@ public enum RoslynShapeSurface {
 }
 
 public enum ShapeClassification {
-    Handled,
     GeneratorBacked,
     ParentHandled,
     SyntaxShadow,
@@ -26,9 +25,6 @@ public sealed record RoslynShapeManifestEntry(
     ShapeClassification Classification);
 
 public static class RoslynShapeManifest {
-    private static readonly ImmutableHashSet<OperationKind> RegisteredRuleKinds =
-        ImmutableHashSet<OperationKind>.Empty;
-
     private static readonly ImmutableHashSet<string> GeneratorBackedOperationShapeIds =
         FuzzCaseGenerator.RegistryEntries
             .SelectMany(static entry => entry.PrimaryShapeIds)
@@ -83,8 +79,6 @@ public static class RoslynShapeManifest {
     private static ShapeClassification ClassifyOperation(OperationKind kind) {
         if (GeneratorBackedOperationShapeIds.Contains(OperationShapeId(kind)))
             return ShapeClassification.GeneratorBacked;
-        if (RegisteredRuleKinds.Contains(kind))
-            return ShapeClassification.Handled;
         if (IsParentHandled(kind))
             return ShapeClassification.ParentHandled;
         if (kind == OperationKind.Attribute)

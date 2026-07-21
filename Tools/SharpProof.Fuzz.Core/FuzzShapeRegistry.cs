@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace SharpProof.Tools.Fuzz;
 
 internal static class FuzzShapeRegistry {
@@ -46,7 +44,6 @@ internal static class FuzzShapeRegistry {
                 definition.SyntaxKinds.ToImmutableArray(),
                 CreateExpectation(definition),
                 definition.AllowUnsafe,
-                definition.AllowEffectPreservingWrappers,
                 build));
         }
 
@@ -89,7 +86,6 @@ internal static class FuzzShapeRegistry {
         string[] RequiredSp0010Properties,
         string[] RequiredAnySp0010Properties,
         bool AllowUnsafe,
-        bool AllowEffectPreservingWrappers,
         string? Generator,
         string? SourceTemplate);
 }

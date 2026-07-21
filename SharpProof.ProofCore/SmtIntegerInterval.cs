@@ -45,11 +45,11 @@ internal readonly struct SmtIntegerInterval(
             SmtBinaryOperator.Equal => WithExactValue(constant),
             SmtBinaryOperator.NotEqual => Exclude(constant),
             SmtBinaryOperator.GreaterThan => constant == long.MaxValue
-                ? Impossible()
+                ? new SmtIntegerInterval(LowerBound, UpperBound, ExcludedValues, true)
                 : WithLowerBound(constant + 1),
             SmtBinaryOperator.GreaterThanOrEqual => WithLowerBound(constant),
             SmtBinaryOperator.LessThan => constant == long.MinValue
-                ? Impossible()
+                ? new SmtIntegerInterval(LowerBound, UpperBound, ExcludedValues, true)
                 : WithUpperBound(constant - 1),
             SmtBinaryOperator.LessThanOrEqual => WithUpperBound(constant),
             _ => this
@@ -58,7 +58,7 @@ internal readonly struct SmtIntegerInterval(
 
     internal SmtIntegerInterval Intersect(SmtIntegerInterval other) {
         var interval = this;
-        if (other.IsImpossible) interval = interval.Impossible();
+        if (other.IsImpossible) interval = new SmtIntegerInterval(interval.LowerBound, interval.UpperBound, interval.ExcludedValues, true);
         if (other.LowerBound.HasValue) interval = interval.WithLowerBound(other.LowerBound.Value);
         if (other.UpperBound.HasValue) interval = interval.WithUpperBound(other.UpperBound.Value);
 
@@ -123,6 +123,4 @@ internal readonly struct SmtIntegerInterval(
             (UpperBound.HasValue && value > UpperBound.Value));
     }
 
-    private SmtIntegerInterval Impossible() =>
-        new SmtIntegerInterval(LowerBound, UpperBound, ExcludedValues, true);
 }

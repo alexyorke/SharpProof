@@ -4,7 +4,6 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using SharpProof.Attributes;
-using SharpProof.Identity;
 
 namespace SharpProof.Symbolic;
 

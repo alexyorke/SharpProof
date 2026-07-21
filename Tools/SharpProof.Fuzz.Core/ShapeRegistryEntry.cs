@@ -60,5 +60,4 @@ public sealed record ShapeRegistryEntry(
     ImmutableArray<string> ExpectedSyntaxKinds,
     FuzzExpectation Expectation,
     bool AllowUnsafe,
-    bool AllowEffectPreservingWrappers,
     Func<int, Random, string, string> Build);

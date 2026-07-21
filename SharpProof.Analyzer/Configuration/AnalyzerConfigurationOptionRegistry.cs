@@ -1,22 +1,12 @@
 namespace SharpProof.Analyzer.Configuration;
 
 internal static class AnalyzerConfigurationOptionRegistry {
-    private static ImmutableDictionary<string, AnalyzerConfigurationOption>? _optionsByKey;
-
-    // Computed lazily so it never reads All during static initialization: static initializers run
-    // in textual order, and member-ordering rules (fields before properties) can place this ahead
-    // of All, which would otherwise read a default ImmutableArray and throw in the type initializer.
-    private static ImmutableDictionary<string, AnalyzerConfigurationOption> OptionsByKey =>
-        _optionsByKey ??= All.ToImmutableDictionary(static option => option.Key, StringComparer.Ordinal);
-
     private const string ResourceName = "SharpProof.Analyzer.Configuration.Options.json";
 
     public static ImmutableArray<AnalyzerConfigurationOption> All { get; } = Load();
 
     public static ImmutableArray<AnalyzerConfigurationOption> GlobalOptions =>
         All.Where(static option => option.IsGlobal).ToImmutableArray();
-
-    public static AnalyzerConfigurationOption Get(string key) => OptionsByKey[key];
 
     private static ImmutableArray<AnalyzerConfigurationOption> Load() {
         using var stream = typeof(AnalyzerConfigurationOptionRegistry).Assembly.GetManifestResourceStream(ResourceName)
@@ -41,10 +31,7 @@ internal static class AnalyzerConfigurationOptionRegistry {
                     definition.Unit),
                 definition.Description,
                 definition.AllowedValues.ToImmutableArray(),
-                definition.AcceptedAliases.ToImmutableArray(),
-                definition.ValueDescription,
-                definition.RelatedDiagnostics,
-                definition.SampleValue);
+                definition.AcceptedAliases.ToImmutableArray());
         }).ToImmutableArray();
     }
 
@@ -59,9 +46,6 @@ internal static class AnalyzerConfigurationOptionRegistry {
         public string Description { get; set; } = string.Empty;
         public string[] AllowedValues { get; set; } = Array.Empty<string>();
         public string[] AcceptedAliases { get; set; } = Array.Empty<string>();
-        public string ValueDescription { get; set; } = string.Empty;
-        public string RelatedDiagnostics { get; set; } = string.Empty;
-        public string SampleValue { get; set; } = string.Empty;
     }
     internal static bool TryParseRuntimeHazardMode(string? value, out RuntimeHazardMode mode) {
         mode = value?.Trim().ToLowerInvariant() switch {
@@ -98,19 +82,12 @@ internal sealed record AnalyzerConfigurationOption(
     AnalyzerConfigurationDefault Default,
     string Description,
     ImmutableArray<string> AllowedValues = default,
-    ImmutableArray<string> AcceptedAliases = default,
-    string ValueDescription = "",
-    string RelatedDiagnostics = "",
-    string SampleValue = "") {
-    public string DefaultValue => Default.DocumentationValue;
+    ImmutableArray<string> AcceptedAliases = default) {
 
     public bool IsGlobal =>
         Scope == AnalyzerConfigurationScope.GlobalOnly ||
         Scope == AnalyzerConfigurationScope.GlobalAndTree;
 
-    public bool IsTree =>
-        Scope == AnalyzerConfigurationScope.TreeOnly ||
-        Scope == AnalyzerConfigurationScope.GlobalAndTree;
 }
 
 internal readonly record struct AnalyzerConfigurationDefault(
@@ -119,27 +96,6 @@ internal readonly record struct AnalyzerConfigurationDefault(
     int DeepValue,
     string Unit) {
     internal bool IsModeDependent => ConstantValue == null;
-
-    internal string DocumentationValue => IsModeDependent
-        ? Format(BoundedValue) + " (disabled/bounded), " + Format(DeepValue) + " (deep)"
-        : ConstantValue ?? string.Empty;
-
-    internal string Resolve(SmtAnalysisMode mode) {
-        if (!IsModeDependent) return ConstantValue ?? string.Empty;
-        return (mode == SmtAnalysisMode.Deep ? DeepValue : BoundedValue)
-            .ToString(System.Globalization.CultureInfo.InvariantCulture);
-    }
-
-    public static implicit operator AnalyzerConfigurationDefault(string value) => new AnalyzerConfigurationDefault(
-            value ?? throw new ArgumentNullException(nameof(value)),
-            0,
-            0,
-            string.Empty);
-
-    private string Format(int value) {
-        var formatted = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        return Unit.Length == 0 ? formatted : formatted + " " + Unit;
-    }
 
 }
 

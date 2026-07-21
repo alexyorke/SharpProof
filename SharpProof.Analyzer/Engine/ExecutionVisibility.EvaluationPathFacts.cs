@@ -1,101 +1,6 @@
 namespace SharpProof.Analyzer.Engine;
 
 internal static partial class ExecutionVisibility {
-    private static SymbolicState AddEvaluationPathState(
-        SymbolicState pathState,
-        SyntaxNode syntaxNode,
-        SyntaxNode ancestor,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        Func<ISymbol, int>? getSymbolVersion) {
-        if (TryGetEvaluationBranch(
-                ancestor,
-                syntaxNode.SpanStart,
-                out var condition,
-                out var branchWhenTrue,
-                out var branchBody) &&
-            !SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
-                condition,
-                branchBody,
-                syntaxNode.SpanStart,
-                semanticModel,
-                cancellationToken) &&
-            SymbolicReachabilityLowerer.ApplyCondition(
-                pathState,
-                condition,
-                branchWhenTrue,
-                semanticModel,
-                cancellationToken,
-                getSymbolVersion) is { IsExact: true } transition)
-            return transition.State;
-
-        if (ancestor is BinaryExpressionSyntax binaryExpression &&
-            binaryExpression.Right.Span.Contains(syntaxNode.SpanStart) &&
-            binaryExpression.IsKind(SyntaxKind.CoalesceExpression))
-            return SymbolicStateFactBuilder.AddReferenceNullCondition(
-                pathState,
-                binaryExpression.Left,
-                true,
-                semanticModel,
-                cancellationToken,
-                "analyzer.evaluation.null",
-                getSymbolVersion);
-
-        if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpression &&
-            conditionalAccessExpression.WhenNotNull.Span.Contains(syntaxNode.SpanStart))
-            return SymbolicStateFactBuilder.AddReferenceNullCondition(
-                pathState,
-                conditionalAccessExpression.Expression,
-                false,
-                semanticModel,
-                cancellationToken,
-                "analyzer.evaluation.non-null",
-                getSymbolVersion);
-
-        if (ancestor is SwitchStatementSyntax switchStatement) {
-            var section = switchStatement.Sections.FirstOrDefault(candidate =>
-                candidate.Statements.Any(statement => statement.Span.Contains(syntaxNode.SpanStart)));
-            if (section != null &&
-                !IsReachableConstantSwitchGotoTarget(section, switchStatement, semanticModel, cancellationToken) &&
-                SwitchPathConditionBuilder.TryCreateSwitchStatementSectionSymbolicCondition(
-                    switchStatement.Expression,
-                    section,
-                    semanticModel,
-                    cancellationToken,
-                    out var sectionCondition,
-                    getSymbolVersion))
-                return AddSwitchEvaluationState(
-                    pathState,
-                    switchStatement.Expression,
-                    sectionCondition,
-                    semanticModel,
-                    cancellationToken,
-                    getSymbolVersion);
-        }
-
-        if (ancestor is SwitchExpressionSyntax switchExpression) {
-            var arm = switchExpression.Arms.FirstOrDefault(candidate =>
-                candidate.Expression.Span.Contains(syntaxNode.SpanStart));
-            if (arm != null &&
-                SwitchPathConditionBuilder.TryCreateSwitchExpressionArmSymbolicCondition(
-                    switchExpression.GoverningExpression,
-                    arm,
-                    semanticModel,
-                    cancellationToken,
-                    out var armCondition,
-                    getSymbolVersion))
-                return AddSwitchEvaluationState(
-                    pathState,
-                    switchExpression.GoverningExpression,
-                    armCondition,
-                    semanticModel,
-                    cancellationToken,
-                    getSymbolVersion);
-        }
-
-        return pathState;
-    }
-
     private static bool TryGetEvaluationBranch(
         SyntaxNode ancestor,
         int position,
@@ -152,31 +57,6 @@ internal static partial class ExecutionVisibility {
                 branchBody = null!;
                 return false;
         }
-    }
-
-    private static SymbolicState AddSwitchEvaluationState(
-        SymbolicState pathState,
-        ExpressionSyntax governingExpression,
-        SymbolicCondition selectionCondition,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        Func<ISymbol, int>? getSymbolVersion) {
-        if (SymbolicSemanticPipeline.LowerArrayLengthCountAliasCondition(
-                governingExpression,
-                new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion)) is { IsExact: true, Value: { } aliasCondition })
-            pathState = SymbolicOperationTransferKernel.Assume(
-                pathState,
-                aliasCondition,
-                assumeTrue: true,
-                governingExpression.Span,
-                "analyzer.execution-visibility.switch-alias").State;
-
-        return SymbolicOperationTransferKernel.Assume(
-            pathState,
-            selectionCondition,
-            assumeTrue: true,
-            governingExpression.Span,
-            "analyzer.execution-visibility.switch-selection").State;
     }
 
 }

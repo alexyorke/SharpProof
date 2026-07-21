@@ -134,7 +134,7 @@ internal sealed class SmtSolver : IDisposable {
         bool preprocessedModel,
         bool adjustApproximation,
         bool? containsApproximateRegex = null) {
-        var isApproximate = containsApproximateRegex ?? ContainsApproximateRegex(conditions);
+        var isApproximate = containsApproximateRegex ?? conditions.Any(_encoder.ContainsApproximateRegex);
         using var solver = _encoder.CreateSolver(timeout);
         foreach (var formula in conditions) solver.Assert(_encoder.EncodeCondition(formula));
 
@@ -178,9 +178,6 @@ internal sealed class SmtSolver : IDisposable {
         };
     }
 
-    private bool ContainsApproximateRegex(IEnumerable<SmtFormula> formulas) =>
-        formulas.Any(_encoder.ContainsApproximateRegex);
-
     private PreparedSmtQuery Prepare(IEnumerable<SmtFormula> conditions) {
         var original = conditions.ToArray();
         var status = _preprocessor.Prepare(original, out var prepared);
@@ -189,7 +186,7 @@ internal sealed class SmtSolver : IDisposable {
             original,
             prepared,
             !ReferenceEquals(original, prepared),
-            ContainsApproximateRegex(original));
+            original.Any(_encoder.ContainsApproximateRegex));
     }
 
     private static Feasibility AdjustForApproximation(Feasibility feasibility, bool containsApproximateRegex) {

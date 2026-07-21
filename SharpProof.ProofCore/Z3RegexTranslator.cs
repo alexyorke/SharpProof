@@ -95,7 +95,7 @@ internal sealed class Z3RegexTranslator {
                 Peek(')'))
                 break;
 
-            if (TryParseLookaheadAssertion(out var lookahead)) {
+            if (TryParseLookaroundAssertion(false, out var lookahead)) {
                 if (!TryParseConcat(out var suffix, out var suffixConsumed) || !suffixConsumed) {
                     regex = null!;
                     return false;
@@ -107,7 +107,7 @@ internal sealed class Z3RegexTranslator {
                 return true;
             }
 
-            if (TryParseLookbehindAssertion(out var lookbehind)) {
+            if (TryParseLookaroundAssertion(true, out var lookbehind)) {
                 if (parts.Count == 0) {
                     regex = null!;
                     return false;
@@ -153,12 +153,6 @@ internal sealed class Z3RegexTranslator {
         };
         return true;
     }
-
-    private bool TryParseLookaheadAssertion(out RegexLookaheadAssertion assertion) =>
-        TryParseLookaroundAssertion(false, out assertion);
-
-    private bool TryParseLookbehindAssertion(out RegexLookaheadAssertion assertion) =>
-        TryParseLookaroundAssertion(true, out assertion);
 
     private bool TryParseLookaroundAssertion(bool lookbehind, out RegexLookaheadAssertion assertion) {
         assertion = default;

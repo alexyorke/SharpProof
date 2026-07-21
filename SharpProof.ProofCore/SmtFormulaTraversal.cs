@@ -66,7 +66,7 @@ internal static class SmtFormulaTraversal {
                 continue;
             }
 
-            var childCount = GetChildCount(frame.Formula);
+            var childCount = GetChildren(frame.Formula).Count;
             var children = childCount == 0 ? Array.Empty<SmtFormula>() : new SmtFormula[childCount];
             for (var index = childCount - 1; index >= 0; index--) children[index] = results.Pop();
 
@@ -99,9 +99,6 @@ internal static class SmtFormulaTraversal {
     internal static bool AreStructurallyEqual(SmtFormula left, SmtFormula right) {
         return Equals(left, right);
     }
-
-    private static int GetChildCount(SmtFormula formula) =>
-        GetChildren(formula).Count;
 
     private static void PushChildrenInReverse(SmtFormula formula, Stack<SmtFormula> stack) {
         var children = GetChildren(formula);

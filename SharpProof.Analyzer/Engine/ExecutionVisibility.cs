@@ -74,30 +74,4 @@ internal static partial class ExecutionVisibility {
             syntaxNode, semanticModel, cancellationToken, smtAnalysis);
     }
 
-    public static bool IsEvaluationPathUnsatisfiableUsingSymbolicState(
-        SyntaxNode syntaxNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SymbolicState basePathState,
-        Func<ISymbol, int>? getSymbolVersion,
-        SmtAnalysisService smtAnalysis) {
-        var pathState = basePathState;
-        foreach (var ancestor in syntaxNode.Ancestors()) {
-            var nextState = AddEvaluationPathState(
-                pathState,
-                syntaxNode,
-                ancestor,
-                semanticModel,
-                cancellationToken,
-                getSymbolVersion);
-            if (ReferenceEquals(nextState, pathState)) continue;
-
-            pathState = nextState;
-            if (new SymbolicProofService(smtAnalysis).ClassifyReachability(pathState).Status ==
-                SymbolicProofStatus.Unreachable)
-                return true;
-        }
-
-        return false;
-    }
 }

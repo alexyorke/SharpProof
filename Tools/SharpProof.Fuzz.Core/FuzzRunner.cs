@@ -38,9 +38,6 @@ public static class FuzzRunner {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    private static AnalyzerRunResult EmptyAnalyzerRun =>
-        new(ImmutableArray<Diagnostic>.Empty, ImmutableArray<string>.Empty);
-
     public static async Task<FuzzRunSummary> RunAsync(FuzzOptions options,
         CancellationToken cancellationToken = default) {
         var startedUtc = DateTimeOffset.UtcNow;
@@ -168,7 +165,7 @@ public static class FuzzRunner {
         var syntaxTree =
             CSharpSyntaxTree.ParseText(fuzzCase.Source, ParseOptions, cancellationToken: cancellationToken);
         var compilation = CreateCompilation(fuzzCase.Name, syntaxTree, fuzzCase.AllowUnsafe);
-        var normalizedSourceHash = ComputeStableHash(NormalizeSource(fuzzCase.Source));
+        var normalizedSourceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(NormalizeSource(fuzzCase.Source))));
         var compilerErrors = compilation.GetDiagnostics(cancellationToken)
             .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .Select(diagnostic => diagnostic.ToString())
@@ -312,7 +309,7 @@ public static class FuzzRunner {
             throw;
         }
         catch (Exception ex) {
-            return EmptyAnalyzerRun with { Exceptions = ImmutableArray.Create(ex.ToString()) };
+            return new AnalyzerRunResult(ImmutableArray<Diagnostic>.Empty, ImmutableArray.Create(ex.ToString()));
         }
     }
 
@@ -623,12 +620,6 @@ public static class FuzzRunner {
     private static string NormalizeSource(string source) {
         var normalized = source.Replace("\r\n", "\n", StringComparison.Ordinal).Trim();
         return GeneratedTypeNameRegex.Replace(normalized, "GeneratedTypeX");
-    }
-
-    private static string ComputeStableHash(string text) {
-        using var sha = SHA256.Create();
-        var bytes = Encoding.UTF8.GetBytes(text);
-        return Convert.ToHexString(sha.ComputeHash(bytes));
     }
 
     private static string SanitizeFileName(string value) {
