@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
-using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Analysis;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
@@ -124,7 +124,7 @@ public class SmtAnalysisServiceTests
         var diagnostics = SymbolicSmtDiagnostics.FromService(service);
         var snapshot = diagnostics.Snapshot;
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(attempts, Is.EqualTo(2));
         Assert.That(disposedSessions, Is.EqualTo(1));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(2));
@@ -252,7 +252,7 @@ public class SmtAnalysisServiceTests
             });
         var sharedCached = secondService.Classify(query);
 
-        Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(first.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(localCached.Outcome, Is.EqualTo(first.Outcome));
         Assert.That(sharedCached.Outcome, Is.EqualTo(first.Outcome));
         Assert.That(firstFactoryCalls, Is.EqualTo(2));
@@ -406,7 +406,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.Classify(CreateQuery(Array.Empty<SmtFormula>(), new SmtBooleanConstant(true)));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo("smt_disabled"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -431,7 +431,7 @@ public class SmtAnalysisServiceTests
             },
             new SmtBooleanConstant(true)));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo("smt_path_condition_budget_exceeded"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -451,7 +451,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.Classify(CreateQuery(Array.Empty<SmtFormula>(), containsNeedle));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo("smt_timeout"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -499,7 +499,7 @@ public class SmtAnalysisServiceTests
             fact);
         var second = service.ClassifyImplication(new[] { yAtLeastZero, xAtLeastZero }, fact);
 
-        Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(first.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(second.Outcome, Is.EqualTo(first.Outcome));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(1));
         Assert.That(service.CacheEntryCount, Is.EqualTo(1));
@@ -524,11 +524,11 @@ public class SmtAnalysisServiceTests
             },
             new SmtBooleanConstant(true)));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.PathCheck.WasAttempted, Is.True);
-        Assert.That(result.ImpurityCheck.WasAttempted, Is.False);
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
+        Assert.That(result.HazardCheck.WasAttempted, Is.False);
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -553,11 +553,11 @@ public class SmtAnalysisServiceTests
             },
             new SmtBooleanConstant(true)));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.PathCheck.WasAttempted, Is.True);
-        Assert.That(result.ImpurityCheck.WasAttempted, Is.False);
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
+        Assert.That(result.HazardCheck.WasAttempted, Is.False);
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -603,7 +603,7 @@ public class SmtAnalysisServiceTests
             contradiction
         });
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -624,7 +624,7 @@ public class SmtAnalysisServiceTests
             new[] { nestedBounds },
             new SmtBooleanConstant(true)));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -640,13 +640,13 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(new[] { xIsZero }, xIsZero);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(
             service.ClassifyImplication(new[] { xIsZero }, xIsZero).Outcome,
-            Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
     }
@@ -667,9 +667,9 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(new[] { xAtMostNine }, xLessThanTen);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -691,7 +691,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(new[] { textIsAbc }, lengthAtLeastThree);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -710,7 +710,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(new[] { textIsAbc }, startsWithA);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -731,7 +731,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(new[] { textIsAbc }, doesNotEndWithZ);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -754,7 +754,7 @@ public class SmtAnalysisServiceTests
             new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("XYZ"))
         });
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -775,13 +775,13 @@ public class SmtAnalysisServiceTests
             new SmtIntegerConstant(0));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var result = service.Classify(new PurityProofQuery(
+        var result = service.Classify(new AnalysisProofQuery(
             new[] { divisorIsNotZero },
-            new PurityHazard(PurityHazardKind.DivideByZero, divisorIsZero)));
+            new AnalysisHazard(AnalysisHazardKind.DivideByZero, divisorIsZero)));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("divide_by_zero_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -801,13 +801,13 @@ public class SmtAnalysisServiceTests
             new SmtIntegerConstant(0));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var result = service.Classify(new PurityProofQuery(
+        var result = service.Classify(new AnalysisProofQuery(
             new[] { divisorIsPositive },
-            new PurityHazard(PurityHazardKind.DivideByZero, divisorIsZero)));
+            new AnalysisHazard(AnalysisHazardKind.DivideByZero, divisorIsZero)));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("divide_by_zero_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -851,7 +851,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.Classify(CreateQuery(Array.Empty<SmtFormula>(), trigger));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo("smt_expression_budget_exceeded"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -871,7 +871,7 @@ public class SmtAnalysisServiceTests
             new[] { CreateNestedNegation(4096) },
             new SmtBooleanConstant(true)));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo("smt_expression_budget_exceeded"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -913,7 +913,7 @@ public class SmtAnalysisServiceTests
         _ = service.Classify(CreateQuery(new[] { xIsZero }, xIsZero));
         var result = service.Classify(CreateQuery(new[] { xIsPositive }, xIsPositive));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo("smt_method_budget_exceeded"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(1));
     }
@@ -934,7 +934,7 @@ public class SmtAnalysisServiceTests
         var first = service.Classify(query);
         var second = service.Classify(query);
 
-        Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(first.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(second.Outcome, Is.EqualTo(first.Outcome));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(1));
         Assert.That(service.CacheEntryCount, Is.EqualTo(1));
@@ -965,7 +965,7 @@ public class SmtAnalysisServiceTests
         _ = secondService.Classify(budgetBurnQuery);
         var sharedCached = secondService.Classify(cachedQuery);
 
-        Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(first.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(localCached.Outcome, Is.EqualTo(first.Outcome));
         Assert.That(sharedCached.Outcome, Is.EqualTo(first.Outcome));
         Assert.That(localCached.Reason, Is.Not.EqualTo("smt_method_budget_exceeded"));
@@ -996,7 +996,7 @@ public class SmtAnalysisServiceTests
         var first = firstService.Classify(query);
         var second = secondService.Classify(query);
 
-        Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(first.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(second.Outcome, Is.EqualTo(first.Outcome));
         Assert.That(firstService.ExecutedQueryCount, Is.EqualTo(1));
         Assert.That(secondService.ExecutedQueryCount, Is.EqualTo(0));
@@ -1036,7 +1036,7 @@ public class SmtAnalysisServiceTests
 
             Assert.That(
                 results.Select(result => result.Outcome),
-                Is.All.EqualTo(PurityProofOutcome.ProvablyImpure));
+                Is.All.EqualTo(AnalysisProofOutcome.Disproven));
             Assert.That(services.Sum(service => service.ExecutedQueryCount), Is.EqualTo(1));
             Assert.That(services.Sum(service => service.CacheEntryCount), Is.EqualTo(serviceCount));
         }
@@ -1088,12 +1088,12 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(
             service.ClassifyImplication(pathConditions, fact).Outcome,
-            Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -1109,12 +1109,12 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
         Assert.That(
             service.ClassifyImplication(pathConditions, fact).Outcome,
-            Is.Not.EqualTo(PurityProofOutcome.ProvablyPure));
+            Is.Not.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -1133,8 +1133,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
     }
 
     [Test]
@@ -1166,7 +1166,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
     }
 
@@ -1183,7 +1183,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
     }
 
@@ -1200,7 +1200,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
     }
 
@@ -1217,7 +1217,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
     }
 
@@ -1237,8 +1237,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
     }
 
     [Test]
@@ -1270,7 +1270,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -1291,8 +1291,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
     }
 
     [Test]
@@ -1311,8 +1311,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
     }
 
     [Test]
@@ -1328,7 +1328,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -1346,7 +1346,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
     }
 
@@ -1386,7 +1386,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
     }
 
@@ -1403,7 +1403,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -1423,7 +1423,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -1442,7 +1442,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
     }
 
@@ -1459,7 +1459,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -1482,7 +1482,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -1503,8 +1503,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -1526,8 +1526,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -1552,8 +1552,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -1578,7 +1578,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1601,7 +1601,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1623,7 +1623,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1648,8 +1648,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -1672,7 +1672,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1699,8 +1699,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -1720,7 +1720,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1741,7 +1741,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1759,8 +1759,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(Array.Empty<SmtFormula>(), fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -1782,8 +1782,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -1804,7 +1804,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1826,7 +1826,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1849,7 +1849,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1873,7 +1873,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1895,8 +1895,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -1913,7 +1913,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1937,7 +1937,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1958,7 +1958,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -1979,8 +1979,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -2003,8 +2003,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -2027,7 +2027,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -2059,8 +2059,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -2081,7 +2081,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -2105,7 +2105,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -2129,8 +2129,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -2158,8 +2158,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -2182,7 +2182,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -2205,7 +2205,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -2239,8 +2239,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -2271,7 +2271,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -2303,7 +2303,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(pathConditions);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
@@ -2354,8 +2354,8 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(pathConditions, fact);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
@@ -2373,7 +2373,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyImplication(new SmtFormula[] { xEqualsY, xIsString }, yIsString);
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -2390,7 +2390,7 @@ public class SmtAnalysisServiceTests
 
         var result = service.ClassifyPathFeasibility(new SmtFormula[] { xEqualsY, xIsString, yIsNotString });
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
@@ -2415,18 +2415,18 @@ public class SmtAnalysisServiceTests
         Assert.That(service.Health.LastFailureCode, Is.EqualTo(expectedCode));
     }
 
-    private static PurityProofQuery CreateQuery(
+    private static AnalysisProofQuery CreateQuery(
         IReadOnlyList<SmtFormula> pathConditions,
         SmtFormula triggerCondition)
     {
-        return new PurityProofQuery(
+        return new AnalysisProofQuery(
             pathConditions,
-            new PurityHazard(
-                PurityHazardKind.ImpureCallReachability,
+            new AnalysisHazard(
+                AnalysisHazardKind.EffectViolationReachability,
                 triggerCondition));
     }
 
-    private static PurityProofQuery CreateSolverQuery(string name)
+    private static AnalysisProofQuery CreateSolverQuery(string name)
     {
         var value = new SmtVariable(name, SmtValueKind.Int);
         var valueIsZero = new SmtBinaryFormula(
@@ -2436,10 +2436,10 @@ public class SmtAnalysisServiceTests
         return CreateQuery(new[] { valueIsZero }, valueIsZero);
     }
 
-    private static PurityProofResult CreateTransientFailure()
+    private static AnalysisProofResult CreateTransientFailure()
     {
-        return new PurityProofResult(
-            PurityProofOutcome.Unknown,
+        return new AnalysisProofResult(
+            AnalysisProofOutcome.Unknown,
             new ProofCheckInfo(
                 true,
                 Feasibility.Unknown,
@@ -2451,22 +2451,22 @@ public class SmtAnalysisServiceTests
             "path_feasibility_unknown");
     }
 
-    private static PurityProofResult CreateImpureResult()
+    private static AnalysisProofResult CreateImpureResult()
     {
-        return new PurityProofResult(
-            PurityProofOutcome.ProvablyImpure,
+        return new AnalysisProofResult(
+            AnalysisProofOutcome.Disproven,
             new ProofCheckInfo(true, Feasibility.Satisfiable),
             new ProofCheckInfo(true, Feasibility.Satisfiable),
             "impure_call_reachable");
     }
 
-    private sealed class StubProofSearchSession : IPurityProofSearchSession
+    private sealed class StubProofSearchSession : IAnalysisProofSearchSession
     {
-        private readonly Func<PurityProofQuery, TimeSpan, PurityProofResult> _classify;
+        private readonly Func<AnalysisProofQuery, TimeSpan, AnalysisProofResult> _classify;
         private readonly Action? _dispose;
 
         public StubProofSearchSession(
-            Func<PurityProofQuery, TimeSpan, PurityProofResult> classify,
+            Func<AnalysisProofQuery, TimeSpan, AnalysisProofResult> classify,
             Action? dispose = null)
         {
             _classify = classify;
@@ -2475,7 +2475,7 @@ public class SmtAnalysisServiceTests
 
         public long ConsumedResourceCount => 0;
 
-        public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
+        public AnalysisProofResult Classify(AnalysisProofQuery query, TimeSpan timeout)
         {
             return _classify(query, timeout);
         }

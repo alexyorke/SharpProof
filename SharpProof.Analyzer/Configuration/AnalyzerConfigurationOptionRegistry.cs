@@ -28,8 +28,7 @@ internal static class AnalyzerConfigurationOptionRegistry {
             if (!keys.Add(definition.Key))
                 throw new InvalidOperationException($"Duplicate configuration key '{definition.Key}'.");
             if (!Enum.TryParse<AnalyzerConfigurationScope>(definition.Scope, out var scope) ||
-                !Enum.TryParse<AnalyzerConfigurationValueKind>(definition.ValueKind, out var valueKind) ||
-                !Enum.TryParse<PurityPolicyImpact>(definition.PurityPolicyImpact, out var policyImpact))
+                !Enum.TryParse<AnalyzerConfigurationValueKind>(definition.ValueKind, out var valueKind))
                 throw new InvalidOperationException($"Configuration option '{definition.Key}' has invalid enum metadata.");
             return new AnalyzerConfigurationOption(
                 definition.Key,
@@ -42,7 +41,6 @@ internal static class AnalyzerConfigurationOptionRegistry {
                     definition.Unit),
                 definition.Description,
                 definition.AllowedValues.ToImmutableArray(),
-                policyImpact,
                 definition.AcceptedAliases.ToImmutableArray(),
                 definition.ValueDescription,
                 definition.RelatedDiagnostics,
@@ -60,7 +58,6 @@ internal static class AnalyzerConfigurationOptionRegistry {
         public string Unit { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string[] AllowedValues { get; set; } = Array.Empty<string>();
-        public string PurityPolicyImpact { get; set; } = string.Empty;
         public string[] AcceptedAliases { get; set; } = Array.Empty<string>();
         public string ValueDescription { get; set; } = string.Empty;
         public string RelatedDiagnostics { get; set; } = string.Empty;
@@ -92,8 +89,6 @@ internal static class AnalyzerConfigurationOptionRegistry {
                option.AcceptedAliases.Contains(value!.Trim().ToLowerInvariant(), StringComparer.Ordinal);
     }
 
-    public static ImmutableArray<AnalyzerConfigurationOption> PurityPolicyOptions =>
-        All.Where(static option => option.PurityPolicyImpact != PurityPolicyImpact.None).ToImmutableArray();
 }
 
 internal sealed record AnalyzerConfigurationOption(
@@ -103,7 +98,6 @@ internal sealed record AnalyzerConfigurationOption(
     AnalyzerConfigurationDefault Default,
     string Description,
     ImmutableArray<string> AllowedValues = default,
-    PurityPolicyImpact PurityPolicyImpact = PurityPolicyImpact.None,
     ImmutableArray<string> AcceptedAliases = default,
     string ValueDescription = "",
     string RelatedDiagnostics = "",
@@ -149,16 +143,6 @@ internal readonly record struct AnalyzerConfigurationDefault(
 
 }
 
-[Flags]
-internal enum PurityPolicyImpact {
-    None = 0,
-    TrustsPure = 1,
-    ForcesImpure = 2,
-    ChangesStrictness = 4,
-    ChangesAttributeIdentity = 8,
-    EnablesGeneratedOverrides = 16
-}
-
 internal enum AnalyzerConfigurationScope {
     GlobalOnly,
     TreeOnly,
@@ -170,7 +154,7 @@ internal enum AnalyzerConfigurationValueKind {
     StringList,
     NonNegativeInteger,
     PositiveInteger,
-    MissingPuritySuggestionScope,
+    InferredContractSuggestionScope,
     RuntimeHazardMode,
     SmtMode,
     AllowedValue,

@@ -69,17 +69,6 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
     public string ReturnType { get; }
     public string ReturnRefKind { get; }
 
-    internal StructuralMethodIdentity WithContainingMetadataType(string containingMetadataType) {
-        return new StructuralMethodIdentity(
-            containingMetadataType,
-            MethodKind,
-            Name,
-            GenericArity,
-            Parameters,
-            ReturnType,
-            ReturnRefKind);
-    }
-
     internal string ToCanonicalKey() {
         var values = new List<string> {
             KeyPrefix,
@@ -97,53 +86,6 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
         values.Add(Encode(ReturnRefKind));
         values.Add(Encode(ReturnType));
         return string.Join("|", values);
-    }
-
-    internal static bool TryParseCanonicalKey(string? key, out StructuralMethodIdentity identity) {
-        identity = null!;
-        if (string.IsNullOrWhiteSpace(key)) return false;
-
-        var parts = key!.Trim().Split('|');
-        if (parts.Length < 8 || !string.Equals(parts[0], KeyPrefix, StringComparison.Ordinal)) return false;
-        if (!TryDecode(parts[1], out var containingType) ||
-            !TryDecode(parts[2], out var methodKind) ||
-            !TryDecode(parts[3], out var name) ||
-            !int.TryParse(parts[4], System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture, out var arity) ||
-            arity < 0 ||
-            !int.TryParse(parts[5], System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture, out var parameterCount) ||
-            parameterCount < 0 ||
-            parts.Length != 8 + parameterCount * 2)
-            return false;
-
-        var parameters = ImmutableArray.CreateBuilder<StructuralParameterIdentity>(parameterCount);
-        var partIndex = 6;
-        for (var index = 0; index < parameterCount; index++) {
-            if (!TryDecode(parts[partIndex++], out var refKind) ||
-                !TryDecode(parts[partIndex++], out var type))
-                return false;
-            parameters.Add(new StructuralParameterIdentity(type, refKind));
-        }
-
-        if (!TryDecode(parts[partIndex++], out var returnRefKind) ||
-            !TryDecode(parts[partIndex], out var returnType))
-            return false;
-
-        try {
-            identity = new StructuralMethodIdentity(
-                containingType,
-                methodKind,
-                name,
-                arity,
-                parameters,
-                returnType,
-                returnRefKind);
-            return true;
-        }
-        catch (ArgumentException) {
-            return false;
-        }
     }
 
     public bool Equals(StructuralMethodIdentity? other) {
@@ -185,14 +127,4 @@ internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIden
     private static string Encode(string value) =>
         Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
 
-    private static bool TryDecode(string value, out string decoded) {
-        try {
-            decoded = Encoding.UTF8.GetString(Convert.FromBase64String(value));
-            return true;
-        }
-        catch (FormatException) {
-            decoded = string.Empty;
-            return false;
-        }
-    }
 }

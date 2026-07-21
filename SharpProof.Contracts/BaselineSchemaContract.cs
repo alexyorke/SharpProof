@@ -163,21 +163,6 @@ internal static class BaselineSchemaContract {
         !string.IsNullOrWhiteSpace(entry.OperationKind) ||
         !string.IsNullOrWhiteSpace(entry.EvidenceKey);
 
-    internal static string FormatValidationIssue(
-        BaselineSchemaValidationFailure failure,
-        string versionPropertyName,
-        string surfaceName) => failure.Kind switch {
-        BaselineSchemaValidationFailureKind.Missing =>
-            surfaceName + " is missing required " + versionPropertyName,
-        BaselineSchemaValidationFailureKind.NonNumericVersion =>
-            surfaceName + " has a non-numeric " + versionPropertyName,
-        BaselineSchemaValidationFailureKind.UnsupportedVersion =>
-            "unsupported " + surfaceName + " " + versionPropertyName + " '" + failure.Version +
-            "'; supported version is " +
-            SharpProofEvidenceSchema.CurrentVersion,
-        _ => throw new InvalidOperationException("Unknown evidence-schema validation failure.")
-    };
-
     internal static void ValidateOrThrow(
         JsonElement element,
         string versionPropertyName,

@@ -23,7 +23,7 @@ internal sealed record AnalyzerConfiguration(
         var inferredContractSuggestions = new InferredContractSuggestionOptions(
             GetBoolOrDefault(optionSource, ConfigKeys.SuggestInferredContracts, false),
             GetSuggestionScope(optionSource, ConfigKeys.SuggestInferredContractsScope,
-                MissingPuritySuggestionScope.All),
+                InferredContractSuggestionScope.All),
             GetInferredContractKinds(optionSource, InferredContractSuggestionOptions.AllKinds),
             GetInferredContractConfidence(optionSource, ConfigKeys.SuggestInferredContractsMinimumConfidence,
                 InferredContractConfidence.High));
@@ -201,15 +201,15 @@ internal sealed record AnalyzerConfiguration(
                 : fallback
             : fallback;
 
-    private static MissingPuritySuggestionScope GetSuggestionScope(
+    private static InferredContractSuggestionScope GetSuggestionScope(
         ConfigurationOptionSource options,
         string key,
-        MissingPuritySuggestionScope fallback) => options.TryGetValue(key, out var value)
-            ? ParseNormalizedValue(value, fallback, ("all", MissingPuritySuggestionScope.All),
-                ("public", MissingPuritySuggestionScope.Public), ("public-only", MissingPuritySuggestionScope.Public),
-                ("internal", MissingPuritySuggestionScope.Internal),
-                ("internal-only", MissingPuritySuggestionScope.Internal), ("off", MissingPuritySuggestionScope.Off),
-                ("none", MissingPuritySuggestionScope.Off), ("false", MissingPuritySuggestionScope.Off))
+        InferredContractSuggestionScope fallback) => options.TryGetValue(key, out var value)
+            ? ParseNormalizedValue(value, fallback, ("all", InferredContractSuggestionScope.All),
+                ("public", InferredContractSuggestionScope.Public), ("public-only", InferredContractSuggestionScope.Public),
+                ("internal", InferredContractSuggestionScope.Internal),
+                ("internal-only", InferredContractSuggestionScope.Internal), ("off", InferredContractSuggestionScope.Off),
+                ("none", InferredContractSuggestionScope.Off), ("false", InferredContractSuggestionScope.Off))
             : fallback;
 
     private static ImmutableHashSet<string> GetInferredContractKinds(
@@ -289,7 +289,7 @@ internal sealed record AnalyzerConfiguration(
                 GetIntegerError(value, 0, "expected a non-negative integer"),
             AnalyzerConfigurationValueKind.PositiveInteger =>
                 GetIntegerError(value, 1, "expected a positive integer"),
-            AnalyzerConfigurationValueKind.MissingPuritySuggestionScope or
+            AnalyzerConfigurationValueKind.InferredContractSuggestionScope or
                 AnalyzerConfigurationValueKind.RuntimeHazardMode or
                 AnalyzerConfigurationValueKind.SmtMode or
                 AnalyzerConfigurationValueKind.AllowedValue
@@ -404,7 +404,7 @@ internal sealed record AnalyzerTreeConfiguration(
     bool CheckedExceptions,
     bool ReportNullableInconclusive);
 
-internal enum MissingPuritySuggestionScope {
+internal enum InferredContractSuggestionScope {
     All,
     Public,
     Internal,
@@ -418,7 +418,7 @@ internal enum InferredContractConfidence {
 
 internal sealed record InferredContractSuggestionOptions(
     bool Enabled,
-    MissingPuritySuggestionScope Scope,
+    InferredContractSuggestionScope Scope,
     ImmutableHashSet<string> Kinds,
     InferredContractConfidence MinimumConfidence) {
     internal static readonly ImmutableHashSet<string> AllKinds =
@@ -432,7 +432,7 @@ internal sealed record InferredContractSuggestionOptions(
             "requires",
             "nullability");
 
-    public bool IsEnabled => Enabled && Scope != MissingPuritySuggestionScope.Off && Kinds.Count > 0;
+    public bool IsEnabled => Enabled && Scope != InferredContractSuggestionScope.Off && Kinds.Count > 0;
 
     public bool Includes(string kind, InferredContractConfidence confidence) =>
         IsEnabled && Kinds.Contains(kind) && confidence >= MinimumConfidence;

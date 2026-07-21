@@ -1,11 +1,11 @@
 using NUnit.Framework;
-using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Analysis;
 using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Test;
 
 [TestFixture]
-internal class ProofCorePurityProofTests
+internal class AnalysisProofTests
 {
     [Test]
     public void FormulaTraversal_Contains_VisitsNestedConditionalBranches()
@@ -61,35 +61,35 @@ internal class ProofCorePurityProofTests
     }
 
     [Test]
-    public void PurityProof_FalseImpurityCondition_IsProvablyPure()
+    public void AnalysisProof_FalseHazardCondition_IsProven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
 
         var result = search.Classify(
             new SmtBooleanConstant(false),
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("impure_call_unreachable"));
     }
 
     [Test]
-    public void PurityProof_TrueImpurityCondition_IsProvablyImpure()
+    public void AnalysisProof_TrueHazardCondition_IsDisproven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
 
         var result = search.Classify(
             new SmtBooleanConstant(true),
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(result.Reason, Is.EqualTo("impure_call_reachable"));
     }
 
     [Test]
-    public void PurityProof_ContradictoryPath_IsProvablyPure()
+    public void AnalysisProof_ContradictoryPath_IsProven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
 
         var result = search.Classify(
@@ -101,14 +101,14 @@ internal class ProofCorePurityProofTests
             new SmtBooleanConstant(true),
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
 
     [Test]
-    public void PurityProof_ReachableImpurityGuard_IsProvablyImpure()
+    public void AnalysisProof_ReachableHazardGuard_IsDisproven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
 
@@ -117,17 +117,17 @@ internal class ProofCorePurityProofTests
             xIsZero,
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(result.Reason, Is.EqualTo("impure_call_reachable"));
         Assert.That(result.PathCheck.Witness, Is.Not.Null);
-        Assert.That(result.ImpurityCheck.Witness, Is.Not.Null);
-        Assert.That(result.ImpurityCheck.Witness!.Assignments.Single().IntegerValue, Is.EqualTo(0));
+        Assert.That(result.HazardCheck.Witness, Is.Not.Null);
+        Assert.That(result.HazardCheck.Witness!.Assignments.Single().IntegerValue, Is.EqualTo(0));
     }
 
     [Test]
-    public void PurityProof_ApproximateRegexPathDoesNotProveImpurityReachable()
+    public void AnalysisProof_ApproximateRegexPathDoesNotProveHazardReachable()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
         var text = new SmtVariable("text", SmtValueKind.String);
 
         var result = search.Classify(
@@ -142,209 +142,209 @@ internal class ProofCorePurityProofTests
             new SmtBooleanConstant(true),
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
         Assert.That(result.Reason, Is.EqualTo("path_feasibility_unknown"));
     }
 
     [Test]
-    public void PurityProof_NullReceiverCondition_IsProvablyImpure()
+    public void AnalysisProof_NullReceiverCondition_IsDisproven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
         var s = new SmtVariable("s", SmtValueKind.Reference);
         var sIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, s, new SmtNullConstant());
 
         var result = search.Classify(
-            new PurityProofQuery(
+            new AnalysisProofQuery(
                 new[] { sIsNull },
-                new PurityHazard(PurityHazardKind.NullDereference, sIsNull)),
+                new AnalysisHazard(AnalysisHazardKind.NullDereference, sIsNull)),
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(result.Reason, Is.EqualTo("null_dereference_reachable"));
     }
 
     [Test]
-    public void PurityProof_NonZeroGuard_MakesDivideByZeroProvablyPure()
+    public void AnalysisProof_NonZeroGuard_MakesDivideByZeroProven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var divisorNotZero = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, divisor, new SmtIntegerConstant(0));
         var divisorIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, divisor, new SmtIntegerConstant(0));
 
         var result = search.Classify(
-            new PurityProofQuery(
+            new AnalysisProofQuery(
                 new[] { divisorNotZero },
-                new PurityHazard(PurityHazardKind.DivideByZero, divisorIsZero)),
+                new AnalysisHazard(AnalysisHazardKind.DivideByZero, divisorIsZero)),
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("divide_by_zero_unreachable"));
         Assert.That(result.PathCheck.Witness, Is.Not.Null);
         Assert.That(result.PathCheck.Witness!.Assignments.Single().IntegerValue, Is.Not.EqualTo(0));
-        Assert.That(result.ImpurityCheck.Witness?.Status, Is.EqualTo(SmtWitnessStatus.None));
+        Assert.That(result.HazardCheck.Witness?.Status, Is.EqualTo(SmtWitnessStatus.None));
     }
 
     [Test]
-    public void PurityProof_ReachableImpureCall_IsProvablyImpure()
+    public void AnalysisProof_ReachableEffectViolation_IsDisproven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsNonNegative = new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(0));
 
         var result = search.Classify(
-            new PurityProofQuery(
+            new AnalysisProofQuery(
                 new[] { xIsNonNegative },
-                new PurityHazard(PurityHazardKind.ImpureCallReachability, xIsNonNegative)),
+                new AnalysisHazard(AnalysisHazardKind.EffectViolationReachability, xIsNonNegative)),
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(result.Reason, Is.EqualTo("impure_call_reachable"));
     }
 
     [Test]
-    public void PurityProof_InternalOnlyImpureCall_IsConservativeUnknown()
+    public void AnalysisProof_InternalOnlyEffectViolation_IsConservativeUnknown()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
-        var query = new PurityProofQuery(
+        var query = new AnalysisProofQuery(
             new[] { xIsZero },
-            new PurityHazard(
-                PurityHazardKind.ImpureCallReachability,
+            new AnalysisHazard(
+                AnalysisHazardKind.EffectViolationReachability,
                 xIsZero,
-                PurityEffectVisibility.InternalOnly));
+                AnalysisEffectVisibility.InternalOnly));
 
         var result = search.Classify(query, TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo("invalid_internal_only_hazard"));
         Assert.That(result.PathCheck.WasAttempted, Is.False);
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.ImpurityCheck.WasAttempted, Is.False);
-        Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.ImpurityCheck.Witness, Is.Null);
+        Assert.That(result.HazardCheck.WasAttempted, Is.False);
+        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
+        Assert.That(result.HazardCheck.Witness, Is.Null);
     }
 
     [Test]
-    public void PurityProof_SafeStaticCacheRead_IsProvablyPure()
+    public void AnalysisProof_SafeStaticCacheRead_IsProven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
 
         var result = search.Classify(
-            new PurityProofQuery(
+            new AnalysisProofQuery(
                 Array.Empty<SmtFormula>(),
-                new PurityHazard(PurityHazardKind.StaticCacheRead, new SmtBooleanConstant(true))),
+                new AnalysisHazard(AnalysisHazardKind.StaticCacheRead, new SmtBooleanConstant(true))),
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("safe_static_cache_read"));
     }
 
     [Test]
-    public void PurityProof_FreshOwnedObjectWrite_IsProvablyPure()
+    public void AnalysisProof_FreshOwnedObjectWrite_IsProven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
 
         var result = search.Classify(
-            new PurityProofQuery(
+            new AnalysisProofQuery(
                 Array.Empty<SmtFormula>(),
-                new PurityHazard(PurityHazardKind.FreshOwnedObjectWrite, new SmtBooleanConstant(true))),
+                new AnalysisHazard(AnalysisHazardKind.FreshOwnedObjectWrite, new SmtBooleanConstant(true))),
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("fresh_owned_object_write"));
     }
 
     [Test]
-    public void PurityProof_FreshOwnedArrayWrite_IsProvablyPure()
+    public void AnalysisProof_FreshOwnedArrayWrite_IsProven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
 
         var result = search.Classify(
-            new PurityProofQuery(
+            new AnalysisProofQuery(
                 Array.Empty<SmtFormula>(),
-                new PurityHazard(PurityHazardKind.FreshOwnedArrayWrite, new SmtBooleanConstant(true))),
+                new AnalysisHazard(AnalysisHazardKind.FreshOwnedArrayWrite, new SmtBooleanConstant(true))),
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("fresh_owned_array_write"));
     }
 
     [Test]
-    public void PurityProof_CallerVisibleMemoryWrite_IsProvablyImpure()
+    public void AnalysisProof_CallerVisibleMemoryWrite_IsDisproven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
         var memoryWrite = new SmtBooleanConstant(true);
 
         var result = search.Classify(
-            new PurityProofQuery(
+            new AnalysisProofQuery(
                 Array.Empty<SmtFormula>(),
-                new PurityHazard(PurityHazardKind.CallerVisibleMemoryWrite, memoryWrite)),
+                new AnalysisHazard(AnalysisHazardKind.CallerVisibleMemoryWrite, memoryWrite)),
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(result.Reason, Is.EqualTo("caller_visible_memory_write_reachable"));
     }
 
     [Test]
-    public void PurityProof_QueryBranchReachability_ContradictoryGuard_IsProvablyPure()
+    public void AnalysisProof_QueryBranchReachability_ContradictoryGuard_IsProven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
-        var query = new PurityProofQuery(
+        var query = new AnalysisProofQuery(
             new SmtFormula[]
             {
                 new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0))
             },
-            new PurityHazard(
-                PurityHazardKind.BranchReachability,
+            new AnalysisHazard(
+                AnalysisHazardKind.BranchReachability,
                 new SmtBinaryFormula(SmtBinaryOperator.LessThan, x, new SmtIntegerConstant(0))));
 
         var result = search.Classify(query, TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
     }
 
     [Test]
-    public void PurityProof_NullPathConditionsDefaultToEmpty()
+    public void AnalysisProof_NullPathConditionsDefaultToEmpty()
     {
-        using var search = new PurityProofSearch();
-        var query = new PurityProofQuery(
+        using var search = new AnalysisProofSearch();
+        var query = new AnalysisProofQuery(
             null!,
-            new PurityHazard(
-                PurityHazardKind.BranchReachability,
+            new AnalysisHazard(
+                AnalysisHazardKind.BranchReachability,
                 new SmtBooleanConstant(true)));
 
         var result = search.Classify(query, TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Disproven));
         Assert.That(result.Reason, Is.EqualTo("branch_reachable"));
     }
 }
 
-internal static class PurityProofSearchTestExtensions
+internal static class AnalysisProofSearchTestExtensions
 {
-    internal static PurityProofResult Classify(
-        this PurityProofSearch search,
+    internal static AnalysisProofResult Classify(
+        this AnalysisProofSearch search,
         SmtFormula impurityCondition,
         TimeSpan timeout) =>
         search.Classify(
-            new PurityProofQuery(
+            new AnalysisProofQuery(
                 Array.Empty<SmtFormula>(),
-                new PurityHazard(PurityHazardKind.ImpureCallReachability, impurityCondition)),
+                new AnalysisHazard(AnalysisHazardKind.EffectViolationReachability, impurityCondition)),
             timeout);
 
-    internal static PurityProofResult Classify(
-        this PurityProofSearch search,
+    internal static AnalysisProofResult Classify(
+        this AnalysisProofSearch search,
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula impurityCondition,
         TimeSpan timeout) =>
         search.Classify(
-            new PurityProofQuery(
+            new AnalysisProofQuery(
                 pathConditions.ToArray(),
-                new PurityHazard(PurityHazardKind.ImpureCallReachability, impurityCondition)),
+                new AnalysisHazard(AnalysisHazardKind.EffectViolationReachability, impurityCondition)),
             timeout);
 }

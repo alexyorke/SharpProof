@@ -5,7 +5,6 @@ internal enum SymbolicUnknownReasonSource {
     Capability,
     Complexity,
     RuntimeHazard,
-    Purity,
     Ensures
 }
 
@@ -44,9 +43,6 @@ internal static class SymbolicUnknownReasonTaxonomy {
 
     internal static SymbolicUnknownReasonInfo ForCapability(SymbolicCapabilityUnknownReason reason) =>
         Create(SymbolicUnknownReasonSource.Capability, "capability", Describe(reason), reason.ToString());
-
-    internal static SymbolicUnknownReasonInfo ForCapabilityFailure(string? rawReason) =>
-        Failure(SymbolicUnknownReasonSource.Capability, "capability", rawReason);
 
     internal static SymbolicUnknownReasonInfo ForComplexity(SymbolicComplexityUnknownReason reason) =>
         Create(SymbolicUnknownReasonSource.Complexity, "complexity", Describe(reason), reason.ToString());
@@ -96,30 +92,6 @@ internal static class SymbolicUnknownReasonTaxonomy {
             ? Create(SymbolicUnknownReasonSource.Ensures, "ensures",
                 new(SymbolicUnknownReasonCategory.Unknown, "unknown"), rawReason)
             : ChangeSource(ForProof(classified, rawReason), SymbolicUnknownReasonSource.Ensures, "ensures");
-    }
-
-    internal static SymbolicUnknownReasonInfo ForPurity(string? category, string? bclFallbackReason) {
-        if (!string.IsNullOrWhiteSpace(bclFallbackReason))
-            return Create(SymbolicUnknownReasonSource.Purity, "purity",
-                new(SymbolicUnknownReasonCategory.UnsupportedLibraryModel, "library_model_fallback"),
-                bclFallbackReason);
-
-        var descriptor = Contains(category, "unsupported") || Contains(category, "unsafe_pointer")
-            ? new ReasonDescriptor(SymbolicUnknownReasonCategory.UnsupportedOperation, "unsupported_operation")
-            : Contains(category, "dynamic")
-                ? new(SymbolicUnknownReasonCategory.DynamicDispatch, "dynamic_dispatch")
-                : Contains(category, "external") || Contains(category, "unknown_callee")
-                    ? new(SymbolicUnknownReasonCategory.ExternalBoundary, "external_boundary")
-                    : Contains(category, "recursive")
-                        ? new(SymbolicUnknownReasonCategory.RecursiveAnalysis, "recursive_analysis")
-                        : Contains(category, "cancel")
-                            ? new(SymbolicUnknownReasonCategory.Cancellation, "canceled", true)
-                            : Contains(category, "analysis_failure")
-                                ? new(SymbolicUnknownReasonCategory.AnalysisUnavailable, "analysis_failure", true)
-                                : string.Equals(category, "unknown", StringComparison.OrdinalIgnoreCase)
-                                    ? new(SymbolicUnknownReasonCategory.Unknown, "unknown")
-                                    : new(SymbolicUnknownReasonCategory.None, "none");
-        return Create(SymbolicUnknownReasonSource.Purity, "purity", descriptor, category);
     }
 
     private static ReasonDescriptor Describe(SymbolicUnknownReason reason) => reason switch {

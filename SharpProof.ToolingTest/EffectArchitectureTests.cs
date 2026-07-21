@@ -15,6 +15,17 @@ public sealed class EffectArchitectureTests {
                 "SharpProof." + "Effect" + "Summary.csproj")),
             Is.False);
 
+        var removedFiles = new[] {
+            "SharpProof.Contracts/BclPurityFallbackHeuristics.cs",
+            "SharpProof.Contracts/InferredMethodSummary.cs",
+            "SharpProof.Analyzer/Engine/Rules/CompilationSyntaxAccess.cs",
+            "SharpProof.Analyzer/Engine/Rules/InvocationEvidence.cs",
+            "SharpProof.Analyzer/LowerHexEncoding.cs"
+        };
+        foreach (var relativePath in removedFiles)
+            Assert.That(File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))),
+                Is.False, $"Removed compatibility file returned: {relativePath}");
+
         var roots = new[] {
             "SharpProof.Analyzer", "SharpProof.Attributes", "SharpProof.CodeFixes", "SharpProof.Contracts",
             "SharpProof.Package", "SharpProof.Symbolic", "SharpProof.Vsix", "Tools", "config", "docs"
@@ -29,6 +40,12 @@ public sealed class EffectArchitectureTests {
             "Known" + "Pure",
             "Known" + "Impure",
             "Purity" + "Profile",
+            "Purity" + "ProofQuery",
+            "Purity" + "ProofSearch",
+            "Inferred" + "MethodSummary",
+            "Bcl" + "PurityFallbackHeuristics",
+            "Purity" + "PolicyImpact",
+            "Missing" + "PuritySuggestionScope",
             "Allow" + "Synchronization",
             "Pure" + "External"
         };

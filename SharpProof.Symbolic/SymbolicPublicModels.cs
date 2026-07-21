@@ -87,7 +87,7 @@ internal sealed record SymbolicProofInfo(
 
     public string DisplayKind { get; init; } = DisplayKind ?? Backend.ToString();
 
-    internal PurityProofResult? RawResult { get; init; }
+    internal AnalysisProofResult? RawResult { get; init; }
 
     internal static SymbolicProofInfo Unknown(
         SymbolicUnknownReason reason,
@@ -127,7 +127,7 @@ internal sealed record SymbolicProofInfo(
     };
 
     internal static SymbolicProofInfo FromReachability(
-        PurityProofResult result,
+        AnalysisProofResult result,
         SymbolicBudgetInfo? budget) =>
         FromResult(
             result,
@@ -139,24 +139,24 @@ internal sealed record SymbolicProofInfo(
             budget);
 
     internal static SymbolicProofInfo FromImplication(
-        PurityProofResult result,
+        AnalysisProofResult result,
         SymbolicBudgetInfo? budget) =>
         FromResult(
             result,
             result.Outcome switch {
-                PurityProofOutcome.ProvablyPure => SymbolicProofStatus.ProvenTrue,
-                PurityProofOutcome.ProvablyImpure => SymbolicProofStatus.ProvenFalse,
+                AnalysisProofOutcome.Proven => SymbolicProofStatus.ProvenTrue,
+                AnalysisProofOutcome.Disproven => SymbolicProofStatus.ProvenFalse,
                 _ => SymbolicProofStatus.Unknown
             },
             budget);
 
     internal static SymbolicProofInfo FromConditionTruth(
-        PurityProofResult result,
+        AnalysisProofResult result,
         SymbolicProofStatus status,
         SymbolicBudgetInfo? budget) => FromResult(result, status, budget);
 
     private static SymbolicProofInfo FromResult(
-        PurityProofResult result,
+        AnalysisProofResult result,
         SymbolicProofStatus status,
         SymbolicBudgetInfo? budget) => new(
         status,

@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
-using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Analysis;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
@@ -206,7 +206,7 @@ internal class TestClass
         var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
             .ClassifyImplication(new[] { guardFormula! }, inRangeFormula);
 
-        Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(proof.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -250,7 +250,7 @@ internal class TestClass
         var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
             .ClassifyImplication(new[] { guardFormula! }, inRangeFormula);
 
-        Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(proof.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -294,7 +294,7 @@ internal class TestClass
         var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
             .ClassifyImplication(new[] { guardFormula! }, inRangeFormula);
 
-        Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(proof.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -325,7 +325,7 @@ internal class TestClass
         var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
             .ClassifyImplication(Array.Empty<SmtFormula>(), outOfRangeFormula);
 
-        Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(proof.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -372,7 +372,7 @@ internal class TestClass
         var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
             .ClassifyImplication(new[] { guardFormula! }, inRangeFormula);
 
-        Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(proof.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -419,7 +419,7 @@ internal class TestClass
         var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
             .ClassifyImplication(new[] { guardFormula! }, inRangeFormula);
 
-        Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(proof.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -453,7 +453,7 @@ internal class TestClass
         var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
             .ClassifyImplication(Array.Empty<SmtFormula>(), outOfRangeFormula);
 
-        Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(proof.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -557,7 +557,7 @@ internal class TestClass
                 Array.Empty<SmtFormula>(),
                 new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, minFormula!, new SmtIntegerConstant(10)));
 
-        Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(proof.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -590,7 +590,7 @@ internal class TestClass
                 Array.Empty<SmtFormula>(),
                 new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, maxFormula!, new SmtIntegerConstant(0)));
 
-        Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(proof.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]
@@ -651,7 +651,7 @@ internal class TestClass
         var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
             .ClassifyImplication(new[] { guardFormula! }, inRangeFormula);
 
-        Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(proof.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
     }
 
     [Test]

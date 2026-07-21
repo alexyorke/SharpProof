@@ -37,6 +37,6 @@ internal sealed record SmtFeasibilityResult(
     Feasibility Feasibility,
     SmtSatisfyingWitness Witness);
 
-internal sealed record SmtPathAndImpurityCheckResult(
+internal sealed record SmtPathAndHazardCheckResult(
     SmtFeasibilityResult Path,
     SmtFeasibilityResult Impurity);

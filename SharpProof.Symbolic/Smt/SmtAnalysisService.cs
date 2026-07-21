@@ -2,8 +2,8 @@ namespace SharpProof.Symbolic.Smt;
 
 internal sealed class SmtAnalysisService : IDisposable {
     private const int PreNormalizationFormulaDepthLimit = 1024;
-    private static readonly Func<IPurityProofSearchSession> s_defaultProofSearchFactory =
-        static () => new PurityProofSearch();
+    private static readonly Func<IAnalysisProofSearchSession> s_defaultProofSearchFactory =
+        static () => new AnalysisProofSearch();
 
     private readonly SmtAnalysisBudget _budget;
     private readonly SmtProofResultCache _proofResults = new();
@@ -25,7 +25,7 @@ internal sealed class SmtAnalysisService : IDisposable {
 
     internal SmtAnalysisService(
         SmtAnalysisOptions options,
-        Func<IPurityProofSearchSession> proofSearchFactory) {
+        Func<IAnalysisProofSearchSession> proofSearchFactory) {
         SmtNativeLibraryBootstrap.TryLoadAdjacentLibrary();
         Options = options ?? throw new ArgumentNullException(nameof(options));
         _budget = new SmtAnalysisBudget(Options.MethodBudget);
@@ -85,25 +85,25 @@ internal sealed class SmtAnalysisService : IDisposable {
         }
     }
 
-    internal PurityProofResult ClassifyPathFeasibility(IEnumerable<SmtFormula> pathConditions) => Classify(new PurityProofQuery(
+    internal AnalysisProofResult ClassifyPathFeasibility(IEnumerable<SmtFormula> pathConditions) => Classify(new AnalysisProofQuery(
             pathConditions.ToArray(),
-            new PurityHazard(
-                PurityHazardKind.BranchReachability,
+            new AnalysisHazard(
+                AnalysisHazardKind.BranchReachability,
                 new SmtBooleanConstant(true))));
 
-    internal PurityProofResult ClassifyImplication(
+    internal AnalysisProofResult ClassifyImplication(
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula factFormula) {
         if (factFormula == null) throw new ArgumentNullException(nameof(factFormula));
 
-        return Classify(new PurityProofQuery(
+        return Classify(new AnalysisProofQuery(
             pathConditions.ToArray(),
-            new PurityHazard(
-                PurityHazardKind.BranchReachability,
+            new AnalysisHazard(
+                AnalysisHazardKind.BranchReachability,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, factFormula))));
     }
 
-    internal PurityProofResult Classify(PurityProofQuery query) {
+    internal AnalysisProofResult Classify(AnalysisProofQuery query) {
         if (_disposed) return Unknown("smt_disposed");
 
         if (!Options.IsEnabled) return Unknown("smt_disabled");
@@ -129,7 +129,7 @@ internal sealed class SmtAnalysisService : IDisposable {
                 Options.MaxExpressionNodes))
             return Unknown("smt_expression_budget_exceeded");
 
-        var normalizedQuery = new PurityProofQuery(pathConditions, query.Hazard);
+        var normalizedQuery = new AnalysisProofQuery(pathConditions, query.Hazard);
         var key = CreateQueryKey(normalizedQuery);
         if (_proofResults.TryGetLocal(key, out var cached)) return cached;
 
@@ -143,8 +143,8 @@ internal sealed class SmtAnalysisService : IDisposable {
         return ClassifyLocally(normalizedQuery, key);
     }
 
-    private PurityProofResult ClassifyWithSharedQueryFlight(
-        PurityProofQuery query,
+    private AnalysisProofResult ClassifyWithSharedQueryFlight(
+        AnalysisProofQuery query,
         string queryKey) {
         var flight = _proofResults.AcquireSharedFlight(Options, queryKey, () => {
             if (_proofResults.TryGetShared(Options, queryKey, out var racedSharedResult))
@@ -154,7 +154,7 @@ internal sealed class SmtAnalysisService : IDisposable {
                 ? Unknown("smt_method_budget_exceeded")
                 : ClassifyCore(query);
         });
-        PurityProofResult result;
+        AnalysisProofResult result;
         try {
             result = flight.Result.Value;
             if (flight.OwnsFlight) {
@@ -174,8 +174,8 @@ internal sealed class SmtAnalysisService : IDisposable {
             : ClassifyLocally(query, queryKey);
     }
 
-    private PurityProofResult ClassifyLocally(
-        PurityProofQuery query,
+    private AnalysisProofResult ClassifyLocally(
+        AnalysisProofQuery query,
         string queryKey) {
         if (_proofResults.TryGetShared(Options, queryKey, out var sharedResult)) {
             _proofResults.AddLocal(queryKey, sharedResult);
@@ -190,7 +190,7 @@ internal sealed class SmtAnalysisService : IDisposable {
         return result;
     }
 
-    private PurityProofResult ClassifyCore(PurityProofQuery query) {
+    private AnalysisProofResult ClassifyCore(AnalysisProofQuery query) {
         var queryClock = Stopwatch.StartNew();
         try {
             lock (_solverLock) {
@@ -198,7 +198,7 @@ internal sealed class SmtAnalysisService : IDisposable {
                 if (IsPermanentlyUnavailable) return Unknown("smt_unavailable");
 
                 for (var attempt = 0; ; attempt++) {
-                    PurityProofResult result;
+                    AnalysisProofResult result;
                     try {
                         Interlocked.Increment(ref _executedQueryCount);
                         var search = _proofSearchSessions.GetOrCreate();
@@ -253,8 +253,8 @@ internal sealed class SmtAnalysisService : IDisposable {
         }
     }
 
-    private static PurityProofResult Unknown(string reason) => new PurityProofResult(
-            PurityProofOutcome.Unknown,
+    private static AnalysisProofResult Unknown(string reason) => new AnalysisProofResult(
+            AnalysisProofOutcome.Unknown,
             new ProofCheckInfo(false, Feasibility.Unknown),
             new ProofCheckInfo(false, Feasibility.Unknown),
             reason);
@@ -337,7 +337,7 @@ internal sealed class SmtAnalysisService : IDisposable {
         }
     }
 
-    private static string CreateQueryKey(PurityProofQuery query) => CreateFormulaSequenceKey(query.PathConditions) +
+    private static string CreateQueryKey(AnalysisProofQuery query) => CreateFormulaSequenceKey(query.PathConditions) +
                "|hazard=" + (int)query.Hazard.Kind +
                "|visibility=" + (int)query.Hazard.Visibility +
                "|trigger=" + SmtFormulaStructuralKey.Create(query.Hazard.TriggerCondition);
@@ -365,14 +365,14 @@ internal sealed class SmtAnalysisService : IDisposable {
     }
 
     private static bool TryClassifyConcreteFacts(
-        PurityProofQuery query,
+        AnalysisProofQuery query,
         ImmutableArray<SmtFormula> pathConditions,
-        out PurityProofResult result) {
+        out AnalysisProofResult result) {
         var preprocessor = new SmtConcreteFactPreprocessor();
         var pathStatus = preprocessor.Prepare(pathConditions.ToArray(), out _);
         if (pathStatus == SmtConcreteFactPreparationStatus.Unsatisfiable) {
-            result = new PurityProofResult(
-                PurityProofOutcome.ProvablyPure,
+            result = new AnalysisProofResult(
+                AnalysisProofOutcome.Proven,
                 new ProofCheckInfo(true, Feasibility.Unsatisfiable),
                 new ProofCheckInfo(false, Feasibility.Unknown),
                 "path_unsatisfiable");
@@ -385,8 +385,8 @@ internal sealed class SmtAnalysisService : IDisposable {
             pathConditions.CopyTo(combined);
             combined[combined.Length - 1] = query.Hazard.TriggerCondition;
             if (preprocessor.Prepare(combined, out _) == SmtConcreteFactPreparationStatus.Unsatisfiable) {
-                result = new PurityProofResult(
-                    PurityProofOutcome.ProvablyPure,
+                result = new AnalysisProofResult(
+                    AnalysisProofOutcome.Proven,
                     new ProofCheckInfo(false, Feasibility.Unknown),
                     new ProofCheckInfo(true, Feasibility.Unsatisfiable),
                     pureReason);
@@ -398,15 +398,15 @@ internal sealed class SmtAnalysisService : IDisposable {
         return false;
     }
 
-    private static string GetConcreteTriggerPureReason(PurityHazard hazard) =>
-        hazard.Visibility == PurityEffectVisibility.InternalOnly
+    private static string GetConcreteTriggerPureReason(AnalysisHazard hazard) =>
+        hazard.Visibility == AnalysisEffectVisibility.InternalOnly
             ? string.Empty
             : hazard.Kind switch {
-                PurityHazardKind.BranchReachability => "branch_unreachable",
-                PurityHazardKind.ImpureCallReachability => "impure_call_unreachable",
-                PurityHazardKind.CallerVisibleMemoryWrite => "memory_write_unreachable",
-                PurityHazardKind.NullDereference => "null_dereference_unreachable",
-                PurityHazardKind.DivideByZero => "divide_by_zero_unreachable",
+                AnalysisHazardKind.BranchReachability => "branch_unreachable",
+                AnalysisHazardKind.EffectViolationReachability => "impure_call_unreachable",
+                AnalysisHazardKind.CallerVisibleMemoryWrite => "memory_write_unreachable",
+                AnalysisHazardKind.NullDereference => "null_dereference_unreachable",
+                AnalysisHazardKind.DivideByZero => "divide_by_zero_unreachable",
                 _ => string.Empty
             };
 

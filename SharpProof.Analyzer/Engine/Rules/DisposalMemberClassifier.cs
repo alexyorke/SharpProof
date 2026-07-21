@@ -8,26 +8,6 @@ internal static class DisposalMemberClassifier {
             ? FindDisposalMember(type, compilation, true) ?? FindDisposalMember(type, compilation, false)
             : FindDisposalMember(type, compilation, false) ?? FindDisposalMember(type, compilation, true);
 
-    internal static IEnumerable<IMethodSymbol> EnumerateRuntimeDisposalMembers(
-        ITypeSymbol type,
-        bool async) {
-        var methodName = async ? "DisposeAsync" : "Dispose";
-
-        var baseMembers = TypeHierarchyEnumeration
-            .EnumerateBaseTypeMembers<IMethodSymbol>(type, methodName)
-            .Where(static method => !method.IsStatic && method.Parameters.Length == 0);
-
-        var interfaceMembers = type is INamedTypeSymbol namedType
-            ? TypeHierarchyEnumeration.EnumerateInterfaceMethodImplementations(
-                namedType,
-                methodName,
-                interfaceType => async ? IsAsyncDisposable(interfaceType) : IsDisposable(interfaceType),
-                static method => !method.IsStatic && method.Parameters.Length == 0)
-            : Enumerable.Empty<IMethodSymbol>();
-
-        return baseMembers.Concat(interfaceMembers).DistinctByOriginalDefinition();
-    }
-
     internal static bool IsAsyncDisposable(INamedTypeSymbol type) =>
         TypeHierarchyEnumeration.IsTypeNamed(type, "System", "IAsyncDisposable", 0);
 
@@ -52,8 +32,5 @@ internal static class DisposalMemberClassifier {
 
         return null;
     }
-
-    private static bool IsDisposable(INamedTypeSymbol type) =>
-        type.OriginalDefinition.SpecialType == SpecialType.System_IDisposable;
 
 }

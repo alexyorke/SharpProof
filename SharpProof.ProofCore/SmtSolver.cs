@@ -102,7 +102,7 @@ internal sealed class SmtSolver : IDisposable {
         }
     }
 
-    public SmtPathAndImpurityCheckResult CheckPathAndImpurityWithWitness(
+    public SmtPathAndHazardCheckResult CheckPathAndHazardWithWitness(
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula impurityCondition,
         TimeSpan timeout) {
@@ -110,7 +110,7 @@ internal sealed class SmtSolver : IDisposable {
         var deadline = Stopwatch.StartNew();
         var path = CheckSatisfiability(normalizedPathConditions, timeout, true);
         if (path.Feasibility == Feasibility.Unsatisfiable)
-            return new SmtPathAndImpurityCheckResult(
+            return new SmtPathAndHazardCheckResult(
                 path,
                 new SmtFeasibilityResult(
                     Feasibility.Unknown,
@@ -124,7 +124,7 @@ internal sealed class SmtSolver : IDisposable {
             : CheckSatisfiability(
                 normalizedPathConditions.Concat(new[] { impurityCondition }),
                 remaining);
-        return new SmtPathAndImpurityCheckResult(path, impurity);
+        return new SmtPathAndHazardCheckResult(path, impurity);
     }
 
     private SmtFeasibilityResult CheckSatisfiabilityRawWithWitness(

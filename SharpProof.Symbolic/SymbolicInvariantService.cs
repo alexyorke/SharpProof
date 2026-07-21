@@ -237,7 +237,7 @@ internal sealed record SymbolicProgramPointAnalysis(
     SymbolicSmtDiagnostics SmtDiagnostics,
     [property: JsonIgnore] SyntaxNode SourceNode,
     [property: JsonIgnore] SymbolicAnalysisTruncationInfo AnalysisTruncation,
-    [property: JsonIgnore] PurityProofResult? ReachabilityProof = null) {
+    [property: JsonIgnore] AnalysisProofResult? ReachabilityProof = null) {
     internal SymbolicProgramPointAnalysis(
         int spanStart,
         IReadOnlyList<SmtFormula> pathConditions,

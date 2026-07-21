@@ -3,7 +3,7 @@ namespace SharpProof.Analyzer;
 internal static partial class ExceptionFlowAnalyzer {
     public static void AnalyzeSymbolForExceptions(
         MethodBodyAnalysisContext context,
-        AnalyzerProofService purityService,
+        AnalyzerProofService proofService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var runtimeHazardMode = context.Configuration.RuntimeHazardMode;
@@ -41,7 +41,7 @@ internal static partial class ExceptionFlowAnalyzer {
                         context.Node,
                         context.SemanticModel,
                         context.CancellationToken,
-                        purityService.SmtAnalysis,
+                        proofService.SmtAnalysis,
                         attributePolicy));
 
             if (reportUnknownRuntimeHazards) {
@@ -51,7 +51,7 @@ internal static partial class ExceptionFlowAnalyzer {
                         context.Node,
                         context.SemanticModel,
                         context.CancellationToken,
-                        purityService.SmtAnalysis));
+                        proofService.SmtAnalysis));
                 unknownRuntimeHazards = hazardResult.RawHazards
                     .Where(static hazard =>
                         hazard.Status is SymbolicRuntimeHazardStatus.Unknown or

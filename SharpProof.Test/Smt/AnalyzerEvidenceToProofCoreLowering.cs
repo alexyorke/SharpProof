@@ -1,19 +1,19 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Analysis;
 using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Test.Smt;
 
-internal enum AnalyzerPurityHazardKind
+internal enum AnalyzerAnalysisHazardKind
 {
-    ImpureCallReachability,
+    EffectViolationReachability,
     NullDereference,
     DivideByZero
 }
 
 internal sealed record AnalyzerPurityEvidence(
-    AnalyzerPurityHazardKind Kind,
+    AnalyzerAnalysisHazardKind Kind,
     IReadOnlyList<ExpressionSyntax> PathConditions,
     ExpressionSyntax TriggerCondition);
 
@@ -23,7 +23,7 @@ internal static class AnalyzerEvidenceToProofCoreLowering
         AnalyzerPurityEvidence evidence,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out PurityProofQuery? query)
+        out AnalysisProofQuery? query)
     {
         var pathConditions = new List<SmtFormula>(evidence.PathConditions.Count);
         foreach (var pathCondition in evidence.PathConditions)
@@ -45,19 +45,19 @@ internal static class AnalyzerEvidenceToProofCoreLowering
             return false;
         }
 
-        query = new PurityProofQuery(
+        query = new AnalysisProofQuery(
             pathConditions,
-            new PurityHazard(MapKind(evidence.Kind), triggerFormula));
+            new AnalysisHazard(MapKind(evidence.Kind), triggerFormula));
         return true;
     }
 
-    private static PurityHazardKind MapKind(AnalyzerPurityHazardKind kind)
+    private static AnalysisHazardKind MapKind(AnalyzerAnalysisHazardKind kind)
     {
         return kind switch
         {
-            AnalyzerPurityHazardKind.ImpureCallReachability => PurityHazardKind.ImpureCallReachability,
-            AnalyzerPurityHazardKind.NullDereference => PurityHazardKind.NullDereference,
-            AnalyzerPurityHazardKind.DivideByZero => PurityHazardKind.DivideByZero,
+            AnalyzerAnalysisHazardKind.EffectViolationReachability => AnalysisHazardKind.EffectViolationReachability,
+            AnalyzerAnalysisHazardKind.NullDereference => AnalysisHazardKind.NullDereference,
+            AnalyzerAnalysisHazardKind.DivideByZero => AnalysisHazardKind.DivideByZero,
             _ => throw new InvalidOperationException("Unsupported analyzer hazard kind.")
         };
     }

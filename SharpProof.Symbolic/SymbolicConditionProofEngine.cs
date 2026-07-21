@@ -241,7 +241,7 @@ internal sealed class SymbolicConditionProofEngine(SymbolicInvariantService _inv
                                      "ir_condition_false_branch_feasibility_unknown" or
                                      "ir_condition_both_branches_feasible";
         var selectedModel = unknownTrueBranch
-            ? rawResult?.ImpurityCheck.Witness ?? rawResult?.PathCheck.Witness
+            ? rawResult?.HazardCheck.Witness ?? rawResult?.PathCheck.Witness
             : truthValue == SymbolicTruthValue.Unknown
                 ? null
                 : rawResult?.PathCheck.Witness;
@@ -253,7 +253,7 @@ internal sealed class SymbolicConditionProofEngine(SymbolicInvariantService _inv
             SymbolicWitnessStatus.Unsupported,
             "condition_witness_unavailable");
         var counterexampleModel = unknownFalseBranch
-            ? rawResult?.ImpurityCheck.Witness ?? rawResult?.PathCheck.Witness
+            ? rawResult?.HazardCheck.Witness ?? rawResult?.PathCheck.Witness
             : null;
         var counterexample = counterexampleModel != null
             ? SymbolicInputWitnessFactory.Create(

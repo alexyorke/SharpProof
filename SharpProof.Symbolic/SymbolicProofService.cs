@@ -289,15 +289,15 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
         return result;
     }
 
-    private PurityProofResult ClassifyPathFeasibility(IEnumerable<SmtFormula> pathConditions) =>
+    private AnalysisProofResult ClassifyPathFeasibility(IEnumerable<SmtFormula> pathConditions) =>
         Execute(service => service.ClassifyPathFeasibility(pathConditions));
 
-    private PurityProofResult ClassifyRawImplication(
+    private AnalysisProofResult ClassifyRawImplication(
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula factFormula) =>
         Execute(service => service.ClassifyImplication(pathConditions, factFormula));
 
-    private PurityProofResult Execute(Func<SmtAnalysisService, PurityProofResult> classify) {
+    private AnalysisProofResult Execute(Func<SmtAnalysisService, AnalysisProofResult> classify) {
         if (smtAnalysis != null) return classify(smtAnalysis);
 
         using var fallback = new SmtAnalysisService(SmtAnalysisOptions.Default);

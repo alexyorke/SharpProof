@@ -139,14 +139,6 @@ internal static class DiagnosticEvidenceKey {
         return Build(kind, spanStart, spanLength, segments);
     }
 
-    internal static string ForSpanEnd(
-        string kind,
-        int spanStart,
-        int spanEnd,
-        params string?[] segments) {
-        return Build(kind, spanStart, spanEnd, segments);
-    }
-
     private static string Build(
         string kind,
         int spanStart,

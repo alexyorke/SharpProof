@@ -28,9 +28,6 @@ internal static class RoslynStructuralMethodIdentity {
     internal static string GetCanonicalKey(IMethodSymbol method) =>
         Create(method).ToCanonicalKey();
 
-    internal static ImmutableArray<string> GetCanonicalKeys(IMethodSymbol method) =>
-        ImmutableArray.Create(GetCanonicalKey(method));
-
     internal static string GetTypeKey(ITypeSymbol type) {
         if (type == null) throw new ArgumentNullException(nameof(type));
 

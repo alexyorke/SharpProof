@@ -41,37 +41,10 @@ internal sealed class SharpProofAttributeIdentityPolicy {
         return new SharpProofAttributeIdentityPolicy(builder.ToImmutable());
     }
 
-    internal INamedTypeSymbol? ResolveAttributeSymbol(
-        Compilation compilation,
-        string attributeTypeName) {
-        var official = compilation.GetTypeByMetadataName(OfficialNamespace + "." + attributeTypeName);
-        if (official != null) return official;
-
-        foreach (var namespaceName in _acceptedNamespaces.OrderBy(static value => value, StringComparer.Ordinal)) {
-            if (string.Equals(namespaceName, OfficialNamespace, StringComparison.Ordinal)) continue;
-
-            var metadataName = namespaceName.Length == 0
-                ? attributeTypeName
-                : namespaceName + "." + attributeTypeName;
-            var symbol = compilation.GetTypeByMetadataName(metadataName);
-            if (symbol != null) return symbol;
-        }
-
-        return null;
-    }
-
     internal bool HasAttribute(
         ISymbol symbol,
         string attributeTypeName) {
         return GetAcceptedAttributes(symbol, attributeTypeName).Any();
-    }
-
-    internal INamedTypeSymbol? GetAppliedAttributeSymbol(
-        ISymbol symbol,
-        string attributeTypeName) {
-        return GetAcceptedAttributes(symbol, attributeTypeName)
-            .Select(static attribute => attribute.AttributeClass?.OriginalDefinition)
-            .FirstOrDefault(static attributeClass => attributeClass != null);
     }
 
     internal IEnumerable<AttributeData> GetAcceptedAttributes(

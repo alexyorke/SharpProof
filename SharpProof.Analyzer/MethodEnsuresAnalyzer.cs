@@ -3,7 +3,7 @@ namespace SharpProof.Analyzer;
 internal static class MethodEnsuresAnalyzer {
     internal static void AnalyzeSymbolForEnsures(
         MethodBodyAnalysisContext context,
-        AnalyzerProofService purityService,
+        AnalyzerProofService proofService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
@@ -115,7 +115,7 @@ internal static class MethodEnsuresAnalyzer {
             }
 
             foreach (var completionSite in completionSites) {
-                if (!purityService.SmtAnalysis.Options.IsEnabled) {
+                if (!proofService.SmtAnalysis.Options.IsEnabled) {
                     var diagnostic = CreateUnsupportedDiagnostic(
                         methodSymbol,
                         contract.Condition,
@@ -148,7 +148,7 @@ internal static class MethodEnsuresAnalyzer {
                     RequiresContractHelpers.CombineAsImplication(requiresAssumptions, rewrittenCondition);
                 var proof = MethodCompletionAnalysis.Prove(
                     context,
-                    purityService.SmtAnalysis,
+                    proofService.SmtAnalysis,
                     completionSite,
                     proofCondition);
 

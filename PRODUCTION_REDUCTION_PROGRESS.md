@@ -63,7 +63,7 @@ Tests are excluded from the metric and must not be deleted.
   analyzer behavior solely for test inspection. The retained audit tests now
   own their expected documentation contract and continue exercising the real
   configuration and precedence paths.
-- [x] Made `PurityProofQuery` the only ProofCore hazard-classification request
+- [x] Made `AnalysisProofQuery` the only ProofCore hazard-classification request
   path and migrated wrapper-specific tests to it. Removed seven service-specific
   classification entry points, a conversion-only lowering adapter, and four
   unreachable helpers across ProofCore, Symbolic, CLI, and EffectSummary.

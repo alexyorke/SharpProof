@@ -380,14 +380,14 @@ internal static class InferredContractSuggestionAnalyzer {
             LocalFunctionStatementSyntax;
     }
 
-    private static bool MatchesScope(IMethodSymbol methodSymbol, MissingPuritySuggestionScope scope) {
+    private static bool MatchesScope(IMethodSymbol methodSymbol, InferredContractSuggestionScope scope) {
         return scope switch {
-            MissingPuritySuggestionScope.All => true,
-            MissingPuritySuggestionScope.Public =>
+            InferredContractSuggestionScope.All => true,
+            InferredContractSuggestionScope.Public =>
                 methodSymbol.DeclaredAccessibility is Accessibility.Public or
                     Accessibility.Protected or
                     Accessibility.ProtectedOrInternal,
-            MissingPuritySuggestionScope.Internal =>
+            InferredContractSuggestionScope.Internal =>
                 methodSymbol.DeclaredAccessibility is Accessibility.Internal or
                     Accessibility.ProtectedAndInternal or
                     Accessibility.ProtectedOrInternal,

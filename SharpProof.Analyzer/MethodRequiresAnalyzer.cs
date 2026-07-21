@@ -5,7 +5,7 @@ namespace SharpProof.Analyzer;
 internal static class MethodRequiresAnalyzer {
     internal static void AnalyzeSymbolForRequires(
         MethodBodyAnalysisContext context,
-        AnalyzerProofService purityService,
+        AnalyzerProofService proofService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
@@ -52,12 +52,12 @@ internal static class MethodRequiresAnalyzer {
                         null));
         }
 
-        AnalyzeCallSitesForRequires(context, purityService, baseline, attributePolicy);
+        AnalyzeCallSitesForRequires(context, proofService, baseline, attributePolicy);
     }
 
     private static void AnalyzeCallSitesForRequires(
         MethodBodyAnalysisContext context,
-        AnalyzerProofService purityService,
+        AnalyzerProofService proofService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         foreach (var callSite in context.Snapshot.VisibleOperations.SelectMany(static operation =>
@@ -93,7 +93,7 @@ internal static class MethodRequiresAnalyzer {
                     continue;
                 }
 
-                if (!purityService.SmtAnalysis.Options.IsEnabled) {
+                if (!proofService.SmtAnalysis.Options.IsEnabled) {
                     ReportIfNotSuppressed(
                         context,
                         baseline,
@@ -109,7 +109,7 @@ internal static class MethodRequiresAnalyzer {
                 var proof = context.State.ProveAtNode(
                     callSite.Syntax,
                     rewrittenCondition,
-                    purityService.SmtAnalysis,
+                    proofService.SmtAnalysis,
                     includeCurrentStatementCompletionFacts: false,
                     context.CancellationToken);
 

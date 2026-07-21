@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 using NUnit.Framework;
-using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Analysis;
 using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Test;
@@ -1916,20 +1916,20 @@ internal class ProofCoreZ3SmokeTests
     }
 
     [Test]
-    public void PurityProof_NonNullGuard_MakesNullDereferenceProvablyPure()
+    public void AnalysisProof_NonNullGuard_MakesNullDereferenceProven()
     {
-        using var search = new PurityProofSearch();
+        using var search = new AnalysisProofSearch();
         var s = new SmtVariable("s", SmtValueKind.Reference);
         var sIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, s, new SmtNullConstant());
         var sIsNotNull = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, s, new SmtNullConstant());
 
         var result = search.Classify(
-            new PurityProofQuery(
+            new AnalysisProofQuery(
                 new[] { sIsNotNull },
-                new PurityHazard(PurityHazardKind.NullDereference, sIsNull)),
+                new AnalysisHazard(AnalysisHazardKind.NullDereference, sIsNull)),
             TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("null_dereference_unreachable"));
     }
 }

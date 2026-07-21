@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
-using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Analysis;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
@@ -160,7 +160,7 @@ internal class SymbolicProofModelTests
         return new SymbolicState(new[] { fact });
     }
 
-    private sealed class SequencedProofSearchSession : IPurityProofSearchSession
+    private sealed class SequencedProofSearchSession : IAnalysisProofSearchSession
     {
         private readonly Queue<string> _reasons;
 
@@ -173,12 +173,12 @@ internal class SymbolicProofModelTests
 
         public long ConsumedResourceCount => 0;
 
-        public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
+        public AnalysisProofResult Classify(AnalysisProofQuery query, TimeSpan timeout)
         {
             ClassificationCount++;
             var reason = _reasons.Dequeue();
-            return new PurityProofResult(
-                PurityProofOutcome.Unknown,
+            return new AnalysisProofResult(
+                AnalysisProofOutcome.Unknown,
                 new ProofCheckInfo(true, Feasibility.Unknown),
                 new ProofCheckInfo(false, Feasibility.Unknown),
                 reason);

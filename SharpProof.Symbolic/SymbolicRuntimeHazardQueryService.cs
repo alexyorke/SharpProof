@@ -235,7 +235,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
         string reason) {
         var rawProof = triggerProof?.RawResult;
         if (analysis.Reachability == SymbolicReachability.Unreachable ||
-            rawProof?.ImpurityCheck.Feasibility == Feasibility.Unsatisfiable)
+            rawProof?.HazardCheck.Feasibility == Feasibility.Unsatisfiable)
             return SymbolicInputWitnessFactory.None(reason);
 
         if (!SymbolicIrFormulaEncoder.TryEncode(triggerCondition, out var encodedTrigger))
