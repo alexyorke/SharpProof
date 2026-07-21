@@ -1209,7 +1209,6 @@ public class SmtAnalysisServiceTests {
         var left = Bool("bool_equiv_left_" + Guid.NewGuid().ToString("N"));
         var middle = Bool("bool_equiv_middle_" + Guid.NewGuid().ToString("N"));
         var right = Bool("bool_equiv_right_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(left, middle),
@@ -1217,13 +1216,7 @@ public class SmtAnalysisServiceTests {
         };
         var fact = Equal(left, right);
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
@@ -1231,7 +1224,6 @@ public class SmtAnalysisServiceTests {
         var left = Bool("bool_neg_left_" + Guid.NewGuid().ToString("N"));
         var middle = Bool("bool_neg_middle_" + Guid.NewGuid().ToString("N"));
         var right = Bool("bool_neg_right_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             NotEqual(left, middle),
@@ -1239,13 +1231,7 @@ public class SmtAnalysisServiceTests {
         };
         var fact = Equal(left, right);
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
@@ -1253,7 +1239,6 @@ public class SmtAnalysisServiceTests {
         var left = Bool("bool_not_rel_left_" + Guid.NewGuid().ToString("N"));
         var middle = Bool("bool_not_rel_middle_" + Guid.NewGuid().ToString("N"));
         var right = Bool("bool_not_rel_right_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtBinaryFormula(
@@ -1264,13 +1249,7 @@ public class SmtAnalysisServiceTests {
         };
         var fact = NotEqual(left, right);
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
@@ -1278,7 +1257,6 @@ public class SmtAnalysisServiceTests {
         var left = Bool("bool_not_parity_left_" + Guid.NewGuid().ToString("N"));
         var middle = Bool("bool_not_parity_middle_" + Guid.NewGuid().ToString("N"));
         var right = Bool("bool_not_parity_right_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtBinaryFormula(
@@ -1289,13 +1267,7 @@ public class SmtAnalysisServiceTests {
             Equal(left, right)
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1303,7 +1275,6 @@ public class SmtAnalysisServiceTests {
         var left = Bool("bool_parity_left_" + Guid.NewGuid().ToString("N"));
         var middle = Bool("bool_parity_middle_" + Guid.NewGuid().ToString("N"));
         var right = Bool("bool_parity_right_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(left, middle),
@@ -1311,20 +1282,13 @@ public class SmtAnalysisServiceTests {
             Equal(left, right)
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
     public void ClassifyPathFeasibility_IntegerAliasIntervalContradiction_BypassesSolver() {
         var x = Int("alias_int_x_" + Guid.NewGuid().ToString("N"));
         var y = Int("alias_int_y_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             GreaterThanOrEqual(x, Integer(10)),
@@ -1332,20 +1296,13 @@ public class SmtAnalysisServiceTests {
             LessThan(y, Integer(10))
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
     public void ClassifyImplication_IntegerAliasIntervalEntailment_BypassesSolver() {
         var x = Int("alias_entail_x_" + Guid.NewGuid().ToString("N"));
         var y = Int("alias_entail_y_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(x, y),
@@ -1353,13 +1310,7 @@ public class SmtAnalysisServiceTests {
         };
         var fact = GreaterThanOrEqual(y, Integer(3));
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
@@ -1368,7 +1319,6 @@ public class SmtAnalysisServiceTests {
         var y = Int("affine_offset_alias_y_" + Guid.NewGuid().ToString("N"));
         var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
         var yPlusFour = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, Integer(4));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             GreaterThanOrEqual(x, Integer(5)),
@@ -1376,13 +1326,7 @@ public class SmtAnalysisServiceTests {
             LessThan(y, Integer(3))
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1391,7 +1335,6 @@ public class SmtAnalysisServiceTests {
         var y = Int("affine_offset_entail_y_" + Guid.NewGuid().ToString("N"));
         var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
         var yPlusFour = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, Integer(4));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(xPlusTwo, yPlusFour),
@@ -1399,13 +1342,7 @@ public class SmtAnalysisServiceTests {
         };
         var fact = GreaterThanOrEqual(y, Integer(3));
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
@@ -1413,19 +1350,12 @@ public class SmtAnalysisServiceTests {
         var x = Int("same_base_affine_x_" + Guid.NewGuid().ToString("N"));
         var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
         var xPlusThree = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(3));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(xPlusTwo, xPlusThree)
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1433,19 +1363,12 @@ public class SmtAnalysisServiceTests {
         var x = Int("same_base_affine_order_x_" + Guid.NewGuid().ToString("N"));
         var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
         var xPlusThree = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(3));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             LessThan(xPlusThree, xPlusTwo)
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1453,16 +1376,9 @@ public class SmtAnalysisServiceTests {
         var x = Int("same_base_affine_tautology_x_" + Guid.NewGuid().ToString("N"));
         var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(1));
         var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var fact = LessThanOrEqual(xPlusOne, xPlusTwo);
 
-        var result = service.ClassifyImplication(Array.Empty<SmtFormula>(), fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(Array.Empty<SmtFormula>(), fact);
     }
 
     [Test]
@@ -1470,7 +1386,6 @@ public class SmtAnalysisServiceTests {
         var x = Int("affine_exact_compare_x_" + Guid.NewGuid().ToString("N"));
         var y = Int("affine_exact_compare_y_" + Guid.NewGuid().ToString("N"));
         var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(y, Integer(10)),
@@ -1478,20 +1393,13 @@ public class SmtAnalysisServiceTests {
         };
         var fact = LessThanOrEqual(xPlusTwo, y);
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
     public void ClassifyPathFeasibility_StringAliasContradiction_BypassesSolver() {
         var left = String("alias_text_left_" + Guid.NewGuid().ToString("N"));
         var right = String("alias_text_right_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(left, right),
@@ -1499,20 +1407,13 @@ public class SmtAnalysisServiceTests {
             NotEqual(right, Text("ABC"))
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
     public void ClassifyPathFeasibility_ReferenceAliasNullContradiction_BypassesSolver() {
         var left = Reference("alias_ref_left_" + Guid.NewGuid().ToString("N"));
         var right = Reference("alias_ref_right_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(left, right),
@@ -1520,13 +1421,7 @@ public class SmtAnalysisServiceTests {
             new SmtBinaryFormula(SmtBinaryOperator.NotEqual, right, new SmtNullConstant())
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1534,7 +1429,6 @@ public class SmtAnalysisServiceTests {
         var value = Reference("disjunction_ref_" + Guid.NewGuid().ToString("N"));
         var guard = Bool("disjunction_guard_" + Guid.NewGuid().ToString("N"));
         var valueIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant());
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Or(valueIsNull, guard),
@@ -1542,13 +1436,7 @@ public class SmtAnalysisServiceTests {
             new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant())
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1556,7 +1444,6 @@ public class SmtAnalysisServiceTests {
         var value = Reference("negated_disjunction_ref_" + Guid.NewGuid().ToString("N"));
         var guard = Bool("negated_disjunction_guard_" + Guid.NewGuid().ToString("N"));
         var valueIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant());
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtUnaryFormula(
@@ -1565,20 +1452,13 @@ public class SmtAnalysisServiceTests {
             new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant())
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
     public void ClassifyImplication_ReferenceAliasNonNullEntailment_BypassesSolver() {
         var left = Reference("alias_ref_entail_left_" + Guid.NewGuid().ToString("N"));
         var right = Reference("alias_ref_entail_right_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(left, right),
@@ -1586,30 +1466,17 @@ public class SmtAnalysisServiceTests {
         };
         var fact = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, right, new SmtNullConstant());
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
     public void ClassifyPathFeasibility_NullConstantInequality_BypassesSolver() {
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtBinaryFormula(SmtBinaryOperator.NotEqual, new SmtNullConstant(), new SmtNullConstant())
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1618,7 +1485,6 @@ public class SmtAnalysisServiceTests {
         var y = Int("expr_alias_y_" + Guid.NewGuid().ToString("N"));
         var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(1));
         var yPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, Integer(1));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(x, y),
@@ -1626,53 +1492,33 @@ public class SmtAnalysisServiceTests {
             LessThan(yPlusOne, Integer(5))
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
     public void ClassifyPathFeasibility_SubtractionIntervalContradiction_BypassesSolver() {
         var x = Int("subtract_interval_x_" + Guid.NewGuid().ToString("N"));
         var xMinusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, x, Integer(1));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             GreaterThanOrEqual(x, Integer(5)),
             LessThan(xMinusOne, Integer(4))
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
     public void ClassifyImplication_PositiveConstantMultiplyIntervalEntailment_BypassesSolver() {
         var x = Int("multiply_interval_x_" + Guid.NewGuid().ToString("N"));
         var twiceX = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, x, Integer(2));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             GreaterThanOrEqual(x, Integer(3))
         };
         var fact = GreaterThanOrEqual(twiceX, Integer(6));
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
@@ -1681,7 +1527,6 @@ public class SmtAnalysisServiceTests {
         var right = String("length_alias_right_" + Guid.NewGuid().ToString("N"));
         var leftLength = new SmtStringLengthTerm(left);
         var rightLength = new SmtStringLengthTerm(right);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(left, right),
@@ -1689,13 +1534,7 @@ public class SmtAnalysisServiceTests {
         };
         var fact = Equal(rightLength, Integer(3));
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
@@ -1704,7 +1543,6 @@ public class SmtAnalysisServiceTests {
         var right = String("concat_alias_right_" + Guid.NewGuid().ToString("N"));
         var leftConcat = new SmtStringConcatTerm(left, Text("!"));
         var rightConcat = new SmtStringConcatTerm(right, Text("!"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(left, right),
@@ -1712,13 +1550,7 @@ public class SmtAnalysisServiceTests {
             NotEqual(rightConcat, Text("A!"))
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1726,7 +1558,6 @@ public class SmtAnalysisServiceTests {
         var left = String("concat_length_left_" + Guid.NewGuid().ToString("N"));
         var right = String("concat_length_right_" + Guid.NewGuid().ToString("N"));
         var concatLength = new SmtStringLengthTerm(new SmtStringConcatTerm(left, right));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtBinaryFormula(
@@ -1740,19 +1571,12 @@ public class SmtAnalysisServiceTests {
         };
         var fact = Equal(concatLength, Integer(5));
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
     public void ClassifyPathFeasibility_NegativeStringLength_BypassesSolver() {
         var text = String("negative_length_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtBinaryFormula(
@@ -1761,13 +1585,7 @@ public class SmtAnalysisServiceTests {
                 Integer(0))
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1776,7 +1594,6 @@ public class SmtAnalysisServiceTests {
         var selected = Int("conditional_int_selected_" + Guid.NewGuid().ToString("N"));
         var fallback = Int("conditional_int_fallback_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, selected, fallback, SmtValueKind.Int);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             guard,
@@ -1784,13 +1601,7 @@ public class SmtAnalysisServiceTests {
             LessThan(selected, Integer(10))
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1799,7 +1610,6 @@ public class SmtAnalysisServiceTests {
         var left = Reference("conditional_ref_left_" + Guid.NewGuid().ToString("N"));
         var right = Reference("conditional_ref_right_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, left, right, SmtValueKind.Reference);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
@@ -1807,13 +1617,7 @@ public class SmtAnalysisServiceTests {
         };
         var fact = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, conditional, new SmtNullConstant());
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
@@ -1823,7 +1627,6 @@ public class SmtAnalysisServiceTests {
         var whenTrue = Reference("conditional_ref_alias_true_" + Guid.NewGuid().ToString("N"));
         var whenFalse = Reference("conditional_ref_alias_false_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, whenTrue, whenFalse, SmtValueKind.Reference);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             guard,
@@ -1832,13 +1635,7 @@ public class SmtAnalysisServiceTests {
         };
         var fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, whenTrue, new SmtNullConstant());
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
@@ -1847,7 +1644,6 @@ public class SmtAnalysisServiceTests {
         var selected = Bool("conditional_bool_selected_" + Guid.NewGuid().ToString("N"));
         var fallback = Bool("conditional_bool_fallback_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, selected, fallback, SmtValueKind.Bool);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             guard,
@@ -1855,13 +1651,7 @@ public class SmtAnalysisServiceTests {
             new SmtUnaryFormula(SmtUnaryOperator.Not, selected)
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1869,20 +1659,13 @@ public class SmtAnalysisServiceTests {
         var guard = Bool("conditional_equal_branch_guard_" + Guid.NewGuid().ToString("N"));
         var value = Int("conditional_equal_branch_value_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, value, value, SmtValueKind.Int);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(conditional, Integer(7)),
             NotEqual(value, Integer(7))
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1891,7 +1674,6 @@ public class SmtAnalysisServiceTests {
         var whenTrue = Int("conditional_branch_int_true_" + Guid.NewGuid().ToString("N"));
         var whenFalse = Int("conditional_branch_int_false_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, whenTrue, whenFalse, SmtValueKind.Int);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtBinaryFormula(
@@ -1905,13 +1687,7 @@ public class SmtAnalysisServiceTests {
         };
         var fact = GreaterThanOrEqual(conditional, Integer(0));
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
@@ -1920,7 +1696,6 @@ public class SmtAnalysisServiceTests {
         var whenTrue = Reference("conditional_branch_ref_true_" + Guid.NewGuid().ToString("N"));
         var whenFalse = Reference("conditional_branch_ref_false_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, whenTrue, whenFalse, SmtValueKind.Reference);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtBinaryFormula(
@@ -1934,13 +1709,7 @@ public class SmtAnalysisServiceTests {
             new SmtBinaryFormula(SmtBinaryOperator.Equal, conditional, new SmtNullConstant())
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1949,7 +1718,6 @@ public class SmtAnalysisServiceTests {
         var whenTrue = Bool("conditional_branch_bool_true_" + Guid.NewGuid().ToString("N"));
         var whenFalse = Bool("conditional_branch_bool_false_" + Guid.NewGuid().ToString("N"));
         var conditional = new SmtConditionalFormula(guard, whenTrue, whenFalse, SmtValueKind.Bool);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             new SmtBinaryFormula(
@@ -1960,13 +1728,7 @@ public class SmtAnalysisServiceTests {
             new SmtUnaryFormula(SmtUnaryOperator.Not, conditional)
         };
 
-        var result = service.ClassifyPathFeasibility(pathConditions);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions);
     }
 
     [Test]
@@ -1980,7 +1742,6 @@ public class SmtAnalysisServiceTests {
         var secondIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, second, new SmtNullConstant());
         var selectedReference = new SmtConditionalFormula(guard, first, second, SmtValueKind.Reference);
         var selectedIsNull = new SmtConditionalFormula(guard, firstIsNull, secondIsNull, SmtValueKind.Bool);
-        var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var pathConditions = new SmtFormula[]
         {
             Equal(resultReference, selectedReference),
@@ -2000,13 +1761,7 @@ public class SmtAnalysisServiceTests {
                 guard,
                 Or(resultIsNonNull, secondIsNull)));
 
-        var result = service.ClassifyImplication(pathConditions, fact);
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        AssertPreprocessed(pathConditions, fact);
     }
 
     [Test]
@@ -2041,6 +1796,18 @@ public class SmtAnalysisServiceTests {
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
 
+    private static void AssertPreprocessed(IReadOnlyList<SmtFormula> pathConditions, SmtFormula? conclusion = null) {
+        using var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = conclusion == null
+            ? service.ClassifyPathFeasibility(pathConditions)
+            : service.ClassifyImplication(pathConditions, conclusion);
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
+        Assert.That(conclusion == null ? result.PathCheck.Feasibility : result.HazardCheck.Feasibility,
+            Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.Reason, Is.EqualTo(conclusion == null ? "path_unsatisfiable" : "branch_unreachable"));
+        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+    }
     private static void AssertPermanentFailureCode(Exception exception, string expectedCode) {
         var factoryCalls = 0;
         using var service = new SmtAnalysisService(

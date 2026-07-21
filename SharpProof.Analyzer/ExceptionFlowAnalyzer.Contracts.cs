@@ -1,37 +1,55 @@
 namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowAnalyzer {
-    private static ImmutableArray<ExceptionContract> CollectExceptionContracts(
-        IMethodSymbol methodSymbol,
-        SemanticModel semanticModel,
-        SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken) {
-        var builder = ImmutableArray.CreateBuilder<ExceptionContract>();
-        foreach (var attribute in attributePolicy.GetAcceptedAttributes(methodSymbol, "DoesNotThrowAttribute")) {
-            cancellationToken.ThrowIfCancellationRequested();
-            builder.Add(new ExceptionContract(
+    private static ImmutableArray<EffectiveExceptionContract> CollectExceptionContracts(
+        MethodBodyAnalysisContext context,
+        SharpProofAttributeIdentityPolicy attributePolicy) {
+        var builder = ImmutableArray.CreateBuilder<EffectiveExceptionContract>(2);
+        var doesNotThrow = attributePolicy.GetAcceptedAttributes(
+            context.MethodSymbol, "DoesNotThrowAttribute").FirstOrDefault();
+        if (doesNotThrow != null)
+            builder.Add(new EffectiveExceptionContract(
                 ExceptionContractKind.DoesNotThrow,
                 ImmutableArray<ITypeSymbol>.Empty,
                 "[DoesNotThrow]",
-                GetAttributeLocation(attribute, cancellationToken),
-                ImmutableArray<InvalidExceptionContractArgument>.Empty));
-        }
+                GetAttributeLocation(doesNotThrow, context.CancellationToken)));
 
-        var exceptionBase = semanticModel.Compilation.GetTypeByMetadataName("System.Exception");
-        foreach (var attribute in attributePolicy.GetAcceptedAttributes(methodSymbol, "AllowedExceptionsAttribute")) {
-            cancellationToken.ThrowIfCancellationRequested();
-            var allowedTypes = CollectAllowedExceptionTypes(
+        var allAllowedTypes = ImmutableArray.CreateBuilder<ITypeSymbol>();
+        Location? allowedLocation = null;
+        var hasValidAllowedContract = false;
+        var exceptionBase = context.SemanticModel.Compilation.GetTypeByMetadataName("System.Exception");
+        foreach (var attribute in attributePolicy.GetAcceptedAttributes(
+                     context.MethodSymbol, "AllowedExceptionsAttribute")) {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            var attributeTypes = CollectAllowedExceptionTypes(
                 attribute,
                 exceptionBase,
-                cancellationToken,
+                context.CancellationToken,
                 out var invalidArguments);
-            builder.Add(new ExceptionContract(
-                ExceptionContractKind.AllowedExceptions,
-                allowedTypes,
-                "[AllowedExceptions]",
-                GetAttributeLocation(attribute, cancellationToken),
-                invalidArguments));
+            if (!invalidArguments.IsDefaultOrEmpty) {
+                foreach (var invalidArgument in invalidArguments)
+                    context.ReportDiagnostic(InvalidContractArgumentDiagnostics.Create(
+                        "[AllowedExceptions]",
+                        invalidArgument.Argument,
+                        invalidArgument.Reason,
+                        invalidArgument.Location ?? GetAttributeLocation(attribute, context.CancellationToken) ??
+                        AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node)));
+                continue;
+            }
+
+            hasValidAllowedContract = true;
+            allowedLocation ??= GetAttributeLocation(attribute, context.CancellationToken);
+            foreach (var allowedType in attributeTypes)
+                if (!ContainsSymbol(allAllowedTypes, allowedType))
+                    allAllowedTypes.Add(allowedType);
         }
+
+        if (hasValidAllowedContract)
+            builder.Add(new EffectiveExceptionContract(
+                ExceptionContractKind.AllowedExceptions,
+                allAllowedTypes.ToImmutable(),
+                "[AllowedExceptions]",
+                allowedLocation));
 
         return builder.ToImmutable();
     }
@@ -39,17 +57,9 @@ internal static partial class ExceptionFlowAnalyzer {
     private static void AnalyzeExceptionContracts(
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
-        ImmutableArray<ExceptionContract> contracts,
+        ImmutableArray<EffectiveExceptionContract> contracts,
         ImmutableArray<ExceptionFactView> facts) {
-        if (contracts.Length == 0) return;
-
-        var validContracts = ReportAndFilterInvalidExceptionContracts(
-            contracts,
-            context);
-        if (validContracts.Length == 0) return;
-
-        var effectiveContracts = CreateEffectiveExceptionContracts(validContracts);
-        foreach (var contract in effectiveContracts)
+        foreach (var contract in contracts)
             AnalyzeExceptionContract(context, methodSymbol, contract, facts);
     }
 
@@ -78,63 +88,6 @@ internal static partial class ExceptionFlowAnalyzer {
                 operationDisplay,
                 exceptionList));
         }
-    }
-
-    private static ImmutableArray<ExceptionContract> ReportAndFilterInvalidExceptionContracts(
-        ImmutableArray<ExceptionContract> contracts,
-        MethodBodyAnalysisContext context) {
-        var validContracts = ImmutableArray.CreateBuilder<ExceptionContract>(contracts.Length);
-        foreach (var contract in contracts) {
-            if (contract.InvalidArguments.IsDefaultOrEmpty) {
-                validContracts.Add(contract);
-                continue;
-            }
-
-            foreach (var invalidArgument in contract.InvalidArguments) {
-                var diagnostic = InvalidContractArgumentDiagnostics.Create(
-                    contract.AttributeDisplay,
-                    invalidArgument.Argument,
-                    invalidArgument.Reason,
-                    invalidArgument.Location ?? contract.Location ??
-                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node));
-                context.ReportDiagnostic(diagnostic);
-            }
-        }
-
-        return validContracts.ToImmutable();
-    }
-
-    private static ImmutableArray<EffectiveExceptionContract> CreateEffectiveExceptionContracts(
-        ImmutableArray<ExceptionContract> validContracts) {
-        var builder = ImmutableArray.CreateBuilder<EffectiveExceptionContract>();
-        var doesNotThrow = validContracts
-            .Where(static contract => contract.Kind == ExceptionContractKind.DoesNotThrow)
-            .ToArray();
-        if (doesNotThrow.Length > 0)
-            builder.Add(new EffectiveExceptionContract(
-                ExceptionContractKind.DoesNotThrow,
-                ImmutableArray<ITypeSymbol>.Empty,
-                "[DoesNotThrow]",
-                doesNotThrow[0].Location));
-
-        var allowedExceptions = validContracts
-            .Where(static contract => contract.Kind == ExceptionContractKind.AllowedExceptions)
-            .ToArray();
-        if (allowedExceptions.Length > 0) {
-            var allowedTypes = ImmutableArray.CreateBuilder<ITypeSymbol>();
-            foreach (var contract in allowedExceptions)
-                foreach (var allowedType in contract.AllowedTypes)
-                    if (!ContainsSymbol(allowedTypes, allowedType))
-                        allowedTypes.Add(allowedType);
-
-            builder.Add(new EffectiveExceptionContract(
-                ExceptionContractKind.AllowedExceptions,
-                allowedTypes.ToImmutable(),
-                "[AllowedExceptions]",
-                allowedExceptions[0].Location));
-        }
-
-        return builder.ToImmutable();
     }
 
     private static ImmutableArray<ITypeSymbol> CollectAllowedExceptionTypes(
@@ -267,13 +220,6 @@ internal static partial class ExceptionFlowAnalyzer {
         DoesNotThrow,
         AllowedExceptions
     }
-
-    readonly record struct ExceptionContract(
-        ExceptionContractKind Kind,
-        ImmutableArray<ITypeSymbol> AllowedTypes,
-        string AttributeDisplay,
-        Location? Location,
-        ImmutableArray<InvalidExceptionContractArgument> InvalidArguments);
 
     readonly record struct InvalidExceptionContractArgument(
         string Argument,

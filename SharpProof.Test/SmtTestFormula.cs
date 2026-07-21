@@ -10,6 +10,7 @@ internal static class SmtTestFormula {
     internal static SmtIntegerConstant Integer(long value) => new(value);
     internal static SmtStringConstant Text(string value) => new(value);
     internal static SmtBooleanConstant Boolean(bool value) => new(value);
+    internal static SmtNullConstant Null() => new();
     internal static SmtBinaryFormula Equal(SmtFormula left, SmtFormula right) =>
         new(SmtBinaryOperator.Equal, left, right);
     internal static SmtBinaryFormula NotEqual(SmtFormula left, SmtFormula right) =>
@@ -26,4 +27,23 @@ internal static class SmtTestFormula {
         new(SmtBinaryOperator.And, left, right);
     internal static SmtBinaryFormula Or(SmtFormula left, SmtFormula right) =>
         new(SmtBinaryOperator.Or, left, right);
+    internal static SmtUnaryFormula Not(SmtFormula operand) => new(SmtUnaryOperator.Not, operand);
+    internal static SmtIntegerBinaryTerm Add(SmtFormula left, SmtFormula right) =>
+        new(SmtIntegerBinaryOperator.Add, left, right);
+    internal static SmtIntegerBinaryTerm Subtract(SmtFormula left, SmtFormula right) =>
+        new(SmtIntegerBinaryOperator.Subtract, left, right);
+    internal static SmtIntegerBinaryTerm Multiply(SmtFormula left, SmtFormula right) =>
+        new(SmtIntegerBinaryOperator.Multiply, left, right);
+    internal static SmtIntegerBinaryTerm Divide(SmtFormula left, SmtFormula right) =>
+        new(SmtIntegerBinaryOperator.Divide, left, right);
+    internal static SmtIntegerBinaryTerm Remainder(SmtFormula left, SmtFormula right) =>
+        new(SmtIntegerBinaryOperator.Remainder, left, right);
+    internal static SmtConditionalFormula Conditional(
+        SmtFormula condition, SmtFormula whenTrue, SmtFormula whenFalse, SmtValueKind kind) =>
+        new(condition, whenTrue, whenFalse, kind);
+    internal static SmtStringLengthTerm Length(SmtFormula value) => new(value);
+    internal static SmtStringConcatTerm Concat(SmtFormula left, SmtFormula right) => new(left, right);
+    internal static SmtStringStartsWithFormula StartsWith(SmtFormula value, SmtFormula prefix) => new(value, prefix);
+    internal static SmtStringEndsWithFormula EndsWith(SmtFormula value, SmtFormula suffix) => new(value, suffix);
+    internal static SmtStringContainsFormula Contains(SmtFormula value, SmtFormula fragment) => new(value, fragment);
 }

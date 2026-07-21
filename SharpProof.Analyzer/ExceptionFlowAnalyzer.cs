@@ -4,11 +4,7 @@ internal static partial class ExceptionFlowAnalyzer {
     internal static void AnalyzeSymbolForExceptions(
         MethodBodyAnalysisContext context,
         SharpProofAttributeIdentityPolicy attributePolicy) {
-        var contracts = CollectExceptionContracts(
-            context.MethodSymbol,
-            context.SemanticModel,
-            attributePolicy,
-            context.CancellationToken);
+        var contracts = CollectExceptionContracts(context, attributePolicy);
         if (contracts.IsDefaultOrEmpty) return;
 
         var effects = context.State.GetMethodEffects(context.CancellationToken);

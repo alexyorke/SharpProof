@@ -321,125 +321,40 @@ public sealed class SymbolicIrTests {
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
-    [Test]
-    public void LowerCondition_NullPatternUsesSharedNullRelation() {
-        var context = CreateExpressionContext(
-            "object value",
-            "value is null");
+    private sealed record RelationPatternCase(
+        string Parameters,
+        string Expression,
+        SymbolicRelationOperator Operator,
+        SymbolicTerm Right);
 
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
+    private static IEnumerable<TestCaseData> RelationPatternCases() {
+        yield return RelationCase("LowerCondition_NullPatternUsesSharedNullRelation", "object value", "value is null", SymbolicRelationOperator.Equal, new SymbolicNullTerm());
+        yield return RelationCase("LowerCondition_NegatedNullPatternUsesSharedNullRelation", "object value", "value is not null", SymbolicRelationOperator.NotEqual, new SymbolicNullTerm());
+        yield return RelationCase("LowerCondition_IntegerConstantPatternUsesSharedRelation", "int value", "value is 42", SymbolicRelationOperator.Equal, new SymbolicIntegerConstantTerm(42));
+        yield return RelationCase("LowerCondition_NegatedIntegerConstantPatternUsesSharedRelation", "int value", "value is not 42", SymbolicRelationOperator.NotEqual, new SymbolicIntegerConstantTerm(42));
+        yield return RelationCase("LowerCondition_BooleanConstantPatternUsesSharedRelation", "bool value", "value is true", SymbolicRelationOperator.Equal, new SymbolicBooleanConstantTerm(true));
+        yield return RelationCase("LowerCondition_RelationalPatternUsesSharedRelation", "int value", "value is > 42", SymbolicRelationOperator.GreaterThan, new SymbolicIntegerConstantTerm(42));
+        yield return RelationCase("LowerCondition_NegatedRelationalPatternInvertsRelation", "int value", "value is not >= 42", SymbolicRelationOperator.LessThan, new SymbolicIntegerConstantTerm(42));
+        yield return RelationCase("LowerCondition_EmptyRecursivePatternUsesSharedNullRelation", "object value", "value is { }", SymbolicRelationOperator.NotEqual, new SymbolicNullTerm());
+        yield return RelationCase("LowerCondition_NegatedEmptyRecursivePatternUsesSharedNullRelation", "object value", "value is not { }", SymbolicRelationOperator.Equal, new SymbolicNullTerm());
+    }
+
+    [TestCaseSource(nameof(RelationPatternCases))]
+    public void RelationPatternMatrix(object value) {
+        var testCase = (RelationPatternCase)value;
+        var context = CreateExpressionContext(testCase.Parameters, testCase.Expression);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
-
-        Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
+        Assert.That(relation.Operator, Is.EqualTo(testCase.Operator));
         Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
-        Assert.That(relation.Right, Is.TypeOf<SymbolicNullTerm>());
+        Assert.That(relation.Right, Is.EqualTo(testCase.Right));
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
-    [Test]
-    public void LowerCondition_NegatedNullPatternUsesSharedNullRelation() {
-        var context = CreateExpressionContext(
-            "object value",
-            "value is not null");
-
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
-        var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
-
-        Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.NotEqual));
-        Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
-        Assert.That(relation.Right, Is.TypeOf<SymbolicNullTerm>());
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
-    }
-
-    [Test]
-    public void LowerCondition_IntegerConstantPatternUsesSharedRelation() {
-        var context = CreateExpressionContext(
-            "int value",
-            "value is 42");
-
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
-        var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
-
-        Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
-        Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
-        Assert.That(relation.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(42)));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
-    }
-
-    [Test]
-    public void LowerCondition_NegatedIntegerConstantPatternUsesSharedRelation() {
-        var context = CreateExpressionContext(
-            "int value",
-            "value is not 42");
-
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
-        var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
-
-        Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.NotEqual));
-        Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
-        Assert.That(relation.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(42)));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
-    }
-
-    [Test]
-    public void LowerCondition_BooleanConstantPatternUsesSharedRelation() {
-        var context = CreateExpressionContext(
-            "bool value",
-            "value is true");
-
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
-        var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
-
-        Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
-        Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
-        Assert.That(relation.Right, Is.EqualTo(new SymbolicBooleanConstantTerm(true)));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
-    }
-
-    [Test]
-    public void LowerCondition_RelationalPatternUsesSharedRelation() {
-        var context = CreateExpressionContext(
-            "int value",
-            "value is > 42");
-
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
-        var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
-
-        Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThan));
-        Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
-        Assert.That(relation.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(42)));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
-    }
-
-    [Test]
-    public void LowerCondition_NegatedRelationalPatternInvertsRelation() {
-        var context = CreateExpressionContext(
-            "int value",
-            "value is not >= 42");
-
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
-        var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
-
-        Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.LessThan));
-        Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
-        Assert.That(relation.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(42)));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
-    }
-
+    private static TestCaseData RelationCase(
+        string name, string parameters, string expression, SymbolicRelationOperator relation, SymbolicTerm right) =>
+        new TestCaseData(new RelationPatternCase(parameters, expression, relation, right)).SetName(name);
     [TestCase(SyntaxKind.GreaterThanToken, false, "GreaterThan")]
     [TestCase(SyntaxKind.GreaterThanEqualsToken, false, "GreaterThanOrEqual")]
     [TestCase(SyntaxKind.LessThanToken, false, "LessThan")]
@@ -457,40 +372,6 @@ public sealed class SymbolicIrTests {
             negate,
             out var relationOperator), Is.True);
         Assert.That(relationOperator.ToString(), Is.EqualTo(expected));
-    }
-
-    [Test]
-    public void LowerCondition_EmptyRecursivePatternUsesSharedNullRelation() {
-        var context = CreateExpressionContext(
-            "object value",
-            "value is { }");
-
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
-        var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
-
-        Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.NotEqual));
-        Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
-        Assert.That(relation.Right, Is.TypeOf<SymbolicNullTerm>());
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
-    }
-
-    [Test]
-    public void LowerCondition_NegatedEmptyRecursivePatternUsesSharedNullRelation() {
-        var context = CreateExpressionContext(
-            "object value",
-            "value is not { }");
-
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
-            Is.True);
-        var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
-
-        Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
-        Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
-        Assert.That(relation.Right, Is.TypeOf<SymbolicNullTerm>());
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
     [Test]
