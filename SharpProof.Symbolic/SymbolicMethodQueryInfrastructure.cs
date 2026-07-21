@@ -1,129 +1,21 @@
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicSourceInputDispatcher {
-    internal static TResult Execute<TResult>(
-        SymbolicSourceInput source,
-        SharpProofTarget target,
-        SymbolicQueryOptions? options,
-        SymbolicSourceCompilationKind compilationKind,
-        string unsupportedSourceMessage,
-        Func<SyntaxTree, Compilation, SharpProofTarget, CancellationToken, TResult> querySyntaxTree,
-        Func<SyntaxNode, SemanticModel, SharpProofTarget, CancellationToken, TResult> queryNode,
-        CancellationToken cancellationToken) {
-        if (source == null) throw new ArgumentNullException(nameof(source));
-        if (target == null) throw new ArgumentNullException(nameof(target));
-
-        options ??= SymbolicQueryOptions.Default;
-        switch (source.Kind) {
-            case SymbolicSourceInputKind.File:
-                if (string.IsNullOrWhiteSpace(source.FilePath))
-                    throw new ArgumentException("File path is required.", nameof(source));
-                if (!File.Exists(source.FilePath))
-                    throw new FileNotFoundException("Source file does not exist.", source.FilePath);
-                return QuerySource(
-                    File.ReadAllText(source.FilePath),
-                    Path.GetFullPath(source.FilePath),
-                    target,
-                    options,
-                    source.CompilationProfile,
-                    compilationKind,
-                    querySyntaxTree,
-                    cancellationToken);
-            case SymbolicSourceInputKind.Text:
-                return QuerySource(
-                    source.SourceText!,
-                    source.FilePath ?? SymbolicSourceInput.DefaultFilePath,
-                    target,
-                    options,
-                    source.CompilationProfile,
-                    compilationKind,
-                    querySyntaxTree,
-                    cancellationToken);
-            case SymbolicSourceInputKind.SyntaxTree:
-                return querySyntaxTree(
-                    source.SyntaxTree!,
-                    source.Compilation!,
-                    target,
-                    cancellationToken);
-            case SymbolicSourceInputKind.Node:
-                return queryNode(source.Node!, source.SemanticModel!, target, cancellationToken);
-            default:
-                throw new NotSupportedException(unsupportedSourceMessage);
-        }
-    }
-
-    private static TResult QuerySource<TResult>(
-        string sourceText,
-        string filePath,
-        SharpProofTarget target,
-        SymbolicQueryOptions options,
-        SymbolicSourceCompilationProfile? compilationProfile,
-        SymbolicSourceCompilationKind compilationKind,
-        Func<SyntaxTree, Compilation, SharpProofTarget, CancellationToken, TResult> querySyntaxTree,
-        CancellationToken cancellationToken) {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
-            sourceText,
-            filePath,
-            compilationKind,
-            options.References,
-            cancellationToken,
-            compilationProfile);
-        return querySyntaxTree(syntaxTree, compilation, target, cancellationToken);
-    }
-}
-
 internal static class SymbolicMethodLikeQueryDispatcher {
     internal static TResult Execute<TResult>(
         SymbolicQueryContext request,
-        SymbolicSourceCompilationKind compilationKind,
-        string unsupportedSourceMessage,
         string unsupportedTargetMessage,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
         Func<ResolvedMethodLikeTarget, Compilation, CancellationToken, TResult> executeAnalysis,
         CancellationToken cancellationToken) {
-        return SymbolicSourceInputDispatcher.Execute(
-            request.Source,
+        var semanticModel = request.Source.Compilation.GetSemanticModel(request.Source.SyntaxTree);
+        var resolvedTarget = SymbolicMethodLikeTargetResolver.Resolve(
+            request.Source.SyntaxTree,
+            semanticModel,
             request.Target,
-            request.Options,
-            compilationKind,
-            unsupportedSourceMessage,
-            QuerySyntaxTree,
-            QueryNode,
+            unsupportedTargetMessage,
+            isMethodLikeDeclaration,
             cancellationToken);
-
-        TResult QuerySyntaxTree(
-            SyntaxTree syntaxTree,
-            Compilation compilation,
-            SharpProofTarget queryTarget,
-            CancellationToken queryCancellationToken) {
-            if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-            if (compilation == null) throw new ArgumentNullException(nameof(compilation));
-
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var resolvedTarget = SymbolicMethodLikeTargetResolver.Resolve(
-                syntaxTree,
-                semanticModel,
-                queryTarget,
-                unsupportedTargetMessage,
-                isMethodLikeDeclaration,
-                queryCancellationToken);
-            return executeAnalysis(resolvedTarget, compilation, queryCancellationToken);
-        }
-
-        TResult QueryNode(
-            SyntaxNode node,
-            SemanticModel semanticModel,
-            SharpProofTarget queryTarget,
-            CancellationToken queryCancellationToken) {
-            if (node == null) throw new ArgumentNullException(nameof(node));
-            if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-            var resolvedTarget = SymbolicMethodLikeTargetResolver.ResolveNode(
-                node,
-                semanticModel,
-                isMethodLikeDeclaration,
-                queryCancellationToken);
-            return executeAnalysis(resolvedTarget, semanticModel.Compilation, queryCancellationToken);
-        }
+        return executeAnalysis(resolvedTarget, request.Source.Compilation, cancellationToken);
     }
 }
 
@@ -169,16 +61,6 @@ internal static class SymbolicMethodLikeTargetResolver {
             default:
                 throw new NotSupportedException(unsupportedTargetMessage);
         }
-    }
-
-    internal static ResolvedMethodLikeTarget ResolveNode(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        Func<SyntaxNode, bool> isMethodLikeDeclaration,
-        CancellationToken cancellationToken) {
-        return isMethodLikeDeclaration(node)
-            ? ResolvedMethodLikeTarget.Create(node, semanticModel, cancellationToken)
-            : ResolveContaining(node, semanticModel, isMethodLikeDeclaration, cancellationToken);
     }
 
     private static ResolvedMethodLikeTarget ResolvePosition(

@@ -13,11 +13,14 @@ internal static class SymbolicMergedPathFactMerger {
         if (candidates.Length == 0) return "false";
 
         var seenConditionTexts = new HashSet<string>(StringComparer.Ordinal);
-        var orderedConditions = new List<SymbolicInvariantCondition>();
+        var orderedConditions = new List<(string Text, string Target)>();
         var conditionSets = new List<HashSet<string>>();
         foreach (var point in candidates) {
             var conditionSet = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var condition in point.Invariant.Conditions) {
+            foreach (var formula in point.PathConditions) {
+                var condition = (
+                    Text: SymbolicFormulaDisplay.Format(formula),
+                    Target: SymbolicFormulaDisplay.GetMergeTarget(formula));
                 if (string.IsNullOrWhiteSpace(condition.Text)) continue;
 
                 if (conditionSet.Add(condition.Text) && seenConditionTexts.Add(condition.Text))
@@ -40,7 +43,7 @@ internal static class SymbolicMergedPathFactMerger {
     }
 
     private static IEnumerable<string> CreateConservativeUnknowns(
-        IEnumerable<SymbolicInvariantCondition> conditions) {
+        IEnumerable<(string Text, string Target)> conditions) {
         var seenTargets = new HashSet<string>(StringComparer.Ordinal);
         foreach (var condition in conditions) {
             var target = string.IsNullOrWhiteSpace(condition.Target) ? "path" : condition.Target;

@@ -13,32 +13,8 @@ namespace SharpProof.Test;
 [TestFixture]
 internal class SymbolicProofModelTests
 {
-    [TestCase(SymbolicTruthValue.Unknown, SymbolicProofStatus.Unknown)]
-    [TestCase(SymbolicTruthValue.ProvenTrue, SymbolicProofStatus.ProvenTrue)]
-    [TestCase(SymbolicTruthValue.ProvenFalse, SymbolicProofStatus.ProvenFalse)]
-    [TestCase(SymbolicTruthValue.Unreachable, SymbolicProofStatus.Unreachable)]
-    [TestCase((SymbolicTruthValue)999, SymbolicProofStatus.Unknown)]
-    public void ProofStatusProjection_MapsTruthValuesConservatively(
-        SymbolicTruthValue value,
-        SymbolicProofStatus expected)
-    {
-        Assert.That(SymbolicProofInfo.MapStatus(value), Is.EqualTo(expected));
-    }
-
-    [TestCase(SymbolicRuntimeHazardStatus.Proven, SymbolicProofStatus.ProvenTrue)]
-    [TestCase(SymbolicRuntimeHazardStatus.Unknown, SymbolicProofStatus.Unknown)]
-    [TestCase(SymbolicRuntimeHazardStatus.Unsupported, SymbolicProofStatus.Unknown)]
-    [TestCase(SymbolicRuntimeHazardStatus.Unreachable, SymbolicProofStatus.Unreachable)]
-    [TestCase((SymbolicRuntimeHazardStatus)999, SymbolicProofStatus.Unknown)]
-    public void ProofStatusProjection_MapsHazardStatusesConservatively(
-        SymbolicRuntimeHazardStatus value,
-        SymbolicProofStatus expected)
-    {
-        Assert.That(SymbolicProofInfo.MapStatus(value), Is.EqualTo(expected));
-    }
-
     [Test]
-    public void ConditionTruth_AttributesUnknownToTheDecisiveBranchStage()
+    public void ConditionTruth_PreservesTheDecisiveBranchFailureReason()
     {
         var session = new SequencedProofSearchSession(
             "smt_timeout",
@@ -62,12 +38,10 @@ internal class SymbolicProofModelTests
         Assert.That(result.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
         Assert.That(result.Reason, Is.EqualTo("ir_condition_true_branch_feasibility_unknown"));
         Assert.That(result.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Timeout));
-        Assert.That(result.Stage, Is.EqualTo(SymbolicProofStage.SmtExecution));
-        Assert.That(result.Support, Is.EqualTo(SymbolicProofSupport.Exact));
     }
 
     [Test]
-    public void TypedReachabilityProof_IsMarkedExact()
+    public void TypedReachabilityProof_ClassifiesEmptyStateAsReachable()
     {
         using var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
@@ -75,8 +49,6 @@ internal class SymbolicProofModelTests
             .ClassifyReachability(new SymbolicState());
 
         Assert.That(result.Status, Is.EqualTo(SymbolicProofStatus.Reachable));
-        Assert.That(result.Support, Is.EqualTo(SymbolicProofSupport.Exact));
-        Assert.That(result.Stage, Is.EqualTo(SymbolicProofStage.SyntacticClassification));
     }
 
     [Test]

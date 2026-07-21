@@ -1912,25 +1912,6 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void SymbolicFactInfo_ProjectsOwnershipResourceFactsWithoutSolverTypes()
-    {
-        var resource = new SymbolicVariableTerm("resource#1", SmtValueKind.Reference);
-        var fact = SymbolicFact.Exact(
-            new SymbolicDisposalAtom(resource, SymbolicDisposalState.Disposed),
-            SyntaxFactory.ParseExpression("resource.Dispose()"),
-            "test.disposal",
-            evidenceKey: "evidence.resource.disposed");
-
-        var info = SymbolicFactInfo.FromFact(fact);
-
-        Assert.That(info.Kind, Is.EqualTo(nameof(SymbolicDisposalAtom)));
-        Assert.That(info.Text, Does.Contain(nameof(SymbolicDisposalState.Disposed)));
-        Assert.That(info.Text, Does.Not.Contain(nameof(SmtFormula)));
-        Assert.That(info.Provenance, Is.EqualTo("test.disposal"));
-        Assert.That(info.EvidenceKey, Is.EqualTo("evidence.resource.disposed"));
-    }
-
-    [Test]
     public void OwnershipFactFactory_CreatesConsistentFreshOwnedResourceFacts()
     {
         var value = new SymbolicVariableTerm("value#1", SmtValueKind.Reference);
@@ -2012,10 +1993,7 @@ public sealed class SymbolicIrTests
                 new SymbolicResourceLifetimeAtom(owner, SymbolicResourceLifetimeState.Escaped), syntax,
                 "test.lifetime")
         };
-        var state = new SymbolicState(facts);
-        var infos = SymbolicFactInfo.FromState(state);
-
-        Assert.That(infos.Select(static info => info.Kind), Is.EqualTo(new[]
+        Assert.That(facts.Select(static fact => fact.Atom.GetType().Name), Is.EqualTo(new[]
         {
             nameof(SymbolicAliasAtom),
             nameof(SymbolicBorrowAtom),
@@ -2025,7 +2003,7 @@ public sealed class SymbolicIrTests
             nameof(SymbolicDisposalAtom),
             nameof(SymbolicResourceLifetimeAtom)
         }));
-        Assert.That(infos.Select(static info => info.Provenance), Is.EqualTo(new[]
+        Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[]
         {
             "test.alias",
             "test.borrow",

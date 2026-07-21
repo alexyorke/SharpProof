@@ -313,11 +313,13 @@ internal sealed record SymbolicRuntimeHazard(
 
     public string Category => Descriptor.Category;
 
-    public SymbolicProofInfo Proof => CreateProofInfo(
-        Status, StatusReason, Category, TriggerCondition, Kind, RawProofInfo);
-
     public SymbolicUnknownReasonInfo UnknownReasonInfo => SymbolicUnknownReasonTaxonomy.ForRuntimeHazard(
-        Status, StatusReason, Proof.UnknownReason);
+        Status,
+        StatusReason,
+        RawProofInfo?.UnknownReason ?? (Status is SymbolicRuntimeHazardStatus.Unknown or
+            SymbolicRuntimeHazardStatus.Unsupported
+            ? SymbolicUnknownReasonClassifier.Classify(StatusReason)
+            : SymbolicUnknownReason.None));
 
     public SymbolicAnalysisTruncationInfo AnalysisTruncation =>
         RawAnalysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
@@ -325,40 +327,6 @@ internal sealed record SymbolicRuntimeHazard(
     public SymbolicInputWitness TriggerWitness => RawTriggerWitness ??
         SymbolicInputWitnessFactory.Unsupported("runtime_hazard_trigger_witness_unavailable");
 
-    private static SymbolicProofInfo CreateProofInfo(
-        SymbolicRuntimeHazardStatus status,
-        string statusReason,
-        string category,
-        string triggerCondition,
-        SymbolicRuntimeHazardKind kind,
-        SymbolicProofInfo? proofInfo) {
-        var proofStatus = SymbolicProofInfo.MapStatus(status);
-        if (proofInfo == null) {
-            var isSolverBacked = status != SymbolicRuntimeHazardStatus.Unsupported &&
-                                 !string.Equals(
-                                     statusReason,
-                                     "unsupported_typed_projection",
-                                     StringComparison.Ordinal);
-            return SymbolicProofInfo.Project(
-                proofStatus,
-                isSolverBacked,
-                statusReason,
-                false,
-                null,
-                category,
-                triggerCondition,
-                kind.ToString(),
-                proofStatus == SymbolicProofStatus.Unknown ? statusReason : null);
-        }
-
-        return SymbolicProofInfo.Project(
-            proofStatus,
-            proofInfo,
-            string.IsNullOrWhiteSpace(statusReason) ? proofInfo.Reason : statusReason,
-            category,
-            triggerCondition,
-            kind.ToString());
-    }
 }
 
 internal enum SymbolicRuntimeHazardKind {

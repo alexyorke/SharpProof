@@ -146,7 +146,7 @@ internal static class MethodEnsuresAnalyzer {
                     contract.Condition,
                     completionSite.QueryNode.SpanStart.ToString(CultureInfo.InvariantCulture),
                     proof.TruthValue.ToString(),
-                    proof.Proof.UnknownReason.ToString(),
+                    proof.UnknownReason.ToString(),
                     proof.Reason);
                 if (!seen.Add(key)) continue;
 

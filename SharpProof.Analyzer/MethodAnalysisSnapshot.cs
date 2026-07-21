@@ -4,7 +4,6 @@ internal sealed record MethodAnalysisSnapshot(
     IMethodSymbol MethodSymbol,
     SyntaxNode Declaration,
     SemanticModel SemanticModel,
-    SymbolicSourceInput Source,
     ImmutableArray<IOperation> OperationBlocks,
     IOperation? RootOperation,
     ImmutableArray<IOperation> VisibleOperations) {
@@ -33,7 +32,6 @@ internal sealed record MethodAnalysisSnapshot(
             methodSymbol,
             declaration,
             semanticModel,
-            SymbolicSourceInput.FromNode(declaration, semanticModel),
             blocks,
             root,
             visibleOperations);

@@ -50,38 +50,25 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable
             smtAnalysis: _smtAnalysis);
     }
 
-    public SymbolicQueryResult AnalyzeLine(
-        string marker,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false)
+    public SymbolicQueryResult AnalyzeLine(string marker)
     {
         return _service.QuerySyntaxTreeLine(
             _syntaxTree,
             _compilation,
             FindLine(marker),
-            smtAnalysis: _smtAnalysis,
-            impliedConditions: impliedConditions,
-            includeExpressionProgramPoints: includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
+            smtAnalysis: _smtAnalysis);
     }
 
     public SymbolicProgramPointResult AnalyzeLinePoint(
         int line,
-        int column,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false)
+        int column)
     {
         return _service.QuerySyntaxTreeLinePoint(
             _syntaxTree,
             _compilation,
             line,
             column,
-            smtAnalysis: _smtAnalysis,
-            impliedConditions: impliedConditions,
-            includeExpressionProgramPoints: includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
+            smtAnalysis: _smtAnalysis);
     }
 
     public int FindLineStartPosition(string marker)

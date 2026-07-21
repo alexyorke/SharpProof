@@ -597,7 +597,6 @@ public sealed class SymbolicComplexityTests
             "SharpProof.Test.SymbolicComplexity",
             null,
             default);
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var root = syntaxTree.GetRoot();
         var localFunction = root.DescendantNodes()
             .OfType<LocalFunctionStatementSyntax>()
@@ -605,8 +604,8 @@ public sealed class SymbolicComplexityTests
 
         var result = new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
-                SymbolicSourceInput.FromNode(localFunction, semanticModel),
-                SharpProofTargetFactory.Node()));
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SharpProofTargetFactory.AtPosition(localFunction.SpanStart)));
 
         Assert.That(result.MethodName, Is.EqualTo("Local"));
         Assert.That(result.Complexity.Text, Is.EqualTo("O(m)"));
@@ -637,13 +636,12 @@ public sealed class SymbolicComplexityTests
             "SharpProof.Test.SymbolicComplexity",
             null,
             default);
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var property = syntaxTree.GetRoot().DescendantNodes().OfType<PropertyDeclarationSyntax>().Single();
 
         var result = new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
-                SymbolicSourceInput.FromNode(property, semanticModel),
-                SharpProofTargetFactory.Node()));
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SharpProofTargetFactory.AtPosition(property.SpanStart)));
 
         Assert.That(result.MethodName, Is.EqualTo("get_Count"));
         Assert.That(result.DeclarationKind, Is.EqualTo("property_getter"));
@@ -675,13 +673,12 @@ public sealed class SymbolicComplexityTests
             "SharpProof.Test.SymbolicComplexity",
             null,
             default);
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var indexer = syntaxTree.GetRoot().DescendantNodes().OfType<IndexerDeclarationSyntax>().Single();
 
         var result = new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
-                SymbolicSourceInput.FromNode(indexer, semanticModel),
-                SharpProofTargetFactory.Node()));
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SharpProofTargetFactory.AtPosition(indexer.SpanStart)));
 
         Assert.That(result.MethodName, Is.EqualTo("get_Item"));
         Assert.That(result.DeclarationKind, Is.EqualTo("indexer_getter"));
@@ -734,9 +731,11 @@ public sealed class SymbolicComplexityTests
         var target = useLineTarget
             ? SharpProofTargetFactory.LineNumber(GetLineNumber(source, position))
             : SharpProofTargetFactory.AtPosition(position);
+        var (tree, compilation) = SymbolicSourceCompilation.Create(
+            source, "SymbolicComplexityTests.cs", SymbolicSourceCompilationKind.Query, null, default);
         return new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
-                SymbolicSourceInput.FromText(source, "SymbolicComplexityTests.cs"),
+                SymbolicSourceInput.FromSyntaxTree(tree, compilation),
                 target));
     }
 
@@ -753,11 +752,13 @@ public sealed class SymbolicComplexityTests
     [Test]
     public void QueryComplexity_AllLinesTarget_ThrowsNotSupportedException()
     {
+        var (tree, compilation) = SymbolicSourceCompilation.Create(
+            "class C { }", "SymbolicComplexityTests.cs", SymbolicSourceCompilationKind.Query, null, default);
         var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryExecutor().QueryComplexity(
             new SymbolicQueryContext(
-                SymbolicSourceInput.FromText("class C { }", "SymbolicComplexityTests.cs"),
+                SymbolicSourceInput.FromSyntaxTree(tree, compilation),
                 SharpProofTargetFactory.AllLines())));
 
-        Assert.That(ex!.Message, Is.EqualTo("Complexity queries support point, position, line, or node targets only."));
+        Assert.That(ex!.Message, Is.EqualTo("Complexity queries support point, position, or line targets only."));
     }
 }

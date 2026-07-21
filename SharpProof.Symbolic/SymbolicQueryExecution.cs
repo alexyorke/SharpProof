@@ -3,29 +3,12 @@ namespace SharpProof.Symbolic;
 internal sealed partial class SymbolicQueryExecutor {
     private SymbolicQueryResult QuerySource(
         SymbolicQueryContext request,
-        CancellationToken cancellationToken) {
-        if (!SupportsSourceTarget(request.Target.Kind) &&
-            request.Source.Kind is SymbolicSourceInputKind.File or SymbolicSourceInputKind.Text)
-            throw new NotSupportedException(request.Source.Kind == SymbolicSourceInputKind.File
-                ? "Target kind is not supported for file queries."
-                : "Target kind is not supported for source queries.");
-
-        return SymbolicSourceInputDispatcher.Execute(
-            request.Source,
+        CancellationToken cancellationToken) => QuerySourceSyntaxTree(
+            request.Source.SyntaxTree,
+            request.Source.Compilation,
             request.Target,
             request.Options,
-            SymbolicSourceCompilationKind.Query,
-            "Source kind is not supported.",
-            (syntaxTree, compilation, target, token) =>
-                QuerySourceSyntaxTree(syntaxTree, compilation, target, request.Options, token),
-            (node, semanticModel, target, token) =>
-                QuerySourceNode(node, semanticModel, target, request.Options, token),
             cancellationToken);
-    }
-
-    private static bool SupportsSourceTarget(SharpProofTargetKind kind) =>
-        kind is SharpProofTargetKind.Point or SharpProofTargetKind.Position or
-            SharpProofTargetKind.Line or SharpProofTargetKind.Span or SharpProofTargetKind.AllLines;
 
     private SymbolicQueryResult QuerySourceSyntaxTree(
         SyntaxTree syntaxTree,
@@ -62,45 +45,7 @@ internal sealed partial class SymbolicQueryExecutor {
             cancellationToken);
         return _programPointExecutor.Project(
             query,
-            options,
             cancellationToken);
-    }
-
-    private SymbolicQueryResult QuerySourceNode(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        SharpProofTarget _,
-        SymbolicQueryOptions options,
-        CancellationToken cancellationToken) {
-        var analysis = node is ForStatementSyntax forStatement
-            ? _invariantService.AnalyzeForInitialEntry(
-                forStatement, semanticModel, options.SmtAnalysis, cancellationToken)
-            : _invariantService.AnalyzeAt(node, semanticModel, options.SmtAnalysis, cancellationToken,
-                options.IncludeCurrentStatementCompletionFacts);
-        var proofs = CreateNodeProofs(
-            semanticModel, node, analysis, options.ImpliedConditions, options.SmtAnalysis, cancellationToken);
-        return SymbolicQueryResult.From(SymbolicProgramPointProjector.Project(
-            new SymbolicProgramPointQueryContext(semanticModel, node.SpanStart, node, analysis),
-            proofs,
-            cancellationToken));
-    }
-
-    private IReadOnlyList<SymbolicConditionProofResult> CreateNodeProofs(
-        SemanticModel semanticModel,
-        SyntaxNode node,
-        SymbolicProgramPointAnalysis analysis,
-        IEnumerable<string> conditionTexts,
-        SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken) {
-        if (conditionTexts == null) return Array.Empty<SymbolicConditionProofResult>();
-
-        return conditionTexts
-            .Where(static condition => !string.IsNullOrWhiteSpace(condition))
-            .Select(condition => _conditionProofEngine.ProveAtAnalysis(
-                semanticModel, node, analysis, condition,
-                smtAnalysis ?? throw new ArgumentException("Condition proof requests require SMT analysis."),
-                cancellationToken))
-            .ToArray();
     }
 
     private SymbolicConditionProofResult ProveSource(
@@ -111,22 +56,13 @@ internal sealed partial class SymbolicQueryExecutor {
             throw new ArgumentException("Condition proof requests require a point target.", "context");
 
         var smtAnalysis = RequireSmt(request, "Condition proof requests require SMT analysis.");
-        return SymbolicSourceInputDispatcher.Execute(
-            request.Source,
-            request.Target,
-            request.Options,
-            SymbolicSourceCompilationKind.Query,
-            "Condition proof source kind is not supported.",
-            (syntaxTree, compilation, target, token) => _conditionProofEngine.ProveAtSyntaxTree(
-                syntaxTree,
-                compilation,
-                target.Line!.Value,
-                target.Column ?? 1,
-                conditionText,
-                smtAnalysis,
-                token),
-            static (_, _, _, _) =>
-                throw new NotSupportedException("Condition proof source kind is not supported."),
+        return _conditionProofEngine.ProveAtSyntaxTree(
+            request.Source.SyntaxTree,
+            request.Source.Compilation,
+            request.Target.Line!.Value,
+            request.Target.Column ?? 1,
+            conditionText,
+            smtAnalysis,
             cancellationToken);
     }
 
@@ -135,21 +71,16 @@ internal sealed partial class SymbolicQueryExecutor {
         SmtAnalysisService smtAnalysis,
         SymbolicRuntimeHazardQueryOptions hazardOptions,
         CancellationToken cancellationToken) {
-        if (!SupportsRuntimeHazardTarget(request.Target.Kind) &&
-            request.Source.Kind != SymbolicSourceInputKind.Node)
+        if (!SupportsRuntimeHazardTarget(request.Target.Kind))
             throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
 
-        return SymbolicSourceInputDispatcher.Execute(
-            request.Source,
+        return _runtimeHazardService.QuerySyntaxTreeRuntimeHazards(
+            request.Source.SyntaxTree,
+            request.Source.Compilation,
             request.Target,
-            request.Options,
-            SymbolicSourceCompilationKind.RuntimeHazards,
-            "Runtime hazard source kind is not supported.",
-            (syntaxTree, compilation, target, token) => _runtimeHazardService.QuerySyntaxTreeRuntimeHazards(
-                syntaxTree, compilation, target, request.Options.SmtAnalysis!, token, hazardOptions),
-            (node, semanticModel, target, token) => _runtimeHazardService.QueryNodeRuntimeHazards(
-                node, semanticModel, smtAnalysis, token, hazardOptions, false),
-            cancellationToken);
+            smtAnalysis,
+            cancellationToken,
+            hazardOptions);
     }
 
     private static bool SupportsRuntimeHazardTarget(SharpProofTargetKind kind) =>

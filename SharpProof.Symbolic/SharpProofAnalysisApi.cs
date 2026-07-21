@@ -173,7 +173,7 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         string? filePath = null,
         SharpProofAnalysisOptions? options = null) {
         options ??= new SharpProofAnalysisOptions();
-        var source = CompileSource(sourceText, filePath ?? SymbolicSourceInput.DefaultFilePath);
+        var source = CompileSource(sourceText, filePath ?? "SharpProof.Symbolic.Query.cs");
         var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
         return new SharpProofAnalysisSession(
             source,
@@ -284,8 +284,6 @@ public sealed class SharpProofAnalysisSession : IDisposable {
 
         return SymbolicMethodLikeQueryDispatcher.Execute(
             context,
-            SymbolicSourceCompilationKind.Query,
-            "Method-effect source kind is not supported.",
             "Method-effect analysis supports point, position, line, span, or all-lines targets.",
             static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true),
             (resolved, compilation, token) => {
@@ -301,19 +299,10 @@ public sealed class SharpProofAnalysisSession : IDisposable {
 
     private MethodEffects AnalyzeMethodEffectRange(
         SymbolicQueryContext context,
-        CancellationToken cancellationToken) =>
-        SymbolicSourceInputDispatcher.Execute(
-            context.Source,
+        CancellationToken cancellationToken) => AnalyzeSyntaxTree(
+            context.Source.SyntaxTree,
+            context.Source.Compilation,
             context.Target,
-            context.Options,
-            SymbolicSourceCompilationKind.Query,
-            "Method-effect source kind is not supported.",
-            AnalyzeSyntaxTree,
-            (node, model, target, token) => AnalyzeSyntaxTree(
-                node.SyntaxTree,
-                model.Compilation,
-                target,
-                token),
             cancellationToken);
 
     private MethodEffects AnalyzeSyntaxTree(
@@ -387,21 +376,14 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         }
 
         var result = _executor.Query(context, cancellationToken);
-        var conditionProofs = result.ProgramPoints.SelectMany(static point => point.ConditionProofs).ToArray();
-        var hasUnknown = conditionProofs.Any(static proof => proof.TruthValue == SymbolicTruthValue.Unknown) ||
-                         result.ProgramPoints.Any(static point => point.Reachability == SymbolicReachability.Unknown);
+        var hasUnknown = result.ProgramPoints.Any(
+            static point => point.Reachability == SymbolicReachability.Unknown);
         facts.Add(new SharpProofProofFact(
             "invariant",
             hasUnknown ? "Unknown" : "Proven",
             "merged_symbolic_invariant",
             result.MergedInvariantText,
             null));
-        facts.AddRange(conditionProofs.Select(Project));
-        foreach (var proof in conditionProofs)
-            if (proof.TruthValue == SymbolicTruthValue.Unknown)
-                unknowns.Add(Convert(SymbolicUnknownReasonTaxonomy.ForProof(
-                    SymbolicUnknownReason.Unknown,
-                    proof.Reason)));
         foreach (var point in result.ProgramPoints)
             if (point.Reachability == SymbolicReachability.Unknown)
                 unknowns.Add(Convert(SymbolicUnknownReasonTaxonomy.ForProof(

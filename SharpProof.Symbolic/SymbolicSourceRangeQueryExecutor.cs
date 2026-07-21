@@ -15,8 +15,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
         var nodes = SymbolicSourceTargetSelector.FindOnLine(
             syntaxTree,
             line,
-            cancellationToken,
-            options.IncludeExpressionProgramPoints);
+            cancellationToken);
         var results = nodes
             .Select(node => _programPointExecutor.AnalyzeAndProjectNode(
                 semanticModel,
@@ -41,8 +40,7 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
         var nodes = SymbolicSourceTargetSelector.FindOnLine(
             syntaxTree,
             line,
-            cancellationToken,
-            options.IncludeExpressionProgramPoints);
+            cancellationToken);
         if (nodes.Count == 0) throw new ArgumentException("No program points found on --line.", nameof(line));
 
         var node = SymbolicSourceTargetSelector.SelectNearest(nodes, position);
@@ -66,7 +64,6 @@ internal sealed class SymbolicSourceRangeQueryExecutor(SymbolicSourceProgramPoin
         var nodes = SymbolicSourceTargetSelector.FindInSpan(
             syntaxTree,
             sourceSpan,
-            options.IncludeExpressionProgramPoints,
             cancellationToken);
         var results = nodes
             .Select(node => _programPointExecutor.AnalyzeAndProjectNode(

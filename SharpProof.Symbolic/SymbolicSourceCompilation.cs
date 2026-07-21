@@ -23,10 +23,9 @@ internal static class SymbolicSourceCompilation {
         string filePath,
         SymbolicSourceCompilationKind kind,
         IEnumerable<MetadataReference>? references,
-        CancellationToken cancellationToken,
-        SymbolicSourceCompilationProfile? profile = null) {
+        CancellationToken cancellationToken) {
         var assemblyName = "SharpProof.Symbolic." + kind;
-        return Create(sourceText, filePath, assemblyName + ".cs", assemblyName, references, cancellationToken, profile);
+        return Create(sourceText, filePath, assemblyName + ".cs", assemblyName, references, cancellationToken);
     }
 
     public static (SyntaxTree SyntaxTree, Compilation Compilation) Create(
@@ -35,38 +34,44 @@ internal static class SymbolicSourceCompilation {
         string defaultFilePath,
         string assemblyName,
         IEnumerable<MetadataReference>? references,
-        CancellationToken cancellationToken,
-        SymbolicSourceCompilationProfile? profile = null) {
+        CancellationToken cancellationToken) {
         if (sourceText == null) throw new ArgumentNullException(nameof(sourceText));
 
         if (string.IsNullOrWhiteSpace(filePath)) filePath = defaultFilePath;
 
-        var normalizedProfile = profile ?? SymbolicSourceCompilationProfile.Default;
         var parseOptions = new CSharpParseOptions(
-            normalizedProfile.LanguageVersion,
-            normalizedProfile.DocumentationMode,
-            SourceCodeKind.Regular,
-            normalizedProfile.PreprocessorSymbols);
+            LanguageVersion.Preview,
+            DocumentationMode.Parse,
+            SourceCodeKind.Regular);
         var syntaxTree = CSharpSyntaxTree.ParseText(
             sourceText,
             parseOptions,
             filePath,
             cancellationToken: cancellationToken);
-        var referenceArray = SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));
+        var referenceArray = NormalizeReferences(references);
         if (referenceArray.IsDefaultOrEmpty) referenceArray = GetTrustedPlatformReferences();
 
         var compilationOptions = new CSharpCompilationOptions(
             OutputKind.DynamicallyLinkedLibrary,
-            optimizationLevel: normalizedProfile.OptimizationLevel,
-            allowUnsafe: normalizedProfile.AllowUnsafe,
-            platform: normalizedProfile.Platform,
-            nullableContextOptions: normalizedProfile.NullableContext);
+            optimizationLevel: OptimizationLevel.Debug,
+            platform: Platform.AnyCpu,
+            nullableContextOptions: NullableContextOptions.Disable);
         var compilation = CSharpCompilation.Create(
-            normalizedProfile.AssemblyName ?? assemblyName,
+            assemblyName,
             new[] { syntaxTree },
             referenceArray,
             compilationOptions);
         return (syntaxTree, compilation);
+    }
+
+    private static ImmutableArray<MetadataReference> NormalizeReferences(
+        IEnumerable<MetadataReference>? references) {
+        if (references == null) return ImmutableArray<MetadataReference>.Empty;
+        var builder = ImmutableArray.CreateBuilder<MetadataReference>();
+        foreach (var reference in references)
+            builder.Add(reference ?? throw new ArgumentException(
+                "References cannot contain null entries.", nameof(references)));
+        return builder.ToImmutable();
     }
 }
 

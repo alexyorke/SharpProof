@@ -1,8 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicSourceProgramPointExecutor(
-    SymbolicInvariantService _invariantService,
-    SymbolicConditionProofEngine _conditionProofEngine) {
+internal sealed class SymbolicSourceProgramPointExecutor(SymbolicInvariantService _invariantService) {
     internal SymbolicProgramPointQueryContext AnalyzeAtPosition(
         SyntaxTree syntaxTree,
         Compilation compilation,
@@ -30,26 +28,13 @@ internal sealed class SymbolicSourceProgramPointExecutor(
             node.SpanStart,
             node,
             options.SmtAnalysis,
-            cancellationToken,
-            options.IncludeCurrentStatementCompletionFacts);
-        return Project(query, options, cancellationToken);
+            cancellationToken);
+        return Project(query, cancellationToken);
     }
 
     internal SymbolicProgramPointResult Project(
         SymbolicProgramPointQueryContext query,
-        SymbolicQueryOptions options,
         CancellationToken cancellationToken) {
-        var conditionProofs = _conditionProofEngine.ProveAll(
-            query.SemanticModel,
-            query.Position,
-            query.Node,
-            query.Analysis,
-            options.ImpliedConditions,
-            options.SmtAnalysis,
-            cancellationToken);
-        return SymbolicProgramPointProjector.Project(
-            query,
-            conditionProofs,
-            cancellationToken);
+        return SymbolicProgramPointProjector.Project(query, cancellationToken);
     }
 }

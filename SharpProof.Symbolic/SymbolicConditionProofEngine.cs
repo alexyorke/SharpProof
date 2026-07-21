@@ -91,29 +91,6 @@ internal sealed class SymbolicConditionProofEngine(SymbolicInvariantService _inv
             smtAnalysis).WithAnalysisTruncation(query.Analysis.Truncation);
     }
 
-    internal IReadOnlyList<SymbolicConditionProofResult> ProveAll(
-        SemanticModel semanticModel,
-        int position,
-        SyntaxNode sourceNode,
-        SymbolicProgramPointAnalysis analysis,
-        IEnumerable<string>? conditionTexts,
-        SmtAnalysisService? smtAnalysis,
-        CancellationToken cancellationToken) {
-        if (conditionTexts == null) return Array.Empty<SymbolicConditionProofResult>();
-
-        return conditionTexts
-            .Where(static condition => !string.IsNullOrWhiteSpace(condition))
-            .Select(condition => Prove(
-                semanticModel,
-                position,
-                sourceNode,
-                analysis,
-                condition,
-                smtAnalysis,
-                cancellationToken).WithAnalysisTruncation(analysis.Truncation))
-            .ToArray();
-    }
-
     private static SymbolicConditionProofResult ProveAtQuery(
         SymbolicProgramPointQueryContext query,
         string conditionText,

@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Microsoft.CodeAnalysis;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
@@ -27,25 +28,25 @@ public sealed class SymbolicQueryWitnessTests
         var position = source.IndexOf(targetText, StringComparison.Ordinal);
         var line = FindLine(source, targetText);
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var options = new SymbolicQueryOptions(
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            smtAnalysis);
+        var (tree, compilation) = Compile(source, "WitnessSample.cs");
+        var input = SymbolicSourceInput.FromSyntaxTree(tree, compilation);
+        var options = new SymbolicQueryOptions(smtAnalysis: smtAnalysis);
         var service = new SymbolicQueryExecutor();
 
         var point = service.Query(new SymbolicQueryContext(
-            SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
+            input,
             SharpProofTargetFactory.AtPosition(position),
             options));
         var lineResult = service.Query(new SymbolicQueryContext(
-            SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
+            input,
             SharpProofTargetFactory.LineNumber(line),
             options));
         var span = service.Query(new SymbolicQueryContext(
-            SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
+            input,
             SharpProofTargetFactory.Span(position, position + targetText.Length),
             options));
         var allLines = service.Query(new SymbolicQueryContext(
-            SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
+            input,
             SharpProofTargetFactory.AllLines(),
             options));
 
@@ -75,7 +76,7 @@ public sealed class SymbolicQueryWitnessTests
         }
 
         var proof = service.Prove(new SymbolicQueryContext(
-            SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
+            input,
             SharpProofTargetFactory.Point(line, FindColumn(source, position)),
             options),
             "value > 5");
@@ -90,8 +91,9 @@ public sealed class SymbolicQueryWitnessTests
         try
         {
             File.WriteAllText(sourcePath, source);
+            var (fileTree, fileCompilation) = Compile(File.ReadAllText(sourcePath), sourcePath);
             var fileProof = service.Prove(new SymbolicQueryContext(
-                SymbolicSourceInput.FromFile(sourcePath),
+                SymbolicSourceInput.FromSyntaxTree(fileTree, fileCompilation),
                 SharpProofTargetFactory.Point(line, FindColumn(source, position)),
                 options), "value > 5");
             Assert.That(fileProof.TruthValue, Is.EqualTo(proof.TruthValue));
@@ -116,12 +118,11 @@ public sealed class SymbolicQueryWitnessTests
                               }
                               """;
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var (tree, compilation) = Compile(source, "HazardWitness.cs");
         var result = new SymbolicQueryExecutor().QueryRuntimeHazards(new SymbolicQueryContext(
-            SymbolicSourceInput.FromText(source, "HazardWitness.cs"),
+            SymbolicSourceInput.FromSyntaxTree(tree, compilation),
             SharpProofTargetFactory.AllLines(),
-            new SymbolicQueryOptions(
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                smtAnalysis)),
+            new SymbolicQueryOptions(smtAnalysis: smtAnalysis)),
             new SymbolicRuntimeHazardQueryOptions(
                 true,
                 new[] { SymbolicRuntimeHazardKind.DivideByZero }));
@@ -145,6 +146,14 @@ public sealed class SymbolicQueryWitnessTests
             Assert.That(result.InputDomainSummary.Domains, Has.Some.Property("Name").EqualTo("divisor"));
         });
     }
+
+    private static (SyntaxTree Tree, Compilation Compilation) Compile(string source, string filePath) =>
+        SymbolicSourceCompilation.Create(
+            source,
+            filePath,
+            SymbolicSourceCompilationKind.Query,
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            default);
 
     private static int FindLine(string source, string text)
     {

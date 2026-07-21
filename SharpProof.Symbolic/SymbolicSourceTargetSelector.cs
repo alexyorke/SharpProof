@@ -19,16 +19,14 @@ internal static class SymbolicSourceTargetSelector {
     internal static IReadOnlyList<SyntaxNode> FindOnLine(
         SyntaxTree syntaxTree,
         int line,
-        CancellationToken cancellationToken,
-        bool includeExpressionProgramPoints) {
+        CancellationToken cancellationToken) {
         var lineSpan = SymbolicSourceLocation.GetLineSpan(syntaxTree, line, cancellationToken);
-        return FindInSpan(syntaxTree, lineSpan, includeExpressionProgramPoints, cancellationToken);
+        return FindInSpan(syntaxTree, lineSpan, cancellationToken);
     }
 
     internal static IReadOnlyList<SyntaxNode> FindInSpan(
         SyntaxTree syntaxTree,
         TextSpan span,
-        bool includeExpressionProgramPoints,
         CancellationToken cancellationToken) {
         if (span.Length == 0) return [];
 
@@ -36,7 +34,7 @@ internal static class SymbolicSourceTargetSelector {
         var index = QueryNodeIndexes.GetValue(
             syntaxTree,
             tree => new QueryNodeIndex(tree, cancellationToken));
-        return index.FindIntersecting(span, includeExpressionProgramPoints, cancellationToken);
+        return index.FindIntersecting(span, cancellationToken);
     }
 
     internal static SyntaxNode SelectNearest(IReadOnlyList<SyntaxNode> nodes, int position) {
@@ -95,7 +93,6 @@ internal static class SymbolicSourceTargetSelector {
 
     sealed class QueryNodeIndex {
         private readonly IReadOnlyDictionary<int, ImmutableArray<SyntaxNode>> _baseNodesByLine;
-        private readonly IReadOnlyDictionary<int, ImmutableArray<SyntaxNode>> _expressionNodesByLine;
         private readonly SourceText _text;
 
         internal QueryNodeIndex(SyntaxTree syntaxTree, CancellationToken cancellationToken) {
@@ -124,31 +121,13 @@ internal static class SymbolicSourceTargetSelector {
                 }
             }
 
-            var expressionNodes = new Dictionary<(int RawKind, int Start, int End), SyntaxNode>();
-            foreach (var expression in root.DescendantNodes(descendIntoTrivia: false)
-                         .OfType<ExpressionSyntax>()
-                         .Where(static expression =>
-                             expression.Span.Length > 0 && (expression is AssignmentExpressionSyntax or AwaitExpressionSyntax or BinaryExpressionSyntax
-                                 or CastExpressionSyntax or
-                                 ConditionalAccessExpressionSyntax or ConditionalExpressionSyntax or ElementAccessExpressionSyntax
-                                 or InvocationExpressionSyntax or
-                                 IsPatternExpressionSyntax or MemberAccessExpressionSyntax or ObjectCreationExpressionSyntax
-                                 or PrefixUnaryExpressionSyntax or
-                                 PostfixUnaryExpressionSyntax or RangeExpressionSyntax or SwitchExpressionSyntax or ThrowExpressionSyntax))) {
-                cancellationToken.ThrowIfCancellationRequested();
-                var key = (expression.RawKind, expression.SpanStart, expression.Span.End);
-                if (!expressionNodes.ContainsKey(key)) expressionNodes.Add(key, expression);
-            }
-
             _baseNodesByLine = baseNodesByLine.ToDictionary(
                 static pair => pair.Key,
                 static pair => pair.Value.Values.ToImmutableArray());
-            _expressionNodesByLine = BuildLineIndex(expressionNodes.Values);
         }
 
         internal IReadOnlyList<SyntaxNode> FindIntersecting(
             TextSpan span,
-            bool includeExpressionProgramPoints,
             CancellationToken cancellationToken) {
             if (span.Length == 0) return [];
 
@@ -159,35 +138,12 @@ internal static class SymbolicSourceTargetSelector {
             for (var line = startLine; line <= endLine; line++) {
                 cancellationToken.ThrowIfCancellationRequested();
                 AddNodes(_baseNodesByLine, line, span, seen, nodes);
-                if (includeExpressionProgramPoints)
-                    AddNodes(_expressionNodesByLine, line, span, seen, nodes);
             }
 
             return nodes
                 .OrderBy(static node => node.SpanStart)
                 .ThenBy(static node => node.Span.Length)
                 .ToArray();
-        }
-
-        private IReadOnlyDictionary<int, ImmutableArray<SyntaxNode>> BuildLineIndex(
-            IEnumerable<SyntaxNode> nodes) {
-            var lineNodes = new Dictionary<int, List<SyntaxNode>>();
-            foreach (var node in nodes) {
-                var startLine = _text.Lines.GetLineFromPosition(node.SpanStart).LineNumber;
-                var endLine = _text.Lines.GetLineFromPosition(node.Span.End - 1).LineNumber;
-                for (var line = startLine; line <= endLine; line++) {
-                    if (!lineNodes.TryGetValue(line, out var values)) {
-                        values = new List<SyntaxNode>();
-                        lineNodes.Add(line, values);
-                    }
-
-                    values.Add(node);
-                }
-            }
-
-            return lineNodes.ToDictionary(
-                static pair => pair.Key,
-                static pair => pair.Value.ToImmutableArray());
         }
 
         private static void AddNodes(

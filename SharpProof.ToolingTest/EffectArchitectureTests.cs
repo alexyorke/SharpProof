@@ -50,7 +50,8 @@ public sealed class EffectArchitectureTests {
             "SharpProof.Analyzer/AnalyzerFeatures.cs",
             "SharpProof.Analyzer/RequiresEntryStateBuilder.cs",
             "SharpProof.Symbolic/SharpProofCapabilityFacts.cs",
-            "SharpProof.Symbolic/SymbolicInvariantTargetFilter.cs"
+            "SharpProof.Symbolic/SymbolicInvariantTargetFilter.cs",
+            "SharpProof.Symbolic/SymbolicSourceCompilationProfile.cs"
         };
         foreach (var relativePath in removedFiles)
             Assert.That(File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))),
@@ -99,7 +100,14 @@ public sealed class EffectArchitectureTests {
             "sharpproof_report_exceptions",
             "Diagnostic" + "Baseline",
             "InferredContract" + "SuggestionAnalyzer",
-            "TrustedBoundary" + "ReviewAnalyzer"
+            "TrustedBoundary" + "ReviewAnalyzer",
+            "Symbolic" + "SourceInputKind",
+            "Symbolic" + "FactInfo",
+            "Symbolic" + "ProofBackend",
+            "Symbolic" + "ProofStage",
+            "Symbolic" + "ProofSupport",
+            "Include" + "ExpressionProgramPoints",
+            "Implied" + "Conditions"
         };
         var legacyDiagnostic = new System.Text.RegularExpressions.Regex(
             @"SP(?:000[3-9]|001[0-247]|002[0369]|003[1-9]|004[0567]|00(?:4[89]|5[0-9]|6[0-9]|7[0-6]))",

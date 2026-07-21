@@ -22,8 +22,6 @@ internal sealed class MethodBodyAnalysisState {
 
     internal MethodAnalysisSnapshot Snapshot { get; }
 
-    internal SymbolicQueryExecutor QueryExecutor { get; } = new();
-
     internal MethodEffects GetMethodEffects(CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         return GetOrCreateSymbolicQueryResult(
@@ -38,9 +36,15 @@ internal sealed class MethodBodyAnalysisState {
         CancellationToken cancellationToken) {
         return GetOrCreateSymbolicQueryResult(
             "complexity",
-            () => AnalyzerSymbolicQueryBoundary.TryExecute(() => QueryExecutor.QueryComplexity(
-                new SymbolicQueryContext(Snapshot.Source, new SharpProofTarget(SharpProofTargetKind.Span)),
-                cancellationToken)));
+            () => AnalyzerSymbolicQueryBoundary.TryExecute(() => AnalyzeComplexity(cancellationToken)));
+    }
+
+    private SymbolicComplexityResult AnalyzeComplexity(CancellationToken cancellationToken) {
+        var target = ResolvedMethodLikeTarget.Create(
+            Snapshot.Declaration, Snapshot.SemanticModel, cancellationToken);
+        var summary = new SymbolicComplexityAnalysisSession(
+            Snapshot.SemanticModel.Compilation, cancellationToken).Analyze(target);
+        return SymbolicComplexityResultProjector.Project(target, summary, cancellationToken);
     }
 
     internal SymbolicConditionProofResult ProveAtNode(

@@ -10,9 +10,7 @@ internal sealed partial class SymbolicQueryExecutor {
     internal SymbolicQueryExecutor() {
         _invariantService = new SymbolicInvariantService();
         _conditionProofEngine = new SymbolicConditionProofEngine(_invariantService);
-        _programPointExecutor = new SymbolicSourceProgramPointExecutor(
-            _invariantService,
-            _conditionProofEngine);
+        _programPointExecutor = new SymbolicSourceProgramPointExecutor(_invariantService);
         _rangeQueryExecutor = new SymbolicSourceRangeQueryExecutor(_programPointExecutor);
         _runtimeHazardService = new SymbolicRuntimeHazardQueryService(_invariantService);
     }
@@ -52,9 +50,7 @@ internal sealed partial class SymbolicQueryExecutor {
         return ExecuteWithLimits(context, cancellationToken, (request, token) =>
             SymbolicMethodLikeQueryDispatcher.Execute(
                 request,
-                SymbolicSourceCompilationKind.Complexity,
-                "Complexity source kind is not supported.",
-                "Complexity queries support point, position, line, or node targets only.",
+                "Complexity queries support point, position, or line targets only.",
                 static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true),
                 ExecuteComplexityAnalysis,
                 token));

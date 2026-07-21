@@ -4,9 +4,9 @@ internal static class ContractDiagnosticSupport {
     internal static string FormatUnknownReason(
         SymbolicConditionProofResult proof,
         string contractAttributeName) {
-        if (proof.Proof.UnknownReason != SymbolicUnknownReason.None &&
-            proof.Proof.UnknownReason != SymbolicUnknownReason.Unknown)
-            return proof.Proof.UnknownReason.ToString();
+        if (proof.UnknownReason != SymbolicUnknownReason.None &&
+            proof.UnknownReason != SymbolicUnknownReason.Unknown)
+            return proof.UnknownReason.ToString();
 
         return proof.Reason switch {
             "condition_parse_failure" => "condition parse failure",

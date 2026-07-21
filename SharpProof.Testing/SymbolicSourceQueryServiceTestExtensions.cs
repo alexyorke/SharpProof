@@ -13,13 +13,12 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         int line,
         int column = 1,
         CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null)
+        SmtAnalysisService? smtAnalysis = null)
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
                 SharpProofTargetFactory.Point(line, column),
-                new SymbolicQueryOptions(smtAnalysis: smtAnalysis, impliedConditions: impliedConditions)),
+                new SymbolicQueryOptions(smtAnalysis: smtAnalysis)),
             cancellationToken).ProgramPoints.Single();
     }
 
@@ -29,19 +28,12 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         Compilation compilation,
         int line,
         CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false)
+        SmtAnalysisService? smtAnalysis = null)
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
                 SharpProofTargetFactory.LineNumber(line),
-                new SymbolicQueryOptions(
-                    smtAnalysis: smtAnalysis,
-                    impliedConditions: impliedConditions,
-                    includeExpressionProgramPoints: includeExpressionProgramPoints,
-                    includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts)),
+                new SymbolicQueryOptions(smtAnalysis: smtAnalysis)),
             cancellationToken);
     }
 
@@ -52,19 +44,12 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         int line,
         int column,
         CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false)
+        SmtAnalysisService? smtAnalysis = null)
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
                 SharpProofTargetFactory.Point(line, column),
-                new SymbolicQueryOptions(
-                    smtAnalysis: smtAnalysis,
-                    impliedConditions: impliedConditions,
-                    includeExpressionProgramPoints: includeExpressionProgramPoints,
-                    includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts)),
+                new SymbolicQueryOptions(smtAnalysis: smtAnalysis)),
             cancellationToken).ProgramPoints.Single();
     }
 
@@ -75,19 +60,12 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         int spanStart,
         int spanEnd,
         CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false)
+        SmtAnalysisService? smtAnalysis = null)
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
                 SharpProofTargetFactory.Span(spanStart, spanEnd),
-                new SymbolicQueryOptions(
-                    smtAnalysis: smtAnalysis,
-                    impliedConditions: impliedConditions,
-                    includeExpressionProgramPoints: includeExpressionProgramPoints,
-                    includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts)),
+                new SymbolicQueryOptions(smtAnalysis: smtAnalysis)),
             cancellationToken);
     }
 
@@ -96,19 +74,12 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         SyntaxTree syntaxTree,
         Compilation compilation,
         CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false)
+        SmtAnalysisService? smtAnalysis = null)
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
                 SharpProofTargetFactory.AllLines(),
-                new SymbolicQueryOptions(
-                    smtAnalysis: smtAnalysis,
-                    impliedConditions: impliedConditions,
-                    includeExpressionProgramPoints: includeExpressionProgramPoints,
-                    includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts)),
+                new SymbolicQueryOptions(smtAnalysis: smtAnalysis)),
             cancellationToken);
     }
 
@@ -118,13 +89,12 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         Compilation compilation,
         int position,
         CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null)
+        SmtAnalysisService? smtAnalysis = null)
     {
         return executor.Query(new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
                 SharpProofTargetFactory.AtPosition(position),
-                new SymbolicQueryOptions(smtAnalysis: smtAnalysis, impliedConditions: impliedConditions)),
+                new SymbolicQueryOptions(smtAnalysis: smtAnalysis)),
             cancellationToken).ProgramPoints.Single();
     }
 
@@ -137,17 +107,14 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         string conditionText,
         SmtAnalysisService smtAnalysis,
         IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
+        CancellationToken cancellationToken = default)
     {
-        var source = compilationProfile == null
-            ? SymbolicSourceInput.FromText(sourceText, filePath)
-            : SymbolicSourceInput.FromText(sourceText, filePath, compilationProfile);
+        var (syntaxTree, compilation) = Compile(sourceText, filePath, references, cancellationToken);
         return executor.Prove(
             new SymbolicQueryContext(
-                source,
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
                 SharpProofTargetFactory.Point(line, column),
-                new SymbolicQueryOptions(references, smtAnalysis)),
+                new SymbolicQueryOptions(smtAnalysis: smtAnalysis)),
             conditionText,
             cancellationToken);
     }
@@ -178,9 +145,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         int column = 1,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
+        SmtAnalysisService? smtAnalysis = null)
     {
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("File path is required.", nameof(filePath));
@@ -193,9 +158,7 @@ internal static class SymbolicSourceQueryServiceTestExtensions
             column,
             references,
             cancellationToken,
-            smtAnalysis,
-            impliedConditions,
-            compilationProfile);
+            smtAnalysis);
     }
 
     internal static SymbolicProgramPointResult QuerySource(
@@ -206,20 +169,16 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         int column = 1,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
+        SmtAnalysisService? smtAnalysis = null)
     {
-        var (syntaxTree, compilation) = Compile(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
+        var (syntaxTree, compilation) = Compile(sourceText, filePath, references, cancellationToken);
         return service.QuerySyntaxTree(
             syntaxTree,
             compilation,
             line,
             column,
             cancellationToken,
-            smtAnalysis,
-            impliedConditions);
+            smtAnalysis);
     }
 
     internal static SymbolicProgramPointResult QuerySourceAtPosition(
@@ -229,19 +188,15 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         int position,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
+        SmtAnalysisService? smtAnalysis = null)
     {
-        var (syntaxTree, compilation) = Compile(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
+        var (syntaxTree, compilation) = Compile(sourceText, filePath, references, cancellationToken);
         return service.QuerySyntaxTreeAtPosition(
             syntaxTree,
             compilation,
             position,
             cancellationToken,
-            smtAnalysis,
-            impliedConditions);
+            smtAnalysis);
     }
 
     internal static SymbolicQueryResult QuerySourceLine(
@@ -251,27 +206,19 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         int line,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
+        SmtAnalysisService? smtAnalysis = null)
     {
         var (syntaxTree, compilation) = Compile(
             sourceText,
             filePath,
             references,
-            cancellationToken,
-            compilationProfile);
+            cancellationToken);
         return service.QuerySyntaxTreeLine(
             syntaxTree,
             compilation,
             line,
             cancellationToken,
-            smtAnalysis,
-            impliedConditions,
-            includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts);
+            smtAnalysis);
     }
 
     internal static SymbolicProgramPointResult AnalyzeSource(
@@ -282,11 +229,9 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         int column = 1,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
+        SmtAnalysisService? smtAnalysis = null)
     {
-        var (syntaxTree, compilation) = Compile(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
+        var (syntaxTree, compilation) = Compile(sourceText, filePath, references, cancellationToken);
         return service.QuerySyntaxTree(
             syntaxTree,
             compilation,
@@ -303,11 +248,9 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         int position,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
+        SmtAnalysisService? smtAnalysis = null)
     {
-        var (syntaxTree, compilation) = Compile(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
+        var (syntaxTree, compilation) = Compile(sourceText, filePath, references, cancellationToken);
         return service.QuerySyntaxTreeAtPosition(
             syntaxTree,
             compilation,
@@ -323,15 +266,13 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         SmtAnalysisService smtAnalysis,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
+        SymbolicRuntimeHazardQueryOptions? options = null)
     {
         var (syntaxTree, compilation) = Compile(
             sourceText,
             filePath,
             references,
             cancellationToken,
-            compilationProfile,
             SymbolicSourceCompilationKind.RuntimeHazards);
         return service.QuerySyntaxTreeRuntimeHazards(
             syntaxTree,
@@ -350,15 +291,13 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         SmtAnalysisService smtAnalysis,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
+        SymbolicRuntimeHazardQueryOptions? options = null)
     {
         var (syntaxTree, compilation) = Compile(
             sourceText,
             filePath,
             references,
             cancellationToken,
-            compilationProfile,
             SymbolicSourceCompilationKind.RuntimeHazards);
         return service.QuerySyntaxTreeRuntimeHazards(
             syntaxTree,
@@ -378,15 +317,13 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         SmtAnalysisService smtAnalysis,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
+        SymbolicRuntimeHazardQueryOptions? options = null)
     {
         var (syntaxTree, compilation) = Compile(
             sourceText,
             filePath,
             references,
             cancellationToken,
-            compilationProfile,
             SymbolicSourceCompilationKind.RuntimeHazards);
         return service.QuerySyntaxTreeRuntimeHazards(
             syntaxTree,
@@ -402,7 +339,6 @@ internal static class SymbolicSourceQueryServiceTestExtensions
         string filePath,
         IEnumerable<MetadataReference>? references,
         CancellationToken cancellationToken,
-        SymbolicSourceCompilationProfile? compilationProfile,
         SymbolicSourceCompilationKind compilationKind = SymbolicSourceCompilationKind.Query)
     {
         return SymbolicSourceCompilation.Create(
@@ -410,7 +346,6 @@ internal static class SymbolicSourceQueryServiceTestExtensions
             filePath,
             compilationKind,
             references,
-            cancellationToken,
-            compilationProfile);
+            cancellationToken);
     }
 }

@@ -9,18 +9,12 @@ internal sealed record SymbolicProgramPointQueryContext(
 internal static class SymbolicProgramPointProjector {
     internal static SymbolicProgramPointResult Project(
         SymbolicProgramPointQueryContext query,
-        IReadOnlyList<SymbolicConditionProofResult> conditionProofs,
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
-        var mergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions);
-        var invariant = SymbolicInvariantResult.FromFormulas(
-            query.Analysis.PathConditions,
-            mergedInvariantText);
         return new SymbolicProgramPointResult(
-            invariant,
+            query.Analysis.PathConditions,
             query.Analysis.Reachability,
             query.Analysis.ReachabilityReason,
-            conditionProofs,
             SymbolicInputWitnessFactory.CreateReachability(
                 query.Analysis.ReachabilityProof?.PathCheck.Witness,
                 query.Analysis.PathConditions,
