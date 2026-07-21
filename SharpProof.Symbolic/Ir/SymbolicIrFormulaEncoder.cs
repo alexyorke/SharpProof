@@ -168,6 +168,18 @@ internal static class SymbolicIrFormulaEncoder {
                 }
 
                 break;
+            case SymbolicStringSliceTerm slice:
+                if (TryEncodeTerm(slice.Value, out var sliceSource) &&
+                    TryEncodeTerm(slice.Offset, out var sliceOffset) &&
+                    TryEncodeTerm(slice.Length, out var sliceLength) &&
+                    sliceSource.Kind == SmtValueKind.String &&
+                    sliceOffset.Kind == SmtValueKind.Int &&
+                    sliceLength.Kind == SmtValueKind.Int) {
+                    formula = new SmtStringSubstringTerm(sliceSource, sliceOffset, sliceLength);
+                    return true;
+                }
+
+                break;
             case SymbolicNullableHasValueTerm nullableHasValue:
                 formula = new SmtVariable(nullableHasValue.NullableName + ".HasValue", SmtValueKind.Bool);
                 return true;

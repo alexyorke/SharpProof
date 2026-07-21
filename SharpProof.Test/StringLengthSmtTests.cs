@@ -637,6 +637,78 @@ public class TestClass
             "text.Trim().Length == text.Length");
     }
 
+    [Test]
+    public void SymbolicQueryExecutor_ProvesStringSubstringStartResultLength()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text, int start)
+    {
+        if (text != null && start >= 0 && start <= text.Length)
+        {
+            return text.Substring(start).Length;
+        }
+
+        return 0;
+    }
+}";
+
+        AssertConditionProven(
+            source,
+            "return text.Substring(start).Length;",
+            "text.Substring(start).Length == text.Length - start");
+    }
+
+    [Test]
+    public void SymbolicQueryExecutor_ProvesStringSubstringRangeResultLength()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text, int start, int count)
+    {
+        if (text != null && start >= 0 && count >= 0 && start + count <= text.Length)
+        {
+            return text.Substring(start, count).Length;
+        }
+
+        return 0;
+    }
+}";
+
+        AssertConditionProven(
+            source,
+            "return text.Substring(start, count).Length;",
+            "text.Substring(start, count).Length == count");
+    }
+
+    [Test]
+    public void SymbolicQueryExecutor_ProvesStringSubstringContentIdentity()
+    {
+        // Substring now lowers to a slice carried as a string, so the solver reasons about
+        // the value itself. While it was projected to its length alone this was not
+        // expressible, let alone provable.
+        const string source = @"
+public class TestClass
+{
+    public bool TestMethod(string text)
+    {
+        if (text != null)
+        {
+            return text.Substring(0, text.Length) == text;
+        }
+
+        return false;
+    }
+}";
+
+        AssertConditionProven(
+            source,
+            "return text.Substring(0, text.Length) == text;",
+            "text.Substring(0, text.Length) == text");
+    }
+
     private static void AssertConditionProven(string source, string sourceLine, string condition)
     {
         var proof = ProveCondition(source, sourceLine, condition);

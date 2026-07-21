@@ -59,35 +59,8 @@ internal static class SymbolicStringLengthLowerer {
             invocationOperation.Instance?.Syntax is not ExpressionSyntax sourceExpression)
             return false;
 
-        if (string.Equals(method.Name, nameof(string.Substring), StringComparison.Ordinal) &&
-            method.Parameters.Length == 1) {
-            if (invocationOperation.Arguments.Length != 1 ||
-                !SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength) ||
-                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocationOperation.Arguments[0].Syntax as ExpressionSyntax ??
-                    invocationOperation.Arguments[0].Value.Syntax as ExpressionSyntax ??
-                    invocationExpression.ArgumentList.Arguments[0].Expression, context), out var start) ||
-                start.Kind != SmtValueKind.Int)
-                return false;
-
-            term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, start);
-            return true;
-        }
-
-        if (string.Equals(method.Name, nameof(string.Substring), StringComparison.Ordinal) &&
-            method.Parameters.Length == 2) {
-            if (invocationOperation.Arguments.Length != 2 ||
-                !SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out _) ||
-                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocationOperation.Arguments[0].Syntax as ExpressionSyntax ??
-                    invocationExpression.ArgumentList.Arguments[0].Expression, context), out var startValue) ||
-                startValue.Kind != SmtValueKind.Int ||
-                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocationOperation.Arguments[1].Syntax as ExpressionSyntax ??
-                    invocationExpression.ArgumentList.Arguments[1].Expression, context), out var countValue) ||
-                countValue.Kind != SmtValueKind.Int)
-                return false;
-
-            term = countValue;
-            return true;
-        }
+        // Substring is not handled here: it lowers to a slice term in SymbolicStringLowerer,
+        // and CreateStringResultLengthTerm projects that slice's requested length.
 
         if (string.Equals(method.Name, nameof(string.Remove), StringComparison.Ordinal)) {
             if (!SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength)) return false;
@@ -161,6 +134,12 @@ internal static class SymbolicStringLengthLowerer {
         string provenance) {
         if (stringValue is SymbolicStringConstantTerm constant)
             return new SymbolicIntegerConstantTerm(constant.Value.Length);
+
+        // A slice reaches here only on a path where the call completed, so its length is
+        // the length that was asked for. Projecting it keeps this exact, where deferring
+        // to the solver's total substring would only yield an upper bound.
+        if (stringValue is SymbolicStringSliceTerm slice)
+            return slice.Length;
 
         if (stringValue is not SymbolicStringConcatTerm concat)
             return new SymbolicLengthTerm(stringValue);

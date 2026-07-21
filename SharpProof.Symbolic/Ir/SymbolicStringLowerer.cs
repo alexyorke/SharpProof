@@ -561,12 +561,63 @@ internal static class SymbolicStringLowerer {
             TryLowerStringConcatInvocationTerm(invocation, context, out term))
             return true;
 
+        if (TryLowerStringSliceTerm(expression, context, out term)) return true;
+
         if (expression is InterpolatedStringExpressionSyntax interpolatedString &&
             TryLowerInterpolatedStringTerm(interpolatedString, context, out term))
             return true;
 
         term = null!;
         return false;
+    }
+
+    /// <summary>
+    /// Lowers <c>string.Substring</c> to a slice of the receiver. Carrying the result as a
+    /// string rather than only its length is what lets the solver answer questions about
+    /// its contents; the requested length rides along on the node so the length projection
+    /// stays exactly what it was when the result was a bare arithmetic term.
+    /// </summary>
+    private static bool TryLowerStringSliceTerm(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term) {
+        term = null!;
+        if (!SymbolicIndexingLowerer.TryGetInvocationOperation(expression, context, out _, out var invocationOperation))
+            return false;
+
+        var method = invocationOperation.TargetMethod;
+        if (method.IsStatic ||
+            method.ContainingType?.SpecialType != SpecialType.System_String ||
+            !string.Equals(method.Name, nameof(string.Substring), StringComparison.Ordinal) ||
+            method.Parameters.Length is not (1 or 2) ||
+            invocationOperation.Instance?.Syntax is not ExpressionSyntax sourceExpression ||
+            !TryLowerStringTerm(sourceExpression, context, out var source) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var startExpression) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(startExpression, context), out var start) ||
+            start.Kind != SmtValueKind.Int)
+            return false;
+
+        if (method.Parameters.Length == 2) {
+            if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1, out var countExpression) ||
+                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(countExpression, context), out var count) ||
+                count.Kind != SmtValueKind.Int)
+                return false;
+
+            term = new SymbolicStringSliceTerm(source, start, count);
+            return true;
+        }
+
+        // Substring(start) runs to the end, so its length is the receiver's length less
+        // the offset. The receiver length comes from the same helper the arithmetic
+        // projection used, keeping the projected term identical.
+        if (!SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength))
+            return false;
+
+        term = new SymbolicStringSliceTerm(
+            source,
+            start,
+            new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, start));
+        return true;
     }
 
     internal static bool TryCreateStringContentReferenceTerm(

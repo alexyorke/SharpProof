@@ -55,6 +55,9 @@ internal static class SymbolicFormulaDisplay {
                 return FormatTerm(length.Value) + ".Length";
             case SmtStringConcatTerm concat:
                 return FormatTerm(concat.Left) + " + " + FormatTerm(concat.Right);
+            case SmtStringSubstringTerm substring:
+                return FormatTerm(substring.Value) + ".Substring(" + Format(substring.Offset) + ", " +
+                       Format(substring.Length) + ")";
             case SmtStringContainsFormula contains:
                 return FormatTerm(contains.Value) + ".Contains(" + Format(contains.Search) + ")";
             case SmtStringStartsWithFormula startsWith:
@@ -177,6 +180,7 @@ internal static class SymbolicFormulaDisplay {
             case SmtStringLengthTerm length:
                 return FormatTerm(length.Value) + ".Length";
             case SmtStringConcatTerm:
+            case SmtStringSubstringTerm:
             case SmtIntegerBinaryTerm:
             case SmtOpaqueIntegerBinaryTerm:
             case SmtIntegerUnaryTerm:

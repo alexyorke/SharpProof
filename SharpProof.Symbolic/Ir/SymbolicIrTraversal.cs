@@ -56,6 +56,7 @@ internal readonly record struct SymbolicIrChildren(
         SymbolicFromEndIndexTerm fromEnd => new(fromEnd.Value),
         SymbolicStringContentTerm stringContent => new(stringContent.Reference),
         SymbolicStringConcatTerm stringConcat => new(stringConcat.Left, stringConcat.Right),
+        SymbolicStringSliceTerm slice => new(slice.Value, slice.Offset, Rest: ImmutableArray.Create(slice.Length)),
         SymbolicLengthTerm length => new(length.Value),
         SymbolicArrayDimensionLengthTerm arrayLength => new(arrayLength.Value),
         SymbolicCountTerm count => new(count.Value),
@@ -170,6 +171,10 @@ internal abstract class SymbolicIrRewriter {
             SymbolicStringConcatTerm concat => new SymbolicStringConcatTerm(
                 Rewrite(concat.Left),
                 Rewrite(concat.Right)),
+            SymbolicStringSliceTerm slice => new SymbolicStringSliceTerm(
+                Rewrite(slice.Value),
+                Rewrite(slice.Offset),
+                Rewrite(slice.Length)),
             SymbolicLengthTerm length => new SymbolicLengthTerm(Rewrite(length.Value)),
             SymbolicArrayDimensionLengthTerm length => new SymbolicArrayDimensionLengthTerm(
                 Rewrite(length.Value),

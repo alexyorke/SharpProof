@@ -109,6 +109,20 @@ internal sealed record SymbolicStringContentTerm(SymbolicTerm Reference) : Symbo
 internal sealed record SymbolicStringConcatTerm(SymbolicTerm Left, SymbolicTerm Right)
     : SymbolicTerm(SmtValueKind.String);
 
+/// <summary>
+/// A slice of a string, carried as a string value rather than collapsed to its length, so
+/// that content facts about it reach the solver's substring theory.
+/// </summary>
+/// <remarks>
+/// <see cref="Length" /> is the slice's requested length. It is retained on the node
+/// because the solver's substring is total and would otherwise only yield
+/// <c>min(Length, len(Value) - Offset)</c>; a slice only exists here on a path where the
+/// call completed, so the requested length is the observed one. See
+/// <c>SymbolicStringLengthLowerer.CreateStringResultLengthTerm</c>, which projects it.
+/// </remarks>
+internal sealed record SymbolicStringSliceTerm(SymbolicTerm Value, SymbolicTerm Offset, SymbolicTerm Length)
+    : SymbolicTerm(SmtValueKind.String);
+
 internal sealed record SymbolicNullableHasValueTerm(string NullableName) : SymbolicTerm(SmtValueKind.Bool);
 
 internal sealed record SymbolicNullableValueTerm(string NullableName, SmtValueKind ValueKind) : SymbolicTerm(ValueKind);
@@ -1037,6 +1051,8 @@ internal sealed class SymbolicState {
         SymbolicFromEndIndexTerm fromEnd => "from-end-index:" + CreateTermKey(fromEnd.Value),
         SymbolicStringContentTerm content => "string-content:" + CreateTermKey(content.Reference),
         SymbolicStringConcatTerm concat => CreateStringConcatTermKey(concat),
+        SymbolicStringSliceTerm slice => "string-slice:" + CreateTermKey(slice.Value) + "[" +
+                               CreateTermKey(slice.Offset) + "," + CreateTermKey(slice.Length) + "]",
         SymbolicNullableHasValueTerm nullableHasValue => "nullable-has-value:" + nullableHasValue.NullableName,
         SymbolicNullableValueTerm nullableValue => "nullable-value:" + nullableValue.NullableName + ":" + nullableValue.Kind,
         SymbolicLengthTerm length => "length:" + CreateTermKey(length.Value),

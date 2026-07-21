@@ -123,6 +123,7 @@ internal static class SmtFormulaTraversal {
             SmtOpaqueIntegerBinaryTerm binary => new FormulaChildren(binary.Left, binary.Right),
             SmtStringLengthTerm length => new FormulaChildren(length.Value),
             SmtStringConcatTerm concat => new FormulaChildren(concat.Left, concat.Right),
+            SmtStringSubstringTerm substring => new FormulaChildren(substring.Value, substring.Offset, substring.Length),
             SmtStringContainsFormula contains => new FormulaChildren(contains.Value, contains.Search),
             SmtStringStartsWithFormula startsWith => new FormulaChildren(startsWith.Value, startsWith.Prefix),
             SmtStringEndsWithFormula endsWith => new FormulaChildren(endsWith.Value, endsWith.Suffix),
@@ -159,6 +160,9 @@ internal static class SmtFormulaTraversal {
             SmtStringConcatTerm value => Same(0, value.Left) && Same(1, value.Right)
                 ? formula
                 : new SmtStringConcatTerm(children[0], children[1]),
+            SmtStringSubstringTerm value => Same(0, value.Value) && Same(1, value.Offset) && Same(2, value.Length)
+                ? formula
+                : new SmtStringSubstringTerm(children[0], children[1], children[2]),
             SmtStringContainsFormula value => Same(0, value.Value) && Same(1, value.Search)
                 ? formula
                 : new SmtStringContainsFormula(children[0], children[1]),

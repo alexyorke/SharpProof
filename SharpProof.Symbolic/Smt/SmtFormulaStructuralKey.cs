@@ -24,6 +24,8 @@ internal static class SmtFormulaStructuralKey {
             SmtStringLengthTerm length => "string-length(" + Create(length.Value) + ")",
             SmtStringConcatTerm concat => "string-concat(" + Create(concat.Left) + "," + Create(concat.Right) +
                                            ")",
+            SmtStringSubstringTerm substring => "string-substring(" + Create(substring.Value) + "," +
+                                           Create(substring.Offset) + "," + Create(substring.Length) + ")",
             SmtStringContainsFormula contains =>
                 "string-contains(" + Create(contains.Value) + "," + Create(contains.Search) + ")",
             SmtStringStartsWithFormula startsWith =>

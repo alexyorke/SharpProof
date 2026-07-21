@@ -66,6 +66,20 @@ internal sealed record SmtStringLengthTerm(SmtFormula Value) : SmtFormula(SmtVal
 
 internal sealed record SmtStringConcatTerm(SmtFormula Left, SmtFormula Right) : SmtFormula(SmtValueKind.String);
 
+/// <summary>
+/// A slice of <paramref name="Value" />, encoded onto the solver's native substring
+/// operation so that content facts about it come from the string theory.
+/// </summary>
+/// <remarks>
+/// The solver's substring is total: an out-of-range offset or length yields the empty
+/// string rather than a fault, so its length is <c>min(Length, len(Value) - Offset)</c>
+/// and not <c>Length</c>. Callers that need the exact-length reading must either supply
+/// in-range premises or project the length separately, which is what
+/// <c>SymbolicStringLengthLowerer.CreateStringResultLengthTerm</c> does.
+/// </remarks>
+internal sealed record SmtStringSubstringTerm(SmtFormula Value, SmtFormula Offset, SmtFormula Length)
+    : SmtFormula(SmtValueKind.String);
+
 internal sealed record SmtStringContainsFormula(SmtFormula Value, SmtFormula Search) : SmtFormula(SmtValueKind.Bool);
 
 internal sealed record SmtStringStartsWithFormula(SmtFormula Value, SmtFormula Prefix) : SmtFormula(SmtValueKind.Bool);

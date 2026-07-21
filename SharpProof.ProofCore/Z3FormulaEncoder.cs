@@ -95,6 +95,12 @@ internal sealed class Z3FormulaEncoder : IDisposable {
             SmtStringConcatTerm stringConcatTerm => _context.MkConcat(
                 EncodeString(stringConcatTerm.Left),
                 EncodeString(stringConcatTerm.Right)),
+            // Offset and length are cast to IntExpr so this binds to the sequence
+            // overload of MkExtract rather than the bit-vector one.
+            SmtStringSubstringTerm stringSubstringTerm => _context.MkExtract(
+                EncodeString(stringSubstringTerm.Value),
+                (IntExpr)EncodeInteger(stringSubstringTerm.Offset),
+                (IntExpr)EncodeInteger(stringSubstringTerm.Length)),
             SmtStringContainsFormula stringContainsFormula => _context.MkContains(
                 EncodeString(stringContainsFormula.Value),
                 EncodeString(stringContainsFormula.Search)),
