@@ -58,28 +58,6 @@ internal static class SymbolicStateFactBuilder {
         return true;
     }
 
-    internal static SymbolicState AddReferenceNullCondition(
-        SymbolicState state,
-        ExpressionSyntax expression,
-        bool isNull,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenance,
-        Func<ISymbol, int>? getSymbolVersion = null) {
-        if (!TryCreateReferenceNullCondition(
-            expression,
-            isNull,
-            semanticModel,
-            cancellationToken,
-            provenance,
-            out var condition,
-            getSymbolVersion))
-            return state;
-
-        return SymbolicOperationTransferKernel.Assume(
-            state, condition, true, expression.Span, provenance).State;
-    }
-
     internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind) {
         return SymbolicFactFactory.TryGetValueKind(
             type,

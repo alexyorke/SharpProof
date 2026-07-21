@@ -52,17 +52,6 @@ internal static class SharpProofCapabilityFacts {
         return capabilities;
     }
 
-    internal static string Format(SharpProofCapability capabilities) {
-        capabilities = Normalize(capabilities);
-        if (capabilities == SharpProofCapability.None) return "None";
-
-        var values = Ordered
-            .Where(value => capabilities.HasFlag(value))
-            .Select(static value => value.ToString())
-            .ToArray();
-        return values.Length == 0 ? "None" : string.Join(", ", values);
-    }
-
     internal static int NormalizeMask(int capabilities) =>
         (int)Normalize((SharpProofCapability)capabilities);
 

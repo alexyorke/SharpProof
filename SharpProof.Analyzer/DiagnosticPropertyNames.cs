@@ -9,7 +9,6 @@ internal static class DiagnosticPropertyNames {
     internal const string BaselineSymbolProperty = "sharpproof.baseline.symbol";
     internal const string CapabilityUnknownReasonProperty = "sharpproof.capability.unknown_reason";
     internal const string ExceptionCategoriesProperty = "sharpproof.exceptions.categories";
-    internal const string ExceptionEdgesProperty = "sharpproof.exceptions.edges";
     internal const string ExceptionSourcesProperty = "sharpproof.exceptions.sources";
     internal const string ExceptionTypesProperty = "sharpproof.exceptions.types";
     internal const string ExpectedComplexityProperty = "sharpproof.complexity.expected";

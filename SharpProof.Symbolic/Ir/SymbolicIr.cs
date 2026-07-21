@@ -2,7 +2,6 @@ namespace SharpProof.Symbolic.Ir;
 
 internal enum SymbolicFactConfidence {
     Exact,
-    Approximate,
     Unsupported
 }
 
@@ -58,11 +57,6 @@ internal enum SymbolicEscapeKind {
     Unknown,
     Return,
     Argument,
-    Field,
-    Property,
-    DelegateCapture,
-    CollectionElement,
-    RefAlias
 }
 
 internal enum SymbolicDisposalState {
@@ -73,7 +67,6 @@ internal enum SymbolicDisposalState {
 
 internal enum SymbolicResourceLifetimeState {
     Owned,
-    Borrowed,
     Escaped,
     Returned,
     Released

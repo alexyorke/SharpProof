@@ -17,7 +17,6 @@ internal static class StructuralRefKinds {
 }
 
 internal sealed class StructuralMethodIdentity : IEquatable<StructuralMethodIdentity> {
-    internal const int ContractVersion = 1;
     internal const string KeyPrefix = "spm1";
 
     internal StructuralMethodIdentity(

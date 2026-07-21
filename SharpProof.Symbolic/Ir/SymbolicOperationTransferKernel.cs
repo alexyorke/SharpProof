@@ -81,15 +81,6 @@ internal static class SymbolicOperationTransferKernel {
         return Apply(state, SymbolicOperationSequence.Single(operation));
     }
 
-    internal static int GetDefinitionVersion(Microsoft.CodeAnalysis.Text.TextSpan sourceSpan) {
-        var spanStart = Math.Max(0, sourceSpan.Start);
-        // Definition versions are even; CFG join (phi) versions are odd. Using the
-        // syntax position keeps reprocessing the same block idempotent.
-        return spanStart <= (int.MaxValue - 2) / 2
-            ? (spanStart + 1) * 2
-            : 2 + spanStart % ((int.MaxValue - 2) / 2) * 2;
-    }
-
     internal static SymbolicOperationTransitionResult TransitionLifetime(
         SymbolicState state,
         SymbolicTerm subject,

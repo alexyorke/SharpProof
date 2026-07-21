@@ -343,27 +343,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         return true;
     }
 
-    internal static bool TryApplyCurrentExpressionCompletion(
-        ref SymbolicState state,
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        if (semanticModel.GetOperation(expression, cancellationToken) is not { } operation)
-            return false;
-        if (TryApplyCurrentCompletion(
-                ref state, expression, operation, guard: null, true, semanticModel, cancellationToken))
-            return true;
-        if (expression is not AssignmentExpressionSyntax assignment)
-            return false;
-
-        SymbolicStateInvalidator.InvalidateMutationTarget(
-            ref state, assignment.Left, semanticModel, cancellationToken);
-        SymbolicStateInvalidator.InvalidateNestedAssignmentMutations(
-            ref state, assignment, semanticModel, cancellationToken);
-        return true;
-    }
-
     internal static bool TryApplyOperation(
         ref SymbolicState state,
         IOperation operation,

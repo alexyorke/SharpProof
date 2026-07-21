@@ -74,9 +74,6 @@ public sealed record SharpProofAnalysisBudget(
         ("guard-facts-per-target-per-state", static value => value.MaxGuardFactsPerTargetPerState)
     ];
 
-    internal static bool IsNamedLimit(string name) =>
-        NamedLimits.Any(limit => string.Equals(limit.Name, name, StringComparison.Ordinal));
-
     internal static SharpProofAnalysisBudget FromNamedValues(
         SharpProofAnalysisBudget defaults,
         Func<string, int, int> getValue) {

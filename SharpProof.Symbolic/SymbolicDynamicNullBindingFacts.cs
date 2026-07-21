@@ -9,12 +9,6 @@ internal static class SymbolicDynamicNullBindingFacts {
     internal const string IndexSource = "dynamic_index";
     internal const string InvocationSource = "dynamic_invocation";
 
-    internal static bool IsDynamicNullBindingCategory(string category) {
-        return string.Equals(category, MemberCategory, StringComparison.Ordinal) ||
-               string.Equals(category, InvocationCategory, StringComparison.Ordinal) ||
-               string.Equals(category, IndexCategory, StringComparison.Ordinal);
-    }
-
     internal static bool TryGetDynamicNullBindingShape(
         SyntaxNode node,
         Func<ExpressionSyntax, ExpressionSyntax> unwrapExpression,

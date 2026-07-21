@@ -29,24 +29,6 @@ internal static class EcmaStructuralMethodIdentity {
             GetReturnRefKind(signature.ReturnType, returnAttributes));
     }
 
-    internal static StructuralMethodIdentity Create(MetadataReader reader, MemberReferenceHandle handle) {
-        var reference = reader.GetMemberReference(handle);
-        var signature = reference.DecodeMethodSignature(new StructuralTypeProvider(), null);
-        var metadataName = reader.GetString(reference.Name);
-        return new StructuralMethodIdentity(
-            GetMemberReferenceContainingMetadataType(reader, reference.Parent),
-            GetMethodKind(metadataName),
-            GetLogicalName(metadataName),
-            signature.GenericParameterCount,
-            signature.ParameterTypes.Select(static parameter => new StructuralParameterIdentity(
-                parameter.Key,
-                parameter.IsByRef ? StructuralRefKinds.Ref : StructuralRefKinds.None)),
-            signature.ReturnType.Key,
-            signature.ReturnType.IsByRef
-                ? signature.ReturnType.IsReadOnlyModifier ? StructuralRefKinds.RefReadonly : StructuralRefKinds.Ref
-                : StructuralRefKinds.None);
-    }
-
     internal static string GetCanonicalKey(MetadataReader reader, MethodDefinitionHandle handle) =>
         Create(reader, handle).ToCanonicalKey();
 
@@ -105,27 +87,6 @@ internal static class EcmaStructuralMethodIdentity {
 
     private static string GetSimpleMetadataName(string metadataName) =>
         metadataName.Substring(metadataName.LastIndexOf('.') + 1);
-
-    private static string GetMemberReferenceContainingMetadataType(MetadataReader reader, EntityHandle parent) {
-        return parent.Kind switch {
-            HandleKind.TypeDefinition => GetTypeDefinitionMetadataName(reader, (TypeDefinitionHandle)parent),
-            HandleKind.TypeReference => GetTypeReferenceMetadataName(reader, (TypeReferenceHandle)parent),
-            HandleKind.TypeSpecification => GetDefinitionNameFromTypeKey(
-                reader.GetTypeSpecification((TypeSpecificationHandle)parent)
-                    .DecodeSignature(new StructuralTypeProvider(), null).Key),
-            HandleKind.MethodDefinition => GetTypeDefinitionMetadataName(
-                reader,
-                reader.GetMethodDefinition((MethodDefinitionHandle)parent).GetDeclaringType()),
-            _ => "<unknown>"
-        };
-    }
-
-    private static string GetDefinitionNameFromTypeKey(string key) {
-        if (!key.StartsWith("named:", StringComparison.Ordinal)) return key;
-        var start = "named:".Length;
-        var bracket = key.IndexOf('[', start);
-        return bracket < 0 ? key.Substring(start) : key.Substring(start, bracket - start);
-    }
 
     internal static string GetTypeDefinitionMetadataName(MetadataReader reader, TypeDefinitionHandle handle) {
         var definition = reader.GetTypeDefinition(handle);

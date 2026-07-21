@@ -4,9 +4,6 @@ internal static class RequiresContractHelpers {
     internal const string AttributeTypeName = "RequiresAttribute";
     internal const string AttributeDisplayName = "[Requires]";
 
-    internal static readonly SharpProofAttributeIdentityPolicy OfficialAttributePolicy =
-        SharpProofAttributeIdentityPolicy.Create(ImmutableHashSet<string>.Empty);
-
     internal static ImmutableArray<RequiresContract> CollectContracts(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
@@ -125,21 +122,6 @@ internal static class RequiresContractHelpers {
 
         var typeReplacements = CreateTypeParameterReplacements(contractMethod, invokedMethod);
         var rewriter = new ParameterPlaceholderRewriter(arguments, typeReplacements);
-        var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
-        rewrittenCondition = rewritten.ToFullString();
-        return true;
-    }
-
-    internal static bool TryRewriteForArguments(
-        string conditionText,
-        IReadOnlyDictionary<string, ExpressionSyntax> arguments,
-        out string rewrittenCondition) {
-        rewrittenCondition = conditionText;
-        if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
-
-        var rewriter = new ParameterPlaceholderRewriter(
-            arguments,
-            new Dictionary<string, TypeSyntax>(StringComparer.Ordinal));
         var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
         rewrittenCondition = rewritten.ToFullString();
         return true;

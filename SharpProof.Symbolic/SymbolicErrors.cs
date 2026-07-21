@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicErrorCodes {
@@ -7,9 +5,7 @@ internal static class SymbolicErrorCodes {
     public const string InvalidTarget = "SPQ1001";
     public const string UnsupportedTarget = "SPQ1002";
     public const string SourceNotFound = "SPQ1100";
-    public const string ReferenceNotFound = "SPQ1101";
     public const string ParseFailed = "SPQ1200";
-    public const string ProjectLoadFailed = "SPQ1300";
     public const string NativeSolverUnavailable = "SPQ2000";
     public const string SolverFailed = "SPQ2001";
     public const string TimedOut = "SPQ2100";
@@ -18,7 +14,6 @@ internal static class SymbolicErrorCodes {
 }
 
 internal static class SymbolicErrorExitCodes {
-    public const int GateFailure = 1;
     public const int Usage = 64;
     public const int InvalidData = 65;
     public const int MissingInput = 66;
@@ -28,36 +23,11 @@ internal static class SymbolicErrorExitCodes {
     public const int Canceled = 130;
 }
 
-internal sealed record SymbolicErrorEnvelope(
-    [property: JsonPropertyOrder(2)] SharpProofError Error) {
-    [JsonPropertyOrder(0)]
-    public string Kind => "error";
-
-    [JsonPropertyOrder(1)]
-    public int SchemaVersion => 1;
-}
-
-internal sealed class SymbolicQueryException : Exception {
-    public SymbolicQueryException(SharpProofError error)
-        : base(error?.Message) {
-        Error = error ?? throw new ArgumentNullException(nameof(error));
-    }
-
-    public SymbolicQueryException(SharpProofError error, Exception innerException)
-        : base(error?.Message, innerException) {
-        Error = error ?? throw new ArgumentNullException(nameof(error));
-    }
-
-    public SharpProofError Error { get; }
-}
-
 internal static class SymbolicErrorClassifier {
     public static SharpProofError FromException(Exception exception) {
         if (exception == null) throw new ArgumentNullException(nameof(exception));
 
         var relevant = Unwrap(exception);
-        if (relevant is SymbolicQueryException queryException) return queryException.Error;
-
         if (relevant is OperationCanceledException)
             return Create(SymbolicErrorCodes.Canceled, SharpProofErrorCategory.Cancellation,
                 "The symbolic query was canceled.", SymbolicErrorExitCodes.Canceled, false, relevant);

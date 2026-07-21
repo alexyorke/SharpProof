@@ -19,7 +19,6 @@ internal enum SymbolicProofStatus {
 internal enum SymbolicProofStage {
     None,
     Lowering,
-    Normalization,
     SyntacticClassification,
     Budgeting,
     SmtExecution,
@@ -28,7 +27,6 @@ internal enum SymbolicProofStage {
 
 internal enum SymbolicProofSupport {
     Exact,
-    Approximate,
     Unsupported
 }
 

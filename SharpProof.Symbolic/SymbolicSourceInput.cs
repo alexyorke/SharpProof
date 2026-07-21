@@ -53,8 +53,6 @@ internal sealed record SymbolicSourceInput(
             SemanticModel: semanticModel ?? throw new ArgumentNullException(nameof(semanticModel)));
     }
 
-    public SymbolicSourceInput WithSourceMap(SymbolicSourceMap sourceMap) =>
-        this with { SourceMap = sourceMap ?? throw new ArgumentNullException(nameof(sourceMap)) };
 }
 
 internal enum SymbolicSourceInputKind {

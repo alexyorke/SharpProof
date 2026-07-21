@@ -123,46 +123,6 @@ internal sealed class SymbolicQueryResult(
         _ => ProgramPointCount == 0 ? 0 : 1
     };
 
-    internal SymbolicQueryResult Filter(Func<SymbolicProgramPointResult, bool> matches) {
-        if (matches == null) throw new ArgumentNullException(nameof(matches));
-
-        var points = ProgramPoints.Where(matches).ToArray();
-        return Scope.Kind switch {
-            SymbolicQueryScopeKind.File => FromFile(
-                FilePath,
-                LineCount ?? 0,
-                LineGroups
-                    .Select(group => new SymbolicQueryLineGroup(
-                        group.Line,
-                        group.ProgramPoints.Where(matches).ToArray()))
-                    .Where(static group => group.ProgramPoints.Count != 0)
-                    .ToArray(),
-                SmtDiagnostics),
-            SymbolicQueryScopeKind.Line => FromLine(
-                FilePath,
-                Line ?? 0,
-                points,
-                SmtDiagnostics),
-            SymbolicQueryScopeKind.Span => FromSpan(
-                FilePath,
-                SpanStart ?? 0,
-                SpanEnd ?? 0,
-                Scope.StartLine ?? 1,
-                Scope.StartColumn ?? 1,
-                Scope.EndLine ?? 1,
-                Scope.EndColumn ?? 1,
-                points,
-                SmtDiagnostics),
-            SymbolicQueryScopeKind.Point when points.Length != 0 => From(points[0]),
-            SymbolicQueryScopeKind.Point => FromLine(
-                FilePath,
-                Line ?? 0,
-                points,
-                SmtDiagnostics),
-            _ => throw new InvalidOperationException("Unexpected symbolic query scope.")
-        };
-    }
-
     internal static SymbolicQueryResult FromFile(
         string filePath,
         int lineCount,

@@ -239,12 +239,6 @@ internal sealed record SymbolicInvariantCondition(
 }
 
 internal static class TextFactTargetExtraction {
-    internal static string? TryExtract(string? text) {
-        if (string.IsNullOrWhiteSpace(text)) return null;
-
-        return ScanIdentifierTarget(Unwrap(text!.Trim()));
-    }
-
     internal static string Extract(string text) {
         if (string.IsNullOrWhiteSpace(text)) return string.Empty;
 

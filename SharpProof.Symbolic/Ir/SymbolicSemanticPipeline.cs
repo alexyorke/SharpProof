@@ -38,25 +38,6 @@ internal static class SymbolicSemanticPipeline {
         return Exact(condition, expression, "branch-facts");
     }
 
-    internal static SymbolicLoweringResult<SymbolicCondition> LowerArrayLengthCountAliasCondition(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context) {
-        if (context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type is not IArrayTypeSymbol ||
-            LowerTerm(expression, context) is not
-                { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiver })
-            return Unsupported<SymbolicCondition>(expression, "array-length-count-alias");
-
-        return Exact(
-            CreateRelationCondition(
-                SymbolicRelationOperator.Equal,
-                new SymbolicLengthTerm(receiver),
-                new SymbolicCountTerm(receiver),
-                expression,
-                "ir.array.length-count-alias"),
-            expression,
-            "array-length-count-alias");
-    }
-
     internal static SymbolicLoweringResult<SymbolicState> LowerAsExpressionAssignmentFacts(
         ISymbol targetSymbol,
         ExpressionSyntax valueExpression,

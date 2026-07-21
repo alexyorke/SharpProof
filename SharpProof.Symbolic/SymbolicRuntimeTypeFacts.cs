@@ -218,32 +218,6 @@ internal static class SymbolicRuntimeTypeFacts {
         return true;
     }
 
-    internal static SymbolicState WithoutExactRuntimeType(SymbolicState state, SymbolicTerm value) {
-        var facts = state.Facts.Where(fact =>
-            fact.Atom is not SymbolicExactRuntimeTypeAtom exact || !Equals(exact.Value, value)).ToArray();
-        return facts.Length == state.Facts.Length
-            ? state
-            : new SymbolicState(
-                facts,
-                state.PathConditions,
-                state.SymbolVersions,
-                state.IsContradictory);
-    }
-
-    internal static bool TryGetExactRuntimeType(
-        SymbolicState state,
-        SymbolicTerm value,
-        out INamedTypeSymbol exactType) {
-        var match = state.Facts.FirstOrDefault(fact => fact is {
-                Polarity: true,
-                Confidence: SymbolicFactConfidence.Exact,
-                Atom: SymbolicExactRuntimeTypeAtom exact,
-                Symbol: INamedTypeSymbol
-            } && Equals(exact.Value, value));
-        exactType = match?.Symbol as INamedTypeSymbol ?? null!;
-        return exactType != null;
-    }
-
     private static bool IsNonNullableValueType(ITypeSymbol? typeSymbol) {
         return typeSymbol?.IsValueType == true &&
                !IsNullableType(typeSymbol);

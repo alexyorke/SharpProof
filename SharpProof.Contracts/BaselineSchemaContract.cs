@@ -100,31 +100,6 @@ internal static class BaselineSchemaContract {
         ReadString(element, "operationKind"),
         ReadString(element, "evidenceKey"));
 
-    internal static (int CandidateCount, int ValidCount, int InvalidCount) CountEntries(JsonElement root) {
-        var candidateCount = 0;
-        var validCount = 0;
-        var invalidCount = 0;
-        if (!root.TryGetProperty("diagnostics", out var diagnostics) ||
-            diagnostics.ValueKind != JsonValueKind.Array)
-            return default;
-
-        foreach (var candidate in diagnostics.EnumerateArray()) {
-            if (candidate.ValueKind != JsonValueKind.Object) {
-                invalidCount++;
-                continue;
-            }
-
-            var fields = ReadEntryFields(candidate);
-            if (!fields.HasCandidateProperty) continue;
-
-            candidateCount++;
-            if (fields.IsValid) validCount++;
-            else invalidCount++;
-        }
-
-        return (candidateCount, validCount, invalidCount);
-    }
-
     internal static ImmutableArray<BaselineEntry> Deduplicate(IEnumerable<BaselineEntry> entries) {
         var seen = new HashSet<BaselineEntryKey>();
         var result = ImmutableArray.CreateBuilder<BaselineEntry>();

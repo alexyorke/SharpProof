@@ -115,11 +115,6 @@ internal static class SymbolicTypeFacts {
                namedType.TypeArguments[0].SpecialType == SpecialType.System_Char;
     }
 
-    public static bool IsStringOrReadOnlySpanOfCharType(ITypeSymbol? typeSymbol) {
-        return typeSymbol?.SpecialType == SpecialType.System_String ||
-               IsReadOnlySpanOfCharType(typeSymbol);
-    }
-
     public static bool IsBuiltInMemoryType(ITypeSymbol? typeSymbol) {
         return typeSymbol is INamedTypeSymbol namedType &&
                namedType.OriginalDefinition.ToDisplayString() is "System.Memory<T>" or "System.ReadOnlyMemory<T>";

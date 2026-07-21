@@ -2,44 +2,6 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Symbolic;
 
-internal static class SymbolicCompactProjection {
-    public static SymbolicBoundedProjection<T> Project<T>(IReadOnlyList<T> values, int maxCount) {
-        if (values == null) throw new ArgumentNullException(nameof(values));
-
-        ValidateMaxCount(maxCount);
-        var items = maxCount == 0
-            ? Array.Empty<T>()
-            : values.Take(maxCount).ToArray();
-        return new SymbolicBoundedProjection<T>(items, values.Count);
-    }
-
-    public static IReadOnlyList<T> Take<T>(IEnumerable<T> values, int maxCount) {
-        if (values == null) throw new ArgumentNullException(nameof(values));
-
-        if (maxCount == 0) return Array.Empty<T>();
-
-        ValidateMaxCount(maxCount);
-
-        return values.Take(maxCount).ToArray();
-    }
-
-    private static void ValidateMaxCount(int maxCount) {
-        if (maxCount < 0)
-            throw new ArgumentOutOfRangeException(nameof(maxCount), "Compact output limits cannot be negative.");
-    }
-}
-
-internal readonly struct SymbolicBoundedProjection<T>(IReadOnlyList<T> items, int totalCount) {
-    public IReadOnlyList<T> Items { get; } = items ?? throw new ArgumentNullException(nameof(items));
-    public int TotalCount { get; } = totalCount >= items.Count
-        ? totalCount
-        : throw new ArgumentOutOfRangeException(nameof(totalCount));
-
-    public int OmittedCount => TotalCount - Items.Count;
-
-    public bool IsTruncated => OmittedCount != 0;
-}
-
 internal sealed record SymbolicConservativeUnknownDiagnostic(
     [property: JsonPropertyOrder(0)] string Target,
     [property: JsonPropertyOrder(1)] string UnknownText,
@@ -50,8 +12,6 @@ internal sealed record SymbolicConservativeUnknownDiagnostic(
     [JsonPropertyOrder(4)]
     public int MaybeFactCount => MaybeFacts.Count;
 
-    public string GetDisplayReason() =>
-        SymbolicReasonDisplay.Format(Reason);
 }
 
 internal sealed record SymbolicMergedPathFacts(

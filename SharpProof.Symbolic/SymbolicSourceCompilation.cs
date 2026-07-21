@@ -73,6 +73,5 @@ internal static class SymbolicSourceCompilation {
 internal enum SymbolicSourceCompilationKind {
     Query,
     RuntimeHazards,
-    Complexity,
-    Capabilities
+    Complexity
 }

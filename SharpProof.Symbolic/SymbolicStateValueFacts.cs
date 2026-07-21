@@ -34,12 +34,6 @@ internal static class SymbolicStateValueFacts {
     internal static bool IsKnownNullReference(SymbolicState state, ISymbol symbol) =>
         TryGetKnownReferenceNullState(state, symbol, out var isNull) && isNull;
 
-    internal static bool IsKnownNullReference(SymbolicState state, SymbolicTerm reference) {
-        return reference is SymbolicVariableTerm { ValueKind: SmtValueKind.Reference } variable &&
-               TryGetKnownBooleanState(state, variable.Name, TryGetReferenceNullFactState, out var isNull) &&
-               isNull;
-    }
-
     internal static bool IsKnownNullableHasValue(SymbolicState state, ISymbol symbol) =>
         TryGetKnownNullableHasValueState(state, symbol, out var hasValue) && hasValue;
 

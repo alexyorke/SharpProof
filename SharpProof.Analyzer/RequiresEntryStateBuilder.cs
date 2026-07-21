@@ -1,19 +1,6 @@
 namespace SharpProof.Analyzer;
 
 internal static class RequiresEntryStateBuilder {
-    internal static SymbolicState CreateForUse(
-        SyntaxNode useNode,
-        SemanticModel semanticModel,
-        SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken) {
-        var methodNode = useNode.AncestorsAndSelf().FirstOrDefault(IsMethodLikeDeclaration);
-        if (methodNode == null ||
-            semanticModel.GetDeclaredSymbol(methodNode, cancellationToken) is not IMethodSymbol methodSymbol)
-            return new SymbolicState();
-
-        return Create(methodSymbol, methodNode, semanticModel, attributePolicy, cancellationToken);
-    }
-
     internal static SymbolicState Create(
         IMethodSymbol methodSymbol,
         SyntaxNode methodNode,
@@ -166,12 +153,4 @@ internal static class RequiresEntryStateBuilder {
                receiverType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
     }
 
-    private static bool IsMethodLikeDeclaration(SyntaxNode node) {
-        return node is MethodDeclarationSyntax or
-            AccessorDeclarationSyntax or
-            ConstructorDeclarationSyntax or
-            ConversionOperatorDeclarationSyntax or
-            OperatorDeclarationSyntax or
-            LocalFunctionStatementSyntax;
-    }
 }

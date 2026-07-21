@@ -304,41 +304,4 @@ namespace SharpProof;
             return document.WithSyntaxRoot(newRoot);
         }
 
-        internal async Task<Document> AddEnforcePureAttributeAsync(
-            Document document,
-            SyntaxNode root,
-            SyntaxNode declaration,
-            SharpProofAttributeIdentityPolicy attributePolicy,
-            CancellationToken cancellationToken) {
-            var lists = GetAttributeLists(declaration);
-            var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
-            if (model != null)
-                foreach (var list in lists)
-                    foreach (var attr in list.Attributes) {
-                        var c = GetAttributeClass(model, attr);
-                        if (attributePolicy.IsAccepted(c, "EnforcePureAttribute"))
-                            return document;
-                    }
-
-            var officialAttribute = model?.Compilation.GetTypeByMetadataName(
-                "SharpProof.Attributes.EnforcePureAttribute");
-            var useShortName = model != null &&
-                               officialAttribute != null &&
-                               HasUnaliasedSharpProofAttributesUsing(declaration) &&
-                               IsUnambiguousAttributeName(
-                                   model,
-                                   declaration.SpanStart,
-                                   "EnforcePure",
-                                   officialAttribute);
-            var attributeName = useShortName
-                ? "EnforcePure"
-                : "global::SharpProof.Attributes.EnforcePure";
-            var lineEnding = await GetLineEndingAsync(document, cancellationToken).ConfigureAwait(false);
-            var newAttrList = SyntaxFactory.AttributeList(
-                SyntaxFactory.SingletonSeparatedList(
-                    SyntaxFactory.Attribute(SyntaxFactory.ParseName(attributeName))));
-
-            return InsertFormattedAttributeList(document, root, declaration, newAttrList, lineEnding);
-        }
-
 }

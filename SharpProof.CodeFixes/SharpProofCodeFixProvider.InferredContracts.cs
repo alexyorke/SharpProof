@@ -204,19 +204,6 @@ namespace SharpProof;
                     directive.Alias == null &&
                     string.Equals(directive.Name?.ToString(), "SharpProof.Attributes", StringComparison.Ordinal));
 
-        private static bool IsUnambiguousAttributeName(
-            SemanticModel model,
-            int position,
-            string shortName,
-            INamedTypeSymbol expectedType) {
-            var candidates = model.LookupNamespacesAndTypes(position, name: shortName)
-                .Concat(model.LookupNamespacesAndTypes(position, name: shortName + "Attribute"))
-                .OfType<INamedTypeSymbol>()
-                .ToArray();
-            return candidates.Length != 0 && candidates.All(candidate =>
-                SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, expectedType.OriginalDefinition));
-        }
-
         private static AttributeListSyntax ShortenSharpProofAttributeNames(
             AttributeListSyntax attributeList,
             string attributeNamespace) {

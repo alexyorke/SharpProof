@@ -5,8 +5,6 @@ internal enum SymbolicAssignmentOperationKind {
     Compound,
     Coalesce,
     Deconstruction,
-    Ref,
-    Out
 }
 
 internal enum SymbolicMutationOperationKind {
@@ -33,8 +31,6 @@ internal readonly record struct SymbolicInvalidationTarget(
     int? DefinitionVersion = null);
 
 internal enum SymbolicLoopEdgeKind {
-    Entry,
-    Body,
     BackEdge,
     Exit
 }
@@ -42,10 +38,6 @@ internal enum SymbolicLoopEdgeKind {
 internal enum SymbolicCompletionKind {
     Normal,
     NoFallthrough,
-    Return,
-    Throw,
-    Break,
-    Continue
 }
 
 internal enum SymbolicLifetimeOperationKind {

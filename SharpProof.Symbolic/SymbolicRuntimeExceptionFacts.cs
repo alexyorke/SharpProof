@@ -1,53 +1,6 @@
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicRuntimeExceptionFacts {
-    internal static bool IsKnownEvidenceCategory(string category) {
-        return string.Equals(category, ExceptionCategories.DirectThrow, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.Rethrow, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.SourceCallee, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DynamicDispatch, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteDivideByZero, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteModuloByZero, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteNullDereference, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteWithNull, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteDeconstructionNull, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteAwaitNull, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteLockNull, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteThrowNull, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteNegativeArrayLength, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteNegativeStackAllocLength,
-                   StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteNullableValueWithoutValue,
-                   StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteUnboxNull, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteInvalidCast, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteCheckedIntegralOverflow, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteCheckedNumericConversionOverflow,
-                   StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteArrayTypeMismatch, StringComparison.Ordinal) ||
-                string.Equals(category, ExceptionCategories.DefiniteIndexOutOfRange, StringComparison.Ordinal) ||
-                string.Equals(category, ExceptionCategories.DefiniteIndexConstructionArgumentOutOfRange,
-                    StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
-                   StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteArgumentOutOfRangeGuard, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteInvalidClampBounds, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteRegexNullInput, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteRangeOutOfRange, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteCountIndexOutOfRange, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteInvalidCollectionCardinality,
-                   StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteStringSubstringOutOfRange,
-                   StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteStringRemoveOutOfRange, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteSliceOutOfRange, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteMemoryExtensionsAsSpanOutOfRange,
-                   StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteMemoryExtensionsAsMemoryOutOfRange,
-                   StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteSwitchExpressionNoMatch, StringComparison.Ordinal);
-    }
-
     internal static bool TryGetThrowExpression(SyntaxNode throwNode, out ExpressionSyntax expression) {
         switch (throwNode) {
             case ThrowStatementSyntax { Expression: { } statementExpression }:
@@ -154,28 +107,4 @@ internal static class SymbolicRuntimeExceptionFacts {
         internal const string DefiniteSwitchExpressionNoMatch = "definite_switch_expression_no_match";
     }
 
-    internal static class ExceptionSources {
-        internal const string Throw = "throw";
-        internal const string BinaryOperator = "binary_operator";
-        internal const string CheckedOperator = "checked_operator";
-        internal const string CheckedConversion = "checked_conversion";
-        internal const string ArrayLength = "array_length";
-        internal const string StackAllocLength = "stackalloc_length";
-        internal const string NullReceiver = "null_receiver";
-        internal const string AwaitExpression = "await_expression";
-        internal const string LockReceiver = "lock_receiver";
-        internal const string NullableValue = "nullable_value";
-        internal const string Cast = "cast";
-        internal const string ArrayStore = "array_store";
-        internal const string ArrayIndex = "array_index";
-        internal const string ArrayGetValue = "array_get_value";
-        internal const string SpanSlice = "span_slice";
-        internal const string RangeSlice = "range_slice";
-        internal const string WithExpression = "with_expression";
-        internal const string DeconstructionReceiver = "deconstruction_receiver";
-        internal const string CountIndex = "count_index";
-        internal const string CollectionOperation = "collection_operation";
-        internal const string UnknownRuntimeHazardCandidate = "unknown_runtime_hazard_candidate";
-        internal const string SwitchExpression = "switch_expression";
-    }
 }

@@ -43,8 +43,6 @@ internal enum SymbolicNullness {
 }
 
 internal enum SymbolicDomainPredicateKind {
-    Equality,
-    Inequality,
     Range,
     Nullness,
     StringLength,

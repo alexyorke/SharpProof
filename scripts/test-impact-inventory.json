@@ -1707,7 +1707,6 @@
       "path": "SharpProof.Symbolic/Ir/SymbolicDeconstructionPlan.cs",
       "module": "Symbolic",
       "declaredTypes": [
-        "SymbolicDeconstructionElement",
         "SymbolicDeconstructionPlan",
         "SymbolicDeconstructionTarget"
       ],
@@ -2683,9 +2682,7 @@
       "declaredTypes": [
         "SymbolicErrorClassifier",
         "SymbolicErrorCodes",
-        "SymbolicErrorEnvelope",
-        "SymbolicErrorExitCodes",
-        "SymbolicQueryException"
+        "SymbolicErrorExitCodes"
       ],
       "referencingFixtureCount": 0,
       "referencedTokens": []
@@ -2899,8 +2896,7 @@
       "path": "SharpProof.Symbolic/SymbolicProjectQueryContext.cs",
       "module": "Symbolic",
       "declaredTypes": [
-        "SymbolicProjectConfiguration",
-        "SymbolicProjectQueryContext"
+        "SymbolicProjectConfiguration"
       ],
       "referencingFixtureCount": 1,
       "referencedTokens": [
@@ -3015,8 +3011,6 @@
       "path": "SharpProof.Symbolic/SymbolicQueryFactSummaries.cs",
       "module": "Symbolic",
       "declaredTypes": [
-        "SymbolicBoundedProjection",
-        "SymbolicCompactProjection",
         "SymbolicConditionProofProjection",
         "SymbolicConditionProofReason",
         "SymbolicConditionProofSummary",
@@ -3070,13 +3064,11 @@
       "module": "Symbolic",
       "declaredTypes": [
         "ExceptionCategories",
-        "ExceptionSources",
         "ExceptionTypes",
         "SymbolicRuntimeExceptionFacts"
       ],
       "referencingFixtureCount": 1,
       "referencedTokens": [
-        "ExceptionSources",
         "ExceptionTypes"
       ]
     },
@@ -4880,7 +4872,6 @@
         "CorpusReportTests"
       ],
       "tokens": [
-        "ExceptionSources",
         "ExceptionTypes"
       ],
       "fixtureCount": 1
