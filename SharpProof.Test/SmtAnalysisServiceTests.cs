@@ -1204,566 +1204,103 @@ public class SmtAnalysisServiceTests {
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
 
-    [Test]
-    public void ClassifyImplication_TransitiveBooleanEquivalenceEntailment_BypassesSolver() {
-        var left = Bool("bool_equiv_left_" + Guid.NewGuid().ToString("N"));
-        var middle = Bool("bool_equiv_middle_" + Guid.NewGuid().ToString("N"));
-        var right = Bool("bool_equiv_right_" + Guid.NewGuid().ToString("N"));
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(left, middle),
-            Equal(middle, right)
-        };
-        var fact = Equal(left, right);
+    private sealed record PreprocessorCase(SmtFormula[] Conditions, SmtFormula? Conclusion = null);
 
-        AssertPreprocessed(pathConditions, fact);
+    private static IEnumerable<TestCaseData> PreprocessorCases() {
+        yield return CreatePreprocessorCase("ClassifyImplication_TransitiveBooleanEquivalenceEntailment_BypassesSolver",
+            [Equal(Bool("a"), Bool("b")), Equal(Bool("b"), Bool("c"))], Equal(Bool("a"), Bool("c")));
+        yield return CreatePreprocessorCase("ClassifyImplication_TransitiveBooleanNegationEntailment_BypassesSolver",
+            [NotEqual(Bool("a"), Bool("b")), NotEqual(Bool("b"), Bool("c"))], Equal(Bool("a"), Bool("c")));
+        yield return CreatePreprocessorCase("ClassifyImplication_NegatedBooleanRelationEntailment_BypassesSolver",
+            [Equal(Bool("a"), Not(Bool("b"))), Equal(Bool("b"), Bool("c"))], NotEqual(Bool("a"), Bool("c")));
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_NegatedBooleanRelationParityContradiction_BypassesSolver",
+            [Equal(Bool("a"), Not(Bool("b"))), Equal(Bool("b"), Bool("c")), Equal(Bool("a"), Bool("c"))]);
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_BooleanEquivalenceParityContradiction_BypassesSolver",
+            [Equal(Bool("a"), Bool("b")), NotEqual(Bool("b"), Bool("c")), Equal(Bool("a"), Bool("c"))]);
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_IntegerAliasIntervalContradiction_BypassesSolver",
+            [GreaterThanOrEqual(Int("x"), Integer(10)), Equal(Int("x"), Int("y")), LessThan(Int("y"), Integer(10))]);
+        yield return CreatePreprocessorCase("ClassifyImplication_IntegerAliasIntervalEntailment_BypassesSolver",
+            [Equal(Int("x"), Int("y")), GreaterThanOrEqual(Int("x"), Integer(3))], GreaterThanOrEqual(Int("y"), Integer(3)));
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_AffineOffsetAliasIntervalContradiction_BypassesSolver",
+            [GreaterThanOrEqual(Int("x"), Integer(5)), Equal(Add(Int("x"), Integer(2)), Add(Int("y"), Integer(4))), LessThan(Int("y"), Integer(3))]);
+        yield return CreatePreprocessorCase("ClassifyImplication_AffineOffsetAliasIntervalEntailment_BypassesSolver",
+            [Equal(Add(Int("x"), Integer(2)), Add(Int("y"), Integer(4))), GreaterThanOrEqual(Int("x"), Integer(5))], GreaterThanOrEqual(Int("y"), Integer(3)));
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_SameBaseAffineEqualityContradiction_BypassesSolver",
+            [Equal(Add(Int("x"), Integer(2)), Add(Int("x"), Integer(3)))]);
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_SameBaseAffineOrderingContradiction_BypassesSolver",
+            [LessThan(Add(Int("x"), Integer(3)), Add(Int("x"), Integer(2)))]);
+        yield return CreatePreprocessorCase("ClassifyImplication_SameBaseAffineOrderingTautology_BypassesSolver",
+            [], LessThanOrEqual(Add(Int("x"), Integer(1)), Add(Int("x"), Integer(2))));
+        yield return CreatePreprocessorCase("ClassifyImplication_AffineComparisonAgainstExactTerm_BypassesSolver",
+            [Equal(Int("y"), Integer(10)), LessThanOrEqual(Int("x"), Integer(8))], LessThanOrEqual(Add(Int("x"), Integer(2)), Int("y")));
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_StringAliasContradiction_BypassesSolver",
+            [Equal(String("a"), String("b")), Equal(String("a"), Text("ABC")), NotEqual(String("b"), Text("ABC"))]);
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_ReferenceAliasNullContradiction_BypassesSolver",
+            [Equal(Reference("a"), Reference("b")), Equal(Reference("a"), Null()), NotEqual(Reference("b"), Null())]);
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_DisjunctionReferenceNullContradiction_BypassesSolver",
+            [Or(Equal(Reference("value"), Null()), Bool("guard")), Not(Bool("guard")), NotEqual(Reference("value"), Null())]);
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_NegatedDisjunctionReferenceNullContradiction_BypassesSolver",
+            [Not(Or(Equal(Reference("value"), Null()), Bool("guard"))), Equal(Reference("value"), Null())]);
+        yield return CreatePreprocessorCase("ClassifyImplication_ReferenceAliasNonNullEntailment_BypassesSolver",
+            [Equal(Reference("a"), Reference("b")), NotEqual(Reference("a"), Null())], NotEqual(Reference("b"), Null()));
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_NullConstantInequality_BypassesSolver", [NotEqual(Null(), Null())]);
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_AliasInsideIntegerExpressionIntervalContradiction_BypassesSolver",
+            [Equal(Int("x"), Int("y")), GreaterThanOrEqual(Add(Int("x"), Integer(1)), Integer(5)), LessThan(Add(Int("y"), Integer(1)), Integer(5))]);
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_SubtractionIntervalContradiction_BypassesSolver",
+            [GreaterThanOrEqual(Int("x"), Integer(5)), LessThan(Subtract(Int("x"), Integer(1)), Integer(4))]);
+        yield return CreatePreprocessorCase("ClassifyImplication_PositiveConstantMultiplyIntervalEntailment_BypassesSolver",
+            [GreaterThanOrEqual(Int("x"), Integer(3))], GreaterThanOrEqual(Multiply(Int("x"), Integer(2)), Integer(6)));
+        yield return CreatePreprocessorCase("ClassifyImplication_AliasInsideStringLengthEntailment_BypassesSolver",
+            [Equal(String("a"), String("b")), Equal(Length(String("a")), Integer(3))], Equal(Length(String("b")), Integer(3)));
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_AliasInsideStringConcatContradiction_BypassesSolver",
+            [Equal(String("a"), String("b")), Equal(Concat(String("a"), Text("!")), Text("A!")), NotEqual(Concat(String("b"), Text("!")), Text("A!"))]);
+        yield return CreatePreprocessorCase("ClassifyImplication_StringConcatKnownOperandLengths_BypassesSolver",
+            [Equal(Length(String("a")), Integer(2)), Equal(Length(String("b")), Integer(3))], Equal(Length(Concat(String("a"), String("b"))), Integer(5)));
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_NegativeStringLength_BypassesSolver", [LessThan(Length(String("text")), Integer(0))]);
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_ConditionalIntegerComparisonWithKnownGuard_BypassesSolver",
+            [Bool("g"), GreaterThanOrEqual(Conditional(Bool("g"), Int("a"), Int("b"), SmtValueKind.Int), Integer(10)), LessThan(Int("a"), Integer(10))]);
+        yield return CreatePreprocessorCase("ClassifyImplication_ConditionalReferenceNullFactWithKnownGuard_BypassesSolver",
+            [Not(Bool("g")), NotEqual(Reference("b"), Null())], NotEqual(Conditional(Bool("g"), Reference("a"), Reference("b"), SmtValueKind.Reference), Null()));
+        yield return CreatePreprocessorCase("ClassifyImplication_ConditionalReferenceAliasNullStatePropagatesToSelectedBranch_BypassesSolver",
+            [Bool("g"), Equal(Reference("selected"), Conditional(Bool("g"), Reference("a"), Reference("b"), SmtValueKind.Reference)), Equal(Reference("selected"), Null())], Equal(Reference("a"), Null()));
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_ConditionalBooleanWithKnownGuard_BypassesSolver",
+            [Bool("g"), Conditional(Bool("g"), Bool("a"), Bool("b"), SmtValueKind.Bool), Not(Bool("a"))]);
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_ConditionalWithEqualBranchesCollapsesBeforeSolver",
+            [Equal(Conditional(Bool("g"), Int("x"), Int("x"), SmtValueKind.Int), Integer(7)), NotEqual(Int("x"), Integer(7))]);
+        yield return CreatePreprocessorCase("ClassifyImplication_ConditionalIntegerBranchImplications_BypassesSolver",
+            [Or(Not(Bool("g")), GreaterThanOrEqual(Int("a"), Integer(0))), Or(Bool("g"), GreaterThanOrEqual(Int("b"), Integer(0)))], GreaterThanOrEqual(Conditional(Bool("g"), Int("a"), Int("b"), SmtValueKind.Int), Integer(0)));
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_ConditionalReferenceBranchImplications_BypassesSolver",
+            [Or(Not(Bool("g")), NotEqual(Reference("a"), Null())), Or(Bool("g"), NotEqual(Reference("b"), Null())), Equal(Conditional(Bool("g"), Reference("a"), Reference("b"), SmtValueKind.Reference), Null())]);
+        yield return CreatePreprocessorCase("ClassifyPathFeasibility_ConditionalBooleanBranchImplications_BypassesSolver",
+            [Or(Not(Bool("g")), Bool("a")), Or(Bool("g"), Bool("b")), Not(Conditional(Bool("g"), Bool("a"), Bool("b"), SmtValueKind.Bool))]);
+        yield return CreateConditionalSelectedReferenceCase();
     }
 
-    [Test]
-    public void ClassifyImplication_TransitiveBooleanNegationEntailment_BypassesSolver() {
-        var left = Bool("bool_neg_left_" + Guid.NewGuid().ToString("N"));
-        var middle = Bool("bool_neg_middle_" + Guid.NewGuid().ToString("N"));
-        var right = Bool("bool_neg_right_" + Guid.NewGuid().ToString("N"));
-        var pathConditions = new SmtFormula[]
-        {
-            NotEqual(left, middle),
-            NotEqual(middle, right)
-        };
-        var fact = Equal(left, right);
-
-        AssertPreprocessed(pathConditions, fact);
+    [TestCaseSource(nameof(PreprocessorCases))]
+    public void PreprocessorMatrix(object value) {
+        var testCase = (PreprocessorCase)value;
+        AssertPreprocessed(testCase.Conditions, testCase.Conclusion);
     }
 
-    [Test]
-    public void ClassifyImplication_NegatedBooleanRelationEntailment_BypassesSolver() {
-        var left = Bool("bool_not_rel_left_" + Guid.NewGuid().ToString("N"));
-        var middle = Bool("bool_not_rel_middle_" + Guid.NewGuid().ToString("N"));
-        var right = Bool("bool_not_rel_right_" + Guid.NewGuid().ToString("N"));
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                left,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, middle)),
-            Equal(middle, right)
-        };
-        var fact = NotEqual(left, right);
+    private static TestCaseData CreatePreprocessorCase(
+        string name, SmtFormula[] conditions, SmtFormula? conclusion = null) =>
+        new TestCaseData(new PreprocessorCase(conditions, conclusion)).SetName(name);
 
-        AssertPreprocessed(pathConditions, fact);
+    private static TestCaseData CreateConditionalSelectedReferenceCase() {
+        var guard = Bool("g");
+        var first = Reference("a");
+        var second = Reference("b");
+        var result = Reference("result");
+        var resultIsNonNull = NotEqual(result, Null());
+        var firstIsNull = Equal(first, Null());
+        var secondIsNull = Equal(second, Null());
+        var selected = Conditional(guard, first, second, SmtValueKind.Reference);
+        var selectedIsNull = Conditional(guard, firstIsNull, secondIsNull, SmtValueKind.Bool);
+        return CreatePreprocessorCase(
+            "ClassifyImplication_ConditionalSelectedReferenceNullBranchImplication_BypassesSolver",
+            [Equal(result, selected), Equal(Equal(result, Null()), selectedIsNull)],
+            And(Or(Not(guard), Or(resultIsNonNull, firstIsNull)), Or(guard, Or(resultIsNonNull, secondIsNull))));
     }
-
-    [Test]
-    public void ClassifyPathFeasibility_NegatedBooleanRelationParityContradiction_BypassesSolver() {
-        var left = Bool("bool_not_parity_left_" + Guid.NewGuid().ToString("N"));
-        var middle = Bool("bool_not_parity_middle_" + Guid.NewGuid().ToString("N"));
-        var right = Bool("bool_not_parity_right_" + Guid.NewGuid().ToString("N"));
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                left,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, middle)),
-            Equal(middle, right),
-            Equal(left, right)
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_BooleanEquivalenceParityContradiction_BypassesSolver() {
-        var left = Bool("bool_parity_left_" + Guid.NewGuid().ToString("N"));
-        var middle = Bool("bool_parity_middle_" + Guid.NewGuid().ToString("N"));
-        var right = Bool("bool_parity_right_" + Guid.NewGuid().ToString("N"));
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(left, middle),
-            NotEqual(middle, right),
-            Equal(left, right)
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_IntegerAliasIntervalContradiction_BypassesSolver() {
-        var x = Int("alias_int_x_" + Guid.NewGuid().ToString("N"));
-        var y = Int("alias_int_y_" + Guid.NewGuid().ToString("N"));
-        var pathConditions = new SmtFormula[]
-        {
-            GreaterThanOrEqual(x, Integer(10)),
-            Equal(x, y),
-            LessThan(y, Integer(10))
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyImplication_IntegerAliasIntervalEntailment_BypassesSolver() {
-        var x = Int("alias_entail_x_" + Guid.NewGuid().ToString("N"));
-        var y = Int("alias_entail_y_" + Guid.NewGuid().ToString("N"));
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(x, y),
-            GreaterThanOrEqual(x, Integer(3))
-        };
-        var fact = GreaterThanOrEqual(y, Integer(3));
-
-        AssertPreprocessed(pathConditions, fact);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_AffineOffsetAliasIntervalContradiction_BypassesSolver() {
-        var x = Int("affine_offset_alias_x_" + Guid.NewGuid().ToString("N"));
-        var y = Int("affine_offset_alias_y_" + Guid.NewGuid().ToString("N"));
-        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
-        var yPlusFour = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, Integer(4));
-        var pathConditions = new SmtFormula[]
-        {
-            GreaterThanOrEqual(x, Integer(5)),
-            Equal(xPlusTwo, yPlusFour),
-            LessThan(y, Integer(3))
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyImplication_AffineOffsetAliasIntervalEntailment_BypassesSolver() {
-        var x = Int("affine_offset_entail_x_" + Guid.NewGuid().ToString("N"));
-        var y = Int("affine_offset_entail_y_" + Guid.NewGuid().ToString("N"));
-        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
-        var yPlusFour = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, Integer(4));
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(xPlusTwo, yPlusFour),
-            GreaterThanOrEqual(x, Integer(5))
-        };
-        var fact = GreaterThanOrEqual(y, Integer(3));
-
-        AssertPreprocessed(pathConditions, fact);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_SameBaseAffineEqualityContradiction_BypassesSolver() {
-        var x = Int("same_base_affine_x_" + Guid.NewGuid().ToString("N"));
-        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
-        var xPlusThree = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(3));
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(xPlusTwo, xPlusThree)
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_SameBaseAffineOrderingContradiction_BypassesSolver() {
-        var x = Int("same_base_affine_order_x_" + Guid.NewGuid().ToString("N"));
-        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
-        var xPlusThree = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(3));
-        var pathConditions = new SmtFormula[]
-        {
-            LessThan(xPlusThree, xPlusTwo)
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyImplication_SameBaseAffineOrderingTautology_BypassesSolver() {
-        var x = Int("same_base_affine_tautology_x_" + Guid.NewGuid().ToString("N"));
-        var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(1));
-        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
-        var fact = LessThanOrEqual(xPlusOne, xPlusTwo);
-
-        AssertPreprocessed(Array.Empty<SmtFormula>(), fact);
-    }
-
-    [Test]
-    public void ClassifyImplication_AffineComparisonAgainstExactTerm_BypassesSolver() {
-        var x = Int("affine_exact_compare_x_" + Guid.NewGuid().ToString("N"));
-        var y = Int("affine_exact_compare_y_" + Guid.NewGuid().ToString("N"));
-        var xPlusTwo = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(2));
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(y, Integer(10)),
-            LessThanOrEqual(x, Integer(8))
-        };
-        var fact = LessThanOrEqual(xPlusTwo, y);
-
-        AssertPreprocessed(pathConditions, fact);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_StringAliasContradiction_BypassesSolver() {
-        var left = String("alias_text_left_" + Guid.NewGuid().ToString("N"));
-        var right = String("alias_text_right_" + Guid.NewGuid().ToString("N"));
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(left, right),
-            Equal(left, Text("ABC")),
-            NotEqual(right, Text("ABC"))
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_ReferenceAliasNullContradiction_BypassesSolver() {
-        var left = Reference("alias_ref_left_" + Guid.NewGuid().ToString("N"));
-        var right = Reference("alias_ref_right_" + Guid.NewGuid().ToString("N"));
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(left, right),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, left, new SmtNullConstant()),
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, right, new SmtNullConstant())
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_DisjunctionReferenceNullContradiction_BypassesSolver() {
-        var value = Reference("disjunction_ref_" + Guid.NewGuid().ToString("N"));
-        var guard = Bool("disjunction_guard_" + Guid.NewGuid().ToString("N"));
-        var valueIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant());
-        var pathConditions = new SmtFormula[]
-        {
-            Or(valueIsNull, guard),
-            new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant())
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_NegatedDisjunctionReferenceNullContradiction_BypassesSolver() {
-        var value = Reference("negated_disjunction_ref_" + Guid.NewGuid().ToString("N"));
-        var guard = Bool("negated_disjunction_guard_" + Guid.NewGuid().ToString("N"));
-        var valueIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant());
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtUnaryFormula(
-                SmtUnaryOperator.Not,
-                Or(valueIsNull, guard)),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant())
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyImplication_ReferenceAliasNonNullEntailment_BypassesSolver() {
-        var left = Reference("alias_ref_entail_left_" + Guid.NewGuid().ToString("N"));
-        var right = Reference("alias_ref_entail_right_" + Guid.NewGuid().ToString("N"));
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(left, right),
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, left, new SmtNullConstant())
-        };
-        var fact = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, right, new SmtNullConstant());
-
-        AssertPreprocessed(pathConditions, fact);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_NullConstantInequality_BypassesSolver() {
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, new SmtNullConstant(), new SmtNullConstant())
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_AliasInsideIntegerExpressionIntervalContradiction_BypassesSolver() {
-        var x = Int("expr_alias_x_" + Guid.NewGuid().ToString("N"));
-        var y = Int("expr_alias_y_" + Guid.NewGuid().ToString("N"));
-        var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, Integer(1));
-        var yPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, Integer(1));
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(x, y),
-            GreaterThanOrEqual(xPlusOne, Integer(5)),
-            LessThan(yPlusOne, Integer(5))
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_SubtractionIntervalContradiction_BypassesSolver() {
-        var x = Int("subtract_interval_x_" + Guid.NewGuid().ToString("N"));
-        var xMinusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, x, Integer(1));
-        var pathConditions = new SmtFormula[]
-        {
-            GreaterThanOrEqual(x, Integer(5)),
-            LessThan(xMinusOne, Integer(4))
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyImplication_PositiveConstantMultiplyIntervalEntailment_BypassesSolver() {
-        var x = Int("multiply_interval_x_" + Guid.NewGuid().ToString("N"));
-        var twiceX = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, x, Integer(2));
-        var pathConditions = new SmtFormula[]
-        {
-            GreaterThanOrEqual(x, Integer(3))
-        };
-        var fact = GreaterThanOrEqual(twiceX, Integer(6));
-
-        AssertPreprocessed(pathConditions, fact);
-    }
-
-    [Test]
-    public void ClassifyImplication_AliasInsideStringLengthEntailment_BypassesSolver() {
-        var left = String("length_alias_left_" + Guid.NewGuid().ToString("N"));
-        var right = String("length_alias_right_" + Guid.NewGuid().ToString("N"));
-        var leftLength = new SmtStringLengthTerm(left);
-        var rightLength = new SmtStringLengthTerm(right);
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(left, right),
-            Equal(leftLength, Integer(3))
-        };
-        var fact = Equal(rightLength, Integer(3));
-
-        AssertPreprocessed(pathConditions, fact);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_AliasInsideStringConcatContradiction_BypassesSolver() {
-        var left = String("concat_alias_left_" + Guid.NewGuid().ToString("N"));
-        var right = String("concat_alias_right_" + Guid.NewGuid().ToString("N"));
-        var leftConcat = new SmtStringConcatTerm(left, Text("!"));
-        var rightConcat = new SmtStringConcatTerm(right, Text("!"));
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(left, right),
-            Equal(leftConcat, Text("A!")),
-            NotEqual(rightConcat, Text("A!"))
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyImplication_StringConcatKnownOperandLengths_BypassesSolver() {
-        var left = String("concat_length_left_" + Guid.NewGuid().ToString("N"));
-        var right = String("concat_length_right_" + Guid.NewGuid().ToString("N"));
-        var concatLength = new SmtStringLengthTerm(new SmtStringConcatTerm(left, right));
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                new SmtStringLengthTerm(left),
-                Integer(2)),
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                new SmtStringLengthTerm(right),
-                Integer(3))
-        };
-        var fact = Equal(concatLength, Integer(5));
-
-        AssertPreprocessed(pathConditions, fact);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_NegativeStringLength_BypassesSolver() {
-        var text = String("negative_length_" + Guid.NewGuid().ToString("N"));
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtBinaryFormula(
-                SmtBinaryOperator.LessThan,
-                new SmtStringLengthTerm(text),
-                Integer(0))
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_ConditionalIntegerComparisonWithKnownGuard_BypassesSolver() {
-        var guard = Bool("conditional_int_guard_" + Guid.NewGuid().ToString("N"));
-        var selected = Int("conditional_int_selected_" + Guid.NewGuid().ToString("N"));
-        var fallback = Int("conditional_int_fallback_" + Guid.NewGuid().ToString("N"));
-        var conditional = new SmtConditionalFormula(guard, selected, fallback, SmtValueKind.Int);
-        var pathConditions = new SmtFormula[]
-        {
-            guard,
-            GreaterThanOrEqual(conditional, Integer(10)),
-            LessThan(selected, Integer(10))
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyImplication_ConditionalReferenceNullFactWithKnownGuard_BypassesSolver() {
-        var guard = Bool("conditional_ref_guard_" + Guid.NewGuid().ToString("N"));
-        var left = Reference("conditional_ref_left_" + Guid.NewGuid().ToString("N"));
-        var right = Reference("conditional_ref_right_" + Guid.NewGuid().ToString("N"));
-        var conditional = new SmtConditionalFormula(guard, left, right, SmtValueKind.Reference);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
-            new SmtBinaryFormula(SmtBinaryOperator.NotEqual, right, new SmtNullConstant())
-        };
-        var fact = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, conditional, new SmtNullConstant());
-
-        AssertPreprocessed(pathConditions, fact);
-    }
-
-    [Test]
-    public void ClassifyImplication_ConditionalReferenceAliasNullStatePropagatesToSelectedBranch_BypassesSolver() {
-        var guard = Bool("conditional_ref_alias_guard_" + Guid.NewGuid().ToString("N"));
-        var selected = Reference("conditional_ref_alias_selected_" + Guid.NewGuid().ToString("N"));
-        var whenTrue = Reference("conditional_ref_alias_true_" + Guid.NewGuid().ToString("N"));
-        var whenFalse = Reference("conditional_ref_alias_false_" + Guid.NewGuid().ToString("N"));
-        var conditional = new SmtConditionalFormula(guard, whenTrue, whenFalse, SmtValueKind.Reference);
-        var pathConditions = new SmtFormula[]
-        {
-            guard,
-            Equal(selected, conditional),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, selected, new SmtNullConstant())
-        };
-        var fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, whenTrue, new SmtNullConstant());
-
-        AssertPreprocessed(pathConditions, fact);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_ConditionalBooleanWithKnownGuard_BypassesSolver() {
-        var guard = Bool("conditional_bool_guard_" + Guid.NewGuid().ToString("N"));
-        var selected = Bool("conditional_bool_selected_" + Guid.NewGuid().ToString("N"));
-        var fallback = Bool("conditional_bool_fallback_" + Guid.NewGuid().ToString("N"));
-        var conditional = new SmtConditionalFormula(guard, selected, fallback, SmtValueKind.Bool);
-        var pathConditions = new SmtFormula[]
-        {
-            guard,
-            conditional,
-            new SmtUnaryFormula(SmtUnaryOperator.Not, selected)
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_ConditionalWithEqualBranchesCollapsesBeforeSolver() {
-        var guard = Bool("conditional_equal_branch_guard_" + Guid.NewGuid().ToString("N"));
-        var value = Int("conditional_equal_branch_value_" + Guid.NewGuid().ToString("N"));
-        var conditional = new SmtConditionalFormula(guard, value, value, SmtValueKind.Int);
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(conditional, Integer(7)),
-            NotEqual(value, Integer(7))
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyImplication_ConditionalIntegerBranchImplications_BypassesSolver() {
-        var guard = Bool("conditional_branch_int_guard_" + Guid.NewGuid().ToString("N"));
-        var whenTrue = Int("conditional_branch_int_true_" + Guid.NewGuid().ToString("N"));
-        var whenFalse = Int("conditional_branch_int_false_" + Guid.NewGuid().ToString("N"));
-        var conditional = new SmtConditionalFormula(guard, whenTrue, whenFalse, SmtValueKind.Int);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Or,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
-                GreaterThanOrEqual(whenTrue, Integer(0))),
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Or,
-                guard,
-                GreaterThanOrEqual(whenFalse, Integer(0)))
-        };
-        var fact = GreaterThanOrEqual(conditional, Integer(0));
-
-        AssertPreprocessed(pathConditions, fact);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_ConditionalReferenceBranchImplications_BypassesSolver() {
-        var guard = Bool("conditional_branch_ref_guard_" + Guid.NewGuid().ToString("N"));
-        var whenTrue = Reference("conditional_branch_ref_true_" + Guid.NewGuid().ToString("N"));
-        var whenFalse = Reference("conditional_branch_ref_false_" + Guid.NewGuid().ToString("N"));
-        var conditional = new SmtConditionalFormula(guard, whenTrue, whenFalse, SmtValueKind.Reference);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Or,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, whenTrue, new SmtNullConstant())),
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Or,
-                guard,
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, whenFalse, new SmtNullConstant())),
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, conditional, new SmtNullConstant())
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyPathFeasibility_ConditionalBooleanBranchImplications_BypassesSolver() {
-        var guard = Bool("conditional_branch_bool_guard_" + Guid.NewGuid().ToString("N"));
-        var whenTrue = Bool("conditional_branch_bool_true_" + Guid.NewGuid().ToString("N"));
-        var whenFalse = Bool("conditional_branch_bool_false_" + Guid.NewGuid().ToString("N"));
-        var conditional = new SmtConditionalFormula(guard, whenTrue, whenFalse, SmtValueKind.Bool);
-        var pathConditions = new SmtFormula[]
-        {
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Or,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
-                whenTrue),
-            Or(guard, whenFalse),
-            new SmtUnaryFormula(SmtUnaryOperator.Not, conditional)
-        };
-
-        AssertPreprocessed(pathConditions);
-    }
-
-    [Test]
-    public void ClassifyImplication_ConditionalSelectedReferenceNullBranchImplication_BypassesSolver() {
-        var guard = Bool("conditional_selected_ref_guard_" + Guid.NewGuid().ToString("N"));
-        var first = Reference("conditional_selected_ref_first_" + Guid.NewGuid().ToString("N"));
-        var second = Reference("conditional_selected_ref_second_" + Guid.NewGuid().ToString("N"));
-        var resultReference = Reference("conditional_selected_ref_result_" + Guid.NewGuid().ToString("N"));
-        var resultIsNonNull = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, resultReference, new SmtNullConstant());
-        var firstIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, first, new SmtNullConstant());
-        var secondIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, second, new SmtNullConstant());
-        var selectedReference = new SmtConditionalFormula(guard, first, second, SmtValueKind.Reference);
-        var selectedIsNull = new SmtConditionalFormula(guard, firstIsNull, secondIsNull, SmtValueKind.Bool);
-        var pathConditions = new SmtFormula[]
-        {
-            Equal(resultReference, selectedReference),
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, resultReference, new SmtNullConstant()),
-                selectedIsNull)
-        };
-        var fact = new SmtBinaryFormula(
-            SmtBinaryOperator.And,
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Or,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
-                Or(resultIsNonNull, firstIsNull)),
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Or,
-                guard,
-                Or(resultIsNonNull, secondIsNull)));
-
-        AssertPreprocessed(pathConditions, fact);
-    }
-
     [Test]
     public void ClassifyImplication_RuntimeTypeTestPredicateIsCongruentUnderReferenceEquality() {
         var x = Reference("runtime_x_" + Guid.NewGuid().ToString("N"));
