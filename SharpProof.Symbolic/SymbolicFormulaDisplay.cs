@@ -8,16 +8,6 @@ internal static class SymbolicFormulaDisplay {
             : condition.ToString() ?? string.Empty;
     }
 
-    internal static string FormatMergedInvariant(IReadOnlyList<SmtFormula> pathConditions) {
-        if (pathConditions == null) throw new ArgumentNullException(nameof(pathConditions));
-
-        if (pathConditions.Count == 0) return "true";
-
-        if (pathConditions.Count == 1) return Format(pathConditions[0]);
-
-        return string.Join(" && ", pathConditions.Select(static condition => "(" + Format(condition) + ")"));
-    }
-
     internal static string Format(SmtFormula formula) {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
 

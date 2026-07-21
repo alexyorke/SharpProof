@@ -39,13 +39,12 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable {
     }
 
     public SymbolicConditionProofResult ProveAtMarker((int Line, int Column, int Position) marker, string condition) {
-        return _service.ProveConditionAtSyntaxTree(
-            _syntaxTree,
-            _compilation,
-            marker.Line,
-            marker.Column,
-            condition,
-            _smtAnalysis);
+        return _service.Prove(
+            new SymbolicQueryContext(
+                SymbolicSourceInput.FromSyntaxTree(_syntaxTree, _compilation),
+                SharpProofTargetFactory.Point(marker.Line, marker.Column),
+                new SymbolicQueryOptions(smtAnalysis: _smtAnalysis)),
+            condition);
     }
 
     public int FindLine(string text) {

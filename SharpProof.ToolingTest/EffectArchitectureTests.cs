@@ -46,6 +46,14 @@ public sealed class EffectArchitectureTests {
             "SharpProof.Symbolic/SharpProofCapabilityFacts.cs",
             "SharpProof.Symbolic/SymbolicInvariantTargetFilter.cs",
             "SharpProof.Symbolic/SymbolicSourceCompilationProfile.cs",
+            "SharpProof.Symbolic/SymbolicProgramPointProjector.cs",
+            "SharpProof.Testing/SymbolicSourceQueryServiceTestExtensions.cs",
+            "SharpProof.Test/SemanticOracleTestSources.cs",
+            "SharpProof.Test/DisposableTestSources.cs",
+            "SharpProof.Test/MutableObjectTestSources.cs",
+            "SharpProof.Test/EqualityTestSources.cs",
+            "SharpProof.Test/ConfiguredMemberKeyTestFactory.cs",
+            "SharpProof.ToolingTest/SourceMarker.cs",
             "SharpProof.Tooling.Core/SharpProof.Tooling.Core.csproj"
         };
         foreach (var relativePath in removedFiles)
@@ -101,6 +109,9 @@ public sealed class EffectArchitectureTests {
             "Symbolic" + "ProofBackend",
             "Symbolic" + "ProofStage",
             "Symbolic" + "ProofSupport",
+            "Symbolic" + "ComplexityResultProjector",
+            "Symbolic" + "ProgramPointProjector",
+            "Format" + "MergedInvariant(",
             "Include" + "ExpressionProgramPoints",
             "Implied" + "Conditions"
         };

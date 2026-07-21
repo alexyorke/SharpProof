@@ -91,9 +91,12 @@ public sealed class SymbolicInvariantServiceTests {
     public void RuntimeHazardMatrix(object value) {
         var testCase = (HazardCase)value;
         using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicRuntimeHazardQueryService().QuerySourceRuntimeHazards(
-            testCase.Source, testCase.FileName, smt, AnalyzerTestHost.GetTrustedPlatformReferences(),
-            options: new SymbolicRuntimeHazardQueryOptions(includeUnprovenCandidates: true));
+        var (tree, compilation) = SymbolicSourceCompilation.Create(
+            testCase.Source, testCase.FileName, SymbolicSourceCompilationKind.RuntimeHazards,
+            AnalyzerTestHost.GetTrustedPlatformReferences(), default);
+        var result = new SymbolicRuntimeHazardQueryService().QuerySyntaxTreeRuntimeHazards(
+            tree, compilation, SharpProofTargetFactory.AllLines(), smt, default,
+            new SymbolicRuntimeHazardQueryOptions(includeUnprovenCandidates: true));
         var hazard = result.Hazards.Single(candidate => candidate.Kind == testCase.Kind &&
             (testCase.Operation == null || candidate.OperationText.Contains(testCase.Operation, StringComparison.Ordinal)));
         Assert.That(hazard.Status, Is.EqualTo(testCase.Expected), hazard.StatusReason);

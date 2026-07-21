@@ -1,5 +1,11 @@
 namespace SharpProof.Symbolic;
 
+internal sealed record SymbolicProgramPointQueryContext(
+    SemanticModel SemanticModel,
+    int Position,
+    SyntaxNode Node,
+    SymbolicProgramPointAnalysis Analysis);
+
 internal sealed class SymbolicSourceProgramPointExecutor(SymbolicInvariantService _invariantService) {
     internal SymbolicProgramPointQueryContext AnalyzeAtPosition(
         SyntaxTree syntaxTree,
@@ -35,6 +41,18 @@ internal sealed class SymbolicSourceProgramPointExecutor(SymbolicInvariantServic
     internal SymbolicProgramPointResult Project(
         SymbolicProgramPointQueryContext query,
         CancellationToken cancellationToken) {
-        return SymbolicProgramPointProjector.Project(query, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return new SymbolicProgramPointResult(
+            query.Analysis.PathConditions,
+            query.Analysis.Reachability,
+            query.Analysis.ReachabilityReason,
+            SymbolicInputWitnessFactory.CreateReachability(
+                query.Analysis.ReachabilityProof?.PathCheck.Witness,
+                query.Analysis.PathConditions,
+                query.SemanticModel,
+                query.Position,
+                query.Analysis.Reachability,
+                query.Analysis.ReachabilityReason),
+            query.Analysis.AnalysisTruncation);
     }
 }
