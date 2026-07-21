@@ -145,10 +145,10 @@ internal partial class MethodInvocationPurityRule {
                 if (!enumerableArgumentResult.IsPure) return enumerableArgumentResult;
             }
 
-            if (TryCheckLinqDefaultEqualityDispatchPurity(invocationOperation, context,
+            if (TryCheckLinqDefaultDispatchPurity(invocationOperation, context, equality: true,
                     out var linqEqualityDispatchResult)) return linqEqualityDispatchResult;
 
-            if (TryCheckLinqDefaultComparisonDispatchPurity(invocationOperation, context,
+            if (TryCheckLinqDefaultDispatchPurity(invocationOperation, context, equality: false,
                     out var linqComparisonDispatchResult)) return linqComparisonDispatchResult;
 
             var linqMethodName = invokedMethodSymbol.Name;

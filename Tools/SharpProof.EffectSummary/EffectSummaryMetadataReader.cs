@@ -298,18 +298,20 @@ internal static class EffectSummaryMetadataReader {
         return $"{parentName}.{name}{signature}";
     }
 
-    internal static string GetMemberReferenceExactKey(MetadataReader reader, MemberReferenceHandle handle) {
-        var memberReference = reader.GetMemberReference(handle);
-        var parentName = NormalizeExactTypeName(GetMemberReferenceParentName(reader, memberReference.Parent));
-        var name = reader.GetString(memberReference.Name);
-        var signature = DecodeMethodSignature(memberReference, includeReturnType: true);
-        return $"{parentName}.{name}{signature}";
-    }
+    internal static string GetMemberReferenceExactKey(MetadataReader reader, MemberReferenceHandle handle) =>
+        GetMemberReferenceExactKey(reader, handle, lookupParent: false);
 
-    internal static string GetMemberReferenceMethodLookupExactKey(MetadataReader reader, MemberReferenceHandle handle) {
+    internal static string GetMemberReferenceMethodLookupExactKey(MetadataReader reader, MemberReferenceHandle handle) =>
+        GetMemberReferenceExactKey(reader, handle, lookupParent: true);
+
+    private static string GetMemberReferenceExactKey(
+        MetadataReader reader,
+        MemberReferenceHandle handle,
+        bool lookupParent) {
         var memberReference = reader.GetMemberReference(handle);
-        var parentName =
-            NormalizeExactTypeName(GetMemberReferenceLookupParentName(reader, memberReference.Parent));
+        var parentName = NormalizeExactTypeName(lookupParent
+            ? GetMemberReferenceLookupParentName(reader, memberReference.Parent)
+            : GetMemberReferenceParentName(reader, memberReference.Parent));
         var name = reader.GetString(memberReference.Name);
         var signature = DecodeMethodSignature(memberReference, includeReturnType: true);
         return $"{parentName}.{name}{signature}";

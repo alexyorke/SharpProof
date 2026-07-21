@@ -285,12 +285,12 @@ internal static class EffectSummaryIlAnalyzer {
             return;
         }
 
-        if (TryGetStoreLocalIndex(opCode, il, operandOffset, out var storeLocalIndex)) {
+        if (TryGetLocalIndex(opCode, il, operandOffset, store: true, out var storeLocalIndex)) {
             trackedLocals[storeLocalIndex] = PopTrackedStackValue(trackedStack);
             return;
         }
 
-        if (TryGetLoadLocalIndex(opCode, il, operandOffset, out var loadLocalIndex)) {
+        if (TryGetLocalIndex(opCode, il, operandOffset, store: false, out var loadLocalIndex)) {
             trackedStack.Add(trackedLocals.TryGetValue(loadLocalIndex, out var trackedLocalValue)
                 ? trackedLocalValue
                 : TrackedStackValue.Unknown);
@@ -818,18 +818,6 @@ internal static class EffectSummaryIlAnalyzer {
         return false;
     }
 
-    internal static bool TryGetStoreLocalIndex(OpCode opCode, byte[] il, int operandOffset, out int localIndex) => TryGetLocalIndex(
-            opCode,
-            il,
-            operandOffset,
-            OpCodes.Stloc_0,
-            OpCodes.Stloc_1,
-            OpCodes.Stloc_2,
-            OpCodes.Stloc_3,
-            OpCodes.Stloc_S,
-            OpCodes.Stloc,
-            out localIndex);
-
     internal static bool TryGetPushedInt32Constant(OpCode opCode, byte[] il, int operandOffset, out int value) {
         value = 0;
         var shortFormValue = opCode.Value - OpCodes.Ldc_I4_0.Value;
@@ -851,34 +839,17 @@ internal static class EffectSummaryIlAnalyzer {
         return false;
     }
 
-    internal static bool TryGetLoadLocalIndex(OpCode opCode, byte[] il, int operandOffset, out int localIndex) => TryGetLocalIndex(
-            opCode,
-            il,
-            operandOffset,
-            OpCodes.Ldloc_0,
-            OpCodes.Ldloc_1,
-            OpCodes.Ldloc_2,
-            OpCodes.Ldloc_3,
-            OpCodes.Ldloc_S,
-            OpCodes.Ldloc,
-            out localIndex);
-
     internal static bool TryGetLocalIndex(
         OpCode opCode,
         byte[] il,
         int operandOffset,
-        OpCode index0,
-        OpCode index1,
-        OpCode index2,
-        OpCode index3,
-        OpCode shortForm,
-        OpCode wideForm,
+        bool store,
         out int localIndex) {
+        var index0 = store ? OpCodes.Stloc_0 : OpCodes.Ldloc_0;
+        var shortForm = store ? OpCodes.Stloc_S : OpCodes.Ldloc_S;
+        var wideForm = store ? OpCodes.Stloc : OpCodes.Ldloc;
         var shortFormIndex = opCode.Value - index0.Value;
-        if (shortFormIndex is >= 0 and <= 3 &&
-            index1.Value == index0.Value + 1 &&
-            index2.Value == index0.Value + 2 &&
-            index3.Value == index0.Value + 3) {
+        if (shortFormIndex is >= 0 and <= 3) {
             localIndex = shortFormIndex;
             return true;
         }

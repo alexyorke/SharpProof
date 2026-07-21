@@ -272,33 +272,27 @@ internal static partial class ComparerInvocationPurity {
             "System.Collections.Generic.SortedSet<T>";
     }
 
-    internal static bool TryCheckLinqDefaultEqualityDispatchPurity(
+    internal static bool TryCheckLinqDefaultDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
+        bool equality,
         out PurityAnalysisEngine.PurityAnalysisResult result) {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
-        if (!TryGetLinqDefaultEqualityDispatchType(methodSymbol, out var equalityType)) return false;
+        var hasDispatchType = equality
+            ? TryGetLinqDefaultEqualityDispatchType(methodSymbol, out var dispatchType)
+            : TryGetLinqDefaultComparisonDispatchType(methodSymbol, out dispatchType);
+        if (!hasDispatchType) return false;
 
-        if (!IsLinqDefaultEqualityOverload(invocationOperation)) return false;
+        if (equality
+                ? !IsLinqDefaultEqualityOverload(invocationOperation)
+                : !IsLinqDefaultComparisonOverload(invocationOperation))
+            return false;
 
-        result = CheckDefaultEqualityDispatchPurity(equalityType, invocationOperation, context);
-        return true;
-    }
-
-    internal static bool TryCheckLinqDefaultComparisonDispatchPurity(
-        IInvocationOperation invocationOperation,
-        PurityAnalysisContext context,
-        out PurityAnalysisEngine.PurityAnalysisResult result) {
-        result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-        var methodSymbol = invocationOperation.TargetMethod;
-        if (!TryGetLinqDefaultComparisonDispatchType(methodSymbol, out var comparisonType)) return false;
-
-        if (!IsLinqDefaultComparisonOverload(invocationOperation)) return false;
-
-        result = CheckDefaultComparisonDispatchPurity(comparisonType, invocationOperation, context);
+        result = equality
+            ? CheckDefaultEqualityDispatchPurity(dispatchType, invocationOperation, context)
+            : CheckDefaultComparisonDispatchPurity(dispatchType, invocationOperation, context);
         return true;
     }
 

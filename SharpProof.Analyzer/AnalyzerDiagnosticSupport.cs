@@ -41,25 +41,19 @@ internal static class ContractDiagnosticSupport {
         string? diagnosticUnknownReason = null,
         string? callee = null,
         SymbolicUnknownReasonInfo? structuredUnknownReason = null) {
-        var properties = family switch {
-            EvidenceFamily.Requires => ImmutableDictionary<string, string?>.Empty
-                .Add("sharpproof.requires.condition", condition)
-                .Add("sharpproof.requires.proof_status", proofStatus)
-                .Add("sharpproof.requires.failure_reason", failureReason)
-                .Add("sharpproof.requires.callee", callee),
-            EvidenceFamily.Ensures => ImmutableDictionary<string, string?>.Empty
-                .Add("sharpproof.ensures.condition", condition)
-                .Add("sharpproof.ensures.proof_status", proofStatus)
-                .Add("sharpproof.ensures.failure_reason", failureReason),
+        var prefix = family switch {
+            EvidenceFamily.Requires => "sharpproof.requires.",
+            EvidenceFamily.Ensures => "sharpproof.ensures.",
             _ => throw new ArgumentOutOfRangeException(nameof(family), family, null)
         };
+        var properties = ImmutableDictionary<string, string?>.Empty
+            .Add(prefix + "condition", condition)
+            .Add(prefix + "proof_status", proofStatus)
+            .Add(prefix + "failure_reason", failureReason);
+        if (family == EvidenceFamily.Requires) properties = properties.Add(prefix + "callee", callee);
 
         if (diagnosticUnknownReason != null)
-            properties = properties.Add(
-                family == EvidenceFamily.Requires
-                    ? "sharpproof.requires.unknown_reason"
-                    : "sharpproof.ensures.unknown_reason",
-                diagnosticUnknownReason);
+            properties = properties.Add(prefix + "unknown_reason", diagnosticUnknownReason);
 
         if (structuredUnknownReason?.IsUnknown == true)
             properties = UnknownReasonDiagnosticProperties.Add(properties, structuredUnknownReason);

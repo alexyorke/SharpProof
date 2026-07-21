@@ -893,12 +893,23 @@ Tests are excluded from the metric and must not be deleted.
 - [x] Removed EffectSummary's unused inferred-summary projection. The retained
   shared contract now fails closed for unknown effect tags, and its existing
   test identities remain intact with an added conservative-unknown regression.
+- [x] Made the Symbolic complexity model own the single mapping and sound
+  partial order shared by analyzer contracts and CLI exit gates. Deleted both
+  private seven-value vocabularies, rank functions, and comparison pipelines;
+  Product and Max remain conservatively incomparable outside themselves and
+  the Constant bottom bound. The analyzer-facing seam uses stable integer
+  values so the analyzer assembly retains its required Attributes isolation.
+- [x] Consolidated the remaining proven small parallel owners for LINQ default
+  comparer dispatch, generated-purity predicate validation, IL local opcode
+  decoding, metadata member-reference keys, and requires/ensures proof-property
+  prefixes. Type-distinct operator mappings and ProofCore union operations stay
+  separate because their contracts are not interchangeable.
 
 ## Current evidence
 
-- Phase-two maintained production: 81,044 lines (77,082 C#, 3,228 scripts,
-  and 734 maintained specification lines), a net 3,390-line reduction from the
-  84,434-line phase-two baseline. Another 16,610 lines remain to the 64,434
+- Phase-two maintained production: 80,863 lines (76,901 C#, 3,228 scripts,
+  and 734 maintained specification lines), a net 3,571-line reduction from the
+  84,434-line phase-two baseline. Another 16,429 lines remain to the 64,434
   completion ceiling.
 - The test-preservation check finds all 4,469 baseline attributed test methods
   among 4,474 current methods, unchanged parameterized-case counts, and no new

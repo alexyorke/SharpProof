@@ -235,10 +235,7 @@ internal static class MethodEnsuresAnalyzer {
                 contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
                 methodSymbol,
                 context.Node.SyntaxTree);
-            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(
-                baseline,
-                diagnostic,
-                context.ReportDiagnostic);
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(context, baseline, diagnostic);
         }
 
         return validContracts.ToImmutable();

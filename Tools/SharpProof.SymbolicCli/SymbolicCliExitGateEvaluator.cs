@@ -85,9 +85,9 @@ internal static class SymbolicCliExitGateEvaluator {
         if (result is not SymbolicComplexityResult complexity) return;
 
         var comparison = options.MaximumComplexity.HasValue
-            ? CompareComplexity(complexity.Complexity.Kind, options.MaximumComplexity.Value)
-            : ComplexityComparison.Within;
-        if (options.MaximumComplexity.HasValue && comparison == ComplexityComparison.Exceeds)
+            ? SymbolicComplexityFacts.Compare(complexity.Complexity.Kind, (int)options.MaximumComplexity.Value)
+            : SymbolicComplexityComparison.Within;
+        if (options.MaximumComplexity.HasValue && comparison == SymbolicComplexityComparison.Exceeds)
             failures.Add(new SymbolicCliExitGateFailure(
                 "complexity-exceeded",
                 "actual=" + complexity.Complexity.Kind +
@@ -96,7 +96,7 @@ internal static class SymbolicCliExitGateEvaluator {
         var isUnknown = complexity.Complexity.IsUnknown ||
                         complexity.Complexity.IsRecursiveUnknown ||
                         complexity.UnknownReasons.Count != 0 ||
-                        comparison == ComplexityComparison.Incomparable;
+                        comparison == SymbolicComplexityComparison.Incomparable;
         if (options.FailOnComplexityUnknown && isUnknown)
             failures.Add(new SymbolicCliExitGateFailure(
                 "complexity-unknown",
@@ -179,96 +179,4 @@ internal static class SymbolicCliExitGateEvaluator {
         };
     }
 
-    private static ComplexityComparison CompareComplexity(
-        SymbolicComplexityKind actual,
-        ComplexityKind maximum) {
-        if (!TryMapActual(actual, out var actualClass)) return ComplexityComparison.Incomparable;
-        var maximumClass = MapMaximum(maximum);
-        if (actualClass == maximumClass || actualClass == ComplexityClass.Constant)
-            return ComplexityComparison.Within;
-
-        if (maximumClass == ComplexityClass.Constant)
-            return ComplexityComparison.Exceeds;
-
-        if (TryGetChainRank(actualClass, out var actualRank) &&
-            TryGetChainRank(maximumClass, out var maximumRank))
-            return actualRank <= maximumRank
-                ? ComplexityComparison.Within
-                : ComplexityComparison.Exceeds;
-
-        return ComplexityComparison.Incomparable;
-    }
-
-    private static bool TryMapActual(SymbolicComplexityKind actual, out ComplexityClass complexityClass) {
-        switch (actual) {
-            case SymbolicComplexityKind.Constant:
-                complexityClass = ComplexityClass.Constant;
-                return true;
-            case SymbolicComplexityKind.Linear:
-                complexityClass = ComplexityClass.Linear;
-                return true;
-            case SymbolicComplexityKind.Quadratic:
-                complexityClass = ComplexityClass.Quadratic;
-                return true;
-            case SymbolicComplexityKind.Product:
-                complexityClass = ComplexityClass.Product;
-                return true;
-            case SymbolicComplexityKind.Max:
-                complexityClass = ComplexityClass.Max;
-                return true;
-            default:
-                complexityClass = default;
-                return false;
-        }
-    }
-
-    private static ComplexityClass MapMaximum(ComplexityKind maximum) => maximum switch {
-        ComplexityKind.Constant => ComplexityClass.Constant,
-        ComplexityKind.Logarithmic => ComplexityClass.Logarithmic,
-        ComplexityKind.Linear => ComplexityClass.Linear,
-        ComplexityKind.Linearithmic => ComplexityClass.Linearithmic,
-        ComplexityKind.Quadratic => ComplexityClass.Quadratic,
-        ComplexityKind.Product => ComplexityClass.Product,
-        ComplexityKind.Max => ComplexityClass.Max,
-        _ => throw new ArgumentOutOfRangeException(nameof(maximum), maximum, "Complexity bound is not defined.")
-    };
-
-    private static bool TryGetChainRank(ComplexityClass complexity, out int rank) {
-        switch (complexity) {
-            case ComplexityClass.Constant:
-                rank = 0;
-                return true;
-            case ComplexityClass.Logarithmic:
-                rank = 1;
-                return true;
-            case ComplexityClass.Linear:
-                rank = 2;
-                return true;
-            case ComplexityClass.Linearithmic:
-                rank = 3;
-                return true;
-            case ComplexityClass.Quadratic:
-                rank = 4;
-                return true;
-            default:
-                rank = -1;
-                return false;
-        }
-    }
-
-    private enum ComplexityComparison {
-        Within,
-        Exceeds,
-        Incomparable
-    }
-
-    private enum ComplexityClass {
-        Constant,
-        Logarithmic,
-        Linear,
-        Linearithmic,
-        Quadratic,
-        Product,
-        Max
-    }
 }

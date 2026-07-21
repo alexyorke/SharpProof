@@ -946,12 +946,12 @@ internal static class AssemblyEffectSummarizer {
                 continue;
             }
 
-            if (TryGetStoreLocalIndex(opCode, il, operandOffset, out var storeLocalIndex)) {
+            if (TryGetLocalIndex(opCode, il, operandOffset, store: true, out var storeLocalIndex)) {
                 trackedLocals[storeLocalIndex] = PopStaticFieldInitializerValue(trackedStack);
                 continue;
             }
 
-            if (TryGetLoadLocalIndex(opCode, il, operandOffset, out var loadLocalIndex)) {
+            if (TryGetLocalIndex(opCode, il, operandOffset, store: false, out var loadLocalIndex)) {
                 trackedStack.Add(trackedLocals.TryGetValue(loadLocalIndex, out var localValue)
                     ? localValue
                     : StaticFieldInitializerValue.Unknown);

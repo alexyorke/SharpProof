@@ -41,14 +41,14 @@ internal static class EffectSummaryGeneratedPurityRules {
             ValidateValues(rule.ExactSymbols, $"impure rule {index} exact symbols"),
             ValidateValues(rule.Prefixes, $"impure rule {index} prefixes"),
             ValidateValues(rule.Categories, $"impure rule {index} categories", requireValue: true),
-            ResolveImpurePredicate(rule.Predicate, impurePredicates, index))).ToArray();
+            ResolvePredicate(rule.Predicate, impurePredicates, index, pure: false))).ToArray();
 
         var purePredicates = new HashSet<string>(StringComparer.Ordinal);
         var pure = definitions.Pure.Select((rule, index) => new GeneratedPureRule(
             ValidateVisibility(rule.Visibility, index),
             ValidateValues(rule.ExactSymbols, $"pure rule {index} exact symbols"),
             ValidateValues(rule.Prefixes, $"pure rule {index} prefixes"),
-            ResolvePurePredicate(rule.Predicate, purePredicates, index))).ToArray();
+            ResolvePredicate(rule.Predicate, purePredicates, index, pure: true))).ToArray();
 
         ValidateMatchers(impure, pure);
         return new GeneratedRuleRegistry(impure, pure);
@@ -68,29 +68,19 @@ internal static class EffectSummaryGeneratedPurityRules {
         return visibility;
     }
 
-    private static Func<string, bool>? ResolveImpurePredicate(
+    private static Func<string, bool>? ResolvePredicate(
         string? name,
         HashSet<string> usedPredicates,
-        int index) {
+        int index,
+        bool pure) {
         if (name is null) return null;
         if (!usedPredicates.Add(name))
-            throw new InvalidOperationException($"Generated impure rule {index} repeats predicate '{name}'.");
-        return name switch {
-            nameof(IsGeneratedArrayComparerSort) => IsGeneratedArrayComparerSort,
-            _ => throw new InvalidOperationException($"Generated impure rule {index} references unknown predicate '{name}'.")
-        };
-    }
-
-    private static Func<string, bool>? ResolvePurePredicate(
-        string? name,
-        HashSet<string> usedPredicates,
-        int index) {
-        if (name is null) return null;
-        if (!usedPredicates.Add(name))
-            throw new InvalidOperationException($"Generated pure rule {index} repeats predicate '{name}'.");
-        return name switch {
-            nameof(IsImmutableHashSetEnumeratorMethod) => IsImmutableHashSetEnumeratorMethod,
-            _ => throw new InvalidOperationException($"Generated pure rule {index} references unknown predicate '{name}'.")
+            throw new InvalidOperationException($"Generated {(pure ? "pure" : "impure")} rule {index} repeats predicate '{name}'.");
+        return (pure, name) switch {
+            (false, nameof(IsGeneratedArrayComparerSort)) => IsGeneratedArrayComparerSort,
+            (true, nameof(IsImmutableHashSetEnumeratorMethod)) => IsImmutableHashSetEnumeratorMethod,
+            _ => throw new InvalidOperationException(
+                $"Generated {(pure ? "pure" : "impure")} rule {index} references unknown predicate '{name}'.")
         };
     }
 

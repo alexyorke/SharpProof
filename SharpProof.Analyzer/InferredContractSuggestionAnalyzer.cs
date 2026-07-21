@@ -183,7 +183,7 @@ internal static class InferredContractSuggestionAnalyzer {
             result.Complexity.IsRecursiveUnknown ||
             result.Complexity.IsConservative ||
             result.UnknownReasons.Count != 0 ||
-            !ComplexityContractFacts.TryGetAttributeKindName(result.Complexity.Kind, out var complexityKind))
+            !SymbolicComplexityFacts.TryGetBoundName(result.Complexity.Kind, out var complexityKind))
             return;
 
         Report(
