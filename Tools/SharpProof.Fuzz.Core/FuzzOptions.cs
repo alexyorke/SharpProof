@@ -1,9 +1,7 @@
 namespace SharpProof.Tools.Fuzz;
 
 public sealed record FuzzOptions {
-    public static string Usage { get; } = ToolEmbeddedText.Load(
-        typeof(FuzzOptions).Assembly,
-        "SharpProof.Fuzz.Usage.txt");
+    public static string Usage { get; } = LoadResource("SharpProof.Fuzz.Usage.txt");
 
     public int? Iterations { get; set; } = 100;
 
@@ -29,24 +27,27 @@ public sealed record FuzzOptions {
 
     public bool RepeatAnalyzer { get; set; } = true;
 
-    private static readonly ToolOptionSet<FuzzOptions> OptionSet = new ToolOptionSet<FuzzOptions>()
-        .Add(static (o, r, a) => o.Iterations = ReadInt(r, a), "--iterations")
-        .Add(static (o, r, a) => o.Duration = ReadDuration(r, a, TimeSpan.FromSeconds), "--seconds")
-        .Add(static (o, r, a) => o.Duration = ReadDuration(r, a, TimeSpan.FromMinutes), "--minutes")
-        .Add(static (o, r, a) => o.Duration = ReadDuration(r, a, TimeSpan.FromHours), "--hours")
-        .Add(static (o, r, a) => o.Seed = ReadInt(r, a), "--seed")
-        .Add(static (o, r, a) => o.OutputDirectory = r.RequiredValue(a, $"{a} expects a value."), "--out")
-        .Add(static (o, r, a) => o.MaxInterestingCases = ReadInt(r, a), "--max-interesting")
-        .Add(static (o, r, a) => o.MaxInterestingCasesPerFamily = ReadInt(r, a), "--max-interesting-per-family")
-        .Add(static (o, r, a) => o.CheckpointEvery = ReadInt(r, a), "--checkpoint-every")
-        .Add(static (o, r, a) => o.Parallelism = ReadInt(r, a), "--parallelism")
-        .Add(static (o, _, _) => o.Quiet = true, "--quiet")
-        .Add(static (o, _, _) => o.FailOnFindings = true, "--fail-on-findings")
-        .Add(static (o, _, _) => o.RepeatAnalyzer = false, "--no-repeat");
-
     public static FuzzOptions Parse(string[] args) {
         var options = new FuzzOptions();
-        OptionSet.Parse(args, options);
+        for (var index = 0; index < args.Length; index++) {
+            var option = args[index];
+            switch (option) {
+                case "--iterations": options.Iterations = ReadInt(ReadValue(args, ref index, option), option); break;
+                case "--seconds": options.Duration = ReadDuration(ReadValue(args, ref index, option), option, TimeSpan.FromSeconds); break;
+                case "--minutes": options.Duration = ReadDuration(ReadValue(args, ref index, option), option, TimeSpan.FromMinutes); break;
+                case "--hours": options.Duration = ReadDuration(ReadValue(args, ref index, option), option, TimeSpan.FromHours); break;
+                case "--seed": options.Seed = ReadInt(ReadValue(args, ref index, option), option); break;
+                case "--out": options.OutputDirectory = ReadValue(args, ref index, option); break;
+                case "--max-interesting": options.MaxInterestingCases = ReadInt(ReadValue(args, ref index, option), option); break;
+                case "--max-interesting-per-family": options.MaxInterestingCasesPerFamily = ReadInt(ReadValue(args, ref index, option), option); break;
+                case "--checkpoint-every": options.CheckpointEvery = ReadInt(ReadValue(args, ref index, option), option); break;
+                case "--parallelism": options.Parallelism = ReadInt(ReadValue(args, ref index, option), option); break;
+                case "--quiet": options.Quiet = true; break;
+                case "--fail-on-findings": options.FailOnFindings = true; break;
+                case "--no-repeat": options.RepeatAnalyzer = false; break;
+                default: throw new ArgumentException($"Unknown option '{option}'.");
+            }
+        }
 
         if (options.Iterations < 0) throw new ArgumentException("--iterations must be non-negative.");
 
@@ -66,24 +67,27 @@ public sealed record FuzzOptions {
         return options;
     }
 
-    private static int ReadInt(ToolArgumentReader reader, string option) =>
-        int.TryParse(reader.RequiredValue(option, $"{option} expects a value."), out var parsed)
+    private static string ReadValue(string[] args, ref int index, string option) =>
+        ++index < args.Length ? args[index] : throw new ArgumentException($"{option} expects a value.");
+
+    private static int ReadInt(string value, string option) =>
+        int.TryParse(value, out var parsed)
             ? parsed
             : throw new ArgumentException($"{option} expects an integer.");
 
-    private static double ReadDouble(ToolArgumentReader reader, string option) =>
-        double.TryParse(reader.RequiredValue(option, $"{option} expects a value."), out var parsed) &&
+    private static double ReadDouble(string value, string option) =>
+        double.TryParse(value, out var parsed) &&
         double.IsFinite(parsed) && parsed >= 0
             ? parsed
             : throw new ArgumentException($"{option} expects a finite non-negative number.");
 
     private static TimeSpan ReadDuration(
-        ToolArgumentReader reader,
+        string value,
         string option,
         Func<double, TimeSpan> createDuration) {
-        var value = ReadDouble(reader, option);
+        var duration = ReadDouble(value, option);
         try {
-            return createDuration(value);
+            return createDuration(duration);
         }
         catch (OverflowException ex) {
             throw new ArgumentException($"{option} expects a duration within TimeSpan range.", ex);
@@ -92,5 +96,12 @@ public sealed record FuzzOptions {
 
     private static string DefaultOutputDirectory() => Path.Combine(
         Environment.CurrentDirectory, "artifacts", "fuzz", DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss"));
+
+    internal static string LoadResource(string name) {
+        using var stream = typeof(FuzzOptions).Assembly.GetManifestResourceStream(name) ??
+                           throw new InvalidOperationException($"Embedded resource '{name}' was not found.");
+        using var reader = new StreamReader(stream, Encoding.UTF8, true);
+        return reader.ReadToEnd().TrimEnd('\r', '\n');
+    }
 
 }

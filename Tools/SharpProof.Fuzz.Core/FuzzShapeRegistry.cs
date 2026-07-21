@@ -5,9 +5,7 @@ internal static class FuzzShapeRegistry {
 
     internal static ImmutableArray<ShapeRegistryEntry> Load(
         IReadOnlyDictionary<string, Func<int, Random, string, string>> generators) {
-        var json = ToolEmbeddedText.Load(
-            typeof(FuzzShapeRegistry).Assembly,
-            "SharpProof.Fuzz.ShapeRegistry.json");
+        var json = FuzzOptions.LoadResource("SharpProof.Fuzz.ShapeRegistry.json");
         var definitions = JsonSerializer.Deserialize<RegistryDefinition[]>(json) ??
                           throw new InvalidOperationException("The fuzz shape registry is empty.");
         var seenIds = new HashSet<string>(StringComparer.Ordinal);

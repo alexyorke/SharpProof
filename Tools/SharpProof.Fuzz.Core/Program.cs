@@ -2,11 +2,16 @@ namespace SharpProof.Tools.Fuzz;
 
 
 public static class Program {
-    public static async Task<int> Main(string[] args) => await ToolCommandHost.RunAsync(
-            () => RunAsync(args),
-            argumentErrorExitCode: 64,
-            Console.Error,
-            static error => error.WriteLine(FuzzOptions.Usage));
+    public static async Task<int> Main(string[] args) {
+        try {
+            return await RunAsync(args);
+        }
+        catch (ArgumentException exception) {
+            Console.Error.WriteLine(exception.Message);
+            Console.Error.WriteLine(FuzzOptions.Usage);
+            return 64;
+        }
+    }
 
     private static async Task<int> RunAsync(string[] args) {
         if (args.Contains("--help", StringComparer.Ordinal) || args.Contains("-h", StringComparer.Ordinal)) {

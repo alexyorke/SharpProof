@@ -51,7 +51,8 @@ public sealed class EffectArchitectureTests {
             "SharpProof.Analyzer/RequiresEntryStateBuilder.cs",
             "SharpProof.Symbolic/SharpProofCapabilityFacts.cs",
             "SharpProof.Symbolic/SymbolicInvariantTargetFilter.cs",
-            "SharpProof.Symbolic/SymbolicSourceCompilationProfile.cs"
+            "SharpProof.Symbolic/SymbolicSourceCompilationProfile.cs",
+            "SharpProof.Tooling.Core/SharpProof.Tooling.Core.csproj"
         };
         foreach (var relativePath in removedFiles)
             Assert.That(File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))),
