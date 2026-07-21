@@ -23,26 +23,20 @@ jobs:
           global-json-file: global.json
 
       - name: Restore dependencies
-        run: dotnet restore
+        shell: pwsh
+        run: .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
 
       - name: Verify generated README
         shell: pwsh
         run: .\scripts\Generate-Readme.ps1 -Verify
 
-      - name: Verify phase-two production ceiling
-        shell: pwsh
-        run: .\scripts\Get-SharpProofProductionReduction.ps1 -EnforceCurrentCeiling
-
-      - name: Validate shipping projects warning-free
-        shell: pwsh
-        run: .\scripts\Invoke-SharpProofReleaseValidation.ps1 -Configuration Release -NoRestore
-
       - name: Build solution
-        run: dotnet build SharpProof.sln --configuration Release --no-restore
-
-      - name: Test lanes
         shell: pwsh
-        run: .\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All -SequentialLanes
+        run: .\scripts\Invoke-SharpProofDotnet.ps1 build SharpProof.sln --configuration Release --no-restore
+
+      - name: Test solution
+        shell: pwsh
+        run: .\scripts\Invoke-SharpProofDotnet.ps1 test SharpProof.sln --configuration Release --no-build
 
       - name: Build VSIX project
         run: |

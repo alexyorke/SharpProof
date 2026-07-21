@@ -129,7 +129,7 @@ public sealed class ModernCSharpSurfaceDocumentationTests
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
         while (directory != null)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "PLAN.md"))) return directory.FullName;
+            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
 
             directory = directory.Parent;
         }
