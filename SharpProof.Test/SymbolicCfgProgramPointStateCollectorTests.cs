@@ -196,7 +196,7 @@ sealed class C
         yield return CoalesceCase(
             "LoopCurrentCompletionFallback",
             "static class C { static void M(string? value, bool repeat) { while (repeat) { value ??= \"new\"; } } }",
-            expectedExact: false,
+            expectedExact: true,
             expectedStructuralParity: true);
     }
 

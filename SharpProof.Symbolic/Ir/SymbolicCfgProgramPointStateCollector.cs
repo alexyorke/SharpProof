@@ -385,7 +385,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                         operation,
                         GetActiveGuard(currentPath.GuardFrame),
                         true,
-                        targetIsInsideBranch,
+                        targetIsInsideBranch || observedLoopTarget,
                         true,
                         semanticModel,
                         cancellationToken,

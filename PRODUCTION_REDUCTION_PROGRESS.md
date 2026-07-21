@@ -820,8 +820,8 @@ Tests are excluded from the metric and must not be deleted.
   unknown values under default and custom budgets. This also fixes the
   characterized guarded-assignment bug that combined a pre-assignment null guard
   with the post-assignment non-null value and incorrectly marked a reachable
-  completion contradictory. Loop-local current completion remains an explicit
-  typed fallback until loop observations can preserve the same state contract.
+  completion contradictory. Loop-local current completion was subsequently
+  migrated once loop observations could preserve the same state contract.
 
 - [x] Replaced the simple-assignment-only `for` initializer gate with canonical
   operation dispatch. Increment and compound initializers now produce exact
@@ -876,8 +876,13 @@ Tests are excluded from the metric and must not be deleted.
 - [x] Extended stale-guard detection to the current statement's symbol-version
   changes. Guard-mutating simple and checked/unchecked compound assignments now
   produce exact current-completion state with structural parity. This adds five
-  temporary production lines; loop-local coalesce completion remains the sole
-  characterized assignment-current fallback.
+  temporary production lines.
+- [x] Moved loop-local coalesce-assignment current completion onto the CFG path.
+  After observing the target, back-edge traversal now applies its guarded
+  mutation and invalidates the stale null guard before merging the next loop
+  entry. All reference and nullable coalesce cases retain structural normalized
+  state and evidence parity; no characterized assignment-current fallback
+  remains.
 - [x] Removed the generic path-condition merge framework, which had exactly one
   closed construction. The merger now operates directly on canonical
   `SymbolicCondition` values while retaining deterministic keys, Cartesian
