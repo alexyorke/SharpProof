@@ -1,105 +1,11 @@
-# Typed Query Error Model
+# Unified analysis errors
 
-SharpProof exposes one typed error contract across the symbolic .NET API and
-CLI. Automation can branch on a stable `SPQ` code and category instead of
-matching exception or console text.
+`SharpProofAnalysisResult` distinguishes Succeeded, Unknown, Failed, and Canceled.
+Failures carry a `SharpProofError` with a stable code, category, message,
+retryability, recommended exit code, and details. Unknown evidence is returned in
+the ordinary result instead of being converted into an error.
 
-## Error Codes And Exit Mapping
-
-| Code | Category | Meaning | Recommended CLI exit |
-| --- | --- | --- | --- |
-| `SPQ1000` | `Usage` | Invalid request or option combination | 64 |
-| `SPQ1001` | `Input` | Target line, column, position, or span is outside the source | 65 |
-| `SPQ1002` | `Unsupported` | The source/target combination is not supported | 65 |
-| `SPQ1100` | `Input` | Source input was not found | 66 |
-| `SPQ1101` | `Input` | Metadata reference was not found | 66 |
-| `SPQ1200` | `Parse` | A required request, metadata, or project document could not be parsed | 65 |
-| `SPQ1300` | `Project` | MSBuild project or solution loading failed | 65, or 66 when the project path is missing |
-| `SPQ2000` | `Solver` | The native SMT solver could not be loaded | 69 |
-| `SPQ2001` | `Solver` | An escaping SMT solver operation failed | 75 |
-| `SPQ2100` | `Timeout` | The query timed out | 75 |
-| `SPQ3000` | `Cancellation` | The query was canceled | 130 |
-| `SPQ9000` | `Internal` | An unexpected non-fatal failure escaped the query boundary | 70 |
-
-`SharpProofError` exposes these values on failed public query results. It also
-carries a human-readable message,
-`IsRetryable`, and bounded string details such as `path` and `exceptionType`.
-Details do not include a stack trace.
-
-Native solver failures that bounded analysis already converts into
-`SharpProofSmtMetadata` or a conservative unknown remain normal query
-results. `SPQ2000`, `SPQ2001`, and `SPQ2100` apply when a failure escapes the
-query boundary and no typed result can be returned.
-
-Similarly, recoverable C# syntax diagnostics can still produce conservative
-analysis. `SPQ1200` represents a failed request/document/metadata parse, such
-as malformed JSON request input, rather than every Roslyn syntax diagnostic.
-
-## JSON Error Envelopes
-
-`--json`, `--sarif`, `--request-json`, and
-`--request-json-stdin` automatically emit failures as a lower-camel JSON
-envelope on stdout. Use `--error-json` to request the same behavior for a
-text-mode query.
-
-A failed `explain --sarif` request returns this typed JSON error envelope, not
-a partial SARIF log. Successful SARIF and Markdown explain reports are
-documented in [machine-readable explain reports](explain-reports.md).
-
-```json
-{
-  "kind": "error",
-  "schemaVersion": 1,
-  "error": {
-    "code": "SPQ1101",
-    "category": "Input",
-    "message": "--reference does not exist: Missing.dll",
-    "recommendedExitCode": 66,
-    "isRetryable": false,
-    "details": {
-      "path": "Missing.dll"
-    }
-  }
-}
-```
-
-The process returns `error.recommendedExitCode`. JSON error requests leave
-stderr empty, so stdout contains exactly one machine-readable document. Text
-errors use stderr in this form:
-
-```text
-SPQ1000 [Usage]: Unknown option '--compact-json'.
-```
-
-Usage failures also print CLI help after that line.
-
-CI gate failures are different: the query succeeded and produced a result,
-but a configured policy failed. They return exit code 1, retain the requested
-result on stdout, and report gate reasons on stderr. See [CI exit-code
-gates](ci-exit-gates.md).
-
-## .NET API
-
-`SharpProofAnalysisSession.Analyze(...)` returns one typed result envelope for
-successful, unknown, failed, and canceled queries:
-
-```csharp
-using var session = SharpProofAnalysisSession.FromText(sourceText, "virtual/Buffer.cs");
-var outcome = session.Analyze(
-    new SharpProofQuery(
-        SharpProofQueryKind.Invariant,
-        new SharpProofTarget(SharpProofTargetKind.Point, Line: 42, Column: 1)));
-
-if (!outcome.IsSuccess)
-{
-    SharpProofError error = outcome.Error!;
-    Console.Error.WriteLine($"{error.Code}: {error.Message}");
-    return error.RecommendedExitCode;
-}
-
-var result = (SourceQueryPayload)outcome.Payload!;
-```
-
-All query kinds classify non-fatal failures internally and retain cancellation
-as `SPQ3000` instead of throwing it. The CLI preserves its versioned,
-lower-camel error envelope at the process boundary.
+The CLI returns 0 for accepted results, 2 for usage or input errors, 3 for analysis
+failures, 4 when `--fail-on-unknown` is enabled and matches, and 5 when
+`--fail-on-disproven` is enabled and matches. JSON output serializes the same
+`SharpProofAnalysisResult` returned by the .NET API.

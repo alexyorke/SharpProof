@@ -20,7 +20,10 @@ public sealed class EffectArchitectureTests {
             "SharpProof.Contracts/InferredMethodSummary.cs",
             "SharpProof.Analyzer/Engine/Rules/CompilationSyntaxAccess.cs",
             "SharpProof.Analyzer/Engine/Rules/InvocationEvidence.cs",
-            "SharpProof.Analyzer/LowerHexEncoding.cs"
+            "SharpProof.Analyzer/LowerHexEncoding.cs",
+            "SharpProof.Symbolic/SymbolicCapabilityService.cs",
+            "SharpProof.Symbolic/SymbolicCapabilityModels.cs",
+            "Tools/SharpProof.SymbolicCli.Core/SharpProof.SymbolicCli.Core.csproj"
         };
         foreach (var relativePath in removedFiles)
             Assert.That(File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))),
@@ -46,6 +49,13 @@ public sealed class EffectArchitectureTests {
             "Bcl" + "PurityFallbackHeuristics",
             "Purity" + "PolicyImpact",
             "Missing" + "PuritySuggestionScope",
+            "Collect" + "AncestorReachabilityState",
+            "SHARPPROOF_" + "TRACE_CFG_FALLBACK",
+            "Symbolic" + "CapabilityResult",
+            "Method" + "PurityAnalyzer",
+            "Sp0002" + "Expectation",
+            "sharpproof." + "impurity.",
+            "Exception" + "FlowQuery",
             "Allow" + "Synchronization",
             "Pure" + "External"
         };

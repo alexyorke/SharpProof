@@ -1,11 +1,11 @@
 [
   {
     "Id": "invariants-positive",
-    "Title": "Invariant, reachability, and implication at one point",
-    "Summary": "One query can show the merged invariant at a program point, whether the point is reachable, and whether the current facts imply another condition.",
+    "Title": "Condition proof at one program point",
+    "Summary": "The proofs facet checks a condition against the bounded symbolic state at a source point.",
     "SourcePath": "docs/readme-examples/invariants-positive/input.cs",
     "OutputPath": "docs/readme-examples/invariants-positive/output.txt",
-    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/invariants-positive/input.cs --line 7 --column 13 --check-reachability --implies \"value > 0\"",
+    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- analyze --file docs/readme-examples/invariants-positive/input.cs --target line:7:13 --facets proofs --condition \"value > 0\" --format text",
     "OutputLabel": "CLI output",
     "Language": "csharp",
     "OutputLanguage": "text"
@@ -16,18 +16,18 @@
     "Summary": "The symbolic CLI can report a concrete hazard at a specific operation without executing the method.",
     "SourcePath": "docs/readme-examples/runtime-hazard-divide-by-zero/input.cs",
     "OutputPath": "docs/readme-examples/runtime-hazard-divide-by-zero/output.txt",
-    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/runtime-hazard-divide-by-zero/input.cs --line 7 --runtime-hazards",
+    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- analyze --file docs/readme-examples/runtime-hazard-divide-by-zero/input.cs --target line:7 --facets hazards --format text",
     "OutputLabel": "CLI output",
     "Language": "csharp",
     "OutputLanguage": "text"
   },
   {
     "Id": "capabilities-console",
-    "Title": "Capability summary at a program point",
-    "Summary": "Capability queries classify proven side-effect categories such as `Console` and the derived umbrella category `IO`.",
+    "Title": "Unknown external effect boundary",
+    "Summary": "Framework calls remain unknown unless source, IL, or an exact effect contract establishes their effects; no member-name catalog is consulted.",
     "SourcePath": "docs/readme-examples/capabilities-console/input.cs",
     "OutputPath": "docs/readme-examples/capabilities-console/output.txt",
-    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/capabilities-console/input.cs --line 7 --capabilities",
+    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- analyze --file docs/readme-examples/capabilities-console/input.cs --target line:7 --facets effects --format text",
     "OutputLabel": "CLI output",
     "Language": "csharp",
     "OutputLanguage": "text"
@@ -38,7 +38,7 @@
     "Summary": "Complexity queries report the best proven Big-O plus the structural drivers that justify it.",
     "SourcePath": "docs/readme-examples/complexity-linear/input.cs",
     "OutputPath": "docs/readme-examples/complexity-linear/output.txt",
-    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/complexity-linear/input.cs --line 10 --complexity",
+    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- analyze --file docs/readme-examples/complexity-linear/input.cs --target line:10 --facets complexity --format text",
     "OutputLabel": "CLI output",
     "Language": "csharp",
     "OutputLanguage": "text"
@@ -46,10 +46,10 @@
   {
     "Id": "symbolic-unknown-dynamic",
     "Title": "Conservative unknown for dynamic dispatch",
-    "Summary": "When the engine cannot prove a capability set because of dynamic dispatch, the CLI reports an explicit unknown instead of inventing a stronger answer.",
+    "Summary": "Dynamic dispatch produces explicit unknown method-effect evidence instead of an optimistic verdict.",
     "SourcePath": "docs/readme-examples/symbolic-unknown-dynamic/input.cs",
     "OutputPath": "docs/readme-examples/symbolic-unknown-dynamic/output.txt",
-    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/symbolic-unknown-dynamic/input.cs --line 5 --capabilities",
+    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- analyze --file docs/readme-examples/symbolic-unknown-dynamic/input.cs --target line:5 --facets effects --format text",
     "OutputLabel": "CLI output",
     "Language": "csharp",
     "OutputLanguage": "text"

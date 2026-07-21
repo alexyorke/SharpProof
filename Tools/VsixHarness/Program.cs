@@ -136,7 +136,7 @@ internal static class Program {
                   public class C
                   {
                       [EnforcePure]
-                      public void M() => System.Console.WriteLine("impure");
+                      public void M() => System.Console.WriteLine("effect boundary");
                   }
                   """
                     : """
@@ -152,7 +152,7 @@ internal static class Program {
                       public class C
                       {
                           [SharpProof.Attributes.EnforcePure]
-                          public void M() => System.Console.WriteLine("impure");
+                          public void M() => System.Console.WriteLine("effect boundary");
                       }
                   }
                   """;
@@ -198,8 +198,11 @@ internal static class Program {
 
                 if (analyzerDiagnostics.Any(static diagnostic => diagnostic.Id == "AD0001"))
                     throw new InvalidOperationException("Analyzer execution produced AD0001.");
-                if (!analyzerDiagnostics.Any(static diagnostic => diagnostic.Id == "SP0002"))
-                    throw new InvalidOperationException("Analyzer did not produce the expected SP0002 diagnostic.");
+                var contractFailure = analyzerDiagnostics.FirstOrDefault(static diagnostic => diagnostic.Id == "SP0002");
+                if (contractFailure == null)
+                    throw new InvalidOperationException("Analyzer did not report the unresolved [EnforcePure] contract.");
+                if (!contractFailure.Properties.ContainsKey("sharpproof.effects.flags"))
+                    throw new InvalidOperationException("Analyzer diagnostic did not carry canonical method-effect evidence.");
 
                 return 0;
             }

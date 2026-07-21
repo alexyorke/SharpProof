@@ -1,6 +1,2 @@
-docs/readme-examples/complexity-linear/input.cs
-Method: int Example.Sum(int n)
+Status: Succeeded
 Complexity: O(n)
-Kind: Linear
-Conservative: False
-Driver: ForLoop at 6:9 - for-loop bound O(n) from n

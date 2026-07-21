@@ -30,7 +30,7 @@ public sealed class SharpProofAnalysisSessionTests {
     }
 
     [Test]
-    public void RuntimeHazardsWithoutSmtAreExplicitlyUnknown() {
+    public void RuntimeHazardsUseTheCanonicalSessionAndRemainUnknownWhenUnproven() {
         using var session = SharpProofAnalysisSession.FromText("""
             class C {
                 static int M(int value) => 10 / value;
@@ -42,7 +42,8 @@ public sealed class SharpProofAnalysisSessionTests {
             SharpProofAnalysisFacet.RuntimeHazards));
 
         Assert.That(result.Status, Is.EqualTo(SharpProofQueryStatus.Unknown));
-        Assert.That(result.UnknownReasons.Any(reason => reason.Code == "SP-SMT-REQUIRED"), Is.True);
+        Assert.That(result.Hazards, Has.Some.Property(nameof(SharpProofHazard.Status)).EqualTo("Unknown"));
+        Assert.That(result.UnknownReasons.Any(reason => reason.Code == "SP-SMT-REQUIRED"), Is.False);
     }
 
     [Test]

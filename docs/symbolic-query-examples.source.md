@@ -1,11 +1,9 @@
-# SharpProof Symbolic Query Examples
+# SharpProof Unified Analysis Examples
 
-This page is generated from committed example inputs and committed CLI output
-snapshots. It focuses on the richer proof/query surfaces that do not show up as
-ordinary analyzer diagnostics.
+This page is generated from committed example inputs and unified CLI output
+snapshots.
 
-These examples are backed by tests and are meant to show the current bounded
-symbolic surface honestly: invariants, reachability, implication checks,
-runtime hazards, capability summaries, complexity, and conservative unknowns.
+Every example uses `analyze`; facets select effects, proofs, runtime hazards, or
+complexity. Unknown evidence is never rendered as a proven violation.
 
 <!-- SYMBOLIC_QUERY_EXAMPLES -->

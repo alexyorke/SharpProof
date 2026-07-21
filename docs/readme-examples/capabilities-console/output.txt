@@ -1,5 +1,9 @@
-docs/readme-examples/capabilities-console/input.cs
-Method: Example.Log()
-Capabilities: IO, Console
-Conservative: False
-IO, Console: invocation at 7:9 - System.Console.WriteLine(System.String? value)
+Status: Unknown
+Effects: Unknown, DirectCall
+Capabilities: None
+Purity: Unknown
+Allocation-free: Unknown
+Does-not-throw: Unknown
+  effect direct_call at 88: Console.WriteLine("hello")
+  effect metadata_call at 88: Console.WriteLine("hello")
+Unknown: SP-EFFECT-METADATA: malformed_or_unavailable_metadata

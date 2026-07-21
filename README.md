@@ -57,6 +57,16 @@ SharpProofAnalysisSession.Analyze(SharpProofAnalysisRequest)
 
 The result contains method effects, derived three-state verdicts, proof facts, runtime hazards, complexity, unknown reasons, evidence, and budget/truncation metadata.
 
+## CLI
+
+```powershell
+dotnet run --project Tools/SharpProof.SymbolicCli -- analyze `
+  --file Example.cs --target line:12 --facets effects,proofs,hazards,complexity `
+  --format json
+```
+
+The only exit gates are `--fail-on-unknown` and `--fail-on-disproven`. Exit codes are 0 for accepted analysis, 2 for usage/input errors, 3 for analysis failures, 4 for the unknown gate, and 5 for the disproven gate. Old mode-specific query flags and aliases are unsupported.
+
 ## Metadata analysis
 
 Referenced methods are inspected lazily from the exact compilation reference. Metadata results are cached in memory by module MVID, method token, and generic context. Analysis is bounded by call depth, visited-method count, and IL-instruction count. Missing paths, missing bodies, malformed IL, unresolved dispatch, recursion, and exhausted budgets produce explicit unknown evidence.

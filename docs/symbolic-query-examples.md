@@ -1,23 +1,21 @@
 <!-- Generated from docs/symbolic-query-examples.source.md by scripts/Generate-Readme.ps1. -->
 
-# SharpProof Symbolic Query Examples
+# SharpProof Unified Analysis Examples
 
-This page is generated from committed example inputs and committed CLI output
-snapshots. It focuses on the richer proof/query surfaces that do not show up as
-ordinary analyzer diagnostics.
+This page is generated from committed example inputs and unified CLI output
+snapshots.
 
-These examples are backed by tests and are meant to show the current bounded
-symbolic surface honestly: invariants, reachability, implication checks,
-runtime hazards, capability summaries, complexity, and conservative unknowns.
+Every example uses `analyze`; facets select effects, proofs, runtime hazards, or
+complexity. Unknown evidence is never rendered as a proven violation.
 
-### Invariant, reachability, and implication at one point
+### Condition proof at one program point
 
-One query can show the merged invariant at a program point, whether the point is reachable, and whether the current facts imply another condition.
+The proofs facet checks a condition against the bounded symbolic state at a source point.
 
 Command:
 
 ```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/invariants-positive/input.cs --line 7 --column 13 --check-reachability --implies "value > 0"
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- analyze --file docs/readme-examples/invariants-positive/input.cs --target line:7:13 --facets proofs --condition "value > 0" --format text
 ```
 
 Source (`docs/readme-examples/invariants-positive/input.cs`):
@@ -40,39 +38,8 @@ public static class Example
 CLI output:
 
 ```text
-docs/readme-examples/invariants-positive/input.cs:7:13
-Node: ReturnStatement
-Program point kind: Statement
-Method: UseValue
-Merged invariant: value > 0
-Reachability: Reachable
-Reachability reason: branch_reachable
-Invariant query: Must=1, Maybe=0, Unknown=0
-Invariant query text: value > 0
-Invariant query status: Exact
-Invariant query status reason: all_candidate_program_points_exact
-Invariant query target: value status=Exact reason=target_exact code=SP-SYM-TARGET-EXACT
-Invariant query target summary: All selected reachable program points agree on the facts for this target.
-Invariant query target path: value conditions=1 smt=1 points=1 reachablePoints=1 proofs=1 unknownProofs=0 reason=target_has_path_conditions code=SP-SYM-TARGET-PATH-CONDITIONS
-Invariant query target path summary: This target has source-location path conditions available for invariant queries.
-Invariant query target path conditions: value > 0
-Implies 'value > 0' target=value kind=SmtBinary: ProvenTrue
-Implication reason: ir_state_contains_condition
-Proof outcomes: Total=1, ProvenTrue=1, ProvenFalse=0, Unreachable=0, Unknown=0
-SMT:
-  Mode: Bounded
-  Enabled: True
-  Query timeout ms: 750
-  Method budget ms: 5000
-  Max path conditions: 192
-  Max expression nodes: 2048
-  Executed queries: 1
-  Cache entries: 1
-  Health: Ready
-  Transient retries: 0
-  Context recycles: 0
-Facts:
-  value > 0
+Status: Succeeded
+Proof: value > 0: ProvenTrue (ir_state_contains_condition)
 ```
 
 ### Runtime hazard proof for divide-by-zero
@@ -82,7 +49,7 @@ The symbolic CLI can report a concrete hazard at a specific operation without ex
 Command:
 
 ```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/runtime-hazard-divide-by-zero/input.cs --line 7 --runtime-hazards
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- analyze --file docs/readme-examples/runtime-hazard-divide-by-zero/input.cs --target line:7 --facets hazards --format text
 ```
 
 Source (`docs/readme-examples/runtime-hazard-divide-by-zero/input.cs`):
@@ -105,41 +72,19 @@ public static class Example
 CLI output:
 
 ```text
-docs/readme-examples/runtime-hazard-divide-by-zero/input.cs
-Runtime hazards: 1
-Hazard status summary: Proven=1
-Hazard exception summary: System.DivideByZeroException=1
-Hazard category summary: definite_divide_by_zero=1
-
-docs/readme-examples/runtime-hazard-divide-by-zero/input.cs:7:20 DivideByZero Proven
-Exception: System.DivideByZeroException
-Category: definite_divide_by_zero
-Reason: ir_state_contains_condition
-Operation: 10 / divisor
-Trigger: divisor == 0
-Invariant: divisor == 0
-SMT:
-  Mode: Bounded
-  Enabled: True
-  Query timeout ms: 750
-  Method budget ms: 5000
-  Max path conditions: 192
-  Max expression nodes: 2048
-  Executed queries: 1
-  Cache entries: 1
-  Health: Ready
-  Transient retries: 0
-  Context recycles: 0
+Status: Succeeded
+Hazard: CheckedIntegralOverflow Unreachable: 10 / divisor
+Hazard: DivideByZero Proven: 10 / divisor
 ```
 
-### Capability summary at a program point
+### Unknown external effect boundary
 
-Capability queries classify proven side-effect categories such as `Console` and the derived umbrella category `IO`.
+Framework calls remain unknown unless source, IL, or an exact effect contract establishes their effects; no member-name catalog is consulted.
 
 Command:
 
 ```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/capabilities-console/input.cs --line 7 --capabilities
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- analyze --file docs/readme-examples/capabilities-console/input.cs --target line:7 --facets effects --format text
 ```
 
 Source (`docs/readme-examples/capabilities-console/input.cs`):
@@ -159,11 +104,15 @@ public static class Example
 CLI output:
 
 ```text
-docs/readme-examples/capabilities-console/input.cs
-Method: Example.Log()
-Capabilities: IO, Console
-Conservative: False
-IO, Console: invocation at 7:9 - System.Console.WriteLine(System.String? value)
+Status: Unknown
+Effects: Unknown, DirectCall
+Capabilities: None
+Purity: Unknown
+Allocation-free: Unknown
+Does-not-throw: Unknown
+  effect direct_call at 88: Console.WriteLine("hello")
+  effect metadata_call at 88: Console.WriteLine("hello")
+Unknown: SP-EFFECT-METADATA: malformed_or_unavailable_metadata
 ```
 
 ### Conservative complexity classification
@@ -173,7 +122,7 @@ Complexity queries report the best proven Big-O plus the structural drivers that
 Command:
 
 ```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/complexity-linear/input.cs --line 10 --complexity
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- analyze --file docs/readme-examples/complexity-linear/input.cs --target line:10 --facets complexity --format text
 ```
 
 Source (`docs/readme-examples/complexity-linear/input.cs`):
@@ -197,22 +146,18 @@ public static class Example
 CLI output:
 
 ```text
-docs/readme-examples/complexity-linear/input.cs
-Method: int Example.Sum(int n)
+Status: Succeeded
 Complexity: O(n)
-Kind: Linear
-Conservative: False
-Driver: ForLoop at 6:9 - for-loop bound O(n) from n
 ```
 
 ### Conservative unknown for dynamic dispatch
 
-When the engine cannot prove a capability set because of dynamic dispatch, the CLI reports an explicit unknown instead of inventing a stronger answer.
+Dynamic dispatch produces explicit unknown method-effect evidence instead of an optimistic verdict.
 
 Command:
 
 ```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/symbolic-unknown-dynamic/input.cs --line 5 --capabilities
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- analyze --file docs/readme-examples/symbolic-unknown-dynamic/input.cs --target line:5 --facets effects --format text
 ```
 
 Source (`docs/readme-examples/symbolic-unknown-dynamic/input.cs`):
@@ -230,10 +175,13 @@ public sealed class TestClass
 CLI output:
 
 ```text
-docs/readme-examples/symbolic-unknown-dynamic/input.cs
-Method: TestClass.Render(dynamic)
+Status: Unknown
+Effects: Unknown
 Capabilities: None
-Conservative: True
-Unknown reasons: DynamicDispatch
-Unknown: dynamic at 5:16 - value.ToString()
+Purity: Unknown
+Allocation-free: Unknown
+Does-not-throw: Unknown
+  effect dynamic_dispatch at 93: value.ToString()
+  effect dynamic_dispatch at 93: value.ToString
+Unknown: SP-EFFECT-UNKNOWN: dynamic_dispatch
 ```

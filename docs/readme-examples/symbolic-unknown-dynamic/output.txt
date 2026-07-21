@@ -1,6 +1,9 @@
-docs/readme-examples/symbolic-unknown-dynamic/input.cs
-Method: TestClass.Render(dynamic)
+Status: Unknown
+Effects: Unknown
 Capabilities: None
-Conservative: True
-Unknown reasons: DynamicDispatch
-Unknown: dynamic at 5:16 - value.ToString()
+Purity: Unknown
+Allocation-free: Unknown
+Does-not-throw: Unknown
+  effect dynamic_dispatch at 93: value.ToString()
+  effect dynamic_dispatch at 93: value.ToString
+Unknown: SP-EFFECT-UNKNOWN: dynamic_dispatch
