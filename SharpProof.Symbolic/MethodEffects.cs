@@ -488,6 +488,7 @@ internal sealed class MethodEffectAnalysisSession(
                 while (foreachCollection is IConversionOperation collectionConversion)
                     foreachCollection = collectionConversion.Operand;
                 if (foreachCollection.Type is IArrayTypeSymbol arrayType) {
+                    TrackIntrinsicForEachRefLocal(loop, foreachCollection, builder);
                     builder.Add(
                         GetInstanceReadEffect(foreachCollection, builder),
                         loop,
@@ -505,6 +506,7 @@ internal sealed class MethodEffectAnalysisSession(
                 }
                 var foreachTypeDefinition = foreachCollection.Type?.OriginalDefinition.ToDisplayString();
                 if (foreachTypeDefinition is "System.Span<T>" or "System.ReadOnlySpan<T>") {
+                    TrackIntrinsicForEachRefLocal(loop, foreachCollection, builder);
                     builder.Add(
                         GetInstanceReadEffect(foreachCollection, builder),
                         loop,
@@ -516,6 +518,7 @@ internal sealed class MethodEffectAnalysisSession(
                     inlineArrayType.GetAttributes().Any(static attribute =>
                         attribute.AttributeClass?.ToDisplayString() ==
                         "System.Runtime.CompilerServices.InlineArrayAttribute")) {
+                    TrackIntrinsicForEachRefLocal(loop, foreachCollection, builder);
                     builder.Add(
                         GetInstanceReadEffect(foreachCollection, builder),
                         loop,
@@ -689,6 +692,19 @@ internal sealed class MethodEffectAnalysisSession(
         builder.AssignLocal(local, value);
         if (local.RefKind == RefKind.None && local.Type.TypeKind != TypeKind.Pointer) return;
         var writeEffect = GetAliasStorageWriteEffect(value, builder);
+        builder.SetRefLocalEffects(local, GetAliasReadEffect(writeEffect), writeEffect);
+    }
+    private void TrackIntrinsicForEachRefLocal(
+        IForEachLoopOperation loop,
+        IOperation collection,
+        Builder builder) {
+        var local = loop.LoopControlVariable
+            .DescendantsAndSelf()
+            .OfType<IVariableDeclaratorOperation>()
+            .Select(static declarator => declarator.Symbol)
+            .FirstOrDefault();
+        if (local?.RefKind == RefKind.None || local == null) return;
+        var writeEffect = GetAliasStorageWriteEffect(collection, builder);
         builder.SetRefLocalEffects(local, GetAliasReadEffect(writeEffect), writeEffect);
     }
     private SharpProofEffect GetAliasStorageWriteEffect(IOperation value, Builder builder) {
