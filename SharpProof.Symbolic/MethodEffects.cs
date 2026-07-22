@@ -3767,6 +3767,25 @@ internal sealed class MethodEffectAnalysisSession(
                 assignments.AddRange(resolved);
                 return;
             }
+            if (value is ISwitchExpressionOperation switchExpression) {
+                var resolved = new List<ConstructorMemberAssignment>();
+                foreach (var arm in switchExpression.Arms) {
+                    var count = resolved.Count;
+                    AddDeconstructionMemberAssignments(
+                        target,
+                        arm.Value,
+                        syntax,
+                        memberPath,
+                        compilation,
+                        visited,
+                        callSites,
+                        resolved);
+                    if (resolved.Count == count) return;
+                }
+                if (resolved.Count == 0) return;
+                assignments.AddRange(resolved);
+                return;
+            }
             if (value is IInvocationOperation invocation) {
                 AddDeconstructionCallResultAssignments(
                     target,
