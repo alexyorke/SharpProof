@@ -3719,6 +3719,14 @@ internal sealed class MethodEffectAnalysisSession(
                 return;
             }
             if (value is IPropertyReferenceOperation {
+                Property: { IsStatic: true } returnedStaticProperty
+            } &&
+                IsConcreteAutoProperty(returnedStaticProperty)) {
+                if (ConstructorTargetMatches(target, memberPath))
+                    assignments.Add(new ConstructorMemberAssignment(syntax, value));
+                return;
+            }
+            if (value is IPropertyReferenceOperation {
                 Instance: { } propertyInstance,
                 Property: var returnedProperty
             } &&
@@ -3900,9 +3908,11 @@ internal sealed class MethodEffectAnalysisSession(
             if (ConstructorTargetMatches(target, memberPath))
                 assignments.Add(new ConstructorMemberAssignment(syntax, value));
         }
-        private static bool CanMapAutoPropertyToReceiver(IPropertySymbol property) {
-            if (property.IsStatic ||
-                property.GetMethod is not { IsAbstract: false, IsVirtual: false, IsExtern: false })
+        private static bool CanMapAutoPropertyToReceiver(IPropertySymbol property) =>
+            !property.IsStatic && IsConcreteAutoProperty(property);
+        private static bool IsConcreteAutoProperty(IPropertySymbol property) {
+            if (property.GetMethod is not { IsAbstract: false, IsExtern: false } getterMethod ||
+                (!property.IsStatic && getterMethod.IsVirtual))
                 return false;
             if (property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() is not
                 PropertyDeclarationSyntax { AccessorList: { } accessorList, ExpressionBody: null })
@@ -4296,6 +4306,12 @@ internal sealed class MethodEffectAnalysisSession(
                 writeEffect = GetInstanceWriteEffect(value, this);
                 return true;
             }
+            if (value is IPropertyReferenceOperation { Property: { IsStatic: true } staticProperty } &&
+                IsConcreteAutoProperty(staticProperty)) {
+                readEffect = GetInstanceReadEffect(value, this);
+                writeEffect = GetInstanceWriteEffect(value, this);
+                return true;
+            }
             if (value is IPropertyReferenceOperation { Property.GetMethod: { } getter } returnedProperty)
                 return TryGetCapturedCallResultEffects(
                     getter,
@@ -4468,6 +4484,12 @@ internal sealed class MethodEffectAnalysisSession(
                 return switchExpression.Arms.Length != 0;
             }
             if (value is IFieldReferenceOperation { Field.IsStatic: true }) {
+                readEffect = GetInstanceReadEffect(value, this);
+                writeEffect = GetInstanceWriteEffect(value, this);
+                return true;
+            }
+            if (value is IPropertyReferenceOperation { Property: { IsStatic: true } staticProperty } &&
+                IsConcreteAutoProperty(staticProperty)) {
                 readEffect = GetInstanceReadEffect(value, this);
                 writeEffect = GetInstanceWriteEffect(value, this);
                 return true;
