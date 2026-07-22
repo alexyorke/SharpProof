@@ -1775,9 +1775,12 @@ internal sealed class MethodEffectAnalysisSession(
                 (effects, arm) => effects |
                                   GetInvocationReturnedExpressionEffect(
                                       arm.Expression, targetMethod, invocation, builder, write));
-        if (expression is MemberAccessExpressionSyntax memberAccess)
+        if (expression is MemberAccessExpressionSyntax memberAccess) {
+            if (GetExpressionSymbol(memberAccess, invocation)?.IsStatic == true)
+                return write ? SharpProofEffect.WritesStaticState : SharpProofEffect.ReadsStaticState;
             return GetInvocationReturnedExpressionEffect(
                 memberAccess.Expression, targetMethod, invocation, builder, write);
+        }
         if (expression is ElementAccessExpressionSyntax elementAccess)
             return GetInvocationReturnedExpressionEffect(
                 elementAccess.Expression, targetMethod, invocation, builder, write);
@@ -1855,8 +1858,11 @@ internal sealed class MethodEffectAnalysisSession(
                 (effects, arm) => effects |
                                   GetPropertyReturnedExpressionEffect(
                                       arm.Expression, property, builder, write));
-        if (expression is MemberAccessExpressionSyntax memberAccess)
+        if (expression is MemberAccessExpressionSyntax memberAccess) {
+            if (GetExpressionSymbol(memberAccess, property)?.IsStatic == true)
+                return write ? SharpProofEffect.WritesStaticState : SharpProofEffect.ReadsStaticState;
             return GetPropertyReturnedExpressionEffect(memberAccess.Expression, property, builder, write);
+        }
         if (expression is ElementAccessExpressionSyntax elementAccess)
             return GetPropertyReturnedExpressionEffect(elementAccess.Expression, property, builder, write);
         if (expression is ConditionalAccessExpressionSyntax conditionalAccess)
@@ -1885,6 +1891,11 @@ internal sealed class MethodEffectAnalysisSession(
             AnonymousObjectCreationExpressionSyntax or CollectionExpressionSyntax)
             return write ? SharpProofEffect.WritesFreshOwnedState : SharpProofEffect.None;
         return SharpProofEffect.Unknown;
+    }
+    private static ISymbol? GetExpressionSymbol(ExpressionSyntax expression, IOperation callSite) {
+        if (callSite.SemanticModel?.Compilation is not { } compilation) return null;
+        var semanticModel = compilation.GetSemanticModel(expression.SyntaxTree);
+        return semanticModel.GetSymbolInfo(expression).Symbol;
     }
     private static ImmutableArray<ExpressionSyntax> GetDirectReturnExpressions(SyntaxNode? declaration) {
         ExpressionSyntax? expression = declaration switch {
