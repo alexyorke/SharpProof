@@ -4806,7 +4806,8 @@ internal sealed class MethodEffectAnalysisSession(
                     GetStorageWriteEffect(referencedValue, this));
             }
             var unwrapped = value;
-            while (unwrapped is IConversionOperation conversion) unwrapped = conversion.Operand;
+            while (unwrapped is IConversionOperation { OperatorMethod: null } conversion)
+                unwrapped = conversion.Operand;
             if (unwrapped is IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
                 IDelegateCreationOperation) {
                 _freshLocals.Add(local);
@@ -4901,7 +4902,8 @@ internal sealed class MethodEffectAnalysisSession(
             IOperation value,
             string prefix,
             IDictionary<string, MethodEffectOrigin> origins) {
-            while (value is IConversionOperation conversion) value = conversion.Operand;
+            while (value is IConversionOperation { OperatorMethod: null } conversion)
+                value = conversion.Operand;
             if (value is not IObjectCreationOperation { Initializer: { } initializer }) return;
             foreach (var assignment in initializer.Initializers.OfType<ISimpleAssignmentOperation>()) {
                 var member = assignment.Target switch {
@@ -4912,7 +4914,8 @@ internal sealed class MethodEffectAnalysisSession(
                 if (member == null) continue;
                 var path = prefix.Length == 0 ? GetMemberPathPart(member) : prefix + "/" + GetMemberPathPart(member);
                 var assigned = assignment.Value;
-                while (assigned is IConversionOperation conversion) assigned = conversion.Operand;
+                while (assigned is IConversionOperation { OperatorMethod: null } conversion)
+                    assigned = conversion.Operand;
                 origins[path] = GetValueOrigin(assigned);
                 if (assigned is not (IObjectCreationOperation or IArrayCreationOperation or
                     IAnonymousObjectCreationOperation or IDelegateCreationOperation))
@@ -4920,8 +4923,17 @@ internal sealed class MethodEffectAnalysisSession(
                 CollectMemberOrigins(assigned, path, origins);
             }
         }
-        private MethodEffectOrigin GetValueOrigin(IOperation value) {
-            while (value is IConversionOperation conversion) value = conversion.Operand;
+        private MethodEffectOrigin GetValueOrigin(IOperation value) => GetValueOrigin(
+            value,
+            new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default));
+        private MethodEffectOrigin GetValueOrigin(
+            IOperation value,
+            HashSet<IMethodSymbol> visitedMethods) {
+            while (value is IConversionOperation { OperatorMethod: null } conversion)
+                value = conversion.Operand;
+            if (value is IConversionOperation { OperatorMethod: { } operatorMethod } userConversion)
+                return GetUserDefinedConversionOrigin(
+                    userConversion, operatorMethod, visitedMethods);
             if (TryGetFreshRootOrigin(value, out var freshRootOrigin)) return freshRootOrigin;
             return value switch {
                 IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
@@ -4929,13 +4941,57 @@ internal sealed class MethodEffectAnalysisSession(
                 IInstanceReferenceOperation => MethodEffectOrigin.Receiver,
                 IParameterReferenceOperation => MethodEffectOrigin.Argument,
                 IFieldReferenceOperation { Field.IsStatic: true } => MethodEffectOrigin.Static,
-                IFieldReferenceOperation field => GetValueOrigin(field.Instance!),
+                IFieldReferenceOperation field => GetValueOrigin(field.Instance!, visitedMethods),
                 IPropertyReferenceOperation { Property.IsStatic: true } => MethodEffectOrigin.Static,
-                IPropertyReferenceOperation property => GetValueOrigin(property.Instance!),
-                IArrayElementReferenceOperation array => GetValueOrigin(array.ArrayReference),
+                IPropertyReferenceOperation property => GetValueOrigin(property.Instance!, visitedMethods),
+                IArrayElementReferenceOperation array => GetValueOrigin(array.ArrayReference, visitedMethods),
                 ILocalReferenceOperation => MethodEffectOrigin.Captured,
                 _ => MethodEffectOrigin.Unknown
             };
+        }
+        private MethodEffectOrigin GetUserDefinedConversionOrigin(
+            IConversionOperation conversion,
+            IMethodSymbol operatorMethod,
+            HashSet<IMethodSymbol> visitedMethods) {
+            var method = (operatorMethod.PartialImplementationPart ?? operatorMethod).OriginalDefinition;
+            if (!visitedMethods.Add(method)) return MethodEffectOrigin.Unknown;
+            try {
+                var declaration = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                var expressions = GetDirectReturnExpressions(declaration);
+                if (expressions.IsDefaultOrEmpty ||
+                    conversion.SemanticModel?.Compilation is not { } compilation)
+                    return MethodEffectOrigin.Unknown;
+                MethodEffectOrigin? origin = null;
+                foreach (var expression in expressions) {
+                    var model = compilation.GetSemanticModel(expression.SyntaxTree);
+                    if (model.GetOperation(expression) is not { } returnedValue ||
+                        !TryCollectStableInitializerValues(
+                            returnedValue,
+                            compilation,
+                            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                            out var returnedValues))
+                        return MethodEffectOrigin.Unknown;
+                    foreach (var returned in returnedValues) {
+                        var mapped = returned;
+                        while (mapped is IConversionOperation { OperatorMethod: null } builtInConversion)
+                            mapped = builtInConversion.Operand;
+                        if (mapped is IParameterReferenceOperation parameter &&
+                            SymbolEqualityComparer.Default.Equals(
+                                parameter.Parameter.ContainingSymbol.OriginalDefinition,
+                                method))
+                            mapped = conversion.Operand;
+                        var candidate = GetValueOrigin(mapped, visitedMethods);
+                        if (candidate == MethodEffectOrigin.Unknown ||
+                            origin is { } existing && existing != candidate)
+                            return MethodEffectOrigin.Unknown;
+                        origin = candidate;
+                    }
+                }
+                return origin ?? MethodEffectOrigin.Unknown;
+            }
+            finally {
+                visitedMethods.Remove(method);
+            }
         }
         private static bool TryGetLocalMemberPath(IOperation? operation, out ILocalSymbol local, out string path) {
             while (operation is IConversionOperation conversion) operation = conversion.Operand;
