@@ -3674,22 +3674,27 @@ internal sealed class MethodEffectAnalysisSession(
                     assignments);
                 return;
             }
-            if (!callSites.IsDefaultOrEmpty &&
-                value is IPropertyReferenceOperation {
-                    Instance: IInstanceReferenceOperation,
-                    Property: var returnedProperty
-                } &&
+            if (value is IPropertyReferenceOperation {
+                Instance: { } propertyInstance,
+                Property: var returnedProperty
+            } &&
                 CanMapAutoPropertyToReceiver(returnedProperty)) {
-                var receiver = GetConstructorCallInstance(callSites[0].Operation);
-                if (receiver == null) return;
+                var mappedInstance = propertyInstance;
+                var remainingCallSites = callSites;
+                if (propertyInstance is IInstanceReferenceOperation &&
+                    !callSites.IsDefaultOrEmpty) {
+                    mappedInstance = GetConstructorCallInstance(callSites[0].Operation);
+                    if (mappedInstance == null) return;
+                    remainingCallSites = callSites.RemoveAt(0);
+                }
                 AddDeconstructionMemberAssignments(
                     target,
-                    receiver,
+                    mappedInstance,
                     syntax,
                     memberPath,
                     compilation,
                     visited,
-                    callSites.RemoveAt(0),
+                    remainingCallSites,
                     assignments);
                 return;
             }
