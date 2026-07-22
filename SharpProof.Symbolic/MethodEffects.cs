@@ -403,6 +403,12 @@ internal sealed class MethodEffectAnalysisSession(
             case IConversionOperation { Conversion.IsUserDefined: true } userConversion:
                 AnalyzeCall(userConversion.Conversion.MethodSymbol, userConversion, builder);
                 break;
+            case IAwaitOperation { Syntax: AwaitExpressionSyntax syntax } awaited:
+                var awaitInfo = semanticModel.GetAwaitExpressionInfo(syntax);
+                AnalyzeCall(awaitInfo.GetAwaiterMethod, awaited, builder, awaited.Operation);
+                AnalyzeCall(awaitInfo.IsCompletedProperty?.GetMethod, awaited, builder);
+                AnalyzeCall(awaitInfo.GetResultMethod, awaited, builder);
+                break;
             case IForEachLoopOperation { Syntax: CommonForEachStatementSyntax syntax } loop:
                 var info = semanticModel.GetForEachStatementInfo(syntax);
                 AnalyzeCall(info.GetEnumeratorMethod, loop, builder);
