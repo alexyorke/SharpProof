@@ -263,6 +263,12 @@ internal sealed class MethodEffectAnalysisSession(
                     "property_read");
                 AnalyzeCall(property.Property.GetMethod, property, builder, property.Instance);
                 break;
+            case IInlineArrayAccessOperation inlineArray
+                when inlineArray.Parent is not IAssignmentOperation { Target: var target } ||
+                     !ReferenceEquals(target, inlineArray):
+                builder.Add(GetInstanceReadEffect(inlineArray.Instance, builder), inlineArray, inlineArray.Type,
+                    "inline_array_read");
+                break;
             case var pointer when IsPointerIndirection(pointer) &&
                                   pointer.ChildOperations.FirstOrDefault() is { } pointerOperand &&
                                   (pointer.Parent is not IAssignmentOperation { Target: var target } ||
@@ -843,6 +849,10 @@ internal sealed class MethodEffectAnalysisSession(
             case IArrayElementReferenceOperation array:
                 builder.Add(GetInstanceWriteEffect(array.ArrayReference, builder), array, array.Type, "array_element_write");
                 break;
+            case IInlineArrayAccessOperation inlineArray:
+                builder.Add(GetInstanceWriteEffect(inlineArray.Instance, builder), inlineArray, inlineArray.Type,
+                    "inline_array_write");
+                break;
             case var pointer when IsPointerIndirection(pointer) &&
                                   pointer.ChildOperations.FirstOrDefault() is { } pointerOperand:
                 builder.Add(GetInstanceWriteEffect(pointerOperand, builder), pointer, pointer.Type,
@@ -862,6 +872,7 @@ internal sealed class MethodEffectAnalysisSession(
             IPropertyReferenceOperation { Property.IsStatic: true } => SharpProofEffect.WritesStaticState,
             IPropertyReferenceOperation property => GetInstanceWriteEffect(property.Instance, builder),
             IArrayElementReferenceOperation array => GetInstanceWriteEffect(array.ArrayReference, builder),
+            IInlineArrayAccessOperation inlineArray => GetInstanceWriteEffect(inlineArray.Instance, builder),
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceWriteEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IConversionOperation conversion => GetInstanceWriteEffect(conversion.Operand, builder),
@@ -881,6 +892,7 @@ internal sealed class MethodEffectAnalysisSession(
             IPropertyReferenceOperation { Property.IsStatic: true } => SharpProofEffect.ReadsStaticState,
             IPropertyReferenceOperation property => GetInstanceReadEffect(property.Instance, builder),
             IArrayElementReferenceOperation array => GetInstanceReadEffect(array.ArrayReference, builder),
+            IInlineArrayAccessOperation inlineArray => GetInstanceReadEffect(inlineArray.Instance, builder),
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceReadEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IConversionOperation conversion => GetInstanceReadEffect(conversion.Operand, builder),
