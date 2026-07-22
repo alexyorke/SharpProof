@@ -13,6 +13,13 @@ internal static class MethodBodyOperationResolver {
               (CSharpSyntaxFacts.TryGetExpressionBody(methodNode, out var expressionBody)
                   ? expressionBody
                   : methodNode);
-        return semanticModel.GetOperation(operationNode, cancellationToken);
+        var operation = semanticModel.GetOperation(operationNode, cancellationToken);
+        if (operation != null) return operation;
+        return semanticModel.GetOperation(methodNode, cancellationToken) switch {
+            ILocalFunctionOperation { Body: { } body } => body,
+            IAnonymousFunctionOperation { Body: { } body } => body,
+            IMethodBodyOperation methodBody => methodBody,
+            _ => null
+        };
     }
 }

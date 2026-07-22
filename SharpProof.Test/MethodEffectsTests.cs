@@ -737,6 +737,21 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void CheckedExpressionBodiedLocalFunctionHasAnalyzableBody() {
+        var result = Analyze("""
+            class C {
+                static int M(int x) {
+                    int Local() => checked(x + 1);
+                    return Local();
+                }
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ReassignedDelegateUsesTheCurrentTarget() {
         var result = Analyze("""
             class C {
