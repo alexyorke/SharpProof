@@ -735,6 +735,28 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ForeachDeconstructionIncludesDeconstructEffects() {
+        var result = Analyze("""
+            sealed class Item {
+                private static int state;
+                public void Deconstruct(out int left, out int right) {
+                    state++;
+                    left = 1;
+                    right = 2;
+                }
+            }
+            class C {
+                static void M(Item[] values) {
+                    foreach (var (left, right) in values) { }
+                }
+            }
+            """, 10);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {
