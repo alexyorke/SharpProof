@@ -1457,6 +1457,26 @@ internal sealed class MethodEffectAnalysisSession(
             matches = false;
             return false;
         }
+        var typeSyntax = pattern switch {
+            TypePatternSyntax typePattern => typePattern.Type,
+            DeclarationPatternSyntax declarationPattern => declarationPattern.Type,
+            _ => null
+        };
+        if (typeSyntax != null) {
+            if (value == null) {
+                matches = false;
+                return true;
+            }
+            var valueType = GetConstantType(value, semanticModel.Compilation);
+            var patternType = semanticModel.GetTypeInfo(typeSyntax).Type;
+            if (valueType == null || patternType == null) {
+                matches = false;
+                return false;
+            }
+            var conversion = semanticModel.Compilation.ClassifyConversion(valueType, patternType);
+            matches = conversion.IsIdentity || conversion.IsReference || conversion.IsBoxing;
+            return true;
+        }
         if (pattern is BinaryPatternSyntax binary) {
             if (!TryMatchConstantPattern(binary.Left, value, semanticModel, out var left) ||
                 !TryMatchConstantPattern(binary.Right, value, semanticModel, out var right)) {
@@ -1482,6 +1502,26 @@ internal sealed class MethodEffectAnalysisSession(
         }
         matches = false;
         return false;
+    }
+    private static ITypeSymbol? GetConstantType(object value, Compilation compilation) {
+        var specialType = value switch {
+            bool => SpecialType.System_Boolean,
+            byte => SpecialType.System_Byte,
+            sbyte => SpecialType.System_SByte,
+            short => SpecialType.System_Int16,
+            ushort => SpecialType.System_UInt16,
+            int => SpecialType.System_Int32,
+            uint => SpecialType.System_UInt32,
+            long => SpecialType.System_Int64,
+            ulong => SpecialType.System_UInt64,
+            char => SpecialType.System_Char,
+            float => SpecialType.System_Single,
+            double => SpecialType.System_Double,
+            decimal => SpecialType.System_Decimal,
+            string => SpecialType.System_String,
+            _ => SpecialType.None
+        };
+        return specialType == SpecialType.None ? null : compilation.GetSpecialType(specialType);
     }
     private static bool TryCompareConstants(
         object? left,
