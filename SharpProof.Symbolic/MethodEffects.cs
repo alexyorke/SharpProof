@@ -994,6 +994,44 @@ internal sealed class MethodEffectAnalysisSession(
     }
     private static bool IsPointerIndirection(IOperation operation) =>
         operation.Syntax.IsKind(SyntaxKind.PointerIndirectionExpression);
+    private static SharpProofEffect GetStorageWriteEffect(IOperation target, Builder builder) => target switch {
+        IFieldReferenceOperation { Field.IsStatic: true } => SharpProofEffect.WritesStaticState,
+        IFieldReferenceOperation field => GetInstanceWriteEffect(field.Instance, builder),
+        IPropertyReferenceOperation { Property.IsStatic: true } => SharpProofEffect.WritesStaticState,
+        IPropertyReferenceOperation property => GetInstanceWriteEffect(property.Instance, builder),
+        IArrayElementReferenceOperation array => GetInstanceWriteEffect(array.ArrayReference, builder),
+        IInlineArrayAccessOperation inlineArray => GetInstanceWriteEffect(inlineArray.Instance, builder),
+        IImplicitIndexerReferenceOperation implicitIndexer =>
+            GetInstanceWriteEffect(implicitIndexer.Instance, builder),
+        IConditionalOperation conditional =>
+            GetStorageWriteEffect(conditional.WhenTrue, builder) |
+            (conditional.WhenFalse == null
+                ? SharpProofEffect.Unknown
+                : GetStorageWriteEffect(conditional.WhenFalse, builder)),
+        IOperation pointer when IsPointerIndirection(pointer) &&
+                                pointer.ChildOperations.FirstOrDefault() is { } operand =>
+            GetInstanceWriteEffect(operand, builder),
+        _ => GetInstanceWriteEffect(target, builder)
+    };
+    private static SharpProofEffect GetStorageReadEffect(IOperation target, Builder builder) => target switch {
+        IFieldReferenceOperation { Field.IsStatic: true } => SharpProofEffect.ReadsStaticState,
+        IFieldReferenceOperation field => GetInstanceReadEffect(field.Instance, builder),
+        IPropertyReferenceOperation { Property.IsStatic: true } => SharpProofEffect.ReadsStaticState,
+        IPropertyReferenceOperation property => GetInstanceReadEffect(property.Instance, builder),
+        IArrayElementReferenceOperation array => GetInstanceReadEffect(array.ArrayReference, builder),
+        IInlineArrayAccessOperation inlineArray => GetInstanceReadEffect(inlineArray.Instance, builder),
+        IImplicitIndexerReferenceOperation implicitIndexer =>
+            GetInstanceReadEffect(implicitIndexer.Instance, builder),
+        IConditionalOperation conditional =>
+            GetStorageReadEffect(conditional.WhenTrue, builder) |
+            (conditional.WhenFalse == null
+                ? SharpProofEffect.Unknown
+                : GetStorageReadEffect(conditional.WhenFalse, builder)),
+        IOperation pointer when IsPointerIndirection(pointer) &&
+                                pointer.ChildOperations.FirstOrDefault() is { } operand =>
+            GetInstanceReadEffect(operand, builder),
+        _ => GetInstanceReadEffect(target, builder)
+    };
     private static SharpProofEffect GetInstanceWriteEffect(IOperation? instance, Builder builder) {
         if (builder.TryGetRefLocalEffects(instance, out _, out var refWriteEffect)) return refWriteEffect;
         if (builder.TryGetFreshRootOrigin(instance, out var origin)) return GetWriteEffect(origin);
@@ -1418,10 +1456,12 @@ internal sealed class MethodEffectAnalysisSession(
             _delegateTargets.Remove(local);
             _refLocalEffects.Remove(local);
             if (_flowUncertainLocals.Contains(local) || IsFlowDependent(value.Syntax)) return;
-            if (local.RefKind != RefKind.None)
+            if (local.RefKind != RefKind.None || local.Type.TypeKind == TypeKind.Pointer) {
+                var referencedValue = UnwrapAliasSource(value);
                 _refLocalEffects[local] = (
-                    GetInstanceReadEffect(value, this),
-                    GetInstanceWriteEffect(value, this));
+                    GetStorageReadEffect(referencedValue, this),
+                    GetStorageWriteEffect(referencedValue, this));
+            }
             var unwrapped = value;
             while (unwrapped is IConversionOperation conversion) unwrapped = conversion.Operand;
             if (unwrapped is IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
@@ -1449,6 +1489,25 @@ internal sealed class MethodEffectAnalysisSession(
             else
                 MarkDelegateTargets(local, value);
         }
+        private static IOperation UnwrapAliasSource(IOperation value) {
+            while (true) {
+                switch (value) {
+                    case IConversionOperation conversion:
+                        value = conversion.Operand;
+                        continue;
+                    case IAddressOfOperation address:
+                        value = address.Reference;
+                        continue;
+                    case { Kind: OperationKind.None } transparent:
+                        var children = transparent.ChildOperations.Take(2).ToArray();
+                        if (children.Length != 1) return value;
+                        value = children[0];
+                        continue;
+                    default:
+                        return value;
+                }
+            }
+        }
         internal void MarkFlowUncertain(ILocalSymbol local) {
             local = (ILocalSymbol)local.OriginalDefinition;
             _flowUncertainLocals.Add(local);
@@ -1471,6 +1530,7 @@ internal sealed class MethodEffectAnalysisSession(
                 if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out) {
                     _exactTypes.Remove(local.Local);
                     _delegateTargets.Remove(local.Local);
+                    _refLocalEffects.Remove(local.Local);
                 }
             }
         }
