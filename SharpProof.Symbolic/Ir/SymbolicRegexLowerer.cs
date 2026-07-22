@@ -28,17 +28,11 @@ internal static class SymbolicRegexLowerer {
 
         return TryLowerRegexInvocationPredicate(invocation, context, out condition);
     }
-
     internal static bool TryLowerRegexMatchesCountComparison(
         BinaryExpressionSyntax comparison,
         SymbolicLoweringContext context,
         out SymbolicCondition condition) {
-        if (TryLowerRegexMatchesCountComparisonOperand(
-                comparison.Left,
-                comparison.Right,
-                comparison.Kind(),
-                context,
-                out condition))
+        if (TryLowerRegexMatchesCountComparisonOperand(comparison.Left, comparison.Right, comparison.Kind(), context, out condition))
             return true;
 
         return TryLowerRegexMatchesCountComparisonOperand(
@@ -48,7 +42,6 @@ internal static class SymbolicRegexLowerer {
             context,
             out condition);
     }
-
     private static bool TryLowerRegexMatchesCountComparisonOperand(
         ExpressionSyntax countExpression,
         ExpressionSyntax constantExpression,
@@ -73,16 +66,10 @@ internal static class SymbolicRegexLowerer {
             !TryLowerRegexInvocationParts(invocation, context, out var evaluation, out var match))
             return false;
 
-        condition = CombineRegexEvaluationAndValue(
-            evaluation,
-            hasMatch ? match : new SymbolicNotCondition(match));
+        condition = CombineRegexEvaluationAndValue(evaluation, hasMatch ? match : new SymbolicNotCondition(match));
         return true;
     }
-
-    private static bool TryClassifyRegexMatchCountComparison(
-        SyntaxKind comparisonKind,
-        long constant,
-        out bool hasMatch) {
+    private static bool TryClassifyRegexMatchCountComparison(SyntaxKind comparisonKind, long constant, out bool hasMatch) {
         hasMatch = false;
         switch (comparisonKind) {
             case SyntaxKind.EqualsExpression when constant == 0:
@@ -98,7 +85,6 @@ internal static class SymbolicRegexLowerer {
                 return false;
         }
     }
-
     internal static bool TryLowerRegexInvocationPredicate(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,
@@ -110,7 +96,6 @@ internal static class SymbolicRegexLowerer {
         condition = CombineRegexEvaluationAndValue(evaluation, predicate);
         return true;
     }
-
     internal static bool TryLowerNegatedRegexInvocationPredicate(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -124,7 +109,6 @@ internal static class SymbolicRegexLowerer {
         condition = CombineRegexEvaluationAndValue(evaluation, new SymbolicNotCondition(predicate));
         return true;
     }
-
     private static bool TryLowerRegexInvocationParts(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,
@@ -136,38 +120,23 @@ internal static class SymbolicRegexLowerer {
                 IInvocationOperation operation ||
             operation.TargetMethod.Name is not ("IsMatch" or "Match" or "Matches") ||
             !IsRegexType(operation.TargetMethod.ContainingType) ||
-            !TryResolveRegexInvocation(
-                invocation,
-                operation,
-                context,
-                out var inputExpression,
-                out var pattern,
-                out var options) ||
+            !TryResolveRegexInvocation(invocation, operation, context, out var inputExpression, out var pattern, out var options) ||
             !SymbolicStringLowerer.TryLowerStringTerm(inputExpression, context, out var input))
             return false;
 
         predicate = SymbolicIrLowerer.CreateFactCondition(
-            new SymbolicStringPredicateAtom(
-                SymbolicStringPredicateKind.RegexMatch,
-                input,
-                new SymbolicStringConstantTerm(pattern),
-                options),
+            new SymbolicStringPredicateAtom(SymbolicStringPredicateKind.RegexMatch, input,
+                new SymbolicStringConstantTerm(pattern), options),
             invocation,
             "ir.regex." + operation.TargetMethod.Name.ToLowerInvariant());
 
         if (SymbolicReferenceLowerer.TryLowerReferenceTerm(inputExpression, context, out var inputReference))
-            evaluation = SymbolicIrLowerer.CreateReferenceNullCondition(
-                inputReference,
-                false,
-                inputExpression,
-                "ir.regex.input-non-null");
+            evaluation = SymbolicIrLowerer.CreateReferenceNullCondition(inputReference, false, inputExpression, "ir.regex.input-non-null");
 
         return true;
     }
-
-    private static SymbolicCondition CombineRegexEvaluationAndValue(
-        SymbolicCondition? evaluation,
-        SymbolicCondition value) => evaluation == null
+    private static SymbolicCondition CombineRegexEvaluationAndValue(SymbolicCondition? evaluation, SymbolicCondition value)
+        => evaluation == null
             ? value
             : new SymbolicBinaryCondition(SymbolicConditionOperator.And, evaluation, value);
 
@@ -196,7 +165,6 @@ internal static class SymbolicRegexLowerer {
             inputExpression = input;
             return true;
         }
-
         if (operation.Instance?.Syntax is not ExpressionSyntax receiver ||
             operation.Arguments.Length is not 1 and not 2 ||
             operation.Arguments[0].Value.Syntax is not ExpressionSyntax instanceInput ||
@@ -207,7 +175,6 @@ internal static class SymbolicRegexLowerer {
         inputExpression = instanceInput;
         return true;
     }
-
     private static bool TryResolveRegexSource(
         ExpressionSyntax expression,
         SyntaxNode useSite,
@@ -234,7 +201,6 @@ internal static class SymbolicRegexLowerer {
 
         return false;
     }
-
     private static bool TryResolveRegexObjectCreation(
         ObjectCreationExpressionSyntax creation,
         SymbolicLoweringContext context,
@@ -254,11 +220,7 @@ internal static class SymbolicRegexLowerer {
                operation.Arguments[1].Value.Syntax is ExpressionSyntax optionsExpression &&
                SymbolicStringLowerer.TryGetRegexOptions(optionsExpression, context, out options);
     }
-
-    private static bool TryResolveGeneratedRegexFactory(
-        IMethodSymbol method,
-        out string pattern,
-        out RegexOptions options) {
+    private static bool TryResolveGeneratedRegexFactory(IMethodSymbol method, out string pattern, out RegexOptions options) {
         pattern = string.Empty;
         options = RegexOptions.None;
         foreach (var attribute in method.GetAttributes()) {
@@ -276,10 +238,8 @@ internal static class SymbolicRegexLowerer {
                 options = (RegexOptions)rawOptions;
             return SymbolicStringLowerer.CanRepresentRegexOptions(options);
         }
-
         return false;
     }
-
     private static bool TryResolveLocalRegexSource(
         ILocalSymbol local,
         SyntaxNode useSite,
@@ -310,7 +270,6 @@ internal static class SymbolicRegexLowerer {
 
         return TryResolveRegexSource(initializer, declarator, context, out pattern, out options);
     }
-
     private static bool TryResolveReadonlyRegexFieldSource(
         IFieldSymbol field,
         SymbolicLoweringContext callerContext,
@@ -342,10 +301,7 @@ internal static class SymbolicRegexLowerer {
             callerContext.InvocationTermTypeResolver);
         return TryResolveRegexSource(initializer, declarator, initializerContext, out pattern, out options);
     }
-
-    private static bool FieldHasAssignmentOutsideInitializer(
-        IFieldSymbol field,
-        SymbolicLoweringContext context) {
+    private static bool FieldHasAssignmentOutsideInitializer(IFieldSymbol field, SymbolicLoweringContext context) {
         foreach (var typeReference in field.ContainingType.DeclaringSyntaxReferences) {
             var typeSyntax = typeReference.GetSyntax(context.CancellationToken);
             var semanticModel = context.Compilation.GetSemanticModel(typeSyntax.SyntaxTree);
@@ -355,24 +311,17 @@ internal static class SymbolicRegexLowerer {
                         field))
                     return true;
         }
-
         return false;
     }
-
-    private static bool TryGetConstantString(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context,
-        out string value) {
+    private static bool TryGetConstantString(ExpressionSyntax expression, SymbolicLoweringContext context, out string value) {
         var constant = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constant is { HasValue: true, Value: string stringValue }) {
             value = stringValue;
             return true;
         }
-
         value = string.Empty;
         return false;
     }
-
     private static bool IsConstantZero(SyntaxNode expression, SymbolicLoweringContext context) {
         if (expression is not ExpressionSyntax expressionSyntax) return false;
         var constant = context.SemanticModel.GetConstantValue(expressionSyntax, context.CancellationToken);
@@ -381,7 +330,6 @@ internal static class SymbolicRegexLowerer {
                SymbolicLoweringValueFacts.TryGetIntegralConstant(constant.Value, out var value) &&
                value == 0;
     }
-
     private static bool IsRegexType(ITypeSymbol? type) =>
         string.Equals(type?.ToDisplayString(), RegexMetadataName, StringComparison.Ordinal);
 }

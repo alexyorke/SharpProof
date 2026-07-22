@@ -27,15 +27,14 @@ public sealed record FuzzExpectation(
 
     internal static FuzzExpectation Create(SharpProofVerdict purityVerdict) => new(
         purityVerdict,
-        ImmutableArray<SharpProofEffect>.Empty,
-        ImmutableArray<SharpProofEffect>.Empty,
-        ImmutableArray<string>.Empty,
-        ImmutableArray<string>.Empty,
+        [],
+        [],
+        [],
+        [],
         null,
         null,
         false);
 }
-
 public sealed record ShapeRegistryEntry(
     string Id,
     ImmutableArray<string> PrimaryShapeIds,

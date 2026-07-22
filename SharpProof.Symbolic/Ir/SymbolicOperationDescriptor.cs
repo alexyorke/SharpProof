@@ -1,62 +1,15 @@
 namespace SharpProof.Symbolic.Ir;
 
-internal enum SymbolicAssignmentOperationKind {
-    Simple,
-    Compound,
-    Coalesce,
-    Deconstruction,
-}
-
-internal enum SymbolicMutationOperationKind {
-    Increment,
-    Decrement,
-    Invalidate,
-    CallerVisible
-}
-
-internal enum SymbolicComputedUpdateKind {
-    CompoundAssignment,
-    Increment,
-    Decrement
-}
-
 internal enum SymbolicInvalidationMatchKind {
     VariablePrefix,
     VariableOrMember
 }
-
 internal readonly record struct SymbolicInvalidationTarget(
     string Key,
     SymbolicInvalidationMatchKind MatchKind = SymbolicInvalidationMatchKind.VariablePrefix,
     int? DefinitionVersion = null);
 
-internal enum SymbolicLoopEdgeKind {
-    BackEdge,
-    Exit
-}
-
-internal enum SymbolicCompletionKind {
-    Normal,
-    NoFallthrough,
-}
-
-internal enum SymbolicLifetimeOperationKind {
-    Alias,
-    CreateOwnedValue,
-    CreateOwned,
-    AcquireDisposable,
-    BorrowShared,
-    BorrowMutable,
-    Escape,
-    Return,
-    Dispose,
-    Release
-}
-
-internal readonly record struct SymbolicOperationOrigin(
-    TextSpan SourceSpan,
-    int Sequence,
-    string Provenance);
+internal readonly record struct SymbolicOperationOrigin(TextSpan SourceSpan, int Sequence, string Provenance);
 
 internal abstract record SymbolicOperationDescriptor(SymbolicOperationOrigin Origin);
 
@@ -72,17 +25,13 @@ internal sealed record SymbolicAssignmentBinding(
 
 internal readonly record struct SymbolicTermPropagation(SymbolicTerm Source, SymbolicTerm Target);
 
-internal sealed record SymbolicOperationSequence(
-    ImmutableArray<SymbolicOperationDescriptor> Operations) {
+internal sealed record SymbolicOperationSequence(ImmutableArray<SymbolicOperationDescriptor> Operations) {
     internal static SymbolicOperationSequence Single(SymbolicOperationDescriptor operation) =>
-        new SymbolicOperationSequence(ImmutableArray.Create(operation));
+        new([operation]);
 }
-
 internal sealed record SymbolicAssignmentOperation(
     ImmutableArray<SymbolicAssignmentBinding> Bindings,
     ImmutableArray<SymbolicCondition> Postconditions,
-    SymbolicAssignmentOperationKind AssignmentKind,
-    bool IsChecked,
     SymbolicOperationOrigin Origin,
     ImmutableArray<SymbolicTermPropagation> Propagations = default,
     ImmutableArray<SymbolicInvalidationTarget> Invalidations = default) : SymbolicOperationDescriptor(Origin);
@@ -90,17 +39,9 @@ internal sealed record SymbolicAssignmentOperation(
 internal sealed record SymbolicMutationOperation(
     ImmutableArray<SymbolicAssignmentBinding> Bindings,
     ImmutableArray<SymbolicInvalidationTarget> Invalidations,
-    SymbolicTerm? Subject,
-    SymbolicMutationOperationKind MutationKind,
-    bool IsChecked,
-    bool CallerVisible,
-    ISymbol? Symbol,
-    string? EvidenceKey,
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
 
-internal sealed record SymbolicBranchAssumptionOperation(
-    SymbolicCondition Condition,
-    bool AssumeTrue,
+internal sealed record SymbolicBranchAssumptionOperation(SymbolicCondition Condition, bool AssumeTrue,
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
 
 internal sealed record SymbolicMergeOperation(
@@ -108,24 +49,10 @@ internal sealed record SymbolicMergeOperation(
     SyntaxNode Source,
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
 
-internal sealed record SymbolicLoopEdgeOperation(
-    SymbolicLoopEdgeKind EdgeKind,
-    SymbolicCondition? Condition,
+internal sealed record SymbolicLoopEdgeOperation(SymbolicCondition? Condition,
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
 
-internal sealed record SymbolicCompletionOperation(
-    SymbolicCompletionKind CompletionKind,
-    SymbolicTerm? Value,
-    SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
-
-internal sealed record SymbolicLifetimeOperation(
-    SymbolicTerm Subject,
-    SymbolicLifetimeOperationKind LifetimeKind,
-    SymbolicTerm? RelatedSubject,
-    SymbolicEscapeKind EscapeKind,
-    ISymbol? Symbol,
-    string? EvidenceKey,
-    SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
+internal sealed record SymbolicCompletionOperation(SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
 
 internal sealed record SymbolicHazardOperation(
     SymbolicRuntimeHazardKind HazardKind,
@@ -136,7 +63,7 @@ internal sealed record SymbolicHazardOperation(
     string ExceptionType,
     string Category,
     SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin) {
-    internal SymbolicFact ToPreconditionFact() => new SymbolicFact(
+    internal SymbolicFact ToPreconditionFact() => new(
             new SymbolicExceptionPreconditionAtom(PreconditionKind, Subject, Trigger),
             true,
             Confidence,

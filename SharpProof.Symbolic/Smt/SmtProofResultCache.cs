@@ -32,55 +32,37 @@ internal sealed class SmtProofResultCache {
     public bool TryGetLocal(string queryKey, out AnalysisProofResult result) =>
         _localResults.TryGetValue(queryKey, out result);
 
-    public bool TryGetShared(
-        SmtAnalysisOptions options,
-        string queryKey,
-        out AnalysisProofResult result) {
+    public bool TryGetShared(SmtAnalysisOptions options, string queryKey, out AnalysisProofResult result) {
         if (options.UseSharedResultCache)
             return s_sharedResults.TryGetValue(CreateSharedKey(options, queryKey), out result);
 
         result = default!;
         return false;
     }
-
     public void AddLocalIfCacheable(string queryKey, AnalysisProofResult result) {
         if (!IsTransientFailure(result)) _localResults.TryAdd(queryKey, result);
     }
-
     public void AddLocal(string queryKey, AnalysisProofResult result) => _localResults.TryAdd(queryKey, result);
 
-    public void AddSharedIfCacheable(
-        SmtAnalysisOptions options,
-        string queryKey,
-        AnalysisProofResult result) {
+    public void AddSharedIfCacheable(SmtAnalysisOptions options, string queryKey, AnalysisProofResult result) {
         if (!options.UseSharedResultCache || !IsShareable(result)) return;
 
         s_sharedResults.TryAdd(CreateSharedKey(options, queryKey), result);
     }
-
-    public SharedFlightLease AcquireSharedFlight(
-        SmtAnalysisOptions options,
-        string queryKey,
-        Func<AnalysisProofResult> classify) {
+    public SharedFlightLease AcquireSharedFlight(SmtAnalysisOptions options, string queryKey, Func<AnalysisProofResult> classify) {
         var sharedKey = CreateSharedKey(options, queryKey);
-        var candidate = new Lazy<AnalysisProofResult>(
-            classify,
-            LazyThreadSafetyMode.ExecutionAndPublication);
+        var candidate = new Lazy<AnalysisProofResult>(classify, LazyThreadSafetyMode.ExecutionAndPublication);
         var flight = s_sharedFlights.GetOrAdd(sharedKey, candidate);
-        return new SharedFlightLease(
-            sharedKey,
-            flight,
-            ReferenceEquals(flight, candidate));
+        return new SharedFlightLease(sharedKey, flight, ReferenceEquals(flight, candidate));
     }
-
     public void ReleaseSharedFlight(SharedFlightLease lease) {
         if (lease.OwnsFlight) s_sharedFlights.TryRemove(lease.Key, out _);
     }
-
     public static bool IsShareable(AnalysisProofResult result) =>
         result.Outcome is AnalysisProofOutcome.Proven or AnalysisProofOutcome.Disproven;
 
-    public static bool IsTransientFailure(AnalysisProofResult result) => string.Equals(result.Reason, "smt_transient_failure", StringComparison.Ordinal) ||
+    public static bool IsTransientFailure(AnalysisProofResult result)
+        => string.Equals(result.Reason, "smt_transient_failure", StringComparison.Ordinal) ||
                string.Equals(result.PathCheck.Witness?.Reason, "z3_transient_failure", StringComparison.Ordinal) ||
                string.Equals(result.HazardCheck.Witness?.Reason, "z3_transient_failure", StringComparison.Ordinal);
 
@@ -94,8 +76,5 @@ internal sealed class SmtProofResultCache {
                "|" +
                queryKey;
 
-    internal sealed record SharedFlightLease(
-        string Key,
-        Lazy<AnalysisProofResult> Result,
-        bool OwnsFlight);
+    internal sealed record SharedFlightLease(string Key, Lazy<AnalysisProofResult> Result, bool OwnsFlight);
 }

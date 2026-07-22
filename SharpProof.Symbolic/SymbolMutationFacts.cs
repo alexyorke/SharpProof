@@ -18,7 +18,6 @@ internal static class SymbolMutationFacts {
                 return false;
         }
     }
-
     internal static bool TryGetIncrementedOrDecrementedSymbol(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -29,71 +28,51 @@ internal static class SymbolMutationFacts {
             symbol = null!;
             return false;
         }
-
         var expressionSymbol = semanticModel.GetSymbolInfo(operand, cancellationToken).Symbol;
         if (expressionSymbol is not ILocalSymbol && expressionSymbol is not IParameterSymbol) {
             symbol = null!;
             delta = 0;
             return false;
         }
-
         symbol = expressionSymbol.OriginalDefinition;
         return true;
     }
-
     internal static IReadOnlyList<ISymbol> GetReferencedLocalAndParameterSymbols(
         SyntaxNode root,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         var symbols = new List<ISymbol>();
         foreach (var expression in CSharpSyntaxFacts.DescendantNodesInExecution(root).OfType<ExpressionSyntax>())
-            if (TryGetLocalOrParameterSymbol(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var symbol) &&
+            if (TryGetLocalOrParameterSymbol(expression, semanticModel, cancellationToken, out var symbol) &&
                 symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
                 symbols.Add(symbol);
 
         return symbols;
     }
-
     internal static bool ExpressionReferencesSymbol(
         SyntaxNode root,
         ISymbol symbol,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        return CSharpSyntaxFacts.DescendantNodesInExecution(root)
+        CancellationToken cancellationToken) => CSharpSyntaxFacts.DescendantNodesInExecution(root)
             .OfType<ExpressionSyntax>()
             .Any(expression => {
                 var referencedSymbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
                 return referencedSymbol != null &&
-                       SymbolEqualityComparer.Default.Equals(
-                           referencedSymbol.OriginalDefinition,
-                           symbol.OriginalDefinition);
+                       SymbolEqualityComparer.Default.Equals(referencedSymbol.OriginalDefinition, symbol.OriginalDefinition);
             });
-    }
-
     internal static bool ExpressionMatchesSymbol(
         ExpressionSyntax expression,
         ISymbol symbol,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        return TryGetLocalOrParameterSymbol(expression, semanticModel, cancellationToken, out var expressionSymbol) &&
+        CancellationToken cancellationToken)
+            => TryGetLocalOrParameterSymbol(expression, semanticModel, cancellationToken, out var expressionSymbol) &&
                SymbolEqualityComparer.Default.Equals(expressionSymbol, symbol);
-    }
-
     internal static bool TryGetLocalOrParameterSymbol(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out ISymbol symbol) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        return SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
-            expression,
-            semanticModel,
-            cancellationToken,
-            out symbol);
+        return SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(expression, semanticModel, cancellationToken, out symbol);
     }
-
 }

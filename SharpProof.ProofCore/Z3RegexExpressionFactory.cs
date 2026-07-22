@@ -4,10 +4,7 @@ internal sealed class Z3RegexExpressionFactory {
     private readonly Context _context;
     private ReExpr? _anyCharacter;
 
-    internal Z3RegexExpressionFactory(Context context) {
-        _context = context ?? throw new ArgumentNullException(nameof(context));
-    }
-
+    internal Z3RegexExpressionFactory(Context context) => _context = context ?? throw new ArgumentNullException(nameof(context));
     internal ReExpr AnyString() => _context.MkStar(AnyCharacter());
 
     internal ReExpr OptionalFinalNewline() => _context.MkOption(Literal("\n"));
@@ -20,10 +17,10 @@ internal sealed class Z3RegexExpressionFactory {
         var declaration = _context.MkConstDecl(marker, regexSort);
         var assertions = _context.ParseSMTLIB2String(
             "(assert (= " + marker + " re.allchar))",
-            Array.Empty<Symbol>(),
-            Array.Empty<Sort>(),
+            [],
+            [],
             new[] { _context.MkSymbol(marker) },
-            new[] { declaration });
+            [declaration]);
         if (assertions.Length != 1 ||
             assertions[0].Args.Length != 2 ||
             assertions[0].Args[1] is not ReExpr allCharacter)
@@ -32,23 +29,16 @@ internal sealed class Z3RegexExpressionFactory {
         _anyCharacter = allCharacter;
         return allCharacter;
     }
-
     internal ReExpr CharacterRange(char start, char end) {
         if (start > end) throw new ArgumentOutOfRangeException(nameof(start));
 
         if (start == char.MinValue) {
             if (end == char.MaxValue) return AnyCharacter();
 
-            return _context.MkDiff(
-                AnyCharacter(),
-                CharacterRange((char)(end + 1), char.MaxValue));
+            return _context.MkDiff(AnyCharacter(), CharacterRange((char)(end + 1), char.MaxValue));
         }
-
-        return _context.MkRange(
-            _context.MkString(start.ToString()),
-            _context.MkString(end.ToString()));
+        return _context.MkRange(_context.MkString(start.ToString()), _context.MkString(end.ToString()));
     }
-
     internal ReExpr Dot(bool singleline) =>
         singleline
             ? AnyCharacter()

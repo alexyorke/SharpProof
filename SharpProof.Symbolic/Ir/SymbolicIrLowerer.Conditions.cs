@@ -12,10 +12,7 @@ internal static partial class SymbolicIrLowerer {
         string provenance) => CreateFactCondition(new SymbolicRelationAtom(op, left, right), node, provenance);
 
     internal static SymbolicCondition CreateReferenceIsNullCondition(SymbolicTerm reference, SyntaxNode node) => CreateFactCondition(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.Equal,
-                reference,
-                new SymbolicNullTerm()),
+            new SymbolicRelationAtom(SymbolicRelationOperator.Equal, reference, new SymbolicNullTerm()),
             node,
             "ir.string.concat.null-empty");
 
@@ -39,10 +36,7 @@ internal static partial class SymbolicIrLowerer {
                 node,
                 provenance + ".upper-bound"));
 
-    public static SymbolicCondition CreateReferenceNullCondition(
-        SymbolicTerm value,
-        bool equalToNull,
-        SyntaxNode node,
+    public static SymbolicCondition CreateReferenceNullCondition(SymbolicTerm value, bool equalToNull, SyntaxNode node,
         string provenance) => CreateRelationCondition(
             equalToNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
             value,
@@ -50,10 +44,8 @@ internal static partial class SymbolicIrLowerer {
             node,
             provenance);
 
-    public static SymbolicCondition CreateIntegerZeroCondition(
-        SymbolicTerm value,
-        SyntaxNode node,
-        string provenance) => CreateRelationCondition(
+    public static SymbolicCondition CreateIntegerZeroCondition(SymbolicTerm value, SyntaxNode node, string provenance)
+        => CreateRelationCondition(
             SymbolicRelationOperator.Equal,
             value,
             new SymbolicIntegerConstantTerm(0),

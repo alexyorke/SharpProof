@@ -1,24 +1,18 @@
 namespace SharpProof.Analyzer;
 
 internal static class AnalyzerFeaturePipeline {
-    internal static void AnalyzeOperationBlock(
-        OperationBlockAnalysisContext context,
-        AnalyzerSession session) {
+    internal static void AnalyzeOperationBlock(OperationBlockAnalysisContext context, AnalyzerSession session) {
         if (!TryCreateOperationBlockContext(context, session, out var methodContext)) return;
 
         AnalyzeCallable(methodContext, session);
     }
-
-    internal static void AnalyzeSyntaxFallback(
-        SyntaxNodeAnalysisContext context,
-        AnalyzerSession session) {
+    internal static void AnalyzeSyntaxFallback(SyntaxNodeAnalysisContext context, AnalyzerSession session) {
         if (!RequiresSyntaxFallback(context.Node) ||
             !TryCreateSyntaxContext(context, session, out var methodContext))
             return;
 
         AnalyzeCallable(methodContext, session);
     }
-
     internal static bool RequiresSyntaxFallback(SyntaxNode node) {
         if (node is PropertyDeclarationSyntax { ExpressionBody: not null } or
             IndexerDeclarationSyntax { ExpressionBody: not null } or
@@ -37,10 +31,7 @@ internal static class AnalyzerFeaturePipeline {
             _ => false
         };
     }
-
-    private static void AnalyzeCallable(
-        MethodBodyAnalysisContext context,
-        AnalyzerSession session) {
+    private static void AnalyzeCallable(MethodBodyAnalysisContext context, AnalyzerSession session) {
         using (SymbolicAnalysisLimitContext.Push(session.Configuration.AnalysisLimits, context.Node)) {
             EnforcePureContractAnalyzer.Analyze(context, session.AttributePolicy);
             MethodAllocationAnalyzer.AnalyzeSymbolForZeroAllocations(context, session.AttributePolicy);
@@ -52,7 +43,6 @@ internal static class AnalyzerFeaturePipeline {
             NullableContractAnalyzer.Analyze(context, session);
         }
     }
-
     private static bool TryCreateOperationBlockContext(
         OperationBlockAnalysisContext context,
         AnalyzerSession session,
@@ -72,13 +62,9 @@ internal static class AnalyzerFeaturePipeline {
             context.OperationBlocks,
             context.CancellationToken);
         Action<Diagnostic> reportDiagnostic = context.ReportDiagnostic;
-        methodContext = new MethodBodyAnalysisContext(
-            state,
-            context.CancellationToken,
-            reportDiagnostic);
+        methodContext = new MethodBodyAnalysisContext(state, context.CancellationToken, reportDiagnostic);
         return true;
     }
-
     private static bool TryCreateSyntaxContext(
         SyntaxNodeAnalysisContext context,
         AnalyzerSession session,
@@ -98,16 +84,12 @@ internal static class AnalyzerFeaturePipeline {
             methodSymbol,
             context.Node,
             context.SemanticModel,
-            ImmutableArray<IOperation>.Empty,
+            [],
             context.CancellationToken);
         Action<Diagnostic> reportDiagnostic = context.ReportDiagnostic;
-        methodContext = new MethodBodyAnalysisContext(
-            state,
-            context.CancellationToken,
-            reportDiagnostic);
+        methodContext = new MethodBodyAnalysisContext(state, context.CancellationToken, reportDiagnostic);
         return true;
     }
-
     private static SyntaxNode? FindDeclaration(
         IMethodSymbol methodSymbol,
         ImmutableArray<IOperation> operationBlocks,
@@ -128,15 +110,12 @@ internal static class AnalyzerFeaturePipeline {
         var declaration = references.FirstOrDefault()?.GetSyntax(cancellationToken);
         return declaration == null ? null : NormalizeDeclaration(declaration);
     }
-
-    private static SyntaxNode NormalizeDeclaration(SyntaxNode declaration) {
-        return declaration switch {
-            AccessorDeclarationSyntax => declaration,
-            PropertyDeclarationSyntax => declaration,
-            IndexerDeclarationSyntax => declaration,
-            ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax property } => property,
-            ArrowExpressionClauseSyntax { Parent: IndexerDeclarationSyntax indexer } => indexer,
-            _ => declaration
-        };
-    }
+    private static SyntaxNode NormalizeDeclaration(SyntaxNode declaration) => declaration switch {
+        AccessorDeclarationSyntax => declaration,
+        PropertyDeclarationSyntax => declaration,
+        IndexerDeclarationSyntax => declaration,
+        ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax property } => property,
+        ArrowExpressionClauseSyntax { Parent: IndexerDeclarationSyntax indexer } => indexer,
+        _ => declaration
+    };
 }

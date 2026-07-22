@@ -14,7 +14,6 @@ internal static class SymbolicRuntimeExceptionFacts {
                 return false;
         }
     }
-
     internal static ITypeSymbol? GetThrownExceptionType(
         SyntaxNode throwNode,
         SemanticModel semanticModel,
@@ -26,7 +25,6 @@ internal static class SymbolicRuntimeExceptionFacts {
         var typeInfo = semanticModel.GetTypeInfo(exceptionExpression, cancellationToken);
         return typeInfo.Type ?? typeInfo.ConvertedType;
     }
-
     private static ITypeSymbol? GetRethrownExceptionType(
         SyntaxNode throwNode,
         SemanticModel semanticModel,
@@ -40,13 +38,10 @@ internal static class SymbolicRuntimeExceptionFacts {
 
                 continue;
             }
-
             return semanticModel.GetTypeInfo(catchClause.Declaration.Type, cancellationToken).Type;
         }
-
         return null;
     }
-
     internal static class ExceptionTypes {
         internal const string Unknown = "unknown";
         internal const string Exception = "System.Exception";
@@ -62,7 +57,6 @@ internal static class SymbolicRuntimeExceptionFacts {
         internal const string ArgumentOutOfRangeException = "System.ArgumentOutOfRangeException";
         internal const string SwitchExpressionException = "System.Runtime.CompilerServices.SwitchExpressionException";
     }
-
     internal static class ExceptionCategories {
         internal const string DirectThrow = "direct_throw";
         internal const string Rethrow = "rethrow";
@@ -104,5 +98,4 @@ internal static class SymbolicRuntimeExceptionFacts {
 
         internal const string DefiniteSwitchExpressionNoMatch = "definite_switch_expression_no_match";
     }
-
 }

@@ -1,10 +1,9 @@
 namespace SharpProof.Tools.Fuzz;
 
-internal sealed record AnalyzerRunResult(
-    ImmutableArray<Diagnostic> Diagnostics,
-    ImmutableArray<string> Exceptions);
+internal sealed record AnalyzerRunResult(ImmutableArray<Diagnostic> Diagnostics, ImmutableArray<string> Exceptions);
 
-internal sealed class FixedAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string> globalOptions) : AnalyzerConfigOptionsProvider {
+internal sealed class FixedAnalyzerConfigOptionsProvider(ImmutableDictionary<string,
+    string> globalOptions) : AnalyzerConfigOptionsProvider {
     private readonly AnalyzerConfigOptions _emptyOptions =
         new FixedAnalyzerConfigOptions(ImmutableDictionary<string, string>.Empty);
 
@@ -16,7 +15,6 @@ internal sealed class FixedAnalyzerConfigOptionsProvider(ImmutableDictionary<str
     public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) =>
         _emptyOptions;
 }
-
 internal sealed class FixedAnalyzerConfigOptions(ImmutableDictionary<string, string> values) : AnalyzerConfigOptions {
     private readonly ImmutableDictionary<string, string> _values = values;
 

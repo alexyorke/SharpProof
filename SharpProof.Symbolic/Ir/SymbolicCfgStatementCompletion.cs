@@ -9,62 +9,34 @@ internal static class SymbolicCfgStatementCompletion {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
-        using var limitScope = SymbolicAnalysisLimitContext.Push(
-            SymbolicAnalysisLimitContext.Limits,
-            statement);
-        var result = CollectSeededCompletionTrace(
-            statement,
-            entryState,
-            semanticModel,
-            cancellationToken);
+        using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits, statement);
+        var result = CollectSeededCompletionTrace(statement, entryState, semanticModel, cancellationToken);
         return limitScope.Snapshot().IsTruncated
             ? Unsupported(statement, "trace.truncation")
             : result;
     }
-
     private static SymbolicLoweringResult<SymbolicState> CollectSeededCompletionTrace(
         StatementSyntax statement,
         SymbolicState entryState,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         if (statement is IfStatementSyntax abruptIf &&
-            TryCollectAbruptIfCompletionState(
-                abruptIf,
-                entryState,
-                semanticModel,
-                cancellationToken,
-                out var abruptCompletion))
+            TryCollectAbruptIfCompletionState(abruptIf, entryState, semanticModel, cancellationToken, out var abruptCompletion))
             return abruptCompletion;
         if (statement is WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax &&
             SymbolicControlFlowFacts.StatementDefinitelyExits(statement, semanticModel, cancellationToken)) {
             var terminalState = entryState;
-            SymbolicStateInvalidator.InvalidateNestedMutations(
-                ref terminalState,
-                statement,
-                semanticModel,
-                cancellationToken);
+            SymbolicStateInvalidator.InvalidateNestedMutations(ref terminalState, statement, semanticModel, cancellationToken);
             return Exact(SymbolicOperationTransferKernel.Complete(terminalState, statement.Span).State, statement);
         }
-
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(statement, ExecutionRootPolicy.Callable);
         if (executionRoot == null)
             return Unsupported(statement, "execution-root");
         if (!TryCreateGraph(executionRoot, semanticModel, cancellationToken, out var graph, out var graphFailure))
             return Unsupported(statement, graphFailure);
-        if (!TryLowerLoopPlans(
-                statement,
-                allowAbruptCompletion: true,
-                semanticModel,
-                cancellationToken,
-                out var loopPlans))
+        if (!TryLowerLoopPlans(statement, allowAbruptCompletion: true, semanticModel, cancellationToken, out var loopPlans))
             return Unsupported(statement, "loop-lowering");
-        if (!TryCreateRegionPlan(
-                graph,
-                statement,
-                semanticModel,
-                cancellationToken,
-                out var region,
-                out var failure))
+        if (!TryCreateRegionPlan(graph, statement, semanticModel, cancellationToken, out var region, out var failure))
             return Unsupported(statement, failure);
 
         var entryPoint = region.EntryPoint;
@@ -82,7 +54,7 @@ internal static class SymbolicCfgStatementCompletion {
             incoming,
             queue,
             queued,
-            new List<CfgPathState>(),
+            [],
             loopPlans,
             null,
             null,
@@ -122,16 +94,9 @@ internal static class SymbolicCfgStatementCompletion {
                         GuardFrame = InvalidateGuards(currentPath.GuardFrame, invalidatedGuardTarget)
                     };
                 if (!summarizesLoop)
-                    AddOperationNormalCompletionFacts(
-                        ref state,
-                        operation,
-                        semanticModel,
-                        cancellationToken);
+                    AddOperationNormalCompletionFacts(ref state, operation, semanticModel, cancellationToken);
                 if (operation.Syntax is StatementSyntax operationStatement &&
-                    SymbolicControlFlowFacts.StatementDefinitelyExits(
-                        operationStatement,
-                        semanticModel,
-                        cancellationToken)) {
+                    SymbolicControlFlowFacts.StatementDefinitelyExits(operationStatement, semanticModel, cancellationToken)) {
                     region.TerminalPaths.Add(currentPath with { State = state });
                     completedInBlock = true;
                     break;
@@ -149,25 +114,14 @@ internal static class SymbolicCfgStatementCompletion {
         if (queue.Count != 0)
             return Unsupported(statement, "iteration-limit");
         if (summarizesLoop)
-            return TryCreateCompletedLoopSummary(
-                entryState,
-                region,
-                loopPlans,
-                semanticModel,
-                cancellationToken,
-                out var loopState)
+            return TryCreateCompletedLoopSummary(entryState, region, loopPlans, semanticModel, cancellationToken, out var loopState)
                 ? Exact(loopState, statement)
                 : Unsupported(statement, "statement-region.loop-summary");
 
         SymbolicState? result = null;
         if (region.CompletedPaths.Count != 0) {
-            var path = MergeIncomingStates(
-                region.CompletedPaths.Select(static completion => completion.Path).ToArray(),
-                statement);
-            result = OrderTargetState(
-                path.State,
-                path,
-                region.CompletedPaths.Count == 1 && !HasInvalidatedGuard(path.GuardFrame));
+            var path = MergeIncomingStates(region.CompletedPaths.Select(static completion => completion.Path).ToArray(), statement);
+            result = OrderTargetState(path.State, path, region.CompletedPaths.Count == 1 && !HasInvalidatedGuard(path.GuardFrame));
         }
         else if (region.TerminalPaths.Count != 0) {
             var path = CollapseTerminalCompletionPaths(region.TerminalPaths, statement);
@@ -177,17 +131,12 @@ internal static class SymbolicCfgStatementCompletion {
                 targetIsInsideBranch: false);
         }
         if (result != null && statement is SwitchStatementSyntax completedSwitch &&
-            !TryApplyCompletedSwitchExitExclusions(
-                ref result,
-                completedSwitch,
-                semanticModel,
-                cancellationToken))
+            !TryApplyCompletedSwitchExitExclusions(ref result, completedSwitch, semanticModel, cancellationToken))
             return Unsupported(statement, "statement-region.switch-exit");
         return result == null
             ? Unsupported(statement, "target-block")
             : Exact(result, statement);
     }
-
     internal static bool TryCreateGraph(
         SyntaxNode executionRoot,
         SemanticModel semanticModel,
@@ -205,5 +154,4 @@ internal static class SymbolicCfgStatementCompletion {
             return false;
         }
     }
-
 }

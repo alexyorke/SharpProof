@@ -16,7 +16,6 @@ internal static class Z3RegexTranslationValidator {
         }
     }
 }
-
 internal enum RegexTranslationFallback {
     None,
     PatternTooLong,

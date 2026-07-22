@@ -8,33 +8,20 @@ internal static class SymbolicAsyncLowerer {
         expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         switch (expression) {
             case AwaitExpressionSyntax awaitExpression:
-                return TryGetKnownCompletedAwaitableResultExpression(
-                    awaitExpression.Expression,
-                    context,
-                    out resultExpression);
+                return TryGetKnownCompletedAwaitableResultExpression(awaitExpression.Expression, context, out resultExpression);
             case MemberAccessExpressionSyntax memberAccess
                 when context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is
                     IPropertySymbol { Name: "Result", IsStatic: false } property &&
                      TryGetTaskLikeResultType(property.ContainingType, out _):
-                return TryGetKnownCompletedAwaitableResultExpression(
-                    memberAccess.Expression,
-                    context,
-                    out resultExpression);
+                return TryGetKnownCompletedAwaitableResultExpression(memberAccess.Expression, context, out resultExpression);
             case InvocationExpressionSyntax getResultInvocation
-                when TryGetAwaiterSourceExpression(
-                    getResultInvocation,
-                    context,
-                    out var awaitableExpression):
-                return TryGetKnownCompletedAwaitableResultExpression(
-                    awaitableExpression,
-                    context,
-                    out resultExpression);
+                when TryGetAwaiterSourceExpression(getResultInvocation, context, out var awaitableExpression):
+                return TryGetKnownCompletedAwaitableResultExpression(awaitableExpression, context, out resultExpression);
             default:
                 resultExpression = null!;
                 return false;
         }
     }
-
     private static bool TryGetKnownCompletedAwaitableResultExpression(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -48,7 +35,6 @@ internal static class SymbolicAsyncLowerer {
             resultExpression = fromResultInvocation.ArgumentList.Arguments[0].Expression;
             return true;
         }
-
         if (expression is ObjectCreationExpressionSyntax valueTaskCreation &&
             context.SemanticModel.GetOperation(valueTaskCreation, context.CancellationToken) is
                 IObjectCreationOperation creationOperation &&
@@ -62,19 +48,13 @@ internal static class SymbolicAsyncLowerer {
                 resultExpression = argumentExpression;
                 return true;
             }
-
             if (TryGetTaskLikeResultType(parameterType, out var nestedResultType) &&
                 SymbolEqualityComparer.Default.Equals(nestedResultType, resultType))
-                return TryGetKnownCompletedAwaitableResultExpression(
-                    argumentExpression,
-                    context,
-                    out resultExpression);
+                return TryGetKnownCompletedAwaitableResultExpression(argumentExpression, context, out resultExpression);
         }
-
         resultExpression = null!;
         return false;
     }
-
     private static bool TryGetAwaiterSourceExpression(
         InvocationExpressionSyntax getResultInvocation,
         SymbolicLoweringContext context,
@@ -92,15 +72,13 @@ internal static class SymbolicAsyncLowerer {
                     TargetMethod: { Name: "GetAwaiter", Parameters.Length: 0 }
                 } ||
             getAwaiterInvocation.Expression is not MemberAccessExpressionSyntax getAwaiterMember ||
-            !TryGetTaskLikeResultType(
-                context.SemanticModel.GetTypeInfo(getAwaiterMember.Expression, context.CancellationToken).Type,
-                out _))
+            !TryGetTaskLikeResultType(context.SemanticModel.GetTypeInfo(getAwaiterMember.Expression,
+                context.CancellationToken).Type, out _))
             return false;
 
         awaitableExpression = getAwaiterMember.Expression;
         return true;
     }
-
     private static bool IsKnownFromResultFactory(IMethodSymbol method) {
         if (!method.IsStatic ||
             method.Name != "FromResult" ||
@@ -112,7 +90,6 @@ internal static class SymbolicAsyncLowerer {
         return containingType.ContainingNamespace.ToDisplayString() == "System.Threading.Tasks" &&
                containingType.MetadataName is "Task" or "ValueTask";
     }
-
     private static bool TryGetTaskLikeResultType(ITypeSymbol? type, out ITypeSymbol resultType) {
         if (type is INamedTypeSymbol {
             TypeArguments.Length: 1,
@@ -123,7 +100,6 @@ internal static class SymbolicAsyncLowerer {
             resultType = namedType.TypeArguments[0];
             return true;
         }
-
         resultType = null!;
         return false;
     }

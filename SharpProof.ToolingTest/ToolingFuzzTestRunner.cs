@@ -4,22 +4,6 @@ using SharpProof.Tools.Fuzz;
 namespace SharpProof.Test;
 
 internal static class ToolingFuzzTestRunner {
-    internal static Task<FuzzRunSummary> RunCasesAsync(
-        IEnumerable<FuzzCase> fuzzCases,
-        FuzzOptions options,
-        CancellationToken cancellationToken = default) {
-        var cases = fuzzCases.ToImmutableArray();
-        var startedUtc = DateTimeOffset.UtcNow;
-        return FuzzRunner.RunCoreAsync(
-            options,
-            startedUtc,
-            index => cases[index],
-            "explicit_cases",
-            cases.Length,
-            null,
-            cancellationToken);
-    }
-
     internal static Task<ImmutableArray<FuzzCaseAnalysis>> AnalyzeCasesAsync(
         IEnumerable<FuzzCase> fuzzCases,
         bool repeatAnalyzer = true,

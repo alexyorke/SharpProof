@@ -20,13 +20,14 @@ public sealed class SymbolicInvariantServiceTests {
     private sealed record GuardedProofCase(string Source, bool Negate, bool Constant, SymbolicTruthValue Expected);
 
     private static IEnumerable<TestCaseData> GuardedProofCases() {
-        yield return GuardedCase("ProveImplicationAt_ProvesConditionFromPathFacts", PositiveGuardSource, false, false, SymbolicTruthValue.ProvenTrue);
-        yield return GuardedCase("ProveImplicationAt_ProvesNegatedConditionFalseFromPathFacts", PositiveGuardSource, true, false, SymbolicTruthValue.ProvenFalse);
+        yield return GuardedCase("ProveImplicationAt_ProvesConditionFromPathFacts", PositiveGuardSource, false, false,
+            SymbolicTruthValue.ProvenTrue);
+        yield return GuardedCase("ProveImplicationAt_ProvesNegatedConditionFalseFromPathFacts", PositiveGuardSource, true, false,
+            SymbolicTruthValue.ProvenFalse);
         yield return GuardedCase("ProveImplicationAt_ReturnsUnreachableWhenProgramPointIsUnsatisfiable",
             "public class TestClass { public int TestMethod(int value) { if(value>0&&value<0){return value;} return 0; } }",
             false, true, SymbolicTruthValue.Unreachable);
     }
-
     [TestCaseSource(nameof(GuardedProofCases))]
     public void GuardedProofMatrix(object value) {
         var testCase = (GuardedProofCase)value;
@@ -36,9 +37,7 @@ public sealed class SymbolicInvariantServiceTests {
         var proof = ProveCondition(returnStatement, semanticModel, condition, smt);
         Assert.That(proof.TruthValue, Is.EqualTo(testCase.Expected), proof.Reason);
     }
-
-    private static TestCaseData GuardedCase(
-        string name, string source, bool negate, bool constant, SymbolicTruthValue expected) =>
+    private static TestCaseData GuardedCase(string name, string source, bool negate, bool constant, SymbolicTruthValue expected) =>
         new TestCaseData(new GuardedProofCase(source, negate, constant, expected)).SetName(name);
 
     [Test]
@@ -52,19 +51,18 @@ public sealed class SymbolicInvariantServiceTests {
             SymbolicFormulaDisplay.Format(condition)));
         Assert.That(exception!.Message, Does.Contain("SMT analysis"));
     }
-
     [Test]
     public void ProveImplicationAt_ProvesBooleanLocalAliasInitializer() {
         var context = AnalyzerTestHost.CreateSourceContext(BooleanAliasSource, "SymbolicBooleanAlias");
         var statement = context.Root.DescendantNodes().OfType<ReturnStatementSyntax>()
             .First(node => node.Expression is BinaryExpressionSyntax binary && binary.IsKind(SyntaxKind.DivideExpression));
         var initializer = context.Root.DescendantNodes().OfType<EqualsValueClauseSyntax>().Single().Value;
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition( initializer, new SymbolicLoweringContext(context.SemanticModel, default), out var condition), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(initializer, new SymbolicLoweringContext(context.SemanticModel, default),
+            out var condition), Is.True);
         using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var proof = ProveCondition(statement, context.SemanticModel, condition, smt);
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
     }
-
     private sealed record HazardCase(
         string Source,
         string FileName,
@@ -86,7 +84,6 @@ public sealed class SymbolicInvariantServiceTests {
             "SymbolicNullableLoopHazard.cs", SymbolicRuntimeHazardKind.NullableValueWithoutValue,
             SymbolicRuntimeHazardStatus.Proven);
     }
-
     [TestCaseSource(nameof(HazardCases))]
     public void RuntimeHazardMatrix(object value) {
         var testCase = (HazardCase)value;
@@ -101,7 +98,6 @@ public sealed class SymbolicInvariantServiceTests {
             (testCase.Operation == null || candidate.OperationText.Contains(testCase.Operation, StringComparison.Ordinal)));
         Assert.That(hazard.Status, Is.EqualTo(testCase.Expected), hazard.StatusReason);
     }
-
     private static TestCaseData Hazard(
         string name, string source, string fileName, SymbolicRuntimeHazardKind kind,
         SymbolicRuntimeHazardStatus expected, string? operation = null) =>
@@ -112,14 +108,13 @@ public sealed class SymbolicInvariantServiceTests {
         var context = AnalyzerTestHost.CreateSourceContext(CompoundAssignmentSource, "SymbolicCompoundAssignment");
         var division = context.Root.DescendantNodes().OfType<BinaryExpressionSyntax>()
             .Single(expression => expression.IsKind(SyntaxKind.DivideExpression));
-        Assert.That(TypedSymbolicTestLowering.TryLowerTerm( division.Right, new SymbolicLoweringContext(context.SemanticModel, default), out var divisor), Is.True);
-        var condition = SymbolicIrLowerer.CreateIntegerZeroCondition(
-            divisor, division.Right, "ir.test.compound-assignment.zero");
+        Assert.That(TypedSymbolicTestLowering.TryLowerTerm(division.Right, new SymbolicLoweringContext(context.SemanticModel, default),
+            out var divisor), Is.True);
+        var condition = SymbolicIrLowerer.CreateIntegerZeroCondition(divisor, division.Right, "ir.test.compound-assignment.zero");
         using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var proof = ProveCondition(division, context.SemanticModel, condition, smt);
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
     }
-
     private static (ReturnStatementSyntax Statement, SemanticModel Model, SymbolicCondition Guard)
         CreateGuardedReturnContext(string source, string marker) {
         var context = AnalyzerTestHost.CreateSourceContext(source, "SymbolicInvariantServiceProof");
@@ -128,10 +123,10 @@ public sealed class SymbolicInvariantServiceTests {
         var statement = context.Root.DescendantNodes().OfType<ReturnStatementSyntax>()
             .Single(node => node.SpanStart == position);
         var ifStatement = statement.Ancestors().OfType<IfStatementSyntax>().First();
-        Assert.That(TypedSymbolicTestLowering.TryLowerCondition( ifStatement.Condition, new SymbolicLoweringContext(context.SemanticModel, default), out var guard), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(ifStatement.Condition, new SymbolicLoweringContext(context.SemanticModel,
+            default), out var guard), Is.True);
         return (statement, context.SemanticModel, guard);
     }
-
     private static SymbolicConditionProofResult ProveCondition(
         SyntaxNode node, SemanticModel semanticModel, SymbolicCondition condition, SmtAnalysisService smt) =>
         new SymbolicConditionProofEngine(new SymbolicInvariantService()).ProveAtSyntaxNode(

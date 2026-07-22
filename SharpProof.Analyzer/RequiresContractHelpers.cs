@@ -7,8 +7,7 @@ internal static class RequiresContractHelpers {
     internal static ImmutableArray<RequiresContract> CollectContracts(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken) {
-        return ContractConditionHelpers.Collect(
+        CancellationToken cancellationToken) => ContractConditionHelpers.Collect(
             methodSymbol,
             attributePolicy,
             AttributeTypeName,
@@ -19,28 +18,17 @@ internal static class RequiresContractHelpers {
                 contract.InvalidReason,
                 contract.SourceMethod),
             cancellationToken);
-    }
-
     internal static ImmutableArray<RequiresContract> ValidContracts(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken) {
-        return CollectContracts(methodSymbol, attributePolicy, cancellationToken)
-            .Where(static contract => contract.InvalidReason == null)
-            .ToImmutableArray();
-    }
-
-    internal static bool ContainsResultReference(ExpressionSyntax conditionExpression) {
-        return conditionExpression
+        CancellationToken cancellationToken)
+            => [.. CollectContracts(methodSymbol, attributePolicy, cancellationToken).Where(static contract
+            => contract.InvalidReason == null)];
+    internal static bool ContainsResultReference(ExpressionSyntax conditionExpression) => conditionExpression
             .DescendantNodesAndSelf()
             .OfType<IdentifierNameSyntax>()
-            .Any(static identifier =>
-                string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal));
-    }
-
-    internal static string CombineAsImplication(
-        ImmutableArray<RequiresContract> requiresContracts,
-        string consequent) {
+            .Any(static identifier => string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal));
+    internal static string CombineAsImplication(ImmutableArray<RequiresContract> requiresContracts, string consequent) {
         if (requiresContracts.IsDefaultOrEmpty) return consequent;
 
         var validConditions = requiresContracts
@@ -53,7 +41,6 @@ internal static class RequiresContractHelpers {
         var antecedent = string.Join(" && ", validConditions.Select(static condition => "(" + condition + ")"));
         return "!(" + antecedent + ") || (" + consequent + ")";
     }
-
     internal static bool TryRewriteForArguments(
         string conditionText,
         IMethodSymbol contractMethod,
@@ -69,15 +56,11 @@ internal static class RequiresContractHelpers {
         rewrittenCondition = rewritten.ToFullString();
         return true;
     }
-
     private static IReadOnlyDictionary<string, TypeSyntax> CreateTypeParameterReplacements(
         IMethodSymbol contractMethod,
         IMethodSymbol invokedMethod) {
         var replacements = new Dictionary<string, TypeSyntax>(StringComparer.Ordinal);
-        AddTypeParameterReplacements(
-            contractMethod.TypeParameters,
-            invokedMethod.TypeArguments,
-            replacements);
+        AddTypeParameterReplacements(contractMethod.TypeParameters, invokedMethod.TypeArguments, replacements);
 
         if (contractMethod.ContainingType != null)
             AddTypeParameterReplacements(
@@ -87,7 +70,6 @@ internal static class RequiresContractHelpers {
 
         return replacements;
     }
-
     private static void AddTypeParameterReplacements(
         ImmutableArray<ITypeParameterSymbol> parameters,
         ImmutableArray<ITypeSymbol> arguments,
@@ -97,17 +79,11 @@ internal static class RequiresContractHelpers {
             replacements[parameters[index].Name] = SyntaxFactory.ParseTypeName(display);
         }
     }
-
-    sealed class ParameterPlaceholderRewriter : CSharpSyntaxRewriter {
-        private readonly IReadOnlyDictionary<string, ExpressionSyntax> _replacements;
-        private readonly IReadOnlyDictionary<string, TypeSyntax> _typeReplacements;
-
-        public ParameterPlaceholderRewriter(
-            IReadOnlyDictionary<string, ExpressionSyntax> replacements,
-            IReadOnlyDictionary<string, TypeSyntax> typeReplacements) {
-            _replacements = replacements;
-            _typeReplacements = typeReplacements;
-        }
+    sealed class ParameterPlaceholderRewriter(
+        IReadOnlyDictionary<string, ExpressionSyntax> replacements,
+        IReadOnlyDictionary<string, TypeSyntax> typeReplacements) : CSharpSyntaxRewriter {
+        private readonly IReadOnlyDictionary<string, ExpressionSyntax> _replacements = replacements;
+        private readonly IReadOnlyDictionary<string, TypeSyntax> _typeReplacements = typeReplacements;
 
         public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node) {
             if (CSharpSyntaxFacts.IsMemberOrQualifiedNameRightSide(node))
@@ -124,28 +100,22 @@ internal static class RequiresContractHelpers {
 
             return SyntaxFactory.ParenthesizedExpression(replacement).WithTriviaFrom(node);
         }
-
         private static bool IsShadowedByNestedCallableParameter(IdentifierNameSyntax node, string name) {
             foreach (var ancestor in node.Ancestors())
                 switch (ancestor) {
                     case SimpleLambdaExpressionSyntax simpleLambda:
                         return simpleLambda.Parameter.Identifier.ValueText == name;
                     case ParenthesizedLambdaExpressionSyntax parenthesizedLambda:
-                        return parenthesizedLambda.ParameterList.Parameters.Any(parameter =>
-                            parameter.Identifier.ValueText == name);
+                        return parenthesizedLambda.ParameterList.Parameters.Any(parameter => parameter.Identifier.ValueText == name);
                     case AnonymousMethodExpressionSyntax anonymousMethod:
-                        return anonymousMethod.ParameterList?.Parameters.Any(parameter =>
-                            parameter.Identifier.ValueText == name) == true;
+                        return anonymousMethod.ParameterList?.Parameters.Any(parameter => parameter.Identifier.ValueText == name) == true;
                     case LocalFunctionStatementSyntax localFunction:
-                        return localFunction.ParameterList.Parameters.Any(parameter =>
-                            parameter.Identifier.ValueText == name);
+                        return localFunction.ParameterList.Parameters.Any(parameter => parameter.Identifier.ValueText == name);
                 }
-
             return false;
         }
     }
 }
-
 internal readonly record struct RequiresContract(
     string Condition,
     Location? Location,

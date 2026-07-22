@@ -6,22 +6,16 @@ internal sealed class SharpProofAttributeIdentityPolicy {
 
     private SharpProofAttributeIdentityPolicy() {
     }
-
     internal static SharpProofAttributeIdentityPolicy Create() => Instance;
 
     internal bool HasAttribute(ISymbol symbol, string attributeTypeName) =>
         GetAcceptedAttributes(symbol, attributeTypeName).Any();
 
-    internal IEnumerable<AttributeData> GetAcceptedAttributes(
-        ISymbol symbol,
-        string attributeTypeName) {
-        foreach (var attribute in SymbolAttributeTraversal.GetAttributes(
-                     symbol,
-                     GetAssociatedAttributePolicy(attributeTypeName)))
+    internal IEnumerable<AttributeData> GetAcceptedAttributes(ISymbol symbol, string attributeTypeName) {
+        foreach (var attribute in SymbolAttributeTraversal.GetAttributes(symbol, GetAssociatedAttributePolicy(attributeTypeName)))
             if (IsAccepted(attribute.AttributeClass, attributeTypeName))
                 yield return attribute;
     }
-
     private static bool IsAccepted(INamedTypeSymbol? attributeClass, string attributeTypeName) {
         var definition = attributeClass?.OriginalDefinition;
         return definition != null &&
@@ -31,7 +25,6 @@ internal sealed class SharpProofAttributeIdentityPolicy {
                    OfficialNamespace,
                    StringComparison.Ordinal);
     }
-
     private static AssociatedAttributePolicy GetAssociatedAttributePolicy(string attributeTypeName) =>
         attributeTypeName is
             "AllowedCapabilitiesAttribute" or

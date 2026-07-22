@@ -58,5 +58,4 @@ internal static partial class ExecutionVisibility {
                 return false;
         }
     }
-
 }

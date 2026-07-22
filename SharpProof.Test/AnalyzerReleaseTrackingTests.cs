@@ -33,18 +33,13 @@ public sealed class AnalyzerReleaseTrackingTests {
         Assert.That(newRuleIds.OrderBy(id => id, StringComparer.Ordinal), Is.EqualTo(supportedIds));
         Assert.That(newRuleIds, Does.Not.Contain("SP0001"));
     }
-
     [Test]
     public void AnalyzerProject_DoesNotSuppressReleaseTrackingRules() {
-        var project = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
-            "SharpProof.Analyzer",
-            "SharpProof.Analyzer.csproj"));
+        var project = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "SharpProof.Analyzer", "SharpProof.Analyzer.csproj"));
 
         Assert.That(project, Does.Not.Contain("RS2007"));
         Assert.That(project, Does.Not.Contain("RS2008"));
     }
-
     private static IEnumerable<string> GetNewRuleIds(string path) {
         var inNewRulesSection = false;
         foreach (var line in File.ReadLines(path)) {
@@ -55,14 +50,12 @@ public sealed class AnalyzerReleaseTrackingTests {
                 inNewRulesSection = trimmed == "### New Rules";
                 continue;
             }
-
             if (!inNewRulesSection) continue;
 
             var match = ReleaseRuleRow.Match(trimmed);
             if (match.Success) yield return match.Groups[1].Value;
         }
     }
-
     private static string FindRepositoryRoot() {
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
         while (directory != null) {
@@ -70,7 +63,6 @@ public sealed class AnalyzerReleaseTrackingTests {
 
             directory = directory.Parent;
         }
-
         throw new InvalidOperationException("Could not find repository root.");
     }
 }

@@ -14,18 +14,11 @@ namespace SharpProof.Test;
 internal class SymbolicProofModelTests {
     [Test]
     public void ConditionTruth_PreservesTheDecisiveBranchFailureReason() {
-        var session = new SequencedProofSearchSession(
-            "smt_timeout",
-            "smt_method_budget_exceeded");
-        using var service = new SmtAnalysisService(
-            SmtAnalysisOptions.Default,
-            () => session);
+        var session = new SequencedProofSearchSession("smt_timeout", "smt_method_budget_exceeded");
+        using var service = new SmtAnalysisService(SmtAnalysisOptions.Default, () => session);
         var value = new SymbolicVariableTerm("pipeline_text", SmtValueKind.String);
         var condition = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicStringPredicateAtom(
-                SymbolicStringPredicateKind.Contains,
-                value,
-                new SymbolicStringConstantTerm("needle")),
+            new SymbolicStringPredicateAtom(SymbolicStringPredicateKind.Contains, value, new SymbolicStringConstantTerm("needle")),
             SyntaxFactory.ParseExpression("pipeline_text.Contains(\"needle\")"),
             "test.pipeline"));
 
@@ -37,7 +30,6 @@ internal class SymbolicProofModelTests {
         Assert.That(result.Reason, Is.EqualTo("ir_condition_true_branch_feasibility_unknown"));
         Assert.That(result.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Timeout));
     }
-
     [Test]
     public void TypedReachabilityProof_ClassifiesEmptyStateAsReachable() {
         using var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -47,7 +39,6 @@ internal class SymbolicProofModelTests {
 
         Assert.That(result.Status, Is.EqualTo(SymbolicProofStatus.Reachable));
     }
-
     [Test]
     public void ProofServiceCache_EvictsAtPerServiceLimitWithoutChangingResults() {
         using var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -60,7 +51,6 @@ internal class SymbolicProofModelTests {
             lastState = CreateUnsupportedState(index);
             proofService.ClassifyReachability(lastState);
         }
-
         var cachedLast = proofService.ClassifyReachability(lastState!);
         var recomputedFirst = proofService.ClassifyReachability(firstState);
 
@@ -72,7 +62,6 @@ internal class SymbolicProofModelTests {
         Assert.That(recomputedFirst.Status, Is.EqualTo(first.Status));
         Assert.That(recomputedFirst.Reason, Is.EqualTo(first.Reason));
     }
-
     [Test]
     public void StructuralPathCache_IsBoundedPerMethod() {
         var statements = string.Join(
@@ -92,32 +81,30 @@ internal class SymbolicProofModelTests {
         foreach (var site in sites.Skip(1))
             last = SymbolicReachabilityService.CollectPathStateAt(site, model, CancellationToken.None);
 
-        var cachedLast = SymbolicReachabilityService.CollectPathStateAt(
-            sites[^1], model, CancellationToken.None);
-        var recomputedFirst = SymbolicReachabilityService.CollectPathStateAt(
-            sites[0], model, CancellationToken.None);
+        var cachedLast = SymbolicReachabilityService.CollectPathStateAt(sites[^1], model, CancellationToken.None);
+        var recomputedFirst = SymbolicReachabilityService.CollectPathStateAt(sites[0], model, CancellationToken.None);
 
         Assert.That(sites, Has.Length.EqualTo(520));
         Assert.That(cachedLast, Is.SameAs(last));
         Assert.That(recomputedFirst, Is.Not.SameAs(first));
     }
-
     private static SymbolicState CreateUnsupportedState(int index) {
         var name = "proof_cache_resource_" + index;
-        var fact = SymbolicFact.Exact(
-            new SymbolicFreshnessAtom(new SymbolicVariableTerm(name, SmtValueKind.Reference)),
-            SyntaxFactory.ParseExpression(name),
-            "test.cache");
+        var source = SyntaxFactory.ParseExpression(name);
+        var fact = new SymbolicFact(
+            new SymbolicTruthAtom(new SymbolicVariableTerm(name, SmtValueKind.Bool)),
+            true,
+            SymbolicFactConfidence.Unsupported,
+            "test.cache",
+            source.Span,
+            null,
+            "test.cache.unsupported");
         return new SymbolicState(new[] { fact });
     }
-
     private sealed class SequencedProofSearchSession : IAnalysisProofSearchSession {
         private readonly Queue<string> _reasons;
 
-        internal SequencedProofSearchSession(params string[] reasons) {
-            _reasons = new Queue<string>(reasons);
-        }
-
+        internal SequencedProofSearchSession(params string[] reasons) => _reasons = new Queue<string>(reasons);
         internal int ClassificationCount { get; private set; }
 
         public long ConsumedResourceCount => 0;
@@ -131,7 +118,6 @@ internal class SymbolicProofModelTests {
                 new ProofCheckInfo(false, Feasibility.Unknown),
                 reason);
         }
-
         public void Dispose() {
         }
     }

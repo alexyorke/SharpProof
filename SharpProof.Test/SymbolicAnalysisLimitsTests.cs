@@ -39,23 +39,19 @@ public sealed class SymbolicAnalysisLimitsTests {
         Assert.That(overridden.MaxMergedPathConditions, Is.EqualTo(11));
         Assert.That(overridden.MaxMergedSwitchFacts, Is.EqualTo(defaults.MaxMergedSwitchFacts));
     }
-
     [Test]
     public void AnalysisLimits_RejectNonPositiveValues() {
-        Assert.That( () => new SharpProofAnalysisBudget(MaxMergedIfElseFacts: 0).Validate(), Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(() => new SharpProofAnalysisBudget(MaxMergedIfElseFacts: 0).Validate(), Throws.TypeOf<ArgumentOutOfRangeException>());
         Assert.That(
             () => (SharpProofAnalysisBudget.Default with { MaxStructuralNullStateDepth = -1 }).Validate(),
             Throws.TypeOf<ArgumentOutOfRangeException>());
     }
-
     [Test]
     public void AnalysisLimitEvent_UnknownKindRemainsExplicit() {
-        var item = new SymbolicAnalysisTruncationEvent(
-            (SymbolicAnalysisLimitKind)int.MaxValue, 1, 2, "test", null);
+        var item = new SymbolicAnalysisTruncationEvent((SymbolicAnalysisLimitKind)int.MaxValue, 1, 2, "test", null);
 
         Assert.That(item.Code, Is.EqualTo("analysis_limit.unknown"));
     }
-
     [Test]
     public void AnalysisLimitScope_DeduplicatesEventsAndPreservesNestedSourceLocations() {
         var sourceNode = CSharpSyntaxTree.ParseText("class C { void M() { } }")
@@ -64,32 +60,17 @@ public sealed class SymbolicAnalysisLimitsTests {
             .Single(node => node.RawKind == (int)SyntaxKind.MethodDeclaration);
 
         using var outer = SymbolicAnalysisLimitContext.Push();
-        SymbolicAnalysisLimitContext.Record(
-            SymbolicAnalysisLimitKind.IfElseFactMerge,
-            2,
-            3,
-            sourceNode,
-            "test.if");
-        SymbolicAnalysisLimitContext.Record(
-            SymbolicAnalysisLimitKind.IfElseFactMerge,
-            2,
-            5,
-            sourceNode,
-            "test.if");
+        SymbolicAnalysisLimitContext.Record(SymbolicAnalysisLimitKind.IfElseFactMerge, 2, 3, sourceNode, "test.if");
+        SymbolicAnalysisLimitContext.Record(SymbolicAnalysisLimitKind.IfElseFactMerge, 2, 5, sourceNode, "test.if");
 
         using (SymbolicAnalysisLimitContext.Push())
-            SymbolicAnalysisLimitContext.Record(
-                SymbolicAnalysisLimitKind.ForeachElementFacts,
-                1,
-                4,
-                sourceNode,
-                "test.foreach");
+            SymbolicAnalysisLimitContext.Record(SymbolicAnalysisLimitKind.ForeachElementFacts, 1, 4, sourceNode, "test.foreach");
 
         var info = outer.Snapshot();
 
         Assert.That(info.IsTruncated, Is.True);
         Assert.That(info.Events, Has.Count.EqualTo(2));
-        Assert.That( info.Events.Single(item => item.Kind == SymbolicAnalysisLimitKind.IfElseFactMerge).Observed, Is.EqualTo(5));
+        Assert.That(info.Events.Single(item => item.Kind == SymbolicAnalysisLimitKind.IfElseFactMerge).Observed, Is.EqualTo(5));
         Assert.That(info.Events.All(item => item.SourceSpanStart == sourceNode.SpanStart), Is.True);
         Assert.That(
             info.Events.Select(item => item.Code),
@@ -98,7 +79,6 @@ public sealed class SymbolicAnalysisLimitsTests {
                 "analysis_limit.foreach_element_facts"
             }));
     }
-
     [Test]
     public void AnalysisLimitScope_IsolatedEventsDoNotPropagateToParent() {
         using var outer = SymbolicAnalysisLimitContext.Push();
@@ -111,48 +91,25 @@ public sealed class SymbolicAnalysisLimitsTests {
                 provenance: "test.isolated");
             Assert.That(isolated.Snapshot().IsTruncated, Is.True);
         }
-
         Assert.That(outer.Snapshot().IsTruncated, Is.False);
     }
-
     [Test]
     public void TruncationCombination_UsesMaximumObservationAndCanonicalOrdering() {
         var combined = SymbolicAnalysisTruncationInfo.Combine(new[] {
             new SymbolicAnalysisTruncationInfo(new[] {
-                new SymbolicAnalysisTruncationEvent(
-                    SymbolicAnalysisLimitKind.SwitchFactMerge,
-                    2,
-                    3,
-                    "switch.z",
-                    20),
-                new SymbolicAnalysisTruncationEvent(
-                    SymbolicAnalysisLimitKind.IfElseFactMerge,
-                    2,
-                    3,
-                    "if.a",
-                    10)
+                new SymbolicAnalysisTruncationEvent(SymbolicAnalysisLimitKind.SwitchFactMerge, 2, 3, "switch.z", 20),
+                new SymbolicAnalysisTruncationEvent(SymbolicAnalysisLimitKind.IfElseFactMerge, 2, 3, "if.a", 10)
             }),
             new SymbolicAnalysisTruncationInfo(new[] {
-                new SymbolicAnalysisTruncationEvent(
-                    SymbolicAnalysisLimitKind.SwitchFactMerge,
-                    2,
-                    7,
-                    "switch.z",
-                    20),
-                new SymbolicAnalysisTruncationEvent(
-                    SymbolicAnalysisLimitKind.SwitchFactMerge,
-                    2,
-                    4,
-                    "switch.a",
-                    20)
+                new SymbolicAnalysisTruncationEvent(SymbolicAnalysisLimitKind.SwitchFactMerge, 2, 7, "switch.z", 20),
+                new SymbolicAnalysisTruncationEvent(SymbolicAnalysisLimitKind.SwitchFactMerge, 2, 4, "switch.a", 20)
             })
         });
 
         Assert.That(combined.Events.Select(static item => item.Provenance),
-            Is.EqualTo(new[] { "if.a", "switch.a", "switch.z" }));
+            Is.EqualTo(["if.a", "switch.a", "switch.z"]));
         Assert.That(combined.Events.Single(static item => item.Provenance == "switch.z").Observed, Is.EqualTo(7));
     }
-
     [Test]
     public void PathConditionMerger_ReportsEveryStateMergeCap() {
         var source = SyntaxFactory.ParseExpression("source");
@@ -196,7 +153,6 @@ public sealed class SymbolicAnalysisLimitsTests {
                 source,
                 "test.equal"));
     }
-
     [Test]
     public void PathConditionMerger_GroupsNegatedBooleanAndComparisonTargets() {
         var source = SyntaxFactory.ParseExpression("source");
@@ -223,18 +179,12 @@ public sealed class SymbolicAnalysisLimitsTests {
             static condition => condition is SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or }));
 
         SymbolicCondition Truth(SymbolicTerm term) =>
-            new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicTruthAtom(term), source, "test.truth"));
+            new SymbolicFactCondition(SymbolicFact.Exact(new SymbolicTruthAtom(term), source, "test.truth"));
 
         SymbolicCondition Greater(SymbolicTerm term, int constant) =>
             new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicRelationAtom(
-                    SymbolicRelationOperator.GreaterThan,
-                    term,
-                    new SymbolicIntegerConstantTerm(constant)),
+                new SymbolicRelationAtom(SymbolicRelationOperator.GreaterThan, term, new SymbolicIntegerConstantTerm(constant)),
                 source,
                 "test.greater"));
     }
-
-
 }

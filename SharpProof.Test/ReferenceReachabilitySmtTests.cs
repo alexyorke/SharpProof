@@ -23,7 +23,6 @@ public class TestClass
 
         Assert.That(IsConditionalAccessWhenNotNullUnreachable(source), Is.True);
     }
-
     [Test]
     public void ExecutionVisibility_GuardedNullConditionalAccessWhenNotNull_IsUnreachable() {
         const string source = @"
@@ -40,7 +39,6 @@ public class TestClass
 
         Assert.That(IsConditionalAccessWhenNotNullUnreachable(source), Is.True);
     }
-
     [Test]
     public void ExecutionVisibility_ReassignedConditionalAccessWhenNotNull_RemainsReachable() {
         const string source = @"
@@ -55,7 +53,6 @@ public class TestClass
 
         Assert.That(IsConditionalAccessWhenNotNullUnreachable(source), Is.False);
     }
-
     [Test]
     public void ExecutionVisibility_PriorNonNullCoalesceRight_IsUnreachable() {
         const string source = @"
@@ -71,7 +68,6 @@ public class TestClass
 
         Assert.That(IsInvocationUnreachable(source, "Throw()"), Is.True);
     }
-
     [Test]
     public void ExecutionVisibility_GuardedNonNullCoalesceRight_IsUnreachable() {
         const string source = @"
@@ -90,7 +86,6 @@ public class TestClass
 
         Assert.That(IsInvocationUnreachable(source, "Throw()"), Is.True);
     }
-
     [Test]
     public void ExecutionVisibility_UnknownCoalesceRight_RemainsReachable() {
         const string source = @"
@@ -105,7 +100,6 @@ public class TestClass
 
         Assert.That(IsInvocationUnreachable(source, "Throw()"), Is.False);
     }
-
     private static bool IsConditionalAccessWhenNotNullUnreachable(string source) {
         var (semanticModel, root) = CreateSemanticModel(source);
         var memberBinding = root
@@ -115,7 +109,6 @@ public class TestClass
 
         return IsUnreachable(memberBinding, semanticModel);
     }
-
     private static bool IsInvocationUnreachable(string source, string invocationText) {
         var (semanticModel, root) = CreateSemanticModel(source);
         var invocation = root
@@ -125,7 +118,6 @@ public class TestClass
 
         return IsUnreachable(invocation, semanticModel);
     }
-
     private static bool IsUnreachable(SyntaxNode node, SemanticModel semanticModel) {
         var method = typeof(SharpProofAnalyzer).Assembly
             .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", true)!
@@ -133,13 +125,12 @@ public class TestClass
                 "IsInStaticallyUnreachableBranchUsingSmt",
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
                 null,
-                new[] { typeof(SyntaxNode), typeof(SemanticModel), typeof(CancellationToken),
-                    typeof(SharpProof.Symbolic.Smt.SmtAnalysisService) },
+                [ typeof(SyntaxNode), typeof(SemanticModel), typeof(CancellationToken),
+                    typeof(SharpProof.Symbolic.Smt.SmtAnalysisService) ],
                 null)!;
 
-        return (bool)method.Invoke(null, new object?[] { node, semanticModel, CancellationToken.None, null })!;
+        return (bool)method.Invoke(null, [node, semanticModel, CancellationToken.None, null])!;
     }
-
     private static (SemanticModel SemanticModel, SyntaxNode Root) CreateSemanticModel(string source) {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,

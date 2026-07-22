@@ -17,7 +17,6 @@ internal static class SymbolicConversionLowerer {
                 "ir.decimal-zero-comparison");
             return true;
         }
-
         if (!TryLowerDecimalZeroOperands(expression.Right, expression.Left, context, out value)) return false;
         relation = ReverseRelation(relation);
         condition = SymbolicIrLowerer.CreateRelationCondition(
@@ -28,7 +27,6 @@ internal static class SymbolicConversionLowerer {
             "ir.decimal-zero-comparison.reversed");
         return true;
     }
-
     private static bool TryLowerDecimalZeroOperands(
         ExpressionSyntax valueExpression,
         ExpressionSyntax zeroExpression,
@@ -54,7 +52,6 @@ internal static class SymbolicConversionLowerer {
             : new SymbolicVariableTerm(context.GetVariableName(symbol), SmtValueKind.Int);
         return value.Kind == SmtValueKind.Int;
     }
-
     private static SymbolicRelationOperator ReverseRelation(SymbolicRelationOperator relation) => relation switch {
         SymbolicRelationOperator.LessThan => SymbolicRelationOperator.GreaterThan,
         SymbolicRelationOperator.LessThanOrEqual => SymbolicRelationOperator.GreaterThanOrEqual,
@@ -84,22 +81,12 @@ internal static class SymbolicConversionLowerer {
 
         if (!castOnLeft) relation = ReverseRelation(relation);
 
-        var bounds = SymbolicIrLowerer.CreateIntegerInRangeCondition(
-            operand,
-            minimum,
-            maximum,
-            cast,
+        var bounds = SymbolicIrLowerer.CreateIntegerInRangeCondition(operand, minimum, maximum, cast,
             "ir.checked-conversion.normal-return");
-        var comparison = SymbolicIrLowerer.CreateRelationCondition(
-            relation,
-            operand,
-            other,
-            expression,
-            "ir.checked-conversion.value");
+        var comparison = SymbolicIrLowerer.CreateRelationCondition(relation, operand, other, expression, "ir.checked-conversion.value");
         condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, bounds, comparison);
         return true;
     }
-
     private static bool TryGetCheckedIntegralCast(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -129,7 +116,6 @@ internal static class SymbolicConversionLowerer {
                TryGetIntegralShape(sourceType.SpecialType, out _, out _) &&
                TryGetIntegralShape(targetType.SpecialType, out _, out _);
     }
-
     internal static bool TryLowerReferenceAsTerm(
         BinaryExpressionSyntax asExpression,
         SymbolicLoweringContext context,
@@ -144,24 +130,16 @@ internal static class SymbolicConversionLowerer {
             term = operand;
             return true;
         }
-
         var sourceType = context.SemanticModel.GetTypeInfo(asExpression.Left, context.CancellationToken).Type;
         var targetType = context.SemanticModel.GetTypeInfo(targetTypeSyntax, context.CancellationToken).Type;
         if (sourceType?.IsReferenceType != true ||
             targetType?.IsReferenceType != true ||
-            !SymbolicPatternLowerer.TryLowerTypeTestCondition(
-                operand,
-                targetTypeSyntax,
-                asExpression,
-                false,
-                context,
-                out var typeTest))
+            !SymbolicPatternLowerer.TryLowerTypeTestCondition(operand, targetTypeSyntax, asExpression, false, context, out var typeTest))
             return false;
 
         term = new SymbolicConditionalTerm(typeTest, operand, new SymbolicNullTerm());
         return true;
     }
-
     internal static bool TryLowerUnsignedCastBoundsComparison(
         BinaryExpressionSyntax binaryExpression,
         SymbolicLoweringContext context,
@@ -171,10 +149,8 @@ internal static class SymbolicConversionLowerer {
             !binaryExpression.IsKind(SyntaxKind.GreaterThanOrEqualExpression))
             return false;
 
-        if (!TryGetUnsignedCastOperand(binaryExpression.Left, context, out var indexExpression,
-                out var leftUnsignedType) ||
-            !TryGetUnsignedCastOperand(binaryExpression.Right, context, out var lengthExpression,
-                out var rightUnsignedType) ||
+        if (!TryGetUnsignedCastOperand(binaryExpression.Left, context, out var indexExpression, out var leftUnsignedType) ||
+            !TryGetUnsignedCastOperand(binaryExpression.Right, context, out var lengthExpression, out var rightUnsignedType) ||
             leftUnsignedType != rightUnsignedType ||
             !IsKnownNonNegativeIntegralExpression(lengthExpression, context) ||
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(indexExpression, context), out var index) ||
@@ -192,7 +168,6 @@ internal static class SymbolicConversionLowerer {
             : new SymbolicNotCondition(inRange);
         return true;
     }
-
     private static bool TryGetUnsignedCastOperand(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -207,15 +182,11 @@ internal static class SymbolicConversionLowerer {
                 .SpecialType;
             return true;
         }
-
         operand = null!;
         unsignedType = SpecialType.None;
         return false;
     }
-
-    private static bool IsKnownNonNegativeIntegralExpression(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context) {
+    private static bool IsKnownNonNegativeIntegralExpression(ExpressionSyntax expression, SymbolicLoweringContext context) {
         expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constantValue.HasValue &&
@@ -233,7 +204,6 @@ internal static class SymbolicConversionLowerer {
                receiverType is IArrayTypeSymbol ||
                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(receiverType);
     }
-
     private static bool IsIdentityPreservingReferenceConversion(
         ExpressionSyntax expression,
         TypeSyntax targetTypeSyntax,
@@ -261,7 +231,6 @@ internal static class SymbolicConversionLowerer {
 
         return false;
     }
-
     internal static bool TryLowerSupportedConversionTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -274,7 +243,6 @@ internal static class SymbolicConversionLowerer {
             term = null!;
             return false;
         }
-
         if (expression is CastExpressionSyntax castExpression) {
             if (context.SemanticModel.GetOperation(castExpression, context.CancellationToken) is
                     Microsoft.CodeAnalysis.Operations.IConversionOperation { Conversion.IsIdentity: true } &&
@@ -282,14 +250,12 @@ internal static class SymbolicConversionLowerer {
                 term = identityOperand;
                 return true;
             }
-
             if (IsIdentityPreservingReferenceConversion(castExpression.Expression, castExpression.Type, context) &&
                 SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var referenceOperand) &&
                 referenceOperand.Kind == SmtValueKind.Reference) {
                 term = referenceOperand;
                 return true;
             }
-
             var sourceType = context.SemanticModel.GetTypeInfo(castExpression.Expression, context.CancellationToken)
                 .Type;
             var targetType = context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type;
@@ -301,22 +267,14 @@ internal static class SymbolicConversionLowerer {
                 term = operand;
                 return true;
             }
-
             if (sourceType != null &&
                 targetType != null &&
-                TryCreateNumericConversionTerm(
-                    castExpression,
-                    sourceType,
-                    targetType,
-                    context,
-                    out term))
+                TryCreateNumericConversionTerm(castExpression, sourceType, targetType, context, out term))
                 return true;
         }
-
         term = null!;
         return false;
     }
-
     private static bool TryCreateNumericConversionTerm(
         CastExpressionSyntax castExpression,
         ITypeSymbol sourceType,
@@ -340,17 +298,11 @@ internal static class SymbolicConversionLowerer {
 
             operandIdentity = "symbol:" + context.GetVariableName(operandSymbol);
         }
-
         var isChecked = context.SemanticModel.GetOperation(castExpression, context.CancellationToken) is
             Microsoft.CodeAnalysis.Operations.IConversionOperation { IsChecked: true };
-        term = new SymbolicNumericConversionTerm(
-            operandIdentity,
-            sourceType.SpecialType,
-            targetType.SpecialType,
-            isChecked);
+        term = new SymbolicNumericConversionTerm(operandIdentity, sourceType.SpecialType, targetType.SpecialType, isChecked);
         return true;
     }
-
     private static bool IsNumericSpecialType(SpecialType specialType) => specialType is SpecialType.System_SByte or
             SpecialType.System_Byte or
             SpecialType.System_Int16 or
@@ -381,7 +333,6 @@ internal static class SymbolicConversionLowerer {
             ? targetBits > sourceBits
             : targetBits >= sourceBits;
     }
-
     private static bool TryGetIntegralShape(SpecialType specialType, out bool signed, out int bits) {
         switch (specialType) {
             case SpecialType.System_SByte:

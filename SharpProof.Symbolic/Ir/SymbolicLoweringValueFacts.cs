@@ -1,19 +1,14 @@
 namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicLoweringValueFacts {
-    internal static bool TryGetStableVariableSymbol(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context,
-        out ISymbol symbol) {
+    internal static bool TryGetStableVariableSymbol(ExpressionSyntax expression, SymbolicLoweringContext context, out ISymbol symbol) {
         if (expression is IdentifierNameSyntax) {
             symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol!;
             return symbol is ILocalSymbol or IParameterSymbol;
         }
-
         symbol = null!;
         return false;
     }
-
     internal static bool TryGetIntegralConstant(object value, out long result) {
         try {
             switch (value) {
@@ -48,11 +43,9 @@ internal static class SymbolicLoweringValueFacts {
         }
         catch (OverflowException) {
         }
-
         result = 0;
         return false;
     }
-
     internal static bool TryGetIntegralConstant(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -65,7 +58,6 @@ internal static class SymbolicLoweringValueFacts {
         result = 0;
         return false;
     }
-
     internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression) =>
         CSharpSyntaxFacts.UnwrapExpression(expression, ExpressionCastUnwrapPolicy.NullableOnly);
 }

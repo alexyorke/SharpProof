@@ -5,7 +5,7 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class ModernCSharpSurfaceDocumentationTests {
     private static readonly string[] RequiredColumns =
-    {
+    [
         "Feature",
         "C#",
         "Analyzer",
@@ -15,10 +15,10 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
         "Allocation",
         "Complexity",
         "Ensures"
-    };
+    ];
 
     private static readonly string[] RequiredFeatures =
-    {
+    [
         "Primary constructors",
         "Collection expressions",
         "Inline arrays",
@@ -34,15 +34,15 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
         "Extension properties",
         "Extension operators",
         "Static extension members"
-    };
+    ];
 
     private static readonly string[] SurfaceStatusPrefixes =
-    {
+    [
         "Covered",
         "Partial",
         "Conservative",
         "Gap"
-    };
+    ];
 
     [Test]
     public void ModernCSharpSurfaceMatrix_CoversRequiredFeaturesAndSurfaces() {
@@ -62,12 +62,12 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
                 Assert.That(cell, Does.Not.Contain("TBD").IgnoreCase, $"{row.Key} {RequiredColumns[columnIndex]}");
                 Assert.That(cell, Does.Not.Contain("TODO").IgnoreCase, $"{row.Key} {RequiredColumns[columnIndex]}");
             }
-
             foreach (var cell in row.Value.Skip(2))
-                Assert.That( SurfaceStatusPrefixes.Any(prefix => cell.StartsWith(prefix, StringComparison.Ordinal)), Is.True, row.Key + " has an unrecognized surface status: " + cell);
+                Assert.That(SurfaceStatusPrefixes.Any(prefix
+                    => cell.StartsWith(prefix, StringComparison.Ordinal)), Is.True,
+                    row.Key + " has an unrecognized surface status: " + cell);
         }
     }
-
     [Test]
     public void ModernCSharpSurfaceMatrix_IsLinkedFromReadme() {
         var repositoryRoot = FindRepositoryRoot();
@@ -75,7 +75,6 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
 
         Assert.That(readme, Does.Contain("docs/modern-csharp-surface.md"));
     }
-
     private static IReadOnlyDictionary<string, string[]> ReadMatrixRows(string document) {
         var lines = document.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
         var headerIndex = Array.FindIndex(
@@ -98,19 +97,13 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
             Assert.That(cells.Length, Is.EqualTo(RequiredColumns.Length), line);
             rows.Add(cells[0], cells);
         }
-
         return rows;
     }
-
-    private static string[] SplitRow(string line) {
-        return line
+    private static string[] SplitRow(string line) => [.. line
             .Trim()
             .Trim('|')
             .Split('|')
-            .Select(static cell => cell.Trim())
-            .ToArray();
-    }
-
+            .Select(static cell => cell.Trim())];
     private static string FindRepositoryRoot() {
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
         while (directory != null) {
@@ -118,7 +111,6 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
 
             directory = directory.Parent;
         }
-
         throw new DirectoryNotFoundException("Could not find repository root.");
     }
 }

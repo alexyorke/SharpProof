@@ -49,7 +49,6 @@ internal sealed class SymbolicLoweringContext(
         term = null!;
         return false;
     }
-
     public string GetVariableName(ISymbol symbol) {
         var name = SymbolicFactFactory.GetSmtVariableName(symbol);
         var version = GetSymbolVersion?.Invoke(symbol.OriginalDefinition) ?? 0;

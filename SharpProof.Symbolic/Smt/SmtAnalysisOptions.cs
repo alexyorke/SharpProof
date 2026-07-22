@@ -4,7 +4,6 @@ internal enum SmtAnalysisMode {
     Bounded,
     Deep
 }
-
 internal sealed record SmtAnalysisOptions(
     SmtAnalysisMode Mode,
     TimeSpan QueryTimeout,
@@ -31,7 +30,6 @@ internal sealed record SmtAnalysisOptions(
             useSharedResultCache,
             SmtSolverLifecycleOptions.Default) {
     }
-
     public static SmtAnalysisOptions ForMode(SmtAnalysisMode mode) => mode switch {
         SmtAnalysisMode.Deep => new SmtAnalysisOptions(
                             SmtAnalysisMode.Deep,
@@ -43,7 +41,7 @@ internal sealed record SmtAnalysisOptions(
         _ => CreateBoundedDefaults(),
     };
 
-    private static SmtAnalysisOptions CreateBoundedDefaults() => new SmtAnalysisOptions(
+    private static SmtAnalysisOptions CreateBoundedDefaults() => new(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromMilliseconds(750),
             TimeSpan.FromMilliseconds(5000),

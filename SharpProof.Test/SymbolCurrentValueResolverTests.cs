@@ -35,9 +35,9 @@ public sealed class SymbolCurrentValueResolverTests {
             .Single(identifier => identifier.Identifier.ValueText == "index" &&
                 identifier.Ancestors().OfType<ParenthesizedLambdaExpressionSyntax>().Any());
 
-        Assert.That(SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression( use, use, semanticModel, CancellationToken.None, out _), Is.False);
+        Assert.That(SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(use, use, semanticModel, CancellationToken.None,
+            out _), Is.False);
     }
-
     [Test]
     public void ExactRuntimeType_LaterLoopMutationInvalidatesPriorIterationValue() {
         const string source = """
@@ -65,12 +65,7 @@ public sealed class SymbolCurrentValueResolverTests {
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var cast = syntaxTree.GetRoot().DescendantNodes().OfType<CastExpressionSyntax>().Single();
 
-        var resolved = SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
-            cast.Expression,
-            cast,
-            semanticModel,
-            CancellationToken.None,
-            out _);
+        var resolved = SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(cast.Expression, cast, semanticModel, CancellationToken.None, out _);
 
         Assert.That(resolved, Is.False);
     }

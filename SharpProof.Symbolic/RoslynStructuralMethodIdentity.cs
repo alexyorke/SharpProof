@@ -24,7 +24,6 @@ internal static class RoslynStructuralMethodIdentity {
                         ? StructuralRefKinds.Ref
                         : StructuralRefKinds.None);
     }
-
     internal static string GetCanonicalKey(IMethodSymbol method) =>
         Create(method).ToCanonicalKey();
 
@@ -55,7 +54,6 @@ internal static class RoslynStructuralMethodIdentity {
                 return "unsupported:" + type.TypeKind.ToString().ToLowerInvariant();
         }
     }
-
     internal static string GetMetadataTypeName(INamedTypeSymbol type) {
         if (type == null) throw new ArgumentNullException(nameof(type));
         var definition = type.OriginalDefinition;
@@ -67,7 +65,6 @@ internal static class RoslynStructuralMethodIdentity {
             ? definition.MetadataName
             : namespaceName + "." + definition.MetadataName;
     }
-
     private static string GetNamedTypeKey(INamedTypeSymbol type) {
         var definitionName = GetMetadataTypeName(type.OriginalDefinition);
         var typeArguments = GetFlattenedTypeArguments(type);
@@ -76,13 +73,11 @@ internal static class RoslynStructuralMethodIdentity {
         return "named:" + definitionName + "[" +
                string.Join(";", typeArguments.Select(GetTypeKey)) + "]";
     }
-
     private static string GetFunctionPointerKey(IFunctionPointerTypeSymbol functionPointer) {
         var signature = functionPointer.Signature;
         var parameters = string.Join(
             ";",
-            signature.Parameters.Select(static parameter =>
-                GetRefKind(parameter.RefKind) + ":" + GetTypeKey(parameter.Type)));
+            signature.Parameters.Select(static parameter => GetRefKind(parameter.RefKind) + ":" + GetTypeKey(parameter.Type)));
         var returnRefKind = signature.ReturnsByRefReadonly
             ? StructuralRefKinds.RefReadonly
             : signature.ReturnsByRef
@@ -91,22 +86,17 @@ internal static class RoslynStructuralMethodIdentity {
         return "fnptr:" + signature.CallingConvention.ToString().ToLowerInvariant() + "(" + parameters + ")->" +
                returnRefKind + ":" + GetTypeKey(signature.ReturnType);
     }
-
     private static ImmutableArray<ITypeSymbol> GetFlattenedTypeArguments(INamedTypeSymbol type) {
-        if (!type.IsGenericType && type.ContainingType == null) return ImmutableArray<ITypeSymbol>.Empty;
+        if (!type.IsGenericType && type.ContainingType == null) return [];
 
         var builder = ImmutableArray.CreateBuilder<ITypeSymbol>();
         AppendFlattenedTypeArguments(type, builder);
         return builder.ToImmutable();
     }
-
-    private static void AppendFlattenedTypeArguments(
-        INamedTypeSymbol type,
-        ImmutableArray<ITypeSymbol>.Builder builder) {
+    private static void AppendFlattenedTypeArguments(INamedTypeSymbol type, ImmutableArray<ITypeSymbol>.Builder builder) {
         if (type.ContainingType != null) AppendFlattenedTypeArguments(type.ContainingType, builder);
         foreach (var argument in type.TypeArguments) builder.Add(argument);
     }
-
     private static int GetFlattenedTypeParameterOrdinal(ITypeParameterSymbol parameter) {
         if (parameter.ContainingSymbol is not INamedTypeSymbol owner) return parameter.Ordinal;
 
@@ -115,7 +105,6 @@ internal static class RoslynStructuralMethodIdentity {
             offset += containing.Arity;
         return offset + parameter.Ordinal;
     }
-
     private static int GetFlattenedMethodTypeParameterOrdinal(ITypeParameterSymbol parameter) {
         var offset = parameter.Ordinal;
         for (var containing = parameter.ContainingSymbol?.ContainingSymbol;
@@ -126,24 +115,20 @@ internal static class RoslynStructuralMethodIdentity {
 
         return offset;
     }
-
-    private static string GetMethodKind(IMethodSymbol method) {
-        return method.MethodKind switch {
-            MethodKind.Constructor => "constructor",
-            MethodKind.StaticConstructor => "static-constructor",
-            MethodKind.PropertyGet => "property-get",
-            MethodKind.PropertySet => "property-set",
-            MethodKind.EventAdd => "event-add",
-            MethodKind.EventRemove => "event-remove",
-            MethodKind.UserDefinedOperator => "operator",
-            MethodKind.Conversion => "conversion",
-            MethodKind.Destructor => "destructor",
-            MethodKind.LocalFunction => "local-function",
-            MethodKind.AnonymousFunction => "anonymous-function",
-            _ => "ordinary"
-        };
-    }
-
+    private static string GetMethodKind(IMethodSymbol method) => method.MethodKind switch {
+        MethodKind.Constructor => "constructor",
+        MethodKind.StaticConstructor => "static-constructor",
+        MethodKind.PropertyGet => "property-get",
+        MethodKind.PropertySet => "property-set",
+        MethodKind.EventAdd => "event-add",
+        MethodKind.EventRemove => "event-remove",
+        MethodKind.UserDefinedOperator => "operator",
+        MethodKind.Conversion => "conversion",
+        MethodKind.Destructor => "destructor",
+        MethodKind.LocalFunction => "local-function",
+        MethodKind.AnonymousFunction => "anonymous-function",
+        _ => "ordinary"
+    };
     private static string GetLogicalName(IMethodSymbol method) {
         string? name = method.MethodKind switch {
             MethodKind.Constructor => ".ctor",
@@ -159,17 +144,13 @@ internal static class RoslynStructuralMethodIdentity {
 
         return method.MethodKind.ToString();
     }
-
-    private static string GetRefKind(RefKind refKind) {
-        return refKind switch {
-            RefKind.Ref => StructuralRefKinds.Ref,
-            RefKind.Out => StructuralRefKinds.Out,
-            RefKind.In => StructuralRefKinds.In,
-            RefKind.RefReadOnlyParameter => StructuralRefKinds.RefReadonly,
-            _ => StructuralRefKinds.None
-        };
-    }
-
+    private static string GetRefKind(RefKind refKind) => refKind switch {
+        RefKind.Ref => StructuralRefKinds.Ref,
+        RefKind.Out => StructuralRefKinds.Out,
+        RefKind.In => StructuralRefKinds.In,
+        RefKind.RefReadOnlyParameter => StructuralRefKinds.RefReadonly,
+        _ => StructuralRefKinds.None
+    };
     private static string GetNamespaceName(INamespaceSymbol? namespaceSymbol) {
         if (namespaceSymbol == null || namespaceSymbol.IsGlobalNamespace) return string.Empty;
 

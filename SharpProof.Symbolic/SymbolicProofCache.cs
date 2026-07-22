@@ -8,21 +8,15 @@ internal static class SymbolicProofCacheStore {
 
     internal static SymbolicProofCache Get(SmtAnalysisService? smtAnalysis) =>
         smtAnalysis != null
-            ? ServiceCaches.GetValue(
-                smtAnalysis,
-                static _ => new SymbolicProofCache(PerServiceEntryLimit))
+            ? ServiceCaches.GetValue(smtAnalysis, static _ => new SymbolicProofCache(PerServiceEntryLimit))
             : FallbackCache;
 }
-
 internal sealed class SymbolicProofCache {
     private const string EncodedStatePrefix = "encoded-state:";
     private const string ResultPrefix = "proof-result:";
     private readonly BoundedConcurrentCache<string, object> _values;
 
-    internal SymbolicProofCache(int capacity) {
-        _values = new BoundedConcurrentCache<string, object>(capacity, StringComparer.Ordinal);
-    }
-
+    internal SymbolicProofCache(int capacity) => _values = new BoundedConcurrentCache<string, object>(capacity, StringComparer.Ordinal);
     internal int Count => _values.Count;
     internal long HitCount => _values.HitCount;
     internal long MissCount => _values.MissCount;
@@ -34,31 +28,21 @@ internal sealed class SymbolicProofCache {
             result = cached;
             return true;
         }
-
         result = null!;
         return false;
     }
-
-    internal void TryAddResult(string key, SymbolicProofInfo result) {
-        _values.TryAdd(ResultPrefix + key, result);
-    }
-
+    internal void TryAddResult(string key, SymbolicProofInfo result) => _values.TryAdd(ResultPrefix + key, result);
     internal bool TryGetEncodedState(string key, out SymbolicEncodedState entry) {
         if (_values.TryGetValue(EncodedStatePrefix + key, out var value) &&
             value is SymbolicEncodedState cached) {
             entry = cached;
             return true;
         }
-
         entry = default;
         return false;
     }
-
-    internal void TryAddEncodedState(string key, SymbolicEncodedState entry) {
-        _values.TryAdd(EncodedStatePrefix + key, entry);
-    }
+    internal void TryAddEncodedState(string key, SymbolicEncodedState entry) => _values.TryAdd(EncodedStatePrefix + key, entry);
 }
-
 internal readonly record struct SymbolicEncodedState(
     bool Success,
     ImmutableArray<SmtFormula> PathConditions,

@@ -10,29 +10,25 @@ internal static class ContractConditionHelpers {
         var builder = ImmutableArray.CreateBuilder<TContract>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
-        foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, attributeTypeName)) {
-            cancellationToken.ThrowIfCancellationRequested();
-            var condition = attribute.ConstructorArguments.Length == 1
-                ? attribute.ConstructorArguments[0].Value as string
-                : null;
-            var argument = AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken);
-            var key = condition ?? "<invalid>:" + argument;
-            if (!seen.Add(key)) continue;
+            foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, attributeTypeName)) {
+                cancellationToken.ThrowIfCancellationRequested();
+                var condition = attribute.ConstructorArguments.Length == 1
+                    ? attribute.ConstructorArguments[0].Value as string
+                    : null;
+                var argument = AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken);
+                var key = condition ?? "<invalid>:" + argument;
+                if (!seen.Add(key)) continue;
 
-            builder.Add(createContract(new ContractAttributeCondition(
-                condition ?? string.Empty,
-                attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation(),
-                argument,
-                GetInvalidReason(attribute, condition),
-                source)));
-        }
-
+                builder.Add(createContract(new ContractAttributeCondition(
+                    condition ?? string.Empty,
+                    attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation(),
+                    argument,
+                    GetInvalidReason(attribute, condition),
+                    source)));
+            }
         return builder.ToImmutable();
     }
-
-    internal static bool TryParse(
-        string conditionText,
-        out IfStatementSyntax conditionStatement,
+    internal static bool TryParse(string conditionText, out IfStatementSyntax conditionStatement,
         out ExpressionSyntax conditionExpression) {
         var statement = SyntaxFactory.ParseStatement("if (" + conditionText + ") { }");
         if (statement.ContainsDiagnostics || statement is not IfStatementSyntax ifStatement) {
@@ -40,12 +36,10 @@ internal static class ContractConditionHelpers {
             conditionExpression = null!;
             return false;
         }
-
         conditionStatement = ifStatement;
         conditionExpression = ifStatement.Condition;
         return true;
     }
-
     internal static bool TryCreateSpeculativeModel(
         SemanticModel semanticModel,
         int position,
@@ -56,11 +50,9 @@ internal static class ContractConditionHelpers {
             speculativeModel = model;
             return true;
         }
-
         speculativeModel = null!;
         return false;
     }
-
     private static string? GetInvalidReason(AttributeData attribute, string? condition) {
         if (attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0].Value is not string)
@@ -71,7 +63,6 @@ internal static class ContractConditionHelpers {
             : null;
     }
 }
-
 internal readonly record struct ContractAttributeCondition(
     string Condition,
     Location? Location,

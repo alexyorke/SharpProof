@@ -1,8 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicQueryResult(
-    IReadOnlyList<SymbolicProgramPointResult> programPoints,
-    string mergedInvariantText) {
+internal sealed class SymbolicQueryResult(IReadOnlyList<SymbolicProgramPointResult> programPoints, string mergedInvariantText) {
     public IReadOnlyList<SymbolicProgramPointResult> ProgramPoints { get; } =
         programPoints ?? throw new ArgumentNullException(nameof(programPoints));
 
@@ -17,7 +15,6 @@ internal sealed class SymbolicQueryResult(
 
         return From(new[] { point });
     }
-
     internal static SymbolicQueryResult From(IReadOnlyList<SymbolicProgramPointResult> points) {
         if (points == null) throw new ArgumentNullException(nameof(points));
 

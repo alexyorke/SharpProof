@@ -1,8 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal sealed class AnalyzerProofService(
-    SmtAnalysisOptions smtOptions,
-    SharpProofAnalysisBudget analysisLimits) : IDisposable {
+internal sealed class AnalyzerProofService(SmtAnalysisOptions smtOptions, SharpProofAnalysisBudget analysisLimits) : IDisposable {
     internal SmtAnalysisService SmtAnalysis { get; } = new(smtOptions);
 
     internal SharpProofAnalysisBudget AnalysisLimits { get; } =

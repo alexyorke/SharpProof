@@ -15,19 +15,22 @@ public sealed class ExpressionAtomSmtTests {
 
     private static IEnumerable<TestCaseData> Cases() {
         yield return Case("SymbolicSourceQueryService_ProvesConditionalNullableMemberFacts",
-            Method("int", "bool flag, int? left, int? right", "if (flag && left.HasValue && left.Value == 5)\n{\n    return left.Value;\n}\n\nreturn 0;"),
+            Method("int", "bool flag, int? left, int? right",
+                "if (flag && left.HasValue && left.Value == 5)\n{\n    return left.Value;\n}\n\nreturn 0;"),
             Yes("return left.Value;", "(flag ? left : right).HasValue && (flag ? left : right).Value == 5"));
         yield return Case("SymbolicSourceQueryService_ProvesNullableValueComparisonHasValueFacts",
             Method("int", "int? value", "if (value.Value == 5)\n{\n    return 1;\n}\n\nreturn 0;"),
             Yes("return 1;", "value.HasValue"), Yes("return 1;", "value.Value == 5"));
         yield return Case("SymbolicSourceQueryService_ProvesConditionalAccessReferenceNullCheck",
-            Method("string", "Holder holder", "if (holder != null && holder.Text != null)\n{\n    return holder?.Text;\n}\n\nreturn null;", prefix: Holder),
+            Method("string", "Holder holder", "if (holder != null && holder.Text != null)\n{\n    return holder?.Text;\n}\n\nreturn null;",
+                prefix: Holder),
             Yes("return holder?.Text;", "holder?.Text != null"));
         yield return Case("SymbolicSourceQueryService_ProvesConditionalAccessStringEqualityFacts",
             Method("int", "Holder holder", "if (holder?.Text == \"ABC\")\n{\n    return 1;\n}\n\nreturn 0;", prefix: Holder),
             Yes("return 1;", "holder != null && holder.Text == \"ABC\""));
         yield return Case("SymbolicSourceQueryService_ProvesConditionalAccessStringCoalesceLengthFacts",
-            Method("int", "Holder holder, string fallback", "if ((holder?.Text ?? fallback) == \"OK\")\n{\n    return 1;\n}\n\nreturn 0;", prefix: Holder),
+            Method("int", "Holder holder, string fallback", "if ((holder?.Text ?? fallback) == \"OK\")\n{\n    return 1;\n}\n\nreturn 0;",
+                prefix: Holder),
             Yes("return 1;", "(holder?.Text ?? fallback).Length == 2"));
         yield return Case("SymbolicSourceQueryService_ProvesTupleEqualityElementRelation",
             Method("int", "(int A, int B) left, (int A, int B) right", "if (left == right)\n{\n    return left.A;\n}\n\nreturn 0;"),
@@ -54,7 +57,8 @@ public sealed class ExpressionAtomSmtTests {
             Method("int", "int[] values, int index", "if (values != null && index >= 0 && index < values.Length && values[checked(index)] == 7)\n{\n    return 1;\n}\n\nreturn 0;"),
             Yes("return 1;", "values[index] == 7"));
         yield return Case("SymbolicSourceQueryService_ProvesConditionalTupleElementFacts",
-            Method("int", "bool flag, (int A, int B) left, (int A, int B) right", "if ((flag ? left : right).A > 0)\n{\n    return 1;\n}\n\nreturn 0;"),
+            Method("int", "bool flag, (int A, int B) left, (int A, int B) right",
+                "if ((flag ? left : right).A > 0)\n{\n    return 1;\n}\n\nreturn 0;"),
             Yes("return 1;", "(flag ? left : right).A != 0"));
         yield return Case("SymbolicSourceQueryService_ProvesConditionalBooleanAtomNullFacts",
             Method("int", "string text", "if (text != null ? text.Length == 3 : false)\n{\n    return 1;\n}\n\nreturn 0;"),
@@ -85,7 +89,8 @@ public sealed class ExpressionAtomSmtTests {
             Method("int", "string text", "if (text != null && text.Contains(\"Z\"))\n{\n    return 1;\n}\n\nreturn 0;"),
             Yes("return 1;", "text != \"ABC\""));
         yield return Case("SymbolicSourceQueryService_DefaultStringStartsWithRemainsConservative",
-            Method("int", "string text, string prefix", "if (text != null && prefix != null && text.StartsWith(prefix))\n{\n    return 1;\n}\n\nreturn 0;"),
+            Method("int", "string text, string prefix",
+                "if (text != null && prefix != null && text.StartsWith(prefix))\n{\n    return 1;\n}\n\nreturn 0;"),
             No("return 1;", "text.StartsWith(prefix, System.StringComparison.Ordinal)"));
         yield return Case("SymbolicSourceQueryService_ProvesAsExpressionNonNullImpliesSourceNonNull",
             Method("int", "object value", "if ((value as string) != null)\n{\n    return 1;\n}\n\nreturn 0;"),
@@ -100,7 +105,6 @@ public sealed class ExpressionAtomSmtTests {
             Method("int", "object value", "if (value != null)\n{\n    return 1;\n}\n\nreturn 0;"),
             No("return 1;", "value is string"));
     }
-
     [TestCaseSource(nameof(Cases))]
     public void ExpressionAtomMatrix(ExpressionCase testCase) {
         foreach (var expectation in testCase.Expectations)
@@ -109,13 +113,8 @@ public sealed class ExpressionAtomSmtTests {
             else
                 AssertConditionUnknown(testCase.Source, expectation.Marker, expectation.Condition);
     }
-
-    private static string Method(
-        string returnType,
-        string parameters,
-        string body,
-        string? usings = null,
-        string? prefix = null) => SemanticTestSource.Method(returnType, parameters, body, usings, prefix);
+    private static string Method(string returnType, string parameters, string body, string? usings = null, string? prefix = null)
+        => SemanticTestSource.Method(returnType, parameters, body, usings, prefix);
 
     private static Expectation Yes(string marker, string condition) => new(marker, condition);
 

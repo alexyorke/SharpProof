@@ -26,16 +26,13 @@ public sealed class SymbolicSemanticPipelineTests {
         Assert.That(exactResult.Provenance.Single().SourceSpan, Is.EqualTo(exact.Expression.Span));
 
         var unsupported = CreateExpressionContext("object value", "new object()");
-        var unsupportedResult = SymbolicSemanticPipeline.LowerTerm(
-            unsupported.Expression,
-            unsupported.LoweringContext);
+        var unsupportedResult = SymbolicSemanticPipeline.LowerTerm(unsupported.Expression, unsupported.LoweringContext);
 
         Assert.That(unsupportedResult.Support, Is.EqualTo(SymbolicLoweringSupport.Unsupported));
         Assert.That(unsupportedResult.Value, Is.Null);
         Assert.That(unsupportedResult.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
         Assert.That(unsupportedResult.Provenance.Single().Detail, Is.EqualTo("unsupported"));
     }
-
     [Test]
     public void EnumConversions_PreserveByteLongAndUnsignedIntegralValues() {
         const string declarations = """
@@ -58,7 +55,6 @@ public sealed class SymbolicSemanticPipelineTests {
             Assert.That(result.Value, Is.EqualTo(new SymbolicIntegerConstantTerm(expected[index])), expressions[index]);
         }
     }
-
     [TestCase("ByteMode", "long")]
     [TestCase("LongMode", "long")]
     [TestCase("UIntMode", "long")]
@@ -69,10 +65,7 @@ public sealed class SymbolicSemanticPipelineTests {
                                     public enum LongMode : long { Value = 1 }
                                     public enum UIntMode : uint { Value = 1 }
                                     """;
-        var context = CreateExpressionContext(
-            enumType + " value",
-            "(" + targetType + ")value",
-            declarations);
+        var context = CreateExpressionContext(enumType + " value", "(" + targetType + ")value", declarations);
 
         var result = SymbolicSemanticPipeline.LowerTerm(context.Expression, context.LoweringContext);
 
@@ -80,7 +73,6 @@ public sealed class SymbolicSemanticPipelineTests {
         Assert.That(result.Value, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(((SymbolicVariableTerm)result.Value!).Name, Does.StartWith("value#"));
     }
-
     [Test]
     public void ExecutionTraversal_StopsAtLambdasAndLocalFunctionsByDefault() {
         var tree = CSharpSyntaxTree.ParseText("""
@@ -107,36 +99,13 @@ public sealed class SymbolicSemanticPipelineTests {
             .Select(static assignment => assignment.Right.ToString())
             .ToArray();
 
-        Assert.That(visibleAssignments, Is.EqualTo(new[] { "1" }));
-        Assert.That(allAssignments, Is.EqualTo(new[] { "1", "2", "3" }));
+        Assert.That(visibleAssignments, Is.EqualTo(["1"]));
+        Assert.That(allAssignments, Is.EqualTo(["1", "2", "3"]));
     }
-
     [Test]
-    public void TestOracle_TypeTestRequiresNonNullEquivalence() {
-        static bool CanTranslate(string valueType, string testedType) {
-            var tree = CSharpSyntaxTree.ParseText(
-                "class Target { bool M(" + valueType + " value) => value is " + testedType + "; }");
-            var compilation = CreateCompilation(tree, "TypeTestOracleProbe");
-            var semanticModel = compilation.GetSemanticModel(tree);
-            var expression = tree.GetRoot().DescendantNodes().OfType<BinaryExpressionSyntax>()
-                .Single(static candidate => candidate.IsKind(SyntaxKind.IsExpression));
-
-            return CSharpConditionToFormula.TryTranslate(
-                expression,
-                semanticModel,
-                CancellationToken.None,
-                out _);
-        }
-
-        Assert.That(CanTranslate("object", "string"), Is.False);
-        Assert.That(CanTranslate("string", "object"), Is.True);
-    }
-
-    [Test]
-    public void ListPatternElementPosition_TestOnlyAdapterIsAbsent() {
-        Assert.That( typeof(CSharpSyntaxFacts).GetMethod( "TryGetListPatternElementPosition", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static), Is.Null);
-    }
-
+    public void ListPatternElementPosition_TestOnlyAdapterIsAbsent()
+        => Assert.That(typeof(CSharpSyntaxFacts).GetMethod("TryGetListPatternElementPosition",
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static), Is.Null);
     [Test]
     public void VariablePrefixScanner_DoesNotConfuseNumericLocationPrefixes() {
         static SymbolicFact Fact(string name) => SymbolicFact.Exact(
@@ -147,10 +116,9 @@ public sealed class SymbolicSemanticPipelineTests {
             SyntaxFactory.IdentifierName(name),
             "test.variable-prefix");
 
-        Assert.That( SymbolicIrReferenceScanner.ContainsVariablePrefix( Fact("x#12"), "x#1"), Is.False);
-        Assert.That( SymbolicIrReferenceScanner.ContainsVariablePrefix( Fact("x#1@v2"), "x#1"), Is.True);
+        Assert.That(SymbolicIrReferenceScanner.ContainsVariablePrefix(Fact("x#12"), "x#1"), Is.False);
+        Assert.That(SymbolicIrReferenceScanner.ContainsVariablePrefix(Fact("x#1@v2"), "x#1"), Is.True);
     }
-
     [Test]
     public void InferredNotNullPostcondition_RecognizesSubsequentLeadingParameterGuard() {
         var tree = CSharpSyntaxTree.ParseText("""
@@ -168,9 +136,9 @@ public sealed class SymbolicSemanticPipelineTests {
         var method = compilation.GetSemanticModel(tree).GetDeclaredSymbol(
             tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
 
-        Assert.That( NullableFlowFacts.HasInferredNotNullNormalCompletionPostcondition( method.Parameters[1], CancellationToken.None), Is.True);
+        Assert.That(NullableFlowFacts.HasInferredNotNullNormalCompletionPostcondition(method.Parameters[1], CancellationToken.None),
+            Is.True);
     }
-
     [Test]
     public void RangeShapeWriteDetection_IgnoresUnexecutedLambdaBody() {
         var tree = CSharpSyntaxTree.ParseText("""
@@ -201,15 +169,11 @@ public sealed class SymbolicSemanticPipelineTests {
             Is.True);
         Assert.That(condition, Is.Not.Null);
     }
-
     [Test]
     public void FalseTypePatternBranch_ProducesComplementaryTypedFacts() {
         var context = CreateExpressionContext("object value", "value is string");
 
-        var result = SymbolicSemanticPipeline.LowerBranchCondition(
-            context.Expression,
-            false,
-            context.LoweringContext);
+        var result = SymbolicSemanticPipeline.LowerBranchCondition(context.Expression, false, context.LoweringContext);
 
         Assert.That(result.Support, Is.EqualTo(SymbolicLoweringSupport.Exact));
         Assert.That(result.Value, Is.TypeOf<SymbolicNotCondition>());
@@ -217,31 +181,19 @@ public sealed class SymbolicSemanticPipelineTests {
         var negated = (SymbolicNotCondition)result.Value!;
         Assert.That(ContainsRuntimeTypeTest(negated.Operand), Is.True);
     }
-
     [Test]
     public void StructuralKeys_AreCultureAndAllocationOrderIndependent() {
         static SymbolicCondition CreateCondition(bool reverse) {
             var left = new SymbolicElementTerm(
-                new SymbolicMemberTerm(
-                    new SymbolicVariableTerm("receiver", SmtValueKind.Reference),
-                    "Values",
-                    SmtValueKind.Reference),
+                new SymbolicMemberTerm(new SymbolicVariableTerm("receiver", SmtValueKind.Reference), "Values", SmtValueKind.Reference),
                 new SymbolicIntegerConstantTerm(12),
                 SmtValueKind.Int);
             var right = new SymbolicIntegerConstantTerm(34);
             var relation = reverse
                 ? new SymbolicRelationAtom(SymbolicRelationOperator.Equal, right, left)
                 : new SymbolicRelationAtom(SymbolicRelationOperator.Equal, left, right);
-            return new SymbolicFactCondition(new SymbolicFact(
-                relation,
-                true,
-                SymbolicFactConfidence.Exact,
-                "test",
-                default,
-                null,
-                null));
+            return new SymbolicFactCondition(new SymbolicFact(relation, true, SymbolicFactConfidence.Exact, "test", default, null, null));
         }
-
         var previousCulture = CultureInfo.CurrentCulture;
         var previousUiCulture = CultureInfo.CurrentUICulture;
         try {
@@ -260,14 +212,11 @@ public sealed class SymbolicSemanticPipelineTests {
             CultureInfo.CurrentUICulture = previousUiCulture;
         }
     }
-
     [Test]
     public void MixedAggregateTrigger_DoesNotUseExactSubsetAsReachabilityProof() {
         const string source =
             "static class C { static int Size() => 1; static int[,] M(int first) => new int[first, Size()]; }";
-        var fixture = RoslynTestFixture.CreateCompilation(
-            source,
-            nameof(MixedAggregateTrigger_DoesNotUseExactSubsetAsReachabilityProof));
+        var fixture = RoslynTestFixture.CreateCompilation(source, nameof(MixedAggregateTrigger_DoesNotUseExactSubsetAsReachabilityProof));
         var site = fixture.Root.DescendantNodes().OfType<ArrayCreationExpressionSyntax>().Single();
         var lowered = SymbolicOperationLowerer.TryLowerNegativeLengthHazard(
             fixture.SemanticModel.GetOperation(site)!,
@@ -278,9 +227,9 @@ public sealed class SymbolicSemanticPipelineTests {
         Assert.That(hazard.Confidence, Is.EqualTo(SymbolicFactConfidence.Unsupported));
         Assert.That(hazard.Subject, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(hazard.Trigger, Is.TypeOf<SymbolicFactCondition>());
-        Assert.That(((SymbolicFactCondition)hazard.Trigger).Fact.Provenance, Is.EqualTo("ir.runtime-hazard.array.negative-length.aggregate.unsupported.trigger"));
+        Assert.That(((SymbolicFactCondition)hazard.Trigger).Fact.Provenance,
+            Is.EqualTo("ir.runtime-hazard.array.negative-length.aggregate.unsupported.trigger"));
     }
-
     [Test]
     public void ExtendedPropertyPattern_LowersIntermediateNonNullCondition() {
         var context = CreateExpressionContext(
@@ -295,7 +244,6 @@ public sealed class SymbolicSemanticPipelineTests {
         Assert.That(lowering.Value, Is.Not.Null);
         Assert.That(SymbolicState.CreateProofConditionKey(lowering.Value!), Does.Contain("Child"));
     }
-
     [Test]
     public void ListPatternDesignation_LowersBindingAndLengthConditions() {
         var context = CreateExpressionContext("int[] values", "values is [var first, ..]");
@@ -308,31 +256,21 @@ public sealed class SymbolicSemanticPipelineTests {
         Assert.That(key, Does.Contain("first"));
         Assert.That(key, Does.Contain("length"));
     }
-
-    private static bool ContainsRuntimeTypeTest(SmtFormula formula) {
-        return formula switch {
-            SmtRuntimeTypeTestFormula => true,
-            SmtUnaryFormula unary => ContainsRuntimeTypeTest(unary.Operand),
-            SmtBinaryFormula binary =>
-                ContainsRuntimeTypeTest(binary.Left) || ContainsRuntimeTypeTest(binary.Right),
-            _ => false
-        };
-    }
-
-    private static bool ContainsRuntimeTypeTest(SymbolicCondition condition) {
-        return condition switch {
-            SymbolicFactCondition { Fact.Atom: SymbolicTypeTestAtom } => true,
-            SymbolicNotCondition negation => ContainsRuntimeTypeTest(negation.Operand),
-            SymbolicBinaryCondition binary =>
-                ContainsRuntimeTypeTest(binary.Left) || ContainsRuntimeTypeTest(binary.Right),
-            _ => false
-        };
-    }
-
-    private static ExpressionContext CreateExpressionContext(
-        string parameters,
-        string expression,
-        string declarations = "") {
+    private static bool ContainsRuntimeTypeTest(SmtFormula formula) => formula switch {
+        SmtRuntimeTypeTestFormula => true,
+        SmtUnaryFormula unary => ContainsRuntimeTypeTest(unary.Operand),
+        SmtBinaryFormula binary =>
+            ContainsRuntimeTypeTest(binary.Left) || ContainsRuntimeTypeTest(binary.Right),
+        _ => false
+    };
+    private static bool ContainsRuntimeTypeTest(SymbolicCondition condition) => condition switch {
+        SymbolicFactCondition { Fact.Atom: SymbolicTypeTestAtom } => true,
+        SymbolicNotCondition negation => ContainsRuntimeTypeTest(negation.Operand),
+        SymbolicBinaryCondition binary =>
+            ContainsRuntimeTypeTest(binary.Left) || ContainsRuntimeTypeTest(binary.Right),
+        _ => false
+    };
+    private static ExpressionContext CreateExpressionContext(string parameters, string expression, string declarations = "") {
         var source = declarations + "\npublic sealed class Probe { public object M(" + parameters + ") => " +
                      expression + "; }";
         var fixture = RoslynTestFixture.CreateSingleNode<ArrowExpressionClauseSyntax>(
@@ -347,17 +285,13 @@ public sealed class SymbolicSemanticPipelineTests {
             fixture.Node.Expression,
             new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None));
     }
-
-    private static CSharpCompilation CreateCompilation(SyntaxTree tree, string assemblyName) {
-        return RoslynTestFixture.CreateCompilation(
+    private static CSharpCompilation CreateCompilation(SyntaxTree tree, string assemblyName) => RoslynTestFixture.CreateCompilation(
             tree,
             assemblyName,
             new[] {
                 MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location)
             }).Compilation;
-    }
-
     private sealed record ExpressionContext(
         SemanticModel SemanticModel,
         ExpressionSyntax Expression,

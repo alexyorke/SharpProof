@@ -29,7 +29,6 @@ internal static class CSharpMathPatternRecognizer {
         divisorExpression = remainderExpression.Right;
         return true;
     }
-
     private static bool HasSupportedIntegralType(
         ExpressionSyntax expression,
         SemanticModel semanticModel,

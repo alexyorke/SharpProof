@@ -7,24 +7,16 @@ internal delegate bool KnownApiLoweringHandler<TValue>(
     out TValue value);
 
 internal sealed class KnownApiLoweringDescriptor<TValue> {
-    public KnownApiLoweringDescriptor(
-        SpecialType containingTypeSpecialType,
-        string methodName,
-        KnownApiLoweringHandler<TValue> handler) {
+    public KnownApiLoweringDescriptor(SpecialType containingTypeSpecialType, string methodName, KnownApiLoweringHandler<TValue> handler) {
         ContainingTypeSpecialType = containingTypeSpecialType;
         MethodName = methodName;
         Handler = handler;
     }
-
-    public KnownApiLoweringDescriptor(
-        string containingTypeMetadataName,
-        string methodName,
-        KnownApiLoweringHandler<TValue> handler) {
+    public KnownApiLoweringDescriptor(string containingTypeMetadataName, string methodName, KnownApiLoweringHandler<TValue> handler) {
         ContainingTypeMetadataName = containingTypeMetadataName;
         MethodName = methodName;
         Handler = handler;
     }
-
     public SpecialType ContainingTypeSpecialType { get; }
 
     public string? ContainingTypeMetadataName { get; }

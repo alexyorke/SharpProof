@@ -34,7 +34,6 @@ internal static class SmtResourceBudget {
 
         return TimeSpan.FromTicks(budget.Ticks * WallClockSafetyFactor);
     }
-
     public static long GetMethodRlimitBudget(TimeSpan methodBudget) =>
         GetSaturatedRlimit(methodBudget, long.MaxValue, 0);
 

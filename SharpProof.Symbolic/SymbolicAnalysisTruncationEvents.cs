@@ -4,9 +4,7 @@ internal static class SymbolicAnalysisTruncationEventOrdering {
     internal static IComparer<SymbolicAnalysisTruncationEvent> Canonical { get; } =
         Comparer<SymbolicAnalysisTruncationEvent>.Create(Compare);
 
-    private static int Compare(
-        SymbolicAnalysisTruncationEvent? left,
-        SymbolicAnalysisTruncationEvent? right) {
+    private static int Compare(SymbolicAnalysisTruncationEvent? left, SymbolicAnalysisTruncationEvent? right) {
         if (ReferenceEquals(left, right)) return 0;
         if (left == null) return -1;
         if (right == null) return 1;
@@ -28,11 +26,10 @@ internal static class SymbolicAnalysisTruncationEventOrdering {
         return comparison != 0 ? comparison : left.Observed.CompareTo(right.Observed);
     }
 }
-
 internal sealed class SymbolicAnalysisTruncationEventAccumulator {
     private readonly Dictionary<
         (SymbolicAnalysisLimitKind Kind, int? SourceSpanStart, string Provenance),
-        SymbolicAnalysisTruncationEvent> _events = new();
+        SymbolicAnalysisTruncationEvent> _events = [];
 
     internal int Count => _events.Count;
 
@@ -45,12 +42,9 @@ internal sealed class SymbolicAnalysisTruncationEventAccumulator {
         if (!_events.TryGetValue(key, out var existing) || item.Observed > existing.Observed)
             _events[key] = item;
     }
-
-    internal SymbolicAnalysisTruncationInfo ToInfo() {
-        return Count == 0
+    internal SymbolicAnalysisTruncationInfo ToInfo() => Count == 0
             ? SymbolicAnalysisTruncationInfo.None
             : new SymbolicAnalysisTruncationInfo(
                 _events.Values.OrderBy(static item => item, SymbolicAnalysisTruncationEventOrdering.Canonical)
                     .ToArray());
-    }
 }

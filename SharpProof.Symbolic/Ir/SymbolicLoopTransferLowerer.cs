@@ -17,8 +17,7 @@ internal static class SymbolicLoopTransferLowerer {
         if (!TryGetCondition(loop, out var condition))
             return Unsupported(loop, "loop-kind");
         if (!allowAbruptCompletion &&
-            CSharpSyntaxFacts.DescendantNodesInExecution(loop).Any(static node =>
-                node is BreakStatementSyntax or ContinueStatementSyntax))
+            CSharpSyntaxFacts.DescendantNodesInExecution(loop).Any(static node => node is BreakStatementSyntax or ContinueStatementSyntax))
             return Unsupported(loop, "abrupt-completion");
         SymbolicCondition entryCondition;
         SymbolicCondition exitCondition;
@@ -36,18 +35,10 @@ internal static class SymbolicLoopTransferLowerer {
             entryCondition = exactEntry;
             exitCondition = exactExit;
         }
-
-        if (!TryCollectBackEdgeInvalidations(
-                loop,
-                semanticModel,
-                cancellationToken,
-                out var invalidations))
+        if (!TryCollectBackEdgeInvalidations(loop, semanticModel, cancellationToken, out var invalidations))
             return Unsupported(loop, "invalidation");
 
-        var invariantLowering = SymbolicLoopStateTransfer.LowerLoopBodyInvariants(
-            loop,
-            semanticModel,
-            cancellationToken);
+        var invariantLowering = SymbolicLoopStateTransfer.LowerLoopBodyInvariants(loop, semanticModel, cancellationToken);
         if (invariantLowering is not { IsExact: true, Value: { } invariantPlan } &&
             !allowAbruptCompletion)
             return Unsupported(loop, "invariants");
@@ -55,18 +46,10 @@ internal static class SymbolicLoopTransferLowerer {
             ? exactInvariantPlan
             : Array.Empty<SymbolicCondition>();
         return SymbolicLoweringResult<SymbolicLoopTransferPlan>.Exact(
-            new SymbolicLoopTransferPlan(
-                loop,
-                entryCondition,
-                exitCondition,
-                invalidations,
-                invariants),
+            new SymbolicLoopTransferPlan(loop, entryCondition, exitCondition, invalidations, invariants),
             Provenance(loop, "exact"));
     }
-
-    private static bool TryGetCondition(
-        StatementSyntax loop,
-        out ExpressionSyntax? condition) {
+    private static bool TryGetCondition(StatementSyntax loop, out ExpressionSyntax? condition) {
         condition = loop switch {
             WhileStatementSyntax whileStatement => whileStatement.Condition,
             DoStatementSyntax doStatement => doStatement.Condition,
@@ -75,7 +58,6 @@ internal static class SymbolicLoopTransferLowerer {
         };
         return condition != null || loop is ForStatementSyntax;
     }
-
     private static bool TryCollectBackEdgeInvalidations(
         StatementSyntax loop,
         SemanticModel semanticModel,
@@ -89,11 +71,9 @@ internal static class SymbolicLoopTransferLowerer {
                 invalidations = default;
                 return false;
             }
-
         invalidations = targets.ToImmutable();
         return true;
     }
-
     private static IEnumerable<SyntaxNode> EnumerateBackEdgeMutationRoots(StatementSyntax loop) {
         switch (loop) {
             case WhileStatementSyntax whileStatement:
@@ -113,10 +93,7 @@ internal static class SymbolicLoopTransferLowerer {
                 break;
         }
     }
-
-    private static SymbolicLoweringResult<SymbolicLoopTransferPlan> Unsupported(
-        SyntaxNode source,
-        string detail) =>
+    private static SymbolicLoweringResult<SymbolicLoopTransferPlan> Unsupported(SyntaxNode source, string detail) =>
         SymbolicLoweringResult<SymbolicLoopTransferPlan>.Unsupported(Provenance(source, detail));
 
     private static SymbolicLoweringProvenance Provenance(SyntaxNode source, string detail) =>

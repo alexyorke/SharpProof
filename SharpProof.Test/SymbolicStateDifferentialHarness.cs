@@ -18,52 +18,37 @@ internal static class SymbolicStateDifferentialHarness {
         SymbolicAnalysisTruncationInfo? truncation = null) {
         if (result == null) throw new ArgumentNullException(nameof(result));
 
-        return Capture(
-            result.Value,
-            result.Support,
-            result.UnknownReason,
-            result.Provenance,
-            truncation);
+        return Capture(result.Value, result.Support, result.UnknownReason, result.Provenance, truncation);
     }
-
     internal static SymbolicStateDifferentialSnapshot Capture(
         SymbolicState? state,
         SymbolicLoweringSupport support,
         SymbolicUnknownReason unknownReason,
         IEnumerable<SymbolicLoweringProvenance>? provenance = null,
-        SymbolicAnalysisTruncationInfo? truncation = null) {
-        return new SymbolicStateDifferentialSnapshot(
+        SymbolicAnalysisTruncationInfo? truncation = null) => new(
             state?.Normalize().NormalizedProofKey,
             support,
             unknownReason,
             CreateProvenanceKey(provenance),
             CreateTruncationKey(truncation));
-    }
-
     internal static void AssertEquivalent(
         SymbolicStateDifferentialSnapshot expected,
         SymbolicStateDifferentialSnapshot actual,
-        string context) {
-        Assert.Multiple(() => {
+        string context) => Assert.Multiple(() => {
             Assert.That(actual.NormalizedStateKey, Is.EqualTo(expected.NormalizedStateKey), context + ": state");
             Assert.That(actual.Support, Is.EqualTo(expected.Support), context + ": support");
             Assert.That(actual.UnknownReason, Is.EqualTo(expected.UnknownReason), context + ": unknown reason");
             Assert.That(actual.ProvenanceKey, Is.EqualTo(expected.ProvenanceKey), context + ": provenance");
             Assert.That(actual.TruncationKey, Is.EqualTo(expected.TruncationKey), context + ": truncation");
         });
-    }
-
-    private static string CreateProvenanceKey(IEnumerable<SymbolicLoweringProvenance>? provenance) {
-        return string.Join(
+    private static string CreateProvenanceKey(IEnumerable<SymbolicLoweringProvenance>? provenance) => string.Join(
             "\n",
             provenance?.Select(static item => string.Join(
                 "|",
                 Encode(item.Stage),
                 item.SourceSpan.Start.ToString(CultureInfo.InvariantCulture),
                 item.SourceSpan.Length.ToString(CultureInfo.InvariantCulture),
-                Encode(item.Detail))) ?? Enumerable.Empty<string>());
-    }
-
+                Encode(item.Detail))) ?? []);
     private static string CreateTruncationKey(SymbolicAnalysisTruncationInfo? truncation) {
         if (truncation == null || !truncation.IsTruncated) return string.Empty;
 
@@ -78,7 +63,6 @@ internal static class SymbolicStateDifferentialHarness {
                 Encode(item.Provenance),
                 item.SourceSpanStart?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)));
     }
-
     private static string Encode(string value) {
         value ??= string.Empty;
         return value.Length.ToString(CultureInfo.InvariantCulture) + ":" + value;

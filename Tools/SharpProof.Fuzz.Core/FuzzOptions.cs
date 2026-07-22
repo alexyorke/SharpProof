@@ -39,7 +39,9 @@ public sealed record FuzzOptions {
                 case "--seed": options.Seed = ReadInt(ReadValue(args, ref index, option), option); break;
                 case "--out": options.OutputDirectory = ReadValue(args, ref index, option); break;
                 case "--max-interesting": options.MaxInterestingCases = ReadInt(ReadValue(args, ref index, option), option); break;
-                case "--max-interesting-per-family": options.MaxInterestingCasesPerFamily = ReadInt(ReadValue(args, ref index, option), option); break;
+                case "--max-interesting-per-family":
+                    options.MaxInterestingCasesPerFamily = ReadInt(ReadValue(args, ref index, option),
+                    option); break;
                 case "--checkpoint-every": options.CheckpointEvery = ReadInt(ReadValue(args, ref index, option), option); break;
                 case "--parallelism": options.Parallelism = ReadInt(ReadValue(args, ref index, option), option); break;
                 case "--quiet": options.Quiet = true; break;
@@ -48,7 +50,6 @@ public sealed record FuzzOptions {
                 default: throw new ArgumentException($"Unknown option '{option}'.");
             }
         }
-
         if (options.Iterations < 0) throw new ArgumentException("--iterations must be non-negative.");
 
         if (options.MaxInterestingCases < 0) throw new ArgumentException("--max-interesting must be non-negative.");
@@ -61,12 +62,10 @@ public sealed record FuzzOptions {
         if (options.Parallelism <= 0) throw new ArgumentException("--parallelism must be positive.");
 
         if (options.Iterations == 0 && options.Duration is null)
-            throw new ArgumentException(
-                "Duration-only runs need --seconds, --minutes, or --hours when --iterations is 0.");
+            throw new ArgumentException("Duration-only runs need --seconds, --minutes, or --hours when --iterations is 0.");
 
         return options;
     }
-
     private static string ReadValue(string[] args, ref int index, string option) =>
         ++index < args.Length ? args[index] : throw new ArgumentException($"{option} expects a value.");
 
@@ -81,10 +80,7 @@ public sealed record FuzzOptions {
             ? parsed
             : throw new ArgumentException($"{option} expects a finite non-negative number.");
 
-    private static TimeSpan ReadDuration(
-        string value,
-        string option,
-        Func<double, TimeSpan> createDuration) {
+    private static TimeSpan ReadDuration(string value, string option, Func<double, TimeSpan> createDuration) {
         var duration = ReadDouble(value, option);
         try {
             return createDuration(duration);
@@ -93,7 +89,6 @@ public sealed record FuzzOptions {
             throw new ArgumentException($"{option} expects a duration within TimeSpan range.", ex);
         }
     }
-
     private static string DefaultOutputDirectory() => Path.Combine(
         Environment.CurrentDirectory, "artifacts", "fuzz", DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss"));
 
@@ -103,5 +98,4 @@ public sealed record FuzzOptions {
         using var reader = new StreamReader(stream, Encoding.UTF8, true);
         return reader.ReadToEnd().TrimEnd('\r', '\n');
     }
-
 }

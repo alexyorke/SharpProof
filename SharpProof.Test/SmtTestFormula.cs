@@ -38,8 +38,7 @@ internal static class SmtTestFormula {
         new(SmtIntegerBinaryOperator.Divide, left, right);
     internal static SmtIntegerBinaryTerm Remainder(SmtFormula left, SmtFormula right) =>
         new(SmtIntegerBinaryOperator.Remainder, left, right);
-    internal static SmtConditionalFormula Conditional(
-        SmtFormula condition, SmtFormula whenTrue, SmtFormula whenFalse, SmtValueKind kind) =>
+    internal static SmtConditionalFormula Conditional(SmtFormula condition, SmtFormula whenTrue, SmtFormula whenFalse, SmtValueKind kind) =>
         new(condition, whenTrue, whenFalse, kind);
     internal static SmtStringLengthTerm Length(SmtFormula value) => new(value);
     internal static SmtStringConcatTerm Concat(SmtFormula left, SmtFormula right) => new(left, right);

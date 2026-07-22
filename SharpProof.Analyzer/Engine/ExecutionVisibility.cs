@@ -10,19 +10,8 @@ internal static partial class ExecutionVisibility {
             if (CSharpSyntaxFacts.IsNestedLocalCallableBoundary(ancestor)) break;
 
             if (ancestor is not ForStatementSyntax &&
-                TryGetEvaluationBranch(
-                    ancestor,
-                    syntaxNode.SpanStart,
-                    out var condition,
-                    out var branchWhenTrue,
-                    out _) &&
-                IsConditionTruthAt(
-                    condition,
-                    !branchWhenTrue,
-                    ancestor,
-                    semanticModel,
-                    cancellationToken,
-                    smtAnalysis))
+                TryGetEvaluationBranch(ancestor, syntaxNode.SpanStart, out var condition, out var branchWhenTrue, out _) &&
+                IsConditionTruthAt(condition, !branchWhenTrue, ancestor, semanticModel, cancellationToken, smtAnalysis))
                 return true;
 
             if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpression) {
@@ -59,19 +48,14 @@ internal static partial class ExecutionVisibility {
                     return true;
             }
             else if (ancestor is SwitchStatementSyntax switchStatement &&
-                     IsInUnreachableSwitchStatementSection(syntaxNode, switchStatement, semanticModel,
-                         cancellationToken, smtAnalysis)) {
+                     IsInUnreachableSwitchStatementSection(syntaxNode, switchStatement, semanticModel, cancellationToken, smtAnalysis)) {
                 return true;
             }
             else if (ancestor is SwitchExpressionSyntax switchExpression &&
-                     IsInUnreachableSwitchExpressionArm(syntaxNode, switchExpression, semanticModel, cancellationToken,
-                         smtAnalysis)) {
+                     IsInUnreachableSwitchExpressionArm(syntaxNode, switchExpression, semanticModel, cancellationToken, smtAnalysis)) {
                 return true;
             }
         }
-
-        return IsProgramPointUnreachableUsingSharedFacts(
-            syntaxNode, semanticModel, cancellationToken, smtAnalysis);
+        return IsProgramPointUnreachableUsingSharedFacts(syntaxNode, semanticModel, cancellationToken, smtAnalysis);
     }
-
 }

@@ -18,7 +18,6 @@ internal static class SymbolicMethodLikeQueryDispatcher {
         return executeAnalysis(resolvedTarget, request.Source.Compilation, cancellationToken);
     }
 }
-
 internal static class SymbolicMethodLikeTargetResolver {
     internal static ResolvedMethodLikeTarget Resolve(
         SyntaxTree syntaxTree,
@@ -30,39 +29,16 @@ internal static class SymbolicMethodLikeTargetResolver {
         var root = syntaxTree.GetRoot(cancellationToken);
         switch (target.Kind) {
             case SharpProofTargetKind.Point:
-                var position = SymbolicSourceLocation.GetPosition(
-                    syntaxTree,
-                    target.Line!.Value,
-                    target.Column ?? 1,
-                    cancellationToken);
-                return ResolvePosition(
-                    root,
-                    syntaxTree,
-                    semanticModel,
-                    position,
-                    isMethodLikeDeclaration,
-                    cancellationToken);
+                var position = SymbolicSourceLocation.GetPosition(syntaxTree, target.Line!.Value, target.Column ?? 1, cancellationToken);
+                return ResolvePosition(root, syntaxTree, semanticModel, position, isMethodLikeDeclaration, cancellationToken);
             case SharpProofTargetKind.Position:
-                return ResolvePosition(
-                    root,
-                    syntaxTree,
-                    semanticModel,
-                    target.Position!.Value,
-                    isMethodLikeDeclaration,
-                    cancellationToken);
+                return ResolvePosition(root, syntaxTree, semanticModel, target.Position!.Value, isMethodLikeDeclaration, cancellationToken);
             case SharpProofTargetKind.Line:
-                return ResolveLine(
-                    root,
-                    syntaxTree,
-                    semanticModel,
-                    target.Line!.Value,
-                    isMethodLikeDeclaration,
-                    cancellationToken);
+                return ResolveLine(root, syntaxTree, semanticModel, target.Line!.Value, isMethodLikeDeclaration, cancellationToken);
             default:
                 throw new NotSupportedException(unsupportedTargetMessage);
         }
     }
-
     private static ResolvedMethodLikeTarget ResolvePosition(
         SyntaxNode root,
         SyntaxTree syntaxTree,
@@ -76,12 +52,10 @@ internal static class SymbolicMethodLikeTargetResolver {
 
         var node = root.FindToken(position).Parent;
         if (node == null)
-            throw new ArgumentException("Could not resolve a method-like body at the requested position.",
-                nameof(position));
+            throw new ArgumentException("Could not resolve a method-like body at the requested position.", nameof(position));
 
         return ResolveContaining(node, semanticModel, isMethodLikeDeclaration, cancellationToken);
     }
-
     private static ResolvedMethodLikeTarget ResolveLine(
         SyntaxNode root,
         SyntaxTree syntaxTree,
@@ -105,7 +79,6 @@ internal static class SymbolicMethodLikeTargetResolver {
 
         return ResolveContaining(node, semanticModel, isMethodLikeDeclaration, cancellationToken);
     }
-
     private static ResolvedMethodLikeTarget ResolveContaining(
         SyntaxNode node,
         SemanticModel semanticModel,
@@ -116,12 +89,9 @@ internal static class SymbolicMethodLikeTargetResolver {
             if (isMethodLikeDeclaration(ancestor))
                 return ResolvedMethodLikeTarget.Create(ancestor, semanticModel, cancellationToken);
         }
-
-        throw new ArgumentException("Could not resolve a containing method-like body for the requested target.",
-            nameof(node));
+        throw new ArgumentException("Could not resolve a containing method-like body for the requested target.", nameof(node));
     }
 }
-
 internal sealed record ResolvedMethodLikeTarget(
     SemanticModel SemanticModel,
     SyntaxNode Declaration,
@@ -137,7 +107,6 @@ internal sealed record ResolvedMethodLikeTarget(
             SymbolicMethodSourceResolver.GetBodyNode(declaration),
             SymbolicMethodLikeDeclaration.GetMethodSymbol(declaration, semanticModel, cancellationToken));
 }
-
 internal static class SymbolicMethodSourceResolver {
     internal static bool IsBackedBySource(IMethodSymbol method) =>
         method.OriginalDefinition.DeclaringSyntaxReferences.Length != 0;
@@ -166,42 +135,33 @@ internal static class SymbolicMethodSourceResolver {
                 semanticModel = candidateSemanticModel;
                 return true;
             }
-
             if (allowBodylessFallback) {
                 fallbackDeclaration ??= candidate;
                 fallbackSemanticModel ??= candidateSemanticModel;
             }
         }
-
         if (fallbackDeclaration != null && fallbackSemanticModel != null) {
             declaration = fallbackDeclaration;
             body = null;
             semanticModel = fallbackSemanticModel;
             return true;
         }
-
         declaration = null!;
         body = null;
         semanticModel = null!;
         return false;
     }
-
-    internal static SyntaxNode? GetBodyNode(SyntaxNode declaration) {
-        return declaration switch {
-            BaseMethodDeclarationSyntax method => (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
-            AccessorDeclarationSyntax accessor => (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression,
-            PropertyDeclarationSyntax property => GetGetterBody(property.ExpressionBody, property.AccessorList),
-            IndexerDeclarationSyntax indexer => GetGetterBody(indexer.ExpressionBody, indexer.AccessorList),
-            LocalFunctionStatementSyntax localFunction =>
-                (SyntaxNode?)localFunction.Body ?? localFunction.ExpressionBody?.Expression,
-            AnonymousFunctionExpressionSyntax anonymousFunction => anonymousFunction.Body,
-            _ => null
-        };
-    }
-
-    private static SyntaxNode? GetGetterBody(
-        ArrowExpressionClauseSyntax? expressionBody,
-        AccessorListSyntax? accessorList) {
+    internal static SyntaxNode? GetBodyNode(SyntaxNode declaration) => declaration switch {
+        BaseMethodDeclarationSyntax method => (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
+        AccessorDeclarationSyntax accessor => (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression,
+        PropertyDeclarationSyntax property => GetGetterBody(property.ExpressionBody, property.AccessorList),
+        IndexerDeclarationSyntax indexer => GetGetterBody(indexer.ExpressionBody, indexer.AccessorList),
+        LocalFunctionStatementSyntax localFunction =>
+            (SyntaxNode?)localFunction.Body ?? localFunction.ExpressionBody?.Expression,
+        AnonymousFunctionExpressionSyntax anonymousFunction => anonymousFunction.Body,
+        _ => null
+    };
+    private static SyntaxNode? GetGetterBody(ArrowExpressionClauseSyntax? expressionBody, AccessorListSyntax? accessorList) {
         var getter = accessorList?.Accessors.FirstOrDefault(static accessor => accessor.Keyword.ValueText == "get");
         return expressionBody?.Expression ?? (SyntaxNode?)getter?.Body ?? getter?.ExpressionBody?.Expression;
     }

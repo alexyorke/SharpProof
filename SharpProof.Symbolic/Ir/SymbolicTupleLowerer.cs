@@ -29,16 +29,12 @@ internal static class SymbolicTupleLowerer {
                 ? elementEquality
                 : new SymbolicBinaryCondition(SymbolicConditionOperator.And, equality, elementEquality);
         }
-
         condition = binaryExpression.IsKind(SyntaxKind.EqualsExpression)
             ? equality!
             : new SymbolicNotCondition(equality!);
         return true;
     }
-
-    private static bool TupleComparisonUsesUserDefinedElementOperator(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context) {
+    private static bool TupleComparisonUsesUserDefinedElementOperator(ExpressionSyntax expression, SymbolicLoweringContext context) {
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
         if ((typeInfo.ConvertedType ?? typeInfo.Type) is not INamedTypeSymbol { IsTupleType: true } tupleType)
             return false;
@@ -49,7 +45,6 @@ internal static class SymbolicTupleLowerer {
                    type.GetMembers("op_Inequality").OfType<IMethodSymbol>().Any();
         });
     }
-
     internal static bool TryLowerTupleElementMemberTerm(
         MemberAccessExpressionSyntax memberAccess,
         SymbolicLoweringContext context,
@@ -64,18 +59,17 @@ internal static class SymbolicTupleLowerer {
         if (SymbolicLoweringValueFacts.UnwrapExpression(memberAccess.Expression) is TupleExpressionSyntax tupleExpression &&
             TryGetTupleStoragePosition(storageName, out var position) &&
             position < tupleExpression.Arguments.Count &&
-            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(tupleExpression.Arguments[position].Expression, context), out var tupleElement) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(tupleExpression.Arguments[position].Expression, context),
+                out var tupleElement) &&
             tupleElement.Kind == kind) {
             term = tupleElement;
             return true;
         }
-
         if (!SymbolicLoweringValueFacts.TryGetStableVariableSymbol(memberAccess.Expression, context, out var tupleSymbol)) return false;
 
         term = CreateTupleStorageTerm(tupleSymbol, storageName, kind, context);
         return true;
     }
-
     private static bool TryGetTupleStoragePosition(string storageName, out int position) {
         position = -1;
         return storageName.StartsWith("Item", StringComparison.Ordinal) &&
@@ -87,7 +81,6 @@ internal static class SymbolicTupleLowerer {
                oneBased > 0 &&
                (position = oneBased - 1) >= 0;
     }
-
     private static bool TryLowerTupleElementTerms(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -97,18 +90,15 @@ internal static class SymbolicTupleLowerer {
             var tupleBuilder = ImmutableArray.CreateBuilder<SymbolicTerm>(tupleExpression.Arguments.Count);
             foreach (var argument in tupleExpression.Arguments) {
                 if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argument.Expression, context), out var element)) {
-                    terms = ImmutableArray<SymbolicTerm>.Empty;
+                    terms = [];
                     return false;
                 }
-
                 tupleBuilder.Add(element);
             }
-
             terms = tupleBuilder.MoveToImmutable();
             return terms.Length != 0;
         }
-
-        terms = ImmutableArray<SymbolicTerm>.Empty;
+        terms = [];
         if (!SymbolicLoweringValueFacts.TryGetStableVariableSymbol(expression, context, out var symbol) ||
             context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type is not INamedTypeSymbol {
                 IsTupleType: true
@@ -125,17 +115,14 @@ internal static class SymbolicTupleLowerer {
 
             builder.Add(CreateTupleStorageTerm(symbol, storageName, kind, context));
         }
-
         terms = builder.ToImmutable();
         return true;
     }
-
     internal static bool TryGetTupleElementStorageName(IFieldSymbol field, out string storageName) {
         var storageField = field.CorrespondingTupleField ?? field;
         storageName = storageField.Name;
         return storageName.StartsWith("Item", StringComparison.Ordinal);
     }
-
     private static SymbolicTerm CreateTupleStorageTerm(
         ISymbol tupleSymbol,
         string storageName,

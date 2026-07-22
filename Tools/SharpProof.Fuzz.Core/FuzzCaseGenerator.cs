@@ -17,13 +17,12 @@ public sealed class FuzzCaseGenerator(int seed) {
                     StringComparer.Ordinal));
 
     private static readonly Lazy<ImmutableArray<string>> OrderedGeneratorBackedShapeIds =
-        new(() => RegistryByPrimaryShape.Value.Keys.ToImmutableArray());
+        new(() => [.. RegistryByPrimaryShape.Value.Keys]);
 
     private readonly int _seed = seed;
     private static readonly IReadOnlyDictionary<string, Func<int, Random, string, string>> RegistryGenerators =
         new Dictionary<string, Func<int, Random, string, string>>(StringComparer.Ordinal) {
-            ["PureArithmetic"] = CreateExpressionGenerator(
-                "int x", "x + 1", "(x * 3) - 7", "(x / 2) + 9", "unchecked((x << 1) ^ 17)"),
+            ["PureArithmetic"] = CreateExpressionGenerator("int x", "x + 1", "(x * 3) - 7", "(x / 2) + 9", "unchecked((x << 1) ^ 17)"),
             ["PureStringConcat"] = BuildPureStringConcat,
             ["PureListPattern"] = CreateExpressionGenerator(
                 "int[] values", "values is [1, .., 3] ? 1 : 0", "values is [_, .. var rest] ? rest.Length : 0"),
@@ -35,9 +34,7 @@ public sealed class FuzzCaseGenerator(int seed) {
     public static ImmutableArray<ShapeRegistryEntry> RegistryEntries { get; } =
         FuzzShapeRegistry.Load(RegistryGenerators);
 
-    private static Func<int, Random, string, string> CreateExpressionGenerator(
-        string parameters,
-        params string[] expressions) =>
+    private static Func<int, Random, string, string> CreateExpressionGenerator(string parameters, params string[] expressions) =>
         (_, random, className) => {
             var expression = expressions.Length == 1
                 ? expressions[0]
@@ -51,7 +48,6 @@ public sealed class FuzzCaseGenerator(int seed) {
         var variant = index / shapeIds.Length;
         return GenerateForShapeCore(shapeId, variant, index);
     }
-
     private FuzzCase GenerateForShapeCore(string shapeId, int variant, int index) {
         if (!RegistryByPrimaryShape.Value.TryGetValue(shapeId, out var entries))
             throw new ArgumentException($"Unknown generator-backed shape '{shapeId}'.", nameof(shapeId));
@@ -60,7 +56,6 @@ public sealed class FuzzCaseGenerator(int seed) {
         var entryVariant = variant / entries.Length;
         return GenerateForRegistryEntry(entry, index, entryVariant);
     }
-
     public FuzzCase GenerateForRegistryEntry(ShapeRegistryEntry registryEntry, int index, int variant = 0) {
         var random = CreateRandom(StableHash(index, variant, registryEntry.Id));
         var className = $"FuzzCase{index}_{registryEntry.Id}_V{variant}";
@@ -77,7 +72,6 @@ public sealed class FuzzCaseGenerator(int seed) {
             registryEntry.ExpectedOperationKinds,
             registryEntry.ExpectedSyntaxKinds);
     }
-
     private static string BuildPureStringConcat(int index, Random random, string className) {
         const string expression = "(left + right).Length";
         return BuildClass(
@@ -90,9 +84,8 @@ public sealed class FuzzCaseGenerator(int seed) {
                   }
               """);
     }
-
     private Random CreateRandom(int index) =>
-        new Random(StableHash(_seed, index, 0x51ED270B));
+        new(StableHash(_seed, index, 0x51ED270B));
 
     private static int StableHash(int first, int second, int third) =>
         Mix(Mix(Mix(unchecked((int)2166136261), first), second), third);
@@ -104,7 +97,6 @@ public sealed class FuzzCaseGenerator(int seed) {
 
         return hash;
     }
-
     private static int Mix(int hash, int value) => unchecked((hash ^ value) * 16777619);
 
     private static string BuildIntMethodFromExpression(string expression, Random random, string parameterList = "int x") => $$"""

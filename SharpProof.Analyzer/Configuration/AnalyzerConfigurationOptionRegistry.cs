@@ -24,8 +24,7 @@ internal static class AnalyzerConfigurationOptionRegistry {
     ];
 
     internal static bool IsAcceptedValue(AnalyzerConfigurationOption option, string? value) =>
-        !string.IsNullOrWhiteSpace(value) && option.AllowedValues.Contains(
-            value!.Trim().ToLowerInvariant(), StringComparer.Ordinal);
+        !string.IsNullOrWhiteSpace(value) && option.AllowedValues.Contains(value!.Trim().ToLowerInvariant(), StringComparer.Ordinal);
 
     private static AnalyzerConfigurationOption Positive(string key) =>
         new(key, AnalyzerConfigurationValueKind.PositiveInteger);
@@ -33,7 +32,6 @@ internal static class AnalyzerConfigurationOptionRegistry {
     private static AnalyzerConfigurationOption Bool(string key) =>
         new(key, AnalyzerConfigurationValueKind.Bool);
 }
-
 internal sealed record AnalyzerConfigurationOption(
     string Key,
     AnalyzerConfigurationValueKind ValueKind,

@@ -20,23 +20,17 @@ internal static class SymbolicDispatchFacts {
 
         return !HasExactReceiverType(operation);
     }
-
-    public static IOperation? GetReceiverOperation(IOperation operation) {
-        return operation switch {
-            IInvocationOperation invocationOperation => UnwrapImplicitConversion(invocationOperation.Instance),
-            IPropertyReferenceOperation propertyReferenceOperation => UnwrapImplicitConversion(
-                propertyReferenceOperation.Instance),
-            _ => null
-        };
-    }
-
+    public static IOperation? GetReceiverOperation(IOperation operation) => operation switch {
+        IInvocationOperation invocationOperation => UnwrapImplicitConversion(invocationOperation.Instance),
+        IPropertyReferenceOperation propertyReferenceOperation => UnwrapImplicitConversion(propertyReferenceOperation.Instance),
+        _ => null
+    };
     private static bool HasExactReceiverType(IOperation operation) {
         var receiver = GetReceiverOperation(operation);
         var receiverType = receiver?.Type as INamedTypeSymbol;
         return receiverType is { TypeKind: TypeKind.Struct } ||
                receiverType is { IsSealed: true };
     }
-
     private static IOperation? UnwrapImplicitConversion(IOperation? operation) {
         var current = operation;
         while (current is IConversionOperation conversionOperation && conversionOperation.IsImplicit)
@@ -44,7 +38,6 @@ internal static class SymbolicDispatchFacts {
 
         return current;
     }
-
     public static bool IsBaseReference(IOperation? operation) {
         var unwrappedOperation = UnwrapImplicitConversion(operation);
         return unwrappedOperation is IInstanceReferenceOperation instanceReferenceOperation &&

@@ -42,7 +42,6 @@ internal static class SmtFormulaStructuralKey {
             _ => throw new NotSupportedException("Unsupported SMT formula type: " + formula.GetType().FullName)
         };
     }
-
     private static string Encode(string value) =>
         value.Length.ToString(CultureInfo.InvariantCulture) + ":" + value;
 }

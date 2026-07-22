@@ -29,19 +29,17 @@ internal static class Z3RegexCharacterRanges {
             _ => null,
         };
         if (baseRanges is null) {
-            ranges = Array.Empty<CharacterRange>();
+            ranges = [];
             return false;
         }
-
         ranges = escaped is 'D' or 'S' or 'W' ? Complement(baseRanges) : baseRanges;
         return true;
     }
-
     internal static bool TryGet(string atomPattern, out CharacterRange[] ranges) =>
         TryGet(atomPattern, RegexOptions.None, out ranges);
 
     internal static bool TryGet(string atomPattern, RegexOptions options, out CharacterRange[] ranges) {
-        ranges = Array.Empty<CharacterRange>();
+        ranges = [];
         try {
             ranges = Cache.GetOrAdd((atomPattern, options), Create);
             return ranges.Length is > 0 and <= MaxRangeCount;
@@ -51,13 +49,12 @@ internal static class Z3RegexCharacterRanges {
             return false;
         }
     }
-
     internal static CharacterRange[] Merge(IEnumerable<CharacterRange> ranges) {
         var ordered = ranges
             .OrderBy(static range => range.Start)
             .ThenBy(static range => range.End)
             .ToArray();
-        if (ordered.Length == 0) return Array.Empty<CharacterRange>();
+        if (ordered.Length == 0) return [];
 
         var merged = new List<CharacterRange>();
         var currentStart = ordered[0].Start;
@@ -69,16 +66,13 @@ internal static class Z3RegexCharacterRanges {
                 if (range.End > currentEnd) currentEnd = range.End;
                 continue;
             }
-
             merged.Add(new CharacterRange(currentStart, currentEnd));
             currentStart = range.Start;
             currentEnd = range.End;
         }
-
         merged.Add(new CharacterRange(currentStart, currentEnd));
-        return merged.ToArray();
+        return [.. merged];
     }
-
     internal static CharacterRange[] Complement(IEnumerable<CharacterRange> ranges) {
         var merged = Merge(ranges);
         var complement = new List<CharacterRange>();
@@ -91,14 +85,11 @@ internal static class Z3RegexCharacterRanges {
                 nextStart = char.MaxValue + 1;
                 break;
             }
-
             nextStart = range.End + 1;
         }
-
         if (nextStart <= char.MaxValue) complement.Add(new CharacterRange((char)nextStart, char.MaxValue));
-        return complement.ToArray();
+        return [.. complement];
     }
-
     private static CharacterRange[] Create((string Pattern, RegexOptions Options) key) {
         var ranges = new List<CharacterRange>();
         char? rangeStart = null;
@@ -111,26 +102,22 @@ internal static class Z3RegexCharacterRanges {
                 previous = current;
                 continue;
             }
-
             if (rangeStart is { } start) {
                 ranges.Add(new CharacterRange(start, previous));
                 rangeStart = null;
             }
         }
-
         if (rangeStart is { } finalStart) ranges.Add(new CharacterRange(finalStart, previous));
-        return ranges.ToArray();
+        return [.. ranges];
     }
-
     private static CharacterRange[] CreateOrEmpty((string Pattern, RegexOptions Options) key) {
         try {
             return Create(key);
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or
                                                RegexMatchTimeoutException) {
-            return Array.Empty<CharacterRange>();
+            return [];
         }
     }
 }
-
 internal readonly record struct CharacterRange(char Start, char End);

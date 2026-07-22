@@ -6,7 +6,6 @@ internal enum SmtWitnessStatus {
     Approximate,
     Unsupported
 }
-
 internal sealed record SmtModelAssignment(
     string Name,
     SmtValueKind Kind,
@@ -17,10 +16,7 @@ internal sealed record SmtModelAssignment(
     bool? IsNull = null,
     SmtWitnessStatus Status = SmtWitnessStatus.Exact);
 
-internal sealed record SmtSatisfyingWitness(
-    SmtWitnessStatus Status,
-    string Reason,
-    IReadOnlyList<SmtModelAssignment> Assignments) {
+internal sealed record SmtSatisfyingWitness(SmtWitnessStatus Status, string Reason, IReadOnlyList<SmtModelAssignment> Assignments) {
     internal static SmtSatisfyingWitness None(string reason) =>
         Absent(SmtWitnessStatus.None, reason);
 
@@ -28,13 +24,8 @@ internal sealed record SmtSatisfyingWitness(
         Absent(SmtWitnessStatus.Unsupported, reason);
 
     private static SmtSatisfyingWitness Absent(SmtWitnessStatus status, string reason) =>
-        new SmtSatisfyingWitness(status, reason, Array.Empty<SmtModelAssignment>());
+        new(status, reason, Array.Empty<SmtModelAssignment>());
 }
+internal sealed record SmtFeasibilityResult(Feasibility Feasibility, SmtSatisfyingWitness Witness);
 
-internal sealed record SmtFeasibilityResult(
-    Feasibility Feasibility,
-    SmtSatisfyingWitness Witness);
-
-internal sealed record SmtPathAndHazardCheckResult(
-    SmtFeasibilityResult Path,
-    SmtFeasibilityResult Impurity);
+internal sealed record SmtPathAndHazardCheckResult(SmtFeasibilityResult Path, SmtFeasibilityResult Impurity);

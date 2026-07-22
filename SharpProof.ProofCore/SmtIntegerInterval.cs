@@ -1,15 +1,8 @@
 namespace SharpProof.ProofCore.Smt;
 
-internal readonly struct SmtIntegerInterval(
-    long? lowerBound,
-    long? upperBound,
-    long[] excludedValues,
+internal readonly struct SmtIntegerInterval(long? lowerBound, long? upperBound, long[] excludedValues,
     bool isImpossible) : IEquatable<SmtIntegerInterval> {
-    internal static SmtIntegerInterval Unbounded { get; } = new(
-        null,
-        null,
-        Array.Empty<long>(),
-        false);
+    internal static SmtIntegerInterval Unbounded { get; } = new(null, null, [], false);
 
     internal long? LowerBound { get; } = lowerBound;
 
@@ -40,22 +33,19 @@ internal readonly struct SmtIntegerInterval(
         (LowerBound.HasValue && value < LowerBound.Value) ||
         (UpperBound.HasValue && value > UpperBound.Value);
 
-    internal SmtIntegerInterval Apply(SmtBinaryOperator op, long constant) {
-        return op switch {
-            SmtBinaryOperator.Equal => WithExactValue(constant),
-            SmtBinaryOperator.NotEqual => Exclude(constant),
-            SmtBinaryOperator.GreaterThan => constant == long.MaxValue
-                ? new SmtIntegerInterval(LowerBound, UpperBound, ExcludedValues, true)
-                : WithLowerBound(constant + 1),
-            SmtBinaryOperator.GreaterThanOrEqual => WithLowerBound(constant),
-            SmtBinaryOperator.LessThan => constant == long.MinValue
-                ? new SmtIntegerInterval(LowerBound, UpperBound, ExcludedValues, true)
-                : WithUpperBound(constant - 1),
-            SmtBinaryOperator.LessThanOrEqual => WithUpperBound(constant),
-            _ => this
-        };
-    }
-
+    internal SmtIntegerInterval Apply(SmtBinaryOperator op, long constant) => op switch {
+        SmtBinaryOperator.Equal => WithExactValue(constant),
+        SmtBinaryOperator.NotEqual => Exclude(constant),
+        SmtBinaryOperator.GreaterThan => constant == long.MaxValue
+            ? new SmtIntegerInterval(LowerBound, UpperBound, ExcludedValues, true)
+            : WithLowerBound(constant + 1),
+        SmtBinaryOperator.GreaterThanOrEqual => WithLowerBound(constant),
+        SmtBinaryOperator.LessThan => constant == long.MinValue
+            ? new SmtIntegerInterval(LowerBound, UpperBound, ExcludedValues, true)
+            : WithUpperBound(constant - 1),
+        SmtBinaryOperator.LessThanOrEqual => WithUpperBound(constant),
+        _ => this
+    };
     internal SmtIntegerInterval Intersect(SmtIntegerInterval other) {
         var interval = this;
         if (other.IsImpossible) interval = new SmtIntegerInterval(interval.LowerBound, interval.UpperBound, interval.ExcludedValues, true);
@@ -67,14 +57,10 @@ internal readonly struct SmtIntegerInterval(
 
         return interval;
     }
-
-    public bool Equals(SmtIntegerInterval other) {
-        return LowerBound == other.LowerBound &&
+    public bool Equals(SmtIntegerInterval other) => LowerBound == other.LowerBound &&
                UpperBound == other.UpperBound &&
                IsImpossible == other.IsImpossible &&
                ExcludedValues.SequenceEqual(other.ExcludedValues);
-    }
-
     public override bool Equals(object? obj) =>
         obj is SmtIntegerInterval other && Equals(other);
 
@@ -87,7 +73,6 @@ internal readonly struct SmtIntegerInterval(
             return hash;
         }
     }
-
     private SmtIntegerInterval Exclude(long value) {
         if (Array.IndexOf(ExcludedValues, value) >= 0) return this;
 
@@ -96,31 +81,21 @@ internal readonly struct SmtIntegerInterval(
         excludedValues[excludedValues.Length - 1] = value;
         return new SmtIntegerInterval(LowerBound, UpperBound, excludedValues, IsImpossible);
     }
-
-    private SmtIntegerInterval WithLowerBound(long lowerBound) {
-        return new SmtIntegerInterval(
+    private SmtIntegerInterval WithLowerBound(long lowerBound) => new(
             LowerBound.HasValue ? Math.Max(LowerBound.Value, lowerBound) : lowerBound,
             UpperBound,
             ExcludedValues,
             IsImpossible);
-    }
-
-    private SmtIntegerInterval WithUpperBound(long upperBound) {
-        return new SmtIntegerInterval(
+    private SmtIntegerInterval WithUpperBound(long upperBound) => new(
             LowerBound,
             UpperBound.HasValue ? Math.Min(UpperBound.Value, upperBound) : upperBound,
             ExcludedValues,
             IsImpossible);
-    }
-
-    private SmtIntegerInterval WithExactValue(long value) {
-        return new SmtIntegerInterval(
+    private SmtIntegerInterval WithExactValue(long value) => new(
             value,
             value,
             ExcludedValues,
             IsImpossible ||
             (LowerBound.HasValue && value < LowerBound.Value) ||
             (UpperBound.HasValue && value > UpperBound.Value));
-    }
-
 }

@@ -35,7 +35,6 @@ internal static partial class ExecutionVisibility {
             cancellationToken,
             smtAnalysis);
     }
-
     private static bool HasSymbolicConditionStatusAt(
         SymbolicCondition condition,
         SymbolicProofStatus expectedStatus,
@@ -43,14 +42,10 @@ internal static partial class ExecutionVisibility {
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis) {
-        var pathState = SymbolicReachabilityService.CollectPathStateAt(
-            site,
-            semanticModel,
-            cancellationToken);
+        var pathState = SymbolicReachabilityService.CollectPathStateAt(site, semanticModel, cancellationToken);
         return new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(pathState, condition).Status ==
                expectedStatus;
     }
-
     private static bool IsConditionTruthAt(
         ExpressionSyntax expression,
         bool expectedTruth,
@@ -58,8 +53,7 @@ internal static partial class ExecutionVisibility {
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis) =>
-        EvaluateKnownConditionTruthAtSite(
-            expression, site, semanticModel, cancellationToken, smtAnalysis) == expectedTruth;
+        EvaluateKnownConditionTruthAtSite(expression, site, semanticModel, cancellationToken, smtAnalysis) == expectedTruth;
 
     private static bool? EvaluateKnownConditionTruthAtSite(
         ExpressionSyntax expression,
@@ -67,12 +61,7 @@ internal static partial class ExecutionVisibility {
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis) {
-        var key = new ConditionTruthCacheKey(
-            expression.SpanStart,
-            expression.Span.Length,
-            site.SpanStart,
-            site.Span.Length,
-            smtAnalysis);
+        var key = new ConditionTruthCacheKey(expression.SpanStart, expression.Span.Length, site.SpanStart, site.Span.Length, smtAnalysis);
         var cache = s_conditionTruthCache.GetValue(semanticModel, static _ => new(512));
         if (cache.TryGetValue(key, out var cached)) return cached;
 
@@ -85,7 +74,6 @@ internal static partial class ExecutionVisibility {
         cache.TryAdd(key, truth);
         return truth;
     }
-
     public static bool IsConditionAlwaysTrueUsingSmt(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -106,10 +94,7 @@ internal static partial class ExecutionVisibility {
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis) =>
-        EvaluateKnownConditionTruth(
-            expression,
-            new SymbolicState(),
-            semanticModel, cancellationToken, smtAnalysis) == expectedTruth;
+        EvaluateKnownConditionTruth(expression, new SymbolicState(), semanticModel, cancellationToken, smtAnalysis) == expectedTruth;
 
     private static bool? EvaluateKnownConditionTruth(
         ExpressionSyntax expression,
@@ -120,9 +105,7 @@ internal static partial class ExecutionVisibility {
         var constant = semanticModel.GetConstantValue(expression, cancellationToken);
         if (constant is { HasValue: true, Value: bool constantValue }) return constantValue;
 
-        var lowering = SymbolicSemanticPipeline.LowerCondition(
-            expression,
-            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        var lowering = SymbolicSemanticPipeline.LowerCondition(expression, new SymbolicLoweringContext(semanticModel, cancellationToken));
         if (lowering is not { IsExact: true, Value: { } condition }) return null;
 
         return new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(pathState, condition).Status
@@ -132,7 +115,6 @@ internal static partial class ExecutionVisibility {
                 _ => null
             };
     }
-
 
     private readonly record struct ConditionTruthCacheKey(
         int ExpressionStart,

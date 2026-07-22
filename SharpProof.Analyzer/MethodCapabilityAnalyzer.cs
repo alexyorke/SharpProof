@@ -3,8 +3,7 @@ using SharpProof.Attributes;
 namespace SharpProof.Analyzer;
 
 internal static class MethodCapabilityAnalyzer {
-    internal static void AnalyzeSymbolForCapabilities(
-        MethodBodyAnalysisContext context,
+    internal static void AnalyzeSymbolForCapabilities(MethodBodyAnalysisContext context,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         if (!TryGetAllowedCapabilities(context, attributePolicy, out var allowed)) return;
 
@@ -23,7 +22,6 @@ internal static class MethodCapabilityAnalyzer {
                 method.Name,
                 text));
         }
-
         if (effects.UnknownReasons.IsDefaultOrEmpty) return;
         var unknown = effects.UnknownReasons[0];
         var declarationLocation = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
@@ -34,26 +32,20 @@ internal static class MethodCapabilityAnalyzer {
             method.Name,
             unknown.Message));
     }
-
     private static bool TryGetAllowedCapabilities(
         MethodBodyAnalysisContext context,
         SharpProofAttributeIdentityPolicy attributePolicy,
         out SharpProofCapability allowed) {
         allowed = SharpProofCapability.None;
         var found = false;
-        foreach (var source in MethodContractHierarchy.EnumerateSources(
-                     context.MethodSymbol,
-                     context.CancellationToken))
-        foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, "AllowedCapabilitiesAttribute")) {
-            if (attribute.ConstructorArguments.Length != 1 || attribute.ConstructorArguments[0].Value == null)
-                continue;
-            var declared = (SharpProofCapability)Convert.ToInt32(
-                attribute.ConstructorArguments[0].Value,
-                CultureInfo.InvariantCulture);
-            allowed = found ? allowed & declared : declared;
-            found = true;
-        }
-
+        foreach (var source in MethodContractHierarchy.EnumerateSources(context.MethodSymbol, context.CancellationToken))
+            foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, "AllowedCapabilitiesAttribute")) {
+                if (attribute.ConstructorArguments.Length != 1 || attribute.ConstructorArguments[0].Value == null)
+                    continue;
+                var declared = (SharpProofCapability)Convert.ToInt32(attribute.ConstructorArguments[0].Value, CultureInfo.InvariantCulture);
+                allowed = found ? allowed & declared : declared;
+                found = true;
+            }
         return found;
     }
 }

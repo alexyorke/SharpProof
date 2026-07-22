@@ -7,7 +7,6 @@ public enum SharpProofVerdict {
     Disproven,
     Unknown
 }
-
 public enum MethodEffectOrigin {
     Ambient,
     Receiver,
@@ -23,7 +22,6 @@ public enum MethodEffectOrigin {
     Call,
     Unknown
 }
-
 public enum MethodExceptionSource {
     ExplicitThrow,
     RuntimeHazard,
@@ -32,7 +30,6 @@ public enum MethodExceptionSource {
     Contract,
     Unknown
 }
-
 public sealed record MethodExceptionFact(
     string ExceptionType,
     SharpProofVerdict Escape,
@@ -59,7 +56,6 @@ public sealed record MethodExceptionFact(
         true,
         reason);
 }
-
 public sealed record MethodEffectSite(
     SharpProofEffect Effect,
     SharpProofCapability Capabilities,
@@ -97,11 +93,10 @@ public sealed record MethodEffects(
 
     public SharpProofVerdict AllocationFree => GetVerdict(SharpProofEffect.Allocates, false);
 
-    public ImmutableArray<string> ThrownExceptions => ExceptionFacts
+    public ImmutableArray<string> ThrownExceptions => [.. ExceptionFacts
         .Where(static fact => fact.Escape == SharpProofVerdict.Proven)
         .Select(static fact => fact.ExceptionType)
-        .Distinct(StringComparer.Ordinal)
-        .ToImmutableArray();
+        .Distinct(StringComparer.Ordinal)];
 
     public SharpProofVerdict DoesNotThrow {
         get {
@@ -114,7 +109,6 @@ public sealed record MethodEffects(
                 : SharpProofVerdict.Proven;
         }
     }
-
     private SharpProofVerdict GetVerdict(SharpProofEffect prohibited, bool hasProhibitedCapability) {
         if ((Effects & prohibited) != 0 || hasProhibitedCapability) return SharpProofVerdict.Disproven;
         return (Effects & SharpProofEffect.Unknown) != 0 || !UnknownReasons.IsDefaultOrEmpty
@@ -122,7 +116,6 @@ public sealed record MethodEffects(
             : SharpProofVerdict.Proven;
     }
 }
-
 internal sealed class MethodEffectAnalysisSession(
     Compilation compilation,
     CancellationToken cancellationToken,
@@ -133,33 +126,23 @@ internal sealed class MethodEffectAnalysisSession(
     private readonly MetadataMethodEffectAnalyzer _metadata = new(compilation);
     private readonly object _gate = new();
 
-    internal MethodEffects Analyze(
-        IMethodSymbol method,
-        SyntaxNode declaration,
-        SemanticModel semanticModel) {
+    internal MethodEffects Analyze(IMethodSymbol method, SyntaxNode declaration, SemanticModel semanticModel) {
         lock (_gate) return AnalyzeCore(method, declaration, semanticModel);
     }
-
-    private MethodEffects AnalyzeCore(
-        IMethodSymbol method,
-        SyntaxNode declaration,
-        SemanticModel semanticModel) {
+    private MethodEffects AnalyzeCore(IMethodSymbol method, SyntaxNode declaration, SemanticModel semanticModel) {
         method = method.OriginalDefinition;
         if (_cache.TryGetValue(method, out var cached)) return cached;
         if (!_active.Add(method)) return Unknown("recursive_call", declaration);
 
         try {
-            var root = MethodBodyOperationResolver.GetMethodBodyRootOperation(
-                declaration,
-                semanticModel,
-                cancellationToken,
-                true);
+            var root = MethodBodyOperationResolver.GetMethodBodyRootOperation(declaration, semanticModel, cancellationToken, true);
             if (root == null) return Cache(method, AnalyzeMetadata(method, declaration));
 
             var builder = new Builder(IsCaught);
             foreach (var operation in root.DescendantsAndSelf())
                 if (operation is IVariableDeclaratorOperation { Symbol: var local, Initializer.Value: var value }) {
-                    if (value is IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or IDelegateCreationOperation) builder.MarkFresh(local);
+                    if (value is IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
+                        IDelegateCreationOperation) builder.MarkFresh(local);
                     builder.MarkExactType(local, value.Type);
                     builder.MarkDelegateTargets(local, value);
                 }
@@ -168,7 +151,6 @@ internal sealed class MethodEffectAnalysisSession(
                 if (!IsVisible(operation, declaration, semanticModel)) continue;
                 AnalyzeOperation(operation, semanticModel, builder);
             }
-
             if (smtAnalysis != null)
                 AddRuntimeHazards(root, declaration, semanticModel, smtAnalysis, builder);
 
@@ -178,7 +160,6 @@ internal sealed class MethodEffectAnalysisSession(
             _active.Remove(method);
         }
     }
-
     private void AddRuntimeHazards(
         IOperation root,
         SyntaxNode declaration,
@@ -206,8 +187,7 @@ internal sealed class MethodEffectAnalysisSession(
                                 candidate.Syntax.SpanStart == hazard.SpanStart &&
                                 candidate.Syntax.Span.End == hazard.SpanEnd) ??
                             root.DescendantsAndSelf()
-                                .Where(candidate => candidate.Syntax.Span.Contains(
-                                    hazardSpan))
+                                .Where(candidate => candidate.Syntax.Span.Contains(hazardSpan))
                                 .OrderBy(static candidate => candidate.Syntax.Span.Length)
                                 .FirstOrDefault() ?? root;
             var escape = hazard.Status switch {
@@ -226,11 +206,7 @@ internal sealed class MethodEffectAnalysisSession(
                 hazard.Kind.ToString());
         }
     }
-
-    private void AnalyzeOperation(
-        IOperation operation,
-        SemanticModel semanticModel,
-        Builder builder) {
+    private void AnalyzeOperation(IOperation operation, SemanticModel semanticModel, Builder builder) {
         switch (operation) {
             case ISimpleAssignmentOperation assignment:
                 AddWrite(assignment.Target, builder);
@@ -277,12 +253,10 @@ internal sealed class MethodEffectAnalysisSession(
                 builder.Add(SharpProofEffect.Allocates, collection, collection.Type, "array_collection_allocation");
                 break;
             case IAnonymousObjectCreationOperation anonymousObject:
-                builder.Add(SharpProofEffect.Allocates, anonymousObject, anonymousObject.Type,
-                    "anonymous_object_allocation");
+                builder.Add(SharpProofEffect.Allocates, anonymousObject, anonymousObject.Type, "anonymous_object_allocation");
                 break;
             case IDelegateCreationOperation delegateCreation:
-                builder.Add(SharpProofEffect.Allocates, delegateCreation, delegateCreation.Type,
-                    "delegate_allocation");
+                builder.Add(SharpProofEffect.Allocates, delegateCreation, delegateCreation.Type, "delegate_allocation");
                 break;
             case IConversionOperation conversion when conversion.Conversion.IsImplicit &&
                                                      conversion.Operand.Type?.IsValueType == true &&
@@ -304,12 +278,7 @@ internal sealed class MethodEffectAnalysisSession(
                     "explicit_throw");
                 break;
             case ILockOperation locked:
-                builder.Add(
-                    SharpProofEffect.Synchronizes,
-                    SharpProofCapability.Synchronization,
-                    locked,
-                    null,
-                    "synchronization");
+                builder.Add(SharpProofEffect.Synchronizes, SharpProofCapability.Synchronization, locked, null, "synchronization");
                 break;
             case IInvocationOperation invocation:
                 if (invocation.TargetMethod.MethodKind == MethodKind.DelegateInvoke &&
@@ -359,8 +328,7 @@ internal sealed class MethodEffectAnalysisSession(
                 builder.AddUnknown(operation, "function_pointer_dispatch");
                 break;
             case ITypeParameterObjectCreationOperation typeParameterCreation:
-                builder.Add(SharpProofEffect.Allocates, typeParameterCreation, typeParameterCreation.Type,
-                    "generic_object_allocation");
+                builder.Add(SharpProofEffect.Allocates, typeParameterCreation, typeParameterCreation.Type, "generic_object_allocation");
                 builder.AddUnknown(typeParameterCreation, "generic_constructor_dispatch");
                 break;
             case IDynamicInvocationOperation or IDynamicIndexerAccessOperation or
@@ -369,17 +337,11 @@ internal sealed class MethodEffectAnalysisSession(
                 break;
         }
     }
-
-    private void AnalyzeCall(
-        IMethodSymbol? method,
-        IOperation site,
-        Builder builder,
-        IOperation? receiver = null) {
+    private void AnalyzeCall(IMethodSymbol? method, IOperation site, Builder builder, IOperation? receiver = null) {
         if (method == null) {
             builder.AddUnknown(site, "unresolved_call");
             return;
         }
-
         method = (method.ReducedFrom ?? method).OriginalDefinition;
         var exactDispatchTarget = ResolveExactDispatchTarget(method, receiver, builder);
         method = exactDispatchTarget ?? method;
@@ -392,22 +354,15 @@ internal sealed class MethodEffectAnalysisSession(
             return;
         }
         if (method.GetDllImportData() != null) {
-            builder.Add(
-                SharpProofEffect.UsesNativeCode,
-                SharpProofCapability.NativeInterop,
-                site,
-                method,
-                "native_call");
+            builder.Add(SharpProofEffect.UsesNativeCode, SharpProofCapability.NativeInterop, site, method, "native_call");
             return;
         }
-
         var hasContract = TryReadEffectContract(method, out var contracted);
         var configured = externalContractResolver?.Invoke(method);
         if (configured != null) {
             contracted = hasContract ? UnionContracts(contracted, configured) : configured;
             hasContract = true;
         }
-
         var syntax = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
         if (syntax == null) {
             if (IsStructurallyEffectFreeIntrinsic(method)) return;
@@ -420,20 +375,20 @@ internal sealed class MethodEffectAnalysisSession(
             }
             return;
         }
-
         var model = compilation.GetSemanticModel(syntax.SyntaxTree);
         builder.AddTransitive(Analyze(method, syntax, model), site, method, "source_call");
         if (hasContract) builder.AddTransitive(contracted, site, method, "effect_contract");
     }
-
     private static bool IsStructurallyEffectFreeIntrinsic(IMethodSymbol method) =>
         method is { MethodKind: MethodKind.Constructor, ContainingType.SpecialType: SpecialType.System_Object } ||
-        method is { MethodKind: MethodKind.PropertyGet, AssociatedSymbol: IPropertySymbol {
-            Name: "Length",
-            IsStatic: false,
-            Type.SpecialType: SpecialType.System_Int32,
-            ContainingType.SpecialType: SpecialType.System_Array
-        } } ||
+        method is {
+            MethodKind: MethodKind.PropertyGet, AssociatedSymbol: IPropertySymbol {
+                Name: "Length",
+                IsStatic: false,
+                Type.SpecialType: SpecialType.System_Int32,
+                ContainingType.SpecialType: SpecialType.System_Array
+            }
+        } ||
         SymbolicTypeFacts.IsBuiltInIntegralType(method.ContainingType) ||
         method.ContainingType?.SpecialType is SpecialType.System_String or
             SpecialType.System_Boolean or
@@ -447,10 +402,7 @@ internal sealed class MethodEffectAnalysisSession(
             "System.Index" or
             "System.Range";
 
-    private static IMethodSymbol? ResolveExactDispatchTarget(
-        IMethodSymbol method,
-        IOperation? receiver,
-        Builder builder) {
+    private static IMethodSymbol? ResolveExactDispatchTarget(IMethodSymbol method, IOperation? receiver, Builder builder) {
         if (!method.IsVirtual && method.ContainingType?.TypeKind != TypeKind.Interface) return method;
         var exactType = receiver switch {
             IObjectCreationOperation { Type: INamedTypeSymbol created } => created,
@@ -464,14 +416,12 @@ internal sealed class MethodEffectAnalysisSession(
         return exactType.GetMembers(method.Name).OfType<IMethodSymbol>()
             .FirstOrDefault(candidate => Overrides(candidate, method));
     }
-
     private static bool Overrides(IMethodSymbol candidate, IMethodSymbol method) {
         for (var current = candidate; current != null; current = current.OverriddenMethod)
             if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, method.OriginalDefinition))
                 return true;
         return false;
     }
-
     private void AnalyzeDisposal(ITypeSymbol? type, IOperation site, Builder builder) {
         if (type is not INamedTypeSymbol named) return;
         var disposable = compilation.GetTypeByMetadataName("System.IDisposable");
@@ -481,7 +431,6 @@ internal sealed class MethodEffectAnalysisSession(
             .FirstOrDefault(static method => !method.IsStatic && method.Parameters.Length == 0);
         if (implementation != null) AnalyzeCall(implementation, site, builder);
     }
-
     private static bool TryReadEffectContract(IMethodSymbol method, out MethodEffects effects) {
         var canonicalKey = RoslynStructuralMethodIdentity.GetCanonicalKey(method);
         foreach (var attribute in method.GetAttributes().Concat(method.ContainingAssembly?.GetAttributes() ?? [])) {
@@ -491,8 +440,7 @@ internal sealed class MethodEffectAnalysisSession(
 
             if (attribute.AttributeClass?.ContainingAssembly != null &&
                 attribute.ConstructorArguments.Length == 2 &&
-                !string.Equals(attribute.ConstructorArguments[0].Value as string, canonicalKey,
-                    StringComparison.Ordinal))
+                !string.Equals(attribute.ConstructorArguments[0].Value as string, canonicalKey, StringComparison.Ordinal))
                 continue;
 
             var valueIndex = attribute.ConstructorArguments.Length == 1 ? 0 : 1;
@@ -516,28 +464,23 @@ internal sealed class MethodEffectAnalysisSession(
                     foreach (var item in pair.Value.Values)
                         if (item.Value is ITypeSymbol type) exceptions.Add(type.ToDisplayString());
             }
-
             if (!deterministic) declared |= SharpProofEffect.UsesNondeterminism;
             if (exceptions.Count != 0) declared |= SharpProofEffect.Throws;
             if (!complete) declared |= SharpProofEffect.Unknown;
             effects = new MethodEffects(
                 declared,
                 capabilities,
-                exceptions.Select(static type => MethodExceptionFact.Boundary(
-                    type,
-                    MethodExceptionSource.Contract,
-                    "effect_contract")).ToImmutableArray(),
-                ImmutableArray<MethodEffectSite>.Empty,
+                [.. exceptions.Select(static type
+                    => MethodExceptionFact.Boundary(type, MethodExceptionSource.Contract, "effect_contract"))],
+                [],
                 complete
-                    ? ImmutableArray<SharpProofUnknownReason>.Empty
-                    : ImmutableArray.Create(CreateUnknownReason("partial_effect_contract")));
+                    ? []
+                    : [CreateUnknownReason("partial_effect_contract")]);
             return true;
         }
-
         effects = null!;
         return false;
     }
-
     private static MethodEffects UnionContracts(MethodEffects left, MethodEffects right) {
         var conflicts = left.Effects != right.Effects || left.Capabilities != right.Capabilities ||
                         !left.ThrownExceptions.SequenceEqual(right.ThrownExceptions);
@@ -547,11 +490,10 @@ internal sealed class MethodEffectAnalysisSession(
         return new MethodEffects(
             left.Effects | right.Effects | (conflicts ? SharpProofEffect.Unknown : SharpProofEffect.None),
             left.Capabilities | right.Capabilities,
-            left.ExceptionFacts.AddRange(right.ExceptionFacts).Distinct().ToImmutableArray(),
+            [.. left.ExceptionFacts.AddRange(right.ExceptionFacts).Distinct()],
             left.Sites.AddRange(right.Sites),
-            unknowns.Distinct().ToImmutableArray());
+            [.. unknowns.Distinct()]);
     }
-
     private static void AddWrite(IOperation target, Builder builder) {
         if (target.Syntax.Ancestors().Any(static syntax =>
                 syntax is InitializerExpressionSyntax or WithExpressionSyntax or
@@ -564,24 +506,19 @@ internal sealed class MethodEffectAnalysisSession(
                 builder.Add(SharpProofEffect.WritesStaticState, field, field.Field, "static_field_write");
                 break;
             case IFieldReferenceOperation field:
-                builder.Add(GetInstanceWriteEffect(field.Instance, builder), field, field.Field,
-                    "instance_field_write");
+                builder.Add(GetInstanceWriteEffect(field.Instance, builder), field, field.Field, "instance_field_write");
                 break;
             case IPropertyReferenceOperation { Property.IsStatic: true } property:
-                builder.Add(SharpProofEffect.WritesStaticState, property, property.Property,
-                    "static_property_write");
+                builder.Add(SharpProofEffect.WritesStaticState, property, property.Property, "static_property_write");
                 break;
             case IPropertyReferenceOperation property:
-                builder.Add(GetInstanceWriteEffect(property.Instance, builder), property, property.Property,
-                    "instance_property_write");
+                builder.Add(GetInstanceWriteEffect(property.Instance, builder), property, property.Property, "instance_property_write");
                 break;
             case IArrayElementReferenceOperation array:
-                builder.Add(GetInstanceWriteEffect(array.ArrayReference, builder), array, array.Type,
-                    "array_element_write");
+                builder.Add(GetInstanceWriteEffect(array.ArrayReference, builder), array, array.Type, "array_element_write");
                 break;
         }
     }
-
     private static SharpProofEffect GetInstanceWriteEffect(IOperation? instance, Builder builder) => instance switch {
         IInstanceReferenceOperation => SharpProofEffect.WritesReceiverState,
         IParameterReferenceOperation => SharpProofEffect.WritesArgumentState,
@@ -621,7 +558,6 @@ internal sealed class MethodEffectAnalysisSession(
             return MethodEffectOrigin.Call;
         return MethodEffectOrigin.Unknown;
     }
-
     private bool IsCaught(IOperation operation, string exceptionTypeName) {
         var exceptionType = compilation.GetTypeByMetadataName(exceptionTypeName) ?? operation switch {
             IThrowOperation thrown => thrown.Exception?.Type,
@@ -629,12 +565,10 @@ internal sealed class MethodEffectAnalysisSession(
         };
         return exceptionType != null && IsCaught(operation.Syntax, exceptionType);
     }
-
     private bool IsCaught(SyntaxNode site, string exceptionTypeName) {
         var exceptionType = compilation.GetTypeByMetadataName(exceptionTypeName);
         return exceptionType != null && IsCaught(site, exceptionType);
     }
-
     private bool IsCaught(SyntaxNode site, ITypeSymbol exceptionType) {
         foreach (var tryStatement in site.Ancestors().OfType<TryStatementSyntax>()) {
             if (!tryStatement.Block.Span.Contains(site.Span)) continue;
@@ -649,17 +583,13 @@ internal sealed class MethodEffectAnalysisSession(
         }
         return false;
     }
-
     private static bool IsNullConstant(IOperation? operation) => operation switch {
         { ConstantValue: { HasValue: true, Value: null } } => true,
         IConversionOperation conversion => IsNullConstant(conversion.Operand),
         _ => false
     };
 
-    private static bool IsVisible(
-        IOperation operation,
-        SyntaxNode declaration,
-        SemanticModel semanticModel) {
+    private static bool IsVisible(IOperation operation, SyntaxNode declaration, SemanticModel semanticModel) {
         for (var current = operation.Syntax; current != null && current != declaration; current = current.Parent)
             if (current is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax)
                 return false;
@@ -675,21 +605,18 @@ internal sealed class MethodEffectAnalysisSession(
                 return false;
         return true;
     }
-
     private MethodEffects AnalyzeMetadata(IMethodSymbol method, SyntaxNode site) {
         if (TryReadEffectContract(method, out var contracted)) return contracted;
         return Unknown("method_body_unavailable", site);
     }
-
     private MethodEffects Cache(IMethodSymbol method, MethodEffects effects) {
         _cache[method] = effects;
         return effects;
     }
-
     private static MethodEffects Unknown(string reason, SyntaxNode site) => new(
         SharpProofEffect.Unknown,
         SharpProofCapability.None,
-        ImmutableArray.Create(new MethodExceptionFact(
+        [new MethodExceptionFact(
             "System.Exception",
             SharpProofVerdict.Unknown,
             MethodExceptionSource.Unknown,
@@ -698,8 +625,8 @@ internal sealed class MethodEffectAnalysisSession(
             site.SpanStart,
             site.Span.Length,
             false,
-            reason)),
-        ImmutableArray.Create(new MethodEffectSite(
+            reason)],
+        [new MethodEffectSite(
             SharpProofEffect.Unknown,
             SharpProofCapability.None,
             site.ToString(),
@@ -707,15 +634,10 @@ internal sealed class MethodEffectAnalysisSession(
             site.SpanStart,
             site.Span.Length,
             false,
-            reason)),
-        ImmutableArray.Create(CreateUnknownReason(reason)));
+            reason)],
+        [CreateUnknownReason(reason)]);
 
-    private static SharpProofUnknownReason CreateUnknownReason(string reason) => new(
-        "SP-EFFECT-UNKNOWN",
-        "Effects",
-        reason,
-        false,
-        false);
+    private static SharpProofUnknownReason CreateUnknownReason(string reason) => new("SP-EFFECT-UNKNOWN", "Effects", reason, false, false);
 
     sealed class Builder(Func<IOperation, string, bool> isCaught) {
         private readonly ImmutableArray<MethodExceptionFact>.Builder _exceptions =
@@ -739,7 +661,6 @@ internal sealed class MethodEffectAnalysisSession(
             if (type is INamedTypeSymbol { TypeKind: not (TypeKind.Interface or TypeKind.Dynamic), IsAbstract: false } named)
                 _exactTypes[local] = named;
         }
-
         internal INamedTypeSymbol? GetExactType(ILocalSymbol local) =>
             _exactTypes.TryGetValue(local, out var type) ? type : null;
 
@@ -753,21 +674,13 @@ internal sealed class MethodEffectAnalysisSession(
                 .ToImmutableArray();
             if (!methods.IsDefaultOrEmpty) _delegateTargets[local] = methods;
         }
-
         internal ImmutableArray<IMethodSymbol> GetDelegateTargets(ILocalSymbol local) =>
-            _delegateTargets.TryGetValue(local, out var methods) ? methods : ImmutableArray<IMethodSymbol>.Empty;
+            _delegateTargets.TryGetValue(local, out var methods) ? methods : [];
 
-        internal void Add(
-            SharpProofEffect effect,
-            IOperation operation,
-            ISymbol? symbol,
-            string reason) => Add(effect, SharpProofCapability.None, operation, symbol, reason);
+        internal void Add(SharpProofEffect effect, IOperation operation, ISymbol? symbol, string reason)
+            => Add(effect, SharpProofCapability.None, operation, symbol, reason);
 
-        internal void Add(
-            SharpProofEffect effect,
-            SharpProofCapability capabilities,
-            IOperation operation,
-            ISymbol? symbol,
+        internal void Add(SharpProofEffect effect, SharpProofCapability capabilities, IOperation operation, ISymbol? symbol,
             string reason) {
             _effects |= effect;
             _capabilities |= capabilities;
@@ -782,7 +695,6 @@ internal sealed class MethodEffectAnalysisSession(
                 reason,
                 GetOrigin(effect)));
         }
-
         internal void AddException(
             ITypeSymbol? type,
             IOperation operation,
@@ -806,13 +718,10 @@ internal sealed class MethodEffectAnalysisSession(
             if (reason.IndexOf("throw_null", StringComparison.Ordinal) >= 0)
                 for (var index = _exceptions.Count - 1; index >= 0; index--)
                     if (_exceptions[index].Source == MethodExceptionSource.ExplicitThrow &&
-                        syntaxSite.Span.OverlapsWith(new TextSpan(
-                            _exceptions[index].SpanStart,
-                            _exceptions[index].SpanLength)))
+                        syntaxSite.Span.OverlapsWith(new TextSpan(_exceptions[index].SpanStart, _exceptions[index].SpanLength)))
                         _exceptions.RemoveAt(index);
             AddException(exceptionType, syntaxSite, source, escape, reason, kind, exceptionType);
         }
-
         internal void AddUnknown(IOperation operation, string reason, ISymbol? symbol = null) {
             Add(SharpProofEffect.Unknown, operation, symbol, reason);
             _unknowns.Add(CreateUnknownReason(reason));
@@ -824,7 +733,6 @@ internal sealed class MethodEffectAnalysisSession(
                 reason,
                 symbol: symbol?.ToDisplayString() ?? string.Empty);
         }
-
         private void AddException(
             string exceptionType,
             SyntaxNode site,
@@ -838,12 +746,7 @@ internal sealed class MethodEffectAnalysisSession(
                 exceptionType, escape, source, site.ToString(), symbol,
                 site.SpanStart, site.Span.Length, false, reason, kind));
         }
-
-        internal void AddTransitive(
-            MethodEffects effects,
-            IOperation site,
-            ISymbol symbol,
-            string reason) {
+        internal void AddTransitive(MethodEffects effects, IOperation site, ISymbol symbol, string reason) {
             _effects |= effects.Effects;
             _capabilities |= effects.Capabilities;
             foreach (var exception in effects.ExceptionFacts) {
@@ -876,12 +779,11 @@ internal sealed class MethodEffectAnalysisSession(
                     effects.ThrownExceptions.FirstOrDefault(),
                     symbol.ToDisplayString()));
         }
-
         internal MethodEffects Build() => new(
             _effects,
             _capabilities,
-            _exceptions.Distinct().ToImmutableArray(),
+            [.. _exceptions.Distinct()],
             _sites.ToImmutable(),
-            _unknowns.Distinct().ToImmutableArray());
+            [.. _unknowns.Distinct()]);
     }
 }

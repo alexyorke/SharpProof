@@ -7,17 +7,12 @@ internal static class SymbolicStateFactBuilder {
             term = null!;
             return false;
         }
-
         term = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(symbol), kind);
         return true;
     }
-
-    internal static bool CanCompareIrTerms(SymbolicTerm left, SymbolicTerm right) {
-        return left.Kind == right.Kind ||
+    internal static bool CanCompareIrTerms(SymbolicTerm left, SymbolicTerm right) => left.Kind == right.Kind ||
                (left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference) ||
                (right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference);
-    }
-
     internal static void AddSymbolReferenceNullCondition(
         ref SymbolicState state,
         ISymbol symbol,
@@ -30,7 +25,6 @@ internal static class SymbolicStateFactBuilder {
         state = SymbolicOperationTransferKernel.Assume(
             state, CreateReferenceNullCondition(term, source, isNull, provenance), true, source.Span, provenance).State;
     }
-
     internal static SymbolicCondition CreateReferenceNullCondition(SymbolicTerm reference, SyntaxNode source,
         bool isNull, string provenance, string? evidenceKey = null) =>
         new SymbolicFactCondition(SymbolicFact.Exact(
@@ -53,19 +47,14 @@ internal static class SymbolicStateFactBuilder {
             condition = null!;
             return false;
         }
-
         condition = CreateReferenceNullCondition(reference, expression, isNull, provenance);
         return true;
     }
-
-    internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind) {
-        return SymbolicFactFactory.TryGetValueKind(
+    internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind) => SymbolicFactFactory.TryGetValueKind(
             type,
             SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
             IsProgramPointReferenceLikeType,
             out kind);
-    }
-
     private static bool IsProgramPointReferenceLikeType(ITypeSymbol type) =>
         SymbolicTypeFacts.IsSymbolicReferenceLikeType(type);
 }

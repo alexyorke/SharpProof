@@ -16,17 +16,15 @@ internal static class SymbolicOperationTransfer {
         string? asExpressionProvenanceRoot = null,
         SymbolicAssignmentPostconditionProfile postconditionProfile = SymbolicAssignmentPostconditionProfile.Analyzer,
         SymbolicTerm? preInvalidationTargetValue = null) {
-        var targetContext = new SymbolicLoweringContext(
-            semanticModel,
-            cancellationToken,
-            getTargetVersion);
+        var targetContext = new SymbolicLoweringContext(semanticModel, cancellationToken, getTargetVersion);
         var valueContext = new SymbolicLoweringContext(
             semanticModel,
             cancellationToken,
             getValueVersion,
             symbolSubstitutions: preInvalidationTargetValue == null
                 ? null
-                : new Dictionary<ISymbol, SymbolicTerm>(1, SymbolEqualityComparer.Default) { [targetSymbol.OriginalDefinition] = preInvalidationTargetValue });
+                : new Dictionary<ISymbol, SymbolicTerm>(1,
+                    SymbolEqualityComparer.Default) { [targetSymbol.OriginalDefinition] = preInvalidationTargetValue });
         var lowering = SymbolicOperationLowerer.LowerSimpleAssignment(
             targetSymbol,
             valueSyntax,
@@ -40,7 +38,6 @@ internal static class SymbolicOperationTransfer {
             postconditionProfile);
         return ApplyLowering(state, lowering);
     }
-
     internal static SymbolicOperationTransitionResult ApplyComputedUpdate(
         SymbolicState state,
         ISymbol targetSymbol,
@@ -48,22 +45,11 @@ internal static class SymbolicOperationTransfer {
         SyntaxNode source,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SymbolicComputedUpdateKind updateKind,
-        bool isChecked,
         string provenance) {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicOperationLowerer.LowerComputedUpdate(
-            targetSymbol,
-            sourceTerm,
-            source,
-            context,
-            updateKind,
-            isChecked,
-            sequence: 0,
-            provenance);
+        var lowering = SymbolicOperationLowerer.LowerComputedUpdate(targetSymbol, sourceTerm, source, context, sequence: 0, provenance);
         return ApplyLowering(state, lowering);
     }
-
     internal static SymbolicOperationTransitionResult ApplyCoalesceAssignment(
         SymbolicState state,
         ISymbol targetSymbol,
@@ -74,31 +60,19 @@ internal static class SymbolicOperationTransfer {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         return ApplyLowering(
             state,
-            SymbolicOperationLowerer.LowerCoalesceAssignment(
-                targetSymbol,
-                rightExpression,
-                context,
-                sequence: 0,
-                provenance));
+            SymbolicOperationLowerer.LowerCoalesceAssignment(targetSymbol, rightExpression, context, sequence: 0, provenance));
     }
-
     internal static SymbolicOperationTransitionResult ApplyBindings(
         SymbolicState state,
         System.Collections.Immutable.ImmutableArray<SymbolicAssignmentBinding> bindings,
         SyntaxNode source,
-        SymbolicAssignmentOperationKind assignmentKind,
         string provenance) {
         var operation = new SymbolicAssignmentOperation(
             bindings,
-            System.Collections.Immutable.ImmutableArray<SymbolicCondition>.Empty,
-            assignmentKind,
-            IsChecked: false,
+            [],
             new SymbolicOperationOrigin(source.Span, 0, provenance));
-        return SymbolicOperationTransferKernel.Apply(
-            state,
-            SymbolicOperationSequence.Single(operation));
+        return SymbolicOperationTransferKernel.Apply(state, SymbolicOperationSequence.Single(operation));
     }
-
     internal static SymbolicOperationTransitionResult ApplyLowering(
         SymbolicState state,
         SymbolicLoweringResult<SymbolicOperationSequence> lowering) => lowering is { IsExact: true, Value: { } operations }

@@ -48,7 +48,6 @@ internal static class SymbolicRuntimeHazardCandidateFactory {
             }
         }
     }
-
     private static IEnumerable<RuntimeHazardCandidate> EnumerateCandidatesForNode(
         SyntaxNode node,
         SemanticModel semanticModel,
@@ -63,19 +62,13 @@ internal static class SymbolicRuntimeHazardCandidateFactory {
         // Invocation targets can have no member-level operation because Roslyn owns the operation at the parent call.
         if (node is MemberAccessExpressionSyntax memberAccess &&
             (operation == null || !ReferenceEquals(operation.Syntax, memberAccess)) &&
-            SymbolicOperationLowerer.TryLowerMemberAccessNullDereferenceHazard(
-                memberAccess,
-                context,
-                out var memberNullHazard))
+            SymbolicOperationLowerer.TryLowerMemberAccessNullDereferenceHazard(memberAccess, context, out var memberNullHazard))
             yield return new RuntimeHazardCandidate(memberAccess, memberNullHazard);
 
         if (node is ThrowStatementSyntax or ThrowExpressionSyntax)
             foreach (var throwCandidate in CreateThrowCandidates(node, semanticModel, cancellationToken))
                 yield return throwCandidate;
     }
-
-    private delegate bool TryLowerOperationHazard(
-        IOperation operation,
-        SymbolicLoweringContext context,
+    private delegate bool TryLowerOperationHazard(IOperation operation, SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard);
 }

@@ -25,7 +25,6 @@ internal static class SymbolicValueFacts {
                 return false;
         }
     }
-
     public static bool TryGetInvocationArgumentExpression(
         IInvocationOperation invocationOperation,
         int parameterIndex,
@@ -42,16 +41,13 @@ internal static class SymbolicValueFacts {
                 expression = argumentExpression;
                 return true;
             }
-
         if (parameterIndex < invocationOperation.Arguments.Length &&
             invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression) {
             expression = fallbackExpression;
             return true;
         }
-
         return false;
     }
-
     public static bool TryGetInvocationArgumentExpressionByOrdinal(
         IInvocationOperation invocationOperation,
         int parameterIndex,
@@ -62,11 +58,9 @@ internal static class SymbolicValueFacts {
                 expression = argumentExpression;
                 return true;
             }
-
         expression = null!;
         return false;
     }
-
     internal static bool TryGetInvocationArgumentExpressionsByOrdinal(
         IInvocationOperation invocationOperation,
         int count,
@@ -75,17 +69,14 @@ internal static class SymbolicValueFacts {
             expressions = default;
             return false;
         }
-
         var builder = ImmutableArray.CreateBuilder<ExpressionSyntax>(count);
         for (var ordinal = 0; ordinal < count; ordinal++) {
             if (!TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, ordinal, out var expression)) {
                 expressions = default;
                 return false;
             }
-
             builder.Add(expression);
         }
-
         expressions = builder.MoveToImmutable();
         return true;
     }

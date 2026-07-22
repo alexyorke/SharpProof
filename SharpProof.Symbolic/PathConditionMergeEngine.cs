@@ -4,14 +4,12 @@ internal static class PathConditionMergeEngine {
     internal static ImmutableArray<SymbolicCondition> MergeAcrossAll(
         IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets,
         SharpProofAnalysisBudget limits) {
-        if (conditionSets.Count == 0) return ImmutableArray<SymbolicCondition>.Empty;
+        if (conditionSets.Count == 0) return [];
 
         var common = GetCommonConditions(conditionSets);
         if (conditionSets.Count < 2) return common;
 
-        var commonKeys = new HashSet<string>(
-            common.Select(SymbolicState.CreateProofConditionKey),
-            StringComparer.Ordinal);
+        var commonKeys = new HashSet<string>(common.Select(SymbolicState.CreateProofConditionKey), StringComparer.Ordinal);
         var states = conditionSets
             .Select(conditions => new StatePathFacts(conditions, commonKeys, limits))
             .ToArray();
@@ -35,7 +33,6 @@ internal static class PathConditionMergeEngine {
                         "state_merge.fact_choice_combinations");
                     break;
                 }
-
                 if (choices.Select(static choice => SymbolicState.CreateProofConditionKey(choice.Condition))
                     .Distinct(StringComparer.Ordinal)
                     .Count() == 1)
@@ -50,7 +47,6 @@ internal static class PathConditionMergeEngine {
                             SymbolicConditionOperator.And,
                             new[] { guard, choices[index].Condition });
                 }
-
                 var merged = SymbolicStateMerger.Combine(SymbolicConditionOperator.Or, branches);
                 if (!commonKeys.Add(SymbolicState.CreateProofConditionKey(merged))) continue;
                 if (emittedCount >= limits.MaxMergedPathConditions) {
@@ -61,20 +57,14 @@ internal static class PathConditionMergeEngine {
                         "state_merge.merged_path_conditions");
                     return builder.ToImmutable();
                 }
-
                 builder.Add(merged);
                 emittedCount++;
             }
         }
-
         return builder.ToImmutable();
     }
-
-    private static ImmutableArray<SymbolicCondition> GetCommonConditions(
-        IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets) {
-        var commonKeys = new HashSet<string>(
-            conditionSets[0].Select(SymbolicState.CreateProofConditionKey),
-            StringComparer.Ordinal);
+    private static ImmutableArray<SymbolicCondition> GetCommonConditions(IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets) {
+        var commonKeys = new HashSet<string>(conditionSets[0].Select(SymbolicState.CreateProofConditionKey), StringComparer.Ordinal);
         for (var index = 1; index < conditionSets.Count; index++)
             commonKeys.IntersectWith(conditionSets[index].Select(SymbolicState.CreateProofConditionKey));
 
@@ -84,10 +74,8 @@ internal static class PathConditionMergeEngine {
             var key = SymbolicState.CreateProofConditionKey(condition);
             if (commonKeys.Contains(key) && emitted.Add(key)) builder.Add(condition);
         }
-
         return builder.ToImmutable();
     }
-
     private static IEnumerable<PathFact[]> EnumerateChoices(
         IReadOnlyList<StatePathFacts> states,
         string target,
@@ -104,7 +92,6 @@ internal static class PathConditionMergeEngine {
             yield return selected.ToArray();
             yield break;
         }
-
         foreach (var fact in states[stateIndex].FactsByTarget[target]
                      .Take(limits.MaxMergeableFactsPerTargetPerState)) {
             selected[stateIndex] = fact;
@@ -112,12 +99,7 @@ internal static class PathConditionMergeEngine {
                 yield return choices;
         }
     }
-
-    private static void RecordLimit(
-        SymbolicAnalysisLimitKind kind,
-        int limit,
-        int observed,
-        string provenance) =>
+    private static void RecordLimit(SymbolicAnalysisLimitKind kind, int limit, int observed, string provenance) =>
         SymbolicAnalysisLimitContext.Record(kind, limit, observed, null, provenance);
 
     sealed class StatePathFacts {
@@ -125,10 +107,7 @@ internal static class PathConditionMergeEngine {
         private readonly ImmutableArray<PathFact> facts;
         private readonly SharpProofAnalysisBudget limits;
 
-        internal StatePathFacts(
-            IEnumerable<SymbolicCondition> conditions,
-            ISet<string> commonKeys,
-            SharpProofAnalysisBudget limits) {
+        internal StatePathFacts(IEnumerable<SymbolicCondition> conditions, ISet<string> commonKeys, SharpProofAnalysisBudget limits) {
             this.limits = limits;
             var factsByTarget = new Dictionary<string, List<PathFact>>(StringComparer.Ordinal);
             var localBranches = ImmutableArray.CreateBuilder<SymbolicCondition>();
@@ -140,23 +119,18 @@ internal static class PathConditionMergeEngine {
                     localBranches.Add(condition);
                     continue;
                 }
-
                 var fact = new PathFact(condition, targetKey);
                 if (!factsByTarget.TryGetValue(targetKey, out var targetFacts)) {
-                    targetFacts = new List<PathFact>();
+                    targetFacts = [];
                     factsByTarget.Add(targetKey, targetFacts);
                 }
-
                 targetFacts.Add(fact);
                 localFacts.Add(fact);
             }
-
             branches = localBranches.ToImmutable();
             facts = localFacts.ToImmutable();
-            FactsByTarget = factsByTarget.ToDictionary(
-                static pair => pair.Key,
-                static pair => pair.Value.ToArray(),
-                StringComparer.Ordinal);
+            FactsByTarget = factsByTarget.ToDictionary(static pair => pair.Key, static pair
+                => pair.Value.ToArray(), StringComparer.Ordinal);
             foreach (var pair in FactsByTarget)
                 if (pair.Value.Length > limits.MaxMergeableFactsPerTargetPerState)
                     RecordLimit(
@@ -165,7 +139,6 @@ internal static class PathConditionMergeEngine {
                         pair.Value.Length,
                         "state_merge.facts_per_target_per_state");
         }
-
         internal IReadOnlyDictionary<string, PathFact[]> FactsByTarget { get; }
 
         internal SymbolicCondition? CreateGuard(string targetKey) {
@@ -181,18 +154,13 @@ internal static class PathConditionMergeEngine {
                         "state_merge.guard_facts_per_target_per_state");
                     break;
                 }
-
                 conditions.Add(fact.Condition);
                 guardFactCount++;
             }
-
             return conditions.Count == 0
                 ? null
                 : SymbolicStateMerger.Combine(SymbolicConditionOperator.And, conditions);
         }
     }
-
-    sealed record PathFact(
-        SymbolicCondition Condition,
-        string TargetKey);
+    sealed record PathFact(SymbolicCondition Condition, string TargetKey);
 }

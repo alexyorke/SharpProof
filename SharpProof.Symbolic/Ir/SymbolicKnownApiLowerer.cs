@@ -11,25 +11,31 @@ internal static class SymbolicKnownApiLowerer {
         SymbolicNumericLowerer.TryLowerIntegralMathClampInvocation);
 
     private static readonly ImmutableArray<KnownApiLoweringDescriptor<SymbolicCondition>> KnownApiLowerings =
-        ImmutableArray.Create(
-            new KnownApiLoweringDescriptor<SymbolicCondition>("System.Object", nameof(ReferenceEquals), SymbolicObjectLowerer.TryLowerObjectReferenceEqualsInvocation),
-            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.Contains), SymbolicStringLowerer.TryLowerStringPredicateInvocation),
-            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.StartsWith), SymbolicStringLowerer.TryLowerStringPredicateInvocation),
-            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.EndsWith), SymbolicStringLowerer.TryLowerStringPredicateInvocation),
+        [
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.Object", nameof(ReferenceEquals),
+                SymbolicObjectLowerer.TryLowerObjectReferenceEqualsInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.Contains),
+                SymbolicStringLowerer.TryLowerStringPredicateInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.StartsWith),
+                SymbolicStringLowerer.TryLowerStringPredicateInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.EndsWith),
+                SymbolicStringLowerer.TryLowerStringPredicateInvocation),
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.IsNullOrEmpty),
                 SymbolicStringLowerer.TryLowerStringNullOrPredicateInvocation),
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.IsNullOrWhiteSpace),
                 SymbolicStringLowerer.TryLowerStringNullOrPredicateInvocation),
-            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.Equals), SymbolicStringLowerer.TryLowerStringEqualsInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.Equals),
+                SymbolicStringLowerer.TryLowerStringEqualsInvocation),
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.Text.RegularExpressions.Regex", nameof(Regex.IsMatch),
-                SymbolicStringLowerer.TryLowerRegexIsMatchInvocation));
+                SymbolicStringLowerer.TryLowerRegexIsMatchInvocation),
+        ];
 
     private static readonly ImmutableArray<KnownApiLoweringDescriptor<SymbolicTerm>> KnownApiTermLowerings =
-        ImmutableArray.Create(
+        [
             new KnownApiLoweringDescriptor<SymbolicTerm>(
-                SpecialType.System_Nullable_T,
-                nameof(Nullable<int>.GetValueOrDefault),
-                SymbolicNullableLowerer.TryLowerNullableGetValueOrDefaultInvocation),
+                        SpecialType.System_Nullable_T,
+                        nameof(Nullable<int>.GetValueOrDefault),
+                        SymbolicNullableLowerer.TryLowerNullableGetValueOrDefaultInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetLength),
@@ -55,7 +61,8 @@ internal static class SymbolicKnownApiLowerer {
                 nameof(Math.Max),
                 SymbolicNumericLowerer.TryLowerIntegralMathMinMaxInvocation),
             MathAbsLowering,
-            MathClampLowering);
+            MathClampLowering,
+        ];
 
     internal static bool IsMathAbs(IMethodSymbol method) => MathAbsLowering.Matches(method);
 
@@ -87,7 +94,6 @@ internal static class SymbolicKnownApiLowerer {
 
         return false;
     }
-
     internal static bool TryLowerKnownStaticValueMember(
         MemberAccessExpressionSyntax memberAccess,
         SymbolicLoweringContext context,

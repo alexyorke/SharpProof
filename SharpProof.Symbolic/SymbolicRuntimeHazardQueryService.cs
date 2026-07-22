@@ -6,11 +6,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
     public SymbolicRuntimeHazardQueryService()
         : this(new SymbolicInvariantService()) {
     }
-
-    internal SymbolicRuntimeHazardQueryService(SymbolicInvariantService invariantService) {
-        _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
-    }
-
+    internal SymbolicRuntimeHazardQueryService(SymbolicInvariantService invariantService)
+        => _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
     internal SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazards(
         SyntaxTree syntaxTree,
         Compilation compilation,
@@ -22,20 +19,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             SharpProofTargetKind.Line or SharpProofTargetKind.Point => new RuntimeHazardScope(
                 SymbolicSourceLocation.GetLineSpan(syntaxTree, target.Line!.Value, cancellationToken)),
             SharpProofTargetKind.Span => new RuntimeHazardScope(
-                SymbolicSourceLocation.GetSourceSpan(
-                    syntaxTree, target.SpanStart!.Value, target.SpanEnd!.Value, cancellationToken)),
+                SymbolicSourceLocation.GetSourceSpan(syntaxTree, target.SpanStart!.Value, target.SpanEnd!.Value, cancellationToken)),
             SharpProofTargetKind.AllLines => RuntimeHazardScope.All,
             _ => throw new NotSupportedException("Target kind is not supported for runtime hazard queries.")
         };
-        return QuerySyntaxTreeRuntimeHazardsCore(
-            syntaxTree,
-            compilation,
-            scope,
-            smtAnalysis,
-            cancellationToken,
-            options);
+        return QuerySyntaxTreeRuntimeHazardsCore(syntaxTree, compilation, scope, smtAnalysis, cancellationToken, options);
     }
-
     public SymbolicRuntimeHazardQueryResult QueryNodeRuntimeHazards(
         SyntaxNode node,
         SemanticModel semanticModel,
@@ -55,7 +44,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             options,
             includeNestedCallables);
     }
-
     private SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazardsCore(
         SyntaxTree syntaxTree,
         Compilation compilation,
@@ -72,17 +60,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
         options ??= SymbolicRuntimeHazardQueryOptions.Default;
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var root = syntaxTree.GetRoot(cancellationToken);
-        return QueryRuntimeHazardsCore(
-            syntaxTree,
-            semanticModel,
-            root,
-            scope,
-            smtAnalysis,
-            cancellationToken,
-            options,
-            true);
+        return QueryRuntimeHazardsCore(syntaxTree, semanticModel, root, scope, smtAnalysis, cancellationToken, options, true);
     }
-
     private SymbolicRuntimeHazardQueryResult QueryRuntimeHazardsCore(
         SyntaxTree syntaxTree,
         SemanticModel semanticModel,
@@ -106,12 +85,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             .EnumerateCandidates(root, semanticModel, cancellationToken, includeNestedCallables)
             .Where(candidate => !scope.Span.HasValue || candidate.Site.Span.IntersectsWith(scope.Span.Value))
             .Where(candidate => options.Includes(candidate.Kind))
-            .Select(candidate => ClassifyCandidate(
-                semanticModel,
-                candidate,
-                smtAnalysis,
-                cancellationToken,
-                initialState))
+            .Select(candidate => ClassifyCandidate(semanticModel, candidate, smtAnalysis, cancellationToken, initialState))
             .Where(hazard => options.IncludeUnprovenCandidates || hazard.Status == SymbolicRuntimeHazardStatus.Proven)
             .OrderBy(static hazard => hazard.SpanStart)
             .ThenBy(static hazard => hazard.Kind.ToString(), StringComparer.Ordinal)
@@ -119,11 +93,9 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
 
         return new SymbolicRuntimeHazardQueryResult(hazards);
     }
-
     readonly record struct RuntimeHazardScope(TextSpan? Span) {
         public static RuntimeHazardScope All { get; } = new(null);
     }
-
     private SymbolicRuntimeHazard ClassifyCandidate(
         SemanticModel semanticModel,
         RuntimeHazardCandidate candidate,
@@ -140,11 +112,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
         var triggerPrecondition = descriptor.ToPreconditionFact();
         var triggerCondition = descriptor.Trigger;
 
-        var (status, reason, proofInfo, triggerProof) = ClassifyTriggerCore(
-            analysis,
-            triggerCondition,
-            triggerPrecondition,
-            smtAnalysis);
+        var (status, reason, proofInfo, triggerProof) = ClassifyTriggerCore(analysis, triggerCondition, triggerPrecondition, smtAnalysis);
         var triggerWitness = CreateTriggerWitness(
             analysis,
             triggerCondition,
@@ -165,7 +133,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             triggerWitness,
             analysis.AnalysisTruncation);
     }
-
     private static SymbolicInputWitness CreateTriggerWitness(
         SymbolicProgramPointAnalysis analysis,
         SymbolicCondition triggerCondition,
@@ -189,13 +156,11 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
 
         return SymbolicInputWitnessFactory.Create(
             triggerFeasibility.RawResult?.PathCheck.Witness,
-            analysis.PathConditions.Concat(new[] { encodedTrigger }),
             semanticModel,
             position,
             SymbolicWitnessStatus.Unsupported,
             rawProof?.Reason ?? reason);
     }
-
     internal static (
         SymbolicRuntimeHazardStatus Status,
         string Reason,
@@ -222,7 +187,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
 
         return ClassifyIrTrigger(analysis, triggerPrecondition, smtAnalysis);
     }
-
     private static (
         SymbolicRuntimeHazardStatus Status,
         string Reason,
@@ -242,7 +206,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
         return (SymbolicRuntimeHazardStatus.Unknown, proof.Reason, proof, proof);
     }
 }
-
 internal sealed class SymbolicRuntimeHazardQueryOptions(
     bool includeUnprovenCandidates = false,
     IEnumerable<SymbolicRuntimeHazardKind>? kinds = null) {
@@ -250,17 +213,15 @@ internal sealed class SymbolicRuntimeHazardQueryOptions(
 
     public bool IncludeUnprovenCandidates { get; } = includeUnprovenCandidates;
     public ImmutableHashSet<SymbolicRuntimeHazardKind> Kinds { get; } =
-        kinds?.ToImmutableHashSet() ?? ImmutableHashSet<SymbolicRuntimeHazardKind>.Empty;
+        kinds?.ToImmutableHashSet() ?? [];
 
     public bool Includes(SymbolicRuntimeHazardKind kind) =>
         Kinds.Count == 0 || Kinds.Contains(kind);
 }
-
 internal sealed record SymbolicRuntimeHazardQueryResult(IReadOnlyList<SymbolicRuntimeHazard> Hazards) {
     public SymbolicAnalysisTruncationInfo AnalysisTruncation =>
         SymbolicAnalysisTruncationInfo.Combine(Hazards.Select(static hazard => hazard.AnalysisTruncation));
 }
-
 internal sealed record SymbolicRuntimeHazard(
     SymbolicHazardOperation Descriptor,
     SymbolicRuntimeHazardStatus Status,
@@ -284,9 +245,7 @@ internal sealed record SymbolicRuntimeHazard(
             SymbolicRuntimeHazardStatus.Unsupported
             ? SymbolicUnknownReasonClassifier.Classify(StatusReason)
             : SymbolicUnknownReason.None));
-
 }
-
 internal enum SymbolicRuntimeHazardKind {
     DirectThrow,
     Rethrow,
@@ -306,7 +265,6 @@ internal enum SymbolicRuntimeHazardKind {
     ArgumentNull,
     InvalidCollectionCardinality
 }
-
 internal enum SymbolicRuntimeHazardStatus {
     Proven,
     Unreachable,

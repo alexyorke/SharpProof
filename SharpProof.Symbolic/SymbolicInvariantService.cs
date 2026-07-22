@@ -15,13 +15,7 @@ internal sealed class SymbolicInvariantService {
             node,
             node is ForStatementSyntax forStatement
             ? AnalyzeForInitialEntry(forStatement, semanticModel, smtAnalysis, cancellationToken)
-            : AnalyzeAt(
-                node,
-                semanticModel,
-                smtAnalysis,
-                cancellationToken,
-                includeCurrentStatementCompletionFacts,
-                initialState));
+            : AnalyzeAt(node, semanticModel, smtAnalysis, cancellationToken, includeCurrentStatementCompletionFacts, initialState));
 
     public SymbolicProgramPointAnalysis AnalyzeAt(
         SyntaxNode site,
@@ -30,45 +24,26 @@ internal sealed class SymbolicInvariantService {
         CancellationToken cancellationToken = default,
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicState? initialState = null) {
-        var point = CollectProgramPoint(
-            site,
-            semanticModel,
-            cancellationToken,
-            includeCurrentStatementCompletionFacts,
-            initialState);
-        return CreateAnalysis(
-            point.Formulas,
-            point.PathState,
-            smtAnalysis,
-            point.Truncation);
+        var point = CollectProgramPoint(site, semanticModel, cancellationToken, includeCurrentStatementCompletionFacts, initialState);
+        return CreateAnalysis(point.Formulas, point.PathState, smtAnalysis, point.Truncation);
     }
-
     public SymbolicProgramPointAnalysis AnalyzeForInitialEntry(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
         SmtAnalysisService? smtAnalysis = null,
         CancellationToken cancellationToken = default) {
         using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
-        var pathState = SymbolicReachabilityService.CollectForInitialEntryState(
-            forStatement,
-            semanticModel,
-            cancellationToken);
+        var pathState = SymbolicReachabilityService.CollectForInitialEntryState(forStatement, semanticModel, cancellationToken);
         var formulas = EncodePathState(pathState);
 
-        return CreateAnalysis(
-            formulas,
-            pathState,
-            smtAnalysis,
-            limitScope.Snapshot());
+        return CreateAnalysis(formulas, pathState, smtAnalysis, limitScope.Snapshot());
     }
-
     private static IReadOnlyList<SmtFormula> EncodePathState(SymbolicState pathState) {
         pathState = SymbolicProofStateFacts.NormalizeState(pathState);
         return SymbolicProofEncoder.EncodeState(pathState) is { Success: true } encoded
             ? encoded.PathConditions
             : [];
     }
-
     private static CollectedProgramPoint CollectProgramPoint(
         SyntaxNode site,
         SemanticModel semanticModel,
@@ -82,13 +57,8 @@ internal sealed class SymbolicInvariantService {
             cancellationToken,
             initialState,
             includeCurrentStatementCompletionFacts);
-        return new CollectedProgramPoint(
-            site.SpanStart,
-            pathState,
-            EncodePathState(pathState),
-            limitScope.Snapshot());
+        return new CollectedProgramPoint(site.SpanStart, pathState, EncodePathState(pathState), limitScope.Snapshot());
     }
-
     private static SymbolicProgramPointAnalysis CreateAnalysis(
         IReadOnlyList<SmtFormula> formulas,
         SymbolicState pathState,
@@ -122,14 +92,8 @@ internal sealed class SymbolicInvariantService {
                     truncation,
                     stateProof.RawResult);
 
-            return new SymbolicProgramPointAnalysis(
-                formulas,
-                pathState,
-                SymbolicReachability.Reachable,
-                "no_path_conditions",
-                truncation);
+            return new SymbolicProgramPointAnalysis(formulas, pathState, SymbolicReachability.Reachable, "no_path_conditions", truncation);
         }
-
         return new SymbolicProgramPointAnalysis(
             formulas,
             pathState,
@@ -138,7 +102,6 @@ internal sealed class SymbolicInvariantService {
             truncation,
             stateProof?.RawResult);
     }
-
     private static IReadOnlyList<SmtFormula> FlattenProjectedConjunctions(IEnumerable<SmtFormula> formulas) {
         var projected = new List<SmtFormula>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -149,33 +112,26 @@ internal sealed class SymbolicInvariantService {
                 Add(conjunction.Right);
                 return;
             }
-
             if (seen.Add(SmtFormulaStructuralKey.Create(formula))) projected.Add(formula);
         }
-
         foreach (var formula in formulas)
             if (formula != null)
                 Add(formula);
 
         return projected;
     }
-
-    private static SymbolicReachability MapReachability(SymbolicProofStatus status) {
-        return status switch {
-            SymbolicProofStatus.Reachable => SymbolicReachability.Reachable,
-            SymbolicProofStatus.Unreachable => SymbolicReachability.Unreachable,
-            SymbolicProofStatus.Unknown => SymbolicReachability.Unknown,
-            _ => SymbolicReachability.NotChecked
-        };
-    }
-
+    private static SymbolicReachability MapReachability(SymbolicProofStatus status) => status switch {
+        SymbolicProofStatus.Reachable => SymbolicReachability.Reachable,
+        SymbolicProofStatus.Unreachable => SymbolicReachability.Unreachable,
+        SymbolicProofStatus.Unknown => SymbolicReachability.Unknown,
+        _ => SymbolicReachability.NotChecked
+    };
     readonly record struct CollectedProgramPoint(
         int Position,
         SymbolicState PathState,
         IReadOnlyList<SmtFormula> Formulas,
         SymbolicAnalysisTruncationInfo Truncation);
 }
-
 internal sealed record SymbolicInvariantFactSummary(IReadOnlyList<string> Facts) {
     public string MergedInvariantText { get; } = FormatMergedInvariantFacts(Facts);
 
@@ -191,10 +147,8 @@ internal sealed record SymbolicInvariantFactSummary(IReadOnlyList<string> Facts)
                 if (!string.IsNullOrWhiteSpace(fact) && seen.Add(fact))
                     facts.Add(fact);
         }
-
         return new SymbolicInvariantFactSummary(facts);
     }
-
     internal static string FormatMergedInvariantFacts(IReadOnlyList<string> facts) {
         if (facts == null) throw new ArgumentNullException(nameof(facts));
         return facts.Count switch {
@@ -204,7 +158,6 @@ internal sealed record SymbolicInvariantFactSummary(IReadOnlyList<string> Facts)
         };
     }
 }
-
 internal sealed record SymbolicProgramPointAnalysis(
     IReadOnlyList<SmtFormula> PathConditions,
     SymbolicState PathState,

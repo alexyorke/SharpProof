@@ -5,7 +5,6 @@ internal enum SymbolicUnknownReasonSource {
     Complexity,
     RuntimeHazard
 }
-
 internal enum SymbolicUnknownReasonCategory {
     None,
     UnsupportedSyntax,
@@ -22,7 +21,6 @@ internal enum SymbolicUnknownReasonCategory {
     Cancellation,
     Unknown
 }
-
 internal sealed record SymbolicUnknownReasonInfo(
     SymbolicUnknownReasonSource Source,
     SymbolicUnknownReasonCategory Category,
@@ -32,7 +30,6 @@ internal sealed record SymbolicUnknownReasonInfo(
     bool IsConfigurationRelated) {
     public bool IsUnknown => Category != SymbolicUnknownReasonCategory.None;
 }
-
 internal static class SymbolicUnknownReasonTaxonomy {
     internal static SymbolicUnknownReasonInfo ForProof(SymbolicUnknownReason reason, string? rawReason = null) =>
         Create(SymbolicUnknownReasonSource.Proof, "proof", Describe(reason), rawReason);
@@ -53,32 +50,25 @@ internal static class SymbolicUnknownReasonTaxonomy {
                 new(SymbolicUnknownReasonCategory.UnsupportedOperation, "unsupported_typed_projection"), rawReason);
 
         if (proofReason is not (SymbolicUnknownReason.None or SymbolicUnknownReason.Unknown))
-            return ChangeSource(ForProof(proofReason, rawReason), SymbolicUnknownReasonSource.RuntimeHazard,
-                "runtime_hazard");
+            return ChangeSource(ForProof(proofReason, rawReason), SymbolicUnknownReasonSource.RuntimeHazard, "runtime_hazard");
 
         var unsupported = status == SymbolicRuntimeHazardStatus.Unsupported;
         return Create(SymbolicUnknownReasonSource.RuntimeHazard, "runtime_hazard",
             new(unsupported ? SymbolicUnknownReasonCategory.UnsupportedOperation : SymbolicUnknownReasonCategory.Unknown,
                 unsupported ? "unsupported" : "unknown"), rawReason);
     }
-
     private static ReasonDescriptor Describe(SymbolicUnknownReason reason) => reason switch {
         SymbolicUnknownReason.None => new(SymbolicUnknownReasonCategory.None, "none"),
-        SymbolicUnknownReason.UnsupportedIrEncoding => new(SymbolicUnknownReasonCategory.UnsupportedSyntax,
-            "unsupported_ir_encoding"),
+        SymbolicUnknownReason.UnsupportedIrEncoding => new(SymbolicUnknownReasonCategory.UnsupportedSyntax, "unsupported_ir_encoding"),
         SymbolicUnknownReason.SmtDisabled => new(SymbolicUnknownReasonCategory.SolverDisabled, "solver_disabled",
             IsConfigurationRelated: true),
-        SymbolicUnknownReason.SmtUnavailable => new(SymbolicUnknownReasonCategory.NativeSolverFailure,
-            "native_solver_failure", true),
-        SymbolicUnknownReason.Timeout => new(SymbolicUnknownReasonCategory.SolverTimeout, "solver_timeout", true,
-            true),
+        SymbolicUnknownReason.SmtUnavailable => new(SymbolicUnknownReasonCategory.NativeSolverFailure, "native_solver_failure", true),
+        SymbolicUnknownReason.Timeout => new(SymbolicUnknownReasonCategory.SolverTimeout, "solver_timeout", true, true),
         SymbolicUnknownReason.MethodBudgetExceeded => Budget("solver_method_budget"),
         SymbolicUnknownReason.PathConditionBudgetExceeded => Budget("solver_path_condition_budget"),
         SymbolicUnknownReason.ExpressionBudgetExceeded => Budget("solver_expression_budget"),
-        SymbolicUnknownReason.CancellationRequested => new(SymbolicUnknownReasonCategory.Cancellation, "canceled",
-            true),
-        SymbolicUnknownReason.EncodingFailure => new(SymbolicUnknownReasonCategory.SolverEncodingFailure,
-            "solver_encoding_failure"),
+        SymbolicUnknownReason.CancellationRequested => new(SymbolicUnknownReasonCategory.Cancellation, "canceled", true),
+        SymbolicUnknownReason.EncodingFailure => new(SymbolicUnknownReasonCategory.SolverEncodingFailure, "solver_encoding_failure"),
         _ => new(SymbolicUnknownReasonCategory.Unknown, "unknown")
     };
 
@@ -109,9 +99,7 @@ internal static class SymbolicUnknownReasonTaxonomy {
     private static ReasonDescriptor Budget(string suffix) =>
         new(SymbolicUnknownReasonCategory.SolverBudget, suffix, true, true);
 
-    private static SymbolicUnknownReasonInfo ChangeSource(
-        SymbolicUnknownReasonInfo info,
-        SymbolicUnknownReasonSource source,
+    private static SymbolicUnknownReasonInfo ChangeSource(SymbolicUnknownReasonInfo info, SymbolicUnknownReasonSource source,
         string prefix) => new(
         source,
         info.Category,

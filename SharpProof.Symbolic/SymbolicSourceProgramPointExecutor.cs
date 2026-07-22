@@ -20,27 +20,17 @@ internal sealed class SymbolicSourceProgramPointExecutor(SymbolicInvariantServic
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var root = syntaxTree.GetRoot(cancellationToken);
         var node = SymbolicSourceTargetSelector.FindAtPosition(root, position);
-        return _invariantService.Analyze(
-            semanticModel, position, node, options.SmtAnalysis, cancellationToken);
+        return _invariantService.Analyze(semanticModel, position, node, options.SmtAnalysis, cancellationToken);
     }
-
     internal SymbolicProgramPointResult AnalyzeAndProjectNode(
         SemanticModel semanticModel,
         SyntaxNode node,
         SymbolicQueryOptions options,
         CancellationToken cancellationToken) {
-        var query = _invariantService.Analyze(
-            semanticModel,
-            node.SpanStart,
-            node,
-            options.SmtAnalysis,
-            cancellationToken);
+        var query = _invariantService.Analyze(semanticModel, node.SpanStart, node, options.SmtAnalysis, cancellationToken);
         return Project(query, cancellationToken);
     }
-
-    internal SymbolicProgramPointResult Project(
-        SymbolicProgramPointQueryContext query,
-        CancellationToken cancellationToken) {
+    internal SymbolicProgramPointResult Project(SymbolicProgramPointQueryContext query, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         return new SymbolicProgramPointResult(
             query.Analysis.PathConditions,
@@ -48,7 +38,6 @@ internal sealed class SymbolicSourceProgramPointExecutor(SymbolicInvariantServic
             query.Analysis.ReachabilityReason,
             SymbolicInputWitnessFactory.CreateReachability(
                 query.Analysis.ReachabilityProof?.PathCheck.Witness,
-                query.Analysis.PathConditions,
                 query.SemanticModel,
                 query.Position,
                 query.Analysis.Reachability,

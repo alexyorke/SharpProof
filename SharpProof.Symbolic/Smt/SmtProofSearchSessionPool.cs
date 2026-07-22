@@ -1,7 +1,8 @@
 namespace SharpProof.Symbolic.Smt;
 
 internal sealed class SmtProofSearchSessionPool(Func<IAnalysisProofSearchSession> sessionFactory) {
-    private readonly Func<IAnalysisProofSearchSession> _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
+    private readonly Func<IAnalysisProofSearchSession> _sessionFactory =
+        sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
     private readonly ThreadLocal<IAnalysisProofSearchSession?> _sessions = new(trackAllValues: true);
     private bool _disposed;
 
@@ -10,7 +11,6 @@ internal sealed class SmtProofSearchSessionPool(Func<IAnalysisProofSearchSession
 
         return _sessions.Value ??= _sessionFactory();
     }
-
     public bool RecycleCurrentThread() {
         ThrowIfDisposed();
         if (!_sessions.IsValueCreated || _sessions.Value == null) return false;
@@ -19,7 +19,6 @@ internal sealed class SmtProofSearchSessionPool(Func<IAnalysisProofSearchSession
         _sessions.Value = null;
         return true;
     }
-
     public int Dispose(bool disposeOwnedSessions) {
         if (_disposed) return 0;
 
@@ -33,11 +32,9 @@ internal sealed class SmtProofSearchSessionPool(Func<IAnalysisProofSearchSession
                 disposedCount++;
             }
         }
-
         _sessions.Dispose();
         return disposedCount;
     }
-
     private static void DisposeSession(IAnalysisProofSearchSession session) {
         try {
             session.Dispose();
@@ -46,7 +43,6 @@ internal sealed class SmtProofSearchSessionPool(Func<IAnalysisProofSearchSession
             // Disposal is best effort for a failed or stale native context.
         }
     }
-
     private void ThrowIfDisposed() {
         if (_disposed) throw new ObjectDisposedException(nameof(SmtProofSearchSessionPool));
     }

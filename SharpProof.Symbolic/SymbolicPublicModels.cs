@@ -7,7 +7,6 @@ internal enum SymbolicProofStatus {
     ProvenTrue,
     ProvenFalse
 }
-
 internal enum SymbolicUnknownReason {
     None,
     UnsupportedIrEncoding,
@@ -21,7 +20,6 @@ internal enum SymbolicUnknownReason {
     EncodingFailure,
     Unknown
 }
-
 internal sealed record SymbolicBudgetInfo(
     int MaxPathConditions,
     int MaxExpressionNodes,
@@ -78,9 +76,7 @@ internal sealed record SymbolicProofInfo(
         Reason = reason ?? Reason
     };
 
-    internal static SymbolicProofInfo FromReachability(
-        AnalysisProofResult result,
-        SymbolicBudgetInfo? budget) =>
+    internal static SymbolicProofInfo FromReachability(AnalysisProofResult result, SymbolicBudgetInfo? budget) =>
         FromResult(
             result,
             result.PathCheck.Feasibility switch {
@@ -90,9 +86,7 @@ internal sealed record SymbolicProofInfo(
             },
             budget);
 
-    internal static SymbolicProofInfo FromImplication(
-        AnalysisProofResult result,
-        SymbolicBudgetInfo? budget) =>
+    internal static SymbolicProofInfo FromImplication(AnalysisProofResult result, SymbolicBudgetInfo? budget) =>
         FromResult(
             result,
             result.Outcome switch {
@@ -102,22 +96,15 @@ internal sealed record SymbolicProofInfo(
             },
             budget);
 
-    internal static SymbolicProofInfo FromConditionTruth(
-        AnalysisProofResult result,
-        SymbolicProofStatus status,
+    internal static SymbolicProofInfo FromConditionTruth(AnalysisProofResult result, SymbolicProofStatus status,
         SymbolicBudgetInfo? budget) => FromResult(result, status, budget);
 
-    private static SymbolicProofInfo FromResult(
-        AnalysisProofResult result,
-        SymbolicProofStatus status,
-        SymbolicBudgetInfo? budget) => new(
+    private static SymbolicProofInfo FromResult(AnalysisProofResult result, SymbolicProofStatus status, SymbolicBudgetInfo? budget) => new(
         status,
         status == SymbolicProofStatus.Unknown
             ? SymbolicUnknownReasonClassifier.Classify(result.Reason)
             : SymbolicUnknownReason.None,
         result.Reason,
         false,
-        budget)
-    { RawResult = result };
-
+        budget) { RawResult = result };
 }

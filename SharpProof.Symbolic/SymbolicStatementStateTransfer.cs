@@ -9,9 +9,9 @@ internal static class SymbolicStatementStateTransfer {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         if (semanticModel.GetEnclosingSymbol(site.SpanStart, cancellationToken) is IMethodSymbol {
-                IsStatic: false,
-                ContainingType.IsReferenceType: true
-            } method) {
+            IsStatic: false,
+            ContainingType.IsReferenceType: true
+        } method) {
             var thisFact = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.NotEqual,
@@ -22,27 +22,19 @@ internal static class SymbolicStatementStateTransfer {
                 method);
             state = state.AddPathCondition(new SymbolicFactCondition(thisFact));
         }
-
-        foreach (var parameter in GetDefinitelyNotNullEntryParameters(
-                     site,
-                     semanticModel,
-                     cancellationToken)) {
+        foreach (var parameter in GetDefinitelyNotNullEntryParameters(site, semanticModel, cancellationToken)) {
             if (!TryCreateSymbolTerm(parameter, out var parameterTerm) ||
                 parameterTerm.Kind != SmtValueKind.Reference)
                 continue;
 
             var fact = SymbolicFact.Exact(
-                new SymbolicRelationAtom(
-                    SymbolicRelationOperator.NotEqual,
-                    parameterTerm,
-                    new SymbolicNullTerm()),
+                new SymbolicRelationAtom(SymbolicRelationOperator.NotEqual, parameterTerm, new SymbolicNullTerm()),
                 site,
                 "ir.path.method-entry.nullability-contract",
                 parameter);
             state = state.AddPathCondition(new SymbolicFactCondition(fact));
         }
     }
-
     private static IEnumerable<IParameterSymbol> GetDefinitelyNotNullEntryParameters(
         SyntaxNode site,
         SemanticModel semanticModel,
@@ -55,21 +47,16 @@ internal static class SymbolicStatementStateTransfer {
                 NullableFlowFacts.HasExplicitNotNullInputContract(parameter))
                 yield return (IParameterSymbol)parameter.OriginalDefinition;
     }
-
     internal static void AddPriorStatementStateFacts(
         ref SymbolicState state,
         StatementSyntax statement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         if (statement is LocalDeclarationStatementSyntax or ExpressionStatementSyntax &&
-            SymbolicCfgProgramPointStateCollector.TryApplyPriorStatementCompletion(
-                ref state,
-                statement,
-                semanticModel,
+            SymbolicCfgProgramPointStateCollector.TryApplyPriorStatementCompletion(ref state, statement, semanticModel,
                 cancellationToken)) {
             return;
         }
-
         if (statement is BlockSyntax completedBlock) {
             state = SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
                 completedBlock,
@@ -78,24 +65,15 @@ internal static class SymbolicStatementStateTransfer {
                 cancellationToken).Value!;
             return;
         }
-
         if (statement is TryStatementSyntax or IfStatementSyntax or SwitchStatementSyntax or
             WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax or
             ForEachStatementSyntax or ForEachVariableStatementSyntax or LockStatementSyntax &&
-            SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(
-                statement,
-                state,
-                semanticModel,
+            SymbolicCfgProgramPointStateCollector.CollectCompletedStatementState(statement, state, semanticModel,
                 cancellationToken) is { IsExact: true, Value: { } completedControlFlowState }) {
             state = completedControlFlowState;
             return;
         }
-
-        SymbolicStateInvalidator.InvalidateNestedMutations(
-            ref state,
-            statement,
-            semanticModel,
-            cancellationToken);
+        SymbolicStateInvalidator.InvalidateNestedMutations(ref state, statement, semanticModel, cancellationToken);
         if (statement is UsingStatementSyntax completedUsingStatement) {
             if (completedUsingStatement.Expression != null)
                 state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
@@ -119,7 +97,6 @@ internal static class SymbolicStatementStateTransfer {
 
             return;
         }
-
         if (statement is IfStatementSyntax completedIf &&
             SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(
                 completedIf.Condition,

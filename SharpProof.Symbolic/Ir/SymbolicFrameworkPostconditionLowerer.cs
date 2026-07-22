@@ -20,38 +20,31 @@ internal static class SymbolicFrameworkPostconditionLowerer {
         AddMemberNotNullConditions(after, expression, semanticModel, cancellationToken);
         return Exact(expression, before.ToImmutable(), after.ToImmutable());
     }
-
     internal static SymbolicLoweringResult<SymbolicFrameworkPostconditionPlan> LowerMemberNotNull(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         var conditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
         AddMemberNotNullConditions(conditions, expression, semanticModel, cancellationToken);
-        return Exact(expression, ImmutableArray<SymbolicCondition>.Empty, conditions.ToImmutable());
+        return Exact(expression, [], conditions.ToImmutable());
     }
-
     internal static bool IsCurrentInstanceInvocation(InvocationExpressionSyntax invocation) {
         var invokedExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(invocation.Expression);
         return invokedExpression is IdentifierNameSyntax or
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax };
     }
-
     internal static bool TryCreateImplicitThisMemberTerm(ISymbol member, out SymbolicTerm term) {
         if (!NullableFlowFacts.TryGetMemberType(member, out var type) ||
             !TryGetValueKind(type, out var kind)) {
             term = null!;
             return false;
         }
-
         term = new SymbolicMemberTerm(
-            new SymbolicVariableTerm(
-                SymbolicStateValueFacts.ImplicitThisVariableName,
-                SmtValueKind.Reference),
+            new SymbolicVariableTerm(SymbolicStateValueFacts.ImplicitThisVariableName, SmtValueKind.Reference),
             member.Name,
             kind);
         return true;
     }
-
     private static void AddParameterNotNullConditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ExpressionSyntax expression,
@@ -74,7 +67,6 @@ internal static class SymbolicFrameworkPostconditionLowerer {
                     out var condition))
                 conditions.Add(condition);
     }
-
     private static void AddKnownGuardCondition(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ExpressionSyntax expression,
@@ -92,7 +84,6 @@ internal static class SymbolicFrameworkPostconditionLowerer {
                 out _))
             conditions.Add(normalCompletionCondition);
     }
-
     private static void AddMemberNotNullConditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ExpressionSyntax expression,
@@ -106,10 +97,7 @@ internal static class SymbolicFrameworkPostconditionLowerer {
             return;
 
         foreach (var target in NullableFlowFacts.GetMemberNotNullTargets(operation.TargetMethod))
-            if (NullableFlowFacts.TryResolveInstanceMemberTarget(
-                    operation.TargetMethod.ContainingType,
-                    target,
-                    out var member) &&
+            if (NullableFlowFacts.TryResolveInstanceMemberTarget(operation.TargetMethod.ContainingType, target, out var member) &&
                 TryCreateImplicitThisMemberTerm(member, out var memberTerm) &&
                 memberTerm.Kind == SmtValueKind.Reference)
                 conditions.Add(SymbolicIrLowerer.CreateRelationCondition(
@@ -119,7 +107,6 @@ internal static class SymbolicFrameworkPostconditionLowerer {
                     invocation,
                     "ir.path.normal-completion.member-not-null"));
     }
-
     private static bool TryCreateStableNonNullCondition(
         ExpressionSyntax expression,
         StatementSyntax statement,
@@ -128,23 +115,14 @@ internal static class SymbolicFrameworkPostconditionLowerer {
         string provenance,
         bool allowArgumentMutation,
         out SymbolicCondition condition) {
-        if (!NullableFlowFacts.TryGetArgumentTargetSymbol(
-                expression,
-                semanticModel,
-                cancellationToken,
-                out var symbol) ||
+        if (!NullableFlowFacts.TryGetArgumentTargetSymbol(expression, semanticModel, cancellationToken, out var symbol) ||
             !allowArgumentMutation &&
-            SymbolicLoopStateTransfer.AnyConditionSymbolMutatedInStatement(
-                expression,
-                statement,
-                semanticModel,
-                cancellationToken) ||
+            SymbolicLoopStateTransfer.AnyConditionSymbolMutatedInStatement(expression, statement, semanticModel, cancellationToken) ||
             !TryCreateSymbolTerm(symbol, out var term) ||
             term.Kind != SmtValueKind.Reference) {
             condition = null!;
             return false;
         }
-
         condition = SymbolicIrLowerer.CreateRelationCondition(
             SymbolicRelationOperator.NotEqual,
             term,
@@ -153,7 +131,6 @@ internal static class SymbolicFrameworkPostconditionLowerer {
             provenance);
         return true;
     }
-
     internal static IEnumerable<(IInvocationOperation Invocation, IArgumentOperation Argument,
         IParameterSymbol Parameter, ArgumentSyntax Syntax)> EnumerateExplicitInvocationArguments(
         ExpressionSyntax expression,
@@ -171,10 +148,7 @@ internal static class SymbolicFrameworkPostconditionLowerer {
             })
                 yield return (operation, argument, parameter, syntax);
     }
-
-    private static bool HasNotNullNormalCompletionPostcondition(
-        IParameterSymbol parameter,
-        CancellationToken cancellationToken) =>
+    private static bool HasNotNullNormalCompletionPostcondition(IParameterSymbol parameter, CancellationToken cancellationToken) =>
         parameter.RefKind == RefKind.None
             ? NullableFlowFacts.HasNotNullPostcondition(parameter) ||
               NullableFlowFacts.HasInferredNotNullNormalCompletionPostcondition(parameter, cancellationToken)
@@ -194,33 +168,24 @@ internal static class SymbolicFrameworkPostconditionLowerer {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         if (argument.Syntax is not ArgumentSyntax syntax ||
-            !NullableFlowFacts.TryGetArgumentTargetSymbol(
-                syntax.Expression,
-                semanticModel,
-                cancellationToken,
-                out var target))
+            !NullableFlowFacts.TryGetArgumentTargetSymbol(syntax.Expression, semanticModel, cancellationToken, out var target))
             return false;
 
         foreach (var other in invocation.Arguments)
             if (!ReferenceEquals(argument, other) &&
                 other.Syntax is ArgumentSyntax otherSyntax &&
-                NullableFlowFacts.TryGetArgumentTargetSymbol(
-                    otherSyntax.Expression,
-                    semanticModel,
-                    cancellationToken,
+                NullableFlowFacts.TryGetArgumentTargetSymbol(otherSyntax.Expression, semanticModel, cancellationToken,
                     out var otherTarget) &&
                 SymbolEqualityComparer.Default.Equals(target, otherTarget))
                 return false;
         return true;
     }
-
     internal static ExpressionSyntax UnwrapAwaited(ExpressionSyntax expression) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         return expression is AwaitExpressionSyntax awaited
             ? CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(awaited.Expression)
             : expression;
     }
-
     private static SymbolicLoweringResult<SymbolicFrameworkPostconditionPlan> Exact(
         SyntaxNode source,
         ImmutableArray<SymbolicCondition> before,

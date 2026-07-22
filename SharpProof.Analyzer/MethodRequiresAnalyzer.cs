@@ -21,7 +21,6 @@ internal static class MethodRequiresAnalyzer {
                 context.ReportDiagnostic(invalidDiagnostic);
                 continue;
             }
-
             if (!ContractConditionHelpers.TryParse(contract.Condition, out _, out var conditionExpression)) {
                 context.ReportDiagnostic(CreateUnsupportedDiagnostic(
                         methodSymbol,
@@ -31,7 +30,6 @@ internal static class MethodRequiresAnalyzer {
                         null));
                 continue;
             }
-
             if (RequiresContractHelpers.ContainsResultReference(conditionExpression))
                 context.ReportDiagnostic(CreateUnsupportedDiagnostic(
                         methodSymbol,
@@ -40,20 +38,14 @@ internal static class MethodRequiresAnalyzer {
                         "result placeholder is not supported in [Requires] conditions",
                         null));
         }
-
         AnalyzeCallSitesForRequires(context, proofService, attributePolicy);
     }
-
     private static void AnalyzeCallSitesForRequires(
         MethodBodyAnalysisContext context,
         AnalyzerProofService proofService,
         SharpProofAttributeIdentityPolicy attributePolicy) {
-        foreach (var callSite in context.Snapshot.VisibleOperations.SelectMany(static operation =>
-                     CreateCallSites(operation))) {
-            var contracts = RequiresContractHelpers.ValidContracts(
-                callSite.Method,
-                attributePolicy,
-                context.CancellationToken);
+        foreach (var callSite in context.Snapshot.VisibleOperations.SelectMany(static operation => CreateCallSites(operation))) {
+            var contracts = RequiresContractHelpers.ValidContracts(callSite.Method, attributePolicy, context.CancellationToken);
             if (contracts.Length == 0) continue;
 
             var location = callSite.Syntax.GetLocation();
@@ -77,7 +69,6 @@ internal static class MethodRequiresAnalyzer {
                             AdditionalLocations(contract.Location)));
                     continue;
                 }
-
                 var proof = context.State.ProveAtNode(
                     callSite.Syntax,
                     rewrittenCondition,
@@ -94,14 +85,9 @@ internal static class MethodRequiresAnalyzer {
                 if (!seen.Add(key)) continue;
 
                 if (proof.TruthValue == SymbolicTruthValue.ProvenFalse) {
-                    context.ReportDiagnostic(CreateNotProvenDiagnostic(
-                        callSite.Method,
-                        contract.Condition,
-                        location,
-                        contract.Location));
+                    context.ReportDiagnostic(CreateNotProvenDiagnostic(callSite.Method, contract.Condition, location, contract.Location));
                     continue;
                 }
-
                 context.ReportDiagnostic(CreateUnsupportedDiagnostic(
                         callSite.Method,
                         contract.Condition,
@@ -111,7 +97,6 @@ internal static class MethodRequiresAnalyzer {
             }
         }
     }
-
     private static ImmutableArray<RequiresCallSite> CreateCallSites(IOperation operation) {
         var builder = ImmutableArray.CreateBuilder<RequiresCallSite>();
         switch (operation) {
@@ -145,13 +130,8 @@ internal static class MethodRequiresAnalyzer {
 
             case ICompoundAssignmentOperation compoundAssignment
                 when compoundAssignment.Target is IPropertyReferenceOperation propertyTarget:
-                AddPropertyAccessor(builder, propertyTarget, propertyTarget.Property.GetMethod, null,
-                    compoundAssignment.Syntax);
-                AddOperator(
-                    builder,
-                    compoundAssignment.OperatorMethod,
-                    compoundAssignment.Syntax,
-                    propertyTarget,
+                AddPropertyAccessor(builder, propertyTarget, propertyTarget.Property.GetMethod, null, compoundAssignment.Syntax);
+                AddOperator(builder, compoundAssignment.OperatorMethod, compoundAssignment.Syntax, propertyTarget,
                     compoundAssignment.Value);
                 AddPropertyAccessor(
                     builder,
@@ -163,13 +143,8 @@ internal static class MethodRequiresAnalyzer {
 
             case IIncrementOrDecrementOperation incrementOrDecrement
                 when incrementOrDecrement.Target is IPropertyReferenceOperation propertyTarget:
-                AddPropertyAccessor(builder, propertyTarget, propertyTarget.Property.GetMethod, null,
-                    incrementOrDecrement.Syntax);
-                AddOperator(
-                    builder,
-                    incrementOrDecrement.OperatorMethod,
-                    incrementOrDecrement.Syntax,
-                    propertyTarget);
+                AddPropertyAccessor(builder, propertyTarget, propertyTarget.Property.GetMethod, null, incrementOrDecrement.Syntax);
+                AddOperator(builder, incrementOrDecrement.OperatorMethod, incrementOrDecrement.Syntax, propertyTarget);
                 AddPropertyAccessor(
                     builder,
                     propertyTarget,
@@ -190,10 +165,8 @@ internal static class MethodRequiresAnalyzer {
                 AddOperator(builder, operatorMethod, conversion.Syntax, conversion.Operand);
                 break;
         }
-
         return builder.ToImmutable();
     }
-
     private static ExpressionSyntax? CreateCompoundSetterValue(ICompoundAssignmentOperation operation) {
         if (operation.Syntax is not AssignmentExpressionSyntax assignment ||
             operation.Target.Syntax is not ExpressionSyntax target ||
@@ -206,7 +179,6 @@ internal static class MethodRequiresAnalyzer {
             SyntaxFactory.ParenthesizedExpression((ExpressionSyntax)target.WithoutTrivia()),
             SyntaxFactory.ParenthesizedExpression((ExpressionSyntax)value.WithoutTrivia()));
     }
-
     private static ExpressionSyntax? CreateIncrementSetterValue(IIncrementOrDecrementOperation operation) {
         if (operation.Target.Syntax is not ExpressionSyntax target ||
             operation.Syntax is not ExpressionSyntax updateExpression ||
@@ -218,16 +190,12 @@ internal static class MethodRequiresAnalyzer {
             SyntaxFactory.ParenthesizedExpression((ExpressionSyntax)target.WithoutTrivia()),
             SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(1)));
     }
-
-    private static bool IsMutationTarget(IPropertyReferenceOperation propertyReference) {
-        return propertyReference.Parent switch {
-            IAssignmentOperation assignment => ReferenceEquals(assignment.Target, propertyReference),
-            IIncrementOrDecrementOperation incrementOrDecrement =>
-                ReferenceEquals(incrementOrDecrement.Target, propertyReference),
-            _ => false
-        };
-    }
-
+    private static bool IsMutationTarget(IPropertyReferenceOperation propertyReference) => propertyReference.Parent switch {
+        IAssignmentOperation assignment => ReferenceEquals(assignment.Target, propertyReference),
+        IIncrementOrDecrementOperation incrementOrDecrement =>
+            ReferenceEquals(incrementOrDecrement.Target, propertyReference),
+        _ => false
+    };
     private static void AddPropertyAccessor(
         ImmutableArray<RequiresCallSite>.Builder builder,
         IPropertyReferenceOperation propertyReference,
@@ -245,16 +213,13 @@ internal static class MethodRequiresAnalyzer {
 
             arguments[accessor.Parameters[ordinal].Name] = (ExpressionSyntax)expression.WithoutTrivia();
         }
-
         if (setterValue != null && accessor.MethodKind is MethodKind.PropertySet or MethodKind.EventAdd or MethodKind.EventRemove) {
             var valueParameter = accessor.Parameters.LastOrDefault();
             if (valueParameter != null)
                 arguments[valueParameter.Name] = (ExpressionSyntax)setterValue.WithoutTrivia();
         }
-
         builder.Add(new RequiresCallSite(accessor, arguments.ToImmutable(), syntax ?? propertyReference.Syntax));
     }
-
     private static void AddOperator(
         ImmutableArray<RequiresCallSite>.Builder builder,
         IMethodSymbol? operatorMethod,
@@ -269,7 +234,6 @@ internal static class MethodRequiresAnalyzer {
 
         builder.Add(new RequiresCallSite(operatorMethod, arguments.ToImmutable(), syntax));
     }
-
     private static ImmutableDictionary<string, ExpressionSyntax> CreateArgumentMap(
         IMethodSymbol method,
         ImmutableArray<IArgumentOperation> arguments) {
@@ -282,10 +246,8 @@ internal static class MethodRequiresAnalyzer {
 
             result[method.Parameters[ordinal].Name] = (ExpressionSyntax)expression.WithoutTrivia();
         }
-
         return result.ToImmutable();
     }
-
     private static Diagnostic CreateNotProvenDiagnostic(
         IMethodSymbol methodSymbol,
         string condition,
@@ -299,7 +261,6 @@ internal static class MethodRequiresAnalyzer {
             callee,
             condition);
     }
-
     internal static Diagnostic CreateUnsupportedDiagnostic(
         IMethodSymbol methodSymbol,
         string condition,
@@ -315,7 +276,6 @@ internal static class MethodRequiresAnalyzer {
             condition,
             reason);
     }
-
     private static IEnumerable<Location>? AdditionalLocations(Location? location) =>
         location == null ? null : [location];
 

@@ -5,11 +5,7 @@ internal static class SymbolicRuntimeHazardSourceCandidateFactory {
         SyntaxNode throwNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
-        var exceptionType = SymbolicRuntimeExceptionFacts.GetThrownExceptionType(
-            throwNode,
-            semanticModel,
-            cancellationToken,
-            false);
+        var exceptionType = SymbolicRuntimeExceptionFacts.GetThrownExceptionType(throwNode, semanticModel, cancellationToken, false);
         var isRethrow = throwNode is ThrowStatementSyntax { Expression: null };
         var exceptionTypeName =
             exceptionType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)

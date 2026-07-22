@@ -22,11 +22,11 @@ public sealed class SymbolicLoopTransferLowererTests {
             Assert.That(result.IsExact, Is.True, result.Provenance.Single().Detail);
             Assert.That(result.Value!.EntryCondition, Is.Not.Null);
             Assert.That(result.Value.ExitCondition, Is.Not.Null);
-            Assert.That(result.Value.BackEdgeInvalidations.Select(static target => target.Key), Does.Contain(SymbolicFactFactory.GetSmtVariableName(valueSymbol)));
+            Assert.That(result.Value.BackEdgeInvalidations.Select(static target
+                => target.Key), Does.Contain(SymbolicFactFactory.GetSmtVariableName(valueSymbol)));
             Assert.That(result.Value.Invariants, Is.Not.Empty);
         });
     }
-
     [Test]
     public void ForLoop_ExcludesOneTimeInitializerFromBackEdgeInvalidation() {
         const string source = "static class C { static int M() { int value = 0; for (int index = 0; index < 3; index++) value += index; return value; } }";
@@ -43,7 +43,6 @@ public sealed class SymbolicLoopTransferLowererTests {
             SymbolicFactFactory.GetSmtVariableName(symbols["value"])
         }));
     }
-
     [Test]
     public void ForeachLoop_RemainsUnsupportedUntilFiniteDomainLoweringMigrates() {
         const string source = "static class C { static int M(int[] values) { int total = 0; foreach (var value in values) total += value; return total; } }";
@@ -54,7 +53,6 @@ public sealed class SymbolicLoopTransferLowererTests {
 
         Assert.That(result.IsUnsupported, Is.True);
     }
-
     [Test]
     public void AbruptLoopCompletion_RemainsUnsupportedUntilExitSummariesMigrate() {
         const string source = "static class C { static int M(bool stop) { int value = 0; while (true) { if (stop) break; value++; } return value; } }";

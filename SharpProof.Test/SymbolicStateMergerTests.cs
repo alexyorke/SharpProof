@@ -44,24 +44,11 @@ public sealed class SymbolicStateMergerTests {
                 item.Limit == 1 &&
                 item.Observed == 2));
     }
-
-    private static SymbolicCondition Truth(SymbolicTerm value, Microsoft.CodeAnalysis.SyntaxNode source) {
-        return new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicTruthAtom(value),
-            source,
-            "test.truth"));
-    }
-
-    private static SymbolicCondition Equal(
-        SymbolicTerm value,
-        long constant,
-        Microsoft.CodeAnalysis.SyntaxNode source) {
-        return new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.Equal,
-                value,
-                new SymbolicIntegerConstantTerm(constant)),
+    private static SymbolicCondition Truth(SymbolicTerm value, Microsoft.CodeAnalysis.SyntaxNode source)
+        => new SymbolicFactCondition(SymbolicFact.Exact(new SymbolicTruthAtom(value), source, "test.truth"));
+    private static SymbolicCondition Equal(SymbolicTerm value, long constant, Microsoft.CodeAnalysis.SyntaxNode source)
+        => new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(SymbolicRelationOperator.Equal, value, new SymbolicIntegerConstantTerm(constant)),
             source,
             "test.equal"));
-    }
 }

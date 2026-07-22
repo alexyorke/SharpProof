@@ -11,14 +11,10 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
 
         state = SymbolicProofStateFacts.NormalizeState(state);
         if (state.IsContradictory)
-            return SymbolicProofInfo.Syntactic(
-                SymbolicProofStatus.Unreachable,
-                ContradictoryStateReason);
+            return SymbolicProofInfo.Syntactic(SymbolicProofStatus.Unreachable, ContradictoryStateReason);
 
         if (state.Facts.Length == 0 && state.PathConditions.Length == 0)
-            return SymbolicProofInfo.Syntactic(
-                SymbolicProofStatus.Reachable,
-                "ir_state_empty");
+            return SymbolicProofInfo.Syntactic(SymbolicProofStatus.Reachable, "ir_state_empty");
 
         return ClassifyWithIrCache(
             "reachability:" + state.NormalizedProofKey,
@@ -26,12 +22,9 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
                 if (!TryEncodeState(state, out var pathConditions, out var unknownReason))
                     return SymbolicProofInfo.Unknown(unknownReason);
 
-                return SymbolicProofInfo.FromReachability(
-                    ClassifyPathFeasibility(pathConditions),
-                    CreateBudgetInfo());
+                return SymbolicProofInfo.FromReachability(ClassifyPathFeasibility(pathConditions), CreateBudgetInfo());
             });
     }
-
     public SymbolicProofInfo ClassifyImplication(SymbolicState state, SymbolicFact fact) {
         if (state == null) throw new ArgumentNullException(nameof(state));
 
@@ -42,26 +35,18 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
         state = SymbolicProofStateFacts.NormalizeState(state);
         fact = SymbolicProofStateFacts.RewriteQueryFactToCurrentVersions(fact, state);
         if (state.IsContradictory)
-            return SymbolicProofInfo.Syntactic(
-                SymbolicProofStatus.ProvenTrue,
-                ContradictoryStateReason);
+            return SymbolicProofInfo.Syntactic(SymbolicProofStatus.ProvenTrue, ContradictoryStateReason);
 
         if (SymbolicState.TryEvaluateProofFact(fact, out var factValue))
             return factValue
-                ? SymbolicProofInfo.Syntactic(
-                    SymbolicProofStatus.ProvenTrue,
-                    "ir_target_fact_syntactic_true")
+                ? SymbolicProofInfo.Syntactic(SymbolicProofStatus.ProvenTrue, "ir_target_fact_syntactic_true")
                 : ClassifySyntacticallyFalseImplication(state, "ir_target_fact_syntactic_false");
 
         if (SymbolicProofStateFacts.StateContainsFact(state, fact))
-            return SymbolicProofInfo.Syntactic(
-                SymbolicProofStatus.ProvenTrue,
-                "ir_state_contains_fact");
+            return SymbolicProofInfo.Syntactic(SymbolicProofStatus.ProvenTrue, "ir_state_contains_fact");
 
         if (SymbolicProofStateFacts.StateContradictsFact(state, fact))
-            return SymbolicProofInfo.Syntactic(
-                SymbolicProofStatus.ProvenFalse,
-                "ir_state_contradicts_fact");
+            return SymbolicProofInfo.Syntactic(SymbolicProofStatus.ProvenFalse, "ir_state_contradicts_fact");
 
         return ClassifyWithIrCache(
             "implication-fact:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofFactKey(fact),
@@ -72,12 +57,9 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
                 if (!SymbolicProofEncoder.TryEncodeFactWithPathState(fact, state, out var factFormula))
                     return SymbolicProofInfo.Unknown(SymbolicUnknownReason.UnsupportedIrEncoding);
 
-                return SymbolicProofInfo.FromImplication(
-                    ClassifyRawImplication(pathConditions, factFormula),
-                    CreateBudgetInfo());
+                return SymbolicProofInfo.FromImplication(ClassifyRawImplication(pathConditions, factFormula), CreateBudgetInfo());
             });
     }
-
     public SymbolicProofInfo ClassifyBranchFeasibility(SymbolicState state, SymbolicCondition branchCondition) {
         if (state == null) throw new ArgumentNullException(nameof(state));
 
@@ -88,30 +70,23 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
         state = SymbolicProofStateFacts.NormalizeState(state);
         branchCondition = SymbolicProofStateFacts.RewriteQueryConditionToCurrentVersions(branchCondition, state);
         if (state.IsContradictory)
-            return SymbolicProofInfo.Syntactic(
-                SymbolicProofStatus.Unreachable,
-                ContradictoryStateReason);
+            return SymbolicProofInfo.Syntactic(SymbolicProofStatus.Unreachable, ContradictoryStateReason);
 
         if (SymbolicProofStateFacts.TryClassifySyntacticConditionTruth(branchCondition, out var syntacticStatus))
             return syntacticStatus == SymbolicProofStatus.ProvenTrue
                 ? ClassifyReachability(state)
-                : SymbolicProofInfo.Syntactic(
-                    SymbolicProofStatus.Unreachable,
-                    "ir_branch_syntactic_false");
+                : SymbolicProofInfo.Syntactic(SymbolicProofStatus.Unreachable, "ir_branch_syntactic_false");
 
         if (SymbolicProofStateFacts.StateContainsCondition(state, branchCondition)) return ClassifyReachability(state);
 
         if (SymbolicProofStateFacts.StateContradictsCondition(state, branchCondition))
-            return SymbolicProofInfo.Syntactic(
-                SymbolicProofStatus.Unreachable,
-                "ir_state_contradicts_branch");
+            return SymbolicProofInfo.Syntactic(SymbolicProofStatus.Unreachable, "ir_state_contradicts_branch");
 
         if (!SymbolicProofEncoder.TryEncodeConditionWithPathState(branchCondition, state, out _))
             return SymbolicProofInfo.Unknown(SymbolicUnknownReason.UnsupportedIrEncoding);
 
         return ClassifyReachability(state.AddPathCondition(branchCondition));
     }
-
     public SymbolicProofInfo ClassifyConditionTruth(SymbolicState state, SymbolicCondition condition) {
         if (TryClassifyConditionPreliminarily(
                 state,
@@ -131,56 +106,30 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
                 var trueBranch = ClassifyBranchFeasibility(state, condition);
                 if (trueBranch.Status == SymbolicProofStatus.Unreachable)
                     return trueBranch.RawResult != null
-                        ? SymbolicProofInfo.FromConditionTruth(
-                            trueBranch.RawResult,
-                            SymbolicProofStatus.ProvenFalse,
-                            CreateBudgetInfo())
-                        : SymbolicProofInfo.Syntactic(
-                            SymbolicProofStatus.ProvenFalse,
-                            trueBranch.Reason);
+                        ? SymbolicProofInfo.FromConditionTruth(trueBranch.RawResult, SymbolicProofStatus.ProvenFalse, CreateBudgetInfo())
+                        : SymbolicProofInfo.Syntactic(SymbolicProofStatus.ProvenFalse, trueBranch.Reason);
                 if (trueBranch.Status == SymbolicProofStatus.Unknown)
-                    return trueBranch.WithStatus(
-                        SymbolicProofStatus.Unknown,
-                        "ir_condition_true_branch_feasibility_unknown");
+                    return trueBranch.WithStatus(SymbolicProofStatus.Unknown, "ir_condition_true_branch_feasibility_unknown");
 
                 var falseBranch = ClassifyBranchFeasibility(state, new SymbolicNotCondition(condition));
                 if (falseBranch.Status == SymbolicProofStatus.Unreachable)
                     return falseBranch.RawResult != null
-                        ? SymbolicProofInfo.FromConditionTruth(
-                            falseBranch.RawResult,
-                            SymbolicProofStatus.ProvenTrue,
-                            CreateBudgetInfo())
-                        : SymbolicProofInfo.Syntactic(
-                            SymbolicProofStatus.ProvenTrue,
-                            falseBranch.Reason);
+                        ? SymbolicProofInfo.FromConditionTruth(falseBranch.RawResult, SymbolicProofStatus.ProvenTrue, CreateBudgetInfo())
+                        : SymbolicProofInfo.Syntactic(SymbolicProofStatus.ProvenTrue, falseBranch.Reason);
                 if (falseBranch.Status == SymbolicProofStatus.Unknown)
-                    return falseBranch.WithStatus(
-                        SymbolicProofStatus.Unknown,
-                        "ir_condition_false_branch_feasibility_unknown");
+                    return falseBranch.WithStatus(SymbolicProofStatus.Unknown, "ir_condition_false_branch_feasibility_unknown");
 
-                return falseBranch.WithStatus(
-                    SymbolicProofStatus.Unknown,
-                    "ir_condition_both_branches_feasible");
+                return falseBranch.WithStatus(SymbolicProofStatus.Unknown, "ir_condition_both_branches_feasible");
             });
     }
-
-    private SymbolicProofInfo ClassifySyntacticallyFalseImplication(
-        SymbolicState state,
-        string reachableReason) {
+    private SymbolicProofInfo ClassifySyntacticallyFalseImplication(SymbolicState state, string reachableReason) {
         var reachability = ClassifyReachability(state);
         return reachability.Status switch {
-            SymbolicProofStatus.Unreachable => reachability.WithStatus(
-                SymbolicProofStatus.ProvenTrue,
-                reachability.Reason),
-            SymbolicProofStatus.Reachable => reachability.WithStatus(
-                SymbolicProofStatus.ProvenFalse,
-                reachableReason),
-            _ => reachability.WithStatus(
-                SymbolicProofStatus.Unknown,
-                "ir_false_implication_state_reachability_unknown")
+            SymbolicProofStatus.Unreachable => reachability.WithStatus(SymbolicProofStatus.ProvenTrue, reachability.Reason),
+            SymbolicProofStatus.Reachable => reachability.WithStatus(SymbolicProofStatus.ProvenFalse, reachableReason),
+            _ => reachability.WithStatus(SymbolicProofStatus.Unknown, "ir_false_implication_state_reachability_unknown")
         };
     }
-
     private bool TryClassifyConditionPreliminarily(
         SymbolicState state,
         SymbolicCondition condition,
@@ -205,13 +154,10 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
                 ContradictoryStateReason);
             return true;
         }
-
         if (SymbolicProofStateFacts.TryClassifySyntacticConditionTruth(rewrittenCondition, out var syntacticStatus)) {
             if (mode == ConditionClassificationMode.Implication &&
                 syntacticStatus == SymbolicProofStatus.ProvenFalse)
-                result = ClassifySyntacticallyFalseImplication(
-                    normalizedState,
-                    "ir_condition_syntactic_false_reachable");
+                result = ClassifySyntacticallyFalseImplication(normalizedState, "ir_condition_syntactic_false_reachable");
             else
                 result = SymbolicProofInfo.Syntactic(
                     syntacticStatus,
@@ -222,30 +168,21 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
                             : "ir_condition_syntactic_false");
             return true;
         }
-
         if (SymbolicProofStateFacts.StateContainsCondition(normalizedState, rewrittenCondition)) {
-            result = SymbolicProofInfo.Syntactic(
-                SymbolicProofStatus.ProvenTrue,
-                "ir_state_contains_condition");
+            result = SymbolicProofInfo.Syntactic(SymbolicProofStatus.ProvenTrue, "ir_state_contains_condition");
             return true;
         }
-
         if (SymbolicProofStateFacts.StateContradictsCondition(normalizedState, rewrittenCondition)) {
-            result = SymbolicProofInfo.Syntactic(
-                SymbolicProofStatus.ProvenFalse,
-                "ir_state_contradicts_condition");
+            result = SymbolicProofInfo.Syntactic(SymbolicProofStatus.ProvenFalse, "ir_state_contradicts_condition");
             return true;
         }
-
         result = null!;
         return false;
     }
-
     enum ConditionClassificationMode {
         Implication,
         Truth
     }
-
     public SymbolicProofInfo ClassifyHazardTrigger(SymbolicState state, SymbolicFact triggerPrecondition) {
         if (state == null) throw new ArgumentNullException(nameof(state));
 
@@ -256,9 +193,7 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
         state = SymbolicProofStateFacts.NormalizeState(state);
         triggerPrecondition = SymbolicProofStateFacts.RewriteQueryFactToCurrentVersions(triggerPrecondition, state);
         if (state.IsContradictory)
-            return SymbolicProofInfo.Syntactic(
-                SymbolicProofStatus.Unreachable,
-                ContradictoryStateReason);
+            return SymbolicProofInfo.Syntactic(SymbolicProofStatus.Unreachable, ContradictoryStateReason);
 
         return ClassifyWithIrCache(
             "hazard-trigger:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofFactKey(triggerPrecondition),
@@ -274,39 +209,29 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
                 var proven = ClassifyImplication(state, triggerPrecondition);
                 if (proven.Status == SymbolicProofStatus.ProvenTrue) return proven;
 
-                var triggerFeasibility = ClassifyBranchFeasibility(
-                    state,
-                    new SymbolicFactCondition(triggerPrecondition));
+                var triggerFeasibility = ClassifyBranchFeasibility(state, new SymbolicFactCondition(triggerPrecondition));
                 return triggerFeasibility.Status == SymbolicProofStatus.Unreachable
                     ? triggerFeasibility
                     : proven;
             });
     }
-
-    private SymbolicProofInfo ClassifyExceptionTriggerCondition(SymbolicState state,
-        SymbolicFact triggerPrecondition) {
+    private SymbolicProofInfo ClassifyExceptionTriggerCondition(SymbolicState state, SymbolicFact triggerPrecondition) {
         if (triggerPrecondition is { Polarity: true, Atom: SymbolicExceptionPreconditionAtom precondition })
             return ClassifyConditionTruth(state, precondition.Trigger);
 
         return SymbolicProofInfo.Unknown(SymbolicUnknownReason.UnsupportedIrEncoding);
     }
-
-    private SymbolicProofInfo ClassifyWithIrCache(
-        string key,
-        Func<SymbolicProofInfo> classify) {
+    private SymbolicProofInfo ClassifyWithIrCache(string key, Func<SymbolicProofInfo> classify) {
         if (proofCache.TryGetResult(key, out var cached)) return cached.WithCacheHit(CreateBudgetInfo());
 
         var result = classify();
         proofCache.TryAddResult(key, result);
         return result;
     }
-
     private AnalysisProofResult ClassifyPathFeasibility(IEnumerable<SmtFormula> pathConditions) =>
         Execute(service => service.ClassifyPathFeasibility(pathConditions));
 
-    private AnalysisProofResult ClassifyRawImplication(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula factFormula) =>
+    private AnalysisProofResult ClassifyRawImplication(IEnumerable<SmtFormula> pathConditions, SmtFormula factFormula) =>
         Execute(service => service.ClassifyImplication(pathConditions, factFormula));
 
     private AnalysisProofResult Execute(Func<SmtAnalysisService, AnalysisProofResult> classify) {
@@ -315,7 +240,6 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
         using var fallback = new SmtAnalysisService(SmtAnalysisOptions.Default);
         return classify(fallback);
     }
-
     private SymbolicBudgetInfo? CreateBudgetInfo() {
         var service = smtAnalysis;
         if (service == null) return null;
@@ -334,24 +258,18 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
             cache.Entries,
             cache);
     }
-
     private static int ToBoundedMilliseconds(TimeSpan value) =>
         value.TotalMilliseconds >= int.MaxValue ? int.MaxValue :
         value.TotalMilliseconds <= int.MinValue ? int.MinValue : (int)value.TotalMilliseconds;
 
-    private bool TryEncodeState(
-        SymbolicState state,
-        out ImmutableArray<SmtFormula> pathConditions,
+    private bool TryEncodeState(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions,
         out SymbolicUnknownReason unknownReason) {
         if (!proofCache.TryGetEncodedState(state.NormalizedProofKey, out var entry)) {
             entry = SymbolicProofEncoder.EncodeState(state);
             proofCache.TryAddEncodedState(state.NormalizedProofKey, entry);
         }
-
         pathConditions = entry.PathConditions;
         unknownReason = entry.UnknownReason;
         return entry.Success;
     }
-
-
 }

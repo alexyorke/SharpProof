@@ -18,5 +18,4 @@ public sealed class SharpProofTargetTests {
 
         Assert.That(exception!.ParamName, Is.EqualTo("references"));
     }
-
 }

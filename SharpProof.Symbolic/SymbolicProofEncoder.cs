@@ -7,25 +7,14 @@ internal static class SymbolicProofEncoder {
         AssumeStatePathCondition,
         true);
 
-    internal static bool TryEncodeConditionWithPathState(
-        SymbolicCondition condition,
-        SymbolicState state,
-        out SmtFormula formula) =>
+    internal static bool TryEncodeConditionWithPathState(SymbolicCondition condition, SymbolicState state, out SmtFormula formula) =>
         TryEncodeConditionWithPathState(condition, state, s_syntheticProofNode, true, out formula);
 
     internal static bool TryEncodeConditionWithPathState(
         SymbolicCondition condition,
         SymbolicState state,
         SyntaxNode sourceNode,
-        out SmtFormula formula) {
-        return TryEncodeConditionWithPathState(
-            condition,
-            state,
-            sourceNode,
-            true,
-            out formula);
-    }
-
+        out SmtFormula formula) => TryEncodeConditionWithPathState(condition, state, sourceNode, true, out formula);
     private static bool TryEncodeConditionWithPathState(
         SymbolicCondition condition,
         SymbolicState state,
@@ -47,40 +36,20 @@ internal static class SymbolicProofEncoder {
             formula = null!;
             return false;
         }
-
         return SymbolicIrFormulaEncoder.TryEncode(condition, out formula);
     }
 
-
-    internal static bool TryEncodeFactWithPathState(
-        SymbolicFact fact,
-        SymbolicState state,
-        out SmtFormula formula) =>
+    internal static bool TryEncodeFactWithPathState(SymbolicFact fact, SymbolicState state, out SmtFormula formula) =>
         TryEncodeFactWithPathState(fact, state, s_syntheticProofNode, out formula);
 
-    internal static bool TryEncodeFactWithPathState(
-        SymbolicFact fact,
-        SymbolicState state,
-        SyntaxNode sourceNode,
-        out SmtFormula formula) {
+    internal static bool TryEncodeFactWithPathState(SymbolicFact fact, SymbolicState state, SyntaxNode sourceNode, out SmtFormula formula) {
         if (fact == null) throw new ArgumentNullException(nameof(fact));
 
-        return TryEncodeConditionWithPathState(
-            new SymbolicFactCondition(fact),
-            state,
-            sourceNode,
-            false,
-            out formula);
+        return TryEncodeConditionWithPathState(new SymbolicFactCondition(fact), state, sourceNode, false, out formula);
     }
 
-
-    private static bool HasSafeIntegerDivisors(
-        SymbolicCondition condition,
-        SymbolicState state,
-        SyntaxNode sourceNode) {
-        return HasSafeIntegerDivisorsCore(condition, state, sourceNode, StateSafeDivisorStrategy);
-    }
-
+    private static bool HasSafeIntegerDivisors(SymbolicCondition condition, SymbolicState state, SyntaxNode sourceNode)
+        => HasSafeIntegerDivisorsCore(condition, state, sourceNode, StateSafeDivisorStrategy);
     private static bool HasSafeIntegerDivisorsCore<TContext>(
         SymbolicTerm term,
         TContext context,
@@ -107,11 +76,9 @@ internal static class SymbolicProofEncoder {
                             or SymbolicBinaryTermOperator.Remainder) ||
                         strategy.IsTermProvablyNonZero(binary.Right, context, sourceNode));
             default:
-                return HasSafeIntegerDivisorsInChildren(
-                    SymbolicIrChildren.OfTerm(term), context, sourceNode, strategy);
+                return HasSafeIntegerDivisorsInChildren(SymbolicIrChildren.OfTerm(term), context, sourceNode, strategy);
         }
     }
-
     /// <summary>
     /// Conjunction over the children of an atom or of a term that neither refines the
     /// context nor is itself a divisor hazard. Written as explicit recursion rather
@@ -137,7 +104,6 @@ internal static class SymbolicProofEncoder {
         return children.Condition == null ||
                HasSafeIntegerDivisorsCore(children.Condition, context, sourceNode, strategy);
     }
-
     private static bool HasSafeIntegerDivisorsCore<TContext>(
         SymbolicCondition condition,
         TContext context,
@@ -173,7 +139,6 @@ internal static class SymbolicProofEncoder {
                 return true;
         }
     }
-
     private static bool HasSafeIntegerDivisorsInShortCircuitRight<TContext>(
         SymbolicCondition left,
         SymbolicCondition right,
@@ -188,19 +153,14 @@ internal static class SymbolicProofEncoder {
                (rightContext.IsContradictory ||
                 HasSafeIntegerDivisorsCore(right, rightContext.Context, sourceNode, strategy));
     }
-
     private static bool HasSafeIntegerDivisorsCore<TContext>(
         SymbolicAtom atom,
         TContext context,
         SyntaxNode sourceNode,
         SafeDivisorProofStrategy<TContext> strategy) =>
-        HasSafeIntegerDivisorsInChildren(
-            SymbolicIrChildren.OfAtom(atom), context, sourceNode, strategy);
+        HasSafeIntegerDivisorsInChildren(SymbolicIrChildren.OfAtom(atom), context, sourceNode, strategy);
 
-    private static bool IsTermProvablyNonZero(
-        SymbolicTerm term,
-        SymbolicState state,
-        SyntaxNode sourceNode) {
+    private static bool IsTermProvablyNonZero(SymbolicTerm term, SymbolicState state, SyntaxNode sourceNode) {
         if (term is SymbolicIntegerConstantTerm integerConstant) return integerConstant.Value != 0;
 
         var zero = new SymbolicIntegerConstantTerm(0);
@@ -215,22 +175,16 @@ internal static class SymbolicProofEncoder {
                 "ir.safe-divisor.non-zero");
             if (SymbolicProofStateFacts.StateContainsFact(state, nonZeroFact)) return true;
         }
-
-        var zeroCondition = SymbolicIrLowerer.CreateIntegerZeroCondition(
-            term,
-            sourceNode,
-            "ir.safe-divisor.zero");
+        var zeroCondition = SymbolicIrLowerer.CreateIntegerZeroCondition(term, sourceNode, "ir.safe-divisor.zero");
         if (zeroCondition is SymbolicFactCondition factCondition) {
             if (SymbolicProofStateFacts.StateContradictsFact(state, factCondition.Fact)) return true;
 
             if (SymbolicProofStateFacts.StateContainsFact(state, factCondition.Fact)) return false;
         }
-
         if (SymbolicProofStateFacts.TryEvaluateConditionFromState(state, zeroCondition, out var value)) return !value;
 
         return SymbolicProofStateFacts.StateContradictsCondition(state, zeroCondition);
     }
-
     private static SymbolicState AssumePathCondition(SymbolicState state, SymbolicCondition condition) =>
         SymbolicProofStateFacts.NormalizeState(state.AddPathCondition(condition));
 
@@ -238,16 +192,10 @@ internal static class SymbolicProofEncoder {
         SymbolicState state,
         SymbolicCondition condition,
         bool whenTrue) {
-        var assumedState = AssumePathCondition(
-            state,
-            whenTrue ? condition : new SymbolicNotCondition(condition));
+        var assumedState = AssumePathCondition(state, whenTrue ? condition : new SymbolicNotCondition(condition));
         return new SafeDivisorAssumption<SymbolicState>(true, assumedState.IsContradictory, assumedState);
     }
-
-    readonly record struct SafeDivisorAssumption<TContext>(
-        bool IsSupported,
-        bool IsContradictory,
-        TContext Context);
+    readonly record struct SafeDivisorAssumption<TContext>(bool IsSupported, bool IsContradictory, TContext Context);
 
     sealed class SafeDivisorProofStrategy<TContext>(
         Func<SymbolicTerm, TContext, SyntaxNode, bool> isTermProvablyNonZero,
@@ -259,10 +207,8 @@ internal static class SymbolicProofEncoder {
 
         public bool RefineShortCircuitConditions { get; } = refineShortCircuitConditions;
     }
-
     internal static SymbolicEncodedState EncodeState(SymbolicState state) {
-        var builder = ImmutableArray.CreateBuilder<SmtFormula>(
-            state.Facts.Length + state.PathConditions.Length);
+        var builder = ImmutableArray.CreateBuilder<SmtFormula>(state.Facts.Length + state.PathConditions.Length);
         var skippedUnsupported = false;
 
         foreach (var fact in state.Facts) {
@@ -270,33 +216,18 @@ internal static class SymbolicProofEncoder {
                 skippedUnsupported = true;
                 continue;
             }
-
             builder.Add(formula);
         }
-
         foreach (var condition in state.PathConditions) {
-            if (!TryEncodeConditionWithPathState(
-                    condition,
-                    state,
-                    s_syntheticProofNode,
-                    false,
-                    out var formula)) {
+            if (!TryEncodeConditionWithPathState(condition, state, s_syntheticProofNode, false, out var formula)) {
                 skippedUnsupported = true;
                 continue;
             }
-
             builder.Add(formula);
         }
-
         if (skippedUnsupported && builder.Count == 0)
-            return new SymbolicEncodedState(
-                false,
-                ImmutableArray<SmtFormula>.Empty,
-                SymbolicUnknownReason.UnsupportedIrEncoding);
+            return new SymbolicEncodedState(false, [], SymbolicUnknownReason.UnsupportedIrEncoding);
 
-        return new SymbolicEncodedState(
-            true,
-            builder.ToImmutable(),
-            SymbolicUnknownReason.None);
+        return new SymbolicEncodedState(true, builder.ToImmutable(), SymbolicUnknownReason.None);
     }
 }

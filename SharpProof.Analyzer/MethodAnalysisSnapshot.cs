@@ -21,22 +21,14 @@ internal sealed record MethodAnalysisSnapshot(
                 "The method declaration and semantic model must belong to the same syntax tree.",
                 nameof(semanticModel));
         cancellationToken.ThrowIfCancellationRequested();
-        var blocks = operationBlocks.IsDefault ? ImmutableArray<IOperation>.Empty : operationBlocks;
-        var root = MethodBodyOperationResolver.GetMethodBodyRootOperation(
-                       declaration, semanticModel, cancellationToken) ??
+        var blocks = operationBlocks.IsDefault ? [] : operationBlocks;
+        var root = MethodBodyOperationResolver.GetMethodBodyRootOperation(declaration, semanticModel, cancellationToken) ??
                    SelectRootOperation(blocks);
         var visibleOperations = root == null
             ? ImmutableArray<IOperation>.Empty
-            : ExecutionVisibility.VisibleDescendants(root).ToImmutableArray();
-        return new MethodAnalysisSnapshot(
-            methodSymbol,
-            declaration,
-            semanticModel,
-            blocks,
-            root,
-            visibleOperations);
+            : [.. ExecutionVisibility.VisibleDescendants(root)];
+        return new MethodAnalysisSnapshot(methodSymbol, declaration, semanticModel, blocks, root, visibleOperations);
     }
-
     private static IOperation? SelectRootOperation(ImmutableArray<IOperation> operationBlocks) {
         if (operationBlocks.IsDefaultOrEmpty) return null;
 

@@ -12,9 +12,7 @@ public sealed class SmtConcreteFactIndexTests {
     [TestCase(0, (int)SmtBinaryOperator.Equal)]
     [TestCase(1, (int)SmtBinaryOperator.NotEqual)]
     [TestCase(2, (int)SmtBinaryOperator.Equal)]
-    public void ComparisonExtraction_PreservesNestedNegationParity(
-        int negationCount,
-        int expectedOperatorValue) {
+    public void ComparisonExtraction_PreservesNestedNegationParity(int negationCount, int expectedOperatorValue) {
         var expectedOperator = (SmtBinaryOperator)expectedOperatorValue;
         SmtFormula formula = new SmtBinaryFormula(
             SmtBinaryOperator.Equal,
@@ -23,14 +21,13 @@ public sealed class SmtConcreteFactIndexTests {
         for (var index = 0; index < negationCount; index++)
             formula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
 
-        Assert.That( SmtComparisonOperatorFacts.TryExtract(formula, out var comparison, out var actualNegationCount), Is.True);
+        Assert.That(SmtComparisonOperatorFacts.TryExtract(formula, out var comparison, out var actualNegationCount), Is.True);
         Assert.Multiple(() => {
             Assert.That(comparison.Operator, Is.EqualTo(SmtBinaryOperator.Equal));
             Assert.That(actualNegationCount, Is.EqualTo(negationCount));
-            Assert.That( SmtComparisonOperatorFacts.ApplyNegations(comparison.Operator, actualNegationCount), Is.EqualTo(expectedOperator));
+            Assert.That(SmtComparisonOperatorFacts.ApplyNegations(comparison.Operator, actualNegationCount), Is.EqualTo(expectedOperator));
         });
     }
-
     [TestCase("integer")]
     [TestCase("string")]
     [TestCase("reference")]
@@ -45,12 +42,9 @@ public sealed class SmtConcreteFactIndexTests {
             _ => throw new ArgumentOutOfRangeException(nameof(domain))
         };
         var equality = new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right);
-        var pathConditions = ImmutableArray.Create<SmtFormula>(
-            equality,
-            new SmtUnaryFormula(SmtUnaryOperator.Not, equality));
+        var pathConditions = ImmutableArray.Create<SmtFormula>(equality, new SmtUnaryFormula(SmtUnaryOperator.Not, equality));
         AssertPreparationStatus(pathConditions, SmtConcreteFactPreparationStatus.Unsatisfiable);
     }
-
     [Test]
     public void ConcreteFactSetCopy_PreservesDepthAndSharesWorkBudget() {
         var factSetType = typeof(SmtFormula).Assembly
@@ -63,43 +57,28 @@ public sealed class SmtConcreteFactIndexTests {
         var copyConstructor = factSetType.GetConstructor(
             BindingFlags.Instance | BindingFlags.NonPublic,
             null,
-            new[] { factSetType },
+            [factSetType],
             null)!;
-        var depthField = factSetType.GetField(
-            "_booleanFactInferenceDepth",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var workBudgetField = factSetType.GetField(
-            "_workBudget",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var depthField = factSetType.GetField("_booleanFactInferenceDepth", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var workBudgetField = factSetType.GetField("_workBudget", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
-        var source = defaultConstructor.Invoke(Array.Empty<object>());
+        var source = defaultConstructor.Invoke([]);
         depthField.SetValue(source, 7);
 
-        var copy = copyConstructor.Invoke(new[] { source });
+        var copy = copyConstructor.Invoke([source]);
 
         Assert.That(depthField.GetValue(copy), Is.EqualTo(7));
         Assert.That(workBudgetField.GetValue(copy), Is.SameAs(workBudgetField.GetValue(source)));
     }
-
     [Test]
     public void AffineConcreteFacts_NormalizeLongMinValueCoefficientWithoutLosingContradiction() {
         var value = new SmtVariable("value", SmtValueKind.Int);
-        var scaled = new SmtIntegerBinaryTerm(
-            SmtIntegerBinaryOperator.Multiply,
-            new SmtIntegerConstant(long.MinValue),
-            value);
+        var scaled = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, new SmtIntegerConstant(long.MinValue), value);
         var pathConditions = ImmutableArray.Create<SmtFormula>(
-            new SmtBinaryFormula(
-                SmtBinaryOperator.GreaterThan,
-                value,
-                new SmtIntegerConstant(0)),
-            new SmtBinaryFormula(
-                SmtBinaryOperator.GreaterThanOrEqual,
-                scaled,
-                new SmtIntegerConstant(0)));
+            new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, value, new SmtIntegerConstant(0)),
+            new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, scaled, new SmtIntegerConstant(0)));
         AssertPreparationStatus(pathConditions, SmtConcreteFactPreparationStatus.Unsatisfiable);
     }
-
     [Test]
     public void AffineConcreteFacts_NegativeCoefficientPreservesAdjustedConstantSign() {
         var value = new SmtVariable("value", SmtValueKind.Int);
@@ -109,7 +88,6 @@ public sealed class SmtConcreteFactIndexTests {
             new SmtBinaryFormula(SmtBinaryOperator.LessThan, negated, new SmtIntegerConstant(5)));
         AssertPreparationStatus(pathConditions, SmtConcreteFactPreparationStatus.Ready);
     }
-
     [Test]
     public void AffineConcreteFacts_NegativeCoefficientStillFindsRealContradiction() {
         var value = new SmtVariable("value", SmtValueKind.Int);
@@ -119,16 +97,12 @@ public sealed class SmtConcreteFactIndexTests {
             new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, negated, new SmtIntegerConstant(5)));
         AssertPreparationStatus(pathConditions, SmtConcreteFactPreparationStatus.Unsatisfiable);
     }
-
     [Test]
     public void AffineIntegerTerm_SharedParserPreservesScaleAndOffset() {
         var value = new SmtVariable("value", SmtValueKind.Int);
         var formula = new SmtIntegerBinaryTerm(
             SmtIntegerBinaryOperator.Subtract,
-            new SmtIntegerBinaryTerm(
-                SmtIntegerBinaryOperator.Multiply,
-                new SmtIntegerConstant(2),
-                value),
+            new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, new SmtIntegerConstant(2), value),
             new SmtIntegerConstant(3));
 
         static bool ResolveConstant(SmtFormula candidate, out long constant) {
@@ -136,11 +110,9 @@ public sealed class SmtConcreteFactIndexTests {
                 constant = integer.Value;
                 return true;
             }
-
             constant = default;
             return false;
         }
-
         Assert.That(
             SmtAffineIntegerTerm.TryCreate(
                 formula,
@@ -157,7 +129,6 @@ public sealed class SmtConcreteFactIndexTests {
             Assert.That(affine.Offset, Is.EqualTo(-3));
         });
     }
-
     [Test]
     public void IntegerInterval_IntersectionPreservesBoundsAndExclusions() {
         var interval = SmtIntegerInterval.Unbounded
@@ -173,9 +144,8 @@ public sealed class SmtConcreteFactIndexTests {
             Assert.That(interval.IsContradictory, Is.False);
         });
 
-        Assert.That( interval.Intersect( SmtIntegerInterval.Unbounded.Apply(SmtBinaryOperator.Equal, 0)).IsContradictory, Is.True);
+        Assert.That(interval.Intersect(SmtIntegerInterval.Unbounded.Apply(SmtBinaryOperator.Equal, 0)).IsContradictory, Is.True);
     }
-
     [TestCase((int)SmtBinaryOperator.GreaterThan, long.MaxValue)]
     [TestCase((int)SmtBinaryOperator.LessThan, long.MinValue)]
     public void IntegerInterval_ImpossibleStrictBoundaryIsContradictory(int operatorValue, long constant) {
@@ -183,7 +153,6 @@ public sealed class SmtConcreteFactIndexTests {
 
         Assert.That(interval.IsContradictory, Is.True);
     }
-
     [Test]
     public void OpaqueIntegerOperation_RemainsAvailableForSolverEncoding() {
         var opaque = new SmtOpaqueIntegerBinaryTerm(
@@ -191,25 +160,16 @@ public sealed class SmtConcreteFactIndexTests {
             new SmtVariable("left", SmtValueKind.Int),
             new SmtVariable("right", SmtValueKind.Int));
         var pathConditions = ImmutableArray.Create<SmtFormula>(
-            new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                opaque,
-                new SmtIntegerConstant(0)));
+            new SmtBinaryFormula(SmtBinaryOperator.Equal, opaque, new SmtIntegerConstant(0)));
         AssertPreparationStatus(pathConditions, SmtConcreteFactPreparationStatus.Ready);
     }
-
     [Test]
     public void FormulaStructuralKey_IsIndependentOfCultureAndAllocationOrder() {
-        static SmtFormula CreateFormula() {
-            return new SmtConditionalFormula(
+        static SmtFormula CreateFormula() => new SmtConditionalFormula(
                 new SmtVariable("condition", SmtValueKind.Bool),
-                new SmtStringConcatTerm(
-                    new SmtStringConstant("left"),
-                    new SmtVariable("value", SmtValueKind.String)),
+                new SmtStringConcatTerm(new SmtStringConstant("left"), new SmtVariable("value", SmtValueKind.String)),
                 new SmtStringConstant("right"),
                 SmtValueKind.String);
-        }
-
         var previousCulture = CultureInfo.CurrentCulture;
         try {
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("ar-SA");
@@ -223,11 +183,8 @@ public sealed class SmtConcreteFactIndexTests {
             CultureInfo.CurrentCulture = previousCulture;
         }
     }
-
-    private static void AssertPreparationStatus(
-        ImmutableArray<SmtFormula> conditions,
-        SmtConcreteFactPreparationStatus expected) {
-        var status = new SmtConcreteFactPreprocessor().Prepare(conditions.ToArray(), out _);
+    private static void AssertPreparationStatus(ImmutableArray<SmtFormula> conditions, SmtConcreteFactPreparationStatus expected) {
+        var status = new SmtConcreteFactPreprocessor().Prepare([.. conditions], out _);
         Assert.That(status, Is.EqualTo(expected));
     }
 }

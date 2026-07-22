@@ -1,12 +1,7 @@
 namespace SharpProof.Test;
 
 internal static class SemanticTestSource {
-    internal static string Method(
-        string returnType,
-        string parameters,
-        string body,
-        string? usings = null,
-        string? prefix = null) => Class(
+    internal static string Method(string returnType, string parameters, string body, string? usings = null, string? prefix = null) => Class(
         "public " + returnType + " TestMethod(" + parameters + ")\n{\n" + Indent(body, 4) + "\n}",
         usings,
         prefix);

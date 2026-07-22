@@ -11,13 +11,11 @@ internal enum SymbolicComplexityKind {
     Unknown,
     RecursiveUnknown
 }
-
 internal enum SymbolicComplexityComparison {
     Within,
     Exceeds,
     Incomparable
 }
-
 internal static class SymbolicComplexityFacts {
     internal static bool IsDefinedBound(int value) => Enum.IsDefined(typeof(ComplexityKind), value);
 
@@ -44,10 +42,7 @@ internal static class SymbolicComplexityFacts {
         return kind is SymbolicComplexityKind.Constant or SymbolicComplexityKind.Linear or
             SymbolicComplexityKind.Quadratic or SymbolicComplexityKind.Product or SymbolicComplexityKind.Max;
     }
-
-    internal static SymbolicComplexityComparison Compare(
-        SymbolicComplexityKind actual,
-        int declaredValue) {
+    internal static SymbolicComplexityComparison Compare(SymbolicComplexityKind actual, int declaredValue) {
         if (!TryGetBound(actual, out var actualBound)) return SymbolicComplexityComparison.Incomparable;
         if (!IsDefinedBound(declaredValue)) return SymbolicComplexityComparison.Incomparable;
         var declared = (ComplexityKind)declaredValue;
@@ -63,7 +58,6 @@ internal static class SymbolicComplexityFacts {
                 : SymbolicComplexityComparison.Exceeds;
         return SymbolicComplexityComparison.Incomparable;
     }
-
     private static int GetChainRank(ComplexityKind kind) => kind switch {
         ComplexityKind.Constant => 0,
         ComplexityKind.Logarithmic => 1,
@@ -73,7 +67,6 @@ internal static class SymbolicComplexityFacts {
         _ => -1
     };
 }
-
 internal enum SymbolicComplexityUnknownReason {
     None,
     UnsupportedTarget,
@@ -88,7 +81,6 @@ internal enum SymbolicComplexityUnknownReason {
     CancellationRequested,
     Unknown
 }
-
 internal sealed record SymbolicComplexityInfo(
     string Text,
     SymbolicComplexityKind Kind,
@@ -96,11 +88,7 @@ internal sealed record SymbolicComplexityInfo(
     bool IsUnknown,
     bool IsRecursiveUnknown);
 
-internal sealed record SymbolicComplexityDriverInfo(
-    string Kind,
-    string Description,
-    int SourceSpanStart,
-    int SourceSpanLength);
+internal sealed record SymbolicComplexityDriverInfo(string Kind, string Description, int SourceSpanStart, int SourceSpanLength);
 
 internal sealed record SymbolicComplexityCalleeInfo(
     string MethodDisplayName,

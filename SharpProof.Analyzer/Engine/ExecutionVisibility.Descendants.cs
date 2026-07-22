@@ -7,7 +7,6 @@ internal static partial class ExecutionVisibility {
                 yield return operation;
     }
 
-
     private static bool IsNestedFunctionDescendant(IOperation operation, IOperation rootOperation) {
         if (ReferenceEquals(operation, rootOperation)) return false;
 

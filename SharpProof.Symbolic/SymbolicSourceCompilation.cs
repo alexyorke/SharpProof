@@ -10,14 +10,11 @@ internal static class SymbolicSourceCompilation {
         return TrustedPlatformReferenceCache.GetOrAdd(
             cacheKey,
             static value => string.IsNullOrWhiteSpace(value)
-                ? ImmutableArray.Create<MetadataReference>(
-                    MetadataReference.CreateFromFile(typeof(object).Assembly.Location))
-                : value.Split(Path.PathSeparator)
+                ? [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)]
+                : [.. value.Split(Path.PathSeparator)
                     .Where(static path => !string.IsNullOrWhiteSpace(path))
-                    .Select(static path => MetadataReference.CreateFromFile(path))
-                    .ToImmutableArray<MetadataReference>());
+                    .Select(static path => MetadataReference.CreateFromFile(path))]);
     }
-
     public static (SyntaxTree SyntaxTree, Compilation Compilation) Create(
         string sourceText,
         string filePath,
@@ -27,7 +24,6 @@ internal static class SymbolicSourceCompilation {
         var assemblyName = "SharpProof.Symbolic." + kind;
         return Create(sourceText, filePath, assemblyName + ".cs", assemblyName, references, cancellationToken);
     }
-
     public static (SyntaxTree SyntaxTree, Compilation Compilation) Create(
         string sourceText,
         string filePath,
@@ -39,15 +35,8 @@ internal static class SymbolicSourceCompilation {
 
         if (string.IsNullOrWhiteSpace(filePath)) filePath = defaultFilePath;
 
-        var parseOptions = new CSharpParseOptions(
-            LanguageVersion.Preview,
-            DocumentationMode.Parse,
-            SourceCodeKind.Regular);
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            sourceText,
-            parseOptions,
-            filePath,
-            cancellationToken: cancellationToken);
+        var parseOptions = new CSharpParseOptions(LanguageVersion.Preview, DocumentationMode.Parse, SourceCodeKind.Regular);
+        var syntaxTree = CSharpSyntaxTree.ParseText(sourceText, parseOptions, filePath, cancellationToken: cancellationToken);
         var referenceArray = NormalizeReferences(references);
         if (referenceArray.IsDefaultOrEmpty) referenceArray = GetTrustedPlatformReferences();
 
@@ -63,18 +52,14 @@ internal static class SymbolicSourceCompilation {
             compilationOptions);
         return (syntaxTree, compilation);
     }
-
-    private static ImmutableArray<MetadataReference> NormalizeReferences(
-        IEnumerable<MetadataReference>? references) {
-        if (references == null) return ImmutableArray<MetadataReference>.Empty;
+    private static ImmutableArray<MetadataReference> NormalizeReferences(IEnumerable<MetadataReference>? references) {
+        if (references == null) return [];
         var builder = ImmutableArray.CreateBuilder<MetadataReference>();
         foreach (var reference in references)
-            builder.Add(reference ?? throw new ArgumentException(
-                "References cannot contain null entries.", nameof(references)));
+            builder.Add(reference ?? throw new ArgumentException("References cannot contain null entries.", nameof(references)));
         return builder.ToImmutable();
     }
 }
-
 internal enum SymbolicSourceCompilationKind {
     Query,
     RuntimeHazards,

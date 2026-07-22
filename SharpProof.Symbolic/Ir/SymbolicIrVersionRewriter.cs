@@ -1,20 +1,15 @@
 namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicIrVersionRewriter {
-    internal static SymbolicCondition RewriteToCurrentVersions(
-        SymbolicCondition condition,
-        ImmutableDictionary<string, int> symbolVersions) {
+    internal static SymbolicCondition RewriteToCurrentVersions(SymbolicCondition condition, ImmutableDictionary<string,
+        int> symbolVersions) {
         if (condition == null) throw new ArgumentNullException(nameof(condition));
         return symbolVersions.IsEmpty ? condition : new CurrentVersionRewriter(symbolVersions).Rewrite(condition);
     }
-
-    internal static SymbolicFact RewriteToCurrentVersions(
-        SymbolicFact fact,
-        ImmutableDictionary<string, int> symbolVersions) {
+    internal static SymbolicFact RewriteToCurrentVersions(SymbolicFact fact, ImmutableDictionary<string, int> symbolVersions) {
         if (fact == null) throw new ArgumentNullException(nameof(fact));
         return symbolVersions.IsEmpty ? fact : new CurrentVersionRewriter(symbolVersions).Rewrite(fact);
     }
-
     sealed class CurrentVersionRewriter : SymbolicIrRewriter {
         private readonly ImmutableDictionary<string, int> _symbolVersions;
 
@@ -45,7 +40,6 @@ internal static class SymbolicIrVersionRewriter {
                     return false;
             }
         }
-
         private bool TryRewriteVariableLike<TTerm>(
             TTerm term,
             string name,
@@ -57,11 +51,9 @@ internal static class SymbolicIrVersionRewriter {
                 rewritten = term;
                 return true;
             }
-
             rewritten = factory(term, rewrittenName);
             return true;
         }
-
         private string RewriteVariableLikeName(string name) {
             if (string.IsNullOrEmpty(name)) return name;
 
@@ -75,16 +67,11 @@ internal static class SymbolicIrVersionRewriter {
                 : baseName;
         }
     }
-
     private static (string BaseName, int Version) SplitVersionedName(string name) {
         var markerIndex = name.LastIndexOf("@v", StringComparison.Ordinal);
         if (markerIndex < 0 ||
             markerIndex + 2 >= name.Length ||
-            !int.TryParse(
-                name.Substring(markerIndex + 2),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out var version))
+            !int.TryParse(name.Substring(markerIndex + 2), NumberStyles.None, CultureInfo.InvariantCulture, out var version))
             return (name, 0);
 
         return (name.Substring(0, markerIndex), version);

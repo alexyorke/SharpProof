@@ -27,7 +27,6 @@ internal static class SymbolicControlFlowFacts {
             return false;
         }
     }
-
     internal static bool ExpressionStatementDefinitelyExits(
         ExpressionStatementSyntax statement,
         SemanticModel semanticModel,
@@ -37,7 +36,6 @@ internal static class SymbolicControlFlowFacts {
                semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation &&
                NullableFlowFacts.HasDoesNotReturn(invocationOperation.TargetMethod);
     }
-
     internal static StatementSyntax UnwrapSingleStatementBlock(StatementSyntax statement) {
         while (statement is BlockSyntax { Statements.Count: 1 } block) statement = block.Statements[0];
 

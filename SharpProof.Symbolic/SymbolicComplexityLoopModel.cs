@@ -1,8 +1,6 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicComplexityLoopModel(
-    SymbolicComplexityCostModel _costModel,
-    CancellationToken _cancellationToken) {
+internal sealed class SymbolicComplexityLoopModel(SymbolicComplexityCostModel _costModel, CancellationToken _cancellationToken) {
     internal bool TryGetForLoopBound(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
@@ -23,15 +21,13 @@ internal sealed class SymbolicComplexityLoopModel(
             stepDirection != direction)
             return false;
 
-        if (dependentSymbols.Any(symbol =>
-                IsSymbolMutatedInStatement(symbol, forStatement.Statement, semanticModel)) ||
+        if (dependentSymbols.Any(symbol => IsSymbolMutatedInStatement(symbol, forStatement.Statement, semanticModel)) ||
             IsSymbolMutatedInStatement(loopSymbol, forStatement.Statement, semanticModel))
             return false;
 
         bound = new LoopBoundInfo(boundCost, boundExpressionText);
         return true;
     }
-
     internal bool TryGetWhileLikeBound(
         ExpressionSyntax conditionExpression,
         StatementSyntax loopBody,
@@ -56,28 +52,19 @@ internal sealed class SymbolicComplexityLoopModel(
         bound = new LoopBoundInfo(boundCost, boundExpressionText);
         return true;
     }
-
     internal bool TryGetForeachBound(
         SyntaxNode collectionSyntaxNode,
         SemanticModel semanticModel,
         IMethodSymbol currentMethod,
         out LoopBoundInfo bound) {
         if (collectionSyntaxNode is not ExpressionSyntax collectionExpression ||
-            !_costModel.TryCreate(
-                collectionExpression,
-                semanticModel,
-                currentMethod,
-                CostProjection.LengthOrCount,
-                false,
-                out var cost)) {
+            !_costModel.TryCreate(collectionExpression, semanticModel, currentMethod, CostProjection.LengthOrCount, false, out var cost)) {
             bound = default;
             return false;
         }
-
         bound = new LoopBoundInfo(cost, collectionExpression.ToString());
         return true;
     }
-
     private bool TryGetForLoopVariable(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
@@ -90,7 +77,6 @@ internal sealed class SymbolicComplexityLoopModel(
             initializerExpression = declaration.Variables[0].Initializer!.Value;
             return true;
         }
-
         if (forStatement.Initializers.Count == 1 &&
             forStatement.Initializers[0] is AssignmentExpressionSyntax assignment &&
             semanticModel.GetSymbolInfo(assignment.Left, _cancellationToken).Symbol is { } assignedSymbol &&
@@ -99,27 +85,19 @@ internal sealed class SymbolicComplexityLoopModel(
             initializerExpression = assignment.Right;
             return true;
         }
-
         loopSymbol = null!;
         initializerExpression = null!;
         return false;
     }
-
-    private bool TryGetLoopConditionVariable(
-        BinaryExpressionSyntax condition,
-        SemanticModel semanticModel,
-        out ISymbol symbol) {
-        symbol = semanticModel.GetSymbolInfo(
-            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Left),
+    private bool TryGetLoopConditionVariable(BinaryExpressionSyntax condition, SemanticModel semanticModel, out ISymbol symbol) {
+        symbol = semanticModel.GetSymbolInfo(CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Left),
             _cancellationToken).Symbol!;
         if (symbol is ILocalSymbol or IParameterSymbol) return true;
 
-        symbol = semanticModel.GetSymbolInfo(
-            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Right),
+        symbol = semanticModel.GetSymbolInfo(CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Right),
             _cancellationToken).Symbol!;
         return symbol is ILocalSymbol or IParameterSymbol;
     }
-
     private bool TryParseLoopCondition(
         BinaryExpressionSyntax condition,
         ISymbol loopSymbol,
@@ -132,7 +110,7 @@ internal sealed class SymbolicComplexityLoopModel(
         direction = StepDirection.Up;
         boundCost = SymbolicCostExpression.Unknown(SymbolicComplexityUnknownReason.UnsupportedLoopShape);
         boundDescription = string.Empty;
-        dependentSymbols = ImmutableArray<ISymbol>.Empty;
+        dependentSymbols = [];
 
         var left = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Left);
         var right = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Right);
@@ -160,18 +138,15 @@ internal sealed class SymbolicComplexityLoopModel(
                     : StepDirection.None;
             boundExpression = left;
         }
-
         if (direction == StepDirection.None ||
             boundExpression == null ||
-            !_costModel.TryCreate(boundExpression, semanticModel, currentMethod, CostProjection.Value, true,
-                out boundCost))
+            !_costModel.TryCreate(boundExpression, semanticModel, currentMethod, CostProjection.Value, true, out boundCost))
             return false;
 
         boundDescription = boundExpression.ToString();
         dependentSymbols = GetDependentSymbols(boundExpression, semanticModel);
         return true;
     }
-
     private bool TryParseForLoopStep(
         ForStatementSyntax forStatement,
         ISymbol loopSymbol,
@@ -182,11 +157,7 @@ internal sealed class SymbolicComplexityLoopModel(
 
         return TryParseLoopStep(forStatement.Incrementors[0], loopSymbol, semanticModel, out direction);
     }
-
-    private bool TryParseLoopStep(
-        ExpressionSyntax expression,
-        ISymbol loopSymbol,
-        SemanticModel semanticModel,
+    private bool TryParseLoopStep(ExpressionSyntax expression, ISymbol loopSymbol, SemanticModel semanticModel,
         out StepDirection direction) {
         direction = StepDirection.None;
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
@@ -195,25 +166,21 @@ internal sealed class SymbolicComplexityLoopModel(
             direction = delta > 0 ? StepDirection.Up : StepDirection.Down;
             return true;
         }
-
         switch (expression) {
             case AssignmentExpressionSyntax assignment
-                when SymbolEquals(semanticModel.GetSymbolInfo(assignment.Left, _cancellationToken).Symbol,
-                    loopSymbol):
+                when SymbolEquals(semanticModel.GetSymbolInfo(assignment.Left, _cancellationToken).Symbol, loopSymbol):
                 if (assignment.IsKind(SyntaxKind.AddAssignmentExpression) &&
                     _costModel.TryGetIntegralConstant(assignment.Right, semanticModel, out var addValue) &&
                     addValue > 0) {
                     direction = StepDirection.Up;
                     return true;
                 }
-
                 if (assignment.IsKind(SyntaxKind.SubtractAssignmentExpression) &&
                     _costModel.TryGetIntegralConstant(assignment.Right, semanticModel, out var subtractValue) &&
                     subtractValue > 0) {
                     direction = StepDirection.Down;
                     return true;
                 }
-
                 if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
                     assignment.Right is BinaryExpressionSyntax binaryExpression) {
                     if (binaryExpression.IsKind(SyntaxKind.AddExpression) &&
@@ -223,7 +190,6 @@ internal sealed class SymbolicComplexityLoopModel(
                         direction = StepDirection.Up;
                         return true;
                     }
-
                     if (binaryExpression.IsKind(SyntaxKind.AddExpression) &&
                         _costModel.TryGetIntegralConstant(binaryExpression.Left, semanticModel, out var leftAdd) &&
                         leftAdd > 0 &&
@@ -231,7 +197,6 @@ internal sealed class SymbolicComplexityLoopModel(
                         direction = StepDirection.Up;
                         return true;
                     }
-
                     if (binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
                         IsReferenceToSymbol(binaryExpression.Left, loopSymbol, semanticModel) &&
                         _costModel.TryGetIntegralConstant(binaryExpression.Right, semanticModel, out var rightSubtract) &&
@@ -240,14 +205,12 @@ internal sealed class SymbolicComplexityLoopModel(
                         return true;
                     }
                 }
-
                 return false;
 
             default:
                 return false;
         }
     }
-
     private bool IsSymbolMutatedInStatement(
         ISymbol symbol,
         StatementSyntax statement,
@@ -266,25 +229,17 @@ internal sealed class SymbolicComplexityLoopModel(
                 sawMutation = true;
                 continue;
             }
-
             return true;
         }
-
         return allowRecognizedLoopUpdates ? sawMutation : false;
     }
-
-    private bool AssignmentTargetReferencesSymbol(
-        ExpressionSyntax expression,
-        ISymbol symbol,
-        SemanticModel semanticModel) {
+    private bool AssignmentTargetReferencesSymbol(ExpressionSyntax expression, ISymbol symbol, SemanticModel semanticModel) {
         var operation = semanticModel.GetOperation(expression, _cancellationToken);
         return operation != null
             ? AssignmentTargetReferencesSymbol(operation, symbol)
             : expression is TupleExpressionSyntax tuple &&
-              tuple.Arguments.Any(argument =>
-                  AssignmentTargetReferencesSymbol(argument.Expression, symbol, semanticModel));
+              tuple.Arguments.Any(argument => AssignmentTargetReferencesSymbol(argument.Expression, symbol, semanticModel));
     }
-
     private static bool AssignmentTargetReferencesSymbol(IOperation operation, ISymbol symbol) {
         switch (operation) {
             case ILocalReferenceOperation local:
@@ -303,11 +258,7 @@ internal sealed class SymbolicComplexityLoopModel(
                 return false;
         }
     }
-
-    private List<StepDirection> GetRecognizedLoopUpdates(
-        StatementSyntax loopBody,
-        ISymbol loopSymbol,
-        SemanticModel semanticModel) {
+    private List<StepDirection> GetRecognizedLoopUpdates(StatementSyntax loopBody, ISymbol loopSymbol, SemanticModel semanticModel) {
         var updates = new List<StepDirection>();
         foreach (var expression in loopBody.DescendantNodesAndSelf(static candidate =>
                          !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
@@ -317,10 +268,7 @@ internal sealed class SymbolicComplexityLoopModel(
 
         return updates;
     }
-
-    private ImmutableArray<ISymbol> GetDependentSymbols(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel) {
+    private ImmutableArray<ISymbol> GetDependentSymbols(ExpressionSyntax expression, SemanticModel semanticModel) {
         var builder = ImmutableArray.CreateBuilder<ISymbol>();
         foreach (var identifier in expression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
             if (semanticModel.GetSymbolInfo(identifier, _cancellationToken).Symbol is ISymbol symbol &&
@@ -329,21 +277,10 @@ internal sealed class SymbolicComplexityLoopModel(
 
         return builder.ToImmutable();
     }
-
-    private bool IsReferenceToSymbol(
-        ExpressionSyntax expression,
-        ISymbol symbol,
-        SemanticModel semanticModel) {
-        return SymbolEquals(
-            semanticModel.GetSymbolInfo(
-                CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression),
-                _cancellationToken).Symbol,
+    private bool IsReferenceToSymbol(ExpressionSyntax expression, ISymbol symbol, SemanticModel semanticModel) => SymbolEquals(
+            semanticModel.GetSymbolInfo(CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression), _cancellationToken).Symbol,
             symbol);
-    }
-
-    private static bool SymbolEquals(ISymbol? left, ISymbol? right) {
-        return left != null &&
+    private static bool SymbolEquals(ISymbol? left, ISymbol? right) => left != null &&
                right != null &&
                SymbolEqualityComparer.Default.Equals(left.OriginalDefinition, right.OriginalDefinition);
-    }
 }

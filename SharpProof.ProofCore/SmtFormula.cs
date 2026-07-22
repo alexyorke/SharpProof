@@ -6,15 +6,12 @@ internal enum SmtValueKind {
     Reference,
     String
 }
-
 internal enum SmtUnaryOperator {
     Not
 }
-
 internal enum SmtIntegerUnaryOperator {
     Negate
 }
-
 internal enum SmtBinaryOperator {
     And,
     Or,
@@ -25,7 +22,6 @@ internal enum SmtBinaryOperator {
     GreaterThan,
     GreaterThanOrEqual
 }
-
 internal enum SmtIntegerBinaryOperator {
     Add,
     Subtract,
@@ -33,7 +29,6 @@ internal enum SmtIntegerBinaryOperator {
     Divide,
     Remainder
 }
-
 internal abstract record SmtFormula(SmtValueKind Kind);
 
 internal sealed record SmtBooleanConstant(bool Value) : SmtFormula(SmtValueKind.Bool);
@@ -57,9 +52,7 @@ internal sealed record SmtIntegerUnaryTerm(SmtIntegerUnaryOperator Operator, Smt
 internal sealed record SmtIntegerBinaryTerm(SmtIntegerBinaryOperator Operator, SmtFormula Left, SmtFormula Right)
     : SmtFormula(SmtValueKind.Int);
 
-internal sealed record SmtOpaqueIntegerBinaryTerm(
-    SmtIntegerBinaryOperator Operator,
-    SmtFormula Left,
+internal sealed record SmtOpaqueIntegerBinaryTerm(SmtIntegerBinaryOperator Operator, SmtFormula Left,
     SmtFormula Right) : SmtFormula(SmtValueKind.Int);
 
 internal sealed record SmtStringLengthTerm(SmtFormula Value) : SmtFormula(SmtValueKind.Int);
@@ -86,15 +79,10 @@ internal sealed record SmtStringStartsWithFormula(SmtFormula Value, SmtFormula P
 
 internal sealed record SmtStringEndsWithFormula(SmtFormula Value, SmtFormula Suffix) : SmtFormula(SmtValueKind.Bool);
 
-internal sealed record SmtRegexMatchFormula(
-    SmtFormula Value,
-    string Pattern,
+internal sealed record SmtRegexMatchFormula(SmtFormula Value, string Pattern,
     RegexOptions Options = RegexOptions.None) : SmtFormula(SmtValueKind.Bool);
 
 internal sealed record SmtRuntimeTypeTestFormula(SmtFormula Value, string TypeKey) : SmtFormula(SmtValueKind.Bool);
 
-internal sealed record SmtConditionalFormula(
-    SmtFormula Condition,
-    SmtFormula WhenTrue,
-    SmtFormula WhenFalse,
+internal sealed record SmtConditionalFormula(SmtFormula Condition, SmtFormula WhenTrue, SmtFormula WhenFalse,
     SmtValueKind ResultKind) : SmtFormula(ResultKind);

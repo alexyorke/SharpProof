@@ -12,8 +12,7 @@ internal static class MethodAllocationAnalyzer {
             return;
 
         var effects = context.State.GetMethodEffects(context.CancellationToken);
-        foreach (var site in effects.Sites.Where(static site =>
-                     (site.Effect & SharpProofEffect.Allocates) != 0)) {
+        foreach (var site in effects.Sites.Where(static site => (site.Effect & SharpProofEffect.Allocates) != 0)) {
             var location = Location.Create(context.Node.SyntaxTree, new TextSpan(site.SpanStart, site.SpanLength));
             context.ReportDiagnostic(Diagnostic.Create(
                 AnalyzerDiagnosticCatalog.Get("AllocationInZeroAllocationMethodRule"),

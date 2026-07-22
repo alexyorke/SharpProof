@@ -21,21 +21,13 @@ internal sealed record ComplexityArtifacts(
         SymbolicCostExpression cost,
         IEnumerable<SymbolicComplexityDriverInfo>? drivers = null,
         IEnumerable<SymbolicComplexityUnknownReason>? unknownReasons = null,
-        IEnumerable<SymbolicComplexityCalleeInfo>? calleeSummaries = null) {
-        return new ComplexityArtifacts(
+        IEnumerable<SymbolicComplexityCalleeInfo>? calleeSummaries = null) => new(
             cost,
-            drivers?.ToArray() ?? Array.Empty<SymbolicComplexityDriverInfo>(),
-            unknownReasons?.ToArray() ?? Array.Empty<SymbolicComplexityUnknownReason>(),
-            calleeSummaries?.ToArray() ?? Array.Empty<SymbolicComplexityCalleeInfo>());
-    }
-
-    public static ComplexityArtifacts Unknown(
-        SymbolicComplexityUnknownReason reason,
-        SyntaxNode syntax,
-        params ComplexityArtifacts[] parts) {
-        return Unknown(reason, syntax, parts.AsEnumerable());
-    }
-
+            drivers?.ToArray() ?? [],
+            unknownReasons?.ToArray() ?? [],
+            calleeSummaries?.ToArray() ?? []);
+    public static ComplexityArtifacts Unknown(SymbolicComplexityUnknownReason reason, SyntaxNode syntax,
+        params ComplexityArtifacts[] parts) => Unknown(reason, syntax, parts.AsEnumerable());
     public static ComplexityArtifacts Unknown(
         SymbolicComplexityUnknownReason reason,
         SyntaxNode syntax,
@@ -50,30 +42,19 @@ internal sealed record ComplexityArtifacts(
                 reasons.AddRange(part.UnknownReasons);
                 callees.AddRange(part.CalleeSummaries);
             }
-
         if (calleeSummaries != null) callees.AddRange(calleeSummaries);
 
         drivers.Add(CreateUnknownDriver(reason, syntax));
         return FromCost(SymbolicCostExpression.Unknown(reason), drivers, reasons, callees);
     }
-
     public ComplexityArtifacts WithDriver(SymbolicComplexityDriverInfo driver) {
         var drivers = Drivers.ToList();
         drivers.Add(driver);
         return new ComplexityArtifacts(Cost, drivers, UnknownReasons, CalleeSummaries);
     }
-
-    private static SymbolicComplexityDriverInfo CreateUnknownDriver(
-        SymbolicComplexityUnknownReason reason,
-        SyntaxNode syntax) {
-        return new SymbolicComplexityDriverInfo(
-            "Unknown",
-            reason.ToString(),
-            syntax.SpanStart,
-            syntax.Span.Length);
-    }
+    private static SymbolicComplexityDriverInfo CreateUnknownDriver(SymbolicComplexityUnknownReason reason, SyntaxNode syntax)
+        => new("Unknown", reason.ToString(), syntax.SpanStart, syntax.Span.Length);
 }
-
 internal sealed record SubstitutionResult(
     SymbolicCostExpression Cost,
     IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,
@@ -86,7 +67,6 @@ internal enum StepDirection {
     Up,
     Down
 }
-
 internal enum CostProjection {
     Value,
     LengthOrCount

@@ -14,12 +14,10 @@ internal static class SymbolicIrReferenceScanner {
             name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
 
     internal static bool ContainsVariableOrMember(SymbolicTerm term, string variableName) {
-        var scanner = new VariableReferenceVisitor(
-            name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
+        var scanner = new VariableReferenceVisitor(name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
         scanner.Visit(term);
         return scanner.Found;
     }
-
     internal static SymbolicState RemoveVariableReferences(SymbolicState state, string variablePrefix) => RemoveReferences(
             state,
             fact => ContainsVariablePrefix(fact, variablePrefix),
@@ -43,13 +41,11 @@ internal static class SymbolicIrReferenceScanner {
         scanner.Visit(fact);
         return scanner.Found;
     }
-
     private static bool ContainsVariable(SymbolicCondition condition, Func<string, bool> match) {
         var scanner = new VariableReferenceVisitor(match);
         scanner.Visit(condition);
         return scanner.Found;
     }
-
     private static bool TryCreateVariableOrMemberPath(SymbolicTerm term, out string path) {
         switch (term) {
             case SymbolicVariableTerm variable:
@@ -64,7 +60,6 @@ internal static class SymbolicIrReferenceScanner {
                 return false;
         }
     }
-
     private static bool MatchesVariablePrefix(string candidate, string variablePrefix) {
         if (SymbolicFactFactory.MatchesVariableOrMemberName(candidate, variablePrefix)) return true;
 
@@ -78,7 +73,6 @@ internal static class SymbolicIrReferenceScanner {
         return index > digitStart &&
                (index == candidate.Length || candidate[index] is '.' or '[');
     }
-
     sealed class VariableReferenceVisitor : SymbolicIrVisitor {
         private readonly Func<string, bool> _match;
 
@@ -93,7 +87,6 @@ internal static class SymbolicIrReferenceScanner {
                 _match(memberPath))
                 Found = true;
         }
-
         protected override void OnVariableLikeName(string name) {
             if (!Found && _match(name)) Found = true;
         }

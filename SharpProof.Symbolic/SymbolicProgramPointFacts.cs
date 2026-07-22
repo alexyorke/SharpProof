@@ -9,16 +9,10 @@ internal static class SymbolicProgramPointFacts {
         bool mustBeTrue,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
-        var transition = SymbolicReachabilityLowerer.Apply(
-            state,
-            condition,
-            mustBeTrue,
-            semanticModel,
-            cancellationToken);
+        var transition = SymbolicReachabilityLowerer.Apply(state, condition, mustBeTrue, semanticModel, cancellationToken);
         if (transition.IsExact)
             state = transition.State;
     }
-
     internal static void AddReferenceNullCondition(
         ref SymbolicState state,
         ExpressionSyntax expression,
@@ -32,14 +26,12 @@ internal static class SymbolicProgramPointFacts {
 
             return;
         }
-
         if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(expression, semanticModel, cancellationToken)) {
             if (isNull)
                 state = SymbolicOperationTransferKernel.Complete(state, expression.Span).State;
 
             return;
         }
-
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
         if (lowering is not { IsExact: true, Value: { } subject } ||
@@ -55,13 +47,10 @@ internal static class SymbolicProgramPointFacts {
             provenance ?? (isNull ? "ir.path.reference-null" : "ir.path.reference-not-null"));
         state = state.AddPathCondition(new SymbolicFactCondition(fact));
     }
-
     internal static bool StatementInvalidatesSymbolValue(
         StatementSyntax statement,
         ISymbol symbol,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        return SymbolicMutationInventory.Create(statement, semanticModel, cancellationToken)
+        CancellationToken cancellationToken) => SymbolicMutationInventory.Create(statement, semanticModel, cancellationToken)
             .InvalidatesSymbol(symbol, mutableExposures: true);
-    }
 }

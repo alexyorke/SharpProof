@@ -22,25 +22,17 @@ internal static class SymbolicReachabilityService {
                 initialState,
                 includeCurrentStatementCompletionFacts);
 
-        var key = new PathStateCacheKey(
-            site.SpanStart, site.Span.Length, site.RawKind, includeCurrentStatementCompletionFacts);
+        var key = new PathStateCacheKey(site.SpanStart, site.Span.Length, site.RawKind, includeCurrentStatementCompletionFacts);
         var methodCaches = s_structuralPathStateCache.GetOrCreateValue(semanticModel);
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(site);
         var cache = methodCaches.GetValue(executionRoot, static _ =>
             new BoundedConcurrentCache<PathStateCacheKey, SymbolicState>(StructuralPathStateCacheEntryLimit));
         if (!cache.TryGetValue(key, out var state)) {
-            state = BuildStructuralPathStateSnapshot(
-                site,
-                semanticModel,
-                cancellationToken,
-                null,
-                includeCurrentStatementCompletionFacts);
+            state = BuildStructuralPathStateSnapshot(site, semanticModel, cancellationToken, null, includeCurrentStatementCompletionFacts);
             cache.TryAdd(key, state);
         }
-
         return state;
     }
-
     internal static bool IsForInitialEntryConditionAlwaysFalse(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
@@ -48,10 +40,7 @@ internal static class SymbolicReachabilityService {
         SmtAnalysisService? smtAnalysis) {
         if (forStatement.Condition == null) return false;
 
-        var initialEntryState = CollectForInitialEntryState(
-            forStatement,
-            semanticModel,
-            cancellationToken);
+        var initialEntryState = CollectForInitialEntryState(forStatement, semanticModel, cancellationToken);
         var lowering = SymbolicSemanticPipeline.LowerCondition(
             forStatement.Condition,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
@@ -61,20 +50,15 @@ internal static class SymbolicReachabilityService {
             .ClassifyConditionTruth(initialEntryState, initialEntryCondition);
         return proof.Status is SymbolicProofStatus.ProvenFalse or SymbolicProofStatus.Unreachable;
     }
-
     internal static SymbolicState CollectForInitialEntryState(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
-        var cfgState = SymbolicCfgProgramPointStateCollector.CollectForInitialEntryState(
-            forStatement,
-            semanticModel,
-            cancellationToken);
+        var cfgState = SymbolicCfgProgramPointStateCollector.CollectForInitialEntryState(forStatement, semanticModel, cancellationToken);
         return cfgState is { IsExact: true, Value: { } exactState }
             ? exactState
             : UnsupportedState(cfgState);
     }
-
     private static SymbolicState BuildStructuralPathStateSnapshot(
         SyntaxNode site,
         SemanticModel semanticModel,
@@ -91,7 +75,6 @@ internal static class SymbolicReachabilityService {
             return exactState;
         return UnsupportedState(cfgState);
     }
-
     private static SymbolicState UnsupportedState(SymbolicLoweringResult<SymbolicState> result) => new(
         support: result.Support,
         unknownReason: result.UnknownReason == SymbolicUnknownReason.None
@@ -99,6 +82,5 @@ internal static class SymbolicReachabilityService {
             : result.UnknownReason,
         provenance: result.Provenance);
 
-    readonly record struct PathStateCacheKey(
-        int SiteStart, int SiteLength, int SiteRawKind, bool IncludeCurrentStatementCompletionFacts);
+    readonly record struct PathStateCacheKey(int SiteStart, int SiteLength, int SiteRawKind, bool IncludeCurrentStatementCompletionFacts);
 }

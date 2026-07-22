@@ -29,7 +29,6 @@ try {
         if (++index >= args.Length) return Usage("Missing value for " + argument + ".");
         values[argument] = args[index];
     }
-
     if (!values.TryGetValue("--file", out var file) || string.IsNullOrWhiteSpace(file))
         return Usage("--file is required.");
     file = Path.GetFullPath(file);
@@ -42,15 +41,11 @@ try {
     if (format is not ("text" or "json")) return Usage("--format must be text or json.");
 
     using var session = SharpProofAnalysisSession.FromFile(file);
-    var result = session.Analyze(new SharpProofAnalysisRequest(
-        target,
-        facets,
-        values.GetValueOrDefault("--condition")));
+    var result = session.Analyze(new SharpProofAnalysisRequest(target, facets, values.GetValueOrDefault("--condition")));
     if (result.Status is SharpProofQueryStatus.Failed or SharpProofQueryStatus.Canceled) {
         Console.Error.WriteLine(result.Error?.Message ?? "Analysis failed.");
         return 3;
     }
-
     if (format == "json") {
         Console.WriteLine(JsonSerializer.Serialize(result, new JsonSerializerOptions {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -77,14 +72,13 @@ try {
         foreach (var reason in result.UnknownReasons)
             Console.WriteLine($"Unknown: {reason.Code}: {reason.Message}");
     }
-
     var verdicts = result.MethodEffects == null
         ? Array.Empty<SharpProofVerdict>()
-        : new[] {
+        : [
             result.MethodEffects.Purity,
             result.MethodEffects.AllocationFree,
             result.MethodEffects.DoesNotThrow
-        };
+        ];
     if (flags.Contains("--fail-on-disproven") && verdicts.Contains(SharpProofVerdict.Disproven))
         return 5;
     if (flags.Contains("--fail-on-unknown") &&
@@ -97,13 +91,11 @@ catch (Exception exception) when (exception is ArgumentException or IOException 
     Console.Error.WriteLine(exception.Message);
     return 3;
 }
-
 int Usage(string message) {
     Console.Error.WriteLine(message);
     Console.Error.WriteLine(usage);
     return 2;
 }
-
 bool TryParseTarget(string value, out SharpProofTarget target) {
     target = null!;
     if (value == "all-lines") {
@@ -131,7 +123,6 @@ bool TryParseTarget(string value, out SharpProofTarget target) {
     }
     return false;
 }
-
 bool TryParseFacets(string value, out SharpProofAnalysisFacet facets) {
     facets = SharpProofAnalysisFacet.None;
     foreach (var item in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) {

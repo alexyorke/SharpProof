@@ -1,17 +1,9 @@
 namespace SharpProof.ProofCore.Smt;
 
 internal static class Z3RegexPatternNormalizer {
-    internal static bool TryNormalize(
-        string pattern,
-        RegexOptions options,
-        out NormalizedRegexPattern normalized) {
+    internal static bool TryNormalize(string pattern, RegexOptions options, out NormalizedRegexPattern normalized) {
         var multiline = (options & RegexOptions.Multiline) != 0;
-        var startAnchored = TryFindLeadingStartAnchor(
-            pattern,
-            options,
-            !multiline,
-            out var startAnchorStart,
-            out var startAnchorLength);
+        var startAnchored = TryFindLeadingStartAnchor(pattern, options, !multiline, out var startAnchorStart, out var startAnchorLength);
         var strictEndAnchored = EndsWithUnescapedAnchor(pattern, @"\z");
         var finalNewlineEndAnchored = !strictEndAnchored && EndsWithUnescapedAnchor(pattern, @"\Z");
         var dollarEndAnchored = !strictEndAnchored &&
@@ -25,18 +17,11 @@ internal static class Z3RegexPatternNormalizer {
             normalized = default;
             return false;
         }
-
         var bodyPattern = pattern.Substring(0, bodyEnd);
         if (startAnchored) bodyPattern = bodyPattern.Remove(startAnchorStart, startAnchorLength);
-        normalized = new NormalizedRegexPattern(
-            bodyPattern,
-            startAnchored,
-            strictEndAnchored,
-            finalNewlineEndAnchored,
-            dollarEndAnchored);
+        normalized = new NormalizedRegexPattern(bodyPattern, startAnchored, strictEndAnchored, finalNewlineEndAnchored, dollarEndAnchored);
         return true;
     }
-
     internal static RegexOptionScope CreateInitialOptionScope(RegexOptions options) => new(
         (options & RegexOptions.IgnorePatternWhitespace) != 0,
         (options & RegexOptions.Singleline) != 0,
@@ -63,44 +48,37 @@ internal static class Z3RegexPatternNormalizer {
                 position++;
                 continue;
             }
-
             if (current == 'n') {
                 sawOption = true;
                 position++;
                 continue;
             }
-
             if (current == 'x') {
                 sawOption = true;
                 nextIgnorePatternWhitespace = !sawDisableSeparator;
                 position++;
                 continue;
             }
-
             if (current == 's') {
                 sawOption = true;
                 nextSingleline = !sawDisableSeparator;
                 position++;
                 continue;
             }
-
             if (current == 'i' && canUseIgnoreCase) {
                 sawOption = true;
                 nextIgnoreCase = !sawDisableSeparator;
                 position++;
                 continue;
             }
-
             return false;
         }
-
         if (!sawOption || position >= pattern.Length || pattern[position] != terminator) return false;
 
         position++;
         nextScope = new RegexOptionScope(nextIgnorePatternWhitespace, nextSingleline, nextIgnoreCase);
         return true;
     }
-
     internal static void SkipIgnoredTrivia(string pattern, ref int position, bool ignorePatternWhitespace) {
         while (position < pattern.Length) {
             if (TrySkipInlineComment(pattern, ref position)) continue;
@@ -111,18 +89,15 @@ internal static class Z3RegexPatternNormalizer {
                 position++;
                 continue;
             }
-
             if (current == '#') {
                 position++;
                 while (position < pattern.Length && pattern[position] != '\r' && pattern[position] != '\n')
                     position++;
                 continue;
             }
-
             return;
         }
     }
-
     private static bool TryFindLeadingStartAnchor(
         string pattern,
         RegexOptions options,
@@ -136,29 +111,24 @@ internal static class Z3RegexPatternNormalizer {
         var canUseIgnoreCase = (options & RegexOptions.CultureInvariant) != 0;
         while (true) {
             SkipIgnoredTrivia(pattern, ref index, optionScope.IgnorePatternWhitespace);
-            if (!TryReadInlineOptionGroup(pattern, index, optionScope, canUseIgnoreCase, out var nextScope,
-                    out var nextIndex)) break;
+            if (!TryReadInlineOptionGroup(pattern, index, optionScope, canUseIgnoreCase, out var nextScope, out var nextIndex)) break;
 
             optionScope = nextScope;
             index = nextIndex;
         }
-
         if (index >= pattern.Length) return false;
         if (pattern[index] == '^' && allowCaretAnchor) {
             anchorStart = index;
             anchorLength = 1;
             return true;
         }
-
         if (index + 1 < pattern.Length && pattern[index] == '\\' && pattern[index + 1] is 'A' or 'G') {
             anchorStart = index;
             anchorLength = 2;
             return true;
         }
-
         return false;
     }
-
     private static bool TryReadInlineOptionGroup(
         string pattern,
         int start,
@@ -176,7 +146,6 @@ internal static class Z3RegexPatternNormalizer {
         nextIndex = index;
         return true;
     }
-
     private static bool TrySkipInlineComment(string pattern, ref int position) {
         if (position + 2 >= pattern.Length || pattern[position] != '(' || pattern[position + 1] != '?' ||
             pattern[position + 2] != '#')
@@ -189,7 +158,6 @@ internal static class Z3RegexPatternNormalizer {
         position = end + 1;
         return true;
     }
-
     private static bool EndsWithUnescapedAnchor(string value, string anchor) =>
         value.EndsWith(anchor, StringComparison.Ordinal) && !IsEscaped(value, value.Length - anchor.Length);
 
@@ -199,7 +167,6 @@ internal static class Z3RegexPatternNormalizer {
         return slashCount % 2 != 0;
     }
 }
-
 internal readonly record struct NormalizedRegexPattern(
     string Body,
     bool StartAnchored,
@@ -207,7 +174,4 @@ internal readonly record struct NormalizedRegexPattern(
     bool FinalNewlineEndAnchored,
     bool DollarEndAnchored);
 
-internal readonly record struct RegexOptionScope(
-    bool IgnorePatternWhitespace,
-    bool Singleline,
-    bool IgnoreCase);
+internal readonly record struct RegexOptionScope(bool IgnorePatternWhitespace, bool Singleline, bool IgnoreCase);

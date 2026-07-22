@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowAnalyzer {
-    internal static void AnalyzeSymbolForExceptions(
-        MethodBodyAnalysisContext context,
-        SharpProofAttributeIdentityPolicy attributePolicy) {
+    internal static void AnalyzeSymbolForExceptions(MethodBodyAnalysisContext context, SharpProofAttributeIdentityPolicy attributePolicy) {
         var contracts = CollectExceptionContracts(context, attributePolicy);
         if (contracts.IsDefaultOrEmpty) return;
 
@@ -13,17 +11,15 @@ internal static partial class ExceptionFlowAnalyzer {
             .ToImmutableArray();
         AnalyzeExceptionContracts(context, context.MethodSymbol, contracts, facts);
     }
-
     private static ImmutableArray<ExceptionFactView> ProjectEffectFacts(
         MethodBodyAnalysisContext context,
-        ImmutableArray<MethodExceptionFact> facts) => facts
+        ImmutableArray<MethodExceptionFact> facts) => [.. facts
         .Where(static fact => fact.Escape != SharpProofVerdict.Disproven)
         .Select(fact => new ExceptionFactView(
             FindSite(context.Node, fact.SpanStart, fact.SpanStart + fact.SpanLength),
             fact.ExceptionType,
             ResolveExceptionType(context.SemanticModel.Compilation, fact.ExceptionType),
-            fact.Escape))
-        .ToImmutableArray();
+            fact.Escape))];
 
     private static SyntaxNode FindSite(SyntaxNode method, int start, int end) =>
         method.DescendantNodesAndSelf().FirstOrDefault(node => node.SpanStart == start && node.Span.End == end) ??
@@ -35,9 +31,5 @@ internal static partial class ExceptionFlowAnalyzer {
 
     private static Location GetExceptionSiteLocation(SyntaxNode node) => node.GetLocation();
 
-    private readonly record struct ExceptionFactView(
-        SyntaxNode Site,
-        string ExceptionType,
-        ITypeSymbol? Type,
-        SharpProofVerdict Escape);
+    private readonly record struct ExceptionFactView(SyntaxNode Site, string ExceptionType, ITypeSymbol? Type, SharpProofVerdict Escape);
 }

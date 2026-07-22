@@ -43,13 +43,13 @@ internal static class SymbolicStringLengthLowerer {
         term = null!;
         return false;
     }
-
     internal static bool TryLowerStringInvocationResultLengthTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         term = null!;
-        if (!SymbolicIndexingLowerer.TryGetInvocationOperation(expression, context, out var invocationExpression, out var invocationOperation))
+        if (!SymbolicIndexingLowerer.TryGetInvocationOperation(expression, context, out var invocationExpression,
+            out var invocationOperation))
             return false;
 
         var method = invocationOperation.TargetMethod;
@@ -66,27 +66,22 @@ internal static class SymbolicStringLengthLowerer {
             if (!SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength)) return false;
 
             if (method.Parameters.Length == 1 &&
-                SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0,
-                    out var startExpression) &&
+                SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var startExpression) &&
                 SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(startExpression, context), out var start) &&
                 start.Kind == SmtValueKind.Int) {
                 term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, start);
                 return true;
             }
-
             if (method.Parameters.Length == 2 &&
                 SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var _) &&
-                SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1,
-                    out var countExpression) &&
+                SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1, out var countExpression) &&
                 SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(countExpression, context), out var count) &&
                 count.Kind == SmtValueKind.Int) {
                 term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, count);
                 return true;
             }
-
             return false;
         }
-
         if (string.Equals(method.Name, nameof(string.Insert), StringComparison.Ordinal) &&
             method.Parameters.Length == 2 &&
             method.Parameters[1].Type.SpecialType == SpecialType.System_String &&
@@ -105,7 +100,6 @@ internal static class SymbolicStringLengthLowerer {
                 "ir.known-api.string.insert.length");
             return true;
         }
-
         if (method.Name is nameof(string.PadLeft) or nameof(string.PadRight) &&
             (method.Parameters.Length == 1 ||
              method.Parameters.Length == 2 && method.Parameters[1].Type.SpecialType == SpecialType.System_Char) &&
@@ -124,14 +118,9 @@ internal static class SymbolicStringLengthLowerer {
                 padSourceLength);
             return true;
         }
-
         return false;
     }
-
-    internal static SymbolicTerm CreateStringResultLengthTerm(
-        SymbolicTerm stringValue,
-        SyntaxNode source,
-        string provenance) {
+    internal static SymbolicTerm CreateStringResultLengthTerm(SymbolicTerm stringValue, SyntaxNode source, string provenance) {
         if (stringValue is SymbolicStringConstantTerm constant)
             return new SymbolicIntegerConstantTerm(constant.Value.Length);
 
@@ -154,7 +143,6 @@ internal static class SymbolicStringLengthLowerer {
             provenance + ".sum",
             false);
     }
-
     internal static bool TryLowerStringResultLengthIdentityCondition(
         BinaryExpressionSyntax binaryExpression,
         SymbolicLoweringContext context,
@@ -175,7 +163,6 @@ internal static class SymbolicStringLengthLowerer {
         condition = new SymbolicConstantCondition(binaryExpression.IsKind(SyntaxKind.EqualsExpression));
         return true;
     }
-
     private static bool TryLowerStringConstructionLengthSum(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -188,11 +175,9 @@ internal static class SymbolicStringLengthLowerer {
             term = null!;
             return false;
         }
-
         term = CreateMathematicalStringLengthSum(stringValue);
         return true;
     }
-
     private static SymbolicTerm CreateMathematicalStringLengthSum(SymbolicTerm stringValue) {
         if (stringValue is SymbolicStringConstantTerm constant)
             return new SymbolicIntegerConstantTerm(constant.Value.Length);
@@ -211,11 +196,7 @@ internal static class SymbolicStringLengthLowerer {
             CreateMathematicalStringLengthSum(concat.Left),
             CreateMathematicalStringLengthSum(concat.Right));
     }
-
-    private static bool TryLowerNonNegativeLengthSum(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context,
-        out SymbolicTerm term) {
+    private static bool TryLowerNonNegativeLengthSum(ExpressionSyntax expression, SymbolicLoweringContext context, out SymbolicTerm term) {
         expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         if (expression is BinaryExpressionSyntax binary &&
             binary.IsKind(SyntaxKind.AddExpression) &&
@@ -226,7 +207,6 @@ internal static class SymbolicStringLengthLowerer {
             term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, left, right);
             return true;
         }
-
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constantValue.HasValue &&
             constantValue.Value != null &&
@@ -235,25 +215,21 @@ internal static class SymbolicStringLengthLowerer {
             term = new SymbolicIntegerConstantTerm(integerConstant);
             return true;
         }
-
         if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var length) &&
             (length is SymbolicLengthTerm or SymbolicArrayDimensionLengthTerm or SymbolicCountTerm ||
              length is SymbolicIntegerConstantTerm { Value: >= 0 })) {
             term = length;
             return true;
         }
-
         term = null!;
         return false;
     }
-
     internal static bool IsMemoryExtensionsViewMethod(IMethodSymbol method) {
         var definition = method.ReducedFrom ?? method;
         return definition.Name is "AsSpan" or "AsMemory" &&
                definition.IsExtensionMethod &&
                definition.ContainingType?.ToDisplayString() == "System.MemoryExtensions";
     }
-
     internal static bool TryGetMemoryExtensionsViewSourceExpression(
         InvocationExpressionSyntax invocationExpression,
         SymbolicLoweringContext context,
@@ -265,37 +241,26 @@ internal static class SymbolicStringLengthLowerer {
             firstArgumentIndex = 0;
             return true;
         }
-
         if (invocationExpression.ArgumentList.Arguments.Count == 0) {
             sourceExpression = null!;
             firstArgumentIndex = 0;
             return false;
         }
-
         sourceExpression = invocationExpression.ArgumentList.Arguments[0].Expression;
         firstArgumentIndex = 1;
         return true;
     }
-
-    internal static bool IsSupportedMemoryExtensionsViewSource(
-        ExpressionSyntax sourceExpression,
-        SymbolicLoweringContext context) {
+    internal static bool IsSupportedMemoryExtensionsViewSource(ExpressionSyntax sourceExpression, SymbolicLoweringContext context) {
         var sourceTypeInfo = context.SemanticModel.GetTypeInfo(sourceExpression, context.CancellationToken);
         var sourceType = PreferLengthSemanticType(sourceTypeInfo.Type, sourceTypeInfo.ConvertedType);
         return sourceType?.SpecialType == SpecialType.System_String ||
                sourceType is IArrayTypeSymbol { Rank: 1 };
     }
-
-    internal static ITypeSymbol? GetPreferredLengthSemanticType(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context) {
+    internal static ITypeSymbol? GetPreferredLengthSemanticType(ExpressionSyntax expression, SymbolicLoweringContext context) {
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
         return PreferLengthSemanticType(typeInfo.Type, typeInfo.ConvertedType);
     }
-
-    private static ITypeSymbol? PreferLengthSemanticType(
-        ITypeSymbol? sourceType,
-        ITypeSymbol? convertedType) {
+    private static ITypeSymbol? PreferLengthSemanticType(ITypeSymbol? sourceType, ITypeSymbol? convertedType) {
         if (sourceType != null &&
             HasLengthLikeShape(sourceType) &&
             !HasLengthLikeShape(convertedType))
@@ -303,11 +268,9 @@ internal static class SymbolicStringLengthLowerer {
 
         return convertedType ?? sourceType;
     }
-
     private static bool HasLengthLikeShape(ITypeSymbol? type) => type?.SpecialType == SpecialType.System_String ||
                type is IArrayTypeSymbol { Rank: >= 1 } ||
                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type) ||
                SymbolicIndexingLowerer.HasCountBackedIntIndexer(type) ||
                SymbolicTypeFacts.HasInstanceInt32Member(type, "Count");
-
 }

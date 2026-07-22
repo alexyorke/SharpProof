@@ -29,21 +29,10 @@ internal static partial class SymbolicOperationLowerer {
                 targetContext,
                 valueContext,
                 provenance);
-            AddSymbolicNullableAssignmentPropagations(
-                propagations,
-                targetSymbol,
-                valueExpression,
-                targetContext,
-                valueContext);
-            AddSymbolicTupleAssignmentPostconditions(
-                postconditions,
-                targetSymbol,
-                valueExpression,
-                targetContext,
-                valueContext,
-                provenance);
+            AddSymbolicNullableAssignmentPropagations(propagations, targetSymbol, valueExpression, targetContext, valueContext);
+            AddSymbolicTupleAssignmentPostconditions(postconditions, targetSymbol, valueExpression, targetContext,
+                valueContext, provenance);
         }
-
         if (TryCreateSymbolTerm(targetSymbol, targetContext, out var target)) {
             var value = target.Kind == SmtValueKind.Bool
                 ? SymbolicSemanticPipeline.LowerBooleanValueTerm(valueExpression, valueContext)
@@ -70,7 +59,6 @@ internal static partial class SymbolicOperationLowerer {
                         postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic &&
                         target.Kind == SmtValueKind.Int));
             }
-
             AddReferenceAssignmentPostconditions(
                 postconditions,
                 targetSymbol,
@@ -80,20 +68,9 @@ internal static partial class SymbolicOperationLowerer {
                 provenance,
                 postconditionProfile);
             if (postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic) {
-                AddSymbolicFiniteArrayElementPostconditions(
-                    postconditions,
-                    targetSymbol,
-                    target,
-                    valueExpression,
-                    valueContext,
-                    provenance);
-                AddSymbolicSwitchExpressionPostconditions(
-                    postconditions,
-                    targetSymbol,
-                    target,
-                    valueExpression,
-                    valueContext,
-                    provenance);
+                AddSymbolicFiniteArrayElementPostconditions(postconditions, targetSymbol, target, valueExpression,
+                    valueContext, provenance);
+                AddSymbolicSwitchExpressionPostconditions(postconditions, targetSymbol, target, valueExpression, valueContext, provenance);
             }
             var asExpressionFacts = SymbolicSemanticPipeline.LowerAsExpressionAssignmentFacts(
                 targetSymbol,
@@ -105,44 +82,30 @@ internal static partial class SymbolicOperationLowerer {
                 postconditions.AddRange(asExpressionState.PathConditions);
         }
         if (postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic)
-            AddSymbolicThrowGuardedAssignmentPostconditions(
-                postconditions,
-                targetSymbol,
-                throwGuardedValue,
-                valueContext,
-                provenance);
+            AddSymbolicThrowGuardedAssignmentPostconditions(postconditions, targetSymbol, throwGuardedValue, valueContext, provenance);
         if (bindings.Count == 0 && postconditions.Count == 0 && propagations.Count == 0)
             return Unsupported(source, provenance + ".value");
 
         var operation = new SymbolicAssignmentOperation(
             bindings.ToImmutable(),
             postconditions.ToImmutable(),
-            SymbolicAssignmentOperationKind.Simple,
-            IsChecked: false,
             new SymbolicOperationOrigin(valueExpression.Span, sequence, provenance),
             propagations.ToImmutable(),
-            ImmutableArray.Create(new SymbolicInvalidationTarget(
-                SymbolicFactFactory.GetSmtVariableName(targetSymbol.OriginalDefinition))));
+            [new SymbolicInvalidationTarget(SymbolicFactFactory.GetSmtVariableName(targetSymbol.OriginalDefinition))]);
         return SymbolicLoweringResult<SymbolicOperationSequence>.Exact(
             SymbolicOperationSequence.Single(operation),
             new SymbolicLoweringProvenance("roslyn-to-operation", valueExpression.Span, provenance));
     }
-
     private static void AddSymbolicThrowGuardedAssignmentPostconditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ISymbol targetSymbol,
         SymbolicThrowGuardedValue guardedValue,
         SymbolicLoweringContext valueContext,
         string provenance) {
-        var condition = LowerThrowGuardedAssignmentPostcondition(
-            targetSymbol,
-            guardedValue,
-            valueContext,
-            provenance);
+        var condition = LowerThrowGuardedAssignmentPostcondition(targetSymbol, guardedValue, valueContext, provenance);
         if (condition != null)
             conditions.Add(condition);
     }
-
     internal static SymbolicCondition? LowerThrowGuardedAssignmentPostcondition(
         ISymbol targetSymbol,
         SymbolicThrowGuardedValue guardedValue,
@@ -153,8 +116,7 @@ internal static partial class SymbolicOperationLowerer {
         if (guardedValue.GuardExpression is { } guard) {
             var effectiveValueIsTarget =
                 SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
-                    CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(
-                        guardedValue.EffectiveValueExpression),
+                    CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(guardedValue.EffectiveValueExpression),
                     valueContext.SemanticModel,
                     valueContext.CancellationToken,
                     out var effectiveValueSymbol) &&
@@ -167,22 +129,20 @@ internal static partial class SymbolicOperationLowerer {
                 !effectiveValueIsTarget)
                 return null;
 
-            return SymbolicSemanticPipeline.LowerBranchCondition(
-                guard,
-                guardedValue.GuardBranchWhenTrue,
+            return SymbolicSemanticPipeline.LowerBranchCondition(guard, guardedValue.GuardBranchWhenTrue,
                 valueContext) is { IsExact: true, Value: { } condition }
                     ? condition
                     : null;
         }
-
         if (!guardedValue.RequiresNonNullValue ||
             NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
                 guardedValue.EffectiveValueExpression,
                 valueContext.SemanticModel,
                 valueContext.CancellationToken) ||
-            SymbolicSemanticPipeline.LowerTerm(
-                guardedValue.EffectiveValueExpression,
-                valueContext) is not { IsExact: true, Value: { Kind: SmtValueKind.Reference } subject })
+            SymbolicSemanticPipeline.LowerTerm(guardedValue.EffectiveValueExpression, valueContext) is not {
+                IsExact: true,
+                Value: { Kind: SmtValueKind.Reference } subject
+            })
             return null;
 
         return ExactRelation(
@@ -192,7 +152,6 @@ internal static partial class SymbolicOperationLowerer {
             guardedValue.EffectiveValueExpression,
             provenance + ".throw-guard.non-null");
     }
-
     private static void AddReferenceAssignmentPostconditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ISymbol targetSymbol,
@@ -203,34 +162,12 @@ internal static partial class SymbolicOperationLowerer {
         SymbolicAssignmentPostconditionProfile profile) {
         if (target.Kind != SmtValueKind.Reference) return;
         if (profile == SymbolicAssignmentPostconditionProfile.Symbolic) {
-            AddSymbolicStringAssignmentPostconditions(
-                conditions,
-                targetSymbol,
-                target,
-                valueExpression,
-                valueContext,
-                provenance);
-            AddSymbolicCollectionLowerBound(
-                conditions,
-                targetSymbol,
-                target,
-                valueExpression,
-                provenance);
-            AddSymbolicReferenceAssignmentPostconditions(
-                conditions,
-                targetSymbol,
-                target,
-                valueExpression,
-                valueContext,
-                provenance);
-            conditions.AddRange(LowerSymbolicReferenceBackedPostconditions(
-                target,
-                valueExpression,
-                valueContext,
-                provenance));
+            AddSymbolicStringAssignmentPostconditions(conditions, targetSymbol, target, valueExpression, valueContext, provenance);
+            AddSymbolicCollectionLowerBound(conditions, targetSymbol, target, valueExpression, provenance);
+            AddSymbolicReferenceAssignmentPostconditions(conditions, targetSymbol, target, valueExpression, valueContext, provenance);
+            conditions.AddRange(LowerSymbolicReferenceBackedPostconditions(target, valueExpression, valueContext, provenance));
             return;
         }
-
         AddEquality(
             conditions,
             new SymbolicLengthTerm(target),
@@ -251,7 +188,6 @@ internal static partial class SymbolicOperationLowerer {
                     provenance + ".collection_length",
                     evidenceKey: provenance + ".collection_length"));
         }
-
         if (SymbolicFactFactory.GetTrackedSymbolType(targetSymbol)?.SpecialType != SpecialType.System_String)
             return;
 
@@ -281,7 +217,6 @@ internal static partial class SymbolicOperationLowerer {
                 new SymbolicNotCondition(targetNonNull),
                 new SymbolicNotCondition(valueNonNull))));
     }
-
     private static void AddSymbolicNullableAssignmentPostconditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ISymbol targetSymbol,
@@ -289,18 +224,20 @@ internal static partial class SymbolicOperationLowerer {
         SymbolicLoweringContext targetContext,
         SymbolicLoweringContext valueContext,
         string provenance) {
-        if (!SymbolicNullableLowerer.TryCreateSymbolTerms(
-                targetSymbol,
-                targetContext,
-                out var targetHasValue,
-                out var targetValue))
+        if (!SymbolicNullableLowerer.TryCreateSymbolTerms(targetSymbol, targetContext, out var targetHasValue, out var targetValue))
             return;
 
         SymbolicTerm sourceHasValue;
         SymbolicTerm? sourceValue = null;
-        if (SymbolicSemanticPipeline.LowerNullableHasValueTerm(valueExpression, valueContext) is { IsExact: true, Value: { } nullableHasValue }) {
+        if (SymbolicSemanticPipeline.LowerNullableHasValueTerm(valueExpression, valueContext) is {
+            IsExact: true,
+            Value: { } nullableHasValue
+        }) {
             sourceHasValue = nullableHasValue;
-            if (SymbolicSemanticPipeline.LowerNullableValueTerm(valueExpression, valueContext) is { IsExact: true, Value: { } nullableValue })
+            if (SymbolicSemanticPipeline.LowerNullableValueTerm(valueExpression, valueContext) is {
+                IsExact: true,
+                Value: { } nullableValue
+            })
                 sourceValue = nullableValue;
         }
         else if (SymbolicSemanticPipeline.LowerTerm(valueExpression, valueContext) is { IsExact: true, Value: { } wrappedValue } &&
@@ -311,7 +248,6 @@ internal static partial class SymbolicOperationLowerer {
         else {
             return;
         }
-
         conditions.Add(ExactRelation(
             SymbolicRelationOperator.Equal,
             targetHasValue,
@@ -324,11 +260,7 @@ internal static partial class SymbolicOperationLowerer {
 
         conditions.Add(new SymbolicBinaryCondition(
             SymbolicConditionOperator.Or,
-            new SymbolicNotCondition(ExactTruth(
-                targetHasValue,
-                valueExpression,
-                provenance + ".nullable.value-present",
-                targetSymbol)),
+            new SymbolicNotCondition(ExactTruth(targetHasValue, valueExpression, provenance + ".nullable.value-present", targetSymbol)),
             ExactRelation(
                 SymbolicRelationOperator.Equal,
                 targetValue,
@@ -337,7 +269,6 @@ internal static partial class SymbolicOperationLowerer {
                 provenance + ".nullable.value",
                 targetSymbol)));
     }
-
     private static void AddSymbolicNullableAssignmentPropagations(
         ImmutableArray<SymbolicTermPropagation>.Builder propagations,
         ISymbol targetSymbol,
@@ -350,16 +281,8 @@ internal static partial class SymbolicOperationLowerer {
                 valueContext.CancellationToken,
                 out var sourceSymbol) ||
             SymbolEqualityComparer.Default.Equals(sourceSymbol, targetSymbol) ||
-            !SymbolicNullableLowerer.TryCreateSymbolTerms(
-                sourceSymbol,
-                valueContext,
-                out var sourceHasValue,
-                out var sourceValue) ||
-            !SymbolicNullableLowerer.TryCreateSymbolTerms(
-                targetSymbol,
-                targetContext,
-                out var targetHasValue,
-                out var targetValue) ||
+            !SymbolicNullableLowerer.TryCreateSymbolTerms(sourceSymbol, valueContext, out var sourceHasValue, out var sourceValue) ||
+            !SymbolicNullableLowerer.TryCreateSymbolTerms(targetSymbol, targetContext, out var targetHasValue, out var targetValue) ||
             !SymbolicStateFactBuilder.CanCompareIrTerms(sourceHasValue, targetHasValue) ||
             !SymbolicStateFactBuilder.CanCompareIrTerms(sourceValue, targetValue))
             return;
@@ -367,7 +290,6 @@ internal static partial class SymbolicOperationLowerer {
         propagations.Add(new SymbolicTermPropagation(sourceHasValue, targetHasValue));
         propagations.Add(new SymbolicTermPropagation(sourceValue, targetValue));
     }
-
     private static void AddSymbolicStringAssignmentPostconditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ISymbol targetSymbol,
@@ -392,10 +314,7 @@ internal static partial class SymbolicOperationLowerer {
                 valueExpression,
                 provenance + ".assigned-string.non-null"));
     }
-
-    private static bool IsDefinitelyNonNullStringExpression(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context) {
+    private static bool IsDefinitelyNonNullStringExpression(ExpressionSyntax expression, SymbolicLoweringContext context) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         var constant = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constant.HasValue) return constant.Value is string;
@@ -409,10 +328,12 @@ internal static partial class SymbolicOperationLowerer {
             ConditionalExpressionSyntax conditional =>
                 IsDefinitelyNonNullStringExpression(conditional.WhenTrue, context) &&
                 IsDefinitelyNonNullStringExpression(conditional.WhenFalse, context),
-            _ => SymbolicSemanticPipeline.LowerStringTerm(expression, context) is { IsExact: true, Value: SymbolicStringConstantTerm or SymbolicStringConcatTerm }
+            _ => SymbolicSemanticPipeline.LowerStringTerm(expression, context) is {
+                IsExact: true,
+                Value: SymbolicStringConstantTerm or SymbolicStringConcatTerm
+            }
         };
     }
-
     private static void AddSymbolicCollectionLowerBound(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ISymbol targetSymbol,
@@ -436,7 +357,6 @@ internal static partial class SymbolicOperationLowerer {
                 valueExpression,
                 provenance + ".collection-expression.fixed-lower-bound"));
     }
-
     private static void AddSymbolicReferenceAssignmentPostconditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ISymbol targetSymbol,
@@ -446,24 +366,16 @@ internal static partial class SymbolicOperationLowerer {
         string provenance) {
         if (SymbolicSemanticPipeline.LowerReferenceTerm(valueExpression, context) is { IsExact: true, Value: { } value } &&
             SymbolicStateFactBuilder.CanCompareIrTerms(target, value)) {
-            conditions.Add(ExactRelation(
-                SymbolicRelationOperator.Equal,
-                target,
-                value,
-                valueExpression,
+            conditions.Add(ExactRelation(SymbolicRelationOperator.Equal, target, value, valueExpression,
                 provenance + ".assigned-reference"));
             AddConditionalReferencePostconditions(conditions, target, value, valueExpression, provenance);
         }
-
         var nullRelation = NullableFlowFacts.IsDefinitelyNullReferenceValue(
             valueExpression,
             context.SemanticModel,
             context.CancellationToken)
             ? SymbolicRelationOperator.Equal
-            : NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
-                valueExpression,
-                context.SemanticModel,
-                context.CancellationToken)
+            : NullableFlowFacts.IsDefinitelyNotNullReferenceValue(valueExpression, context.SemanticModel, context.CancellationToken)
                 ? SymbolicRelationOperator.NotEqual
                 : (SymbolicRelationOperator?)null;
         if (nullRelation.HasValue)
@@ -476,7 +388,10 @@ internal static partial class SymbolicOperationLowerer {
                     ? ".assigned-null"
                     : ".assigned-non-null")));
 
-        if (SymbolicSemanticPipeline.LowerNotNullIfNotNullAssignedResultTerm(valueExpression, context) is { IsExact: true, Value: { Kind: SmtValueKind.Bool } resultNonNull }) {
+        if (SymbolicSemanticPipeline.LowerNotNullIfNotNullAssignedResultTerm(valueExpression, context) is {
+            IsExact: true,
+            Value: { Kind: SmtValueKind.Bool } resultNonNull
+        }) {
             var targetNonNull = ExactRelation(
                 SymbolicRelationOperator.NotEqual,
                 target,
@@ -486,16 +401,12 @@ internal static partial class SymbolicOperationLowerer {
                 targetSymbol);
             conditions.Add(ExactRelation(
                 SymbolicRelationOperator.Equal,
-                new SymbolicConditionalTerm(
-                    targetNonNull,
-                    new SymbolicBooleanConstantTerm(true),
-                    new SymbolicBooleanConstantTerm(false)),
+                new SymbolicConditionalTerm(targetNonNull, new SymbolicBooleanConstantTerm(true), new SymbolicBooleanConstantTerm(false)),
                 resultNonNull,
                 valueExpression,
                 provenance + ".not-null-if-not-null.result"));
         }
     }
-
     private static void AddConditionalReferencePostconditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         SymbolicTerm target,
@@ -535,7 +446,6 @@ internal static partial class SymbolicOperationLowerer {
             conditional.Condition,
             new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetNonNull, falseValueNull)));
     }
-
     internal static ImmutableArray<SymbolicCondition> LowerSymbolicReferenceBackedPostconditions(
         SymbolicTerm target,
         ExpressionSyntax valueExpression,
@@ -547,11 +457,8 @@ internal static partial class SymbolicOperationLowerer {
         string stringSuffix = ".reference-backed-string",
         string arrayDimensionSuffix = ".reference-backed-array-length") {
         if (target.Kind != SmtValueKind.Reference ||
-            NullableFlowFacts.IsDefinitelyNullReferenceValue(
-                valueExpression,
-                context.SemanticModel,
-                context.CancellationToken))
-            return ImmutableArray<SymbolicCondition>.Empty;
+            NullableFlowFacts.IsDefinitelyNullReferenceValue(valueExpression, context.SemanticModel, context.CancellationToken))
+            return [];
 
         var typeInfo = context.SemanticModel.GetTypeInfo(valueExpression, context.CancellationToken);
         var sourceType = typeInfo.Type;
@@ -559,7 +466,7 @@ internal static partial class SymbolicOperationLowerer {
         if (targetType == null && sourceType != null &&
             ShouldUseReferenceBackedSourceType(sourceType, valueType))
             valueType = sourceType;
-        if (valueType == null) return ImmutableArray<SymbolicCondition>.Empty;
+        if (valueType == null) return [];
 
         var conditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
         AddEquality(
@@ -570,7 +477,10 @@ internal static partial class SymbolicOperationLowerer {
             provenance + lengthSuffix);
 
         if (countSuffix != null &&
-            SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(valueType, target, valueExpression) is { IsExact: true, Value: SymbolicCountTerm targetCount } &&
+            SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(valueType, target, valueExpression) is {
+                IsExact: true,
+                Value: SymbolicCountTerm targetCount
+            } &&
             GetExactListCreationCount(valueExpression, sourceType ?? valueType) is { } count)
             conditions.Add(ExactRelation(
                 SymbolicRelationOperator.Equal,
@@ -592,16 +502,12 @@ internal static partial class SymbolicOperationLowerer {
                 AddEquality(
                     conditions,
                     new SymbolicArrayDimensionLengthTerm(target, dimension),
-                    SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(
-                        valueExpression,
-                        dimension,
-                        context),
+                    SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(valueExpression, dimension, context),
                     valueExpression,
                     provenance + arrayDimensionSuffix);
 
         return conditions.ToImmutable();
     }
-
     private static void AddSymbolicFiniteArrayElementPostconditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ISymbol targetSymbol,
@@ -633,10 +539,7 @@ internal static partial class SymbolicOperationLowerer {
                 elementValue.Kind != elementKind)
                 continue;
 
-            var targetElement = new SymbolicElementTerm(
-                target,
-                new SymbolicIntegerConstantTerm(index),
-                elementKind);
+            var targetElement = new SymbolicElementTerm(target, new SymbolicIntegerConstantTerm(index), elementKind);
             conditions.Add(ExactRelation(
                 SymbolicRelationOperator.Equal,
                 targetElement,
@@ -647,8 +550,7 @@ internal static partial class SymbolicOperationLowerer {
                 SymbolicRelationOperator.Equal,
                 new SymbolicElementTerm(
                     target,
-                    new SymbolicFromEndIndexTerm(
-                        new SymbolicIntegerConstantTerm(elementExpressions.Count - index)),
+                    new SymbolicFromEndIndexTerm(new SymbolicIntegerConstantTerm(elementExpressions.Count - index)),
                     elementKind),
                 elementValue,
                 elementExpression,
@@ -667,7 +569,6 @@ internal static partial class SymbolicOperationLowerer {
                     provenance + ".finite-array-element.non-null"));
         }
     }
-
     private static void AddSymbolicTupleAssignmentPostconditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ISymbol targetSymbol,
@@ -720,10 +621,8 @@ internal static partial class SymbolicOperationLowerer {
                     ".assigned-string",
                     ".assigned-dimension-length"));
             }
-
             return;
         }
-
         if (!SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
                 unwrappedValue,
                 valueContext.SemanticModel,
@@ -735,16 +634,8 @@ internal static partial class SymbolicOperationLowerer {
             return;
 
         for (var index = 0; index < targetElementNames.Length; index++)
-            if (TryCreateTupleElementTerm(
-                    targetSymbol,
-                    targetElementNames[index],
-                    targetContext,
-                    out var targetElement) &&
-                TryCreateTupleElementTerm(
-                    sourceSymbol,
-                    sourceElementNames[index],
-                    valueContext,
-                    out var sourceElement) &&
+            if (TryCreateTupleElementTerm(targetSymbol, targetElementNames[index], targetContext, out var targetElement) &&
+                TryCreateTupleElementTerm(sourceSymbol, sourceElementNames[index], valueContext, out var sourceElement) &&
                 SymbolicStateFactBuilder.CanCompareIrTerms(targetElement, sourceElement))
                 conditions.Add(ExactRelation(
                     SymbolicRelationOperator.Equal,
@@ -753,7 +644,6 @@ internal static partial class SymbolicOperationLowerer {
                     valueExpression,
                     provenance + ".tuple-element.snapshot"));
     }
-
     private static void AddSymbolicSwitchExpressionPostconditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ISymbol targetSymbol,
@@ -806,12 +696,8 @@ internal static partial class SymbolicOperationLowerer {
             addedCount++;
         }
     }
-
-    internal static bool TryGetTupleElementStorageNames(
-        ISymbol symbol,
-        int expectedCount,
-        out string[] elementNames) {
-        elementNames = Array.Empty<string>();
+    internal static bool TryGetTupleElementStorageNames(ISymbol symbol, int expectedCount, out string[] elementNames) {
+        elementNames = [];
         if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not INamedTypeSymbol { IsTupleType: true } tupleType ||
             expectedCount > 0 && tupleType.TupleElements.Length != expectedCount)
             return false;
@@ -822,25 +708,18 @@ internal static partial class SymbolicOperationLowerer {
             if (string.IsNullOrWhiteSpace(field.Name)) return false;
             elementNames[index] = field.Name;
         }
-
         return true;
     }
-
-    private static bool TryGetTupleElementType(
-        ISymbol tupleSymbol,
-        string elementName,
-        out ITypeSymbol elementType) {
+    private static bool TryGetTupleElementType(ISymbol tupleSymbol, string elementName, out ITypeSymbol elementType) {
         if (SymbolicFactFactory.GetTrackedSymbolType(tupleSymbol) is not INamedTypeSymbol { IsTupleType: true } tupleType) {
             elementType = null!;
             return false;
         }
-
         var element = tupleType.TupleElements.FirstOrDefault(field =>
             string.Equals((field.CorrespondingTupleField ?? field).Name, elementName, StringComparison.Ordinal));
         elementType = element?.Type!;
         return element != null;
     }
-
     internal static bool TryCreateTupleElementTerm(
         ISymbol tupleSymbol,
         string elementName,
@@ -855,14 +734,12 @@ internal static partial class SymbolicOperationLowerer {
             term = null!;
             return false;
         }
-
         term = new SymbolicMemberTerm(
             new SymbolicVariableTerm(context.GetVariableName(tupleSymbol), SmtValueKind.Reference),
             elementName,
             elementKind);
         return true;
     }
-
     private static bool ShouldUseReferenceBackedSourceType(ITypeSymbol sourceType, ITypeSymbol? convertedType) => convertedType == null ||
                !SymbolEqualityComparer.Default.Equals(sourceType, convertedType) &&
                HasBuiltInLengthShape(sourceType) &&
@@ -873,10 +750,7 @@ internal static partial class SymbolicOperationLowerer {
 
     private static int? GetExactListCreationCount(ExpressionSyntax valueExpression, ITypeSymbol? sourceType) {
         if (sourceType is not INamedTypeSymbol namedType ||
-            !string.Equals(
-                namedType.OriginalDefinition.ToDisplayString(),
-                "System.Collections.Generic.List<T>",
-                StringComparison.Ordinal))
+            !string.Equals(namedType.OriginalDefinition.ToDisplayString(), "System.Collections.Generic.List<T>", StringComparison.Ordinal))
             return null;
 
         valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression);
@@ -888,7 +762,6 @@ internal static partial class SymbolicOperationLowerer {
             _ => null
         };
     }
-
     private static int? GetCollectionInitializerCount(InitializerExpressionSyntax? initializer) => initializer == null
             ? 0
             : initializer.IsKind(SyntaxKind.CollectionInitializerExpression)
@@ -904,15 +777,8 @@ internal static partial class SymbolicOperationLowerer {
         string? evidenceKey = null) {
         if (value is { IsExact: true, Value: { } valueTerm } &&
             SymbolicStateFactBuilder.CanCompareIrTerms(target, valueTerm))
-            conditions.Add(ExactRelation(
-                SymbolicRelationOperator.Equal,
-                target,
-                valueTerm,
-                source,
-                provenance,
-                evidenceKey: evidenceKey));
+            conditions.Add(ExactRelation(SymbolicRelationOperator.Equal, target, valueTerm, source, provenance, evidenceKey: evidenceKey));
     }
-
     private static void AddEquality(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         SymbolicLoweringResult<SymbolicTerm> target,
@@ -922,14 +788,11 @@ internal static partial class SymbolicOperationLowerer {
         if (target is { IsExact: true, Value: { } targetTerm })
             AddEquality(conditions, targetTerm, value, source, provenance);
     }
-
     internal static SymbolicLoweringResult<SymbolicOperationSequence> LowerComputedUpdate(
         ISymbol targetSymbol,
         SymbolicTerm sourceTerm,
         SyntaxNode source,
         SymbolicLoweringContext targetContext,
-        SymbolicComputedUpdateKind updateKind,
-        bool isChecked,
         int sequence,
         string provenance) {
         if (!TryCreateSymbolTerm(targetSymbol, targetContext, out var target) ||
@@ -946,31 +809,14 @@ internal static partial class SymbolicOperationLowerer {
                     sourceTerm,
                     provenance));
         var origin = new SymbolicOperationOrigin(source.Span, sequence, provenance);
-        SymbolicOperationDescriptor operation = updateKind switch {
-            SymbolicComputedUpdateKind.CompoundAssignment => new SymbolicAssignmentOperation(
-                bindings,
-                System.Collections.Immutable.ImmutableArray<SymbolicCondition>.Empty,
-                SymbolicAssignmentOperationKind.Compound,
-                isChecked,
-                origin),
-            _ => new SymbolicMutationOperation(
-                bindings,
-                System.Collections.Immutable.ImmutableArray<SymbolicInvalidationTarget>.Empty,
-                null,
-                updateKind == SymbolicComputedUpdateKind.Increment
-                    ? SymbolicMutationOperationKind.Increment
-                    : SymbolicMutationOperationKind.Decrement,
-                isChecked,
-                CallerVisible: false,
-                null,
-                null,
-                origin)
-        };
+        var operation = new SymbolicMutationOperation(
+            bindings,
+            [],
+            origin);
         return SymbolicLoweringResult<SymbolicOperationSequence>.Exact(
             SymbolicOperationSequence.Single(operation),
             new SymbolicLoweringProvenance("roslyn-to-operation", source.Span, provenance));
     }
-
     internal static SymbolicLoweringResult<SymbolicOperationSequence> LowerExplicitTargetAssignment(
         AssignmentExpressionSyntax assignment,
         SymbolicLoweringContext context) {
@@ -978,10 +824,7 @@ internal static partial class SymbolicOperationLowerer {
             return Unsupported(assignment, "ir.path.prior-statement.explicit-target.kind");
 
         var left = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(assignment.Left);
-        var isMember = SymbolicStateInvalidator.IsCurrentInstanceMemberReference(
-            left,
-            context.SemanticModel,
-            context.CancellationToken);
+        var isMember = SymbolicStateInvalidator.IsCurrentInstanceMemberReference(left, context.SemanticModel, context.CancellationToken);
         if (!isMember && left is not ElementAccessExpressionSyntax)
             return Unsupported(assignment, "ir.path.prior-statement.explicit-target.shape");
 
@@ -1015,7 +858,6 @@ internal static partial class SymbolicOperationLowerer {
             isMember ? provenance + ".assigned-value" : provenance,
             includeReferencePostconditions: isMember);
     }
-
     internal static SymbolicLoweringResult<SymbolicOperationSequence> LowerExplicitTargetAssignment(
         SymbolicTerm target,
         ExpressionSyntax valueExpression,
@@ -1036,23 +878,15 @@ internal static partial class SymbolicOperationLowerer {
                 InvalidateTarget: false));
 
         if (includeReferencePostconditions && target.Kind == SmtValueKind.Reference) {
-            if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
-                    valueExpression,
-                    context.SemanticModel,
-                    context.CancellationToken))
+            if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(valueExpression, context.SemanticModel, context.CancellationToken))
                 postconditions.Add(ExactRelation(
                     SymbolicRelationOperator.NotEqual,
                     target,
                     new SymbolicNullTerm(),
                     valueExpression,
                     provenance + ".assigned-non-null"));
-            postconditions.AddRange(LowerSymbolicReferenceBackedPostconditions(
-                target,
-                valueExpression,
-                context,
-                provenance));
+            postconditions.AddRange(LowerSymbolicReferenceBackedPostconditions(target, valueExpression, context, provenance));
         }
-
         if (bindings.Count == 0 && postconditions.Count == 0)
             return Unsupported(source, provenance + ".value");
 
@@ -1060,12 +894,9 @@ internal static partial class SymbolicOperationLowerer {
             SymbolicOperationSequence.Single(new SymbolicAssignmentOperation(
                 bindings.ToImmutable(),
                 postconditions.ToImmutable(),
-                SymbolicAssignmentOperationKind.Simple,
-                IsChecked: false,
                 new SymbolicOperationOrigin(source.Span, 0, provenance))),
             new SymbolicLoweringProvenance("explicit-target-assignment", source.Span, provenance));
     }
-
     internal static SymbolicLoweringResult<SymbolicOperationSequence> LowerCoalesceAssignment(
         ISymbol targetSymbol,
         ExpressionSyntax rightExpression,
@@ -1088,36 +919,24 @@ internal static partial class SymbolicOperationLowerer {
             else
                 return Unsupported(rightExpression, provenance + ".target");
         }
-        else if (SymbolicNullableLowerer.TryCreateSymbolTerms(
-                     targetSymbol,
-                     context,
-                     out var targetHasValue,
-                     out var targetValue)) {
+        else if (SymbolicNullableLowerer.TryCreateSymbolTerms(targetSymbol, context, out var targetHasValue, out var targetValue)) {
             var hasValue = SymbolicSemanticPipeline.LowerNullableHasValueTerm(rightExpression, context);
             SymbolicTerm? rightHasValue = hasValue is { IsExact: true, Value: { } loweredHasValue }
                 ? loweredHasValue
-                : SymbolicSemanticPipeline.LowerTerm(rightExpression, context) is { IsExact: true, Value: { } rightValue } && rightValue.Kind == targetValue.Kind
+                : SymbolicSemanticPipeline.LowerTerm(rightExpression, context) is {
+                    IsExact: true,
+                    Value: { } rightValue
+                } && rightValue.Kind == targetValue.Kind
                     ? new SymbolicBooleanConstantTerm(true)
                     : null;
             if (rightHasValue == null) return Unsupported(rightExpression, provenance + ".value");
 
             postcondition = rightHasValue is SymbolicBooleanConstantTerm { Value: true }
-                ? ExactTruth(
-                    targetHasValue,
-                    rightExpression,
-                    provenance + ".nullable-has-value",
-                    targetSymbol)
+                ? ExactTruth(targetHasValue, rightExpression, provenance + ".nullable-has-value", targetSymbol)
                 : new SymbolicBinaryCondition(
                     SymbolicConditionOperator.Or,
-                    ExactTruth(
-                        targetHasValue,
-                        rightExpression,
-                        provenance + ".target-has-value",
-                        targetSymbol),
-                    new SymbolicNotCondition(ExactTruth(
-                        rightHasValue,
-                        rightExpression,
-                        provenance + ".right-has-value")));
+                    ExactTruth(targetHasValue, rightExpression, provenance + ".target-has-value", targetSymbol),
+                    new SymbolicNotCondition(ExactTruth(rightHasValue, rightExpression, provenance + ".right-has-value")));
         }
         else if (TryCreateSymbolTerm(targetSymbol, context, out var target) &&
                  target.Kind == SmtValueKind.Reference) {
@@ -1151,18 +970,14 @@ internal static partial class SymbolicOperationLowerer {
         else {
             return Unsupported(rightExpression, provenance + ".target");
         }
-
         var operation = new SymbolicAssignmentOperation(
-            System.Collections.Immutable.ImmutableArray<SymbolicAssignmentBinding>.Empty,
-            System.Collections.Immutable.ImmutableArray.Create(postcondition),
-            SymbolicAssignmentOperationKind.Coalesce,
-            IsChecked: false,
+            [],
+            [postcondition],
             new SymbolicOperationOrigin(rightExpression.Span, sequence, provenance));
         return SymbolicLoweringResult<SymbolicOperationSequence>.Exact(
             SymbolicOperationSequence.Single(operation),
             new SymbolicLoweringProvenance("roslyn-to-operation", rightExpression.Span, provenance));
     }
-
     private static SymbolicCondition ExactTruth(
         SymbolicTerm value,
         SyntaxNode source,
@@ -1189,10 +1004,7 @@ internal static partial class SymbolicOperationLowerer {
             symbol,
             evidenceKey));
 
-    private static bool TryCreateSymbolTerm(
-        ISymbol symbol,
-        SymbolicLoweringContext context,
-        out SymbolicTerm term) {
+    private static bool TryCreateSymbolTerm(ISymbol symbol, SymbolicLoweringContext context, out SymbolicTerm term) {
         var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
         if (type == null ||
             !SymbolicFactFactory.TryGetValueKind(
@@ -1203,13 +1015,10 @@ internal static partial class SymbolicOperationLowerer {
             term = null!;
             return false;
         }
-
         term = new SymbolicVariableTerm(context.GetVariableName(symbol), kind);
         return true;
     }
-
-    private static SymbolicLoweringResult<SymbolicOperationSequence> Unsupported(
-        SyntaxNode source,
-        string provenance) => SymbolicLoweringResult<SymbolicOperationSequence>.Unsupported(
+    private static SymbolicLoweringResult<SymbolicOperationSequence> Unsupported(SyntaxNode source, string provenance)
+        => SymbolicLoweringResult<SymbolicOperationSequence>.Unsupported(
             new SymbolicLoweringProvenance("roslyn-to-operation", source.Span, provenance));
 }

@@ -10,12 +10,9 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
 
         context.RegisterCompilationStartAction(startContext => {
-            SmtNativeLibraryBootstrap.TryLoadFromAnalyzerLocatorPaths(
-                startContext.Options.AdditionalFiles.Select(static file => file.Path));
-            var session = new AnalyzerSession(
-                startContext.Compilation,
-                startContext.Options,
-                startContext.CancellationToken);
+            SmtNativeLibraryBootstrap.TryLoadFromAnalyzerLocatorPaths(startContext.Options.AdditionalFiles.Select(static
+                file => file.Path));
+            var session = new AnalyzerSession(startContext.Compilation, startContext.Options, startContext.CancellationToken);
 
             startContext.RegisterCompilationEndAction(endContext => {
                 try {
@@ -29,8 +26,7 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
                 }
             });
 
-            startContext.RegisterOperationBlockAction(
-                c => AnalyzerFeaturePipeline.AnalyzeOperationBlock(c, session));
+            startContext.RegisterOperationBlockAction(c => AnalyzerFeaturePipeline.AnalyzeOperationBlock(c, session));
             startContext.RegisterSyntaxNodeAction(
                 c => AnalyzerFeaturePipeline.AnalyzeSyntaxFallback(c, session),
                 SyntaxKind.AddAccessorDeclaration,
@@ -49,7 +45,6 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
             startContext.RegisterSyntaxTreeAction(AnalyzeTreeConfiguration);
         });
     }
-
     private static void AnalyzeTreeConfiguration(SyntaxTreeAnalysisContext context) {
         var options = context.Options.AnalyzerConfigOptionsProvider.GetOptions(context.Tree);
         var invalidConfigurationValues = AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
@@ -61,16 +56,12 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
             context.ReportDiagnostic(diagnostic);
         }
     }
-
     private static Diagnostic CreateInvalidConfigurationDiagnostic(
         InvalidAnalyzerConfigurationValue invalidConfigurationValue,
-        Location? location = null) {
-        return Diagnostic.Create(
+        Location? location = null) => Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("InvalidAnalyzerConfigurationRule"),
             location ?? Location.None,
             invalidConfigurationValue.Key,
             invalidConfigurationValue.Value,
             invalidConfigurationValue.Reason);
-    }
-
 }

@@ -16,37 +16,33 @@ public sealed class SymbolicIrTests {
 
     [Test]
     public void LowerCondition_EncodesIntegerRange() {
-        var context = CreateExpressionContext(
-            "int x",
-            "x > 0 && x < 10");
+        var context = CreateExpressionContext("int x", "x > 0 && x < 10");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_StringConcatLengthIdentityFoldsWithoutStringSolver() {
         var concatContext = CreateExpressionContext(
             "string first, string second",
             "string.Concat(first, \"-\", second).Length == first.Length + 1 + second.Length");
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerCondition( concatContext.Expression, concatContext.LoweringContext, out var condition), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(concatContext.Expression, concatContext.LoweringContext,
+            out var condition), Is.True);
         Assert.That(condition, Is.EqualTo(new SymbolicConstantCondition(true)));
 
         var interpolationContext = CreateExpressionContext(
             "string text",
             "$\"{text}:{nameof(C)}\".Length == text.Length + 1 + nameof(C).Length");
-        Assert.That( TypedSymbolicTestLowering.TryLowerCondition( interpolationContext.Expression, interpolationContext.LoweringContext, out condition), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(interpolationContext.Expression, interpolationContext.LoweringContext,
+            out condition), Is.True);
         Assert.That(condition, Is.EqualTo(new SymbolicConstantCondition(true)));
     }
-
     [Test]
     public void ConditionTruth_EqualOldSnapshotPreservesUncheckedAdditionIdentity() {
-        var context = CreateExpressionContext(
-            "int value, int oldValue",
-            "value + 1 == oldValue + 1");
-        Assert.That( TypedSymbolicTestLowering.TryLowerCondition( context.Expression, context.LoweringContext, out var condition), Is.True);
+        var context = CreateExpressionContext("int value, int oldValue", "value + 1 == oldValue + 1");
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
 
         var parameters = ((IMethodSymbol)context.SemanticModel.GetDeclaredSymbol(
             context.Expression.FirstAncestorOrSelf<MethodDeclarationSyntax>()!)!).Parameters;
@@ -67,7 +63,6 @@ public sealed class SymbolicIrTests {
 
         Assert.That(proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue), proof.Reason);
     }
-
     [Test]
     public void MetadataSymbolsWithTheSameNameHaveDistinctVariableNames() {
         var context = CreateExpressionContext("int value", "value > 0");
@@ -83,17 +78,14 @@ public sealed class SymbolicIrTests {
         Assert.That(intName, Does.Not.EndWith("#0"));
         Assert.That(longName, Does.Not.EndWith("#0"));
     }
-
     [TestCase("-value")]
     [TestCase("value + other")]
     [TestCase("value - other")]
     [TestCase("value * other")]
     public void LowerTerm_BoundedIntegralArithmeticIsOverflowSensitive(string expression) {
-        var context = CreateExpressionContext(
-            "int value, int other",
-            expression);
+        var context = CreateExpressionContext("int value, int other", expression);
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out var term), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out var term), Is.True);
         Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
         var conditional = (SymbolicConditionalTerm)term;
         Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicBinaryTerm>());
@@ -106,19 +98,15 @@ public sealed class SymbolicIrTests {
             Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicConditionalTerm>());
         }
     }
-
     [TestCase("value / other")]
     [TestCase("value % other")]
     public void LowerTerm_IntegralDivisionKeepsNormalCompletionSemantics(string expression) {
-        var context = CreateExpressionContext(
-            "int value, int other",
-            expression);
+        var context = CreateExpressionContext("int value, int other", expression);
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out var term), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out var term), Is.True);
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         Assert.That(((SymbolicBinaryTerm)term).MayOverflow, Is.False);
     }
-
     [Test]
     public void LowerTerm_UserDefinedArithmeticOperatorIsNotLoweredAsIntegerArithmetic() {
         var context = CreateExpressionContext(
@@ -126,14 +114,11 @@ public sealed class SymbolicIrTests {
             "left + right",
             "public readonly struct Number { public static Number operator +(Number left, Number right) => left; }");
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out _), Is.False);
+        Assert.That(TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out _), Is.False);
     }
-
     [Test]
     public void LowerCondition_RepresentsStringLengthAsSharedLengthAtom() {
-        var context = CreateExpressionContext(
-            "string s, int n",
-            "s.Length == n");
+        var context = CreateExpressionContext("string s, int n", "s.Length == n");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var fact = AssertFactCondition<SymbolicRelationAtom>(condition);
@@ -144,34 +129,25 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_IdentityPreservingAsValueEncodes() {
-        var context = CreateExpressionContext(
-            "string text",
-            "(text as object) == text");
+        var context = CreateExpressionContext("string text", "(text as object) == text");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_IdentityPreservingReferenceCastEncodes() {
-        var context = CreateExpressionContext(
-            "string text",
-            "((object)text) == text");
+        var context = CreateExpressionContext("string text", "((object)text) == text");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_StringLiteralEqualityEmitsNullSafeContentFacts() {
-        var context = CreateExpressionContext(
-            "string s",
-            "s == \"A\"");
+        var context = CreateExpressionContext("string s", "s == \"A\"");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
@@ -185,12 +161,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_TupleEqualityEmitsElementFacts() {
-        var context = CreateExpressionContext(
-            "(int A, int B) left, (int A, int B) right",
-            "left == right");
+        var context = CreateExpressionContext("(int A, int B) left, (int A, int B) right", "left == right");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
@@ -204,7 +177,6 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_UncheckedEnumCastEqualityUsesIntegralEnumTerm() {
         var context = CreateExpressionContext(
@@ -222,12 +194,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_TypePatternUsesSharedTypeTestAtom() {
-        var context = CreateExpressionContext(
-            "object value",
-            "value is string");
+        var context = CreateExpressionContext("object value", "value is string");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
@@ -241,12 +210,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_DeclarationPatternUsesSharedTypeTestAtom() {
-        var context = CreateExpressionContext(
-            "object value",
-            "value is string text");
+        var context = CreateExpressionContext("object value", "value is string text");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
@@ -265,12 +231,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_NegatedTypePatternNegatesSharedTypeTestFacts() {
-        var context = CreateExpressionContext(
-            "object value",
-            "value is not string");
+        var context = CreateExpressionContext("object value", "value is not string");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicNotCondition>());
@@ -284,25 +247,28 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
-    private sealed record RelationPatternCase(
-        string Parameters,
-        string Expression,
-        SymbolicRelationOperator Operator,
-        SymbolicTerm Right);
+    private sealed record RelationPatternCase(string Parameters, string Expression, SymbolicRelationOperator Operator, SymbolicTerm Right);
 
     private static IEnumerable<TestCaseData> RelationPatternCases() {
-        yield return RelationCase("LowerCondition_NullPatternUsesSharedNullRelation", "object value", "value is null", SymbolicRelationOperator.Equal, new SymbolicNullTerm());
-        yield return RelationCase("LowerCondition_NegatedNullPatternUsesSharedNullRelation", "object value", "value is not null", SymbolicRelationOperator.NotEqual, new SymbolicNullTerm());
-        yield return RelationCase("LowerCondition_IntegerConstantPatternUsesSharedRelation", "int value", "value is 42", SymbolicRelationOperator.Equal, new SymbolicIntegerConstantTerm(42));
-        yield return RelationCase("LowerCondition_NegatedIntegerConstantPatternUsesSharedRelation", "int value", "value is not 42", SymbolicRelationOperator.NotEqual, new SymbolicIntegerConstantTerm(42));
-        yield return RelationCase("LowerCondition_BooleanConstantPatternUsesSharedRelation", "bool value", "value is true", SymbolicRelationOperator.Equal, new SymbolicBooleanConstantTerm(true));
-        yield return RelationCase("LowerCondition_RelationalPatternUsesSharedRelation", "int value", "value is > 42", SymbolicRelationOperator.GreaterThan, new SymbolicIntegerConstantTerm(42));
-        yield return RelationCase("LowerCondition_NegatedRelationalPatternInvertsRelation", "int value", "value is not >= 42", SymbolicRelationOperator.LessThan, new SymbolicIntegerConstantTerm(42));
-        yield return RelationCase("LowerCondition_EmptyRecursivePatternUsesSharedNullRelation", "object value", "value is { }", SymbolicRelationOperator.NotEqual, new SymbolicNullTerm());
-        yield return RelationCase("LowerCondition_NegatedEmptyRecursivePatternUsesSharedNullRelation", "object value", "value is not { }", SymbolicRelationOperator.Equal, new SymbolicNullTerm());
+        yield return RelationCase("LowerCondition_NullPatternUsesSharedNullRelation", "object value", "value is null",
+            SymbolicRelationOperator.Equal, new SymbolicNullTerm());
+        yield return RelationCase("LowerCondition_NegatedNullPatternUsesSharedNullRelation", "object value", "value is not null",
+            SymbolicRelationOperator.NotEqual, new SymbolicNullTerm());
+        yield return RelationCase("LowerCondition_IntegerConstantPatternUsesSharedRelation", "int value", "value is 42",
+            SymbolicRelationOperator.Equal, new SymbolicIntegerConstantTerm(42));
+        yield return RelationCase("LowerCondition_NegatedIntegerConstantPatternUsesSharedRelation", "int value", "value is not 42",
+            SymbolicRelationOperator.NotEqual, new SymbolicIntegerConstantTerm(42));
+        yield return RelationCase("LowerCondition_BooleanConstantPatternUsesSharedRelation", "bool value", "value is true",
+            SymbolicRelationOperator.Equal, new SymbolicBooleanConstantTerm(true));
+        yield return RelationCase("LowerCondition_RelationalPatternUsesSharedRelation", "int value", "value is > 42",
+            SymbolicRelationOperator.GreaterThan, new SymbolicIntegerConstantTerm(42));
+        yield return RelationCase("LowerCondition_NegatedRelationalPatternInvertsRelation", "int value", "value is not >= 42",
+            SymbolicRelationOperator.LessThan, new SymbolicIntegerConstantTerm(42));
+        yield return RelationCase("LowerCondition_EmptyRecursivePatternUsesSharedNullRelation", "object value", "value is { }",
+            SymbolicRelationOperator.NotEqual, new SymbolicNullTerm());
+        yield return RelationCase("LowerCondition_NegatedEmptyRecursivePatternUsesSharedNullRelation", "object value", "value is not { }",
+            SymbolicRelationOperator.Equal, new SymbolicNullTerm());
     }
-
     [TestCaseSource(nameof(RelationPatternCases))]
     public void RelationPatternMatrix(object value) {
         var testCase = (RelationPatternCase)value;
@@ -315,7 +281,6 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     private static TestCaseData RelationCase(
         string name, string parameters, string expression, SymbolicRelationOperator relation, SymbolicTerm right) =>
         new TestCaseData(new RelationPatternCase(parameters, expression, relation, right)).SetName(name);
@@ -327,19 +292,13 @@ public sealed class SymbolicIrTests {
     [TestCase(SyntaxKind.GreaterThanEqualsToken, true, "LessThan")]
     [TestCase(SyntaxKind.LessThanToken, true, "GreaterThanOrEqual")]
     [TestCase(SyntaxKind.LessThanEqualsToken, true, "GreaterThan")]
-    public void RelationalPatternOperatorMapping_IsCanonical(
-        SyntaxKind tokenKind,
-        bool negate,
-        string expected) {
-        Assert.That(SymbolicOperatorLowerer.TryGetRelationalPatternOperator( tokenKind, negate, out var relationOperator), Is.True);
+    public void RelationalPatternOperatorMapping_IsCanonical(SyntaxKind tokenKind, bool negate, string expected) {
+        Assert.That(SymbolicOperatorLowerer.TryGetRelationalPatternOperator(tokenKind, negate, out var relationOperator), Is.True);
         Assert.That(relationOperator.ToString(), Is.EqualTo(expected));
     }
-
     [Test]
     public void LowerCondition_AndPatternComposesSharedRelations() {
-        var context = CreateExpressionContext(
-            "int value",
-            "value is > 0 and < 10");
+        var context = CreateExpressionContext("int value", "value is > 0 and < 10");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
@@ -351,12 +310,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_OrPatternComposesSharedRelations() {
-        var context = CreateExpressionContext(
-            "int value",
-            "value is < 0 or > 10");
+        var context = CreateExpressionContext("int value", "value is < 0 or > 10");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
@@ -364,16 +320,14 @@ public sealed class SymbolicIrTests {
 
         Assert.That(disjunction.Operator, Is.EqualTo(SymbolicConditionOperator.Or));
         Assert.That(AssertFactCondition<SymbolicRelationAtom>(disjunction.Left).Operator, Is.EqualTo(SymbolicRelationOperator.LessThan));
-        Assert.That(AssertFactCondition<SymbolicRelationAtom>(disjunction.Right).Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThan));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(disjunction.Right).Operator,
+            Is.EqualTo(SymbolicRelationOperator.GreaterThan));
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_UnaryPatternNegatesComposedPattern() {
-        var context = CreateExpressionContext(
-            "int value",
-            "value is not (> 0 and < 10)");
+        var context = CreateExpressionContext("int value", "value is not (> 0 and < 10)");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicNotCondition>());
@@ -387,12 +341,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void KnownApiLowering_StringStartsWithEmitsDeclarativeStringPredicate() {
-        var context = CreateExpressionContext(
-            "string s",
-            """s.StartsWith("A")""");
+        var context = CreateExpressionContext("string s", """s.StartsWith("A")""");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
@@ -403,7 +354,6 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtStringStartsWithFormula>());
     }
-
     [TestCase("Contains")]
     [TestCase("StartsWith")]
     [TestCase("EndsWith")]
@@ -419,7 +369,6 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [TestCase("Contains")]
     [TestCase("StartsWith")]
     [TestCase("EndsWith")]
@@ -435,12 +384,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void KnownApiLowering_StringConcatPredicateUsesSharedConcatTerm() {
-        var context = CreateExpressionContext(
-            "string suffix",
-            """("pre" + suffix).StartsWith("pre")""");
+        var context = CreateExpressionContext("string suffix", """("pre" + suffix).StartsWith("pre")""");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
@@ -450,7 +396,6 @@ public sealed class SymbolicIrTests {
         var predicate = (SmtStringStartsWithFormula)formula;
         Assert.That(predicate.Value, Is.TypeOf<SmtStringConcatTerm>());
     }
-
     [Test]
     public void KnownApiLowering_InterpolatedStringPredicateUsesSharedConcatTerm() {
         var context = CreateExpressionContext(
@@ -464,14 +409,16 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtStringStartsWithFormula>());
     }
-
     private static IEnumerable<TestCaseData> StringEqualityCases() {
-        yield return Named("KnownApiLowering_StaticStringEqualsUsesSharedEqualityFacts", "string left, string right", "string.Equals(left, right)");
-        yield return Named("KnownApiLowering_StaticStringEqualsOrdinalUsesSharedEqualityFacts", "string left, string right", "string.Equals(left, right, System.StringComparison.Ordinal)");
-        yield return Named("KnownApiLowering_InstanceStringEqualsUsesSharedEqualityFacts", "string left, string right", "left.Equals(right)");
-        yield return Named("KnownApiLowering_InstanceStringEqualsOrdinalUsesSharedEqualityFacts", "string left, string right", "left.Equals(right, System.StringComparison.Ordinal)");
+        yield return Named("KnownApiLowering_StaticStringEqualsUsesSharedEqualityFacts", "string left, string right",
+            "string.Equals(left, right)");
+        yield return Named("KnownApiLowering_StaticStringEqualsOrdinalUsesSharedEqualityFacts", "string left, string right",
+            "string.Equals(left, right, System.StringComparison.Ordinal)");
+        yield return Named("KnownApiLowering_InstanceStringEqualsUsesSharedEqualityFacts", "string left, string right",
+            "left.Equals(right)");
+        yield return Named("KnownApiLowering_InstanceStringEqualsOrdinalUsesSharedEqualityFacts", "string left, string right",
+            "left.Equals(right, System.StringComparison.Ordinal)");
     }
-
     [TestCaseSource(nameof(StringEqualityCases))]
     public void StringEqualityLoweringMatrix(string parameters, string expression) {
         var context = CreateExpressionContext(parameters, expression);
@@ -480,24 +427,22 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     private static IEnumerable<TestCaseData> UnsupportedStringEqualityCases() {
-        yield return Named("KnownApiLowering_InstanceStringEqualsIgnoreCaseStaysOnLegacyPath", "string left, string right", "left.Equals(right, System.StringComparison.OrdinalIgnoreCase)");
-        yield return Named("KnownApiLowering_InstanceStringEqualsObjectFallsBackToLegacyTranslator", "string left, object right", "left.Equals(right)");
-        yield return Named("KnownApiLowering_StaticStringEqualsIgnoreCaseStaysOnLegacyPath", "string left, string right", "string.Equals(left, right, System.StringComparison.OrdinalIgnoreCase)");
+        yield return Named("KnownApiLowering_InstanceStringEqualsIgnoreCaseStaysOnLegacyPath", "string left, string right",
+            "left.Equals(right, System.StringComparison.OrdinalIgnoreCase)");
+        yield return Named("KnownApiLowering_InstanceStringEqualsObjectFallsBackToLegacyTranslator", "string left, object right",
+            "left.Equals(right)");
+        yield return Named("KnownApiLowering_StaticStringEqualsIgnoreCaseStaysOnLegacyPath", "string left, string right",
+            "string.Equals(left, right, System.StringComparison.OrdinalIgnoreCase)");
     }
-
     [TestCaseSource(nameof(UnsupportedStringEqualityCases))]
     public void UnsupportedStringEqualityMatrix(string parameters, string expression) {
         var context = CreateExpressionContext(parameters, expression);
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out _), Is.False);
     }
-
     [Test]
     public void KnownApiLowering_ObjectReferenceEqualsUsesReferenceEqualityAtom() {
-        var context = CreateExpressionContext(
-            "object? left, object? right",
-            "object.ReferenceEquals(left, right)");
+        var context = CreateExpressionContext("object? left, object? right", "object.ReferenceEquals(left, right)");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var fact = AssertFactCondition<SymbolicRelationAtom>(condition);
@@ -508,7 +453,6 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void KnownApiLowering_RegexIsMatchEmitsDeclarativeRegexPredicate() {
         var context = CreateExpressionContext(
@@ -532,7 +476,6 @@ public sealed class SymbolicIrTests {
         Assert.That(((SmtBinaryFormula)formula).Operator, Is.EqualTo(SmtBinaryOperator.And));
         Assert.That(((SmtBinaryFormula)formula).Right, Is.TypeOf<SmtRegexMatchFormula>());
     }
-
     [Test]
     public void KnownApiLowering_RegexUnrepresentableOptionsRemainUnsupported() {
         var context = CreateExpressionContext(
@@ -541,12 +484,9 @@ public sealed class SymbolicIrTests {
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out _), Is.False);
     }
-
     [Test]
     public void KnownApiLowering_StringIsNullOrEmptyUsesNullnessAndLengthAtoms() {
-        var context = CreateExpressionContext(
-            "string s",
-            "string.IsNullOrEmpty(s)");
+        var context = CreateExpressionContext("string s", "string.IsNullOrEmpty(s)");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
@@ -560,12 +500,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void KnownApiLowering_StringIsNullOrWhiteSpaceUsesNullnessAndRegexAtoms() {
-        var context = CreateExpressionContext(
-            "string s",
-            "string.IsNullOrWhiteSpace(s)");
+        var context = CreateExpressionContext("string s", "string.IsNullOrWhiteSpace(s)");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
@@ -579,12 +516,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void KnownApiLowering_StringIsNullOrEmptyOverConcatOmitsImpossibleNullBranch() {
-        var context = CreateExpressionContext(
-            "string s",
-            """string.IsNullOrEmpty("A" + s)""");
+        var context = CreateExpressionContext("string s", """string.IsNullOrEmpty("A" + s)""");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var atom = AssertFactCondition<SymbolicRelationAtom>(condition);
@@ -592,12 +526,9 @@ public sealed class SymbolicIrTests {
         Assert.That(atom.Left, Is.TypeOf<SymbolicLengthTerm>());
         Assert.That(((SymbolicLengthTerm)atom.Left).Value, Is.TypeOf<SymbolicStringConcatTerm>());
     }
-
     [TestCase("Min", true)]
     [TestCase("Max", false)]
-    public void KnownApiLowering_IntegralMathMinMaxUsesTypedConditionalTerm(
-        string methodName,
-        bool isMinimum) {
+    public void KnownApiLowering_IntegralMathMinMaxUsesTypedConditionalTerm(string methodName, bool isMinimum) {
         var context = CreateExpressionContext(
             "int left, int right",
             $"System.Math.{methodName}(left, right) == left");
@@ -609,20 +540,15 @@ public sealed class SymbolicIrTests {
 
         Assert.That(
             AssertFactCondition<SymbolicRelationAtom>(conditional.Condition).Operator,
-            Is.EqualTo(isMinimum
-                ? SymbolicRelationOperator.LessThanOrEqual
-                : SymbolicRelationOperator.GreaterThanOrEqual));
+            Is.EqualTo(isMinimum ? SymbolicRelationOperator.LessThanOrEqual : SymbolicRelationOperator.GreaterThanOrEqual));
         Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
     }
-
     [Test]
     public void KnownApiLowering_IntegralMathMinMapsNamedArgumentsByParameter() {
-        var context = CreateExpressionContext(
-            "int left, int right",
-            "System.Math.Min(val2: right, val1: left) == left");
+        var context = CreateExpressionContext("int left, int right", "System.Math.Min(val2: right, val1: left) == left");
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
@@ -632,72 +558,59 @@ public sealed class SymbolicIrTests {
         Assert.That(((SymbolicVariableTerm)comparison.Left).Name, Does.StartWith("left#"));
         Assert.That(((SymbolicVariableTerm)comparison.Right).Name, Does.StartWith("right#"));
     }
-
     [Test]
     public void KnownApiLowering_FloatingMathMinStaysOnLegacyPath() {
-        var context = CreateExpressionContext(
-            "double left, double right",
-            "System.Math.Min(left, right) == left");
+        var context = CreateExpressionContext("double left, double right", "System.Math.Min(left, right) == left");
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(invocation, context.LoweringContext, out _), Is.False);
     }
-
     [Test]
     public void KnownApiLowering_IntegralMathAbsUsesTypedConditionalTerm() {
-        var context = CreateExpressionContext(
-            "int value",
-            "System.Math.Abs(value) >= 0");
+        var context = CreateExpressionContext("int value", "System.Math.Abs(value) >= 0");
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
         Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
         var conditional = (SymbolicConditionalTerm)term;
 
-        Assert.That( AssertFactCondition<SymbolicRelationAtom>(conditional.Condition).Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThanOrEqual));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conditional.Condition).Operator,
+            Is.EqualTo(SymbolicRelationOperator.GreaterThanOrEqual));
         Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicBinaryTerm>());
-        Assert.That( ((SymbolicBinaryTerm)conditional.WhenFalse).Operator, Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
+        Assert.That(((SymbolicBinaryTerm)conditional.WhenFalse).Operator, Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
     }
-
     [Test]
     public void KnownApiLowering_FloatingMathAbsStaysOnLegacyPath() {
-        var context = CreateExpressionContext(
-            "double value",
-            "System.Math.Abs(value) >= 0");
+        var context = CreateExpressionContext("double value", "System.Math.Abs(value) >= 0");
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(invocation, context.LoweringContext, out _), Is.False);
     }
-
     [Test]
     public void KnownApiLowering_IntegralMathClampWithOrderedBoundsUsesTypedConditionalTerm() {
-        var context = CreateExpressionContext(
-            "int value",
-            "System.Math.Clamp(value, 0, 10) >= 0");
+        var context = CreateExpressionContext("int value", "System.Math.Clamp(value, 0, 10) >= 0");
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
         Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
         var belowMin = (SymbolicConditionalTerm)term;
 
-        Assert.That( AssertFactCondition<SymbolicRelationAtom>(belowMin.Condition).Operator, Is.EqualTo(SymbolicRelationOperator.LessThan));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(belowMin.Condition).Operator, Is.EqualTo(SymbolicRelationOperator.LessThan));
         Assert.That(belowMin.WhenTrue, Is.EqualTo(new SymbolicIntegerConstantTerm(0)));
         Assert.That(belowMin.WhenFalse, Is.TypeOf<SymbolicConditionalTerm>());
         var aboveMax = (SymbolicConditionalTerm)belowMin.WhenFalse;
-        Assert.That( AssertFactCondition<SymbolicRelationAtom>(aboveMax.Condition).Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThan));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(aboveMax.Condition).Operator,
+            Is.EqualTo(SymbolicRelationOperator.GreaterThan));
         Assert.That(aboveMax.WhenTrue, Is.EqualTo(new SymbolicIntegerConstantTerm(10)));
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
     }
-
     [Test]
     public void KnownApiLowering_IntegralMathClampMapsNamedArgumentsByParameter() {
-        var context = CreateExpressionContext(
-            "int value",
-            "System.Math.Clamp(max: 10, value: value, min: 0) >= 0");
+        var context = CreateExpressionContext("int value", "System.Math.Clamp(max: 10, value: value, min: 0) >= 0");
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
@@ -707,38 +620,28 @@ public sealed class SymbolicIrTests {
         Assert.That(((SymbolicVariableTerm)comparison.Left).Name, Does.StartWith("value#"));
         Assert.That(comparison.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(0)));
     }
-
     [Test]
     public void KnownApiLowering_IntegralMathClampWithKnownInvalidBoundsIsUnsupported() {
-        var context = CreateExpressionContext(
-            "int value, int min, int max",
-            "System.Math.Clamp(value, 10, 0) >= 0");
+        var context = CreateExpressionContext("int value, int min, int max", "System.Math.Clamp(value, 10, 0) >= 0");
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(invocation, context.LoweringContext, out _), Is.False);
     }
-
     [Test]
     public void KnownApiLowering_IntegralMathClampWithVariableBoundsUsesNormalCompletionShape() {
-        var context = CreateExpressionContext(
-            "int value, int min, int max",
-            "System.Math.Clamp(value, min, max) >= 0");
+        var context = CreateExpressionContext("int value, int min, int max", "System.Math.Clamp(value, min, max) >= 0");
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
         Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
     }
-
     [Test]
     public void KnownApiLowering_FloatingMathClampStaysOnLegacyPath() {
-        var context = CreateExpressionContext(
-            "double value",
-            "System.Math.Clamp(value, 0.0, 10.0) >= 0.0");
+        var context = CreateExpressionContext("double value", "System.Math.Clamp(value, 0.0, 10.0) >= 0.0");
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(invocation, context.LoweringContext, out _), Is.False);
     }
-
     [Test]
     public void LowerTerm_InstanceReferencePropertyUsesSharedMemberTerm() {
         var context = CreateExpressionContext(
@@ -755,7 +658,6 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(member, out var formula), Is.True);
         Assert.That(formula, Is.EqualTo(new SmtVariable(((SymbolicVariableTerm)member.Receiver).Name + ".Value", SmtValueKind.Reference)));
     }
-
     [Test]
     public void LowerTerm_InstanceIntegerPropertyUsesSharedMemberTerm() {
         var context = CreateExpressionContext(
@@ -772,7 +674,6 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(member, out var formula), Is.True);
         Assert.That(formula, Is.EqualTo(new SmtVariable(((SymbolicVariableTerm)member.Receiver).Name + ".Number", SmtValueKind.Int)));
     }
-
     [Test]
     public void LowerTerm_ImplicitThisStringPropertyUsesSharedMemberReference() {
         const string source = """
@@ -808,7 +709,6 @@ public sealed class SymbolicIrTests {
         Assert.That(TypedSymbolicTestLowering.TryLowerStringTerm(expression, loweringContext, out var stringTerm), Is.True);
         Assert.That(stringTerm, Is.TypeOf<SymbolicStringContentTerm>());
     }
-
     [Test]
     public void LowerTerm_ConditionalAccessStringPropertyUsesConditionalReference() {
         const string source = """
@@ -851,12 +751,9 @@ public sealed class SymbolicIrTests {
         Assert.That(((SmtConditionalFormula)formula).WhenTrue.Kind, Is.EqualTo(SmtValueKind.String));
         Assert.That(((SmtConditionalFormula)formula).WhenFalse.Kind, Is.EqualTo(SmtValueKind.String));
     }
-
     [Test]
     public void LowerTerm_ArrayElementUsesSharedElementTerm() {
-        var context = CreateExpressionContext(
-            "int[] values, int index",
-            "values[index]");
+        var context = CreateExpressionContext("int[] values, int index", "values[index]");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(context.Expression, context.LoweringContext, out var term), Is.True);
         var element = (SymbolicElementTerm)term;
@@ -866,20 +763,13 @@ public sealed class SymbolicIrTests {
         Assert.That(element.Kind, Is.EqualTo(SmtValueKind.Int));
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(element, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtVariable>());
-        Assert.That( ((SmtVariable)formula).Name, Does.StartWith(((SymbolicVariableTerm)element.Receiver).Name + "["));
+        Assert.That(((SmtVariable)formula).Name, Does.StartWith(((SymbolicVariableTerm)element.Receiver).Name + "["));
     }
-
     [Test]
     public void EncodeTerm_ArrayElementsWithDifferentSymbolicIndicesRemainDistinct() {
         var receiver = new SymbolicVariableTerm("values", SmtValueKind.Reference);
-        var first = new SymbolicElementTerm(
-            receiver,
-            new SymbolicVariableTerm("firstIndex", SmtValueKind.Int),
-            SmtValueKind.Int);
-        var second = new SymbolicElementTerm(
-            receiver,
-            new SymbolicVariableTerm("secondIndex", SmtValueKind.Int),
-            SmtValueKind.Int);
+        var first = new SymbolicElementTerm(receiver, new SymbolicVariableTerm("firstIndex", SmtValueKind.Int), SmtValueKind.Int);
+        var second = new SymbolicElementTerm(receiver, new SymbolicVariableTerm("secondIndex", SmtValueKind.Int), SmtValueKind.Int);
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(first, out var firstFormula), Is.True);
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(second, out var secondFormula), Is.True);
@@ -889,12 +779,9 @@ public sealed class SymbolicIrTests {
         Assert.That(((SmtVariable)secondFormula).Name, Is.EqualTo("values[secondIndex]"));
         Assert.That(firstFormula, Is.Not.EqualTo(secondFormula));
     }
-
     [Test]
     public void KnownApiLowering_OrdinalIgnoreCaseStringComparisonIsExact() {
-        var context = CreateExpressionContext(
-            "string s",
-            """s.StartsWith("A", System.StringComparison.OrdinalIgnoreCase)""");
+        var context = CreateExpressionContext("string s", """s.StartsWith("A", System.StringComparison.OrdinalIgnoreCase)""");
 
         var lowering = SymbolicSemanticPipeline.LowerCondition(context.Expression, context.LoweringContext);
 
@@ -904,12 +791,9 @@ public sealed class SymbolicIrTests {
         Assert.That(atom.Predicate, Is.EqualTo(SymbolicStringPredicateKind.RegexMatch));
         Assert.That(atom.RegexOptions, Is.EqualTo(RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
     }
-
     [Test]
     public void LowerCondition_DivisionAndRemainderUseSharedBinaryTerms() {
-        var context = CreateExpressionContext(
-            "int value, int divisor",
-            "value / divisor == value % divisor");
+        var context = CreateExpressionContext("int value, int divisor", "value / divisor == value % divisor");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
@@ -922,12 +806,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_UnaryMinusUsesSharedBinaryTerm() {
-        var context = CreateExpressionContext(
-            "int value",
-            "-value == 0");
+        var context = CreateExpressionContext("int value", "-value == 0");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
@@ -936,12 +817,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_ConditionalExpressionUsesSharedConditionalTerm() {
-        var context = CreateExpressionContext(
-            "bool flag, int left, int right",
-            "(flag ? left : right) == 0");
+        var context = CreateExpressionContext("bool flag, int left, int right", "(flag ? left : right) == 0");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
@@ -954,12 +832,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_ReferenceCoalesceUsesSharedConditionalTerm() {
-        var context = CreateExpressionContext(
-            "object? left, object? right",
-            "(left ?? right) == null");
+        var context = CreateExpressionContext("object? left, object? right", "(left ?? right) == null");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
@@ -972,7 +847,6 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_BigIntegerZeroOneUseIntegralAtoms() {
         var context = CreateExpressionContext(
@@ -983,7 +857,6 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_StringEmptyUsesStaticStringConstantTerm() {
         var source = """
@@ -1014,27 +887,23 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.EqualTo(new SmtStringConstant(string.Empty)));
     }
-
     [Test]
     public void LowerCondition_StringNonNullHelper_TreatsConcatAsAlwaysNonNull() {
-        var context = CreateExpressionContext(
-            "string left, string right",
-            "left + right");
+        var context = CreateExpressionContext("string left, string right", "left + right");
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerStringNonNullCondition( context.Expression, context.LoweringContext, out var condition), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerStringNonNullCondition(context.Expression, context.LoweringContext,
+            out var condition), Is.True);
 
         Assert.That(condition, Is.EqualTo(new SymbolicConstantCondition(true)));
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula, Is.EqualTo(new SmtBooleanConstant(true)));
     }
-
     [Test]
     public void LowerCondition_StringNonNullHelper_LowersCoalesceToOperandDisjunction() {
-        var context = CreateExpressionContext(
-            "string left, string right",
-            "left ?? right");
+        var context = CreateExpressionContext("string left, string right", "left ?? right");
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerStringNonNullCondition( context.Expression, context.LoweringContext, out var condition), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerStringNonNullCondition(context.Expression, context.LoweringContext,
+            out var condition), Is.True);
 
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var disjunction = (SymbolicBinaryCondition)condition;
@@ -1044,14 +913,12 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_StringNonNullHelper_LowersConditionalToBranchSensitiveCondition() {
-        var context = CreateExpressionContext(
-            "bool flag, string first, string second",
-            "flag ? first : second");
+        var context = CreateExpressionContext("bool flag, string first, string second", "flag ? first : second");
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerStringNonNullCondition( context.Expression, context.LoweringContext, out var condition), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerStringNonNullCondition(context.Expression, context.LoweringContext,
+            out var condition), Is.True);
 
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
         var outerOr = (SymbolicBinaryCondition)condition;
@@ -1061,12 +928,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void LowerCondition_NullableHasValueUsesSharedNullableTerm() {
-        var context = CreateExpressionContext(
-            "int? maybe",
-            "maybe.HasValue");
+        var context = CreateExpressionContext("int? maybe", "maybe.HasValue");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         var atom = AssertFactCondition<SymbolicTruthAtom>(condition);
@@ -1079,12 +943,9 @@ public sealed class SymbolicIrTests {
         Assert.That(variable.Name, Does.StartWith("maybe#"));
         Assert.That(variable.Name, Does.EndWith(".HasValue"));
     }
-
     [Test]
     public void LowerCondition_NullableValueUsesSharedNullableValueTerm() {
-        var context = CreateExpressionContext(
-            "int? maybe, int expected",
-            "maybe.Value == expected");
+        var context = CreateExpressionContext("int? maybe, int expected", "maybe.Value == expected");
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
         Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
@@ -1109,19 +970,16 @@ public sealed class SymbolicIrTests {
         Assert.That(relation.Left, Is.TypeOf<SmtVariable>());
         Assert.That(((SmtVariable)relation.Left).Name, Does.EndWith(".Value"));
     }
-
     private static IEnumerable<TestCaseData> NullableDefaultCases() {
-        yield return NullableDefault("LowerTerm_NullableGetValueOrDefaultUsesConditionalDefaultTerm", "int? maybe", "maybe.GetValueOrDefault() == 0", "", SmtValueKind.Int);
-        yield return NullableDefault("LowerTerm_NullableBoolGetValueOrDefaultUsesConditionalDefaultTerm", "bool? maybe", "maybe.GetValueOrDefault() == false", "", SmtValueKind.Bool);
-        yield return NullableDefault("LowerTerm_NullableEnumGetValueOrDefaultUsesIntegralDefaultTerm", "Status? maybe", "maybe.GetValueOrDefault() == Status.None", "public enum Status { None = 0, Active = 1 }", SmtValueKind.Int);
+        yield return NullableDefault("LowerTerm_NullableGetValueOrDefaultUsesConditionalDefaultTerm", "int? maybe",
+            "maybe.GetValueOrDefault() == 0", "", SmtValueKind.Int);
+        yield return NullableDefault("LowerTerm_NullableBoolGetValueOrDefaultUsesConditionalDefaultTerm", "bool? maybe",
+            "maybe.GetValueOrDefault() == false", "", SmtValueKind.Bool);
+        yield return NullableDefault("LowerTerm_NullableEnumGetValueOrDefaultUsesIntegralDefaultTerm", "Status? maybe",
+            "maybe.GetValueOrDefault() == Status.None", "public enum Status { None = 0, Active = 1 }", SmtValueKind.Int);
     }
-
     [TestCaseSource(nameof(NullableDefaultCases))]
-    public void NullableDefaultTermMatrix(
-        string parameters,
-        string expression,
-        string declarations,
-        int expectedKindValue) {
+    public void NullableDefaultTermMatrix(string parameters, string expression, string declarations, int expectedKindValue) {
         var expectedKind = (SmtValueKind)expectedKindValue;
         var context = CreateExpressionContext(parameters, expression, declarations);
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
@@ -1137,11 +995,9 @@ public sealed class SymbolicIrTests {
         Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
         Assert.That(formula.Kind, Is.EqualTo(expectedKind));
     }
-
     [TestCase("maybe.GetValueOrDefault(fallback) == fallback",
         TestName = "LowerTerm_NullableGetValueOrDefaultFallbackUsesConditionalFallbackTerm")]
-    [TestCase("(maybe ?? fallback) == fallback",
-        TestName = "LowerTerm_NullableCoalesceUnderlyingFallbackUsesConditionalValueTerm")]
+    [TestCase("(maybe ?? fallback) == fallback", TestName = "LowerTerm_NullableCoalesceUnderlyingFallbackUsesConditionalValueTerm")]
     public void NullableFallbackTermMatrix(string expression) {
         var context = CreateExpressionContext("int? maybe, int fallback", expression);
         var value = ((BinaryExpressionSyntax)context.Expression).Left;
@@ -1155,12 +1011,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
     }
-
     [Test]
     public void LowerTerm_NullableConditionalAccessCoalesceUsesElementValueTerm() {
-        var context = CreateExpressionContext(
-            "int[] values, int fallback",
-            "(values?[0] ?? fallback) == fallback");
+        var context = CreateExpressionContext("int[] values, int fallback", "(values?[0] ?? fallback) == fallback");
         var coalesce = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(coalesce, context.LoweringContext, out var term), Is.True);
@@ -1175,12 +1028,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
     }
-
     [Test]
     public void LowerTerm_NullableConditionalAccessMultidimensionalArrayLengthUsesDimensionProduct() {
-        var context = CreateExpressionContext(
-            "int[,] values, int fallback",
-            "(values?.Length ?? fallback) == fallback");
+        var context = CreateExpressionContext("int[,] values, int fallback", "(values?.Length ?? fallback) == fallback");
         var coalesce = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(coalesce, context.LoweringContext, out var term), Is.True);
@@ -1199,39 +1049,28 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
     }
-
     [Test]
     public void Encoder_ExceptionPreconditionUsesTriggerFormulaWithoutSpecialAnalyzerRule() {
         var divisor = new SymbolicVariableTerm("d#1", SmtValueKind.Int);
         var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.Equal,
-                divisor,
-                new SymbolicIntegerConstantTerm(0)),
+            new SymbolicRelationAtom(SymbolicRelationOperator.Equal, divisor, new SymbolicIntegerConstantTerm(0)),
             SyntaxFactory.ParseExpression("d == 0"),
             "test.divide-by-zero"));
         var condition = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicExceptionPreconditionAtom(
-                SymbolicExceptionPreconditionKind.DivideByZero,
-                divisor,
-                trigger),
+            new SymbolicExceptionPreconditionAtom(SymbolicExceptionPreconditionKind.DivideByZero, divisor, trigger),
             SyntaxFactory.ParseExpression("1 / d"),
             "test.exception-precondition"));
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula( SmtBinaryOperator.Equal, new SmtVariable("d#1", SmtValueKind.Int), new SmtIntegerConstant(0))));
+        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula(SmtBinaryOperator.Equal, new SmtVariable("d#1", SmtValueKind.Int),
+            new SmtIntegerConstant(0))));
     }
-
     [Test]
     public void Encoder_BoundsExceptionPreconditionUsesSharedBoundsAtom() {
         var index = new SymbolicVariableTerm("i#1", SmtValueKind.Int);
         var length = new SymbolicVariableTerm("values#1.Length", SmtValueKind.Int);
         var inRange = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicBoundsAtom(
-                index,
-                length,
-                true,
-                true),
+            new SymbolicBoundsAtom(index, length, true, true),
             SyntaxFactory.ParseExpression("values[i]"),
             "test.bounds"));
         var condition = new SymbolicFactCondition(SymbolicFact.Exact(
@@ -1248,29 +1087,22 @@ public sealed class SymbolicIrTests {
         Assert.That(negated.Operator, Is.EqualTo(SmtUnaryOperator.Not));
         Assert.That(negated.Operand, Is.TypeOf<SmtBinaryFormula>());
     }
-
     [Test]
     public void Encoder_NegativeLengthExceptionPreconditionUsesRelationAtom() {
         var length = new SymbolicVariableTerm("length#1", SmtValueKind.Int);
         var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.LessThan,
-                length,
-                new SymbolicIntegerConstantTerm(0)),
+            new SymbolicRelationAtom(SymbolicRelationOperator.LessThan, length, new SymbolicIntegerConstantTerm(0)),
             SyntaxFactory.ParseExpression("new int[length]"),
             "test.negative-length"));
         var condition = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicExceptionPreconditionAtom(
-                SymbolicExceptionPreconditionKind.NegativeLength,
-                length,
-                trigger),
+            new SymbolicExceptionPreconditionAtom(SymbolicExceptionPreconditionKind.NegativeLength, length, trigger),
             SyntaxFactory.ParseExpression("new int[length]"),
             "test.exception-precondition.negative-length"));
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula( SmtBinaryOperator.LessThan, new SmtVariable("length#1", SmtValueKind.Int), new SmtIntegerConstant(0))));
+        Assert.That(formula, Is.EqualTo(new SmtBinaryFormula(SmtBinaryOperator.LessThan, new SmtVariable("length#1", SmtValueKind.Int),
+            new SmtIntegerConstant(0))));
     }
-
     [Test]
     public void Encoder_CheckedOverflowExceptionPreconditionUsesOutOfRangeAtoms() {
         var result = new SymbolicBinaryTerm(
@@ -1278,27 +1110,18 @@ public sealed class SymbolicIrTests {
             new SymbolicVariableTerm("left#1", SmtValueKind.Int),
             new SymbolicVariableTerm("right#1", SmtValueKind.Int));
         var lowerOverflow = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.LessThan,
-                result,
-                new SymbolicIntegerConstantTerm(int.MinValue)),
+            new SymbolicRelationAtom(SymbolicRelationOperator.LessThan, result, new SymbolicIntegerConstantTerm(int.MinValue)),
             SyntaxFactory.ParseExpression("left + right"),
             "test.checked-overflow.below-min"));
         var upperOverflow = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.GreaterThan,
-                result,
-                new SymbolicIntegerConstantTerm(int.MaxValue)),
+            new SymbolicRelationAtom(SymbolicRelationOperator.GreaterThan, result, new SymbolicIntegerConstantTerm(int.MaxValue)),
             SyntaxFactory.ParseExpression("left + right"),
             "test.checked-overflow.above-max"));
         var condition = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicExceptionPreconditionAtom(
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
                 result,
-                new SymbolicBinaryCondition(
-                    SymbolicConditionOperator.Or,
-                    lowerOverflow,
-                    upperOverflow)),
+                new SymbolicBinaryCondition(SymbolicConditionOperator.Or, lowerOverflow, upperOverflow)),
             SyntaxFactory.ParseExpression("checked(left + right)"),
             "test.exception-precondition.checked-overflow"));
 
@@ -1309,33 +1132,25 @@ public sealed class SymbolicIrTests {
         Assert.That(disjunction.Left, Is.TypeOf<SmtBinaryFormula>());
         Assert.That(disjunction.Right, Is.TypeOf<SmtBinaryFormula>());
     }
-
     [Test]
     public void StructuralKey_DistinguishesOverflowSensitiveBinaryTerms() {
         var left = new SymbolicVariableTerm("left#1", SmtValueKind.Int);
         var right = new SymbolicVariableTerm("right#1", SmtValueKind.Int);
         var exact = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, left, right);
-        var overflowSensitive = new SymbolicBinaryTerm(
-            SymbolicBinaryTermOperator.Add,
-            left,
-            right,
-            MayOverflow: true);
+        var overflowSensitive = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, left, right, MayOverflow: true);
 
-        Assert.That( SymbolicState.CreateProofTermKey(overflowSensitive), Is.Not.EqualTo(SymbolicState.CreateProofTermKey(exact)));
+        Assert.That(SymbolicState.CreateProofTermKey(overflowSensitive), Is.Not.EqualTo(SymbolicState.CreateProofTermKey(exact)));
     }
-
     private static IEnumerable<TestCaseData> NullExceptionPreconditionCases() {
-        yield return NullPrecondition("Encoder_NullDereferenceExceptionPreconditionUsesNullnessAtom", SymbolicExceptionPreconditionKind.NullDereference, "text#1", "text.Length", "null-dereference");
-        yield return NullPrecondition("Encoder_UnboxNullExceptionPreconditionUsesNullnessAtom", SymbolicExceptionPreconditionKind.UnboxNull, "value#1", "(int)value", "unbox-null");
-        yield return NullPrecondition("Encoder_ArgumentNullExceptionPreconditionUsesNullnessAtom", SymbolicExceptionPreconditionKind.ArgumentNull, "gate#1", "lock (gate) { }", "argument-null");
+        yield return NullPrecondition("Encoder_NullDereferenceExceptionPreconditionUsesNullnessAtom",
+            SymbolicExceptionPreconditionKind.NullDereference, "text#1", "text.Length", "null-dereference");
+        yield return NullPrecondition("Encoder_UnboxNullExceptionPreconditionUsesNullnessAtom",
+            SymbolicExceptionPreconditionKind.UnboxNull, "value#1", "(int)value", "unbox-null");
+        yield return NullPrecondition("Encoder_ArgumentNullExceptionPreconditionUsesNullnessAtom",
+            SymbolicExceptionPreconditionKind.ArgumentNull, "gate#1", "lock (gate) { }", "argument-null");
     }
-
     [TestCaseSource(nameof(NullExceptionPreconditionCases))]
-    public void NullExceptionPreconditionMatrix(
-        int kindValue,
-        string variableName,
-        string expression,
-        string provenance) {
+    public void NullExceptionPreconditionMatrix(int kindValue, string variableName, string expression, string provenance) {
         var kind = (SymbolicExceptionPreconditionKind)kindValue;
         var value = new SymbolicVariableTerm(variableName, SmtValueKind.Reference);
         var syntax = SyntaxFactory.ParseExpression(expression);
@@ -1352,7 +1167,6 @@ public sealed class SymbolicIrTests {
         Assert.That(formula, Is.EqualTo(new SmtBinaryFormula(
             SmtBinaryOperator.Equal, new SmtVariable(variableName, SmtValueKind.Reference), new SmtNullConstant())));
     }
-
     [Test]
     public void Encoder_NullableValueExceptionPreconditionUsesHasValueAtom() {
         var hasValue = new SymbolicNullableHasValueTerm("maybe#1");
@@ -1369,9 +1183,8 @@ public sealed class SymbolicIrTests {
             "test.exception-precondition.nullable-value"));
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula, Is.EqualTo(new SmtUnaryFormula( SmtUnaryOperator.Not, new SmtVariable("maybe#1.HasValue", SmtValueKind.Bool))));
+        Assert.That(formula, Is.EqualTo(new SmtUnaryFormula(SmtUnaryOperator.Not, new SmtVariable("maybe#1.HasValue", SmtValueKind.Bool))));
     }
-
     [Test]
     public void Encoder_InvalidCastExceptionPreconditionUsesTypeTestAtom() {
         var value = new SymbolicVariableTerm("value#1", SmtValueKind.Reference);
@@ -1380,172 +1193,42 @@ public sealed class SymbolicIrTests {
             SyntaxFactory.ParseExpression("(string)value"),
             "test.invalid-cast"));
         var condition = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicExceptionPreconditionAtom(
-                SymbolicExceptionPreconditionKind.InvalidCast,
-                value,
-                new SymbolicNotCondition(trigger)),
+            new SymbolicExceptionPreconditionAtom(SymbolicExceptionPreconditionKind.InvalidCast, value, new SymbolicNotCondition(trigger)),
             SyntaxFactory.ParseExpression("(string)value"),
             "test.exception-precondition.invalid-cast"));
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula, Is.EqualTo(new SmtUnaryFormula( SmtUnaryOperator.Not, new SmtRuntimeTypeTestFormula( new SmtVariable("value#1", SmtValueKind.Reference), "System.String"))));
+        Assert.That(formula, Is.EqualTo(new SmtUnaryFormula(SmtUnaryOperator.Not, new SmtRuntimeTypeTestFormula(new SmtVariable("value#1",
+            SmtValueKind.Reference), "System.String"))));
     }
-
     [Test]
     public void Encoder_DirectThrowExceptionPreconditionUsesConstantTrigger() {
         var condition = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicExceptionPreconditionAtom(
-                SymbolicExceptionPreconditionKind.DirectThrow,
-                null,
-                new SymbolicConstantCondition(true)),
+            new SymbolicExceptionPreconditionAtom(SymbolicExceptionPreconditionKind.DirectThrow, null, new SymbolicConstantCondition(true)),
             SyntaxFactory.ParseStatement("throw new System.Exception();"),
             "test.exception-precondition.direct-throw"));
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula, Is.EqualTo(new SmtBooleanConstant(true)));
     }
-
-    [Test]
-    public void Encoder_OwnershipResourceAtomsStayConservativeUntilProofSemanticsExist() {
-        var owner = new SymbolicVariableTerm("owner#1", SmtValueKind.Reference);
-        var alias = new SymbolicVariableTerm("alias#1", SmtValueKind.Reference);
-        var resource = new SymbolicVariableTerm("resource#1", SmtValueKind.Reference);
-        var source = SyntaxFactory.ParseExpression("resource");
-        var atoms = new SymbolicAtom[] {
-            new SymbolicFreshnessAtom(owner),
-            new SymbolicOwnershipAtom(owner, false),
-            new SymbolicAliasAtom(owner, alias, true),
-            new SymbolicBorrowAtom(owner, alias, SymbolicBorrowKind.Shared),
-            new SymbolicEscapeAtom(owner, SymbolicEscapeKind.Return),
-            new SymbolicReturnedOwnershipAtom(owner),
-            new SymbolicMutationAtom(owner, false),
-            new SymbolicDisposalAtom(resource, SymbolicDisposalState.Disposed),
-            new SymbolicResourceLifetimeAtom(resource, SymbolicResourceLifetimeState.Owned)
-        };
-
-        foreach (var atom in atoms) {
-            var condition = new SymbolicFactCondition(SymbolicFact.Exact(atom, source, "test.ownership-resource"));
-
-            Assert.That( SymbolicIrFormulaEncoder.TryEncode(condition, out _), Is.False, atom.GetType().Name + " should not be encoded optimistically.");
-        }
-    }
-
-    [Test]
-    public void OwnershipFactFactory_CreatesConsistentFreshOwnedResourceFacts() {
-        var value = new SymbolicVariableTerm("value#1", SmtValueKind.Reference);
-        var syntax = SyntaxFactory.ParseExpression("new MutableResource()");
-
-        var facts = SymbolicOperationTransferKernel.TransitionLifetime(
-            new SymbolicState(),
-            value,
-            SymbolicLifetimeOperationKind.CreateOwned,
-            syntax.Span,
-            "test.ownership",
-            evidenceKey: "evidence.ownership").State.Facts;
-
-        Assert.That(facts, Has.Length.EqualTo(3));
-        Assert.That(facts[0].Atom, Is.EqualTo(new SymbolicFreshnessAtom(value)));
-        Assert.That(facts[1].Atom, Is.EqualTo(new SymbolicOwnershipAtom(value, false)));
-        Assert.That(facts[2].Atom, Is.EqualTo(new SymbolicResourceLifetimeAtom(value, SymbolicResourceLifetimeState.Owned)));
-        Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[] {
-            "test.ownership.fresh",
-            "test.ownership.owned",
-            "test.ownership.lifetime"
-        }));
-        Assert.That(facts.All(static fact => fact.Confidence == SymbolicFactConfidence.Exact), Is.True);
-        Assert.That(facts.All(static fact => fact.EvidenceKey == "evidence.ownership"), Is.True);
-    }
-
-    [Test]
-    public void OwnershipFactFactory_CreatesFreshOwnedValueFactsWithoutResourceLifetime() {
-        var value = new SymbolicVariableTerm("array#1", SmtValueKind.Reference);
-        var syntax = SyntaxFactory.ParseExpression("new int[1]");
-
-        var facts = SymbolicOperationTransferKernel.TransitionLifetime(
-            new SymbolicState(),
-            value,
-            SymbolicLifetimeOperationKind.CreateOwnedValue,
-            syntax.Span,
-            "test.array",
-            evidenceKey: "evidence.array").State.Facts;
-
-        Assert.That(facts, Has.Length.EqualTo(2));
-        Assert.That(facts[0].Atom, Is.EqualTo(new SymbolicFreshnessAtom(value)));
-        Assert.That(facts[1].Atom, Is.EqualTo(new SymbolicOwnershipAtom(value, false)));
-        Assert.That(facts.Any(static fact => fact.Atom is SymbolicResourceLifetimeAtom), Is.False);
-        Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[] {
-            "test.array.fresh",
-            "test.array.owned"
-        }));
-        Assert.That(facts.All(static fact => fact.Confidence == SymbolicFactConfidence.Exact), Is.True);
-        Assert.That(facts.All(static fact => fact.EvidenceKey == "evidence.array"), Is.True);
-    }
-
-    [Test]
-    public void OwnershipFactFactory_CreatesAliasBorrowEscapeMutationAndDisposalFacts() {
-        var owner = new SymbolicVariableTerm("owner#1", SmtValueKind.Reference);
-        var alias = new SymbolicVariableTerm("alias#1", SmtValueKind.Reference);
-        var syntax = SyntaxFactory.ParseExpression("owner");
-        var facts = new[] {
-            SymbolicOperationTransferKernel.TransitionLifetime(
-                new SymbolicState(), owner, SymbolicLifetimeOperationKind.Alias, syntax.Span, "test.alias",
-                relatedSubject: alias).State.Facts.Single(),
-            SymbolicOperationTransferKernel.TransitionLifetime(
-                new SymbolicState(), owner, SymbolicLifetimeOperationKind.BorrowMutable, syntax.Span, "test.borrow",
-                relatedSubject: alias).State.Facts.Single(),
-            SymbolicOperationTransferKernel.TransitionLifetime(
-                new SymbolicState(), owner, SymbolicLifetimeOperationKind.Escape, syntax.Span, "test.escape",
-                escapeKind: SymbolicEscapeKind.Argument).State.Facts.Single(),
-            SymbolicFact.Exact(new SymbolicReturnedOwnershipAtom(owner), syntax, "test.returned"),
-            SymbolicOperationTransferKernel.TransitionMutation(
-                new SymbolicState(), owner, syntax.Span, "test.mutation").State.Facts.Single(),
-            SymbolicFact.Exact(
-                new SymbolicDisposalAtom(owner, SymbolicDisposalState.MaybeDisposed), syntax, "test.disposal"),
-            SymbolicFact.Exact(
-                new SymbolicResourceLifetimeAtom(owner, SymbolicResourceLifetimeState.Escaped), syntax,
-                "test.lifetime")
-        };
-        Assert.That(facts.Select(static fact => fact.Atom.GetType().Name), Is.EqualTo(new[] {
-            nameof(SymbolicAliasAtom),
-            nameof(SymbolicBorrowAtom),
-            nameof(SymbolicEscapeAtom),
-            nameof(SymbolicReturnedOwnershipAtom),
-            nameof(SymbolicMutationAtom),
-            nameof(SymbolicDisposalAtom),
-            nameof(SymbolicResourceLifetimeAtom)
-        }));
-        Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[] {
-            "test.alias",
-            "test.borrow",
-            "test.escape",
-            "test.returned",
-            "test.mutation",
-            "test.disposal",
-            "test.lifetime"
-        }));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(facts[5], out _), Is.False);
-    }
-
     [Test]
     public void FormulaEncoder_ArrayDimensionLengthUsesReferenceDimensionLength() {
         var array = new SymbolicVariableTerm("matrix#1", SmtValueKind.Reference);
         var dimensionLength = new SymbolicArrayDimensionLengthTerm(array, 1);
 
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(dimensionLength, out var encoded), Is.True);
-        Assert.That( encoded, Is.EqualTo(new SmtVariable("matrix#1.GetLength(1)", SmtValueKind.Int)));
+        Assert.That(encoded, Is.EqualTo(new SmtVariable("matrix#1.GetLength(1)", SmtValueKind.Int)));
     }
-
     [Test]
     public void LowerTerm_ArrayCreationDimensionLengthUsesSizeExpression() {
-        var context = CreateExpressionContext(
-            "int rows, int columns",
-            "new int[rows, columns].GetLength(1) == columns");
+        var context = CreateExpressionContext("int rows, int columns", "new int[rows, columns].GetLength(1) == columns");
         var arrayCreation = context.Expression
             .DescendantNodes()
             .OfType<ArrayCreationExpressionSyntax>()
             .Single();
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerArrayDimensionLengthTerm(arrayCreation, 1, context.LoweringContext, out var term), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerArrayDimensionLengthTerm(arrayCreation, 1, context.LoweringContext, out var term),
+            Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicVariableTerm>());
         var variable = (SymbolicVariableTerm)term;
@@ -1554,7 +1237,6 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtVariable>());
     }
-
     [TestCase("int[,] matrix, int columns", "matrix.GetLength(1) == columns", "matrix#",
         TestName = "LowerTerm_ArrayGetLengthInvocationUsesDimensionLengthTerm")]
     [TestCase("int[,] matrix, long columns", "matrix.GetLongLength(1) == columns", "matrix#",
@@ -1573,12 +1255,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtVariable>());
     }
-
     [Test]
     public void LowerTerm_ArrayRankMemberUsesStaticArrayRank() {
-        var context = CreateExpressionContext(
-            "int[,] matrix",
-            "matrix.Rank == 2");
+        var context = CreateExpressionContext("int[,] matrix", "matrix.Rank == 2");
         var memberAccess = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(memberAccess, context.LoweringContext, out var term), Is.True);
@@ -1587,12 +1266,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.EqualTo(new SmtIntegerConstant(2)));
     }
-
     [Test]
     public void LowerTerm_MultidimensionalArrayLengthUsesDimensionProduct() {
-        var context = CreateExpressionContext(
-            "int[,] matrix, int total",
-            "matrix.Length == total");
+        var context = CreateExpressionContext("int[,] matrix, int total", "matrix.Length == total");
         var memberAccess = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(memberAccess, context.LoweringContext, out var term), Is.True);
@@ -1607,15 +1283,13 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
     }
-
     [Test]
     public void LowerBuiltInLengthTerm_MultidimensionalArrayUsesDimensionProduct() {
-        var context = CreateExpressionContext(
-            "int[,] matrix, int total",
-            "matrix.Length == total");
+        var context = CreateExpressionContext("int[,] matrix, int total", "matrix.Length == total");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+            Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         var multiply = (SymbolicBinaryTerm)term;
@@ -1623,7 +1297,6 @@ public sealed class SymbolicIrTests {
         Assert.That(multiply.Left, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
         Assert.That(multiply.Right, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
     }
-
     [TestCase("string text, int start", "text.Substring(start).Length == text.Length - start", false, true,
         TestName = "LowerBuiltInLengthTerm_StringSubstringOneArgumentUsesSourceLengthDelta")]
     [TestCase("string text, int start, int length", "text.Substring(start, length).Length == length", false, false,
@@ -1637,7 +1310,8 @@ public sealed class SymbolicIrTests {
             ? CreateMethodExpressionContext(parameters, string.Empty, expression)
             : CreateExpressionContext(parameters, expression);
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
-        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+            Is.True);
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         if (difference) {
             Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
@@ -1653,7 +1327,6 @@ public sealed class SymbolicIrTests {
             Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
         }
     }
-
     [TestCase("int[] values", "values[1..^1].Length == values.Length - 2",
         TestName = "LowerBuiltInLengthTerm_ArrayRangeUsesEndpointDifference")]
     [TestCase("string text", "text[1..^1].Length == text.Length - 2",
@@ -1662,7 +1335,8 @@ public sealed class SymbolicIrTests {
         var context = CreateExpressionContext(parameters, expression);
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+            Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         var subtract = (SymbolicBinaryTerm)term;
@@ -1672,7 +1346,6 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
     }
-
     [TestCase("int[] values", "Range range = 1..^1;", "values[range].Length == values.Length - 2",
         TestName = "LowerBuiltInLengthTerm_AssignedRangeElementAccessUsesResolvedEndpoints")]
     [TestCase("string text, Range range", "range = 1..^1;", "text.AsSpan(range).Length == text.Length - 2",
@@ -1680,12 +1353,12 @@ public sealed class SymbolicIrTests {
     public void AssignedRangeLengthTermMatrix(string parameters, string statement, string expression) {
         var context = CreateMethodExpressionContext(parameters, statement, expression);
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
-        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+            Is.True);
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
     }
-
     [Test]
     public void StringContentReferenceHelper_CreatesReferenceBackedStringTerm() {
         var reference = new SymbolicVariableTerm("text#1", SmtValueKind.Reference);
@@ -1693,20 +1366,12 @@ public sealed class SymbolicIrTests {
         Assert.That(TypedSymbolicTestLowering.TryCreateStringContentReferenceTerm(reference, out var term), Is.True);
         Assert.That(term, Is.EqualTo(new SymbolicStringContentTerm(reference)));
     }
-
     [Test]
     public void SemanticPipeline_BuiltInLengthProjectionSupportsMultidimensionalArrayTargets() {
-        var context = CreateLocalDeclarationContext(
-            "int[,] values",
-            "int[,] copy = values;");
+        var context = CreateLocalDeclarationContext("int[,] values", "int[,] copy = values;");
 
-        var target = new SymbolicVariableTerm(
-            SymbolicFactFactory.GetSmtVariableName(context.Symbol),
-            SmtValueKind.Reference);
-        var targetLength = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(
-            context.Symbol.Type,
-            target,
-            context.ValueExpression);
+        var target = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(context.Symbol), SmtValueKind.Reference);
+        var targetLength = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(context.Symbol.Type, target, context.ValueExpression);
         var valueLength = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(
             context.ValueExpression,
             new SymbolicLoweringContext(context.SemanticModel, CancellationToken.None));
@@ -1716,7 +1381,6 @@ public sealed class SymbolicIrTests {
         Assert.That(valueLength.IsExact, Is.True);
         Assert.That(valueLength.Value!.Kind, Is.EqualTo(SmtValueKind.Int));
     }
-
     [Test]
     public void SemanticPipeline_BuiltInLengthValueSupportsAssignedRangeStringViews() {
         var context = CreateMethodExpressionContext(
@@ -1734,16 +1398,15 @@ public sealed class SymbolicIrTests {
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.Value, Is.TypeOf<SymbolicBinaryTerm>());
     }
-
-    [TestCase("System.Collections.Generic.IReadOnlyList<int> values",
-        TestName = "LowerBuiltInLengthTerm_CountBackedIndexerUsesCountTerm")]
+    [TestCase("System.Collections.Generic.IReadOnlyList<int> values", TestName = "LowerBuiltInLengthTerm_CountBackedIndexerUsesCountTerm")]
     [TestCase("System.Collections.Generic.IReadOnlyCollection<int> values",
         TestName = "LowerBuiltInLengthTerm_CountOnlyCollectionUsesCountTerm")]
     public void CountBackedLengthTermMatrix(string parameters) {
         var context = CreateMethodExpressionContext(parameters, string.Empty, "values.Count > 0");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm( memberAccess.Expression, context.LoweringContext, out var term), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+            Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicCountTerm>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
@@ -1751,15 +1414,13 @@ public sealed class SymbolicIrTests {
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
         Assert.That(formula.ToString(), Does.Contain(".Count"));
     }
-
     [Test]
     public void LowerBuiltInLengthTerm_SpanParameterUsesReferenceBackedLengthTerm() {
-        var context = CreateExpressionContext(
-            "System.Span<int> span",
-            "span.Length == 0");
+        var context = CreateExpressionContext("System.Span<int> span", "span.Length == 0");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm( memberAccess.Expression, context.LoweringContext, out var term), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+            Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicLengthTerm>());
         var lengthTerm = (SymbolicLengthTerm)term;
@@ -1768,21 +1429,20 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
     }
-
     [Test]
     public void LowerBuiltInLengthTerm_CollectionExpressionSpreadUsesSummedLengths() {
         var context = CreateMethodLocalDeclarationContext(
             "System.Collections.Generic.IReadOnlyCollection<int> values",
             "int[] copy = [0, .. values, 1];");
 
-        Assert.That( TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm( context.ValueExpression, new SymbolicLoweringContext(context.SemanticModel, CancellationToken.None), out var term), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerBuiltInLengthTerm(context.ValueExpression,
+            new SymbolicLoweringContext(context.SemanticModel, CancellationToken.None), out var term), Is.True);
 
         Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
         Assert.That(formula.ToString(), Does.Contain(".Count"));
     }
-
     [TestCase(false, TestName = "BuiltInElementAccessInRangeCondition_SupportsAssignedIndexShape")]
     [TestCase(true, TestName = "BuiltInElementAccessInRangeCondition_SupportsRangeShape")]
     public void BuiltInElementAccessInRangeConditionMatrix(bool range) {
@@ -1806,7 +1466,6 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
-
     [Test]
     public void SemanticPipeline_BuiltInLengthAssignmentSupportsAssignedRangeStringViews() {
         var context = CreateMethodLocalDeclarationContext(
@@ -1817,13 +1476,8 @@ public sealed class SymbolicIrTests {
             """,
             "using System;");
 
-        var target = new SymbolicVariableTerm(
-            SymbolicFactFactory.GetSmtVariableName(context.Symbol),
-            SmtValueKind.Reference);
-        var targetLength = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(
-            context.Symbol.Type,
-            target,
-            context.ValueExpression);
+        var target = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(context.Symbol), SmtValueKind.Reference);
+        var targetLength = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(context.Symbol.Type, target, context.ValueExpression);
         var valueLength = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(
             context.ValueExpression,
             new SymbolicLoweringContext(context.SemanticModel, CancellationToken.None));
@@ -1833,16 +1487,11 @@ public sealed class SymbolicIrTests {
         Assert.That(valueLength.IsExact, Is.True);
         Assert.That(valueLength.Value!.Kind, Is.EqualTo(SmtValueKind.Int));
     }
-
     [Test]
     public void SemanticPipeline_StringContentAssignmentSupportsStringTargets() {
-        var context = CreateLocalDeclarationContext(
-            "string input",
-            "string copy = input;");
+        var context = CreateLocalDeclarationContext("string input", "string copy = input;");
 
-        var target = new SymbolicVariableTerm(
-            SymbolicFactFactory.GetSmtVariableName(context.Symbol),
-            SmtValueKind.Reference);
+        var target = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(context.Symbol), SmtValueKind.Reference);
         var targetString = SymbolicSemanticPipeline.ProjectStringContentTerm(target, context.ValueExpression);
         var valueString = SymbolicSemanticPipeline.LowerStringTerm(
             context.ValueExpression,
@@ -1853,12 +1502,9 @@ public sealed class SymbolicIrTests {
         Assert.That(valueString.IsExact, Is.True);
         Assert.That(valueString.Value!.Kind, Is.EqualTo(SmtValueKind.String));
     }
-
     [Test]
     public void LowerTerm_MultidimensionalArrayCreationLengthUsesSizeProduct() {
-        var context = CreateExpressionContext(
-            "int rows, int columns",
-            "new int[rows, columns].Length == rows * columns");
+        var context = CreateExpressionContext("int rows, int columns", "new int[rows, columns].Length == rows * columns");
         var memberAccess = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(memberAccess, context.LoweringContext, out var term), Is.True);
@@ -1871,12 +1517,9 @@ public sealed class SymbolicIrTests {
         Assert.That(multiply.Right, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(((SymbolicVariableTerm)multiply.Right).Name, Does.StartWith("columns#"));
     }
-
     [Test]
     public void LowerTerm_ArrayGetLowerBoundInvocationUsesZeroTerm() {
-        var context = CreateExpressionContext(
-            "int[,] matrix",
-            "matrix.GetLowerBound(1) == 0");
+        var context = CreateExpressionContext("int[,] matrix", "matrix.GetLowerBound(1) == 0");
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
@@ -1885,12 +1528,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.EqualTo(new SmtIntegerConstant(0)));
     }
-
     [Test]
     public void LowerTerm_ArrayGetUpperBoundInvocationUsesDimensionLengthMinusOne() {
-        var context = CreateExpressionContext(
-            "int[,] matrix, int columns",
-            "matrix.GetUpperBound(1) == columns - 1");
+        var context = CreateExpressionContext("int[,] matrix, int columns", "matrix.GetUpperBound(1) == columns - 1");
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
@@ -1904,12 +1544,9 @@ public sealed class SymbolicIrTests {
         Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
         Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
     }
-
     [Test]
     public void LowerTerm_ArrayCreationGetLengthInvocationUsesSizeExpression() {
-        var context = CreateExpressionContext(
-            "int rows, int columns",
-            "new int[rows, columns].GetLength(1) == columns");
+        var context = CreateExpressionContext("int rows, int columns", "new int[rows, columns].GetLength(1) == columns");
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
         Assert.That(TypedSymbolicTestLowering.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
@@ -1919,7 +1556,6 @@ public sealed class SymbolicIrTests {
         Assert.That(variable.Name, Does.StartWith("columns#"));
         Assert.That(variable.Kind, Is.EqualTo(SmtValueKind.Int));
     }
-
     private static TAtom AssertFactCondition<TAtom>(SymbolicCondition condition)
         where TAtom : SymbolicAtom {
         Assert.That(condition, Is.TypeOf<SymbolicFactCondition>());
@@ -1928,7 +1564,6 @@ public sealed class SymbolicIrTests {
         Assert.That(factCondition.Fact.Atom, Is.TypeOf<TAtom>());
         return (TAtom)factCondition.Fact.Atom;
     }
-
     private static TestCaseData Named(string name, string parameters, string expression) =>
         new TestCaseData(parameters, expression).SetName(name);
 
@@ -1947,8 +1582,7 @@ public sealed class SymbolicIrTests {
         SmtValueKind expectedKind) =>
         new TestCaseData(parameters, expression, declarations, (int)expectedKind).SetName(name);
 
-    private static ExpressionContext CreateExpressionContext(string parameters, string expression,
-        string declarations = "") {
+    private static ExpressionContext CreateExpressionContext(string parameters, string expression, string declarations = "") {
         var source = $$"""
                        {{declarations}}
                        public sealed class C
@@ -1970,9 +1604,7 @@ public sealed class SymbolicIrTests {
             fixture.SemanticModel,
             new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None));
     }
-
-    private static ExpressionContext CreateMethodExpressionContext(string parameters, string statements,
-        string expression) {
+    private static ExpressionContext CreateMethodExpressionContext(string parameters, string statements, string expression) {
         var source = $$"""
                        using System;
                        public sealed class C
@@ -1995,9 +1627,7 @@ public sealed class SymbolicIrTests {
             fixture.SemanticModel,
             new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None));
     }
-
-    private static LocalDeclarationContext CreateLocalDeclarationContext(string parameters, string declaration,
-        string declarations = "") {
+    private static LocalDeclarationContext CreateLocalDeclarationContext(string parameters, string declaration, string declarations = "") {
         var source = $$"""
                        {{declarations}}
                        public sealed class C
@@ -2019,7 +1649,6 @@ public sealed class SymbolicIrTests {
             fixture.Node.Initializer!.Value,
             fixture.SemanticModel);
     }
-
     private static LocalDeclarationContext CreateMethodLocalDeclarationContext(string parameters, string statements,
         string declarations = "") {
         var source = $$"""
@@ -2043,14 +1672,10 @@ public sealed class SymbolicIrTests {
             fixture.Node.Initializer!.Value,
             fixture.SemanticModel);
     }
-
     private sealed record ExpressionContext(
         ExpressionSyntax Expression,
         SemanticModel SemanticModel,
         SymbolicLoweringContext LoweringContext);
 
-    private sealed record LocalDeclarationContext(
-        ILocalSymbol Symbol,
-        ExpressionSyntax ValueExpression,
-        SemanticModel SemanticModel);
+    private sealed record LocalDeclarationContext(ILocalSymbol Symbol, ExpressionSyntax ValueExpression, SemanticModel SemanticModel);
 }

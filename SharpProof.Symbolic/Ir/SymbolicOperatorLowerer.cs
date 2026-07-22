@@ -25,18 +25,11 @@ internal static class SymbolicOperatorLowerer {
                 new SymbolicBinaryCondition(SymbolicConditionOperator.Or, left, right),
             _ => new SymbolicBinaryCondition(
                 SymbolicConditionOperator.Or,
-                new SymbolicBinaryCondition(
-                    SymbolicConditionOperator.And,
-                    left,
-                    new SymbolicNotCondition(right)),
-                new SymbolicBinaryCondition(
-                    SymbolicConditionOperator.And,
-                    new SymbolicNotCondition(left),
-                    right))
+                new SymbolicBinaryCondition(SymbolicConditionOperator.And, left, new SymbolicNotCondition(right)),
+                new SymbolicBinaryCondition(SymbolicConditionOperator.And, new SymbolicNotCondition(left), right))
         };
         return true;
     }
-
     internal static bool CanCompareTerms(SymbolicTerm left, SymbolicTerm right, SymbolicRelationOperator op) {
         if (op is not SymbolicRelationOperator.Equal and not SymbolicRelationOperator.NotEqual &&
             left.Kind != SmtValueKind.Int)
@@ -46,8 +39,8 @@ internal static class SymbolicOperatorLowerer {
                (left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference) ||
                (right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference);
     }
-
-    internal static bool IsEqualityExpression(BinaryExpressionSyntax binaryExpression) => binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
+    internal static bool IsEqualityExpression(BinaryExpressionSyntax binaryExpression)
+        => binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
                binaryExpression.IsKind(SyntaxKind.NotEqualsExpression);
 
     internal static bool TryGetRelationOperator(SyntaxKind kind, out SymbolicRelationOperator op) {
@@ -75,11 +68,7 @@ internal static class SymbolicOperatorLowerer {
                 return false;
         }
     }
-
-    internal static bool TryGetRelationalPatternOperator(
-        SyntaxKind tokenKind,
-        bool negate,
-        out SymbolicRelationOperator op) {
+    internal static bool TryGetRelationalPatternOperator(SyntaxKind tokenKind, bool negate, out SymbolicRelationOperator op) {
         op = tokenKind switch {
             SyntaxKind.GreaterThanToken => negate
                 ? SymbolicRelationOperator.LessThanOrEqual
@@ -100,7 +89,6 @@ internal static class SymbolicOperatorLowerer {
             SyntaxKind.LessThanToken or
             SyntaxKind.LessThanEqualsToken;
     }
-
     internal static bool TryGetBinaryTermOperator(SyntaxKind kind, out SymbolicBinaryTermOperator op) {
         switch (kind) {
             case SyntaxKind.AddExpression:
@@ -123,7 +111,6 @@ internal static class SymbolicOperatorLowerer {
                 return false;
         }
     }
-
     internal static bool TryGetBinaryTermOperator(SmtIntegerBinaryOperator smtOperator, out SymbolicBinaryTermOperator op) {
         switch (smtOperator) {
             case SmtIntegerBinaryOperator.Add:
@@ -146,7 +133,6 @@ internal static class SymbolicOperatorLowerer {
                 return false;
         }
     }
-
     internal static SmtIntegerBinaryOperator GetSmtIntegerBinaryOperator(SymbolicBinaryTermOperator op) => op switch {
         SymbolicBinaryTermOperator.Add => SmtIntegerBinaryOperator.Add,
         SymbolicBinaryTermOperator.Subtract => SmtIntegerBinaryOperator.Subtract,

@@ -3,8 +3,7 @@ namespace SharpProof.Tools.Fuzz;
 internal static class FuzzShapeRegistry {
     private const string ClassNamePlaceholder = "__CLASS__";
 
-    internal static ImmutableArray<ShapeRegistryEntry> Load(
-        IReadOnlyDictionary<string, Func<int, Random, string, string>> generators) {
+    internal static ImmutableArray<ShapeRegistryEntry> Load(IReadOnlyDictionary<string, Func<int, Random, string, string>> generators) {
         var json = FuzzOptions.LoadResource("SharpProof.Fuzz.ShapeRegistry.json");
         var definitions = JsonSerializer.Deserialize<RegistryDefinition[]>(json) ??
                           throw new InvalidOperationException("The fuzz shape registry is empty.");
@@ -34,39 +33,35 @@ internal static class FuzzShapeRegistry {
                 build = (_, _, className) =>
                     template.Replace(ClassNamePlaceholder, className, StringComparison.Ordinal);
             }
-
             entries.Add(new ShapeRegistryEntry(
                 definition.Id,
-                definition.PrimaryShapes.ToImmutableArray(),
-                definition.OperationKinds.ToImmutableArray(),
-                definition.SyntaxKinds.ToImmutableArray(),
+                [.. definition.PrimaryShapes],
+                [.. definition.OperationKinds],
+                [.. definition.SyntaxKinds],
                 CreateExpectation(definition),
                 definition.AllowUnsafe,
                 build));
         }
-
         var unusedGenerators = generators.Keys.Except(usedGenerators, StringComparer.Ordinal).ToArray();
         if (unusedGenerators.Length != 0)
             throw new InvalidOperationException(
                 "The fuzz shape registry does not reference generator(s): " + string.Join(", ", unusedGenerators));
         return entries.MoveToImmutable();
     }
-
     private static FuzzExpectation CreateExpectation(RegistryDefinition definition) {
         if (!Enum.TryParse<SharpProofVerdict>(definition.PurityVerdict, out var purityVerdict) ||
             !Enum.IsDefined(purityVerdict))
             throw new InvalidOperationException($"Fuzz shape '{definition.Id}' has an invalid expectation.");
         return new FuzzExpectation(
             purityVerdict,
-            Compact(definition.RequiredEffects).Select(ParseEffect).ToImmutableArray(),
-            Compact(definition.ForbiddenEffects).Select(ParseEffect).ToImmutableArray(),
-            Compact(definition.RequiredUnknownCategories).ToImmutableArray(),
-            Compact(definition.RequiredDiagnosticIds).ToImmutableArray(),
+            [.. Compact(definition.RequiredEffects).Select(ParseEffect)],
+            [.. Compact(definition.ForbiddenEffects).Select(ParseEffect)],
+            [.. Compact(definition.RequiredUnknownCategories)],
+            [.. Compact(definition.RequiredDiagnosticIds)],
             definition.ProofCondition,
             definition.ProofStatus,
             definition.RequireCounterexample);
     }
-
     private static IEnumerable<string> Compact(string[]? values) =>
         (values ?? []).Where(static value => !string.IsNullOrWhiteSpace(value));
 

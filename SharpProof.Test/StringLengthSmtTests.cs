@@ -12,7 +12,8 @@ public sealed class StringLengthSmtTests : SemanticOracleSmtTestBase {
 
     private static IEnumerable<TestCaseData> Cases() {
         yield return Case("SymbolicQueryExecutor_ProvesStringRemoveStartResultLength",
-            Method("int", "string text, int start", "if (text != null && start >= 0 && start <= text.Length)\n{\n    return text.Remove(start).Length;\n}\n\nreturn 0;"),
+            Method("int", "string text, int start",
+                "if (text != null && start >= 0 && start <= text.Length)\n{\n    return text.Remove(start).Length;\n}\n\nreturn 0;"),
             Yes("return text.Remove(start).Length;", "text.Remove(start).Length == text.Length - start"));
         yield return Case("SymbolicQueryExecutor_ProvesStringRemoveRangeResultLength",
             Method("int", "string text, int start, int count", "if (text != null && start >= 0 && count >= 0 && start + count <= text.Length)\n{\n    return text.Remove(start, count).Length;\n}\n\nreturn 0;"),
@@ -25,13 +26,15 @@ public sealed class StringLengthSmtTests : SemanticOracleSmtTestBase {
             Yes("return text.PadLeft(width).Length;", "text.PadLeft(width).Length == width"),
             Yes("return text.PadRight(width, '.').Length;", "text.PadRight(width, '.').Length == text.Length"));
         yield return Case("SymbolicQueryExecutor_ProvesSpanSliceStartResultLength",
-            Method("int", "System.Span<int> span, int start", "if (start >= 0 && start <= span.Length)\n{\n    return span.Slice(start).Length;\n}\n\nreturn 0;"),
+            Method("int", "System.Span<int> span, int start",
+                "if (start >= 0 && start <= span.Length)\n{\n    return span.Slice(start).Length;\n}\n\nreturn 0;"),
             Yes("return span.Slice(start).Length;", "span.Slice(start).Length == span.Length - start"));
         yield return Case("SymbolicQueryExecutor_ProvesReadOnlySpanSliceRangeResultLength",
             Method("int", "System.ReadOnlySpan<int> span, int start, int length", "if (start >= 0 && length >= 0 && start + length <= span.Length)\n{\n    return span.Slice(start, length).Length;\n}\n\nreturn 0;"),
             Yes("return span.Slice(start, length).Length;", "span.Slice(start, length).Length == length"));
         yield return Case("SymbolicQueryExecutor_ProvesMemorySliceStartResultLength",
-            Method("int", "System.Memory<int> memory, int start", "if (start >= 0 && start <= memory.Length)\n{\n    return memory.Slice(start).Length;\n}\n\nreturn 0;"),
+            Method("int", "System.Memory<int> memory, int start",
+                "if (start >= 0 && start <= memory.Length)\n{\n    return memory.Slice(start).Length;\n}\n\nreturn 0;"),
             Yes("return memory.Slice(start).Length;", "memory.Slice(start).Length == memory.Length - start"));
         yield return Case("SymbolicQueryExecutor_ProvesReadOnlyMemorySliceRangeResultLength",
             Method("int", "System.ReadOnlyMemory<int> memory, int start, int length", "if (start >= 0 && length >= 0 && start + length <= memory.Length)\n{\n    return memory.Slice(start, length).Length;\n}\n\nreturn 0;"),
@@ -67,14 +70,18 @@ public sealed class StringLengthSmtTests : SemanticOracleSmtTestBase {
             Yes("return new string(chars.AsSpan(start, length)).Length;", "new string(chars.AsSpan(start, length)).Length == length"));
         yield return Case("SymbolicQueryExecutor_ProvesStringConcatResultLengths",
             Class("public int FixedConcat(string first, string second)\n{\n    if (first != null && second != null)\n    {\n        return string.Concat(first, \"-\", second).Length;\n    }\n    return 0;\n}\n\npublic int ParamsConcat(string first, string second, string third)\n{\n    if (first != null && second != null && third != null)\n    {\n        return string.Concat(first, \"-\", second, \"-\", third).Length;\n    }\n    return 0;\n}"),
-            Yes("return string.Concat(first, \"-\", second).Length;", "string.Concat(first, \"-\", second).Length == first.Length + 1 + second.Length"),
-            Yes("return string.Concat(first, \"-\", second, \"-\", third).Length;", "string.Concat(first, \"-\", second, \"-\", third).Length == first.Length + 1 + second.Length + 1 + third.Length"));
+            Yes("return string.Concat(first, \"-\", second).Length;",
+                "string.Concat(first, \"-\", second).Length == first.Length + 1 + second.Length"),
+            Yes("return string.Concat(first, \"-\", second, \"-\", third).Length;",
+                "string.Concat(first, \"-\", second, \"-\", third).Length == first.Length + 1 + second.Length + 1 + third.Length"));
         yield return Case("SymbolicQueryExecutor_ProvesStringInterpolationResultLengthWhenPartsAreStrings",
-            Method("int", "string first, string second", "if (first != null && second != null)\n{\n    return $\"{first}-{second}\".Length;\n}\n\nreturn 0;"),
+            Method("int", "string first, string second",
+                "if (first != null && second != null)\n{\n    return $\"{first}-{second}\".Length;\n}\n\nreturn 0;"),
             Yes("return $\"{first}-{second}\".Length;", "$\"{first}-{second}\".Length == first.Length + 1 + second.Length"));
         yield return Case("SymbolicQueryExecutor_ProvesStringInterpolationLengthWithNameofConstant",
             Class("public int WithNameof(string text)\n{\n    if (text != null)\n    {\n        return $\"{text}:{nameof(WithNameof)}\".Length;\n    }\n    return 0;\n}"),
-            Yes("return $\"{text}:{nameof(WithNameof)}\".Length;", "$\"{text}:{nameof(WithNameof)}\".Length == text.Length + 1 + nameof(WithNameof).Length"));
+            Yes("return $\"{text}:{nameof(WithNameof)}\".Length;",
+                "$\"{text}:{nameof(WithNameof)}\".Length == text.Length + 1 + nameof(WithNameof).Length"));
         yield return Case("SymbolicQueryExecutor_UnsupportedFormattedStringConstructionLengthsRemainUnknown",
             Class("public int InterpolationWithNonStringHole(string text, int value)\n{\n    if (text != null)\n    {\n        return $\"{text}:{value}\".Length;\n    }\n    return 0;\n}\n\npublic int ObjectConcat(string text, object value)\n{\n    if (text != null)\n    {\n        return string.Concat(text, value).Length;\n    }\n    return 0;\n}"),
             No("return $\"{text}:{value}\".Length;", "$\"{text}:{value}\".Length == text.Length + 1"),
@@ -84,7 +91,8 @@ public sealed class StringLengthSmtTests : SemanticOracleSmtTestBase {
             No("return text.Replace(oldValue, newValue).Length;", "text.Replace(oldValue, newValue).Length == text.Length"),
             No("return text.Trim().Length;", "text.Trim().Length == text.Length"));
         yield return Case("SymbolicQueryExecutor_ProvesStringSubstringStartResultLength",
-            Method("int", "string text, int start", "if (text != null && start >= 0 && start <= text.Length)\n{\n    return text.Substring(start).Length;\n}\n\nreturn 0;"),
+            Method("int", "string text, int start",
+                "if (text != null && start >= 0 && start <= text.Length)\n{\n    return text.Substring(start).Length;\n}\n\nreturn 0;"),
             Yes("return text.Substring(start).Length;", "text.Substring(start).Length == text.Length - start"));
         yield return Case("SymbolicQueryExecutor_ProvesStringSubstringRangeResultLength",
             Method("int", "string text, int start, int count", "if (text != null && start >= 0 && count >= 0 && start + count <= text.Length)\n{\n    return text.Substring(start, count).Length;\n}\n\nreturn 0;"),
@@ -93,7 +101,6 @@ public sealed class StringLengthSmtTests : SemanticOracleSmtTestBase {
             Method("bool", "string text", "if (text != null)\n{\n    return text.Substring(0, text.Length) == text;\n}\n\nreturn false;"),
             Yes("return text.Substring(0, text.Length) == text;", "text.Substring(0, text.Length) == text"));
     }
-
     [TestCaseSource(nameof(Cases))]
     public void StringLengthMatrix(StringCase testCase) {
         foreach (var expectation in testCase.Expectations)
@@ -102,7 +109,6 @@ public sealed class StringLengthSmtTests : SemanticOracleSmtTestBase {
             else
                 AssertConditionUnknown(testCase.Source, expectation.Marker, expectation.Condition);
     }
-
     [Test]
     public void ExecutionVisibility_StringInsertLengthContradiction_IsAlwaysFalse() => Assert.That(
         IsConditionAlwaysFalse(

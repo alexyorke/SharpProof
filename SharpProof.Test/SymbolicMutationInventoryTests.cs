@@ -31,20 +31,19 @@ public sealed class SymbolicMutationInventoryTests {
 
         Assert.Multiple(() => {
             Assert.That(plan.HasUnsupportedMutation, Is.False);
-            Assert.That(plan.Steps.Select(static step => step.Provenance), Is.EqualTo(new[] {
+            Assert.That(plan.Steps.Select(static step => step.Provenance), Is.EqualTo([
                 "operation-transfer.mutation-invalidation",
                 "operation-transfer.reference-invalidation",
                 "operation-transfer.reference-invalidation"
-            }));
+            ]));
             Assert.That(plan.Steps.SelectMany(static step => step.Targets).Select(static target => target.Key),
-                Is.EqualTo(new[] {
+                Is.EqualTo([
                     SymbolicStateValueFacts.ImplicitThisVariableName + "._field",
                     SymbolicFactFactory.GetSmtVariableName(value),
                     SymbolicFactFactory.GetSmtVariableName(value)
-                }));
+                ]));
         });
     }
-
     [Test]
     public void Inventory_ExcludesNestedCallableBodiesButIncludesPassedCaptures() {
         const string source = """
@@ -75,7 +74,6 @@ public sealed class SymbolicMutationInventoryTests {
             Assert.That(plan.Steps[0].Targets.Single().Key, Is.EqualTo(SymbolicFactFactory.GetSmtVariableName(value)));
         });
     }
-
     [Test]
     public void Inventory_PreservesUnsupportedTupleAndStrictSpanSemantics() {
         const string source = """
@@ -92,17 +90,16 @@ public sealed class SymbolicMutationInventoryTests {
         var fixture = RoslynTestFixture.CreateCompilation(source, nameof(Inventory_PreservesUnsupportedTupleAndStrictSpanSemantics));
         var block = fixture.Root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single().Body!;
         var assignments = block.DescendantNodes().OfType<AssignmentExpressionSyntax>().ToArray();
-        var first = fixture.SemanticModel.GetDeclaredSymbol(
-            fixture.Root.DescendantNodes().OfType<ParameterSyntax>().First())!;
+        var first = fixture.SemanticModel.GetDeclaredSymbol(fixture.Root.DescendantNodes().OfType<ParameterSyntax>().First())!;
         var inventory = SymbolicMutationInventory.Create(block, fixture.SemanticModel, CancellationToken.None);
 
         Assert.Multiple(() => {
             Assert.That(inventory.ToInvalidationPlan().HasUnsupportedMutation, Is.True);
-            Assert.That(inventory.MutatesBetween( assignments[0].SpanStart, assignments[1].SpanStart, first), Is.False, "window endpoints must remain exclusive");
-            Assert.That(inventory.MutatesBetween( assignments[0].SpanStart - 1, assignments[1].SpanStart, first), Is.True);
+            Assert.That(inventory.MutatesBetween(assignments[0].SpanStart, assignments[1].SpanStart, first), Is.False,
+                "window endpoints must remain exclusive");
+            Assert.That(inventory.MutatesBetween(assignments[0].SpanStart - 1, assignments[1].SpanStart, first), Is.True);
         });
     }
-
     [Test]
     public void ExposurePolicy_FiltersImmutableReferencesOnlyWhenRequested() {
         const string source = "static class C { static void Use(object value) { } static void M(string text) { Use(text); } }";

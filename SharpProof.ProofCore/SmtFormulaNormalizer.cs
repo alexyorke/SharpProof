@@ -19,21 +19,15 @@ internal static class SmtFormulaNormalizer {
                 changed = true;
                 continue;
             }
-
             normalizedConditions.Add(normalizedCondition);
         }
-
         return TryApplyEqualitySubstitutions(normalizedConditions, ref changed);
     }
-
     internal static bool TryClassifyCondition(SmtFormula condition, out bool shouldKeep) {
         shouldKeep = condition is not SmtBooleanConstant;
         return condition is not SmtBooleanConstant { Value: false };
     }
-
-    private static bool TryApplyEqualitySubstitutions(
-        List<SmtFormula> conditions,
-        ref bool changed) {
+    private static bool TryApplyEqualitySubstitutions(List<SmtFormula> conditions, ref bool changed) {
         for (var pass = 0; pass < MaxEqualitySubstitutionPasses; pass++) {
             var substitutions = new Dictionary<SmtVariable, SmtFormula>();
             foreach (var condition in conditions) TryCollectEqualitySubstitutions(condition, substitutions);
@@ -42,10 +36,7 @@ internal static class SmtFormulaNormalizer {
 
             var passChanged = false;
             for (var index = conditions.Count - 1; index >= 0; index--) {
-                var substituted = SubstituteEqualityAliases(
-                    conditions[index],
-                    substitutions,
-                    out var substitutedChanged);
+                var substituted = SubstituteEqualityAliases(conditions[index], substitutions, out var substitutedChanged);
                 if (substitutedChanged) substituted = SimplifyBooleanConstants(substituted, out _);
 
                 if (!TryClassifyCondition(substituted, out var shouldKeep)) return false;
@@ -55,23 +46,17 @@ internal static class SmtFormulaNormalizer {
                     passChanged = true;
                     continue;
                 }
-
                 if (substitutedChanged) {
                     conditions[index] = substituted;
                     passChanged = true;
                 }
             }
-
             changed |= passChanged;
             if (!passChanged) return true;
         }
-
         return true;
     }
-
-    private static void TryCollectEqualitySubstitutions(
-        SmtFormula formula,
-        Dictionary<SmtVariable, SmtFormula> substitutions) {
+    private static void TryCollectEqualitySubstitutions(SmtFormula formula, Dictionary<SmtVariable, SmtFormula> substitutions) {
         switch (formula) {
             case SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula:
                 TryCollectEqualitySubstitutions(andFormula.Left, substitutions);
@@ -83,11 +68,8 @@ internal static class SmtFormulaNormalizer {
                 break;
         }
     }
-
-    private static void TryCollectEqualitySubstitution(
-        SmtFormula left,
-        SmtFormula right,
-        Dictionary<SmtVariable, SmtFormula> substitutions) {
+    private static void TryCollectEqualitySubstitution(SmtFormula left, SmtFormula right, Dictionary<SmtVariable,
+        SmtFormula> substitutions) {
         if (left is SmtVariable leftVariable && right is SmtVariable rightVariable) {
             var comparison = string.CompareOrdinal(leftVariable.Name, rightVariable.Name);
             if (comparison < 0)
@@ -96,15 +78,12 @@ internal static class SmtFormulaNormalizer {
 
             return;
         }
-
         if (left is SmtVariable variableLeft) {
             TryAddEqualitySubstitution(variableLeft, right, substitutions);
             return;
         }
-
         if (right is SmtVariable variableRight) TryAddEqualitySubstitution(variableRight, left, substitutions);
     }
-
     private static void TryAddEqualitySubstitution(
         SmtVariable source,
         SmtFormula replacement,
@@ -119,7 +98,6 @@ internal static class SmtFormulaNormalizer {
 
         substitutions.Add(source, replacement);
     }
-
     private static bool WouldCreateSubstitutionCycle(
         SmtVariable source,
         SmtFormula replacement,
@@ -132,10 +110,8 @@ internal static class SmtFormulaNormalizer {
                 WouldCreateSubstitutionCycle(source, nested, substitutions, remainingDepth - 1))
                 return true;
         }
-
         return false;
     }
-
     private static SmtFormula SubstituteEqualityAliases(
         SmtFormula formula,
         IReadOnlyDictionary<SmtVariable, SmtFormula> substitutions,
@@ -154,10 +130,8 @@ internal static class SmtFormulaNormalizer {
             changed = true;
             current = rewritten;
         }
-
         return current;
     }
-
     private static SmtFormula SimplifyBooleanConstants(SmtFormula formula, out bool changed) {
         changed = false;
         var current = formula;
@@ -166,10 +140,8 @@ internal static class SmtFormulaNormalizer {
             if (!passChanged) break;
             changed = true;
         }
-
         return current;
     }
-
     private static SmtFormula SimplifyBooleanNode(SmtFormula formula) {
         if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated) {
             if (negated.Operand is SmtBooleanConstant booleanConstant)
@@ -178,23 +150,19 @@ internal static class SmtFormulaNormalizer {
                 return nested.Operand;
             if (negated.Operand is SmtBinaryFormula comparison &&
                 SmtComparisonOperatorFacts.IsComparison(comparison.Operator))
-                return new SmtBinaryFormula(
-                    SmtComparisonOperatorFacts.Negate(comparison.Operator),
-                    comparison.Left,
-                    comparison.Right);
+                return new SmtBinaryFormula(SmtComparisonOperatorFacts.Negate(comparison.Operator), comparison.Left, comparison.Right);
             if (negated.Operand is SmtBinaryFormula {
-                    Operator: SmtBinaryOperator.And or SmtBinaryOperator.Or
-                } logical)
+                Operator: SmtBinaryOperator.And or SmtBinaryOperator.Or
+            } logical)
                 return new SmtBinaryFormula(
                     logical.Operator == SmtBinaryOperator.And ? SmtBinaryOperator.Or : SmtBinaryOperator.And,
                     new SmtUnaryFormula(SmtUnaryOperator.Not, logical.Left),
                     new SmtUnaryFormula(SmtUnaryOperator.Not, logical.Right));
             return formula;
         }
-
         if (formula is not SmtBinaryFormula {
-                Operator: SmtBinaryOperator.And or SmtBinaryOperator.Or
-            } binary)
+            Operator: SmtBinaryOperator.And or SmtBinaryOperator.Or
+        } binary)
             return formula;
 
         var isAnd = binary.Operator == SmtBinaryOperator.And;

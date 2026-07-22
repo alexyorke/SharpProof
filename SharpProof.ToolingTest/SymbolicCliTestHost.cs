@@ -11,8 +11,7 @@ internal static class SymbolicCliTestHost {
     private static readonly Lazy<Task<string>> CliAssemblyPath =
         new(() => EnsureCliAssemblyPathAsync(RepositoryRoot.Value));
 
-    public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
-        params string[] arguments) {
+    public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(params string[] arguments) {
         var repositoryRoot = RepositoryRoot.Value;
         var cliAssemblyPath = await CliAssemblyPath.Value.ConfigureAwait(false);
         var startInfo = new ProcessStartInfo {
@@ -25,13 +24,9 @@ internal static class SymbolicCliTestHost {
         startInfo.ArgumentList.Add(cliAssemblyPath);
         foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
 
-        return await RunProcessAsync(
-                startInfo,
-                TimeSpan.FromSeconds(90),
-                "Failed to start symbolic CLI.")
+        return await RunProcessAsync(startInfo, TimeSpan.FromSeconds(90), "Failed to start symbolic CLI.")
             .ConfigureAwait(false);
     }
-
     private static async Task<string> EnsureCliAssemblyPathAsync(string repositoryRoot) {
         var existingPath = FindExistingCliAssemblyPath(repositoryRoot);
         if (existingPath != null) return existingPath;
@@ -50,8 +45,7 @@ internal static class SymbolicCliTestHost {
                 UseShellExecute = false
             };
             startInfo.ArgumentList.Add("build");
-            startInfo.ArgumentList.Add(Path.Combine("Tools", "SharpProof.SymbolicCli",
-                "SharpProof.SymbolicCli.csproj"));
+            startInfo.ArgumentList.Add(Path.Combine("Tools", "SharpProof.SymbolicCli", "SharpProof.SymbolicCli.csproj"));
             startInfo.ArgumentList.Add("--configuration");
             startInfo.ArgumentList.Add(buildConfiguration);
             startInfo.ArgumentList.Add("--verbosity");
@@ -60,9 +54,7 @@ internal static class SymbolicCliTestHost {
             startInfo.ArgumentList.Add("/nodeReuse:false");
             startInfo.ArgumentList.Add("-p:UseSharedCompilation=false");
 
-            var buildResult = await RunProcessAsync(
-                startInfo,
-                TimeSpan.FromSeconds(420),
+            var buildResult = await RunProcessAsync(startInfo, TimeSpan.FromSeconds(420),
                 "Failed to start symbolic CLI build.").ConfigureAwait(false);
             if (buildResult.ExitCode != 0)
                 throw new InvalidOperationException(
@@ -76,12 +68,10 @@ internal static class SymbolicCliTestHost {
         finally {
             BuildGate.Release();
         }
-
         throw new FileNotFoundException(
             "Could not find built SharpProof.SymbolicCli.dll after building it on demand.",
             Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli"));
     }
-
     private static string? FindExistingCliAssemblyPath(string repositoryRoot) {
         var targetFramework = Path.GetFileName(TestContext.CurrentContext.TestDirectory);
         var configurations = new[] {
@@ -103,10 +93,8 @@ internal static class SymbolicCliTestHost {
                 "SharpProof.SymbolicCli.dll");
             if (File.Exists(candidate)) return candidate;
         }
-
         return null;
     }
-
     private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunProcessAsync(
         ProcessStartInfo startInfo,
         TimeSpan timeout,
@@ -121,10 +109,8 @@ internal static class SymbolicCliTestHost {
             process.Kill(true);
             throw;
         }
-
         return (process.ExitCode, await outputTask.ConfigureAwait(false), await errorTask.ConfigureAwait(false));
     }
-
     private static string FindBuildConfiguration() {
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
         while (directory != null) {
@@ -134,8 +120,6 @@ internal static class SymbolicCliTestHost {
 
             directory = directory.Parent;
         }
-
         return "Debug";
     }
-
 }

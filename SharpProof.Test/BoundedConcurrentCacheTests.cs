@@ -26,7 +26,6 @@ public class BoundedConcurrentCacheTests {
         Assert.That(cache.MissCount, Is.GreaterThan(0));
         Assert.That(cache.EvictionCount, Is.EqualTo(valueCount + 1 - capacity));
     }
-
     [Test]
     public void Eviction_PreservesResultsComparedWithNoCache() {
         var cache = new BoundedConcurrentCache<int, int>(4);
@@ -39,26 +38,22 @@ public class BoundedConcurrentCacheTests {
         Assert.That(cache.Count, Is.EqualTo(4));
         Assert.That(cache.EvictionCount, Is.GreaterThan(0));
     }
-
     [Test]
     public void GetOrAdd_ConcurrentRequestsComputeOnceAndReuseValue() {
         var cache = new BoundedConcurrentCache<int, object>(4);
         var factoryCalls = 0;
         var results = new object[128];
 
-        Parallel.For(0, results.Length, index => {
-            results[index] = cache.GetOrAdd(1, _ => {
-                Interlocked.Increment(ref factoryCalls);
-                return new object();
-            });
-        });
+        Parallel.For(0, results.Length, index => results[index] = cache.GetOrAdd(1, _ => {
+            Interlocked.Increment(ref factoryCalls);
+            return new object();
+        }));
 
         Assert.That(factoryCalls, Is.EqualTo(1));
         Assert.That(results.All(item => ReferenceEquals(item, results[0])), Is.True);
         Assert.That(cache.MissCount, Is.EqualTo(1));
         Assert.That(cache.HitCount, Is.EqualTo(results.Length - 1));
     }
-
     private static int GetOrCompute(BoundedConcurrentCache<int, int> cache, int input) {
         if (cache.TryGetValue(input, out var value)) return value;
 

@@ -21,7 +21,6 @@ public class RoslynShapeManifestCoverageTests {
 
         Assert.That(missing, Is.Empty, "SyntaxKind values without coverage decisions: " + string.Join(", ", missing));
     }
-
     [Test]
     public void EveryGeneratorBackedShapeHasRegistryEntry() {
         var registryShapeIds = FuzzCaseGenerator.RegistryEntries
@@ -34,7 +33,6 @@ public class RoslynShapeManifestCoverageTests {
 
         Assert.That(missing, Is.Empty, "Generator-backed manifest shapes without registry entries: " + string.Join(", ", missing));
     }
-
     [Test]
     public void EveryRegistryEntryReferencesKnownManifestShapes() {
         var knownShapeIds = RoslynShapeManifest.EntriesByShapeId.Keys.ToImmutableHashSet(StringComparer.Ordinal);
@@ -47,7 +45,6 @@ public class RoslynShapeManifestCoverageTests {
 
         Assert.That(unknown, Is.Empty, "Registry entries reference unknown manifest shapes: " + string.Join(", ", unknown));
     }
-
     [Test]
     public void EveryRegistryEntryReferencesKnownRoslynKinds() {
         var operationKinds = Enum.GetNames<OperationKind>().ToImmutableHashSet(StringComparer.Ordinal);
@@ -65,10 +62,11 @@ public class RoslynShapeManifestCoverageTests {
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.That(unknownOperationKinds, Is.Empty, "Registry entries reference unknown OperationKind values: " + string.Join(", ", unknownOperationKinds));
-        Assert.That(unknownSyntaxKinds, Is.Empty, "Registry entries reference unknown SyntaxKind values: " + string.Join(", ", unknownSyntaxKinds));
+        Assert.That(unknownOperationKinds, Is.Empty, "Registry entries reference unknown OperationKind values: " + string.Join(", ",
+            unknownOperationKinds));
+        Assert.That(unknownSyntaxKinds, Is.Empty, "Registry entries reference unknown SyntaxKind values: " + string.Join(", ",
+            unknownSyntaxKinds));
     }
-
     [Test]
     public async Task EveryRegistryEntryEmitsDeclaredOperationKinds() {
         var analyses = await AnalyzeRegistryEntriesAsync();
@@ -78,10 +76,10 @@ public class RoslynShapeManifestCoverageTests {
             Assert.That(analysis.CompilationErrors, Is.Empty, entry.Id);
 
             foreach (var operationKind in entry.ExpectedOperationKinds)
-                Assert.That( analysis.OperationKinds.ContainsKey(operationKind), Is.True, entry.Id + " missing operation kind " + operationKind);
+                Assert.That(analysis.OperationKinds.ContainsKey(operationKind), Is.True,
+                    entry.Id + " missing operation kind " + operationKind);
         }
     }
-
     [Test]
     public async Task EveryRegistryEntryEmitsDeclaredSyntaxKinds() {
         var analyses = await AnalyzeRegistryEntriesAsync();
@@ -93,10 +91,9 @@ public class RoslynShapeManifestCoverageTests {
             Assert.That(analysis.CompilationErrors, Is.Empty, entry.Id);
 
             foreach (var syntaxKind in entry.ExpectedSyntaxKinds)
-                Assert.That( analysis.SyntaxKinds.ContainsKey(syntaxKind), Is.True, entry.Id + " missing syntax kind " + syntaxKind);
+                Assert.That(analysis.SyntaxKinds.ContainsKey(syntaxKind), Is.True, entry.Id + " missing syntax kind " + syntaxKind);
         }
     }
-
     [Test]
     public void DeterministicSampler_CoversAllGeneratorBackedShapesWithoutRandomSearch() {
         var generator = new FuzzCaseGenerator(20260614);
@@ -108,7 +105,6 @@ public class RoslynShapeManifestCoverageTests {
 
             foreach (var shapeId in fuzzCase.PrimaryShapeIds) observed.Add(shapeId);
         }
-
         var missing = RoslynShapeManifest.GeneratorBackedShapeIds
             .Where(shapeId => !observed.Contains(shapeId))
             .OrderBy(shapeId => shapeId, StringComparer.Ordinal)
@@ -116,8 +112,6 @@ public class RoslynShapeManifestCoverageTests {
 
         Assert.That(missing, Is.Empty, "Deterministic sampler missed generator-backed shapes: " + string.Join(", ", missing));
     }
-
-    private static async Task<ImmutableDictionary<string, FuzzCaseAnalysis>> AnalyzeRegistryEntriesAsync() {
-        return await ToolingFuzzAnalysisCache.GetRegistryEntryAnalysesAsync();
-    }
+    private static async Task<ImmutableDictionary<string, FuzzCaseAnalysis>> AnalyzeRegistryEntriesAsync()
+        => await ToolingFuzzAnalysisCache.GetRegistryEntryAnalysesAsync();
 }

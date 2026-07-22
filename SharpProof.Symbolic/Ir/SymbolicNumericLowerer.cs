@@ -1,10 +1,7 @@
 namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicNumericLowerer {
-    internal static bool TryLowerDefaultValueTerm(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context,
-        out SymbolicTerm term) {
+    internal static bool TryLowerDefaultValueTerm(ExpressionSyntax expression, SymbolicLoweringContext context, out SymbolicTerm term) {
         term = null!;
         if (!expression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression) &&
             expression is not DefaultExpressionSyntax)
@@ -18,20 +15,16 @@ internal static class SymbolicNumericLowerer {
             term = new SymbolicBooleanConstantTerm(false);
             return true;
         }
-
         if (SymbolicTypeLowerer.IsIntegerSmtType(type)) {
             term = new SymbolicIntegerConstantTerm(0);
             return true;
         }
-
         if (type.IsReferenceType) {
             term = new SymbolicNullTerm();
             return true;
         }
-
         return false;
     }
-
     internal static bool TryLowerIntegralMathClampInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
@@ -59,13 +52,9 @@ internal static class SymbolicNumericLowerer {
             max,
             invocation,
             "ir.known-api.math.clamp.above-max");
-        term = new SymbolicConditionalTerm(
-            belowMin,
-            min,
-            new SymbolicConditionalTerm(aboveMax, max, value));
+        term = new SymbolicConditionalTerm(belowMin, min, new SymbolicConditionalTerm(aboveMax, max, value));
         return true;
     }
-
     internal static bool TryLowerIntegralMathAbsInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
@@ -85,13 +74,9 @@ internal static class SymbolicNumericLowerer {
         term = new SymbolicConditionalTerm(
             nonNegative,
             value,
-            new SymbolicBinaryTerm(
-                SymbolicBinaryTermOperator.Subtract,
-                new SymbolicIntegerConstantTerm(0),
-                value));
+            new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, new SymbolicIntegerConstantTerm(0), value));
         return true;
     }
-
     internal static bool TryLowerIntegralMathMinMaxInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
@@ -115,7 +100,6 @@ internal static class SymbolicNumericLowerer {
         term = new SymbolicConditionalTerm(comparison, left, right);
         return true;
     }
-
     private static bool TryLowerIntegralMathArgument(
         IInvocationOperation operation,
         int parameterIndex,
@@ -125,14 +109,10 @@ internal static class SymbolicNumericLowerer {
         return parameterIndex >= 0 &&
                parameterIndex < operation.TargetMethod.Parameters.Length &&
                SymbolicTypeLowerer.IsIntegerSmtType(operation.TargetMethod.Parameters[parameterIndex].Type) &&
-               SymbolicValueFacts.TryGetInvocationArgumentExpression(
-                   operation,
-                   parameterIndex,
-                   out var argumentExpression) &&
+               SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, parameterIndex, out var argumentExpression) &&
                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argumentExpression, context), out term) &&
                term.Kind == SharpProof.ProofCore.Smt.SmtValueKind.Int;
     }
-
     private static bool TryGetIntegralMathInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
@@ -148,11 +128,9 @@ internal static class SymbolicNumericLowerer {
             operation = invocationOperation;
             return true;
         }
-
         operation = null!;
         return false;
     }
-
     internal static bool TryLowerBigIntegerStaticValueMember(ISymbol? memberSymbol, out SymbolicTerm term) {
         if (memberSymbol is IPropertySymbol property &&
             IsBigIntegerType(property.Type)) {
@@ -160,21 +138,17 @@ internal static class SymbolicNumericLowerer {
                 term = new SymbolicIntegerConstantTerm(0);
                 return true;
             }
-
             if (string.Equals(property.Name, "One", StringComparison.Ordinal)) {
                 term = new SymbolicIntegerConstantTerm(1);
                 return true;
             }
-
             if (string.Equals(property.Name, "MinusOne", StringComparison.Ordinal)) {
                 term = new SymbolicIntegerConstantTerm(-1);
                 return true;
             }
         }
-
         term = null!;
         return false;
     }
-
     internal static bool IsBigIntegerType(ITypeSymbol type) => SymbolicTypeFacts.IsBigIntegerType(type);
 }

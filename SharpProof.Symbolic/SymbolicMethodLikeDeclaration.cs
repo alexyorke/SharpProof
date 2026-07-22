@@ -1,11 +1,8 @@
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicMethodLikeDeclaration {
-    internal static bool IsSupported(
-        SyntaxNode node,
-        bool includeAnonymousFunctions = false,
-        bool includeDestructors = false) {
-        return node switch {
+    internal static bool IsSupported(SyntaxNode node, bool includeAnonymousFunctions = false, bool includeDestructors = false)
+        => node switch {
             DestructorDeclarationSyntax => includeDestructors,
             BaseMethodDeclarationSyntax => true,
             AccessorDeclarationSyntax or PropertyDeclarationSyntax or IndexerDeclarationSyntax or
@@ -13,11 +10,7 @@ internal static class SymbolicMethodLikeDeclaration {
             AnonymousFunctionExpressionSyntax => includeAnonymousFunctions,
             _ => false
         };
-    }
-
-    internal static IMethodSymbol? GetMethodSymbol(
-        SyntaxNode declaration,
-        SemanticModel semanticModel,
+    internal static IMethodSymbol? GetMethodSymbol(SyntaxNode declaration, SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         if (declaration is AnonymousFunctionExpressionSyntax anonymousFunction)
             return semanticModel.GetOperation(anonymousFunction, cancellationToken) is IAnonymousFunctionOperation lambda

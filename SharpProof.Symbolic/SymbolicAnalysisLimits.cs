@@ -13,7 +13,6 @@ internal enum SymbolicAnalysisLimitKind {
     FactChoiceCombinationsPerTarget,
     GuardFactsPerTargetPerState
 }
-
 internal sealed record SymbolicAnalysisTruncationEvent(
     SymbolicAnalysisLimitKind Kind,
     int Limit,
@@ -33,15 +32,12 @@ internal sealed record SymbolicAnalysisTruncationEvent(
         return "analysis_limit." + (Enum.IsDefined(typeof(SymbolicAnalysisLimitKind), value) ? snake : "unknown");
     }
 }
-
-internal sealed record SymbolicAnalysisTruncationInfo(
-    IReadOnlyList<SymbolicAnalysisTruncationEvent> Events) {
+internal sealed record SymbolicAnalysisTruncationInfo(IReadOnlyList<SymbolicAnalysisTruncationEvent> Events) {
     public static readonly SymbolicAnalysisTruncationInfo None = new(Array.Empty<SymbolicAnalysisTruncationEvent>());
 
     public bool IsTruncated => Events.Count != 0;
 
-    internal static SymbolicAnalysisTruncationInfo Combine(
-        IEnumerable<SymbolicAnalysisTruncationInfo> truncations) {
+    internal static SymbolicAnalysisTruncationInfo Combine(IEnumerable<SymbolicAnalysisTruncationInfo> truncations) {
         if (truncations == null) throw new ArgumentNullException(nameof(truncations));
 
         var events = new SymbolicAnalysisTruncationEventAccumulator();
@@ -50,11 +46,9 @@ internal sealed record SymbolicAnalysisTruncationInfo(
 
             foreach (var item in truncation.Events) events.Add(item);
         }
-
         return events.ToInfo();
     }
 }
-
 internal static class SymbolicAnalysisLimitContext {
     private static readonly AsyncLocal<Scope?> CurrentScope = new();
 
@@ -66,10 +60,7 @@ internal static class SymbolicAnalysisLimitContext {
     internal static Scope PushIsolated(SharpProofAnalysisBudget? limits = null, SyntaxNode? sourceNode = null)
         => Push(limits, sourceNode, propagateEvents: false);
 
-    private static Scope Push(
-        SharpProofAnalysisBudget? limits,
-        SyntaxNode? sourceNode,
-        bool propagateEvents) {
+    private static Scope Push(SharpProofAnalysisBudget? limits, SyntaxNode? sourceNode, bool propagateEvents) {
         var parent = CurrentScope.Value;
         var scope = new Scope(
             parent,
@@ -79,36 +70,16 @@ internal static class SymbolicAnalysisLimitContext {
         CurrentScope.Value = scope;
         return scope;
     }
-
-    internal static void Record(
-        SymbolicAnalysisLimitKind kind,
-        int limit,
-        int observed,
-        SyntaxNode? sourceNode,
-        string provenance) {
-        CurrentScope.Value?.Record(kind, limit, observed, sourceNode, provenance);
-    }
-
-    internal static bool CanAddMergedSwitchFact(
-        int addedCount,
-        SyntaxNode sourceNode,
-        string provenance) {
+    internal static void Record(SymbolicAnalysisLimitKind kind, int limit, int observed, SyntaxNode? sourceNode, string provenance)
+        => CurrentScope.Value?.Record(kind, limit, observed, sourceNode, provenance);
+    internal static bool CanAddMergedSwitchFact(int addedCount, SyntaxNode sourceNode, string provenance) {
         var limit = Limits.MaxMergedSwitchFacts;
         if (addedCount < limit) return true;
 
-        Record(
-            SymbolicAnalysisLimitKind.SwitchFactMerge,
-            limit,
-            addedCount + 1,
-            sourceNode,
-            provenance);
+        Record(SymbolicAnalysisLimitKind.SwitchFactMerge, limit, addedCount + 1, sourceNode, provenance);
         return false;
     }
-
-    internal sealed class Scope(
-        Scope? parent,
-        SharpProofAnalysisBudget limits,
-        int? defaultSourceSpanStart,
+    internal sealed class Scope(Scope? parent, SharpProofAnalysisBudget limits, int? defaultSourceSpanStart,
         bool propagateEvents) : IDisposable {
         private readonly SymbolicAnalysisTruncationEventAccumulator _events = new();
         private readonly Scope? _parent = parent;
@@ -122,29 +93,10 @@ internal static class SymbolicAnalysisLimitContext {
         internal SymbolicAnalysisTruncationInfo Snapshot() =>
             _events.ToInfo();
 
-        internal void Record(
-            SymbolicAnalysisLimitKind kind,
-            int limit,
-            int observed,
-            SyntaxNode? sourceNode,
-            string provenance) {
-            Record(kind, limit, observed, sourceNode?.SpanStart ?? DefaultSourceSpanStart, provenance);
-        }
-
-        private void Record(
-            SymbolicAnalysisLimitKind kind,
-            int limit,
-            int observed,
-            int? sourceSpanStart,
-            string provenance) {
-            _events.Add(new SymbolicAnalysisTruncationEvent(
-                kind,
-                limit,
-                observed,
-                provenance,
-                sourceSpanStart));
-        }
-
+        internal void Record(SymbolicAnalysisLimitKind kind, int limit, int observed, SyntaxNode? sourceNode,
+            string provenance) => Record(kind, limit, observed, sourceNode?.SpanStart ?? DefaultSourceSpanStart, provenance);
+        private void Record(SymbolicAnalysisLimitKind kind, int limit, int observed, int? sourceSpanStart, string provenance)
+            => _events.Add(new SymbolicAnalysisTruncationEvent(kind, limit, observed, provenance, sourceSpanStart));
         public void Dispose() {
             if (_disposed) return;
 
@@ -153,12 +105,7 @@ internal static class SymbolicAnalysisLimitContext {
             if (_parent == null || !_propagateEvents) return;
 
             foreach (var item in _events.Events)
-                _parent.Record(
-                    item.Kind,
-                    item.Limit,
-                    item.Observed,
-                    item.SourceSpanStart,
-                    item.Provenance);
+                _parent.Record(item.Kind, item.Limit, item.Observed, item.SourceSpanStart, item.Provenance);
         }
     }
 }

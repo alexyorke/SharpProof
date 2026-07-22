@@ -20,17 +20,13 @@ internal static class SmtNativeLibraryBootstrap {
         catch (Exception ex) when (ex is not OperationCanceledException) {
         }
     }
-
     internal static void TryLoadFromAnalyzerLocatorPaths(IEnumerable<string> paths) {
         if (paths == null) throw new ArgumentNullException(nameof(paths));
 
         var directories = new List<string>();
         foreach (var path in paths) {
             try {
-                if (!string.Equals(
-                        Path.GetFileName(path),
-                        AnalyzerLocatorFileName,
-                        StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(Path.GetFileName(path), AnalyzerLocatorFileName, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 var directory = Path.GetDirectoryName(path);
@@ -39,10 +35,8 @@ internal static class SmtNativeLibraryBootstrap {
             catch (Exception ex) when (ex is not OperationCanceledException) {
             }
         }
-
         TryLoadFromDirectories(directories);
     }
-
     private static void TryLoadFromDirectories(IEnumerable<string> directories) {
         var fileName = GetNativeLibraryFileName();
         if (fileName == null) return;
@@ -55,7 +49,6 @@ internal static class SmtNativeLibraryBootstrap {
             catch (Exception ex) when (ex is not OperationCanceledException) {
                 continue;
             }
-
             lock (Sync) {
                 if (s_libraryHandle != IntPtr.Zero) return;
                 if (!AttemptedLibraryPaths.Add(libraryPath) || !File.Exists(libraryPath)) continue;
@@ -70,12 +63,10 @@ internal static class SmtNativeLibraryBootstrap {
                 catch (Exception ex) when (ex is not OperationCanceledException) {
                     s_libraryHandle = IntPtr.Zero;
                 }
-
                 if (s_libraryHandle != IntPtr.Zero) return;
             }
         }
     }
-
     private static string? GetNativeLibraryFileName() {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return GetNativeLibraryFileName(OSPlatform.Windows, RuntimeInformation.ProcessArchitecture);
@@ -86,7 +77,6 @@ internal static class SmtNativeLibraryBootstrap {
 
         return null;
     }
-
     internal static string? GetNativeLibraryFileName(OSPlatform platform, Architecture architecture) {
         if (architecture != Architecture.X64) return null;
 
@@ -96,7 +86,6 @@ internal static class SmtNativeLibraryBootstrap {
 
         return null;
     }
-
     [DllImport("kernel32.dll", EntryPoint = "LoadLibraryW", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr LoadLibraryWindows(string libraryPath);
 

@@ -26,24 +26,19 @@ internal static class SymbolicMergedPathFactMerger {
                 if (conditionSet.Add(condition.Text) && seenConditionTexts.Add(condition.Text))
                     orderedConditions.Add(condition);
             }
-
             conditionSets.Add(conditionSet);
         }
-
         var commonTexts = new HashSet<string>(conditionSets[0], StringComparer.Ordinal);
         for (var index = 1; index < conditionSets.Count; index++) commonTexts.IntersectWith(conditionSets[index]);
 
         var mergedFacts = orderedConditions
             .Where(condition => commonTexts.Contains(condition.Text))
             .Select(static condition => condition.Text)
-            .Concat(CreateConservativeUnknowns(
-                orderedConditions.Where(condition => !commonTexts.Contains(condition.Text))))
+            .Concat(CreateConservativeUnknowns(orderedConditions.Where(condition => !commonTexts.Contains(condition.Text))))
             .ToArray();
         return SymbolicInvariantFactSummary.FormatMergedInvariantFacts(mergedFacts);
     }
-
-    private static IEnumerable<string> CreateConservativeUnknowns(
-        IEnumerable<(string Text, string Target)> conditions) {
+    private static IEnumerable<string> CreateConservativeUnknowns(IEnumerable<(string Text, string Target)> conditions) {
         var seenTargets = new HashSet<string>(StringComparer.Ordinal);
         foreach (var condition in conditions) {
             var target = string.IsNullOrWhiteSpace(condition.Target) ? "path" : condition.Target;

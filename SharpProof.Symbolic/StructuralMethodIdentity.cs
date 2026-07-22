@@ -2,9 +2,7 @@ using System.Text;
 
 namespace SharpProof.Identity;
 
-internal readonly record struct StructuralParameterIdentity(
-    string Type,
-    string RefKind);
+internal readonly record struct StructuralParameterIdentity(string Type, string RefKind);
 
 internal static class StructuralRefKinds {
     internal const string None = "none";
@@ -12,9 +10,7 @@ internal static class StructuralRefKinds {
     internal const string Out = "out";
     internal const string In = "in";
     internal const string RefReadonly = "ref-readonly";
-
 }
-
 internal sealed class StructuralMethodIdentity {
     internal const string KeyPrefix = "spm1";
 
@@ -45,7 +41,6 @@ internal sealed class StructuralMethodIdentity {
         ReturnType = returnType.Trim();
         ReturnRefKind = returnRefKind.Trim();
     }
-
     public string ContainingMetadataType { get; }
     public string MethodKind { get; }
     public string Name { get; }
@@ -67,13 +62,10 @@ internal sealed class StructuralMethodIdentity {
             values.Add(Encode(parameter.RefKind));
             values.Add(Encode(parameter.Type));
         }
-
         values.Add(Encode(ReturnRefKind));
         values.Add(Encode(ReturnType));
         return string.Join("|", values);
     }
-
     private static string Encode(string value) =>
         Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
-
 }

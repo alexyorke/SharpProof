@@ -6,7 +6,6 @@ internal enum AssociatedAttributePolicy {
     PropertyForAnyAccessor,
     AnyAssociatedSymbol
 }
-
 internal static class SymbolAttributeTraversal {
     internal static IEnumerable<AttributeData> GetAttributes(
         ISymbol symbol,

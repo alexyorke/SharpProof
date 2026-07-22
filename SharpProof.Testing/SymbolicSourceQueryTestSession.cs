@@ -11,17 +11,10 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable {
     private readonly SmtAnalysisService _smtAnalysis;
     private readonly SyntaxTree _syntaxTree;
 
-    public SymbolicSourceQueryTestSession(
-        string source,
-        string filePath,
-        bool allowUnsafe = false,
-        SmtAnalysisOptions? smtOptions = null) {
+    public SymbolicSourceQueryTestSession(string source, string filePath, bool allowUnsafe = false, SmtAnalysisOptions? smtOptions = null) {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         FilePath = filePath ?? throw new ArgumentNullException(nameof(filePath));
-        _syntaxTree = CSharpSyntaxTree.ParseText(
-            Source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            FilePath);
+        _syntaxTree = CSharpSyntaxTree.ParseText(Source, new CSharpParseOptions(LanguageVersion.Preview), FilePath);
         _compilation = CSharpCompilation.Create(
             "SharpProof.Test.SymbolicSourceQuery",
             new[] { _syntaxTree },
@@ -29,24 +22,17 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable {
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: allowUnsafe));
         _smtAnalysis = new SmtAnalysisService(smtOptions ?? SmtAnalysisOptions.Default);
     }
-
     public string Source { get; }
 
     public string FilePath { get; }
 
-    public void Dispose() {
-        _smtAnalysis.Dispose();
-    }
-
-    public SymbolicConditionProofResult ProveAtMarker((int Line, int Column, int Position) marker, string condition) {
-        return _service.Prove(
+    public void Dispose() => _smtAnalysis.Dispose();
+    public SymbolicConditionProofResult ProveAtMarker((int Line, int Column, int Position) marker, string condition) => _service.Prove(
             new SymbolicQueryContext(
                 SymbolicSourceInput.FromSyntaxTree(_syntaxTree, _compilation),
                 SharpProofTargetFactory.Point(marker.Line, marker.Column),
                 new SymbolicQueryOptions(smtAnalysis: _smtAnalysis)),
             condition);
-    }
-
     public int FindLine(string text) {
         var lines = Source.Split('\n');
         for (var index = 0; index < lines.Length; index++)
@@ -55,11 +41,7 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable {
 
         throw new InvalidOperationException("Text not found: " + text);
     }
-
-    public (int Line, int Column, int Position) FindMarker(string marker) {
-        return FindMarker(Source, marker);
-    }
-
+    public (int Line, int Column, int Position) FindMarker(string marker) => FindMarker(Source, marker);
     internal static (int Line, int Column, int Position) FindMarker(string source, string marker) {
         var position = source.IndexOf(marker, StringComparison.Ordinal);
         if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
@@ -72,7 +54,6 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable {
 
             currentPosition = nextPosition;
         }
-
         throw new InvalidOperationException("Marker line was not found in source.");
     }
 }

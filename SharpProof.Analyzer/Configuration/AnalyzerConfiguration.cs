@@ -6,14 +6,9 @@ internal sealed record AnalyzerConfiguration(
     ImmutableArray<InvalidAnalyzerConfigurationValue> InvalidConfigurationValues) {
     public static AnalyzerConfiguration FromOptions(AnalyzerOptions options) {
         var symbolic = SymbolicProjectConfiguration.FromAnalyzerOptions(options);
-        return new AnalyzerConfiguration(
-            symbolic.SmtOptions,
-            symbolic.AnalysisLimits,
-            GetInvalidGlobalConfigurationValues(options));
+        return new AnalyzerConfiguration(symbolic.SmtOptions, symbolic.AnalysisLimits, GetInvalidGlobalConfigurationValues(options));
     }
-
-    private static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidGlobalConfigurationValues(
-        AnalyzerOptions options) {
+    private static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidGlobalConfigurationValues(AnalyzerOptions options) {
         var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
         foreach (var option in AnalyzerConfigurationOptionRegistry.All)
             ValidateOption(
@@ -23,7 +18,6 @@ internal sealed record AnalyzerConfiguration(
                 option);
         return builder.ToImmutable();
     }
-
     internal static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidTreeConfigurationValues(
         AnalyzerConfigOptions options,
         AnalyzerConfigOptions? globalOptions = null) {
@@ -37,10 +31,8 @@ internal sealed record AnalyzerConfiguration(
                 value.Trim(),
                 "option is compilation-global; set it in a global AnalyzerConfig or MSBuild property"));
         }
-
         return builder.ToImmutable();
     }
-
     private static void ValidateOption(
         ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
         TryGetConfigurationOption tryGetOption,
@@ -61,7 +53,6 @@ internal sealed record AnalyzerConfiguration(
         if (reason != null)
             builder.Add(new InvalidAnalyzerConfigurationValue(option.Key, value.Trim(), reason));
     }
-
     private static bool TryParseBool(string value) =>
         value.Trim().ToLowerInvariant() is
             "1" or "true" or "yes" or "on" or
@@ -73,10 +64,7 @@ internal sealed record AnalyzerConfiguration(
             ? null
             : reason;
 
-    private static bool TryGetMatchingGlobalOption(
-        AnalyzerConfigOptions? globalOptions,
-        string key,
-        string treeValue) {
+    private static bool TryGetMatchingGlobalOption(AnalyzerConfigOptions? globalOptions, string key, string treeValue) {
         if (globalOptions == null) return false;
         if (globalOptions.TryGetValue(key, out var value) &&
             string.Equals(value, treeValue, StringComparison.Ordinal))
@@ -84,16 +72,9 @@ internal sealed record AnalyzerConfiguration(
         return globalOptions.TryGetValue("build_property." + key, out value) &&
                string.Equals(value, treeValue, StringComparison.Ordinal);
     }
-
-    private static bool TryGetAnalyzerConfigOption(
-        AnalyzerConfigOptions options,
-        string key,
-        out string value) => AnalyzerConfigurationValueReader.TryGetNonEmpty(options, key, out value);
+    private static bool TryGetAnalyzerConfigOption(AnalyzerConfigOptions options, string key, out string value)
+        => AnalyzerConfigurationValueReader.TryGetNonEmpty(options, key, out value);
 
     private delegate bool TryGetConfigurationOption(string key, out string value);
 }
-
-internal readonly record struct InvalidAnalyzerConfigurationValue(
-    string Key,
-    string Value,
-    string Reason);
+internal readonly record struct InvalidAnalyzerConfigurationValue(string Key, string Value, string Reason);

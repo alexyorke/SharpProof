@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer;
 
 internal static class EnforcePureContractAnalyzer {
-    internal static void Analyze(
-        MethodBodyAnalysisContext context,
-        SharpProofAttributeIdentityPolicy attributePolicy) {
+    internal static void Analyze(MethodBodyAnalysisContext context, SharpProofAttributeIdentityPolicy attributePolicy) {
         var method = context.MethodSymbol;
         if (!attributePolicy.HasAttribute(method, "EnforcePureAttribute")) return;
 
@@ -15,12 +13,7 @@ internal static class EnforcePureContractAnalyzer {
             site.Effect != SharpProof.Attributes.SharpProofEffect.Throws);
         var location = firstSite == null
             ? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node)
-            : Location.Create(
-                context.Node.SyntaxTree,
-                new TextSpan(firstSite.SpanStart, firstSite.SpanLength));
-        context.ReportDiagnostic(Diagnostic.Create(
-            AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"),
-            location,
-            method.Name));
+            : Location.Create(context.Node.SyntaxTree, new TextSpan(firstSite.SpanStart, firstSite.SpanLength));
+        context.ReportDiagnostic(Diagnostic.Create(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"), location, method.Name));
     }
 }

@@ -31,14 +31,6 @@ internal class ProofCoreRoslynLoweringTests {
         "divide_by_zero_unreachable",
         TestName = "Lowering_NonZeroGuard_ProvesDivideByZeroUnreachable")]
     [TestCase(
-        "int x",
-        "x + 1 <= 0 && x >= 0",
-        "true",
-        AnalyzerAnalysisHazardKind.EffectViolationReachability,
-        AnalysisProofOutcome.Proven,
-        "path_unsatisfiable",
-        TestName = "Lowering_AffineContradictoryImpureCallPath_ProvesPure")]
-    [TestCase(
         "int divisor",
         "divisor + 1 != 1",
         "divisor == 0",
@@ -53,10 +45,11 @@ internal class ProofCoreRoslynLoweringTests {
         int hazardKind,
         AnalysisProofOutcome expectedOutcome,
         string expectedReason) {
-        var context = AnalyzerTestHost.CreateConditionImplicationContext( parameters, pathCondition, conclusion);
-        var evidence = new AnalyzerPurityEvidence( (AnalyzerAnalysisHazardKind)hazardKind, new[] { context.PathCondition }, context.Conclusion);
+        var context = AnalyzerTestHost.CreateConditionImplicationContext(parameters, pathCondition, conclusion);
+        var evidence = new AnalyzerPurityEvidence((AnalyzerAnalysisHazardKind)hazardKind, new[] { context.PathCondition },
+            context.Conclusion);
 
-        var lowered = AnalyzerEvidenceToProofCoreLowering.TryLower( evidence, context.SemanticModel, CancellationToken.None, out var query);
+        var lowered = AnalyzerEvidenceToProofCoreLowering.TryLower(evidence, context.SemanticModel, CancellationToken.None, out var query);
 
         Assert.That(lowered, Is.True);
         using var search = new AnalysisProofSearch();

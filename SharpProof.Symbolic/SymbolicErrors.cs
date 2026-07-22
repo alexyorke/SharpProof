@@ -12,7 +12,6 @@ internal static class SymbolicErrorCodes {
     public const string Canceled = "SPQ3000";
     public const string InternalFailure = "SPQ9000";
 }
-
 internal static class SymbolicErrorExitCodes {
     public const int Usage = 64;
     public const int InvalidData = 65;
@@ -22,7 +21,6 @@ internal static class SymbolicErrorExitCodes {
     public const int TemporaryFailure = 75;
     public const int Canceled = 130;
 }
-
 internal static class SymbolicErrorClassifier {
     public static SharpProofError FromException(Exception exception) {
         if (exception == null) throw new ArgumentNullException(nameof(exception));
@@ -82,13 +80,11 @@ internal static class SymbolicErrorClassifier {
                 : relevant.Message,
             SymbolicErrorExitCodes.InternalFailure, false, relevant);
     }
-
     public static bool IsFatal(Exception exception) {
         if (exception == null) throw new ArgumentNullException(nameof(exception));
 
         return exception is OutOfMemoryException or StackOverflowException or AccessViolationException;
     }
-
     private static Exception Unwrap(Exception exception) {
         while (true) {
             switch (exception) {
@@ -104,12 +100,9 @@ internal static class SymbolicErrorClassifier {
             }
         }
     }
-
-    private static ImmutableDictionary<string, string> CreateExceptionDetails(Exception exception) {
-        return ImmutableDictionary<string, string>.Empty
+    private static ImmutableDictionary<string, string> CreateExceptionDetails(Exception exception)
+        => ImmutableDictionary<string, string>.Empty
             .Add("exceptionType", exception.GetType().FullName ?? exception.GetType().Name);
-    }
-
     private static SharpProofError Create(
         string code,
         SharpProofErrorCategory category,
@@ -120,26 +113,17 @@ internal static class SymbolicErrorClassifier {
         ImmutableDictionary<string, string>? details = null) =>
         new(code, category, message, exitCode, retryable, details ?? CreateExceptionDetails(exception));
 
-    private static ImmutableDictionary<string, string> AddPath(
-        ImmutableDictionary<string, string> details,
-        string? path) {
+    private static ImmutableDictionary<string, string> AddPath(ImmutableDictionary<string, string> details, string? path) {
         if (string.IsNullOrWhiteSpace(path)) return details;
 
         return details.SetItem("path", path!);
     }
-
-    private static bool IsNativeSolverLoadFailure(Exception exception) {
-        return exception is DllNotFoundException ||
+    private static bool IsNativeSolverLoadFailure(Exception exception) => exception is DllNotFoundException ||
                ((exception is BadImageFormatException or FileLoadException) &&
                (exception.Message.IndexOf("z3", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 exception.Message.IndexOf("solver", StringComparison.OrdinalIgnoreCase) >= 0));
-    }
-
-    private static bool IsZ3Exception(Exception exception) {
-        return IsExceptionType(exception, "Microsoft.Z3.Z3Exception") ||
+    private static bool IsZ3Exception(Exception exception) => IsExceptionType(exception, "Microsoft.Z3.Z3Exception") ||
                string.Equals(exception.GetType().Name, "Z3Exception", StringComparison.Ordinal);
-    }
-
     private static bool IsExceptionType(Exception exception, string fullName) =>
         string.Equals(exception.GetType().FullName, fullName, StringComparison.Ordinal);
 }

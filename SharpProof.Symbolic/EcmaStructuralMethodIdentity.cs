@@ -12,11 +12,8 @@ internal static class EcmaStructuralMethodIdentity {
         for (var index = 0; index < signature.ParameterTypes.Length; index++) {
             parameterAttributes.TryGetValue(index + 1, out var attributes);
             var parameterType = signature.ParameterTypes[index];
-            parameters.Add(new StructuralParameterIdentity(
-                parameterType.Key,
-                GetParameterRefKind(parameterType, attributes)));
+            parameters.Add(new StructuralParameterIdentity(parameterType.Key, GetParameterRefKind(parameterType, attributes)));
         }
-
         parameterAttributes.TryGetValue(0, out var returnAttributes);
         var metadataName = reader.GetString(definition.Name);
         return new StructuralMethodIdentity(
@@ -28,36 +25,29 @@ internal static class EcmaStructuralMethodIdentity {
             signature.ReturnType.Key,
             GetReturnRefKind(signature.ReturnType, returnAttributes));
     }
-
     internal static string GetCanonicalKey(MetadataReader reader, MethodDefinitionHandle handle) =>
         Create(reader, handle).ToCanonicalKey();
 
-    private static Dictionary<int, ParameterAttributes> GetParameterAttributes(
-        MetadataReader reader,
-        MethodDefinition definition) {
+    private static Dictionary<int, ParameterAttributes> GetParameterAttributes(MetadataReader reader, MethodDefinition definition) {
         var result = new Dictionary<int, ParameterAttributes>();
         foreach (var parameterHandle in definition.GetParameters()) {
             var parameter = reader.GetParameter(parameterHandle);
             result[parameter.SequenceNumber] = parameter.Attributes;
         }
-
         return result;
     }
-
     private static string GetParameterRefKind(StructuralDecodedType type, ParameterAttributes attributes) {
         if (!type.IsByRef) return StructuralRefKinds.None;
         if ((attributes & ParameterAttributes.Out) != 0) return StructuralRefKinds.Out;
         if ((attributes & ParameterAttributes.In) != 0) return StructuralRefKinds.In;
         return type.IsReadOnlyModifier ? StructuralRefKinds.RefReadonly : StructuralRefKinds.Ref;
     }
-
     private static string GetReturnRefKind(StructuralDecodedType type, ParameterAttributes attributes) {
         if (!type.IsByRef) return StructuralRefKinds.None;
         return type.IsReadOnlyModifier || (attributes & ParameterAttributes.In) != 0
             ? StructuralRefKinds.RefReadonly
             : StructuralRefKinds.Ref;
     }
-
     private static string GetMethodKind(string metadataName) {
         if (metadataName == ".ctor") return "constructor";
         if (metadataName == ".cctor") return "static-constructor";
@@ -72,7 +62,6 @@ internal static class EcmaStructuralMethodIdentity {
         if (simpleName == "Finalize") return "destructor";
         return "ordinary";
     }
-
     private static string GetLogicalName(string metadataName) {
         var simpleNameStart = metadataName.LastIndexOf('.') + 1;
         var simpleName = metadataName.Substring(simpleNameStart);
@@ -84,7 +73,6 @@ internal static class EcmaStructuralMethodIdentity {
             return metadataName.Substring(0, simpleNameStart) + simpleName.Substring(7);
         return metadataName;
     }
-
     private static string GetSimpleMetadataName(string metadataName) =>
         metadataName.Substring(metadataName.LastIndexOf('.') + 1);
 
@@ -98,7 +86,6 @@ internal static class EcmaStructuralMethodIdentity {
         var name = reader.GetString(definition.Name);
         return namespaceName.Length == 0 ? name : namespaceName + "." + name;
     }
-
     internal static string GetTypeReferenceMetadataName(MetadataReader reader, TypeReferenceHandle handle) {
         var reference = reader.GetTypeReference(handle);
         if (reference.ResolutionScope.Kind == HandleKind.TypeReference)
@@ -110,15 +97,11 @@ internal static class EcmaStructuralMethodIdentity {
         return namespaceName.Length == 0 ? name : namespaceName + "." + name;
     }
 }
-
-internal readonly record struct StructuralDecodedType(
-    string Key,
-    bool IsByRef = false,
-    bool IsReadOnlyModifier = false);
+internal readonly record struct StructuralDecodedType(string Key, bool IsByRef = false, bool IsReadOnlyModifier = false);
 
 internal sealed class StructuralTypeProvider : ISignatureTypeProvider<StructuralDecodedType, object?> {
     public StructuralDecodedType GetArrayType(StructuralDecodedType elementType, ArrayShape shape) =>
-        new StructuralDecodedType("array:" + shape.Rank + "[" + elementType.Key + "]");
+        new("array:" + shape.Rank + "[" + elementType.Key + "]");
 
     public StructuralDecodedType GetByReferenceType(StructuralDecodedType elementType) =>
         elementType with { IsByRef = true };
@@ -135,88 +118,59 @@ internal sealed class StructuralTypeProvider : ISignatureTypeProvider<Structural
             "fnptr:" + signature.Header.CallingConvention.ToString().ToLowerInvariant() + "(" + parameters +
             ")->" + returnRefKind + ":" + signature.ReturnType.Key);
     }
-
     public StructuralDecodedType GetGenericInstantiation(
         StructuralDecodedType genericType,
-        ImmutableArray<StructuralDecodedType> typeArguments) {
-        return new StructuralDecodedType(
+        ImmutableArray<StructuralDecodedType> typeArguments) => new(
             genericType.Key + "[" + string.Join(";", typeArguments.Select(static argument => argument.Key)) + "]");
-    }
-
     public StructuralDecodedType GetGenericMethodParameter(object? genericContext, int index) =>
-        new StructuralDecodedType("mparam:" + index);
+        new("mparam:" + index);
 
     public StructuralDecodedType GetGenericTypeParameter(object? genericContext, int index) =>
-        new StructuralDecodedType("tparam:" + index);
+        new("tparam:" + index);
 
-    public StructuralDecodedType GetModifiedType(
-        StructuralDecodedType modifier,
-        StructuralDecodedType unmodifiedType,
-        bool isRequired) {
+    public StructuralDecodedType GetModifiedType(StructuralDecodedType modifier, StructuralDecodedType unmodifiedType, bool isRequired) {
         var isReadOnly = isRequired &&
-                         (modifier.Key.IndexOf(
-                              "System.Runtime.CompilerServices.IsReadOnlyAttribute",
-                              StringComparison.Ordinal) >= 0 ||
-                          modifier.Key.IndexOf(
-                              "System.Runtime.InteropServices.InAttribute",
-                              StringComparison.Ordinal) >= 0);
+                         (modifier.Key.IndexOf("System.Runtime.CompilerServices.IsReadOnlyAttribute", StringComparison.Ordinal) >= 0 ||
+                          modifier.Key.IndexOf("System.Runtime.InteropServices.InAttribute", StringComparison.Ordinal) >= 0);
         return unmodifiedType with { IsReadOnlyModifier = unmodifiedType.IsReadOnlyModifier || isReadOnly };
     }
-
     public StructuralDecodedType GetPinnedType(StructuralDecodedType elementType) =>
         elementType;
 
     public StructuralDecodedType GetPointerType(StructuralDecodedType elementType) =>
-        new StructuralDecodedType("pointer[" + elementType.Key + "]");
+        new("pointer[" + elementType.Key + "]");
 
-    public StructuralDecodedType GetPrimitiveType(PrimitiveTypeCode typeCode) {
-        return new StructuralDecodedType("named:" + (typeCode switch {
-            PrimitiveTypeCode.Boolean => "System.Boolean",
-            PrimitiveTypeCode.Byte => "System.Byte",
-            PrimitiveTypeCode.Char => "System.Char",
-            PrimitiveTypeCode.Double => "System.Double",
-            PrimitiveTypeCode.Int16 => "System.Int16",
-            PrimitiveTypeCode.Int32 => "System.Int32",
-            PrimitiveTypeCode.Int64 => "System.Int64",
-            PrimitiveTypeCode.IntPtr => "System.IntPtr",
-            PrimitiveTypeCode.Object => "System.Object",
-            PrimitiveTypeCode.SByte => "System.SByte",
-            PrimitiveTypeCode.Single => "System.Single",
-            PrimitiveTypeCode.String => "System.String",
-            PrimitiveTypeCode.TypedReference => "System.TypedReference",
-            PrimitiveTypeCode.UInt16 => "System.UInt16",
-            PrimitiveTypeCode.UInt32 => "System.UInt32",
-            PrimitiveTypeCode.UInt64 => "System.UInt64",
-            PrimitiveTypeCode.UIntPtr => "System.UIntPtr",
-            PrimitiveTypeCode.Void => "System.Void",
-            _ => "<unknown>"
-        }));
-    }
-
+    public StructuralDecodedType GetPrimitiveType(PrimitiveTypeCode typeCode) => new("named:" + (typeCode switch {
+        PrimitiveTypeCode.Boolean => "System.Boolean",
+        PrimitiveTypeCode.Byte => "System.Byte",
+        PrimitiveTypeCode.Char => "System.Char",
+        PrimitiveTypeCode.Double => "System.Double",
+        PrimitiveTypeCode.Int16 => "System.Int16",
+        PrimitiveTypeCode.Int32 => "System.Int32",
+        PrimitiveTypeCode.Int64 => "System.Int64",
+        PrimitiveTypeCode.IntPtr => "System.IntPtr",
+        PrimitiveTypeCode.Object => "System.Object",
+        PrimitiveTypeCode.SByte => "System.SByte",
+        PrimitiveTypeCode.Single => "System.Single",
+        PrimitiveTypeCode.String => "System.String",
+        PrimitiveTypeCode.TypedReference => "System.TypedReference",
+        PrimitiveTypeCode.UInt16 => "System.UInt16",
+        PrimitiveTypeCode.UInt32 => "System.UInt32",
+        PrimitiveTypeCode.UInt64 => "System.UInt64",
+        PrimitiveTypeCode.UIntPtr => "System.UIntPtr",
+        PrimitiveTypeCode.Void => "System.Void",
+        _ => "<unknown>"
+    }));
     public StructuralDecodedType GetSZArrayType(StructuralDecodedType elementType) =>
-        new StructuralDecodedType("array:1[" + elementType.Key + "]");
+        new("array:1[" + elementType.Key + "]");
 
-    public StructuralDecodedType GetTypeFromDefinition(
-        MetadataReader reader,
-        TypeDefinitionHandle handle,
-        byte rawTypeKind) {
-        return new StructuralDecodedType(
-            "named:" + EcmaStructuralMethodIdentity.GetTypeDefinitionMetadataName(reader, handle));
-    }
-
-    public StructuralDecodedType GetTypeFromReference(
-        MetadataReader reader,
-        TypeReferenceHandle handle,
-        byte rawTypeKind) {
-        return new StructuralDecodedType(
-            "named:" + EcmaStructuralMethodIdentity.GetTypeReferenceMetadataName(reader, handle));
-    }
-
+    public StructuralDecodedType GetTypeFromDefinition(MetadataReader reader, TypeDefinitionHandle handle, byte rawTypeKind)
+        => new("named:" + EcmaStructuralMethodIdentity.GetTypeDefinitionMetadataName(reader, handle));
+    public StructuralDecodedType GetTypeFromReference(MetadataReader reader, TypeReferenceHandle handle, byte rawTypeKind)
+        => new("named:" + EcmaStructuralMethodIdentity.GetTypeReferenceMetadataName(reader, handle));
     public StructuralDecodedType GetTypeFromSpecification(
         MetadataReader reader,
         object? genericContext,
         TypeSpecificationHandle handle,
-        byte rawTypeKind) {
-        return reader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
-    }
+        byte rawTypeKind) => reader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
 }

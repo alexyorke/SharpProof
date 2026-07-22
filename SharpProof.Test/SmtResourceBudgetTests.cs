@@ -11,7 +11,6 @@ public sealed class SmtResourceBudgetTests {
         Assert.That(SmtResourceBudget.GetRlimit(TimeSpan.MaxValue), Is.EqualTo(uint.MaxValue));
         Assert.That(SmtResourceBudget.GetMethodRlimitBudget(TimeSpan.FromMilliseconds(-1)), Is.Zero);
     }
-
     [Test]
     public void GetWallClockSafetyNet_LargestSafeBudget_ScalesBySafetyFactor() {
         var safeTicks = TimeSpan.MaxValue.Ticks / SmtResourceBudget.WallClockSafetyFactor;
@@ -21,7 +20,6 @@ public sealed class SmtResourceBudgetTests {
 
         Assert.That(safetyNet.Ticks, Is.EqualTo(safeTicks * SmtResourceBudget.WallClockSafetyFactor));
     }
-
     [Test]
     public void GetWallClockSafetyNet_OverflowingBudget_SaturatesAtMaxValue() {
         var overflowingTicks = TimeSpan.MaxValue.Ticks / SmtResourceBudget.WallClockSafetyFactor + 1;
@@ -31,7 +29,6 @@ public sealed class SmtResourceBudgetTests {
 
         Assert.That(safetyNet, Is.EqualTo(TimeSpan.MaxValue));
     }
-
     [Test]
     public void GetWallClockSafetyNet_NegativeBudget_ClampsToZero() {
         var underflowingTicks = TimeSpan.MinValue.Ticks / SmtResourceBudget.WallClockSafetyFactor - 1;

@@ -99,7 +99,6 @@ public sealed class SymbolicComplexityTests {
             unknowns: [SymbolicComplexityUnknownReason.UnsupportedLoopShape], callee: "Seed",
             exactUnknowns: true, unknownDriverCount: 1, namedCalleeCount: 1);
     }
-
     [TestCaseSource(nameof(ComplexityCases))]
     public void ComplexityMatrix(object value) {
         var testCase = (ComplexityCase)value;
@@ -111,12 +110,15 @@ public sealed class SymbolicComplexityTests {
             else Assert.That(result.UnknownReasons.Any(testCase.Unknowns.Contains), Is.True);
         }
         if (testCase.Driver != null) Assert.That(result.Drivers.Any(driver => driver.Kind == testCase.Driver), Is.True);
-        if (testCase.Callee != null) Assert.That(result.CalleeSummaries.Any(summary => summary.MethodDisplayName.Contains(testCase.Callee, StringComparison.Ordinal)), Is.True);
-        if (testCase.CalleeUnknown is { } reason) Assert.That(result.CalleeSummaries.Any(summary => summary.UnknownReason == reason), Is.True);
-        if (testCase.UnknownDriverCount is { } driverCount) Assert.That(result.Drivers.Count(driver => driver.Kind == "Unknown"), Is.EqualTo(driverCount));
-        if (testCase.NamedCalleeCount is { } calleeCount) Assert.That(result.CalleeSummaries.Count(summary => summary.MethodDisplayName.Contains(testCase.Callee!, StringComparison.Ordinal)), Is.EqualTo(calleeCount));
+        if (testCase.Callee != null) Assert.That(result.CalleeSummaries.Any(summary
+            => summary.MethodDisplayName.Contains(testCase.Callee, StringComparison.Ordinal)), Is.True);
+        if (testCase.CalleeUnknown is { } reason) Assert.That(result.CalleeSummaries.Any(summary
+            => summary.UnknownReason == reason), Is.True);
+        if (testCase.UnknownDriverCount is { } driverCount) Assert.That(result.Drivers.Count(driver
+            => driver.Kind == "Unknown"), Is.EqualTo(driverCount));
+        if (testCase.NamedCalleeCount is { } calleeCount) Assert.That(result.CalleeSummaries.Count(summary
+            => summary.MethodDisplayName.Contains(testCase.Callee!, StringComparison.Ordinal)), Is.EqualTo(calleeCount));
     }
-
     private static TestCaseData Case(
         string name, string source, string marker, SymbolicComplexityKind kind, string? text = null,
         SymbolicComplexityUnknownReason[]? unknowns = null, string? driver = null, string? callee = null,
@@ -129,11 +131,13 @@ public sealed class SymbolicComplexityTests {
     private static SymbolicComplexityResult QueryComplexityAtMarker(string source, string marker, bool useLineTarget = false) {
         var position = source.IndexOf(marker, StringComparison.Ordinal);
         if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
-        var target = useLineTarget ? SharpProofTargetFactory.LineNumber(GetLineNumber(source, position)) : SharpProofTargetFactory.AtPosition(position);
-        var (tree, compilation) = SymbolicSourceCompilation.Create(source, "SymbolicComplexityTests.cs", SymbolicSourceCompilationKind.Query, null, default);
-        return new SymbolicQueryExecutor().QueryComplexity(new SymbolicQueryContext(SymbolicSourceInput.FromSyntaxTree(tree, compilation), target));
+        var target = useLineTarget ? SharpProofTargetFactory.LineNumber(GetLineNumber(source,
+            position)) : SharpProofTargetFactory.AtPosition(position);
+        var (tree, compilation) = SymbolicSourceCompilation.Create(source, "SymbolicComplexityTests.cs",
+            SymbolicSourceCompilationKind.Query, null, default);
+        return new SymbolicQueryExecutor().QueryComplexity(new SymbolicQueryContext(SymbolicSourceInput.FromSyntaxTree(tree, compilation),
+            target));
     }
-
     private static int GetLineNumber(string source, int position) =>
         source.Take(position).Count(static character => character == '\n') + 1;
 

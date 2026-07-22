@@ -6,26 +6,18 @@ internal sealed class AnalyzerSession : IDisposable {
 
     private readonly MethodEffectAnalysisSession _effectAnalysis;
 
-    internal AnalyzerSession(
-        Compilation compilation,
-        AnalyzerOptions options,
-        CancellationToken cancellationToken) {
+    internal AnalyzerSession(Compilation compilation, AnalyzerOptions options, CancellationToken cancellationToken) {
         Configuration = AnalyzerConfiguration.FromOptions(options);
         AttributePolicy = SharpProofAttributeIdentityPolicy.Create();
 
-        ProofService = new AnalyzerProofService(
-            Configuration.SmtOptions,
-            Configuration.AnalysisLimits);
-        var configuredEffects = new ConfiguredEffectContractResolver(
-            options.AnalyzerConfigOptionsProvider.GlobalOptions);
+        ProofService = new AnalyzerProofService(Configuration.SmtOptions, Configuration.AnalysisLimits);
+        var configuredEffects = new ConfiguredEffectContractResolver(options.AnalyzerConfigOptionsProvider.GlobalOptions);
         _effectAnalysis = new MethodEffectAnalysisSession(
             compilation,
             cancellationToken,
             configuredEffects.Resolve,
             ProofService.SmtAnalysis);
-
     }
-
     internal AnalyzerConfiguration Configuration { get; }
 
     internal SharpProofAttributeIdentityPolicy AttributePolicy { get; }
@@ -42,12 +34,7 @@ internal sealed class AnalyzerSession : IDisposable {
             methodSymbol,
             _ => new Lazy<MethodBodyAnalysisState>(
                 () => new MethodBodyAnalysisState(
-                    MethodAnalysisSnapshot.Create(
-                        methodSymbol,
-                        declaration,
-                        semanticModel,
-                        operationBlocks,
-                        cancellationToken),
+                    MethodAnalysisSnapshot.Create(methodSymbol, declaration, semanticModel, operationBlocks, cancellationToken),
                     _effectAnalysis),
                 LazyThreadSafetyMode.ExecutionAndPublication));
         try {
@@ -61,7 +48,6 @@ internal sealed class AnalyzerSession : IDisposable {
             throw;
         }
     }
-
     public void Dispose() {
         ProofService.Dispose();
         _methodBodyAnalyses.Clear();

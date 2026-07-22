@@ -21,42 +21,22 @@ internal static class SymbolicComplexityAlgebra {
 
         return ComplexityArtifacts.FromCost(cost, body.Drivers, reasons, body.CalleeSummaries);
     }
-
     internal static MethodAnalysisSummary CreateSummary(
         SymbolicCostExpression cost,
         IEnumerable<SymbolicComplexityDriverInfo> drivers,
         IEnumerable<SymbolicComplexityUnknownReason> reasons,
-        IEnumerable<SymbolicComplexityCalleeInfo> callees) {
-        return new MethodAnalysisSummary(
-            cost,
-            drivers.ToImmutableArray(),
-            reasons.ToImmutableArray(),
-            callees.ToImmutableArray());
-    }
-
-    internal static SymbolicComplexityDriverInfo CreateDriver(
-        string kind,
-        string description,
-        SyntaxNode node) {
-        return new SymbolicComplexityDriverInfo(
-            kind,
-            description,
-            node.SpanStart,
-            node.Span.Length);
-    }
-
+        IEnumerable<SymbolicComplexityCalleeInfo> callees) => new(cost, [.. drivers], [.. reasons], [.. callees]);
+    internal static SymbolicComplexityDriverInfo CreateDriver(string kind, string description, SyntaxNode node)
+        => new(kind, description, node.SpanStart, node.Span.Length);
     internal static SymbolicComplexityCalleeInfo CreateCalleeInfo(
         string methodDisplayName,
         SymbolicCostExpression cost,
-        IMethodSymbol contextMethod) {
-        return new SymbolicComplexityCalleeInfo(
+        IMethodSymbol contextMethod) => new(
             methodDisplayName,
             cost.ToBigOText(contextMethod),
             cost.ToPublicKind(),
             cost.IsConservative,
             cost.UnknownReason);
-    }
-
     private static ComplexityArtifacts Combine(IEnumerable<ComplexityArtifacts> parts) {
         var costExpressions = new List<SymbolicCostExpression>();
         var drivers = new List<SymbolicComplexityDriverInfo>();
@@ -68,7 +48,6 @@ internal static class SymbolicComplexityAlgebra {
             reasons.AddRange(part.UnknownReasons);
             callees.AddRange(part.CalleeSummaries);
         }
-
         var combinedCost = SymbolicCostExpression.Max(costExpressions);
         if (combinedCost.IsUnknown && combinedCost.UnknownReason != SymbolicComplexityUnknownReason.None)
             reasons.Add(combinedCost.UnknownReason);

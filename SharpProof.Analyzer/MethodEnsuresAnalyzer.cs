@@ -14,9 +14,7 @@ internal static class MethodEnsuresAnalyzer {
         var contracts = CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);
         if (contracts.Length == 0) return;
 
-        contracts = ReportAndFilterInvalidContracts(
-            contracts,
-            context);
+        contracts = ReportAndFilterInvalidContracts(contracts, context);
         if (contracts.Length == 0) return;
 
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) {
@@ -29,24 +27,15 @@ internal static class MethodEnsuresAnalyzer {
                     null);
                 report(diagnostic);
             }
-
             return;
         }
-
         if (!SupportsEnsuresPostconditions(context.Node, out var unsupportedReason)) {
             foreach (var contract in contracts) {
-                var diagnostic = CreateUnsupportedDiagnostic(
-                    methodSymbol,
-                    contract.Condition,
-                    contract.Location,
-                    unsupportedReason,
-                    null);
+                var diagnostic = CreateUnsupportedDiagnostic(methodSymbol, contract.Condition, contract.Location, unsupportedReason, null);
                 report(diagnostic);
             }
-
             return;
         }
-
         var requiresAssumptions = CollectRequiresAssumptions(methodSymbol, attributePolicy, context.CancellationToken);
         var completionSites = MethodCompletionAnalysis.Collect(context);
         if (completionSites.Length == 0) return;
@@ -54,10 +43,7 @@ internal static class MethodEnsuresAnalyzer {
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var contract in contracts) {
-            if (!ContractConditionHelpers.TryParse(
-                    contract.Condition,
-                    out var conditionStatement,
-                    out var conditionExpression)) {
+            if (!ContractConditionHelpers.TryParse(contract.Condition, out var conditionStatement, out var conditionExpression)) {
                 var diagnostic = CreateUnsupportedDiagnostic(
                     methodSymbol,
                     contract.Condition,
@@ -68,7 +54,6 @@ internal static class MethodEnsuresAnalyzer {
 
                 continue;
             }
-
             if (!ContractConditionHelpers.TryCreateSpeculativeModel(
                     context.SemanticModel,
                     completionSites[0].QueryNode.SpanStart,
@@ -84,7 +69,6 @@ internal static class MethodEnsuresAnalyzer {
 
                 continue;
             }
-
             if (!completionSites.All(static site => site.ResultExpression != null) &&
                 RequiresContractHelpers.ContainsResultReference(conditionExpression)) {
                 var diagnostic = CreateUnsupportedDiagnostic(
@@ -97,9 +81,7 @@ internal static class MethodEnsuresAnalyzer {
 
                 continue;
             }
-
-            if (ReferencesUserLocalOrUnsupportedParameter(conditionExpression, speculativeModel, methodSymbol,
-                    context.CancellationToken)) {
+            if (ReferencesUserLocalOrUnsupportedParameter(conditionExpression, speculativeModel, methodSymbol, context.CancellationToken)) {
                 var diagnostic = CreateUnsupportedDiagnostic(
                     methodSymbol,
                     contract.Condition,
@@ -110,7 +92,6 @@ internal static class MethodEnsuresAnalyzer {
 
                 continue;
             }
-
             foreach (var completionSite in completionSites) {
                 if (!TryRewriteConditionForCompletionSite(
                         contract.Condition,
@@ -128,14 +109,9 @@ internal static class MethodEnsuresAnalyzer {
 
                     continue;
                 }
-
                 var proofCondition =
                     RequiresContractHelpers.CombineAsImplication(requiresAssumptions, rewrittenCondition);
-                var proof = MethodCompletionAnalysis.Prove(
-                    context,
-                    proofService.SmtAnalysis,
-                    completionSite,
-                    proofCondition);
+                var proof = MethodCompletionAnalysis.Prove(context, proofService.SmtAnalysis, completionSite, proofCondition);
 
                 if (proof.TruthValue == SymbolicTruthValue.ProvenTrue ||
                     proof.TruthValue == SymbolicTruthValue.Unreachable)
@@ -151,16 +127,11 @@ internal static class MethodEnsuresAnalyzer {
                 if (!seen.Add(key)) continue;
 
                 if (proof.TruthValue == SymbolicTruthValue.ProvenFalse) {
-                    var diagnostic = CreateNotProvenDiagnostic(
-                        methodSymbol,
-                        contract.Condition,
-                        completionSite,
-                        contract.Location);
+                    var diagnostic = CreateNotProvenDiagnostic(methodSymbol, contract.Condition, completionSite, contract.Location);
                     report(diagnostic);
 
                     continue;
                 }
-
                 var unsupportedDiagnostic = CreateUnsupportedDiagnostic(
                     methodSymbol,
                     contract.Condition,
@@ -171,34 +142,22 @@ internal static class MethodEnsuresAnalyzer {
             }
         }
     }
-
     private static ImmutableArray<EnsuresContract> CollectContracts(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken) {
-        return ContractConditionHelpers.Collect(
+        CancellationToken cancellationToken) => ContractConditionHelpers.Collect(
             methodSymbol,
             attributePolicy,
             "EnsuresAttribute",
-            static contract => new EnsuresContract(
-                contract.Condition,
-                contract.Location,
-                contract.Argument,
-                contract.InvalidReason),
+            static contract => new EnsuresContract(contract.Condition, contract.Location, contract.Argument, contract.InvalidReason),
             cancellationToken);
-    }
-
     private static ImmutableArray<RequiresContract> CollectRequiresAssumptions(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken) {
-        return RequiresContractHelpers.ValidContracts(methodSymbol, attributePolicy, cancellationToken)
+        CancellationToken cancellationToken) => [.. RequiresContractHelpers.ValidContracts(methodSymbol, attributePolicy, cancellationToken)
             .Where(contract =>
                 ContractConditionHelpers.TryParse(contract.Condition, out _, out var conditionExpression) &&
-                !RequiresContractHelpers.ContainsResultReference(conditionExpression))
-            .ToImmutableArray();
-    }
-
+                !RequiresContractHelpers.ContainsResultReference(conditionExpression))];
     private static ImmutableArray<EnsuresContract> ReportAndFilterInvalidContracts(
         ImmutableArray<EnsuresContract> contracts,
         MethodBodyAnalysisContext context) {
@@ -208,7 +167,6 @@ internal static class MethodEnsuresAnalyzer {
                 validContracts.Add(contract);
                 continue;
             }
-
             var diagnostic = InvalidContractArgumentDiagnostics.Create(
                 "[Ensures]",
                 contract.Argument,
@@ -216,13 +174,9 @@ internal static class MethodEnsuresAnalyzer {
                 contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node));
             context.ReportDiagnostic(diagnostic);
         }
-
         return validContracts.ToImmutable();
     }
-
-    private static bool SupportsEnsuresPostconditions(
-        SyntaxNode methodNode,
-        out string reason) {
+    private static bool SupportsEnsuresPostconditions(SyntaxNode methodNode, out string reason) {
         if (methodNode is AccessorDeclarationSyntax accessor &&
             (accessor.IsKind(SyntaxKind.SetAccessorDeclaration) ||
              accessor.IsKind(SyntaxKind.InitAccessorDeclaration) ||
@@ -231,11 +185,9 @@ internal static class MethodEnsuresAnalyzer {
             reason = "non-returning accessors are not supported by [Ensures]";
             return false;
         }
-
         reason = string.Empty;
         return true;
     }
-
     private static bool ReferencesUserLocalOrUnsupportedParameter(
         ExpressionSyntax conditionExpression,
         SemanticModel speculativeModel,
@@ -252,18 +204,10 @@ internal static class MethodEnsuresAnalyzer {
                 !IsSupportedEnsuresParameter(parameter, methodSymbol))
                 return true;
         }
-
         return false;
     }
-
-    private static bool IsSupportedEnsuresParameter(
-        IParameterSymbol parameter,
-        IMethodSymbol methodSymbol) {
-        return SymbolEq.AreEqual(
-            parameter.ContainingSymbol?.OriginalDefinition,
-            methodSymbol.OriginalDefinition);
-    }
-
+    private static bool IsSupportedEnsuresParameter(IParameterSymbol parameter, IMethodSymbol methodSymbol)
+        => SymbolEq.AreEqual(parameter.ContainingSymbol?.OriginalDefinition, methodSymbol.OriginalDefinition);
     private static bool TryRewriteConditionForCompletionSite(
         string conditionText,
         MethodNormalCompletion completionSite,
@@ -278,7 +222,6 @@ internal static class MethodEnsuresAnalyzer {
             rewrittenExpression = conditionExpression;
             return true;
         }
-
         if (resultState == NullableFlowFactState.NotNull)
             conditionExpression = (ExpressionSyntax)new NullableResultContractRewriter().Visit(conditionExpression)!;
 
@@ -288,7 +231,6 @@ internal static class MethodEnsuresAnalyzer {
         rewrittenExpression = rewritten;
         return true;
     }
-
     internal static bool TryCreateEntrySnapshotProofCondition(
         string proofCondition,
         IMethodSymbol methodSymbol,
@@ -306,7 +248,6 @@ internal static class MethodEnsuresAnalyzer {
             failureReason = "condition parse failure";
             return false;
         }
-
         if (!ContainsOldValueInvocation(proofExpression)) return false;
 
         if (!ContractConditionHelpers.TryCreateSpeculativeModel(
@@ -317,7 +258,6 @@ internal static class MethodEnsuresAnalyzer {
             failureReason = "condition binding failure";
             return false;
         }
-
         var snapshots = new OldValueSnapshotBuilder(speculativeModel, methodSymbol, cancellationToken);
         var loweringContext = new SymbolicLoweringContext(
             speculativeModel,
@@ -330,65 +270,47 @@ internal static class MethodEnsuresAnalyzer {
                             "old(...) expression is not supported by the current bounded proof engine";
             return false;
         }
-
         symbolicCondition = loweredCondition;
 
         if (!snapshots.HasSnapshots) {
             failureReason = "old(...) expression is not supported by the current bounded proof engine";
             return false;
         }
-
         initialState = snapshots.CreateInitialState();
         return true;
     }
-
-    private static bool ContainsOldValueInvocation(ExpressionSyntax expression) {
-        return expression
+    private static bool ContainsOldValueInvocation(ExpressionSyntax expression) => expression
             .DescendantNodesAndSelf()
             .OfType<InvocationExpressionSyntax>()
             .Any(IsOldValueInvocation);
-    }
-
-    private static bool IsOldValueInvocation(InvocationExpressionSyntax invocation) {
-        return invocation.Expression is IdentifierNameSyntax identifier &&
+    private static bool IsOldValueInvocation(InvocationExpressionSyntax invocation)
+        => invocation.Expression is IdentifierNameSyntax identifier &&
                string.Equals(identifier.Identifier.ValueText, "old", StringComparison.Ordinal);
-    }
-
     private static Diagnostic CreateNotProvenDiagnostic(
         IMethodSymbol methodSymbol,
         string condition,
         MethodNormalCompletion completionSite,
-        Location? contractLocation) {
-        return Diagnostic.Create(
+        Location? contractLocation) => Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("EnsuresNotProvenRule"),
             completionSite.Location,
             contractLocation == null ? null : [contractLocation],
             completionSite.DisplayText,
             methodSymbol.Name,
             condition);
-    }
-
     private static Diagnostic CreateUnsupportedDiagnostic(
         IMethodSymbol methodSymbol,
         string condition,
         Location? location,
         string reason,
-        IEnumerable<Location>? additionalLocations) {
-        return Diagnostic.Create(
+        IEnumerable<Location>? additionalLocations) => Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("EnsuresUnsupportedRule"),
             location,
             additionalLocations,
             condition,
             methodSymbol.Name,
             reason);
-    }
-
-    sealed class ResultPlaceholderRewriter : CSharpSyntaxRewriter {
-        private readonly ExpressionSyntax _replacement;
-
-        public ResultPlaceholderRewriter(ExpressionSyntax replacement) {
-            _replacement = SyntaxFactory.ParenthesizedExpression(replacement);
-        }
+    sealed class ResultPlaceholderRewriter(ExpressionSyntax replacement) : CSharpSyntaxRewriter {
+        private readonly ExpressionSyntax _replacement = SyntaxFactory.ParenthesizedExpression(replacement);
 
         public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node) {
             if (!string.Equals(node.Identifier.ValueText, "result", StringComparison.Ordinal))
@@ -400,7 +322,6 @@ internal static class MethodEnsuresAnalyzer {
             return _replacement.WithTriviaFrom(node);
         }
     }
-
     sealed class NullableResultContractRewriter : CSharpSyntaxRewriter {
         public override SyntaxNode? VisitBinaryExpression(BinaryExpressionSyntax node) {
             if ((node.IsKind(SyntaxKind.EqualsExpression) ||
@@ -415,52 +336,32 @@ internal static class MethodEnsuresAnalyzer {
 
             return base.VisitBinaryExpression(node);
         }
-
         public override SyntaxNode? VisitIsPatternExpression(IsPatternExpressionSyntax node) {
             if (!IsResult(node.Expression) ||
                 !CSharpSyntaxFacts.TryGetNullPatternPolarity(node.Pattern, out var matchesNonNull))
                 return base.VisitIsPatternExpression(node);
 
-            return SyntaxFactory.LiteralExpression(
-                    matchesNonNull ? SyntaxKind.TrueLiteralExpression : SyntaxKind.FalseLiteralExpression)
+            return SyntaxFactory.LiteralExpression(matchesNonNull ? SyntaxKind.TrueLiteralExpression : SyntaxKind.FalseLiteralExpression)
                 .WithTriviaFrom(node);
         }
-
-        private static bool IsResult(ExpressionSyntax expression) {
-            return expression is IdentifierNameSyntax identifier &&
+        private static bool IsResult(ExpressionSyntax expression) => expression is IdentifierNameSyntax identifier &&
                    string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal);
-        }
-
         private static bool IsNull(ExpressionSyntax expression) =>
             expression.IsKind(SyntaxKind.NullLiteralExpression);
-
     }
-
-    sealed class OldValueSnapshotBuilder {
-        private readonly CancellationToken _cancellationToken;
-        private readonly IMethodSymbol _methodSymbol;
-        private readonly SemanticModel _semanticModel;
-        private readonly List<SymbolicFact> _snapshotFacts = new();
+    sealed class OldValueSnapshotBuilder(SemanticModel semanticModel, IMethodSymbol methodSymbol, CancellationToken cancellationToken) {
+        private readonly CancellationToken _cancellationToken = cancellationToken;
+        private readonly IMethodSymbol _methodSymbol = methodSymbol;
+        private readonly SemanticModel _semanticModel = semanticModel;
+        private readonly List<SymbolicFact> _snapshotFacts = [];
         private readonly Dictionary<string, SymbolicTerm> _snapshotTerms = new(StringComparer.Ordinal);
         private int _nextSnapshotId;
-
-        public OldValueSnapshotBuilder(
-            SemanticModel semanticModel,
-            IMethodSymbol methodSymbol,
-            CancellationToken cancellationToken) {
-            _semanticModel = semanticModel;
-            _methodSymbol = methodSymbol;
-            _cancellationToken = cancellationToken;
-        }
 
         public string? FailureReason { get; private set; }
 
         public bool HasSnapshots => _snapshotFacts.Count != 0;
 
-        public bool TryLowerInvocationTerm(
-            InvocationExpressionSyntax invocation,
-            SymbolicLoweringContext context,
-            out SymbolicTerm term) {
+        public bool TryLowerInvocationTerm(InvocationExpressionSyntax invocation, SymbolicLoweringContext context, out SymbolicTerm term) {
             _ = context;
             term = null!;
             if (!IsOldValueInvocation(invocation)) return false;
@@ -469,27 +370,19 @@ internal static class MethodEnsuresAnalyzer {
                 FailureReason = "old(...) requires exactly one argument";
                 return false;
             }
-
             var argument = invocation.ArgumentList.Arguments[0].Expression;
             if (ContainsOldValueInvocation(argument)) {
                 FailureReason = "nested old(...) expressions are not supported";
                 return false;
             }
-
             if (RequiresContractHelpers.ContainsResultReference(argument)) {
                 FailureReason = "result is not available inside old(...)";
                 return false;
             }
-
-            if (ReferencesUserLocalOrUnsupportedParameter(
-                    argument,
-                    _semanticModel,
-                    _methodSymbol,
-                    _cancellationToken)) {
+            if (ReferencesUserLocalOrUnsupportedParameter(argument, _semanticModel, _methodSymbol, _cancellationToken)) {
                 FailureReason = "local variables are not supported inside old(...)";
                 return false;
             }
-
             var key = argument.WithoutTrivia().ToString();
             if (_snapshotTerms.TryGetValue(key, out term)) return true;
 
@@ -499,10 +392,7 @@ internal static class MethodEnsuresAnalyzer {
                 FailureReason = "old(...) expression is not supported by the current bounded proof engine";
                 return false;
             }
-
-            term = new SymbolicVariableTerm(
-                "__sp_old_" + _nextSnapshotId.ToString(CultureInfo.InvariantCulture),
-                entryTerm.Kind);
+            term = new SymbolicVariableTerm("__sp_old_" + _nextSnapshotId.ToString(CultureInfo.InvariantCulture), entryTerm.Kind);
             _nextSnapshotId++;
             _snapshotTerms.Add(key, term);
             _snapshotFacts.Add(SymbolicFact.Exact(
@@ -511,7 +401,6 @@ internal static class MethodEnsuresAnalyzer {
                 "ir.path.ensures-old-snapshot"));
             return true;
         }
-
         public ITypeSymbol? ResolveInvocationTermType(InvocationExpressionSyntax invocation) {
             if (!IsOldValueInvocation(invocation) || invocation.ArgumentList.Arguments.Count != 1)
                 return null;
@@ -520,15 +409,8 @@ internal static class MethodEnsuresAnalyzer {
             var typeInfo = _semanticModel.GetTypeInfo(argument, _cancellationToken);
             return typeInfo.ConvertedType ?? typeInfo.Type;
         }
-
         public SymbolicState CreateInitialState() =>
-            new SymbolicState(_snapshotFacts);
+            new(_snapshotFacts);
     }
-
-    readonly record struct EnsuresContract(
-        string Condition,
-        Location? Location,
-        string Argument,
-        string? InvalidReason);
-
+    readonly record struct EnsuresContract(string Condition, Location? Location, string Argument, string? InvalidReason);
 }

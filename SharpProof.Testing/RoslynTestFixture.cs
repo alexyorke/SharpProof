@@ -17,7 +17,6 @@ internal static class RoslynTestFixture {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, parseOptions);
         return CreateCompilation(syntaxTree, assemblyName, references, compilationOptions);
     }
-
     internal static CompilationFixture CreateCompilation(
         SyntaxTree syntaxTree,
         string assemblyName,
@@ -34,7 +33,6 @@ internal static class RoslynTestFixture {
             compilation.GetSemanticModel(syntaxTree),
             syntaxTree.GetCompilationUnitRoot());
     }
-
     internal static NodeFixture<TNode> CreateSingleNode<TNode>(
         string source,
         string assemblyName,
@@ -43,26 +41,18 @@ internal static class RoslynTestFixture {
         CSharpCompilationOptions? compilationOptions = null,
         Func<IEnumerable<TNode>, TNode>? selectNode = null)
         where TNode : SyntaxNode {
-        var compilation = CreateCompilation(
-            source,
-            assemblyName,
-            references,
-            parseOptions,
-            compilationOptions);
+        var compilation = CreateCompilation(source, assemblyName, references, parseOptions, compilationOptions);
         var candidates = compilation.Root.DescendantNodesAndSelf().OfType<TNode>();
         var node = selectNode == null ? candidates.Single() : selectNode(candidates);
         return new NodeFixture<TNode>(compilation, node);
     }
-
     internal readonly record struct CompilationFixture(
         SyntaxTree SyntaxTree,
         CSharpCompilation Compilation,
         SemanticModel SemanticModel,
         CompilationUnitSyntax Root);
 
-    internal readonly record struct NodeFixture<TNode>(
-        CompilationFixture Fixture,
-        TNode Node)
+    internal readonly record struct NodeFixture<TNode>(CompilationFixture Fixture, TNode Node)
         where TNode : SyntaxNode {
         internal SyntaxTree SyntaxTree => Fixture.SyntaxTree;
 

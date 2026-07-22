@@ -31,14 +31,8 @@ internal sealed record SymbolicOperationTransitionResult(
         if (unknownReason == SymbolicUnknownReason.None)
             throw new ArgumentException("Unsupported transitions require an unknown reason.", nameof(unknownReason));
 
-        return Create(
-            unchangedState,
-            SymbolicLoweringSupport.Unsupported,
-            unknownReason,
-            provenance,
-            truncation);
+        return Create(unchangedState, SymbolicLoweringSupport.Unsupported, unknownReason, provenance, truncation);
     }
-
     private static SymbolicOperationTransitionResult Create(
         SymbolicState state,
         SymbolicLoweringSupport support,
@@ -51,11 +45,6 @@ internal sealed record SymbolicOperationTransitionResult(
         var normalizedTruncation = truncation == null || !truncation.IsTruncated
             ? SymbolicAnalysisTruncationInfo.None
             : SymbolicAnalysisTruncationInfo.Combine(new[] { truncation });
-        return new SymbolicOperationTransitionResult(
-            state,
-            support,
-            unknownReason,
-            provenance.ToImmutableArray(),
-            normalizedTruncation);
+        return new SymbolicOperationTransitionResult(state, support, unknownReason, [.. provenance], normalizedTruncation);
     }
 }

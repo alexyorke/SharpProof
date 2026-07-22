@@ -4,7 +4,6 @@ public enum RoslynShapeSurface {
     OperationKind,
     SyntaxKind
 }
-
 public enum ShapeClassification {
     GeneratorBacked,
     ParentHandled,
@@ -14,7 +13,6 @@ public enum ShapeClassification {
     IntentionallyConservative,
     CSharpNotApplicable
 }
-
 public sealed record RoslynShapeManifestEntry(
     RoslynShapeSurface Surface,
     string ShapeId,
@@ -29,10 +27,10 @@ public static class RoslynShapeManifest {
             .ToImmutableHashSet(StringComparer.Ordinal);
 
     public static ImmutableArray<RoslynShapeManifestEntry> OperationEntries { get; } =
-        Enum.GetValues<OperationKind>().Select(CreateOperationEntry).ToImmutableArray();
+        [.. Enum.GetValues<OperationKind>().Select(CreateOperationEntry)];
 
     public static ImmutableArray<RoslynShapeManifestEntry> SyntaxEntries { get; } =
-        Enum.GetValues<SyntaxKind>().Select(CreateSyntaxEntry).ToImmutableArray();
+        [.. Enum.GetValues<SyntaxKind>().Select(CreateSyntaxEntry)];
 
     public static ImmutableDictionary<string, RoslynShapeManifestEntry> EntriesByShapeId { get; } =
         OperationEntries.Concat(SyntaxEntries).ToImmutableDictionary(static entry => entry.ShapeId, StringComparer.Ordinal);
@@ -44,11 +42,10 @@ public static class RoslynShapeManifest {
         }.ToImmutableDictionary(static name => name, IsActionSurfaceUsed, StringComparer.Ordinal);
 
     public static ImmutableArray<string> GeneratorBackedShapeIds { get; } =
-        EntriesByShapeId.Values
+        [.. EntriesByShapeId.Values
             .Where(static entry => entry.Classification == ShapeClassification.GeneratorBacked)
             .Select(static entry => entry.ShapeId)
-            .OrderBy(static shapeId => shapeId, StringComparer.Ordinal)
-            .ToImmutableArray();
+            .OrderBy(static shapeId => shapeId, StringComparer.Ordinal)];
 
     public static bool IsActionableUnobservedOperationKind(OperationKind kind) {
         if (kind is OperationKind.Invalid or OperationKind.InterpolatedStringAppendInvalid ||
@@ -59,20 +56,14 @@ public static class RoslynShapeManifest {
                entry.Classification is not (ShapeClassification.ParentHandled or
                    ShapeClassification.CSharpNotApplicable or ShapeClassification.SyntaxShadow);
     }
-
     public static string OperationShapeId(OperationKind operationKind) => "operation:" + operationKind;
 
     public static string SyntaxShapeId(SyntaxKind syntaxKind) => "syntax:" + syntaxKind;
 
     private static RoslynShapeManifestEntry CreateOperationEntry(OperationKind kind) {
         var classification = ClassifyOperation(kind);
-        return new RoslynShapeManifestEntry(
-            RoslynShapeSurface.OperationKind,
-            OperationShapeId(kind),
-            kind.ToString(),
-            classification);
+        return new RoslynShapeManifestEntry(RoslynShapeSurface.OperationKind, OperationShapeId(kind), kind.ToString(), classification);
     }
-
     private static ShapeClassification ClassifyOperation(OperationKind kind) {
         if (GeneratorBackedOperationShapeIds.Contains(OperationShapeId(kind)))
             return ShapeClassification.GeneratorBacked;
@@ -85,7 +76,6 @@ public static class RoslynShapeManifest {
             return ShapeClassification.CSharpNotApplicable;
         return ShapeClassification.IntentionallyConservative;
     }
-
     private static bool IsParentHandled(OperationKind kind) => kind is
         OperationKind.None or
         OperationKind.MethodReference or
@@ -133,13 +123,8 @@ public static class RoslynShapeManifest {
                     : IsTokenOnlyKind(name)
                         ? ShapeClassification.TokenOnly
                         : ShapeClassification.ParentHandled;
-        return new RoslynShapeManifestEntry(
-            RoslynShapeSurface.SyntaxKind,
-            SyntaxShapeId(kind),
-            name,
-            classification);
+        return new RoslynShapeManifestEntry(RoslynShapeSurface.SyntaxKind, SyntaxShapeId(kind), name, classification);
     }
-
     private static bool IsSyntaxShadow(string name) =>
         name.StartsWith("Xml", StringComparison.Ordinal) ||
         name.EndsWith("DirectiveTrivia", StringComparison.Ordinal) ||

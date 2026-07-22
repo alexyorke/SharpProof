@@ -8,7 +8,8 @@ public sealed class EffectArchitectureTests {
     [Test]
     public void RemovedEffectInfrastructureCannotReturnToSupportedSurface() {
         var root = AnalyzerTestHost.GetRepositoryRoot();
-        Assert.That( File.Exists(Path.Combine( root, "Tools", "SharpProof." + "Effect" + "Summary", "SharpProof." + "Effect" + "Summary.csproj")), Is.False);
+        Assert.That(File.Exists(Path.Combine(root, "Tools", "SharpProof." + "Effect" + "Summary",
+            "SharpProof." + "Effect" + "Summary.csproj")), Is.False);
 
         var removedFiles = new[] {
             "SharpProof.Contracts/BclPurityFallbackHeuristics.cs",
@@ -57,7 +58,8 @@ public sealed class EffectArchitectureTests {
             "SharpProof.Tooling.Core/SharpProof.Tooling.Core.csproj"
         };
         foreach (var relativePath in removedFiles)
-            Assert.That(File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))), Is.False, $"Removed compatibility file returned: {relativePath}");
+            Assert.That(File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))), Is.False,
+                $"Removed compatibility file returned: {relativePath}");
 
         var roots = new[] {
             "SharpProof.Analyzer", "SharpProof.Attributes",
@@ -131,9 +133,7 @@ public sealed class EffectArchitectureTests {
                 Assert.That(legacyDiagnostic.IsMatch(text), Is.False, $"Disabled diagnostic returned in {file}");
             }
         }
-
-        foreach (var file in Directory.EnumerateFiles(
-                     Path.Combine(root, "SharpProof.Symbolic"), "*.cs", SearchOption.AllDirectories)) {
+        foreach (var file in Directory.EnumerateFiles(Path.Combine(root, "SharpProof.Symbolic"), "*.cs", SearchOption.AllDirectories)) {
             if (file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)) continue;
             var text = File.ReadAllText(file);
             Assert.That(text, Does.Not.Contain("System.Text.Json.Serialization"),
@@ -144,7 +144,6 @@ public sealed class EffectArchitectureTests {
                 $"Symbolic JSON property filtering returned in {file}");
         }
     }
-
     [Test]
     public void AnalyzerCannotDisableOrBypassZ3ProofService() {
         var root = AnalyzerTestHost.GetRepositoryRoot();
@@ -172,6 +171,6 @@ public sealed class EffectArchitectureTests {
         Assert.That(api, Does.Not.Contain("SharpProofTargetKind.LineSpan"));
         Assert.That(
             Enum.GetNames(typeof(SharpProofTargetKind)),
-            Is.EqualTo(new[] { "Point", "Position", "Line", "Span", "AllLines" }));
+            Is.EqualTo(["Point", "Position", "Line", "Span", "AllLines"]));
     }
 }

@@ -6,16 +6,12 @@ internal static class SymbolicBranchCompletionStateTransfer {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         var symbols = new List<ISymbol>();
-        foreach (var node in statement.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))) {
+        foreach (var node in statement.DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))) {
             var symbol = node switch {
                 VariableDeclaratorSyntax declarator => semanticModel.GetDeclaredSymbol(declarator, cancellationToken),
-                SingleVariableDesignationSyntax designation => semanticModel.GetDeclaredSymbol(designation,
-                    cancellationToken),
-                ForEachStatementSyntax forEachStatement => semanticModel.GetDeclaredSymbol(forEachStatement,
-                    cancellationToken),
-                CatchDeclarationSyntax catchDeclaration => semanticModel.GetDeclaredSymbol(catchDeclaration,
-                    cancellationToken),
+                SingleVariableDesignationSyntax designation => semanticModel.GetDeclaredSymbol(designation, cancellationToken),
+                ForEachStatementSyntax forEachStatement => semanticModel.GetDeclaredSymbol(forEachStatement, cancellationToken),
+                CatchDeclarationSyntax catchDeclaration => semanticModel.GetDeclaredSymbol(catchDeclaration, cancellationToken),
                 _ => null
             };
 
@@ -23,10 +19,8 @@ internal static class SymbolicBranchCompletionStateTransfer {
                 symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol.OriginalDefinition)))
                 symbols.Add(symbol.OriginalDefinition);
         }
-
         return symbols;
     }
-
     internal static IReadOnlyList<ISymbol> GetSwitchConditionSymbols(
         SwitchStatementSyntax switchStatement,
         SemanticModel semanticModel,
@@ -43,15 +37,12 @@ internal static class SymbolicBranchCompletionStateTransfer {
                         AddReferencedSymbols(patternLabel.Pattern, semanticModel, cancellationToken, symbols);
                         AddDeclaredPatternSymbols(patternLabel.Pattern, semanticModel, cancellationToken, symbols);
                         if (patternLabel.WhenClause != null)
-                            AddReferencedSymbols(patternLabel.WhenClause.Condition, semanticModel, cancellationToken,
-                                symbols);
+                            AddReferencedSymbols(patternLabel.WhenClause.Condition, semanticModel, cancellationToken, symbols);
 
                         break;
                 }
-
         return symbols;
     }
-
     internal static IReadOnlyList<ISymbol> GetSwitchExpressionConditionSymbols(
         SwitchExpressionSyntax switchExpression,
         SemanticModel semanticModel,
@@ -65,36 +56,28 @@ internal static class SymbolicBranchCompletionStateTransfer {
             if (arm.WhenClause != null)
                 AddReferencedSymbols(arm.WhenClause.Condition, semanticModel, cancellationToken, symbols);
         }
-
         return symbols;
     }
-
     internal static void AddReferencedSymbols(
         SyntaxNode root,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         ICollection<ISymbol> symbols) {
-        foreach (var symbol in SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
-                     root,
-                     semanticModel,
-                     cancellationToken))
+        foreach (var symbol in SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(root, semanticModel, cancellationToken))
             AddSymbolIfAbsent(symbols, symbol);
     }
-
     internal static void AddDeclaredPatternSymbols(
         SyntaxNode root,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         ICollection<ISymbol> symbols) {
-        foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
+        foreach (var node in root.DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
             if (node is SingleVariableDesignationSyntax singleVariableDesignation &&
                 singleVariableDesignation.Identifier.ValueText != "_" &&
                 semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is ILocalSymbol
                     localSymbol)
                 AddSymbolIfAbsent(symbols, localSymbol.OriginalDefinition);
     }
-
     internal static void AddMemberNotNullWhenTargetSymbols(
         SyntaxNode root,
         SemanticModel semanticModel,
@@ -109,8 +92,7 @@ internal static class SymbolicBranchCompletionStateTransfer {
                 !SymbolicFrameworkPostconditionLowerer.IsCurrentInstanceInvocation(invocation))
                 continue;
 
-            foreach (var target in NullableFlowFacts.GetMemberNotNullWhenTargets(
-                         invocationOperation.TargetMethod))
+            foreach (var target in NullableFlowFacts.GetMemberNotNullWhenTargets(invocationOperation.TargetMethod))
                 if (NullableFlowFacts.TryResolveInstanceMemberTarget(
                         invocationOperation.TargetMethod.ContainingType,
                         target,
@@ -118,9 +100,7 @@ internal static class SymbolicBranchCompletionStateTransfer {
                     AddSymbolIfAbsent(symbols, member);
         }
     }
-
     private static void AddSymbolIfAbsent(ICollection<ISymbol> symbols, ISymbol symbol) {
         if (symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol))) symbols.Add(symbol);
     }
-
 }

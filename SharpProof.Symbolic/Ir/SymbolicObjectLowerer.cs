@@ -19,10 +19,7 @@ internal static class SymbolicObjectLowerer {
             return false;
 
         condition = CreateFactCondition(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.Equal,
-                left,
-                right),
+            new SymbolicRelationAtom(SymbolicRelationOperator.Equal, left, right),
             invocation,
             "ir.known-api.object.reference-equals");
         return true;

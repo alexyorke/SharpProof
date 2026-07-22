@@ -1,9 +1,7 @@
 namespace SharpProof.Symbolic;
 
 internal sealed partial class SymbolicQueryExecutor {
-    private SymbolicQueryResult QuerySource(
-        SymbolicQueryContext request,
-        CancellationToken cancellationToken) => QuerySourceSyntaxTree(
+    private SymbolicQueryResult QuerySource(SymbolicQueryContext request, CancellationToken cancellationToken) => QuerySourceSyntaxTree(
             request.Source.SyntaxTree,
             request.Source.Compilation,
             request.Target,
@@ -15,8 +13,7 @@ internal sealed partial class SymbolicQueryExecutor {
         Compilation compilation,
         SharpProofTarget target,
         SymbolicQueryOptions options,
-        CancellationToken cancellationToken) {
-        return target.Kind switch {
+        CancellationToken cancellationToken) => target.Kind switch {
             SharpProofTargetKind.Point => SymbolicQueryResult.From(_rangeQueryExecutor.QueryLinePoint(
                 syntaxTree, compilation, target.Line!.Value, target.Column ?? 1, options, cancellationToken)),
             SharpProofTargetKind.Position => SymbolicQueryResult.From(QueryPosition(
@@ -25,29 +22,18 @@ internal sealed partial class SymbolicQueryExecutor {
                 syntaxTree, compilation, target.Line!.Value, options, cancellationToken),
             SharpProofTargetKind.Span => _rangeQueryExecutor.QuerySpan(
                 syntaxTree, compilation, target.SpanStart!.Value, target.SpanEnd!.Value, options, cancellationToken),
-            SharpProofTargetKind.AllLines => _rangeQueryExecutor.QueryAllLines(
-                syntaxTree, compilation, options, cancellationToken),
+            SharpProofTargetKind.AllLines => _rangeQueryExecutor.QueryAllLines(syntaxTree, compilation, options, cancellationToken),
             _ => throw new NotSupportedException("Target kind is not supported for syntax tree queries.")
         };
-    }
-
     private SymbolicProgramPointResult QueryPosition(
         SyntaxTree syntaxTree,
         Compilation compilation,
         int position,
         SymbolicQueryOptions options,
         CancellationToken cancellationToken) {
-        var query = _programPointExecutor.AnalyzeAtPosition(
-            syntaxTree,
-            compilation,
-            position,
-            options,
-            cancellationToken);
-        return _programPointExecutor.Project(
-            query,
-            cancellationToken);
+        var query = _programPointExecutor.AnalyzeAtPosition(syntaxTree, compilation, position, options, cancellationToken);
+        return _programPointExecutor.Project(query, cancellationToken);
     }
-
     private SymbolicConditionProofResult ProveSource(
         SymbolicQueryContext request,
         string conditionText,
@@ -65,7 +51,6 @@ internal sealed partial class SymbolicQueryExecutor {
             smtAnalysis,
             cancellationToken);
     }
-
     private SymbolicRuntimeHazardQueryResult QueryRuntimeHazardsSource(
         SymbolicQueryContext request,
         SmtAnalysisService smtAnalysis,
@@ -82,7 +67,6 @@ internal sealed partial class SymbolicQueryExecutor {
             cancellationToken,
             hazardOptions);
     }
-
     private static bool SupportsRuntimeHazardTarget(SharpProofTargetKind kind) =>
         kind is SharpProofTargetKind.Line or SharpProofTargetKind.Point or
             SharpProofTargetKind.Span or SharpProofTargetKind.AllLines;

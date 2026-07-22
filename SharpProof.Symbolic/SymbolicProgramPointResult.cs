@@ -15,9 +15,7 @@ internal sealed class SymbolicProgramPointResult(
     public SymbolicInputWitness ReachabilityWitness { get; } = reachabilityWitness;
 
     public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; } = analysisTruncation;
-
 }
-
 internal sealed record SymbolicConditionProofResult(
     string condition,
     SymbolicTruthValue truthValue,
@@ -56,9 +54,7 @@ internal sealed record SymbolicConditionProofResult(
 
     internal SymbolicConditionProofResult WithAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation) =>
         this with { AnalysisTruncation = truncation };
-
 }
-
 internal enum SymbolicTruthValue {
     Unknown,
     ProvenTrue,

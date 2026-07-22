@@ -19,18 +19,12 @@ internal sealed class SymbolicComplexityCallModel(
                invocationSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault() ??
                expressionSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
     }
-
-    internal ComplexityArtifacts AnalyzeTopLevelInvocations(
-        SyntaxNode bodyNode,
-        SemanticModel semanticModel,
-        IMethodSymbol currentMethod) {
+    internal ComplexityArtifacts AnalyzeTopLevelInvocations(SyntaxNode bodyNode, SemanticModel semanticModel, IMethodSymbol currentMethod) {
         var invocationCosts = new List<ComplexityArtifacts>();
         foreach (var invocation in EnumerateTopLevelInvocationTargets(bodyNode, semanticModel)) {
             var (invocationSyntax, invocationOperation, targetMethod) = invocation;
             if (targetMethod == null)
-                return ComplexityArtifacts.Unknown(
-                    SymbolicComplexityUnknownReason.UnknownCallee,
-                    invocationSyntax);
+                return ComplexityArtifacts.Unknown(SymbolicComplexityUnknownReason.UnknownCallee, invocationSyntax);
 
             invocationCosts.Add(AnalyzeMethodCall(
                 targetMethod,
@@ -40,23 +34,17 @@ internal sealed class SymbolicComplexityCallModel(
                 currentMethod,
                 invocationOperation != null
                     ? GetArgumentSyntaxes(targetMethod, invocationOperation.Arguments)
-                    : invocationSyntax.ArgumentList.Arguments
-                        .Select(static argument => (SyntaxNode)argument.Expression)
-                        .ToImmutableArray(),
+                    : [.. invocationSyntax.ArgumentList.Arguments.Select(static argument => (SyntaxNode)argument.Expression)],
                 invocationSyntax.Expression is MemberAccessExpressionSyntax memberAccess
                     ? memberAccess.Expression
                     : null));
         }
-
         return SymbolicComplexityAlgebra.CombineSequence(invocationCosts);
     }
-
     private IEnumerable<(
         InvocationExpressionSyntax Syntax,
         IInvocationOperation? Operation,
-        IMethodSymbol? TargetMethod)> EnumerateTopLevelInvocationTargets(
-        SyntaxNode bodyNode,
-        SemanticModel semanticModel) {
+        IMethodSymbol? TargetMethod)> EnumerateTopLevelInvocationTargets(SyntaxNode bodyNode, SemanticModel semanticModel) {
         foreach (var invocationSyntax in bodyNode.DescendantNodes(static candidate =>
                          !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
                      .OfType<InvocationExpressionSyntax>()) {
@@ -65,20 +53,15 @@ internal sealed class SymbolicComplexityCallModel(
             yield return (invocationSyntax, invocationOperation, targetMethod);
         }
     }
-
-    internal static ImmutableArray<SyntaxNode> GetArgumentSyntaxes(
-        IMethodSymbol method,
-        ImmutableArray<IArgumentOperation> arguments) {
-        if (arguments.IsDefaultOrEmpty) return ImmutableArray<SyntaxNode>.Empty;
+    internal static ImmutableArray<SyntaxNode> GetArgumentSyntaxes(IMethodSymbol method, ImmutableArray<IArgumentOperation> arguments) {
+        if (arguments.IsDefaultOrEmpty) return [];
 
         // Callee factors are parameter-ordinal based. Roslyn includes implicit optional and
         // expanded params arguments in the operation list, while source ArgumentList syntax does not.
-        return arguments
+        return [.. arguments
             .OrderBy(argument => argument.Parameter?.Ordinal ?? method.Parameters.Length)
-            .Select(static argument => argument.Value.Syntax)
-            .ToImmutableArray();
+            .Select(static argument => argument.Value.Syntax)];
     }
-
     internal ComplexityArtifacts AnalyzeMethodCall(
         IMethodSymbol methodSymbol,
         IOperation? operation,
@@ -99,30 +82,16 @@ internal sealed class SymbolicComplexityCallModel(
 
         if (operation != null &&
             SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(methodSymbol, operation))
-            return CreateUnknownCalleeArtifacts(
-                methodSymbol,
-                SymbolicComplexityUnknownReason.DynamicDispatch,
-                syntax);
+            return CreateUnknownCalleeArtifacts(methodSymbol, SymbolicComplexityUnknownReason.DynamicDispatch, syntax);
 
         if (!SymbolicMethodSourceResolver.IsBackedBySource(methodSymbol))
-            return CreateUnknownCalleeArtifacts(
-                methodSymbol,
-                SymbolicComplexityUnknownReason.ExternalCallee,
-                syntax);
+            return CreateUnknownCalleeArtifacts(methodSymbol, SymbolicComplexityUnknownReason.ExternalCallee, syntax);
 
         if (!TryResolveSourceMethod(methodSymbol, out var declaration, out var bodyNode, out var sourceModel))
-            return CreateUnknownCalleeArtifacts(
-                methodSymbol,
-                SymbolicComplexityUnknownReason.UnknownCallee,
-                syntax);
+            return CreateUnknownCalleeArtifacts(methodSymbol, SymbolicComplexityUnknownReason.UnknownCallee, syntax);
 
         var calleeSummary = _analyzeMethod(methodSymbol, bodyNode, sourceModel);
-        var substitutionResult = SubstituteCalleeCost(
-            calleeSummary.Cost,
-            argumentSyntaxes,
-            receiverSyntax,
-            semanticModel,
-            currentMethod);
+        var substitutionResult = SubstituteCalleeCost(calleeSummary.Cost, argumentSyntaxes, receiverSyntax, semanticModel, currentMethod);
         var calleeInfo = SymbolicComplexityAlgebra.CreateCalleeInfo(
             methodSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
             substitutionResult.Cost,
@@ -141,12 +110,10 @@ internal sealed class SymbolicComplexityCallModel(
             substitutionResult.UnknownReasons.Concat(calleeSummary.UnknownReasons),
             new[] { calleeInfo }.Concat(calleeSummary.CalleeSummaries));
     }
-
     private ComplexityArtifacts CreateUnknownCalleeArtifacts(
         IMethodSymbol methodSymbol,
         SymbolicComplexityUnknownReason reason,
-        SyntaxNode syntax) {
-        return ComplexityArtifacts.Unknown(
+        SyntaxNode syntax) => ComplexityArtifacts.Unknown(
             reason,
             syntax,
             parts: null,
@@ -158,8 +125,6 @@ internal sealed class SymbolicComplexityCallModel(
                     true,
                     reason)
             });
-    }
-
     private bool TryResolveSourceMethod(
         IMethodSymbol methodSymbol,
         out SyntaxNode declaration,
@@ -178,14 +143,10 @@ internal sealed class SymbolicComplexityCallModel(
             bodyNode = body;
             return true;
         }
-
         bodyNode = null!;
         return false;
     }
-
-    private static bool TryGetKnownMethodCost(
-        IMethodSymbol methodSymbol,
-        out SymbolicCostExpression cost) {
+    private static bool TryGetKnownMethodCost(IMethodSymbol methodSymbol, out SymbolicCostExpression cost) {
         cost = SymbolicCostExpression.Unknown(SymbolicComplexityUnknownReason.Unknown);
         if (methodSymbol.MethodKind == MethodKind.PropertyGet &&
             methodSymbol.AssociatedSymbol is IPropertySymbol property) {
@@ -194,7 +155,6 @@ internal sealed class SymbolicComplexityCallModel(
                 cost = SymbolicCostExpression.Constant();
                 return true;
             }
-
             if ((string.Equals(property.Name, "Length", StringComparison.Ordinal) ||
                  string.Equals(property.Name, "Count", StringComparison.Ordinal)) &&
                 SymbolicComplexityCostModel.IsKnownSizedType(property.ContainingType)) {
@@ -202,10 +162,8 @@ internal sealed class SymbolicComplexityCallModel(
                 return true;
             }
         }
-
         return false;
     }
-
     private SubstitutionResult SubstituteCalleeCost(
         SymbolicCostExpression cost,
         ImmutableArray<SyntaxNode> argumentSyntaxes,
@@ -231,7 +189,6 @@ internal sealed class SymbolicComplexityCallModel(
                     ? expressionCost
                     : SymbolicCostExpression.Unknown(SymbolicComplexityUnknownReason.UnknownCallee);
             }
-
             if (string.Equals(key, "$this.length", StringComparison.Ordinal))
                 return _costModel.TryCreate(
                     receiverSyntax as ExpressionSyntax,
@@ -256,22 +213,17 @@ internal sealed class SymbolicComplexityCallModel(
 
             return null;
         }
-
         var substituted = cost.Substitute(ResolveFactor);
         var reasons = substituted.IsUnknown
-            ? new[] {
+            ? [
                 substituted.UnknownReason == SymbolicComplexityUnknownReason.None
                     ? SymbolicComplexityUnknownReason.UnknownCallee
                     : substituted.UnknownReason
-            }
+            ]
             : Array.Empty<SymbolicComplexityUnknownReason>();
         return new SubstitutionResult(substituted, Array.Empty<SymbolicComplexityDriverInfo>(), reasons);
     }
-
-    private static bool TryParseParameterKey(
-        string key,
-        out int parameterIndex,
-        out CostProjection projection) {
+    private static bool TryParseParameterKey(string key, out int parameterIndex, out CostProjection projection) {
         parameterIndex = -1;
         projection = CostProjection.Value;
         if (!key.StartsWith("$p", StringComparison.Ordinal)) return false;
@@ -280,7 +232,7 @@ internal sealed class SymbolicComplexityCallModel(
         if (suffixStart < 0) return false;
 
         if (!int.TryParse(key.Substring(2, suffixStart - 2), NumberStyles.None, CultureInfo.InvariantCulture,
-                out parameterIndex)) return false;
+            out parameterIndex)) return false;
 
         var suffix = key.Substring(suffixStart + 1);
         projection = string.Equals(suffix, "length", StringComparison.Ordinal)
@@ -288,5 +240,4 @@ internal sealed class SymbolicComplexityCallModel(
             : CostProjection.Value;
         return true;
     }
-
 }

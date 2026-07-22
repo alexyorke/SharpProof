@@ -8,21 +8,11 @@ internal static class SymbolCurrentValueResolver {
         CancellationToken cancellationToken,
         out ExpressionSyntax valueExpression) {
         valueExpression = null!;
-        if (!SymbolMutationFacts.TryGetLocalOrParameterSymbol(
-                expression,
-                semanticModel,
-                cancellationToken,
-                out var symbol))
+        if (!SymbolMutationFacts.TryGetLocalOrParameterSymbol(expression, semanticModel, cancellationToken, out var symbol))
             return false;
 
-        return TryResolveCurrentSimpleValueExpression(
-            symbol,
-            useNode,
-            semanticModel,
-            cancellationToken,
-            out valueExpression);
+        return TryResolveCurrentSimpleValueExpression(symbol, useNode, semanticModel, cancellationToken, out valueExpression);
     }
-
     internal static bool TryResolveCurrentSimpleValueExpression(
         ISymbol symbol,
         SyntaxNode useNode,
@@ -52,39 +42,26 @@ internal static class SymbolCurrentValueResolver {
 
                     continue;
                 }
-
                 if (statement is ExpressionStatementSyntax {
-                        Expression: AssignmentExpressionSyntax assignment
-                    } &&
-                    SymbolMutationFacts.ExpressionMatchesSymbol(
-                        assignment.Left,
-                        symbol,
-                        semanticModel,
-                        cancellationToken)) {
+                    Expression: AssignmentExpressionSyntax assignment
+                } &&
+                    SymbolMutationFacts.ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken)) {
                     if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-                        SymbolMutationFacts.ExpressionReferencesSymbol(
-                            assignment.Right,
-                            symbol,
-                            semanticModel,
-                            cancellationToken)) {
+                        SymbolMutationFacts.ExpressionReferencesSymbol(assignment.Right, symbol, semanticModel, cancellationToken)) {
                         currentValue = null;
                         continue;
                     }
-
                     currentValue = assignment.Right;
                     continue;
                 }
-
                 if (mutations.MutatesSymbol(symbol))
                     currentValue = null;
             }
-
         if (currentValue == null) return false;
 
         valueExpression = currentValue;
         return true;
     }
-
     private static bool IsMutatedAfterUseInContainingLoop(
         ISymbol symbol,
         SyntaxNode useNode,

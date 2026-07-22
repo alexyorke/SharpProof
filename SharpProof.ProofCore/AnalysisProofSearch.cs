@@ -5,11 +5,7 @@ internal enum AnalysisProofOutcome {
     Disproven,
     Unknown
 }
-
-internal sealed record ProofCheckInfo(
-    bool WasAttempted,
-    Feasibility Feasibility,
-    SmtSatisfyingWitness? Witness = null);
+internal sealed record ProofCheckInfo(bool WasAttempted, Feasibility Feasibility, SmtSatisfyingWitness? Witness = null);
 
 internal sealed record AnalysisProofResult(
     AnalysisProofOutcome Outcome,
@@ -22,7 +18,6 @@ internal interface IAnalysisProofSearchSession : IDisposable {
 
     AnalysisProofResult Classify(AnalysisProofQuery query, TimeSpan timeout);
 }
-
 internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
     private static readonly IReadOnlyDictionary<AnalysisHazardKind, HazardDescriptor> HazardDescriptors =
         new Dictionary<AnalysisHazardKind, HazardDescriptor> {
@@ -62,10 +57,7 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
     /// </summary>
     public long ConsumedResourceCount => _solver.ConsumedResourceCount;
 
-    public void Dispose() {
-        _solver.Dispose();
-    }
-
+    public void Dispose() => _solver.Dispose();
     public AnalysisProofResult Classify(AnalysisProofQuery query, TimeSpan timeout) {
         if (query == null || query.Hazard == null)
             return UnknownWithoutProof("invalid_proof_query");
@@ -78,17 +70,9 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
             !descriptor.AcceptsInternalOnlyVisibility)
             return UnknownWithoutProof("invalid_internal_only_hazard");
 
-        return ClassifyKnownHazard(
-            query.Hazard.Kind,
-            pathConditions,
-            query.Hazard.TriggerCondition,
-            timeout);
+        return ClassifyKnownHazard(query.Hazard.Kind, pathConditions, query.Hazard.TriggerCondition, timeout);
     }
-
-    private AnalysisProofResult ClassifyInternalOnlyEffect(
-        IEnumerable<SmtFormula> pathConditions,
-        TimeSpan timeout,
-        string pureReason) {
+    private AnalysisProofResult ClassifyInternalOnlyEffect(IEnumerable<SmtFormula> pathConditions, TimeSpan timeout, string pureReason) {
         var normalizedPathConditions = pathConditions.ToArray();
         var path = _solver.CheckSatisfiability(normalizedPathConditions, timeout);
         return path.Feasibility switch {
@@ -102,14 +86,9 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
                 Attempted(path),
                 NotAttempted(),
                 "path_feasibility_unknown"),
-            _ => new AnalysisProofResult(
-                AnalysisProofOutcome.Proven,
-                Attempted(path),
-                NotAttempted(),
-                pureReason)
+            _ => new AnalysisProofResult(AnalysisProofOutcome.Proven, Attempted(path), NotAttempted(), pureReason)
         };
     }
-
 
     private AnalysisProofResult ClassifyKnownHazard(
         AnalysisHazardKind kind,
@@ -121,25 +100,17 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
             ? ClassifyInternalOnlyEffect(pathConditions, timeout, descriptor.PureReason)
             : ClassifyTriggeredHazard(pathConditions, triggerCondition!, timeout, descriptor);
     }
-
     private AnalysisProofResult ClassifyTriggeredHazard(
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula impurityCondition,
         TimeSpan timeout,
         HazardDescriptor descriptor) {
         var normalizedPathConditions = pathConditions.ToArray();
-        var check = _solver.CheckPathAndHazardWithWitness(
-            normalizedPathConditions,
-            impurityCondition,
-            timeout);
+        var check = _solver.CheckPathAndHazardWithWitness(normalizedPathConditions, impurityCondition, timeout);
         var pathFeasibility = check.Path.Feasibility;
         var impurityFeasibility = check.Impurity.Feasibility;
         if (pathFeasibility == Feasibility.Unsatisfiable)
-            return new AnalysisProofResult(
-                AnalysisProofOutcome.Proven,
-                Attempted(check.Path),
-                NotAttempted(),
-                "path_unsatisfiable");
+            return new AnalysisProofResult(AnalysisProofOutcome.Proven, Attempted(check.Path), NotAttempted(), "path_unsatisfiable");
 
         if (impurityFeasibility == Feasibility.Unsatisfiable)
             return new AnalysisProofResult(
@@ -168,26 +139,18 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
                 descriptor.UnknownReason)
         };
     }
-
-    private static AnalysisProofResult UnknownWithoutProof(string reason) {
-        return new AnalysisProofResult(
-            AnalysisProofOutcome.Unknown,
-            NotAttempted(),
-            NotAttempted(),
-            reason);
-    }
-
+    private static AnalysisProofResult UnknownWithoutProof(string reason)
+        => new(AnalysisProofOutcome.Unknown, NotAttempted(), NotAttempted(), reason);
     private static ProofCheckInfo Attempted(SmtFeasibilityResult result) =>
-        new ProofCheckInfo(true, result.Feasibility, result.Witness);
+        new(true, result.Feasibility, result.Witness);
 
     private static ProofCheckInfo NotAttempted() =>
-        new ProofCheckInfo(false, Feasibility.Unknown);
+        new(false, Feasibility.Unknown);
 
     enum HazardClassificationMode {
         Triggered,
         InternalEffect
     }
-
     readonly record struct HazardDescriptor(
         HazardClassificationMode Mode,
         string PureReason,
@@ -198,22 +161,13 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
             string pureReason,
             string impureReason,
             string unknownReason,
-            bool acceptsInternalOnlyVisibility = false) {
-            return new HazardDescriptor(
+            bool acceptsInternalOnlyVisibility = false) => new(
                 HazardClassificationMode.Triggered,
                 pureReason,
                 impureReason,
                 unknownReason,
                 acceptsInternalOnlyVisibility);
-        }
-
-        internal static HazardDescriptor InternalEffect(string pureReason) {
-            return new HazardDescriptor(
-                HazardClassificationMode.InternalEffect,
-                pureReason,
-                string.Empty,
-                string.Empty,
-                true);
-        }
+        internal static HazardDescriptor InternalEffect(string pureReason)
+            => new(HazardClassificationMode.InternalEffect, pureReason, string.Empty, string.Empty, true);
     }
 }

@@ -24,9 +24,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         var path = reference?.FilePath;
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             return Unknown("metadata_implementation_path_unavailable");
-        if (!SymbolEqualityComparer.Default.Equals(
-                compilation.GetAssemblyOrModuleSymbol(reference!),
-                method.ContainingAssembly))
+        if (!SymbolEqualityComparer.Default.Equals(compilation.GetAssemblyOrModuleSymbol(reference!), method.ContainingAssembly))
             return Unknown("metadata_assembly_identity_mismatch");
 
         try {
@@ -46,7 +44,6 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             return Unknown("malformed_or_unavailable_metadata");
         }
     }
-
     private static MethodEffects AnalyzeBody(string path, MethodDefinitionHandle root) {
         using var stream = File.OpenRead(path);
         using var pe = new PEReader(stream, PEStreamOptions.PrefetchMetadata);
@@ -69,7 +66,6 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 unknowns.Add(Reason("metadata_recursive_cycle"));
                 return;
             }
-
             var definition = reader.GetMethodDefinition(handle);
             if ((definition.Attributes & MethodAttributes.PinvokeImpl) != 0) {
                 effects |= SharpProofEffect.UsesNativeCode;
@@ -80,7 +76,6 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 unknowns.Add(Reason("metadata_body_unavailable"));
                 return;
             }
-
             var bytes = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes() ?? [];
             for (var offset = 0; offset < bytes.Length;) {
                 if (++instructionCount > MaxInstructions) {
@@ -93,7 +88,6 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                     unknowns.Add(Reason("malformed_il"));
                     return;
                 }
-
                 if (opcode == OpCodes.Newobj || opcode == OpCodes.Newarr || opcode == OpCodes.Box)
                     effects |= SharpProofEffect.Allocates;
                 else if (opcode == OpCodes.Throw || opcode == OpCodes.Rethrow) {
@@ -122,31 +116,21 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 }
             }
         }
-
         Visit(root, 0);
         return new MethodEffects(
             effects,
             SharpProofCapability.None,
-            exceptions.Select(static type => MethodExceptionFact.Boundary(
-                type,
-                MethodExceptionSource.Metadata,
-                "metadata_throw")).ToImmutableArray(),
-            ImmutableArray<MethodEffectSite>.Empty,
-            unknowns.Distinct().ToImmutableArray());
+            [.. exceptions.Select(static type => MethodExceptionFact.Boundary(type, MethodExceptionSource.Metadata, "metadata_throw"))],
+            [],
+            [.. unknowns.Distinct()]);
     }
-
-    private static bool TryFindMethod(
-        MetadataReader reader,
-        IMethodSymbol symbol,
-        out MethodDefinitionHandle result) {
+    private static bool TryFindMethod(MetadataReader reader, IMethodSymbol symbol, out MethodDefinitionHandle result) {
         var wantedKey = RoslynStructuralMethodIdentity.GetCanonicalKey(symbol);
         foreach (var typeHandle in reader.TypeDefinitions) {
             var type = reader.GetTypeDefinition(typeHandle);
             foreach (var methodHandle in type.GetMethods()) {
-                if (!string.Equals(
-                        EcmaStructuralMethodIdentity.GetCanonicalKey(reader, methodHandle),
-                        wantedKey,
-                        StringComparison.Ordinal)) continue;
+                if (!string.Equals(EcmaStructuralMethodIdentity.GetCanonicalKey(reader, methodHandle), wantedKey,
+                    StringComparison.Ordinal)) continue;
                 result = methodHandle;
                 return true;
             }
@@ -154,7 +138,6 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         result = default;
         return false;
     }
-
     private static bool TryRead(byte[] bytes, ref int offset, out OpCode opcode, out int operand) {
         opcode = default;
         operand = 0;
@@ -169,7 +152,6 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         offset += size;
         return true;
     }
-
     private static int OperandSize(OperandType type, byte[] bytes, int offset) => type switch {
         OperandType.InlineNone => 0,
         OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
@@ -185,18 +167,13 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     private static MethodEffects Unknown(string code) => new(
         SharpProofEffect.Unknown,
         SharpProofCapability.None,
-        ImmutableArray.Create(MethodExceptionFact.Boundary(
+        [MethodExceptionFact.Boundary(
             "System.Exception",
             MethodExceptionSource.Metadata,
             code,
-            SharpProofVerdict.Unknown)),
-        ImmutableArray<MethodEffectSite>.Empty,
-        ImmutableArray.Create(Reason(code)));
+            SharpProofVerdict.Unknown)],
+        [],
+        [Reason(code)]);
 
-    private static SharpProofUnknownReason Reason(string code) => new(
-        "SP-EFFECT-METADATA",
-        "Effects",
-        code,
-        false,
-        false);
+    private static SharpProofUnknownReason Reason(string code) => new("SP-EFFECT-METADATA", "Effects", code, false, false);
 }

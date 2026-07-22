@@ -5,12 +5,11 @@ internal static partial class ExceptionFlowAnalyzer {
         MethodBodyAnalysisContext context,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var builder = ImmutableArray.CreateBuilder<EffectiveExceptionContract>(2);
-        var doesNotThrow = attributePolicy.GetAcceptedAttributes(
-            context.MethodSymbol, "DoesNotThrowAttribute").FirstOrDefault();
+        var doesNotThrow = attributePolicy.GetAcceptedAttributes(context.MethodSymbol, "DoesNotThrowAttribute").FirstOrDefault();
         if (doesNotThrow != null)
             builder.Add(new EffectiveExceptionContract(
                 ExceptionContractKind.DoesNotThrow,
-                ImmutableArray<ITypeSymbol>.Empty,
+                [],
                 "[DoesNotThrow]",
                 GetAttributeLocation(doesNotThrow, context.CancellationToken)));
 
@@ -18,13 +17,9 @@ internal static partial class ExceptionFlowAnalyzer {
         Location? allowedLocation = null;
         var hasValidAllowedContract = false;
         var exceptionBase = context.SemanticModel.Compilation.GetTypeByMetadataName("System.Exception");
-        foreach (var attribute in attributePolicy.GetAcceptedAttributes(
-                     context.MethodSymbol, "AllowedExceptionsAttribute")) {
+        foreach (var attribute in attributePolicy.GetAcceptedAttributes(context.MethodSymbol, "AllowedExceptionsAttribute")) {
             context.CancellationToken.ThrowIfCancellationRequested();
-            var attributeTypes = CollectAllowedExceptionTypes(
-                attribute,
-                exceptionBase,
-                context.CancellationToken,
+            var attributeTypes = CollectAllowedExceptionTypes(attribute, exceptionBase, context.CancellationToken,
                 out var invalidArguments);
             if (!invalidArguments.IsDefaultOrEmpty) {
                 foreach (var invalidArgument in invalidArguments)
@@ -36,14 +31,12 @@ internal static partial class ExceptionFlowAnalyzer {
                         AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node)));
                 continue;
             }
-
             hasValidAllowedContract = true;
             allowedLocation ??= GetAttributeLocation(attribute, context.CancellationToken);
             foreach (var allowedType in attributeTypes)
                 if (!ContainsSymbol(allAllowedTypes, allowedType))
                     allAllowedTypes.Add(allowedType);
         }
-
         if (hasValidAllowedContract)
             builder.Add(new EffectiveExceptionContract(
                 ExceptionContractKind.AllowedExceptions,
@@ -53,7 +46,6 @@ internal static partial class ExceptionFlowAnalyzer {
 
         return builder.ToImmutable();
     }
-
     private static void AnalyzeExceptionContracts(
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
@@ -62,7 +54,6 @@ internal static partial class ExceptionFlowAnalyzer {
         foreach (var contract in contracts)
             AnalyzeExceptionContract(context, methodSymbol, contract, facts);
     }
-
     private static void AnalyzeExceptionContract(
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
@@ -89,7 +80,6 @@ internal static partial class ExceptionFlowAnalyzer {
                 exceptionList));
         }
     }
-
     private static ImmutableArray<ITypeSymbol> CollectAllowedExceptionTypes(
         AttributeData attribute,
         INamedTypeSymbol? exceptionBase,
@@ -102,9 +92,8 @@ internal static partial class ExceptionFlowAnalyzer {
                 "could not resolve System.Exception",
                 GetAttributeLocation(attribute, cancellationToken)));
             invalidArguments = invalidBuilder.ToImmutable();
-            return ImmutableArray<ITypeSymbol>.Empty;
+            return [];
         }
-
         if (attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0].Kind != TypedConstantKind.Array) {
             invalidBuilder.Add(new InvalidExceptionContractArgument(
@@ -112,9 +101,8 @@ internal static partial class ExceptionFlowAnalyzer {
                 "expected exception type list",
                 GetAttributeLocation(attribute, cancellationToken)));
             invalidArguments = invalidBuilder.ToImmutable();
-            return ImmutableArray<ITypeSymbol>.Empty;
+            return [];
         }
-
         var values = attribute.ConstructorArguments[0].Values;
         var builder = ImmutableArray.CreateBuilder<ITypeSymbol>(values.Length);
         for (var index = 0; index < values.Length; index++) {
@@ -129,11 +117,7 @@ internal static partial class ExceptionFlowAnalyzer {
                     cancellationToken));
                 continue;
             }
-
-            if (!TypeHierarchyEnumeration.IsSameOrDerivedFrom(
-                    allowedType,
-                    exceptionBase,
-                    TypeIdentityPolicy.ExactOrOriginalDefinition)) {
+            if (!TypeHierarchyEnumeration.IsSameOrDerivedFrom(allowedType, exceptionBase, TypeIdentityPolicy.ExactOrOriginalDefinition)) {
                 invalidBuilder.Add(CreateInvalidAllowedExceptionArgument(
                     attribute,
                     index,
@@ -142,14 +126,11 @@ internal static partial class ExceptionFlowAnalyzer {
                     cancellationToken));
                 continue;
             }
-
             if (!ContainsSymbol(builder, allowedType)) builder.Add(allowedType);
         }
-
         invalidArguments = invalidBuilder.ToImmutable();
         return builder.ToImmutable();
     }
-
     private static InvalidExceptionContractArgument CreateInvalidAllowedExceptionArgument(
         AttributeData attribute,
         int index,
@@ -170,49 +151,31 @@ internal static partial class ExceptionFlowAnalyzer {
                         ?.FirstAncestorOrSelf<AttributeArgumentSyntax>();
             }
         }
-
         var argumentText = argumentSyntax?.ToString() ??
                            (value.Value is ITypeSymbol type ? "typeof(" + FormatType(type) + ")" : value.ToString());
         return new InvalidExceptionContractArgument(argumentText, reason, argumentSyntax?.GetLocation());
     }
-
-    private static bool IsAllowedByExceptionContract(
-        EffectiveExceptionContract contract,
-        ExceptionFactView exception) {
+    private static bool IsAllowedByExceptionContract(EffectiveExceptionContract contract, ExceptionFactView exception) {
         if (contract.Kind == ExceptionContractKind.DoesNotThrow) return false;
 
         if (exception.Type == null) return false;
 
         foreach (var allowedType in contract.AllowedTypes)
-            if (TypeHierarchyEnumeration.IsSameOrDerivedFrom(
-                    exception.Type,
-                    allowedType,
-                    TypeIdentityPolicy.ExactOrOriginalDefinition))
+            if (TypeHierarchyEnumeration.IsSameOrDerivedFrom(exception.Type, allowedType, TypeIdentityPolicy.ExactOrOriginalDefinition))
                 return true;
 
         return false;
     }
-
-    private static bool ContainsSymbol(
-        IEnumerable<ITypeSymbol> symbols,
-        ITypeSymbol candidate) {
-        return symbols.Any(symbol =>
-            SymbolEq.AreEqual(symbol.OriginalDefinition, candidate.OriginalDefinition));
-    }
-
+    private static bool ContainsSymbol(IEnumerable<ITypeSymbol> symbols, ITypeSymbol candidate) => symbols.Any(symbol
+        => SymbolEq.AreEqual(symbol.OriginalDefinition, candidate.OriginalDefinition));
     private static string FormatType(ITypeSymbol type) {
         var display = type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         return string.IsNullOrWhiteSpace(display)
             ? type.Name
             : display;
     }
-
-    private static Location? GetAttributeLocation(
-        AttributeData attribute,
-        CancellationToken cancellationToken) {
-        return attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
-    }
-
+    private static Location? GetAttributeLocation(AttributeData attribute, CancellationToken cancellationToken)
+        => attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
     private static IEnumerable<Location>? AdditionalLocations(Location? location) =>
         location == null ? null : [location];
 
@@ -220,11 +183,7 @@ internal static partial class ExceptionFlowAnalyzer {
         DoesNotThrow,
         AllowedExceptions
     }
-
-    readonly record struct InvalidExceptionContractArgument(
-        string Argument,
-        string Reason,
-        Location? Location);
+    readonly record struct InvalidExceptionContractArgument(string Argument, string Reason, Location? Location);
 
     readonly record struct EffectiveExceptionContract(
         ExceptionContractKind Kind,

@@ -19,7 +19,6 @@ public sealed class UnifiedCliTests {
         }
         finally { File.Delete(file); }
     }
-
     [Test]
     public async Task Analyze_Json_SerializesUnifiedResult() {
         var file = CreateSource("public static class C { public static int M(int x) => 10 / x; }");
@@ -41,7 +40,6 @@ public sealed class UnifiedCliTests {
         }
         finally { File.Delete(file); }
     }
-
     [Test]
     public async Task Analyze_UsesDocumentedExitGates() {
         var file = CreateSource("public static class C { public static object M() => new object(); }");
@@ -53,7 +51,6 @@ public sealed class UnifiedCliTests {
         }
         finally { File.Delete(file); }
     }
-
     [Test]
     public async Task Analyze_AllLines_AggregatesMethodEffects() {
         var file = CreateSource("""
@@ -74,13 +71,11 @@ public sealed class UnifiedCliTests {
         }
         finally { File.Delete(file); }
     }
-
     [Test]
     public async Task Analyze_RejectsLegacyModes() {
         var result = await SymbolicCliTestHost.RunAsync("--capabilities", "file.cs");
         Assert.That(result.ExitCode, Is.EqualTo(2));
     }
-
     private static string CreateSource(string source) {
         var path = Path.Combine(Path.GetTempPath(), "SharpProofCli-" + Guid.NewGuid().ToString("N") + ".cs");
         File.WriteAllText(path, source);

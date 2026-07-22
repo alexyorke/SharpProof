@@ -28,7 +28,6 @@ public sealed class SharpProofAnalysisSessionTests {
             Assert.That(result.Error, Is.Null);
         });
     }
-
     [Test]
     public void RuntimeHazardsUseTheCanonicalSessionAndRemainUnknownWhenUnproven() {
         using var session = SharpProofAnalysisSession.FromText("""
@@ -45,7 +44,6 @@ public sealed class SharpProofAnalysisSessionTests {
         Assert.That(result.Hazards, Has.Some.Property(nameof(SharpProofHazard.Status)).EqualTo("Unknown"));
         Assert.That(result.UnknownReasons.Any(reason => reason.Code == "SP-SMT-REQUIRED"), Is.False);
     }
-
     [Test]
     public void ConditionProofExposesCompactCounterexampleWithoutPublicSolverModel() {
         using var session = SharpProofAnalysisSession.FromText("""
@@ -68,7 +66,6 @@ public sealed class SharpProofAnalysisSessionTests {
             Assert.That(proof.Counterexample, Does.Contain("value="));
         });
     }
-
     [Test]
     public void RequestsAreSafeToReuseConcurrently() {
         using var session = SharpProofAnalysisSession.FromText("""

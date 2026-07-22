@@ -14,17 +14,11 @@ public sealed class SymbolicStateDifferentialHarnessTests {
         var source = SyntaxFactory.ParseExpression("value");
         var value = new SymbolicVariableTerm("value", SmtValueKind.Int);
         var lower = SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.GreaterThanOrEqual,
-                value,
-                new SymbolicIntegerConstantTerm(0)),
+            new SymbolicRelationAtom(SymbolicRelationOperator.GreaterThanOrEqual, value, new SymbolicIntegerConstantTerm(0)),
             source,
             "test.lower");
         var upper = SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.LessThan,
-                value,
-                new SymbolicIntegerConstantTerm(10)),
+            new SymbolicRelationAtom(SymbolicRelationOperator.LessThan, value, new SymbolicIntegerConstantTerm(10)),
             source,
             "test.upper");
         var first = new SymbolicState(
@@ -39,18 +33,8 @@ public sealed class SymbolicStateDifferentialHarnessTests {
                 new KeyValuePair<string, int>("other", 1),
                 new KeyValuePair<string, int>("value", 2)
             });
-        var ifLimit = new SymbolicAnalysisTruncationEvent(
-            SymbolicAnalysisLimitKind.IfElseFactMerge,
-            2,
-            3,
-            "test.if",
-            7);
-        var switchLimit = new SymbolicAnalysisTruncationEvent(
-            SymbolicAnalysisLimitKind.SwitchFactMerge,
-            4,
-            5,
-            "test.switch",
-            11);
+        var ifLimit = new SymbolicAnalysisTruncationEvent(SymbolicAnalysisLimitKind.IfElseFactMerge, 2, 3, "test.if", 7);
+        var switchLimit = new SymbolicAnalysisTruncationEvent(SymbolicAnalysisLimitKind.SwitchFactMerge, 4, 5, "test.switch", 11);
         var firstSnapshot = SymbolicStateDifferentialHarness.Capture(
             first,
             SymbolicLoweringSupport.Exact,
@@ -64,21 +48,12 @@ public sealed class SymbolicStateDifferentialHarnessTests {
 
         SymbolicStateDifferentialHarness.AssertEquivalent(firstSnapshot, secondSnapshot, "equivalent states");
     }
-
     [Test]
     public void Capture_PreservesSupportUnknownReasonProvenanceAndTruncation() {
-        var provenance = new SymbolicLoweringProvenance(
-            "operation-transfer",
-            new TextSpan(12, 4),
-            "unsupported-shape");
+        var provenance = new SymbolicLoweringProvenance("operation-transfer", new TextSpan(12, 4), "unsupported-shape");
         var result = SymbolicLoweringResult<SymbolicState>.Unsupported(provenance);
         var truncation = new SymbolicAnalysisTruncationInfo(new[] {
-            new SymbolicAnalysisTruncationEvent(
-                SymbolicAnalysisLimitKind.MergedPathConditions,
-                8,
-                9,
-                "test.merge",
-                12)
+            new SymbolicAnalysisTruncationEvent(SymbolicAnalysisLimitKind.MergedPathConditions, 8, 9, "test.merge", 12)
         });
 
         var snapshot = SymbolicStateDifferentialHarness.Capture(result, truncation);

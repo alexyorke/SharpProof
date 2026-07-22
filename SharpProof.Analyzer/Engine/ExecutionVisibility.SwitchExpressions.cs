@@ -7,8 +7,7 @@ internal static partial class ExecutionVisibility {
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis) {
-        var arm = switchExpression.Arms.FirstOrDefault(candidate =>
-            candidate.Expression.Span.Contains(syntaxNode.SpanStart));
+        var arm = switchExpression.Arms.FirstOrDefault(candidate => candidate.Expression.Span.Contains(syntaxNode.SpanStart));
         if (arm == null ||
             !SwitchPathConditionBuilder.TryCreateSwitchExpressionArmSymbolicCondition(
                 switchExpression.GoverningExpression,

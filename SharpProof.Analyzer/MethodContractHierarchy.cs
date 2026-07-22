@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer;
 
 internal static class MethodContractHierarchy {
-    internal static IEnumerable<IMethodSymbol> EnumerateSources(
-        IMethodSymbol method,
-        CancellationToken cancellationToken) {
+    internal static IEnumerable<IMethodSymbol> EnumerateSources(IMethodSymbol method, CancellationToken cancellationToken) {
         if (method == null) throw new ArgumentNullException(nameof(method));
 
         var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
@@ -11,7 +9,6 @@ internal static class MethodContractHierarchy {
             cancellationToken.ThrowIfCancellationRequested();
             if (seen.Add(current)) yield return current;
         }
-
         foreach (var implemented in method.ExplicitInterfaceImplementations)
             if (seen.Add(implemented))
                 yield return implemented;
@@ -32,23 +29,17 @@ internal static class MethodContractHierarchy {
                     case IPropertySymbol interfaceProperty
                         when containingType.FindImplementationForInterfaceMember(interfaceProperty) is
                             IPropertySymbol implementationProperty: {
-                        var interfaceAccessor = SelectMatchingAccessor(method, implementationProperty, interfaceProperty);
-                        if (interfaceAccessor != null && seen.Add(interfaceAccessor)) yield return interfaceAccessor;
-                        break;
-                    }
+                            var interfaceAccessor = SelectMatchingAccessor(method, implementationProperty, interfaceProperty);
+                            if (interfaceAccessor != null && seen.Add(interfaceAccessor)) yield return interfaceAccessor;
+                            break;
+                        }
                 }
             }
         }
     }
-
-    private static bool Implements(
-        INamedTypeSymbol containingType,
-        IMethodSymbol method,
-        IMethodSymbol interfaceMethod) {
-        return containingType.FindImplementationForInterfaceMember(interfaceMethod) is IMethodSymbol implementation &&
+    private static bool Implements(INamedTypeSymbol containingType, IMethodSymbol method, IMethodSymbol interfaceMethod)
+        => containingType.FindImplementationForInterfaceMember(interfaceMethod) is IMethodSymbol implementation &&
                TypeHierarchyEnumeration.IsSameOrOverridesTargetMethod(method, implementation);
-    }
-
     private static IMethodSymbol? SelectMatchingAccessor(
         IMethodSymbol method,
         IPropertySymbol implementation,

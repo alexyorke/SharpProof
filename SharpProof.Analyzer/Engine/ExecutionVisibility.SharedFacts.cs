@@ -8,10 +8,7 @@ internal static partial class ExecutionVisibility {
         SmtAnalysisService? smtAnalysis) {
         if (IsInReachableConstantSwitchGotoSection(syntaxNode, semanticModel, cancellationToken)) return false;
 
-        var pathState = SymbolicReachabilityService.CollectPathStateAt(
-            syntaxNode,
-            semanticModel,
-            cancellationToken);
+        var pathState = SymbolicReachabilityService.CollectPathStateAt(syntaxNode, semanticModel, cancellationToken);
         return new SymbolicProofService(smtAnalysis).ClassifyReachability(pathState).Status ==
                SymbolicProofStatus.Unreachable;
     }

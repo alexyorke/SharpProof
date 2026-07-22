@@ -13,7 +13,6 @@ internal static class SymbolicIrFormulaEncoder {
                     formula = new SmtUnaryFormula(SmtUnaryOperator.Not, operand);
                     return true;
                 }
-
                 break;
             case SymbolicBinaryCondition binaryCondition:
                 if (TryEncode(binaryCondition.Left, out var left) &&
@@ -26,26 +25,21 @@ internal static class SymbolicIrFormulaEncoder {
                         right);
                     return true;
                 }
-
                 break;
         }
-
         formula = null!;
         return false;
     }
-
     internal static bool TryEncode(SymbolicFact fact, out SmtFormula formula) {
         if (fact.Confidence != SymbolicFactConfidence.Exact ||
             !TryEncode(fact.Atom, out formula)) {
             formula = null!;
             return false;
         }
-
         if (!fact.Polarity) formula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
 
         return true;
     }
-
     internal static bool TryEncode(SymbolicAtom atom, out SmtFormula formula) {
         switch (atom) {
             case SymbolicTruthAtom truth:
@@ -62,16 +56,13 @@ internal static class SymbolicIrFormulaEncoder {
                     formula = new SmtRuntimeTypeTestFormula(value, typeTest.TypeKey);
                     return true;
                 }
-
                 break;
             case SymbolicExceptionPreconditionAtom exceptionPrecondition:
                 return TryEncode(exceptionPrecondition.Trigger, out formula);
         }
-
         formula = null!;
         return false;
     }
-
     internal static bool TryEncodeTerm(SymbolicTerm term, out SmtFormula formula) {
         switch (term) {
             case SymbolicBooleanConstantTerm constant:
@@ -99,24 +90,18 @@ internal static class SymbolicIrFormulaEncoder {
 
                 if (TryEncodeTerm(member.Receiver, out var receiver) &&
                     receiver.Kind == SmtValueKind.Reference) {
-                    formula = new SmtVariable(
-                        GetReferenceFormulaName(receiver) + "." + member.MemberName,
-                        member.Kind);
+                    formula = new SmtVariable(GetReferenceFormulaName(receiver) + "." + member.MemberName, member.Kind);
                     return true;
                 }
-
                 break;
             case SymbolicElementTerm element:
                 if (TryEncodeTerm(element.Receiver, out var elementReceiver) &&
                     TryEncodeElementIndex(element.Index, out var elementIndexText) &&
                     elementReceiver.Kind == SmtValueKind.Reference &&
                     elementIndexText.Length != 0) {
-                    formula = new SmtVariable(
-                        GetReferenceFormulaName(elementReceiver) + "[" + elementIndexText + "]",
-                        element.Kind);
+                    formula = new SmtVariable(GetReferenceFormulaName(elementReceiver) + "[" + elementIndexText + "]", element.Kind);
                     return true;
                 }
-
                 break;
             case SymbolicMultiElementTerm element:
                 if (TryEncodeTerm(element.Receiver, out var multiElementReceiver) &&
@@ -127,10 +112,8 @@ internal static class SymbolicIrFormulaEncoder {
                             formula = null!;
                             return false;
                         }
-
                         indexTexts.Add(indexText);
                     }
-
                     if (indexTexts.Count != 0) {
                         formula = new SmtVariable(
                             GetReferenceFormulaName(multiElementReceiver) + "[" + string.Join(",", indexTexts) +
@@ -139,7 +122,6 @@ internal static class SymbolicIrFormulaEncoder {
                         return true;
                     }
                 }
-
                 break;
             case SymbolicFromEndIndexTerm:
                 break;
@@ -156,7 +138,6 @@ internal static class SymbolicIrFormulaEncoder {
                     formula = stringFormula;
                     return true;
                 }
-
                 break;
             case SymbolicStringConcatTerm concat:
                 if (TryEncodeTerm(concat.Left, out var leftString) &&
@@ -166,7 +147,6 @@ internal static class SymbolicIrFormulaEncoder {
                     formula = new SmtStringConcatTerm(leftString, rightString);
                     return true;
                 }
-
                 break;
             case SymbolicStringSliceTerm slice:
                 if (TryEncodeTerm(slice.Value, out var sliceSource) &&
@@ -178,7 +158,6 @@ internal static class SymbolicIrFormulaEncoder {
                     formula = new SmtStringSubstringTerm(sliceSource, sliceOffset, sliceLength);
                     return true;
                 }
-
                 break;
             case SymbolicNullableHasValueTerm nullableHasValue:
                 formula = new SmtVariable(nullableHasValue.NullableName + ".HasValue", SmtValueKind.Bool);
@@ -196,7 +175,6 @@ internal static class SymbolicIrFormulaEncoder {
                         return true;
                     }
                 }
-
                 break;
             case SymbolicArrayDimensionLengthTerm dimensionLength:
                 if (TryEncodeTerm(dimensionLength.Value, out var arrayValue) &&
@@ -207,14 +185,10 @@ internal static class SymbolicIrFormulaEncoder {
                     formula = dimensionLengthFormula;
                     return true;
                 }
-
                 break;
             case SymbolicCountTerm count:
                 if (count.Value is SymbolicConditionalTerm conditionalCountValue &&
-                    TryEncodeConditionalProjection(
-                        conditionalCountValue,
-                        static receiver => new SymbolicCountTerm(receiver),
-                        out formula))
+                    TryEncodeConditionalProjection(conditionalCountValue, static receiver => new SymbolicCountTerm(receiver), out formula))
                     return true;
 
                 if (TryEncodeTerm(count.Value, out var countReference) &&
@@ -222,7 +196,6 @@ internal static class SymbolicIrFormulaEncoder {
                     formula = new SmtVariable(GetReferenceFormulaName(countReference) + ".Count", SmtValueKind.Int);
                     return true;
                 }
-
                 break;
             case SymbolicBinaryTerm binary:
                 if (TryEncodeTerm(binary.Left, out var left) &&
@@ -230,13 +203,10 @@ internal static class SymbolicIrFormulaEncoder {
                     left.Kind == SmtValueKind.Int &&
                     right.Kind == SmtValueKind.Int) {
                     formula = binary.MayOverflow
-                        ? new SmtOpaqueIntegerBinaryTerm(
-                            SymbolicOperatorLowerer.GetSmtIntegerBinaryOperator(binary.Operator), left, right)
-                        : new SmtIntegerBinaryTerm(
-                            SymbolicOperatorLowerer.GetSmtIntegerBinaryOperator(binary.Operator), left, right);
+                        ? new SmtOpaqueIntegerBinaryTerm(SymbolicOperatorLowerer.GetSmtIntegerBinaryOperator(binary.Operator), left, right)
+                        : new SmtIntegerBinaryTerm(SymbolicOperatorLowerer.GetSmtIntegerBinaryOperator(binary.Operator), left, right);
                     return true;
                 }
-
                 break;
             case SymbolicConditionalTerm conditional:
                 if (conditional.WhenTrue.Kind == conditional.WhenFalse.Kind &&
@@ -246,39 +216,30 @@ internal static class SymbolicIrFormulaEncoder {
                     formula = new SmtConditionalFormula(conditionFormula, whenTrue, whenFalse, whenTrue.Kind);
                     return true;
                 }
-
                 break;
             case SymbolicNumericConversionTerm conversion:
                 formula = new SmtVariable(SymbolicState.CreateProofTermKey(conversion), SmtValueKind.Int);
                 return true;
         }
-
         formula = null!;
         return false;
     }
-
     private static bool TryEncodeStringLengthTerm(SymbolicTerm value, out SmtFormula formula) {
         if (value is SymbolicStringConcatTerm concat &&
             TryEncodeStringLengthTerm(concat.Left, out var leftLength) &&
             TryEncodeStringLengthTerm(concat.Right, out var rightLength)) {
-            formula = new SmtIntegerBinaryTerm(
-                SmtIntegerBinaryOperator.Add,
-                leftLength,
-                rightLength);
+            formula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, leftLength, rightLength);
             return true;
         }
-
         if (value.Kind == SmtValueKind.String &&
             TryEncodeTerm(value, out var stringValue) &&
             stringValue.Kind == SmtValueKind.String) {
             formula = new SmtStringLengthTerm(stringValue);
             return true;
         }
-
         formula = null!;
         return false;
     }
-
     private static bool TryEncodeElementIndex(SymbolicTerm index, out string text) {
         var fromEnd = index is SymbolicFromEndIndexTerm;
         var value = fromEnd ? ((SymbolicFromEndIndexTerm)index).Value : index;
@@ -286,11 +247,9 @@ internal static class SymbolicIrFormulaEncoder {
             text = string.Empty;
             return false;
         }
-
         text = (fromEnd ? "^" : string.Empty) + CreateElementAccessIndexText(formula);
         return text.Length != 0;
     }
-
     private static bool TryEncodeBooleanTerm(SymbolicTerm term, out SmtFormula formula) {
         if (term.Kind == SmtValueKind.Bool &&
             TryEncodeTerm(term, out formula))
@@ -299,7 +258,6 @@ internal static class SymbolicIrFormulaEncoder {
         formula = null!;
         return false;
     }
-
     private static bool TryEncodeRelation(SymbolicRelationAtom relation, out SmtFormula formula) {
         if (!TryEncodeTerm(relation.Left, out var left) ||
             !TryEncodeTerm(relation.Right, out var right) ||
@@ -307,34 +265,28 @@ internal static class SymbolicIrFormulaEncoder {
             formula = null!;
             return false;
         }
-
         formula = new SmtBinaryFormula(ToSmtOperator(relation.Operator), left, right);
         return true;
     }
-
     private static bool TryEncodeStringPredicate(SymbolicStringPredicateAtom atom, out SmtFormula formula) {
         if (!TryEncodeTerm(atom.Value, out var value) ||
             value.Kind != SmtValueKind.String) {
             formula = null!;
             return false;
         }
-
         if (atom.Predicate == SymbolicStringPredicateKind.RegexMatch) {
             if (atom.Argument is not SymbolicStringConstantTerm pattern) {
                 formula = null!;
                 return false;
             }
-
             formula = new SmtRegexMatchFormula(value, pattern.Value, atom.RegexOptions);
             return true;
         }
-
         if (!TryEncodeTerm(atom.Argument, out var argument) ||
             argument.Kind != SmtValueKind.String) {
             formula = null!;
             return false;
         }
-
         formula = atom.Predicate switch {
             SymbolicStringPredicateKind.Contains => new SmtStringContainsFormula(value, argument),
             SymbolicStringPredicateKind.StartsWith => new SmtStringStartsWithFormula(value, argument),
@@ -344,7 +296,6 @@ internal static class SymbolicIrFormulaEncoder {
 
         return formula != null;
     }
-
     private static bool TryEncodeBounds(SymbolicBoundsAtom bounds, out SmtFormula formula) {
         if (!TryEncodeTerm(bounds.Index, out var index) ||
             !TryEncodeTerm(bounds.Length, out var length) ||
@@ -353,7 +304,6 @@ internal static class SymbolicIrFormulaEncoder {
             formula = null!;
             return false;
         }
-
         SmtFormula? lower = bounds.IncludeLowerBound
             ? new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, index, new SmtIntegerConstant(0))
             : null;
@@ -366,7 +316,6 @@ internal static class SymbolicIrFormulaEncoder {
             : lower ?? upper!;
         return formula != null;
     }
-
     private static bool CanCompareSmtValues(SmtFormula left, SmtFormula right) => left.Kind == right.Kind ||
                (left is SmtNullConstant && right.Kind == SmtValueKind.Reference) ||
                (right is SmtNullConstant && left.Kind == SmtValueKind.Reference);
@@ -396,11 +345,9 @@ internal static class SymbolicIrFormulaEncoder {
             formula = new SmtConditionalFormula(condition, whenTrue, whenFalse, whenTrue.Kind);
             return true;
         }
-
         formula = null!;
         return false;
     }
-
     private static string CreateElementAccessIndexText(SmtFormula index) => index switch {
         SmtIntegerConstant constant => constant.Value.ToString(CultureInfo.InvariantCulture),
         SmtVariable variable => variable.Name,

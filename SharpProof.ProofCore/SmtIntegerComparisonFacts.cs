@@ -1,11 +1,7 @@
 namespace SharpProof.ProofCore.Smt;
 
 internal static class SmtIntegerComparisonFacts {
-    internal static bool TryEvaluate(
-        SmtBinaryOperator op,
-        long left,
-        long right,
-        out bool value) {
+    internal static bool TryEvaluate(SmtBinaryOperator op, long left, long right, out bool value) {
         switch (op) {
             case SmtBinaryOperator.Equal:
                 value = left == right;
@@ -30,5 +26,4 @@ internal static class SmtIntegerComparisonFacts {
                 return false;
         }
     }
-
 }

@@ -31,9 +31,7 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
 
         foreach (var diagnostic in analysis.Diagnostics) _diagnosticCounts.Increment(diagnostic.Id);
     }
-
-    public FuzzRunSummary Build(DateTimeOffset completedUtc, TimeSpan elapsed, string outputDirectory,
-        int interestingCasesSaved) {
+    public FuzzRunSummary Build(DateTimeOffset completedUtc, TimeSpan elapsed, string outputDirectory, int interestingCasesSaved) {
         var findings = _findings
             .OrderByDescending(finding => finding.OccurrenceCount)
             .ThenBy(finding => finding.Category, StringComparer.Ordinal)
@@ -62,10 +60,7 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
         var manifestClassificationCounts = RoslynShapeManifest.EntriesByShapeId.Values
             .GroupBy(entry => entry.Classification.ToString(), StringComparer.Ordinal)
             .OrderBy(group => group.Key, StringComparer.Ordinal)
-            .ToImmutableSortedDictionary(
-                group => group.Key,
-                group => group.Count(),
-                StringComparer.Ordinal);
+            .ToImmutableSortedDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
         var registryExpectationCounts = CreateRegistryExpectationCounts();
         var conservativeRegistryFamilies = FuzzCaseGenerator.RegistryEntries
             .Where(static entry => entry.Expectation.IsConservative)
@@ -117,7 +112,6 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
             _primaryShapeCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
             findings);
     }
-
     private static ImmutableSortedDictionary<string, int> CreateRegistryExpectationCounts() {
         var buckets = new[] {
             FuzzExpectation.ConservativeBucket,
@@ -129,7 +123,6 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
             static bucket => FuzzCaseGenerator.RegistryEntries.Count(entry => entry.Expectation.Bucket == bucket),
             StringComparer.Ordinal);
     }
-
     private int DiagnosticCount(string id) => _diagnosticCounts.GetValueOrDefault(id);
 
     private void AddFinding(string normalizedSourceHash, FuzzFinding finding) {
@@ -142,14 +135,11 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
             };
             return;
         }
-
         _findingIndices.Add(aggregationKey, _findings.Count);
         _findings.Add(finding);
     }
-
     private static void AddAll(SortedDictionary<string, int> target, IReadOnlyDictionary<string, int> source) {
         foreach (var pair in source)
             target[pair.Key] = target.TryGetValue(pair.Key, out var count) ? count + pair.Value : pair.Value;
     }
-
 }

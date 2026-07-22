@@ -5,11 +5,7 @@ internal enum SymbolicLoweringSupport {
     Approximate,
     Unsupported
 }
-
-internal sealed record SymbolicLoweringProvenance(
-    string Stage,
-    TextSpan SourceSpan,
-    string Detail);
+internal sealed record SymbolicLoweringProvenance(string Stage, TextSpan SourceSpan, string Detail);
 
 internal sealed class SymbolicLoweringResult<T>(
     SymbolicLoweringSupport support,
@@ -25,18 +21,16 @@ internal sealed class SymbolicLoweringResult<T>(
     internal bool IsApproximate => Support == SymbolicLoweringSupport.Approximate;
     internal bool IsUnsupported => Support == SymbolicLoweringSupport.Unsupported;
 
-    internal static SymbolicLoweringResult<T> Exact(
-        T value,
-        SymbolicLoweringProvenance provenance) => new SymbolicLoweringResult<T>(
+    internal static SymbolicLoweringResult<T> Exact(T value, SymbolicLoweringProvenance provenance) => new(
             SymbolicLoweringSupport.Exact,
             value ?? throw new ArgumentNullException(nameof(value)),
-            ImmutableArray.Create(provenance),
+            [provenance],
             SymbolicUnknownReason.None);
 
 
-    internal static SymbolicLoweringResult<T> Unsupported(SymbolicLoweringProvenance provenance) => new SymbolicLoweringResult<T>(
+    internal static SymbolicLoweringResult<T> Unsupported(SymbolicLoweringProvenance provenance) => new(
             SymbolicLoweringSupport.Unsupported,
             null,
-            ImmutableArray.Create(provenance),
+            [provenance],
             SymbolicUnknownReason.UnsupportedIrEncoding);
 }

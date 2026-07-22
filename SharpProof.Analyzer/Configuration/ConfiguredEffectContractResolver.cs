@@ -18,8 +18,7 @@ internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions opt
             if (root.ValueKind != JsonValueKind.Object ||
                 !root.TryGetProperty("key", out var keyElement) ||
                 !string.Equals(keyElement.GetString(), canonicalKey, StringComparison.Ordinal) ||
-                !string.Equals(optionKey, Prefix + Sha256(keyElement.GetString() ?? string.Empty),
-                    StringComparison.Ordinal))
+                !string.Equals(optionKey, Prefix + Sha256(keyElement.GetString() ?? string.Empty), StringComparison.Ordinal))
                 return Unknown("effect_contract_hash_or_key_mismatch");
 
             var effects = ReadFlags(root, "effects", SharpProofEffect.None);
@@ -42,20 +41,19 @@ internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions opt
             return new MethodEffects(
                 effects,
                 capabilities,
-                exceptions.Select(static type => MethodExceptionFact.Boundary(
+                [.. exceptions.Select(static type => MethodExceptionFact.Boundary(
                     type,
                     MethodExceptionSource.Contract,
-                    "configured_effect_contract")).ToImmutableArray(),
-                ImmutableArray<MethodEffectSite>.Empty,
+                    "configured_effect_contract"))],
+                [],
                 complete
-                    ? ImmutableArray<SharpProofUnknownReason>.Empty
-                    : ImmutableArray.Create(Reason("partial_configured_effect_contract")));
+                    ? []
+                    : [Reason("partial_configured_effect_contract")]);
         }
         catch (JsonException) {
             return Unknown("malformed_configured_effect_contract");
         }
     }
-
     private static T ReadFlags<T>(JsonElement root, string property, T fallback) where T : struct, Enum {
         if (!root.TryGetProperty(property, out var element)) return fallback;
         if (element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out var number))
@@ -65,28 +63,21 @@ internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions opt
             ? value
             : fallback;
     }
-
     private static string Sha256(string value) {
         using var sha = SHA256.Create();
         return string.Concat(sha.ComputeHash(Encoding.UTF8.GetBytes(value))
             .Select(static value => value.ToString("x2", CultureInfo.InvariantCulture)));
     }
-
     private static MethodEffects Unknown(string reason) => new(
         SharpProofEffect.Unknown,
         SharpProofCapability.None,
-        ImmutableArray.Create(MethodExceptionFact.Boundary(
+        [MethodExceptionFact.Boundary(
             "System.Exception",
             MethodExceptionSource.Contract,
             reason,
-            SharpProofVerdict.Unknown)),
-        ImmutableArray<MethodEffectSite>.Empty,
-        ImmutableArray.Create(Reason(reason)));
+            SharpProofVerdict.Unknown)],
+        [],
+        [Reason(reason)]);
 
-    private static SharpProofUnknownReason Reason(string reason) => new(
-        "SP-EFFECT-CONTRACT",
-        "Configuration",
-        reason,
-        false,
-        true);
+    private static SharpProofUnknownReason Reason(string reason) => new("SP-EFFECT-CONTRACT", "Configuration", reason, false, true);
 }
