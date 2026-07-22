@@ -420,6 +420,15 @@ internal sealed class MethodEffectAnalysisSession(
                     listPattern.IndexerSymbol is IPropertySymbol indexerProperty)
                     AnalyzeCall(indexerProperty.GetMethod, listPattern, builder, patternInput);
                 break;
+            case ISlicePatternOperation { Pattern: not null } slicePattern:
+                var sliceInput = slicePattern.Parent is IListPatternOperation containingList
+                    ? FindPatternInput(containingList)
+                    : null;
+                if (slicePattern.SliceSymbol is IPropertySymbol sliceProperty)
+                    AnalyzeCall(sliceProperty.GetMethod, slicePattern, builder, sliceInput);
+                else if (slicePattern.SliceSymbol is IMethodSymbol sliceMethod)
+                    AnalyzeCall(sliceMethod, slicePattern, builder, sliceInput);
+                break;
             case IAwaitOperation { Syntax: AwaitExpressionSyntax syntax } awaited:
                 var awaitInfo = semanticModel.GetAwaitExpressionInfo(syntax);
                 AnalyzeCall(awaitInfo.GetAwaiterMethod, awaited, builder, awaited.Operation);
