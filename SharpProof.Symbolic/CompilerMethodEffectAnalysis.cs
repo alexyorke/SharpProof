@@ -1106,6 +1106,8 @@ internal sealed class MethodEffectAnalysisSession(
             if (target.MethodKind == MethodKind.DelegateInvoke && !receiver.Callables.IsDefaultOrEmpty) {
                 var returned = EffectFlowValue.None;
                 foreach (var callable in receiver.Callables) {
+                    if (callable.Method.IsStatic && callable.Method.MethodKind != MethodKind.StaticConstructor)
+                        AddTypeInitializerEffects(callable.Method.ContainingType, site);
                     var callableSummary = GetSummary(callable.Method, callable.Captures);
                     if (callable.Method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction)
                         effects.AddTransitive(callableSummary.Effects, site.Syntax, callable.Method, "source_call");
