@@ -3715,6 +3715,32 @@ internal sealed class MethodEffectAnalysisSession(
                     assignments);
                 return;
             }
+            if (value is IConditionalOperation { WhenFalse: { } whenFalse } conditional) {
+                var resolved = new List<ConstructorMemberAssignment>();
+                AddDeconstructionMemberAssignments(
+                    target,
+                    conditional.WhenTrue,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites,
+                    resolved);
+                if (resolved.Count == 0) return;
+                var trueCount = resolved.Count;
+                AddDeconstructionMemberAssignments(
+                    target,
+                    whenFalse,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites,
+                    resolved);
+                if (resolved.Count == trueCount) return;
+                assignments.AddRange(resolved);
+                return;
+            }
             if (value is IInvocationOperation invocation) {
                 AddDeconstructionCallResultAssignments(
                     target,
