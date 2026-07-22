@@ -428,7 +428,9 @@ internal sealed class MethodEffectAnalysisSession(
                             target.ReceiverReadEffect,
                             target.ReceiverWriteEffect,
                             target.CapturedReadEffect,
-                            target.CapturedWriteEffect);
+                            target.CapturedWriteEffect,
+                            target.ArgumentReadEffect,
+                            target.ArgumentWriteEffect);
                 }
                 else {
                     var isFreshInitializerCall = invocation.IsImplicit &&
@@ -2459,7 +2461,9 @@ internal sealed class MethodEffectAnalysisSession(
             SharpProofEffect? ReceiverReadEffect,
             SharpProofEffect? ReceiverWriteEffect,
             SharpProofEffect? CapturedReadEffect,
-            SharpProofEffect? CapturedWriteEffect);
+            SharpProofEffect? CapturedWriteEffect,
+            SharpProofEffect? ArgumentReadEffect,
+            SharpProofEffect? ArgumentWriteEffect);
         private readonly ImmutableArray<MethodExceptionFact>.Builder _exceptions =
             ImmutableArray.CreateBuilder<MethodExceptionFact>();
         private readonly ImmutableArray<MethodEffectSite>.Builder _sites =
@@ -2590,7 +2594,48 @@ internal sealed class MethodEffectAnalysisSession(
                 _ => null
             };
             var target = value == null ? null : CreateDelegateTarget(value, receiverOverride);
+            if (target != null &&
+                value is IAnonymousFunctionOperation function &&
+                function.Symbol.Parameters.Length == 0 &&
+                TryGetReturnedLambdaArgumentEffects(
+                    function,
+                    callSite,
+                    out var argumentReadEffect,
+                    out var argumentWriteEffect))
+                target = target with {
+                    ArgumentReadEffect = argumentReadEffect,
+                    ArgumentWriteEffect = argumentWriteEffect
+                };
             return target == null ? [] : [target];
+        }
+        private bool TryGetReturnedLambdaArgumentEffects(
+            IAnonymousFunctionOperation function,
+            IOperation callSite,
+            out SharpProofEffect readEffect,
+            out SharpProofEffect writeEffect) {
+            readEffect = SharpProofEffect.None;
+            writeEffect = SharpProofEffect.None;
+            if (callSite is not IInvocationOperation invocation) return false;
+            var found = false;
+            foreach (var parameter in function.Body.DescendantsAndSelf().OfType<IParameterReferenceOperation>()) {
+                if (!BelongsDirectlyTo(function, parameter) ||
+                    SymbolEqualityComparer.Default.Equals(
+                        parameter.Parameter.ContainingSymbol,
+                        function.Symbol))
+                    continue;
+                IOperation? source = invocation.Arguments.FirstOrDefault(argument =>
+                    string.Equals(
+                        argument.Parameter?.Name,
+                        parameter.Parameter.Name,
+                        StringComparison.Ordinal))?.Value;
+                if (source == null && parameter.Parameter.Ordinal == 0 && invocation.TargetMethod.ReducedFrom != null)
+                    source = invocation.Instance;
+                if (source == null) return false;
+                found = true;
+                readEffect |= GetInstanceReadEffect(source, this);
+                writeEffect |= GetInstanceWriteEffect(source, this);
+            }
+            return found;
         }
         private DelegateTarget? CreateDelegateTarget(IOperation value, IOperation? receiverOverride = null) {
             if (value is IMethodReferenceOperation reference) {
@@ -2600,6 +2645,8 @@ internal sealed class MethodEffectAnalysisSession(
                     receiver,
                     receiver == null ? null : GetInstanceReadEffect(receiver, this),
                     receiver == null ? null : GetInstanceWriteEffect(receiver, this),
+                    null,
+                    null,
                     null,
                     null);
             }
@@ -2634,7 +2681,9 @@ internal sealed class MethodEffectAnalysisSession(
                 null,
                 null,
                 hasCapture ? capturedReadEffect : null,
-                hasCapture ? capturedWriteEffect : null);
+                hasCapture ? capturedWriteEffect : null,
+                null,
+                null);
         }
         internal bool TryGetCapturedEffects(
             IOperation function,
