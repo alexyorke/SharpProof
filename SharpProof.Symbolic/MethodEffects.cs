@@ -2766,7 +2766,6 @@ internal sealed class MethodEffectAnalysisSession(
             out SharpProofEffect writeEffect) {
             readEffect = SharpProofEffect.None;
             writeEffect = SharpProofEffect.None;
-            if (callSite is not IInvocationOperation invocation) return false;
             var found = false;
             foreach (var parameter in function.Body.DescendantsAndSelf().OfType<IParameterReferenceOperation>()) {
                 if (!BelongsDirectlyTo(function, parameter) ||
@@ -2774,12 +2773,10 @@ internal sealed class MethodEffectAnalysisSession(
                         parameter.Parameter.ContainingSymbol,
                         function.Symbol))
                     continue;
-                IOperation? source = invocation.Arguments.FirstOrDefault(argument =>
-                    string.Equals(
-                        argument.Parameter?.Name,
-                        parameter.Parameter.Name,
-                        StringComparison.Ordinal))?.Value;
-                if (source == null && parameter.Parameter.Ordinal == 0 && invocation.TargetMethod.ReducedFrom != null)
+                var source = GetConstructorCallArgument(callSite, parameter.Parameter.Name);
+                if (source == null &&
+                    parameter.Parameter.Ordinal == 0 &&
+                    callSite is IInvocationOperation { TargetMethod.ReducedFrom: not null } invocation)
                     source = invocation.Instance;
                 if (source == null) return false;
                 found = true;
