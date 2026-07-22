@@ -1066,12 +1066,27 @@ internal sealed class MethodEffectAnalysisSession(
                 .Where(initializer => initializer != null)
                 .Cast<EqualsValueClauseSyntax>());
         foreach (var initializer in initializers) {
-            IOperation? operation = model.GetOperation(initializer.Value);
-            while (operation is IConversionOperation conversion) operation = conversion.Operand;
-            if (operation is not (IParameterReferenceOperation or ILiteralOperation or IDefaultValueOperation))
+            if (model.GetOperation(initializer.Value) is not { } operation ||
+                !IsEffectFreePrimaryConstructorInitializer(operation))
                 return false;
         }
         return true;
+    }
+    private static bool IsEffectFreePrimaryConstructorInitializer(IOperation operation) {
+        while (operation is IConversionOperation conversion) operation = conversion.Operand;
+        if (operation is IParenthesizedOperation parenthesized)
+            return IsEffectFreePrimaryConstructorInitializer(parenthesized.Operand);
+        return operation switch {
+            IParameterReferenceOperation or ILiteralOperation or IDefaultValueOperation => true,
+            IConditionalOperation { WhenFalse: { } whenFalse } conditional =>
+                IsEffectFreePrimaryConstructorInitializer(conditional.Condition) &&
+                IsEffectFreePrimaryConstructorInitializer(conditional.WhenTrue) &&
+                IsEffectFreePrimaryConstructorInitializer(whenFalse),
+            ICoalesceOperation coalesce =>
+                IsEffectFreePrimaryConstructorInitializer(coalesce.Value) &&
+                IsEffectFreePrimaryConstructorInitializer(coalesce.WhenNull),
+            _ => false
+        };
     }
     private static INamedTypeSymbol? GetReturnedExactResultType(
         IMethodSymbol method,
@@ -3167,8 +3182,7 @@ internal sealed class MethodEffectAnalysisSession(
             var declaration = creation.Constructor?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
             if (declaration is TypeDeclarationSyntax { ParameterList: not null } primaryType &&
                 TryGetPrimaryConstructorMemberInitializer(
-                    creation, primaryType, memberPath, compilation, out var primaryValue)) {
-                values = [primaryValue];
+                    creation, primaryType, memberPath, compilation, out values)) {
                 return true;
             }
             var candidates = declaration == null
@@ -3237,8 +3251,8 @@ internal sealed class MethodEffectAnalysisSession(
             TypeDeclarationSyntax declaration,
             string memberPath,
             Compilation compilation,
-            out IOperation value) {
-            value = null!;
+            out ImmutableArray<IOperation> values) {
+            values = [];
             var model = compilation.GetSemanticModel(declaration.SyntaxTree);
             var expressions = new List<ExpressionSyntax>();
             foreach (var member in declaration.Members) {
@@ -3265,16 +3279,29 @@ internal sealed class MethodEffectAnalysisSession(
             }
             if (expressions.Count != 1) return false;
             var initializer = expressions[0];
-            if (initializer is IdentifierNameSyntax identifier) {
-                value = creation.Arguments.FirstOrDefault(argument =>
-                    string.Equals(
-                        argument.Parameter?.Name,
-                        identifier.Identifier.ValueText,
-                        StringComparison.Ordinal))?.Value!;
-                if (value != null) return true;
+            if (model.GetOperation(initializer) is not { } operation ||
+                !TryCollectStableInitializerValues(
+                    operation,
+                    compilation,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                    out var initializerValues))
+                return false;
+            var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
+            foreach (var initializerValue in initializerValues) {
+                var value = initializerValue;
+                while (value is IConversionOperation conversion) value = conversion.Operand;
+                if (value is IParameterReferenceOperation parameter) {
+                    value = creation.Arguments.FirstOrDefault(argument =>
+                        string.Equals(
+                            argument.Parameter?.Name,
+                            parameter.Parameter.Name,
+                            StringComparison.Ordinal))?.Value!;
+                    if (value == null) return false;
+                }
+                mappedValues.Add(value);
             }
-            value = model.GetOperation(initializer)!;
-            return value != null;
+            values = mappedValues.ToImmutable();
+            return !values.IsDefaultOrEmpty;
         }
         private static bool MemberNameMatches(ISymbol? symbol, string name, string memberPath) =>
             symbol != null &&
