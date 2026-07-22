@@ -2606,13 +2606,19 @@ internal sealed class MethodEffectAnalysisSession(
         }
         internal ImmutableArray<DelegateTarget> GetDelegateTargets(IOperation? value) {
             if (value == null) return [];
-            while (value is IConversionOperation conversion) value = conversion.Operand;
+            while (value is IConversionOperation { OperatorMethod: null } conversion)
+                value = conversion.Operand;
             if (value is IConditionalAccessInstanceOperation conditionalAccess &&
                 FindConditionalAccessReceiver(conditionalAccess) is { } conditionalReceiver)
                 value = conditionalReceiver;
             if (value is ILocalReferenceOperation local &&
                 _delegateTargets.TryGetValue(local.Local, out var localTargets))
                 return localTargets;
+            if (value is IConversionOperation { OperatorMethod: { } operatorMethod } userConversion &&
+                GetReturnedDelegateTargets(operatorMethod, userConversion) is {
+                    IsDefaultOrEmpty: false
+                } conversionTargets)
+                return conversionTargets;
             if (value is IInvocationOperation invocation &&
                 GetReturnedDelegateTargets(invocation.TargetMethod, invocation) is {
                     IsDefaultOrEmpty: false
@@ -2647,7 +2653,10 @@ internal sealed class MethodEffectAnalysisSession(
         private ImmutableArray<DelegateTarget> GetReturnedDelegateOperationTargets(
             IOperation? value,
             IOperation callSite) {
-            while (value is IConversionOperation conversion) value = conversion.Operand;
+            while (value is IConversionOperation { OperatorMethod: null } conversion)
+                value = conversion.Operand;
+            if (value is IConversionOperation { OperatorMethod: { } operatorMethod } userConversion)
+                return GetReturnedDelegateTargets(operatorMethod, userConversion);
             if (value is IDelegateCreationOperation creation) value = creation.Target;
             if (value is IConditionalOperation conditional) {
                 var whenTrue = GetReturnedDelegateOperationTargets(conditional.WhenTrue, callSite);
