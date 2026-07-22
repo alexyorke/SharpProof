@@ -239,6 +239,27 @@ public sealed class MethodEffectsTests {
             string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
     }
     [Test]
+    public void AwaitIncludesGetAwaiterEffects() {
+        var result = Analyze("""
+            sealed class Awaitable {
+                private static int state;
+                public Awaiter GetAwaiter() { state++; return default; }
+            }
+            struct Awaiter : System.Runtime.CompilerServices.INotifyCompletion {
+                public bool IsCompleted => true;
+                public void OnCompleted(System.Action continuation) { }
+                public int GetResult() => 1;
+            }
+            class C {
+                static async System.Threading.Tasks.Task<int> M(Awaitable value) => await value;
+            }
+            """, 11);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void ListCollectionExpressionAllocates() {
         var result = Analyze("""
             class C {
