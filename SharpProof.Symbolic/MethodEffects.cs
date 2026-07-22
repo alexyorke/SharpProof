@@ -590,7 +590,7 @@ internal sealed class MethodEffectAnalysisSession(
                 break;
             case IForEachLoopOperation { Syntax: CommonForEachStatementSyntax syntax } loop:
                 var foreachCollection = loop.Collection;
-                while (foreachCollection is IConversionOperation collectionConversion)
+                while (foreachCollection is IConversionOperation { OperatorMethod: null } collectionConversion)
                     foreachCollection = collectionConversion.Operand;
                 AnalyzeForEachDeconstruction(loop, syntax, semanticModel, builder);
                 if (foreachCollection.Type is IArrayTypeSymbol arrayType) {
@@ -896,7 +896,7 @@ internal sealed class MethodEffectAnalysisSession(
     private static IOperation UnwrapAliasSource(IOperation value) {
         while (true) {
             switch (value) {
-                case IConversionOperation conversion:
+                case IConversionOperation { OperatorMethod: null } conversion:
                     value = conversion.Operand;
                     continue;
                 case IAddressOfOperation address:
@@ -5050,7 +5050,7 @@ internal sealed class MethodEffectAnalysisSession(
         private static IOperation UnwrapAliasSource(IOperation value) {
             while (true) {
                 switch (value) {
-                    case IConversionOperation conversion:
+                    case IConversionOperation { OperatorMethod: null } conversion:
                         value = conversion.Operand;
                         continue;
                     case IAddressOfOperation address:
@@ -5106,7 +5106,8 @@ internal sealed class MethodEffectAnalysisSession(
             IOperation? value,
             out SharpProofEffect readEffect,
             out SharpProofEffect writeEffect) {
-            while (value is IConversionOperation conversion) value = conversion.Operand;
+            while (value is IConversionOperation { OperatorMethod: null } conversion)
+                value = conversion.Operand;
             if (value is ILocalReferenceOperation local &&
                 _refLocalEffects.TryGetValue((ILocalSymbol)local.Local.OriginalDefinition, out var effects)) {
                 readEffect = effects.Read;
