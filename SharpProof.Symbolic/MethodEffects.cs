@@ -1620,7 +1620,7 @@ internal sealed class MethodEffectAnalysisSession(
             IFieldReferenceOperation { Field.IsStatic: true } => SharpProofEffect.WritesStaticState,
             IFieldReferenceOperation field => GetInstanceWriteEffect(field.Instance, builder),
             IPropertyReferenceOperation { Property.IsStatic: true } => SharpProofEffect.WritesStaticState,
-            IPropertyReferenceOperation property => GetInstanceWriteEffect(property.Instance, builder),
+            IPropertyReferenceOperation property => GetPropertyResultEffect(property, builder, write: true),
             IArrayElementReferenceOperation array => GetInstanceWriteEffect(array.ArrayReference, builder),
             IInlineArrayAccessOperation inlineArray => GetInstanceWriteEffect(inlineArray.Instance, builder),
             IImplicitIndexerReferenceOperation implicitIndexer =>
@@ -1665,7 +1665,7 @@ internal sealed class MethodEffectAnalysisSession(
             IFieldReferenceOperation { Field.IsStatic: true } => SharpProofEffect.ReadsStaticState,
             IFieldReferenceOperation field => GetInstanceReadEffect(field.Instance, builder),
             IPropertyReferenceOperation { Property.IsStatic: true } => SharpProofEffect.ReadsStaticState,
-            IPropertyReferenceOperation property => GetInstanceReadEffect(property.Instance, builder),
+            IPropertyReferenceOperation property => GetPropertyResultEffect(property, builder, write: false),
             IArrayElementReferenceOperation array => GetInstanceReadEffect(array.ArrayReference, builder),
             IInlineArrayAccessOperation inlineArray => GetInstanceReadEffect(inlineArray.Instance, builder),
             IImplicitIndexerReferenceOperation implicitIndexer =>
@@ -1727,12 +1727,47 @@ internal sealed class MethodEffectAnalysisSession(
             return write ? SharpProofEffect.WritesFreshOwnedState : SharpProofEffect.None;
         return SharpProofEffect.Unknown;
     }
+    private static SharpProofEffect GetPropertyResultEffect(
+        IPropertyReferenceOperation property,
+        Builder builder,
+        bool write) {
+        var getter = property.Property.GetMethod;
+        var declaration = getter?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+        var expression = GetDirectReturnExpression(declaration);
+        if (expression != null) {
+            expression = UnwrapReturnExpression(expression);
+            if (expression is IdentifierNameSyntax identifier) {
+                var member = property.Property.ContainingType.GetMembers(identifier.Identifier.ValueText)
+                    .FirstOrDefault(candidate => candidate is IFieldSymbol or IPropertySymbol);
+                if (member?.IsStatic == true)
+                    return write ? SharpProofEffect.WritesStaticState : SharpProofEffect.ReadsStaticState;
+                if (member != null)
+                    return write
+                        ? GetInstanceWriteEffect(property.Instance, builder)
+                        : GetInstanceReadEffect(property.Instance, builder);
+            }
+            if (expression is ThisExpressionSyntax)
+                return write
+                    ? GetInstanceWriteEffect(property.Instance, builder)
+                    : GetInstanceReadEffect(property.Instance, builder);
+            if (expression is ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax or
+                ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax or
+                AnonymousObjectCreationExpressionSyntax or CollectionExpressionSyntax)
+                return write ? SharpProofEffect.WritesFreshOwnedState : SharpProofEffect.None;
+        }
+        return write
+            ? GetInstanceWriteEffect(property.Instance, builder)
+            : GetInstanceReadEffect(property.Instance, builder);
+    }
     private static ExpressionSyntax? GetDirectReturnExpression(SyntaxNode? declaration) {
         ExpressionSyntax? expression = declaration switch {
             MethodDeclarationSyntax method => method.ExpressionBody?.Expression,
             LocalFunctionStatementSyntax localFunction => localFunction.ExpressionBody?.Expression,
             OperatorDeclarationSyntax @operator => @operator.ExpressionBody?.Expression,
             ConversionOperatorDeclarationSyntax conversion => conversion.ExpressionBody?.Expression,
+            PropertyDeclarationSyntax property => property.ExpressionBody?.Expression,
+            AccessorDeclarationSyntax accessor => accessor.ExpressionBody?.Expression,
+            ArrowExpressionClauseSyntax arrow => arrow.Expression,
             _ => null
         };
         if (expression != null) return expression;
@@ -1741,6 +1776,7 @@ internal sealed class MethodEffectAnalysisSession(
             LocalFunctionStatementSyntax localFunction => localFunction.Body?.Statements,
             OperatorDeclarationSyntax @operator => @operator.Body?.Statements,
             ConversionOperatorDeclarationSyntax conversion => conversion.Body?.Statements,
+            AccessorDeclarationSyntax accessor => accessor.Body?.Statements,
             _ => null
         };
         if (statements == null) return null;
