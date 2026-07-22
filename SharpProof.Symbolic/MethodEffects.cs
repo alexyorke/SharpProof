@@ -937,7 +937,10 @@ internal sealed class MethodEffectAnalysisSession(
         var knownExactReceiverType = dispatchReceiver switch {
             ILocalReferenceOperation localReceiver => builder.GetExactType(localReceiver.Local),
             IObjectCreationOperation { Type: INamedTypeSymbol createdType } => createdType,
-            IInvocationOperation returnedInvocation => GetInvocationExactResultType(returnedInvocation),
+            IInvocationOperation returnedInvocation =>
+                GetReturnedExactResultType(returnedInvocation.TargetMethod, returnedInvocation),
+            IPropertyReferenceOperation { Property.GetMethod: { } getter } returnedProperty =>
+                GetReturnedExactResultType(getter, returnedProperty),
             _ => null
         };
         var exactDispatchTarget = SymbolicDispatchFacts.ResolveExactDispatchTarget(
@@ -1026,12 +1029,12 @@ internal sealed class MethodEffectAnalysisSession(
         }
         return preservesFresh;
     }
-    private static INamedTypeSymbol? GetInvocationExactResultType(IInvocationOperation invocation) {
-        var targetMethod = invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod;
+    private static INamedTypeSymbol? GetReturnedExactResultType(IMethodSymbol method, IOperation callSite) {
+        var targetMethod = method.ReducedFrom ?? method;
         targetMethod = (targetMethod.PartialImplementationPart ?? targetMethod).OriginalDefinition;
         var declaration = targetMethod.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
         var expressions = GetDirectReturnExpressions(declaration);
-        if (expressions.IsDefaultOrEmpty || invocation.SemanticModel?.Compilation is not { } compilation)
+        if (expressions.IsDefaultOrEmpty || callSite.SemanticModel?.Compilation is not { } compilation)
             return null;
         INamedTypeSymbol? exactType = null;
         foreach (var expression in expressions) {
