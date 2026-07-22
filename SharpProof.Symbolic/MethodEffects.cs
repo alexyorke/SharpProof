@@ -2003,7 +2003,7 @@ internal sealed class MethodEffectAnalysisSession(
         return expressions.Aggregate(
             SharpProofEffect.None,
             (effects, expression) => effects |
-                                     (builder.TryGetMappedInvocationReturnedValues(
+                                     (builder.TryGetMappedCallReturnedValues(
                                           expression,
                                           targetMethod,
                                           invocation,
@@ -2097,8 +2097,19 @@ internal sealed class MethodEffectAnalysisSession(
             return expressions.Aggregate(
                 SharpProofEffect.None,
                 (effects, expression) => effects |
-                                         GetPropertyReturnedExpressionEffect(
-                                             expression, property, builder, write));
+                                         (builder.TryGetMappedCallReturnedValues(
+                                              expression,
+                                              (getter!.ReducedFrom ?? getter).OriginalDefinition,
+                                              property,
+                                              out var mappedValues)
+                                             ? mappedValues.Aggregate(
+                                                 SharpProofEffect.None,
+                                                 (mappedEffects, mapped) => mappedEffects |
+                                                     (write
+                                                         ? GetInstanceWriteEffect(mapped, builder)
+                                                         : GetInstanceReadEffect(mapped, builder)))
+                                             : GetPropertyReturnedExpressionEffect(
+                                                 expression, property, builder, write)));
         return write
             ? GetInstanceWriteEffect(property.Instance, builder)
             : GetInstanceReadEffect(property.Instance, builder);
@@ -4902,13 +4913,13 @@ internal sealed class MethodEffectAnalysisSession(
             }
             return false;
         }
-        internal bool TryGetMappedInvocationReturnedValues(
+        internal bool TryGetMappedCallReturnedValues(
             ExpressionSyntax expression,
             IMethodSymbol targetMethod,
-            IInvocationOperation invocation,
+            IOperation callSite,
             out ImmutableArray<IOperation> values) {
             values = [];
-            if (invocation.SemanticModel?.Compilation is not { } compilation)
+            if (callSite.SemanticModel?.Compilation is not { } compilation)
                 return false;
             var model = compilation.GetSemanticModel(expression.SyntaxTree);
             if (model.GetOperation(expression) is not { } returnedValue ||
@@ -4924,7 +4935,7 @@ internal sealed class MethodEffectAnalysisSession(
                 if (!TryMapConstructorAssignedValue(
                         returned,
                         targetMethod,
-                        invocation,
+                        callSite,
                         compilation,
                         visitedMethods,
                         out var mapped))
