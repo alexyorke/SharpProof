@@ -1329,7 +1329,7 @@ internal sealed class MethodEffectAnalysisSession(
     private static bool IsVisible(IOperation operation, SyntaxNode declaration, SemanticModel semanticModel) {
         for (var current = operation; current != null; current = current.Parent)
             if (current is IInvocationOperation invocation &&
-                IsOmittedConditionalCall(invocation, semanticModel))
+                IsOmittedInvocation(invocation, semanticModel))
                 return false;
         for (var parent = operation.Parent; parent != null; parent = parent.Parent)
             if (parent is INameOfOperation)
@@ -1354,6 +1354,11 @@ internal sealed class MethodEffectAnalysisSession(
                 return false;
         return true;
     }
+    private static bool IsOmittedInvocation(
+        IInvocationOperation invocation,
+        SemanticModel semanticModel) =>
+        invocation.TargetMethod is { IsPartialDefinition: true, PartialImplementationPart: null } ||
+        IsOmittedConditionalCall(invocation, semanticModel);
     private static bool IsOmittedConditionalCall(
         IInvocationOperation invocation,
         SemanticModel semanticModel) {
