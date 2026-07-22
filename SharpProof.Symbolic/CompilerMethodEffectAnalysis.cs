@@ -540,6 +540,13 @@ internal sealed class MethodEffectAnalysisSession(
                     return indexerReceiver.Member("#?");
                 case IObjectCreationOperation creation:
                     return EvaluateCreation(creation, ref state);
+                case ITypeParameterObjectCreationOperation typeParameterCreation:
+                    effects.Add(SharpProofEffect.Allocates, typeParameterCreation.Syntax,
+                        typeParameterCreation.Type, "generic_object_allocation");
+                    effects.Add(SharpProofEffect.DispatchUncertainty, typeParameterCreation.Syntax,
+                        typeParameterCreation.Type, "generic_constructor_dispatch");
+                    effects.AddUnknown(typeParameterCreation.Syntax, "generic_constructor_dispatch");
+                    return EffectFlowValue.Fresh(typeParameterCreation.Type);
                 case IArrayCreationOperation arrayCreation:
                     foreach (var size in arrayCreation.DimensionSizes) Evaluate(size, ref state);
                     var arrayValue = EffectFlowValue.Fresh(arrayCreation.Type);
