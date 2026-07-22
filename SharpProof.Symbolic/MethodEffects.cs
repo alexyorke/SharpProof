@@ -253,8 +253,19 @@ internal sealed class MethodEffectAnalysisSession(
                     (assignedLocal.Local.RefKind == RefKind.None || assignment.IsRef))
                     AssignTrackedLocal(builder, assignedLocal.Local, assignment.Value);
                 if (!assignment.IsRef &&
-                    assignment.Target is IPropertyReferenceOperation { Property.SetMethod: not null } propertyTarget)
-                    AnalyzeCall(propertyTarget.Property.SetMethod, assignment, builder, propertyTarget.Instance);
+                    assignment.Target is IPropertyReferenceOperation { Property.SetMethod: not null } propertyTarget) {
+                    var isFreshInitializerAssignment = assignment.Syntax.AncestorsAndSelf().Any(static syntax =>
+                        syntax is InitializerExpressionSyntax or
+                            WithExpressionSyntax or
+                            AnonymousObjectCreationExpressionSyntax);
+                    AnalyzeCall(
+                        propertyTarget.Property.SetMethod,
+                        assignment,
+                        builder,
+                        propertyTarget.Instance,
+                        isFreshInitializerAssignment ? SharpProofEffect.None : null,
+                        isFreshInitializerAssignment ? SharpProofEffect.WritesFreshOwnedState : null);
+                }
                 if (!assignment.IsRef &&
                     assignment.Target is IImplicitIndexerReferenceOperation implicitIndexerTarget)
                     AnalyzeImplicitIndexerAccess(implicitIndexerTarget, assignment, builder, reads: false, writes: true);
@@ -1301,13 +1312,27 @@ internal sealed class MethodEffectAnalysisSession(
         var isListType = typeDefinition == "System.Collections.Generic.List<T>";
         var isDictionaryType = typeDefinition == "System.Collections.Generic.Dictionary<TKey, TValue>";
         var isCollectionIndexerGet = (isListType || isDictionaryType) &&
-                                     method.MethodKind == MethodKind.PropertyGet &&
-                                     method.AssociatedSymbol is IPropertySymbol { IsIndexer: true };
+                                     (method.MethodKind == MethodKind.PropertyGet &&
+                                      method.AssociatedSymbol is IPropertySymbol { IsIndexer: true } ||
+                                      string.Equals(method.Name, "get_Item", StringComparison.Ordinal));
+        var isCollectionIndexerSet = (isListType || isDictionaryType) &&
+                                     (method.MethodKind == MethodKind.PropertySet &&
+                                      method.AssociatedSymbol is IPropertySymbol { IsIndexer: true } ||
+                                      string.Equals(method.Name, "set_Item", StringComparison.Ordinal));
         var isSpanToArray = string.Equals(method.Name, "ToArray", StringComparison.Ordinal) &&
                             typeDefinition is "System.Span<T>" or "System.ReadOnlySpan<T>";
         if (isCollectionIndexerGet) {
             effects = new MethodEffects(
                 SharpProofEffect.ReadsReceiverState,
+                SharpProofCapability.None,
+                [],
+                [],
+                []);
+            return true;
+        }
+        if (isCollectionIndexerSet) {
+            effects = new MethodEffects(
+                SharpProofEffect.WritesReceiverState,
                 SharpProofCapability.None,
                 [],
                 [],
@@ -2918,6 +2943,29 @@ internal sealed class MethodEffectAnalysisSession(
             if (path[index].StartsWith(indexerPrefix, StringComparison.Ordinal)) {
                 if (value is not IObjectCreationOperation { Initializer: { } collectionInitializer })
                     return false;
+                var assignedElement = collectionInitializer.Initializers
+                    .OfType<ISimpleAssignmentOperation>()
+                    .FirstOrDefault(assignment =>
+                        assignment.Target is IPropertyReferenceOperation {
+                            Property.IsIndexer: true,
+                            Arguments.Length: 1
+                        } indexer &&
+                        TryGetConstantPathPart(
+                            indexer.Arguments[0].Value,
+                            indexerPrefix,
+                            out var keyPath) &&
+                        string.Equals(keyPath, path[index], StringComparison.Ordinal))?.Value;
+                if (assignedElement != null) {
+                    if (index == path.Count - 1) {
+                        initializer = assignedElement;
+                        return true;
+                    }
+                    return TryGetObjectInitializerMember(
+                        assignedElement,
+                        path,
+                        index + 1,
+                        out initializer);
+                }
                 var additions = collectionInitializer.Initializers
                     .OfType<IInvocationOperation>()
                     .Where(invocation => invocation.Arguments.Length != 0)
