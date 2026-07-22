@@ -698,6 +698,20 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void SpanRefForeachWritesArgumentState() {
+        var result = Analyze("""
+            class C {
+                static void M(System.Span<int> values) {
+                    foreach (ref var value in values) { value = 1; }
+                }
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+        });
+    }
+    [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {
