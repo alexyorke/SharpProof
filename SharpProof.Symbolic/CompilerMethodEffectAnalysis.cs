@@ -1162,11 +1162,11 @@ internal sealed class MethodEffectAnalysisSession(
                 effects.Read(receiver, property.Syntax, property.Property, "property_read");
             var key = MemberKey(property) ?? MemberKey(property.Property);
             if (property.Property.GetMethod == null) return receiver.Member(key);
-            if (property.Property.GetMethod.IsImplicitlyDeclared || property.Property is {
-                IsAbstract: false, ContainingType.TypeKind: not TypeKind.Interface
-            } && property.Property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(session.CancellationToken) is
+            if (!property.Property.GetMethod.IsVirtual && (property.Property.GetMethod.IsImplicitlyDeclared ||
+                property.Property is { IsAbstract: false, ContainingType.TypeKind: not TypeKind.Interface } &&
+                property.Property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(session.CancellationToken) is
                     PropertyDeclarationSyntax { AccessorList.Accessors: var accessors } &&
-                accessors.All(static accessor => accessor is { Body: null, ExpressionBody: null }))
+                accessors.All(static accessor => accessor is { Body: null, ExpressionBody: null })))
                 return receiver.Member(key);
             var invoked = Invoke(property.Property.GetMethod, property.Instance, property.Arguments, property, ref state);
             if (receiver.Members.TryGetValue(key, out var tracked)) return tracked;
