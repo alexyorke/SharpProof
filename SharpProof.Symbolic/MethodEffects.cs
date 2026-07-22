@@ -486,12 +486,19 @@ internal sealed class MethodEffectAnalysisSession(
             case IForEachLoopOperation { Syntax: CommonForEachStatementSyntax syntax } loop:
                 var info = semanticModel.GetForEachStatementInfo(syntax);
                 AnalyzeCall(info.GetEnumeratorMethod, loop, builder, loop.Collection);
-                var ownsEnumerator = info.GetEnumeratorMethod?.ReturnType.IsValueType == true ||
+                var enumeratorType = info.GetEnumeratorMethod?.ReturnType;
+                var ownsEnumerator = enumeratorType?.IsValueType == true ||
                                      ReturnsFreshValue(info.GetEnumeratorMethod);
-                SharpProofEffect? enumeratorReadEffect = ownsEnumerator ? SharpProofEffect.None : null;
+                SharpProofEffect? enumeratorReadEffect = ownsEnumerator
+                    ? SharpProofEffect.None
+                    : enumeratorType?.IsReferenceType == true
+                        ? GetInstanceReadEffect(loop.Collection, builder)
+                        : null;
                 SharpProofEffect? enumeratorWriteEffect = ownsEnumerator
                     ? SharpProofEffect.WritesFreshOwnedState
-                    : null;
+                    : enumeratorType?.IsReferenceType == true
+                        ? GetInstanceWriteEffect(loop.Collection, builder)
+                        : null;
                 AnalyzeCall(
                     info.MoveNextMethod,
                     loop,
