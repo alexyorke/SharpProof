@@ -2896,8 +2896,14 @@ internal sealed class MethodEffectAnalysisSession(
                 }
                 return TryGetObjectInitializerMember(element, path, index + 1, out initializer);
             }
-            if (value is not IObjectCreationOperation { Initializer: { } objectInitializer }) return false;
-            foreach (var assignment in objectInitializer.Initializers.OfType<ISimpleAssignmentOperation>()) {
+            IEnumerable<ISimpleAssignmentOperation> assignments = value switch {
+                IObjectCreationOperation { Initializer: { } objectInitializer } =>
+                    objectInitializer.Initializers.OfType<ISimpleAssignmentOperation>(),
+                IAnonymousObjectCreationOperation anonymousObject =>
+                    anonymousObject.Initializers.OfType<ISimpleAssignmentOperation>(),
+                _ => []
+            };
+            foreach (var assignment in assignments) {
                 var member = assignment.Target switch {
                     IFieldReferenceOperation field => (ISymbol)field.Field.OriginalDefinition,
                     IPropertyReferenceOperation property => property.Property.OriginalDefinition,
