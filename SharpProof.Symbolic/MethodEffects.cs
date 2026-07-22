@@ -420,10 +420,12 @@ internal sealed class MethodEffectAnalysisSession(
                                     SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
         var isStringSplit = containingType?.SpecialType == SpecialType.System_String &&
                             string.Equals(method.Name, nameof(string.Split), StringComparison.Ordinal);
+        var isStringTrim = containingType?.SpecialType == SpecialType.System_String &&
+                           method.Name is nameof(string.Trim) or nameof(string.TrimStart) or nameof(string.TrimEnd);
         var typeDefinition = containingType?.OriginalDefinition.ToDisplayString();
         var isSpanToArray = string.Equals(method.Name, "ToArray", StringComparison.Ordinal) &&
                             typeDefinition is "System.Span<T>" or "System.ReadOnlySpan<T>";
-        if (isNumericToString || isStringSplit || isSpanToArray) {
+        if (isNumericToString || isStringSplit || isStringTrim || isSpanToArray) {
             effects = new MethodEffects(
                 SharpProofEffect.Allocates,
                 SharpProofCapability.None,
