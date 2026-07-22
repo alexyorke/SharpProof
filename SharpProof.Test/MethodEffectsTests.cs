@@ -5573,6 +5573,22 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void DelegateSubtractionRemovesOnlyTheLastMatchingHandler() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static void Impure() { state++; }
+                static void M() {
+                    System.Action action = Impure;
+                    action += Impure;
+                    action -= Impure;
+                    action();
+                }
+            }
+            """, 4);
+        Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+    }
+    [Test]
     public void LoopBackEdgesDoNotReusePreAssignmentFreshness() {
         var result = Analyze("""
             class Box { public int Value; }

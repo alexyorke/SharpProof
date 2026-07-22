@@ -47,6 +47,27 @@ internal sealed class EffectFlowValue {
         Roots, ExactType, Members.SetItem(member, value), Callables, NullState);
     internal EffectFlowValue WithCallables(ImmutableArray<EffectBoundCallable> callables) => new(
         Roots, ExactType, Members, callables, NullState);
+    internal EffectFlowValue CombineDelegate(EffectFlowValue other) =>
+        Merge(other).WithCallables(Callables.AddRange(other.Callables));
+    internal EffectFlowValue RemoveDelegate(EffectFlowValue other) {
+        if (other.Callables.IsDefaultOrEmpty || other.Callables.Length > Callables.Length) return this;
+        var start = -1;
+        for (var candidate = Callables.Length - other.Callables.Length; candidate >= 0; candidate--) {
+            var matches = true;
+            for (var index = 0; index < other.Callables.Length; index++)
+                if (!string.Equals(Callables[candidate + index].Key, other.Callables[index].Key, StringComparison.Ordinal)) {
+                    matches = false;
+                    break;
+                }
+            if (!matches) continue;
+            start = candidate;
+            break;
+        }
+        if (start < 0) return this;
+        var remaining = Callables.RemoveRange(start, other.Callables.Length);
+        return new EffectFlowValue(Roots, ExactType, Members, remaining,
+            remaining.IsDefaultOrEmpty ? EffectNullState.Null : EffectNullState.NonNull);
+    }
     internal EffectFlowValue AsDefinitelyNonNull() => new(Roots, ExactType, Members, Callables, EffectNullState.NonNull);
     internal EffectFlowValue AsDefinitelyNull() => new(Roots, ExactType, Members, Callables, EffectNullState.Null);
     internal EffectFlowValue Member(string member) => Members.TryGetValue(member, out var value)

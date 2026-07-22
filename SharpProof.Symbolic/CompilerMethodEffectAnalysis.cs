@@ -644,9 +644,11 @@ internal sealed class MethodEffectAnalysisSession(
                     var compoundTarget = Evaluate(compound.Target, ref state);
                     var compoundValue = Evaluate(compound.Value, ref state);
                     if (compound.Type?.TypeKind == TypeKind.Delegate) {
-                        if (compound.OperatorKind == BinaryOperatorKind.Add)
-                            Assign(compound.Target, compoundTarget.Merge(compoundValue), false, ref state);
-                        return compoundTarget;
+                        var delegateResult = compound.OperatorKind == BinaryOperatorKind.Add
+                            ? compoundTarget.CombineDelegate(compoundValue)
+                            : compoundTarget.RemoveDelegate(compoundValue);
+                        Assign(compound.Target, delegateResult, false, ref state);
+                        return delegateResult;
                     }
                     var compoundResult = compound.OperatorMethod == null &&
                                          (compound.Target.Type?.TypeKind == TypeKind.Dynamic ||
@@ -1386,6 +1388,8 @@ internal sealed class MethodEffectAnalysisSession(
                     }
                 }
             }
+            if (target.MethodKind == MethodKind.DelegateInvoke && receiver.IsDefinitelyNull)
+                return EffectFlowValue.None;
             if (target.MethodKind == MethodKind.DelegateInvoke && !receiver.Callables.IsDefaultOrEmpty) {
                 var returned = EffectFlowValue.None;
                 foreach (var callable in receiver.Callables) {
