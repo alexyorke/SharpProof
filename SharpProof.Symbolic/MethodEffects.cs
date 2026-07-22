@@ -1327,6 +1327,10 @@ internal sealed class MethodEffectAnalysisSession(
         _ => false
     };
     private static bool IsVisible(IOperation operation, SyntaxNode declaration, SemanticModel semanticModel) {
+        for (var current = operation; current != null; current = current.Parent)
+            if (current is IInvocationOperation invocation &&
+                IsOmittedConditionalCall(invocation, semanticModel))
+                return false;
         for (var parent = operation.Parent; parent != null; parent = parent.Parent)
             if (parent is INameOfOperation)
                 return false;
@@ -1349,6 +1353,31 @@ internal sealed class MethodEffectAnalysisSession(
                      !ReferenceEquals(section, selectedSection))
                 return false;
         return true;
+    }
+    private static bool IsOmittedConditionalCall(
+        IInvocationOperation invocation,
+        SemanticModel semanticModel) {
+        var symbols = invocation.TargetMethod.GetAttributes()
+            .Where(static attribute =>
+                attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.ConditionalAttribute")
+            .Select(static attribute => attribute.ConstructorArguments.FirstOrDefault().Value as string)
+            .Where(static symbol => symbol != null)
+            .ToArray();
+        if (symbols.Length == 0) return false;
+        var defined = semanticModel.SyntaxTree.Options is CSharpParseOptions options
+            ? new HashSet<string>(options.PreprocessorSymbolNames, StringComparer.Ordinal)
+            : new HashSet<string>(StringComparer.Ordinal);
+        foreach (var directive in semanticModel.SyntaxTree.GetRoot()
+                     .DescendantNodes(descendIntoTrivia: true)
+                     .OfType<DirectiveTriviaSyntax>()) {
+            if (directive.SpanStart >= invocation.Syntax.SpanStart) break;
+            if (!directive.IsActive) continue;
+            if (directive is DefineDirectiveTriviaSyntax define)
+                defined.Add(define.Name.ValueText);
+            else if (directive is UndefDirectiveTriviaSyntax undefine)
+                defined.Remove(undefine.Name.ValueText);
+        }
+        return !symbols.Any(symbol => defined.Contains(symbol!));
     }
     private static bool TryGetSelectedConstantSwitchSection(
         SwitchStatementSyntax statement,

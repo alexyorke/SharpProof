@@ -65,6 +65,22 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
         });
     }
+    [Test]
+    public void DefinedConditionalCallKeepsRuntimeEffects() {
+        var result = Analyze("""
+            #define SHARPPROOF_ENABLED
+            class C {
+                static int state;
+                [System.Diagnostics.Conditional("SHARPPROOF_ENABLED")]
+                static void Trace() { state++; }
+                static void M() { Trace(); }
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
     [TestCase("static int M(int[] values) => values.Length;", SharpProofVerdict.Proven)]
     [TestCase("static int[] M(int x) => [1, x, 3];", SharpProofVerdict.Disproven)]
     public void ArrayIntrinsicsHaveStructuralEffects(string method, SharpProofVerdict expectedAllocationFree) {
