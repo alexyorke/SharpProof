@@ -182,7 +182,8 @@ internal sealed class MethodEffectAnalysisSession(
         return returnedValues.Length != 0 && returnedValues.All(IsFreshReturnedValue);
     }
     private static bool IsFreshReturnedValue(IOperation? value) {
-        while (value is IConversionOperation conversion) value = conversion.Operand;
+        while (value is IConversionOperation { OperatorMethod: null } conversion)
+            value = conversion.Operand;
         return value switch {
             IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
                 IDelegateCreationOperation => true,
@@ -192,6 +193,63 @@ internal sealed class MethodEffectAnalysisSession(
                 IsFreshReturnedValue(conditional.WhenTrue) && IsFreshReturnedValue(conditional.WhenFalse),
             _ => false
         };
+    }
+    private bool ReturnsStaticValue(IMethodSymbol? method) => ReturnsStaticValue(
+        method,
+        new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default));
+    private bool ReturnsStaticValue(
+        IMethodSymbol? method,
+        HashSet<IMethodSymbol> visitedMethods) {
+        if (method == null) return false;
+        method = method.ReducedFrom ?? method;
+        method = (method.PartialImplementationPart ?? method).OriginalDefinition;
+        if (!visitedMethods.Add(method)) return false;
+        try {
+            var declaration = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+            var expressions = GetDirectReturnExpressions(declaration);
+            if (expressions.IsDefaultOrEmpty) return false;
+            var model = compilation.GetSemanticModel(declaration!.SyntaxTree);
+            return expressions.All(expression =>
+                IsStaticReturnedValue(model.GetOperation(expression, cancellationToken), visitedMethods));
+        }
+        finally {
+            visitedMethods.Remove(method);
+        }
+    }
+    private bool IsStaticReturnedValue(
+        IOperation? value,
+        HashSet<IMethodSymbol> visitedMethods) {
+        while (value is IConversionOperation { OperatorMethod: null } conversion)
+            value = conversion.Operand;
+        return value switch {
+            IConversionOperation { OperatorMethod: { } operatorMethod } =>
+                ReturnsStaticValue(operatorMethod, visitedMethods),
+            IFieldReferenceOperation { Field.IsStatic: true } => true,
+            IPropertyReferenceOperation { Property: { IsStatic: true } property } =>
+                IsConcreteAutoPropertySymbol(property) ||
+                ReturnsStaticValue(property.GetMethod, visitedMethods),
+            IConditionalOperation { WhenFalse: { } whenFalse } conditional =>
+                IsStaticReturnedValue(conditional.WhenTrue, visitedMethods) &&
+                IsStaticReturnedValue(whenFalse, visitedMethods),
+            ICoalesceOperation coalesce =>
+                IsStaticReturnedValue(coalesce.Value, visitedMethods) &&
+                IsStaticReturnedValue(coalesce.WhenNull, visitedMethods),
+            ISwitchExpressionOperation switchExpression =>
+                switchExpression.Arms.Length != 0 &&
+                switchExpression.Arms.All(arm => IsStaticReturnedValue(arm.Value, visitedMethods)),
+            _ => false
+        };
+    }
+    private static bool IsConcreteAutoPropertySymbol(IPropertySymbol property) {
+        if (property.GetMethod is not { IsAbstract: false, IsExtern: false } getterMethod ||
+            (!property.IsStatic && getterMethod.IsVirtual))
+            return false;
+        if (property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() is not
+            PropertyDeclarationSyntax { AccessorList: { } accessorList, ExpressionBody: null })
+            return false;
+        var getter = accessorList.Accessors.FirstOrDefault(accessor =>
+            accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
+        return getter is { Body: null, ExpressionBody: null };
     }
     private void AddRuntimeHazards(
         IOperation root,
@@ -556,14 +614,20 @@ internal sealed class MethodEffectAnalysisSession(
                 var info = semanticModel.GetForEachStatementInfo(syntax);
                 AnalyzeCall(info.GetEnumeratorMethod, loop, builder, loop.Collection);
                 var enumeratorType = info.GetEnumeratorMethod?.ReturnType;
+                var hasStaticEnumerator = enumeratorType?.IsReferenceType == true &&
+                                          ReturnsStaticValue(info.GetEnumeratorMethod);
                 var ownsEnumerator = enumeratorType?.IsValueType == true ||
                                      ReturnsFreshValue(info.GetEnumeratorMethod);
-                SharpProofEffect? enumeratorReadEffect = ownsEnumerator
+                SharpProofEffect? enumeratorReadEffect = hasStaticEnumerator
+                    ? SharpProofEffect.ReadsStaticState
+                    : ownsEnumerator
                     ? SharpProofEffect.None
                     : enumeratorType?.IsReferenceType == true
                         ? GetInstanceReadEffect(loop.Collection, builder)
                         : null;
-                SharpProofEffect? enumeratorWriteEffect = ownsEnumerator
+                SharpProofEffect? enumeratorWriteEffect = hasStaticEnumerator
+                    ? SharpProofEffect.WritesStaticState
+                    : ownsEnumerator
                     ? SharpProofEffect.WritesFreshOwnedState
                     : enumeratorType?.IsReferenceType == true
                         ? GetInstanceWriteEffect(loop.Collection, builder)
@@ -3976,17 +4040,8 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private static bool CanMapAutoPropertyToReceiver(IPropertySymbol property) =>
             !property.IsStatic && IsConcreteAutoProperty(property);
-        private static bool IsConcreteAutoProperty(IPropertySymbol property) {
-            if (property.GetMethod is not { IsAbstract: false, IsExtern: false } getterMethod ||
-                (!property.IsStatic && getterMethod.IsVirtual))
-                return false;
-            if (property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() is not
-                PropertyDeclarationSyntax { AccessorList: { } accessorList, ExpressionBody: null })
-                return false;
-            var getter = accessorList.Accessors.FirstOrDefault(accessor =>
-                accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
-            return getter is { Body: null, ExpressionBody: null };
-        }
+        private static bool IsConcreteAutoProperty(IPropertySymbol property) =>
+            IsConcreteAutoPropertySymbol(property);
         private static void AddDeconstructionCallResultAssignments(
             IOperation target,
             IOperation callSite,
