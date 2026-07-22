@@ -1767,35 +1767,54 @@ internal sealed class MethodEffectAnalysisSession(
         bool write) {
         var getter = property.Property.GetMethod;
         var declaration = getter?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
-        var expression = GetDirectReturnExpression(declaration);
-        if (expression != null) {
-            expression = UnwrapReturnExpression(expression);
-            if (expression is IdentifierNameSyntax identifier) {
-                var member = property.Property.ContainingType.GetMembers(identifier.Identifier.ValueText)
-                    .FirstOrDefault(candidate => candidate is IFieldSymbol or IPropertySymbol);
-                if (member?.IsStatic == true)
-                    return write ? SharpProofEffect.WritesStaticState : SharpProofEffect.ReadsStaticState;
-                if (member != null)
-                    return write
-                        ? GetInstanceWriteEffect(property.Instance, builder)
-                        : GetInstanceReadEffect(property.Instance, builder);
-            }
-            if (expression is ThisExpressionSyntax)
-                return write
-                    ? GetInstanceWriteEffect(property.Instance, builder)
-                    : GetInstanceReadEffect(property.Instance, builder);
-            if (expression is ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax or
-                ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax or
-                AnonymousObjectCreationExpressionSyntax or CollectionExpressionSyntax)
-                return write ? SharpProofEffect.WritesFreshOwnedState : SharpProofEffect.None;
-        }
+        var expressions = GetDirectReturnExpressions(declaration);
+        if (!expressions.IsDefaultOrEmpty)
+            return expressions.Aggregate(
+                SharpProofEffect.None,
+                (effects, expression) => effects |
+                                         GetPropertyReturnedExpressionEffect(
+                                             expression, property, builder, write));
         return write
             ? GetInstanceWriteEffect(property.Instance, builder)
             : GetInstanceReadEffect(property.Instance, builder);
     }
-    private static ExpressionSyntax? GetDirectReturnExpression(SyntaxNode? declaration) {
-        var expressions = GetDirectReturnExpressions(declaration);
-        return expressions.Length == 1 ? expressions[0] : null;
+    private static SharpProofEffect GetPropertyReturnedExpressionEffect(
+        ExpressionSyntax expression,
+        IPropertyReferenceOperation property,
+        Builder builder,
+        bool write) {
+        expression = UnwrapReturnExpression(expression);
+        if (expression is ConditionalExpressionSyntax conditional)
+            return GetPropertyReturnedExpressionEffect(conditional.WhenTrue, property, builder, write) |
+                   GetPropertyReturnedExpressionEffect(conditional.WhenFalse, property, builder, write);
+        if (expression is BinaryExpressionSyntax binary && binary.IsKind(SyntaxKind.CoalesceExpression))
+            return GetPropertyReturnedExpressionEffect(binary.Left, property, builder, write) |
+                   GetPropertyReturnedExpressionEffect(binary.Right, property, builder, write);
+        if (expression is SwitchExpressionSyntax switchExpression)
+            return switchExpression.Arms.Aggregate(
+                SharpProofEffect.None,
+                (effects, arm) => effects |
+                                  GetPropertyReturnedExpressionEffect(
+                                      arm.Expression, property, builder, write));
+        if (expression is IdentifierNameSyntax identifier) {
+            var member = property.Property.ContainingType.GetMembers(identifier.Identifier.ValueText)
+                .FirstOrDefault(candidate => candidate is IFieldSymbol or IPropertySymbol);
+            if (member?.IsStatic == true)
+                return write ? SharpProofEffect.WritesStaticState : SharpProofEffect.ReadsStaticState;
+            if (member != null)
+                return write
+                    ? GetInstanceWriteEffect(property.Instance, builder)
+                    : GetInstanceReadEffect(property.Instance, builder);
+        }
+        if (expression is ThisExpressionSyntax)
+            return write
+                ? GetInstanceWriteEffect(property.Instance, builder)
+                : GetInstanceReadEffect(property.Instance, builder);
+        if (expression is ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax or
+            ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax or
+            AnonymousObjectCreationExpressionSyntax or CollectionExpressionSyntax)
+            return write ? SharpProofEffect.WritesFreshOwnedState : SharpProofEffect.None;
+        return SharpProofEffect.Unknown;
     }
     private static ImmutableArray<ExpressionSyntax> GetDirectReturnExpressions(SyntaxNode? declaration) {
         ExpressionSyntax? expression = declaration switch {
