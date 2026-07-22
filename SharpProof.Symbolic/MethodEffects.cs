@@ -2702,7 +2702,8 @@ internal sealed class MethodEffectAnalysisSession(
             if (locals.Length == 0) return false;
             var visited = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
             foreach (var local in locals) {
-                if (!TryGetCapturedLocalInitializer(local, compilation, visited, out var initializer))
+                if (!TryGetCapturedLocalInitializer(
+                        local, callSite, compilation, visited, out var initializer))
                     return false;
                 readEffect |= GetInstanceReadEffect(initializer, this);
                 writeEffect |= GetInstanceWriteEffect(initializer, this);
@@ -2754,6 +2755,7 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private static bool TryGetCapturedLocalInitializer(
             ILocalSymbol local,
+            IOperation callSite,
             Compilation compilation,
             HashSet<ILocalSymbol> visited,
             out IOperation initializer) {
@@ -2775,9 +2777,31 @@ internal sealed class MethodEffectAnalysisSession(
                 return false;
             while (value is IConversionOperation conversion) value = conversion.Operand;
             if (value is ILocalReferenceOperation source) {
-                if (!TryGetCapturedLocalInitializer(source.Local, compilation, visited, out initializer))
+                if (!TryGetCapturedLocalInitializer(
+                        source.Local, callSite, compilation, visited, out initializer))
                     return false;
                 return true;
+            }
+            if (value is IParameterReferenceOperation parameter &&
+                callSite is IInvocationOperation invocation) {
+                initializer = invocation.Arguments.FirstOrDefault(argument =>
+                    string.Equals(
+                        argument.Parameter?.Name,
+                        parameter.Parameter.Name,
+                        StringComparison.Ordinal))?.Value!;
+                if (initializer == null &&
+                    parameter.Parameter.Ordinal == 0 &&
+                    invocation.TargetMethod.ReducedFrom != null)
+                    initializer = invocation.Instance!;
+                return initializer != null;
+            }
+            if (value is IInstanceReferenceOperation) {
+                initializer = callSite switch {
+                    IInvocationOperation receiverInvocation => receiverInvocation.Instance!,
+                    IPropertyReferenceOperation property => property.Instance!,
+                    _ => null!
+                };
+                return initializer != null;
             }
             if (value is not (IObjectCreationOperation or IArrayCreationOperation or
                 IAnonymousObjectCreationOperation or IDelegateCreationOperation or
