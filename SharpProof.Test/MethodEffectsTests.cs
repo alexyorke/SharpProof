@@ -341,6 +341,41 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void InstanceMutationOnArgumentIsRemappedToArgumentState() {
+        var result = Analyze("""
+            sealed class Box {
+                public int Value;
+                public void SetValue() { Value = 1; }
+            }
+            class C { static void M(Box box) { box.SetValue(); } }
+            """, 5);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesReceiverState), Is.False);
+        });
+    }
+    [Test]
+    public void ExplicitConstructorReceiverWritesRemainFreshOwned() {
+        var result = Analyze("""
+            sealed class Box {
+                public int Value;
+                public Box() { Value = 1; }
+            }
+            class C {
+                static int M() {
+                    var box = new Box();
+                    return box.Value;
+                }
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesReceiverState), Is.False);
+        });
+    }
+    [Test]
     public void ReassignedDelegateUsesTheCurrentTarget() {
         var result = Analyze("""
             class C {

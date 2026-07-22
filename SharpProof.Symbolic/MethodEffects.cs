@@ -204,13 +204,13 @@ internal sealed class MethodEffectAnalysisSession(
                 if (assignment.Target is ILocalReferenceOperation assignedLocal)
                     builder.AssignLocal(assignedLocal.Local, assignment.Value);
                 if (assignment.Target is IPropertyReferenceOperation { Property.SetMethod: not null } propertyTarget)
-                    AnalyzeCall(propertyTarget.Property.SetMethod, assignment, builder);
+                    AnalyzeCall(propertyTarget.Property.SetMethod, assignment, builder, propertyTarget.Instance);
                 break;
             case ICompoundAssignmentOperation compound:
                 AddWrite(compound.Target, builder);
                 if (compound.Target is IPropertyReferenceOperation compoundProperty) {
                     AnalyzeCall(compoundProperty.Property.GetMethod, compound, builder, compoundProperty.Instance);
-                    AnalyzeCall(compoundProperty.Property.SetMethod, compound, builder);
+                    AnalyzeCall(compoundProperty.Property.SetMethod, compound, builder, compoundProperty.Instance);
                 }
                 if (compound.OperatorMethod != null) AnalyzeCall(compound.OperatorMethod, compound, builder);
                 break;
@@ -371,7 +371,7 @@ internal sealed class MethodEffectAnalysisSession(
         if (method.GetDllImportData() != null) {
             builder.Add(SharpProofEffect.UsesNativeCode, SharpProofCapability.NativeInterop, site, method, "native_call");
             if (hasContract && IsCompleteContract(contracted))
-                builder.AddTransitive(contracted, site, method, "complete_native_effect_contract");
+                AddCallEffects(contracted, site, method, "complete_native_effect_contract", receiver, builder);
             else
                 builder.AddUnknown(site, "native_exception_boundary", method);
             return;
@@ -380,21 +380,46 @@ internal sealed class MethodEffectAnalysisSession(
         if (syntax == null) {
             if (IsStructurallyEffectFreeIntrinsic(method)) return;
             if (TryGetKnownFrameworkSummary(method, out var frameworkSummary)) {
-                builder.AddTransitive(frameworkSummary, site, method, "framework_method_model");
+                AddCallEffects(frameworkSummary, site, method, "framework_method_model", receiver, builder);
                 return;
             }
             var metadata = _metadata.Analyze(method);
             if (hasContract && metadata.Effects == SharpProofEffect.Unknown)
-                builder.AddTransitive(contracted, site, method, "complete_effect_contract");
+                AddCallEffects(contracted, site, method, "complete_effect_contract", receiver, builder);
             else {
-                builder.AddTransitive(metadata, site, method, "metadata_call");
-                if (hasContract) builder.AddTransitive(contracted, site, method, "effect_contract");
+                AddCallEffects(metadata, site, method, "metadata_call", receiver, builder);
+                if (hasContract) AddCallEffects(contracted, site, method, "effect_contract", receiver, builder);
             }
             return;
         }
         var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        builder.AddTransitive(Analyze(method, syntax, model), site, method, "source_call");
-        if (hasContract) builder.AddTransitive(contracted, site, method, "effect_contract");
+        AddCallEffects(Analyze(method, syntax, model), site, method, "source_call", receiver, builder);
+        if (hasContract) AddCallEffects(contracted, site, method, "effect_contract", receiver, builder);
+    }
+    private static void AddCallEffects(
+        MethodEffects effects,
+        IOperation site,
+        IMethodSymbol method,
+        string reason,
+        IOperation? receiver,
+        Builder builder) {
+        var remapped = effects.Effects;
+        if ((remapped & SharpProofEffect.ReadsReceiverState) != 0) {
+            remapped &= ~SharpProofEffect.ReadsReceiverState;
+            if (receiver != null)
+                remapped |= GetInstanceReadEffect(receiver, builder);
+            else if (site is not IObjectCreationOperation)
+                remapped |= SharpProofEffect.Unknown;
+        }
+        if ((remapped & SharpProofEffect.WritesReceiverState) != 0) {
+            remapped &= ~SharpProofEffect.WritesReceiverState;
+            remapped |= receiver != null
+                ? GetInstanceWriteEffect(receiver, builder)
+                : site is IObjectCreationOperation
+                    ? SharpProofEffect.WritesFreshOwnedState
+                    : SharpProofEffect.Unknown;
+        }
+        builder.AddTransitive(effects with { Effects = remapped }, site, method, reason);
     }
     private bool IsBodylessAutoPropertyAccessor(IMethodSymbol method) {
         if (method.AssociatedSymbol is not IPropertySymbol) return false;
