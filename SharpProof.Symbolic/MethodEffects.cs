@@ -1332,9 +1332,14 @@ internal sealed class MethodEffectAnalysisSession(
             if (current is IInvocationOperation invocation &&
                 IsOmittedInvocation(invocation, semanticModel))
                 return false;
-        for (var parent = operation.Parent; parent != null; parent = parent.Parent)
+        for (var parent = operation.Parent; parent != null; parent = parent.Parent) {
             if (parent is INameOfOperation)
                 return false;
+            if (parent is IConditionalAccessOperation conditionalAccess &&
+                IsNullConstant(conditionalAccess.Operation) &&
+                !IsWithinOperation(operation, conditionalAccess.Operation))
+                return false;
+        }
         for (var current = operation.Syntax; current != null && current != declaration; current = current.Parent)
             if (current is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax)
                 return false;
@@ -1359,6 +1364,12 @@ internal sealed class MethodEffectAnalysisSession(
                      !ReferenceEquals(arm, selectedArm))
                 return false;
         return true;
+    }
+    private static bool IsWithinOperation(IOperation operation, IOperation root) {
+        for (var current = operation; current != null; current = current.Parent)
+            if (ReferenceEquals(current, root))
+                return true;
+        return false;
     }
     private static bool IsOmittedInvocation(
         IInvocationOperation invocation,

@@ -153,6 +153,20 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
         });
     }
+    [Test]
+    public void NullConditionalKeepsGetterForNonNullReceiver() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                int P { get { state++; return 1; } }
+                static int? M() => new C()?.P;
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
     [TestCase("static int M(int[] values) => values.Length;", SharpProofVerdict.Proven)]
     [TestCase("static int[] M(int x) => [1, x, 3];", SharpProofVerdict.Disproven)]
     public void ArrayIntrinsicsHaveStructuralEffects(string method, SharpProofVerdict expectedAllocationFree) {
