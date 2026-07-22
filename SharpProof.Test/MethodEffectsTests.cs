@@ -279,6 +279,28 @@ public sealed class MethodEffectsTests {
         Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
     }
     [Test]
+    public void NestedFreshObjectGraphWritesRemainFreshOwned() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            sealed class Middle { public Box Value { get; init; } }
+            sealed class Outer { public Middle Value { get; init; } }
+            class C {
+                static int M() {
+                    var outer = new Outer { Value = new Middle { Value = new Box() } };
+                    outer.Value.Value.Value = 1;
+                    return outer.Value.Value.Value;
+                }
+            }
+            """, 5);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+                string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                    site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ReassignedDelegateUsesTheCurrentTarget() {
         var result = Analyze("""
             class C {
