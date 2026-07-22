@@ -1095,6 +1095,28 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void CatchFilterIncludesEffectsWithoutEscapingItsException() {
+        var result = Analyze("""
+            static class Globals { public static int Count; }
+            sealed class E : System.Exception { }
+            class C {
+                static bool Filter() { Globals.Count++; throw new System.FormatException(); }
+                static void M() {
+                    try { throw new E(); }
+                    catch (E) when (Filter()) { }
+                }
+            }
+            """, 5);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.ExceptionFacts, Has.Some.Matches<MethodExceptionFact>(fact =>
+                fact.ExceptionType == "E" && fact.Escape == SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.ExceptionFacts, Has.None.Matches<MethodExceptionFact>(fact =>
+                fact.ExceptionType == "System.FormatException" && fact.Escape == SharpProofVerdict.Proven));
+        });
+    }
+    [Test]
     public void CaughtCalleeExceptionDoesNotEscape() {
         var result = Analyze("""
             sealed class E : System.Exception { }
