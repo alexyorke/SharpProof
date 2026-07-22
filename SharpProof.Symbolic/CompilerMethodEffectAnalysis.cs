@@ -1258,7 +1258,8 @@ internal sealed class MethodEffectAnalysisSession(
             AddSummary(summary.Effects, receiver, values, site, target);
             if ((summary.Effects.Effects & SharpProofEffect.WritesStaticState) != 0 &&
                 values.Any(value => value.Roots.Any(static root => root.Kind == EffectValueRootKind.Fresh)) &&
-                PublishesArgument(target))
+                PublishesArgument(target, receiver.Roots.Count == 0 ||
+                    receiver.Roots.Any(static root => root.Kind != EffectValueRootKind.Fresh)))
                 effects.Add(SharpProofEffect.WritesCapturedState, site.Syntax, target, "published_fresh_argument");
             ApplyRefArguments(summary, arguments, receiver, values, ref state);
             var returnedValue = summary.ReturnValue.Instantiate(receiver, values);
@@ -1317,21 +1318,34 @@ internal sealed class MethodEffectAnalysisSession(
                 return arguments[parameter.Ordinal];
             return EffectFlowValue.Unknown;
         }
-        private bool PublishesArgument(IMethodSymbol target) {
+        private bool PublishesArgument(IMethodSymbol target, bool receiverMayEscape) {
             foreach (var reference in target.DeclaringSyntaxReferences) {
                 if (reference.GetSyntax(session.CancellationToken) is not { } declaration) continue;
                 var model = session.Compilation.GetSemanticModel(declaration.SyntaxTree);
                 foreach (var assignment in CSharpSyntaxFacts.DescendantNodesInExecution(declaration)
                              .OfType<AssignmentExpressionSyntax>()) {
-                    if (model.GetSymbolInfo(assignment.Left, session.CancellationToken).Symbol is not
-                        (IFieldSymbol or IPropertySymbol) ||
+                    var publicationTarget = model.GetSymbolInfo(assignment.Left, session.CancellationToken).Symbol;
+                    if (publicationTarget is not (IFieldSymbol or IPropertySymbol) ||
                         assignment.Left is MemberAccessExpressionSyntax memberAccess &&
                         IsEphemeralFreshReceiver(memberAccess.Expression, declaration, model))
                         continue;
-                    if (assignment.Right.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(identifier =>
+                    if (!assignment.Right.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(identifier =>
                             model.GetSymbolInfo(identifier, session.CancellationToken).Symbol is IParameterSymbol parameter &&
                             target.Parameters.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, parameter))))
+                        continue;
+                    if (publicationTarget is IFieldSymbol { IsStatic: true } or IPropertySymbol { IsStatic: true }) return true;
+                    if (assignment.Left is IdentifierNameSyntax) {
+                        if (receiverMayEscape) return true;
+                        continue;
+                    }
+                    if (assignment.Left is MemberAccessExpressionSyntax access) {
+                        if (access.Expression is ThisExpressionSyntax or BaseExpressionSyntax) {
+                            if (receiverMayEscape) return true;
+                            continue;
+                        }
                         return true;
+                    }
+                    return true;
                 }
             }
             return false;
