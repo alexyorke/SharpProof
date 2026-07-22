@@ -2551,6 +2551,23 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ReassigningByValueParameterDoesNotWriteArgumentState() {
+        var result = Analyze("""
+            sealed class Box { }
+            class C {
+                static void M(Box input) {
+                    input = new Box();
+                }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+                string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                    site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+        });
+    }
+    [Test]
     public void RepeatedStaticHelperMutationPreservesFreshOwnership() {
         var result = Analyze("""
             sealed class Box { public int Value; }
