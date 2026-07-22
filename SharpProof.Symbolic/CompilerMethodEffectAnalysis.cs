@@ -488,8 +488,12 @@ internal sealed class MethodEffectAnalysisSession(
                             Assign(compound.Target, compoundTarget.Merge(compoundValue), false, ref state);
                         return compoundTarget;
                     }
+                    var compoundResult = compound.OperatorMethod == null
+                        ? compoundTarget
+                        : InvokeCore(compound.OperatorMethod, EffectFlowValue.None,
+                            [compoundTarget, compoundValue], [], compound, ref state);
                     effects.Write(compoundTarget, compound.Syntax, compound.Target.Type as ISymbol, "compound_assignment");
-                    return compoundTarget;
+                    return compoundResult;
                 case IIncrementOrDecrementOperation increment:
                     var incrementTarget = Evaluate(increment.Target, ref state);
                     if (incrementTarget.Roots.Any(static root => root.Kind == EffectValueRootKind.Unknown) &&
@@ -497,8 +501,12 @@ internal sealed class MethodEffectAnalysisSession(
                             loop.Type.ToString().StartsWith("ref ", StringComparison.Ordinal)) is { } refLoop &&
                         semanticModel.GetOperation(refLoop.Expression, session.CancellationToken) is IConversionOperation refConversion)
                         incrementTarget = EvaluateConversion(refConversion, ref state);
+                    var incrementResult = increment.OperatorMethod == null
+                        ? incrementTarget
+                        : InvokeCore(increment.OperatorMethod, EffectFlowValue.None,
+                            [incrementTarget], [], increment, ref state);
                     effects.Write(incrementTarget, increment.Syntax, null, "increment_assignment");
-                    return incrementTarget;
+                    return incrementResult;
                 case IEventAssignmentOperation {
                     EventReference: IEventReferenceOperation eventReference
                 } eventAssignment:
@@ -609,6 +617,17 @@ internal sealed class MethodEffectAnalysisSession(
                     return whenTrue.Merge(whenFalse);
                 case ICoalesceOperation coalesce:
                     return Evaluate(coalesce.Value, ref state).Merge(Evaluate(coalesce.WhenNull, ref state));
+                case IBinaryOperation binary:
+                    var left = Evaluate(binary.LeftOperand, ref state);
+                    var right = Evaluate(binary.RightOperand, ref state);
+                    return binary.OperatorMethod == null
+                        ? right
+                        : InvokeCore(binary.OperatorMethod, EffectFlowValue.None, [left, right], [], binary, ref state);
+                case IUnaryOperation unary:
+                    var unaryOperand = Evaluate(unary.Operand, ref state);
+                    return unary.OperatorMethod == null
+                        ? unaryOperand
+                        : InvokeCore(unary.OperatorMethod, EffectFlowValue.None, [unaryOperand], [], unary, ref state);
                 case ISwitchExpressionOperation switchExpression:
                     Evaluate(switchExpression.Value, ref state);
                     var switchValue = EffectFlowValue.None;
