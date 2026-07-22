@@ -94,11 +94,10 @@ internal sealed class MethodEffectAnalysisSession(
             }
             else {
                 domain.SetControlFlowGraph(graph);
-                var result = BoundedControlFlowAnalysis.Run(graph, state, domain, cancellationToken);
+                var result = AnalyzerUtilitiesControlFlowAnalysis.Run(
+                    graph, state, domain, compilation, method, cancellationToken);
                 if (result.Truncated) accumulator.AddUnknown(declaration, "effect_cfg_budget_exhausted");
-                finalState = result.Exits.TryGetValue(graph.Blocks[graph.Blocks.Length - 1], out var exit)
-                    ? exit
-                    : result.Exits.Values.Aggregate(state, static (current, value) => current.Merge(value));
+                finalState = result.ExitState;
             }
             finalState = domain.AnalyzeSemanticAdapters(root, finalState);
             finalState = domain.AnalyzeExpressionBody(declaration, finalState);
@@ -385,7 +384,6 @@ internal sealed class MethodEffectAnalysisSession(
                 : RefineConditionValue(isNull.Operand, state, value.AsDefinitelyNonNull());
         }
         public EffectFlowState Merge(EffectFlowState current, EffectFlowState incoming) => current.Merge(incoming);
-        public EffectFlowState Widen(EffectFlowState previous, EffectFlowState current, BasicBlock block) => current;
         public EffectFlowState CompleteBlock(EffectFlowState state, BasicBlock block) {
             if (state.IsUnreachable) return state;
             if (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return ||
