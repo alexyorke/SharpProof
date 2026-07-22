@@ -1153,6 +1153,25 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void FinallyThrowReplacesPendingRuntimeHazard() {
+        var result = Analyze("""
+            sealed class FinallyException : System.Exception { }
+            class C {
+                static int M() {
+                    var zero = 0;
+                    try { return 10 / zero; }
+                    finally { throw new FinallyException(); }
+                }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.ExceptionFacts, Has.Some.Matches<MethodExceptionFact>(fact =>
+                fact.ExceptionType == "FinallyException" && fact.Escape == SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.ExceptionFacts, Has.None.Matches<MethodExceptionFact>(fact =>
+                fact.ExceptionType == "System.DivideByZeroException" && fact.Escape == SharpProofVerdict.Proven));
+        });
+    }
+    [Test]
     public void CaughtCalleeExceptionDoesNotEscape() {
         var result = Analyze("""
             sealed class E : System.Exception { }
