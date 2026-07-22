@@ -1414,6 +1414,28 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void MultipleInvocationReturnsMapAllOrigins() {
+        var result = Analyze("""
+            sealed class Box {
+                public int State;
+                public void Mutate() { State++; }
+            }
+            class C {
+                static Box Choose(Box value, bool choose) {
+                    if (choose) return value;
+                    return new Box();
+                }
+                static void M(Box input, bool choose) { Choose(input, choose).Mutate(); }
+            }
+            """, 10);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void PropertyResultReceiverUsesReturnedStaticOrigin() {
         var result = Analyze("""
             sealed class Box {
