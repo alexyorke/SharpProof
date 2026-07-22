@@ -3703,6 +3703,18 @@ internal sealed class MethodEffectAnalysisSession(
                     assignments);
                 return;
             }
+            if (value is IArrayElementReferenceOperation arrayElement) {
+                AddDeconstructionMemberAssignments(
+                    target,
+                    arrayElement.ArrayReference,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites,
+                    assignments);
+                return;
+            }
             if (value is IInvocationOperation invocation) {
                 AddDeconstructionCallResultAssignments(
                     target,
