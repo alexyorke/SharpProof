@@ -610,8 +610,11 @@ internal sealed class MethodEffectAnalysisSession(
                     if (incrementTarget.Roots.Any(static root => root.Kind == EffectValueRootKind.Unknown) &&
                         increment.Syntax.Ancestors().OfType<ForEachStatementSyntax>().FirstOrDefault(loop =>
                             loop.Type.ToString().StartsWith("ref ", StringComparison.Ordinal)) is { } refLoop &&
-                        semanticModel.GetOperation(refLoop.Expression, session.CancellationToken) is IConversionOperation refConversion)
+                        semanticModel.GetOperation(refLoop.Expression, session.CancellationToken) is IConversionOperation refConversion) {
                         incrementTarget = EvaluateConversion(refConversion, ref state);
+                        if (increment.Target is ILocalReferenceOperation { Local.RefKind: not RefKind.None } refLocal)
+                            state = state with { RefLocals = state.RefLocals.SetItem(refLocal.Local, incrementTarget) };
+                    }
                     var incrementResult = increment.OperatorMethod == null &&
                                           increment.Target.Type?.TypeKind == TypeKind.Dynamic
                         ? DynamicDispatch(increment, "dynamic_operator_dispatch")
