@@ -1703,7 +1703,29 @@ internal sealed class MethodEffectAnalysisSession(
         var declaration = targetMethod.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
         var expression = GetDirectReturnExpression(declaration);
         if (expression == null) return SharpProofEffect.Unknown;
+        return GetInvocationReturnedExpressionEffect(expression, targetMethod, invocation, builder, write);
+    }
+    private static SharpProofEffect GetInvocationReturnedExpressionEffect(
+        ExpressionSyntax expression,
+        IMethodSymbol targetMethod,
+        IInvocationOperation invocation,
+        Builder builder,
+        bool write) {
         expression = UnwrapReturnExpression(expression);
+        if (expression is ConditionalExpressionSyntax conditional)
+            return GetInvocationReturnedExpressionEffect(
+                       conditional.WhenTrue, targetMethod, invocation, builder, write) |
+                   GetInvocationReturnedExpressionEffect(
+                       conditional.WhenFalse, targetMethod, invocation, builder, write);
+        if (expression is BinaryExpressionSyntax binary && binary.IsKind(SyntaxKind.CoalesceExpression))
+            return GetInvocationReturnedExpressionEffect(binary.Left, targetMethod, invocation, builder, write) |
+                   GetInvocationReturnedExpressionEffect(binary.Right, targetMethod, invocation, builder, write);
+        if (expression is SwitchExpressionSyntax switchExpression)
+            return switchExpression.Arms.Aggregate(
+                SharpProofEffect.None,
+                (effects, arm) => effects |
+                                  GetInvocationReturnedExpressionEffect(
+                                      arm.Expression, targetMethod, invocation, builder, write));
         if (expression is IdentifierNameSyntax identifier) {
             var parameter = targetMethod.Parameters.FirstOrDefault(candidate =>
                 string.Equals(candidate.Name, identifier.Identifier.ValueText, StringComparison.Ordinal));
