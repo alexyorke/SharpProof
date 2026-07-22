@@ -441,23 +441,36 @@ internal sealed class MethodEffectAnalysisSession(
         return remappedEffects;
     }
     private static SharpProofEffect GetArgumentEffect(IOperation site, Builder builder, bool write) {
-        var arguments = site switch {
-            IInvocationOperation invocation => invocation.Arguments,
-            IObjectCreationOperation creation => creation.Arguments,
-            _ => []
-        };
         var effect = SharpProofEffect.None;
         var hasCandidate = false;
-        foreach (var argument in arguments) {
-            if (argument.Parameter is not { } parameter ||
+        void AddCandidate(IOperation value, IParameterSymbol? parameter) {
+            if (parameter == null ||
                 parameter.Type.IsValueType &&
                 parameter.Type.TypeKind is not (TypeKind.Pointer or TypeKind.FunctionPointer) &&
                 parameter.RefKind == RefKind.None)
-                continue;
+                return;
             hasCandidate = true;
             effect |= write
-                ? GetInstanceWriteEffect(argument.Value, builder)
-                : GetInstanceReadEffect(argument.Value, builder);
+                ? GetInstanceWriteEffect(value, builder)
+                : GetInstanceReadEffect(value, builder);
+        }
+        switch (site) {
+            case IInvocationOperation invocation:
+                foreach (var argument in invocation.Arguments)
+                    AddCandidate(argument.Value, argument.Parameter);
+                break;
+            case IObjectCreationOperation creation:
+                foreach (var argument in creation.Arguments)
+                    AddCandidate(argument.Value, argument.Parameter);
+                break;
+            case ISimpleAssignmentOperation {
+                Target: IPropertyReferenceOperation property,
+                Value: var value
+            }:
+                foreach (var argument in property.Arguments)
+                    AddCandidate(argument.Value, argument.Parameter);
+                AddCandidate(value, property.Property.SetMethod?.Parameters.LastOrDefault());
+                break;
         }
         if (hasCandidate) return effect;
         return SharpProofEffect.Unknown |
