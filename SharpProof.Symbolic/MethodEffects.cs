@@ -241,6 +241,12 @@ internal sealed class MethodEffectAnalysisSession(
     }
     private void AnalyzeOperation(IOperation operation, SemanticModel semanticModel, Builder builder) {
         switch (operation) {
+            case IVariableDeclaratorOperation {
+                Syntax: VariableDeclaratorSyntax declarator,
+                Initializer.Value: { } initializer
+            } when declarator.Ancestors().OfType<FixedStatementSyntax>().Any():
+                AnalyzePinnableProtocol(initializer, semanticModel, builder);
+                break;
             case ISimpleAssignmentOperation assignment:
                 if (!assignment.IsRef) AddWrite(assignment.Target, builder);
                 if (assignment.Target is ILocalReferenceOperation assignedLocal &&
@@ -671,6 +677,22 @@ internal sealed class MethodEffectAnalysisSession(
         AnalyzeCall(FindProtocolMethod(enumeratorType, "MoveNext"), spread, builder);
         AnalyzeCall(FindProtocolProperty(enumeratorType, "Current")?.GetMethod, spread, builder);
         AnalyzeCall(FindProtocolMethod(enumeratorType, "Dispose"), spread, builder);
+    }
+    private void AnalyzePinnableProtocol(
+        IOperation initializer,
+        SemanticModel semanticModel,
+        Builder builder) {
+        if (initializer.Syntax is not ExpressionSyntax expression) return;
+        var invocation = SyntaxFactory.InvocationExpression(
+            SyntaxFactory.MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                expression.WithoutTrivia(),
+                SyntaxFactory.IdentifierName("GetPinnableReference")));
+        var getPinnableReference = semanticModel.GetSpeculativeSymbolInfo(
+            initializer.Syntax.SpanStart,
+            invocation,
+            SpeculativeBindingOption.BindAsExpression).Symbol as IMethodSymbol;
+        AnalyzeCall(getPinnableReference, initializer, builder, initializer);
     }
     private static IMethodSymbol? FindProtocolMethod(
         ITypeSymbol type,
