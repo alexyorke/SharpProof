@@ -274,6 +274,7 @@ internal sealed class MethodEffectAnalysisSession(
                 break;
             case IDeconstructionAssignmentOperation deconstruction:
                 AnalyzeDeconstructionTarget(deconstruction.Target, builder);
+                AnalyzeDeconstructionProtocol(deconstruction, semanticModel, builder);
                 break;
             case ICompoundAssignmentOperation compound:
                 AddWrite(compound.Target, builder);
@@ -791,6 +792,26 @@ internal sealed class MethodEffectAnalysisSession(
             AnalyzeCall(property.Property.SetMethod, property, builder, property.Instance);
         if (target is IImplicitIndexerReferenceOperation implicitIndexer)
             AnalyzeImplicitIndexerAccess(implicitIndexer, implicitIndexer, builder, reads: false, writes: true);
+    }
+    private void AnalyzeDeconstructionProtocol(
+        IDeconstructionAssignmentOperation deconstruction,
+        SemanticModel semanticModel,
+        Builder builder) {
+        if (deconstruction.Syntax is not AssignmentExpressionSyntax syntax) return;
+        AnalyzeDeconstructionInfo(
+            semanticModel.GetDeconstructionInfo(syntax),
+            deconstruction.Value,
+            deconstruction,
+            builder);
+    }
+    private void AnalyzeDeconstructionInfo(
+        DeconstructionInfo info,
+        IOperation? receiver,
+        IOperation site,
+        Builder builder) {
+        if (info.Method != null) AnalyzeCall(info.Method, site, builder, receiver);
+        foreach (var nested in info.Nested)
+            AnalyzeDeconstructionInfo(nested, null, site, builder);
     }
     private void AnalyzeImplicitIndexerAccess(
         IImplicitIndexerReferenceOperation indexer,
