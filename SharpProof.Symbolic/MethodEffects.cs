@@ -881,6 +881,12 @@ internal sealed class MethodEffectAnalysisSession(
             return;
         }
         switch (target) {
+            case IConditionalOperation conditional:
+                AddWrite(conditional.WhenTrue, builder);
+                if (conditional.WhenFalse != null) AddWrite(conditional.WhenFalse, builder);
+                else builder.Add(SharpProofEffect.Unknown, conditional, conditional.Type,
+                    "conditional_ref_target_unavailable");
+                break;
             case ILocalReferenceOperation local when local.Local.RefKind != RefKind.None:
                 builder.Add(GetInstanceWriteEffect(local, builder), local, local.Local, "ref_local_write");
                 break;
@@ -973,6 +979,11 @@ internal sealed class MethodEffectAnalysisSession(
             IArrayElementReferenceOperation array => GetRelativeRefWriteEffect(array.ArrayReference),
             IInlineArrayAccessOperation inlineArray => GetRelativeRefWriteEffect(inlineArray.Instance),
             IImplicitIndexerReferenceOperation implicitIndexer => GetRelativeRefWriteEffect(implicitIndexer.Instance),
+            IConditionalOperation conditional =>
+                GetRelativeRefWriteEffect(conditional.WhenTrue) |
+                (conditional.WhenFalse == null
+                    ? SharpProofEffect.Unknown
+                    : GetRelativeRefWriteEffect(conditional.WhenFalse)),
             IOperation pointer when IsPointerIndirection(pointer) &&
                                     pointer.ChildOperations.FirstOrDefault() is { } operand =>
                 GetRelativeRefWriteEffect(operand),
@@ -995,6 +1006,9 @@ internal sealed class MethodEffectAnalysisSession(
             IInlineArrayAccessOperation inlineArray => GetInstanceWriteEffect(inlineArray.Instance, builder),
             IImplicitIndexerReferenceOperation implicitIndexer =>
                 GetInstanceWriteEffect(implicitIndexer.Instance, builder),
+            IConditionalOperation conditional =>
+                GetInstanceWriteEffect(conditional.WhenTrue, builder) |
+                GetInstanceWriteEffect(conditional.WhenFalse, builder),
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceWriteEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IConversionOperation conversion => GetInstanceWriteEffect(conversion.Operand, builder),
@@ -1018,6 +1032,9 @@ internal sealed class MethodEffectAnalysisSession(
             IInlineArrayAccessOperation inlineArray => GetInstanceReadEffect(inlineArray.Instance, builder),
             IImplicitIndexerReferenceOperation implicitIndexer =>
                 GetInstanceReadEffect(implicitIndexer.Instance, builder),
+            IConditionalOperation conditional =>
+                GetInstanceReadEffect(conditional.WhenTrue, builder) |
+                GetInstanceReadEffect(conditional.WhenFalse, builder),
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceReadEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IConversionOperation conversion => GetInstanceReadEffect(conversion.Operand, builder),
