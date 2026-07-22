@@ -3422,6 +3422,32 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ReturnedLambdaPreservesConstructorInstanceDeconstructionMemberOrigin() {
+        var result = Analyze("""
+            sealed class Source {
+                public int State;
+                public (Source, int) Pair() => (this, 0);
+            }
+            sealed class Holder {
+                public Source Value;
+                public Holder(Source source) { (Value, _) = source.Pair(); }
+            }
+            class C {
+                static System.Action Bind(Source input) {
+                    var holder = new Holder(input);
+                    return () => holder.Value.State++;
+                }
+                static void M(Source input) { Bind(input)(); }
+            }
+            """, 14);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesCapturedState), Is.False);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ReturnedLambdaPreservesCapturedPrimaryConstructorMemberOrigin() {
         var result = Analyze("""
             sealed class Box { public int State; }
