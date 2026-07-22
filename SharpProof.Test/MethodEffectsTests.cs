@@ -36,6 +36,20 @@ public sealed class MethodEffectsTests {
         Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
     }
     [Test]
+    public void StaticEventSubscriptionWritesStaticState() {
+        var result = Analyze("""
+            class C {
+                static event System.Action? Changed;
+                static void M(System.Action handler) { Changed += handler; }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void NameofDoesNotEvaluatePropertyGetter() {
         var result = Analyze("""
             class C {
