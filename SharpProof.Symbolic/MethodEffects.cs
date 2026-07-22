@@ -151,6 +151,48 @@ internal sealed class MethodEffectAnalysisSession(
             _active.Remove(method);
         }
     }
+    private bool ReturnsFreshValue(IMethodSymbol? method) {
+        if (method == null) return false;
+        method = method.ReducedFrom ?? method;
+        method = (method.PartialImplementationPart ?? method).OriginalDefinition;
+        var declaration = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+        if (declaration == null) return false;
+        var model = compilation.GetSemanticModel(declaration.SyntaxTree);
+        var root = MethodBodyOperationResolver.GetMethodBodyRootOperation(
+            declaration,
+            model,
+            cancellationToken,
+            true);
+        if (root == null) return false;
+        var returnedValues = root.DescendantsAndSelf()
+            .OfType<IReturnOperation>()
+            .Where(returned => IsVisible(returned, declaration, model))
+            .Select(static returned => returned.ReturnedValue)
+            .ToArray();
+        if (returnedValues.Length == 0) {
+            var expression = declaration switch {
+                MethodDeclarationSyntax methodDeclaration => methodDeclaration.ExpressionBody?.Expression,
+                LocalFunctionStatementSyntax localFunction => localFunction.ExpressionBody?.Expression,
+                OperatorDeclarationSyntax operatorDeclaration => operatorDeclaration.ExpressionBody?.Expression,
+                ConversionOperatorDeclarationSyntax conversion => conversion.ExpressionBody?.Expression,
+                _ => null
+            };
+            return expression != null && IsFreshReturnedValue(model.GetOperation(expression, cancellationToken));
+        }
+        return returnedValues.Length != 0 && returnedValues.All(IsFreshReturnedValue);
+    }
+    private static bool IsFreshReturnedValue(IOperation? value) {
+        while (value is IConversionOperation conversion) value = conversion.Operand;
+        return value switch {
+            IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
+                IDelegateCreationOperation => true,
+            ICollectionExpressionOperation collection =>
+                collection.Type is IArrayTypeSymbol || collection.Type?.IsReferenceType == true,
+            IConditionalOperation conditional =>
+                IsFreshReturnedValue(conditional.WhenTrue) && IsFreshReturnedValue(conditional.WhenFalse),
+            _ => false
+        };
+    }
     private void AddRuntimeHazards(
         IOperation root,
         SyntaxNode declaration,
@@ -444,7 +486,8 @@ internal sealed class MethodEffectAnalysisSession(
             case IForEachLoopOperation { Syntax: CommonForEachStatementSyntax syntax } loop:
                 var info = semanticModel.GetForEachStatementInfo(syntax);
                 AnalyzeCall(info.GetEnumeratorMethod, loop, builder, loop.Collection);
-                var ownsEnumerator = info.GetEnumeratorMethod?.ReturnType.IsValueType == true;
+                var ownsEnumerator = info.GetEnumeratorMethod?.ReturnType.IsValueType == true ||
+                                     ReturnsFreshValue(info.GetEnumeratorMethod);
                 SharpProofEffect? enumeratorReadEffect = ownsEnumerator ? SharpProofEffect.None : null;
                 SharpProofEffect? enumeratorWriteEffect = ownsEnumerator
                     ? SharpProofEffect.WritesFreshOwnedState
