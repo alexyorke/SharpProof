@@ -3582,6 +3582,25 @@ internal sealed class MethodEffectAnalysisSession(
                         break;
                 }
             }
+            if (expressions.Count == 0 &&
+                declaration is RecordDeclarationSyntax { ParameterList: { } parameterList } record &&
+                model.GetDeclaredSymbol(record) is { } recordType) {
+                var matchingParameters = parameterList.Parameters.Where(parameter => {
+                    var name = parameter.Identifier.ValueText;
+                    var property = recordType.GetMembers(name).OfType<IPropertySymbol>().FirstOrDefault();
+                    return property != null && MemberNameMatches(property, name, memberPath);
+                }).ToArray();
+                if (matchingParameters.Length != 1) return false;
+                var parameterName = matchingParameters[0].Identifier.ValueText;
+                var argument = creation.Arguments.FirstOrDefault(candidate =>
+                    string.Equals(
+                        candidate.Parameter?.Name,
+                        parameterName,
+                        StringComparison.Ordinal))?.Value;
+                if (argument == null) return false;
+                values = [argument];
+                return true;
+            }
             if (expressions.Count != 1) return false;
             var initializer = expressions[0];
             if (model.GetOperation(initializer) is not { } operation ||
