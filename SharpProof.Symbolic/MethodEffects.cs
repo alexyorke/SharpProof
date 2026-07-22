@@ -450,14 +450,18 @@ internal sealed class MethodEffectAnalysisSession(
         var hasCandidate = false;
         foreach (var argument in arguments) {
             if (argument.Parameter is not { } parameter ||
-                parameter.Type.IsValueType && parameter.RefKind == RefKind.None)
+                parameter.Type.IsValueType &&
+                parameter.Type.TypeKind is not (TypeKind.Pointer or TypeKind.FunctionPointer) &&
+                parameter.RefKind == RefKind.None)
                 continue;
             hasCandidate = true;
             effect |= write
                 ? GetInstanceWriteEffect(argument.Value, builder)
                 : GetInstanceReadEffect(argument.Value, builder);
         }
-        return hasCandidate ? effect : SharpProofEffect.Unknown;
+        if (hasCandidate) return effect;
+        return SharpProofEffect.Unknown |
+               (write ? SharpProofEffect.WritesArgumentState : SharpProofEffect.ReadsArgumentState);
     }
     private static bool CanPreserveFreshArguments(
         MethodEffects effects,
