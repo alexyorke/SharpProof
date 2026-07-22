@@ -815,6 +815,25 @@ public sealed class MethodEffectsTests {
         Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
     }
     [Test]
+    public void CombinedDelegateIncludesAddedTargetEffects() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static void Pure() { }
+                static void Impure() { state++; }
+                static void M() {
+                    System.Action action = Pure;
+                    action += Impure;
+                    action();
+                }
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void LoopBackEdgesDoNotReusePreAssignmentFreshness() {
         var result = Analyze("""
             class Box { public int Value; }
