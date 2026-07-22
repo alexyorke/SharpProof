@@ -1339,12 +1339,13 @@ internal sealed class MethodEffectAnalysisSession(
             effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
             if (target.IsStatic && target.MethodKind != MethodKind.StaticConstructor)
                 AddTypeInitializerEffects(target.ContainingType, site);
-            if (target.IsImplicitlyDeclared) return EffectFlowValue.None;
-            if (exactTarget == null && (target.IsVirtual || target.ContainingType?.TypeKind == TypeKind.Interface)) {
+            if (exactTarget == null && (target.IsVirtual || target.IsOverride ||
+                target.ContainingType?.TypeKind == TypeKind.Interface)) {
                 effects.Add(SharpProofEffect.DispatchUncertainty, site.Syntax, target, "dispatch_uncertainty");
                 effects.AddUnknown(site.Syntax, "unresolved_dispatch", target);
                 return EffectFlowValue.Unknown;
             }
+            if (target.IsImplicitlyDeclared) return EffectFlowValue.None;
             if (target.GetDllImportData() != null) {
                 effects.Add(SharpProofEffect.UsesNativeCode, SharpProofCapability.NativeInterop, site.Syntax, target, "native_call");
                 if (session.TryReadEffectContract(target, out var nativeContract)) {
