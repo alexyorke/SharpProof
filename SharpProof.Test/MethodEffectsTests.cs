@@ -1832,6 +1832,24 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ConditionalDelegateInvocationRetainsImpureTarget() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static void Impure() { state++; }
+                static void M() {
+                    System.Action action = Impure;
+                    action?.Invoke();
+                }
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void CopiedDelegateTargetIsIndependentOfSourceReassignment() {
         var result = Analyze("""
             class C {
