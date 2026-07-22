@@ -1008,6 +1008,24 @@ public sealed class MethodEffectsTests {
             string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
     }
     [Test]
+    public void WithExpressionIncludesCopyConstructorEffects() {
+        var result = Analyze("""
+            sealed record R {
+                private static int state;
+                public int X { get; init; }
+                public R() { }
+                private R(R other) { state++; X = other.X; }
+            }
+            class C {
+                static R M(R value) => value with { X = 2 };
+            }
+            """, 8);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void AwaitIncludesGetAwaiterEffects() {
         var result = Analyze("""
             sealed class Awaitable {
