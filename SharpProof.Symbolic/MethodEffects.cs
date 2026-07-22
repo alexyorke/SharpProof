@@ -139,7 +139,7 @@ internal sealed class MethodEffectAnalysisSession(
                     !reachableSpans.Any(span => span.OverlapsWith(operation.Syntax.Span)))
                     continue;
                 if (operation is IVariableDeclaratorOperation { Symbol: var local, Initializer.Value: var value })
-                    builder.AssignLocal(local, value);
+                    AssignTrackedLocal(builder, local, value);
                 AnalyzeOperation(operation, semanticModel, builder);
             }
             AddCompilerGeneratedAllocations(declaration, semanticModel, builder, reachableOperations);
@@ -203,7 +203,7 @@ internal sealed class MethodEffectAnalysisSession(
                 if (!assignment.IsRef) AddWrite(assignment.Target, builder);
                 if (assignment.Target is ILocalReferenceOperation assignedLocal &&
                     (assignedLocal.Local.RefKind == RefKind.None || assignment.IsRef))
-                    builder.AssignLocal(assignedLocal.Local, assignment.Value);
+                    AssignTrackedLocal(builder, assignedLocal.Local, assignment.Value);
                 if (!assignment.IsRef &&
                     assignment.Target is IPropertyReferenceOperation { Property.SetMethod: not null } propertyTarget)
                     AnalyzeCall(propertyTarget.Property.SetMethod, assignment, builder, propertyTarget.Instance);
@@ -214,7 +214,7 @@ internal sealed class MethodEffectAnalysisSession(
             case ICoalesceAssignmentOperation coalesceAssignment:
                 AddWrite(coalesceAssignment.Target, builder);
                 if (coalesceAssignment.Target is ILocalReferenceOperation coalescedLocal)
-                    builder.AssignLocal(coalescedLocal.Local, coalesceAssignment.Value);
+                    AssignTrackedLocal(builder, coalescedLocal.Local, coalesceAssignment.Value);
                 if (coalesceAssignment.Target is IPropertyReferenceOperation coalescedProperty) {
                     AnalyzeCall(coalescedProperty.Property.GetMethod, coalesceAssignment, builder,
                         coalescedProperty.Instance);
@@ -403,6 +403,62 @@ internal sealed class MethodEffectAnalysisSession(
                 builder.AddUnknown(operation, "dynamic_dispatch");
                 break;
         }
+    }
+    private void AssignTrackedLocal(Builder builder, ILocalSymbol local, IOperation value) {
+        builder.AssignLocal(local, value);
+        if (local.RefKind == RefKind.None && local.Type.TypeKind != TypeKind.Pointer) return;
+        var writeEffect = GetAliasStorageWriteEffect(value, builder);
+        builder.SetRefLocalEffects(local, GetAliasReadEffect(writeEffect), writeEffect);
+    }
+    private SharpProofEffect GetAliasStorageWriteEffect(IOperation value, Builder builder) {
+        value = UnwrapAliasSource(value);
+        return value switch {
+            IInvocationOperation invocation when invocation.TargetMethod.ReturnsByRef ||
+                                                 invocation.TargetMethod.ReturnsByRefReadonly =>
+                GetRefReturnWriteEffect(invocation.TargetMethod, invocation.Instance, invocation, builder),
+            IPropertyReferenceOperation { Property.GetMethod: { } getter } property
+                when getter.ReturnsByRef || getter.ReturnsByRefReadonly =>
+                GetRefReturnWriteEffect(getter, property.Instance, property, builder),
+            IConditionalOperation conditional =>
+                GetAliasStorageWriteEffect(conditional.WhenTrue, builder) |
+                (conditional.WhenFalse == null
+                    ? SharpProofEffect.Unknown
+                    : GetAliasStorageWriteEffect(conditional.WhenFalse, builder)),
+            _ => GetStorageWriteEffect(value, builder)
+        };
+    }
+    private static IOperation UnwrapAliasSource(IOperation value) {
+        while (true) {
+            switch (value) {
+                case IConversionOperation conversion:
+                    value = conversion.Operand;
+                    continue;
+                case IAddressOfOperation address:
+                    value = address.Reference;
+                    continue;
+                case { Kind: OperationKind.None } transparent:
+                    var children = transparent.ChildOperations.Take(2).ToArray();
+                    if (children.Length != 1) return value;
+                    value = children[0];
+                    continue;
+                default:
+                    return value;
+            }
+        }
+    }
+    private static SharpProofEffect GetAliasReadEffect(SharpProofEffect writeEffect) {
+        var readEffect = writeEffect & SharpProofEffect.Unknown;
+        if ((writeEffect & SharpProofEffect.WritesAmbientState) != 0)
+            readEffect |= SharpProofEffect.ReadsAmbientState;
+        if ((writeEffect & SharpProofEffect.WritesReceiverState) != 0)
+            readEffect |= SharpProofEffect.ReadsReceiverState;
+        if ((writeEffect & SharpProofEffect.WritesArgumentState) != 0)
+            readEffect |= SharpProofEffect.ReadsArgumentState;
+        if ((writeEffect & SharpProofEffect.WritesCapturedState) != 0)
+            readEffect |= SharpProofEffect.ReadsCapturedState;
+        if ((writeEffect & SharpProofEffect.WritesStaticState) != 0)
+            readEffect |= SharpProofEffect.ReadsStaticState;
+        return readEffect;
     }
     private void AnalyzeDeconstructionTarget(IOperation target, Builder builder) {
         while (target is IConversionOperation conversion) target = conversion.Operand;
@@ -1549,6 +1605,11 @@ internal sealed class MethodEffectAnalysisSession(
             writeEffect = SharpProofEffect.None;
             return false;
         }
+        internal void SetRefLocalEffects(
+            ILocalSymbol local,
+            SharpProofEffect readEffect,
+            SharpProofEffect writeEffect) =>
+            _refLocalEffects[(ILocalSymbol)local.OriginalDefinition] = (readEffect, writeEffect);
         private void CollectMemberOrigins(
             IOperation value,
             string prefix,
