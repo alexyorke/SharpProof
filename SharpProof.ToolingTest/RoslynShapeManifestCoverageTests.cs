@@ -3,9 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Tools.Fuzz;
-
 namespace SharpProof.Test;
-
 [TestFixture]
 public class RoslynShapeManifestCoverageTests {
     [Test]
@@ -18,7 +16,6 @@ public class RoslynShapeManifestCoverageTests {
             .Select(kind => kind.ToString())
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
-
         Assert.That(missing, Is.Empty, "SyntaxKind values without coverage decisions: " + string.Join(", ", missing));
     }
     [Test]
@@ -30,7 +27,6 @@ public class RoslynShapeManifestCoverageTests {
             .Where(shapeId => !registryShapeIds.Contains(shapeId))
             .OrderBy(shapeId => shapeId, StringComparer.Ordinal)
             .ToArray();
-
         Assert.That(missing, Is.Empty, "Generator-backed manifest shapes without registry entries: " + string.Join(", ", missing));
     }
     [Test]
@@ -42,7 +38,6 @@ public class RoslynShapeManifestCoverageTests {
                 .Select(shapeId => entry.Id + ":" + shapeId))
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
-
         Assert.That(unknown, Is.Empty, "Registry entries reference unknown manifest shapes: " + string.Join(", ", unknown));
     }
     [Test]
@@ -61,7 +56,6 @@ public class RoslynShapeManifestCoverageTests {
                 .Select(kind => entry.Id + ":" + kind))
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
-
         Assert.That(unknownOperationKinds, Is.Empty, "Registry entries reference unknown OperationKind values: " + string.Join(", ",
             unknownOperationKinds));
         Assert.That(unknownSyntaxKinds, Is.Empty, "Registry entries reference unknown SyntaxKind values: " + string.Join(", ",
@@ -70,11 +64,9 @@ public class RoslynShapeManifestCoverageTests {
     [Test]
     public async Task EveryRegistryEntryEmitsDeclaredOperationKinds() {
         var analyses = await AnalyzeRegistryEntriesAsync();
-
         foreach (var entry in FuzzCaseGenerator.RegistryEntries) {
             var analysis = analyses[entry.Id];
             Assert.That(analysis.CompilationErrors, Is.Empty, entry.Id);
-
             foreach (var operationKind in entry.ExpectedOperationKinds)
                 Assert.That(analysis.OperationKinds.ContainsKey(operationKind), Is.True,
                     entry.Id + " missing operation kind " + operationKind);
@@ -83,13 +75,10 @@ public class RoslynShapeManifestCoverageTests {
     [Test]
     public async Task EveryRegistryEntryEmitsDeclaredSyntaxKinds() {
         var analyses = await AnalyzeRegistryEntriesAsync();
-
         foreach (var entry in FuzzCaseGenerator.RegistryEntries) {
             if (entry.ExpectedSyntaxKinds.IsDefaultOrEmpty) continue;
-
             var analysis = analyses[entry.Id];
             Assert.That(analysis.CompilationErrors, Is.Empty, entry.Id);
-
             foreach (var syntaxKind in entry.ExpectedSyntaxKinds)
                 Assert.That(analysis.SyntaxKinds.ContainsKey(syntaxKind), Is.True, entry.Id + " missing syntax kind " + syntaxKind);
         }
@@ -98,18 +87,15 @@ public class RoslynShapeManifestCoverageTests {
     public void DeterministicSampler_CoversAllGeneratorBackedShapesWithoutRandomSearch() {
         var generator = new FuzzCaseGenerator(20260614);
         var observed = new HashSet<string>(StringComparer.Ordinal);
-
         for (var index = 0; index < RoslynShapeManifest.GeneratorBackedShapeIds.Length; index++) {
             var fuzzCase = generator.Next(index);
             Assert.That(fuzzCase.PrimaryShapeIds.IsDefaultOrEmpty, Is.False, fuzzCase.Family);
-
             foreach (var shapeId in fuzzCase.PrimaryShapeIds) observed.Add(shapeId);
         }
         var missing = RoslynShapeManifest.GeneratorBackedShapeIds
             .Where(shapeId => !observed.Contains(shapeId))
             .OrderBy(shapeId => shapeId, StringComparer.Ordinal)
             .ToArray();
-
         Assert.That(missing, Is.Empty, "Deterministic sampler missed generator-backed shapes: " + string.Join(", ", missing));
     }
     private static async Task<ImmutableDictionary<string, FuzzCaseAnalysis>> AnalyzeRegistryEntriesAsync()

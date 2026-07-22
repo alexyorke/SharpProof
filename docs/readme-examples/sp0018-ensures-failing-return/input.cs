@@ -1,5 +1,4 @@
 using SharpProof.Attributes;
-
 public sealed class TestClass
 {
     [Ensures("result > 0")]

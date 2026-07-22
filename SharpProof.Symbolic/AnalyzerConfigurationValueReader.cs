@@ -1,12 +1,10 @@
 namespace SharpProof.Symbolic;
-
 internal static class AnalyzerConfigurationValueReader {
     internal static int GetInteger(AnalyzerOptions options, string key, int fallback, int minimum)
         => TryGetGlobalOption(options, key, out var value) &&
                TryParseInteger(value, minimum, out var parsed)
             ? parsed
             : fallback;
-
     internal static bool TryGetGlobalOption(AnalyzerOptions options, string key, out string value) {
         try {
             var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;

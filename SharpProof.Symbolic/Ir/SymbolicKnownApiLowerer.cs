@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicKnownApiLowerer {
     private static readonly KnownApiLoweringDescriptor<SymbolicTerm> MathAbsLowering = new(
         "System.Math",
@@ -9,7 +8,6 @@ internal static class SymbolicKnownApiLowerer {
         "System.Math",
         "Clamp",
         SymbolicNumericLowerer.TryLowerIntegralMathClampInvocation);
-
     private static readonly ImmutableArray<KnownApiLoweringDescriptor<SymbolicCondition>> KnownApiLowerings =
         [
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.Object", nameof(ReferenceEquals),
@@ -29,7 +27,6 @@ internal static class SymbolicKnownApiLowerer {
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.Text.RegularExpressions.Regex", nameof(Regex.IsMatch),
                 SymbolicStringLowerer.TryLowerRegexIsMatchInvocation),
         ];
-
     private static readonly ImmutableArray<KnownApiLoweringDescriptor<SymbolicTerm>> KnownApiTermLowerings =
         [
             new KnownApiLoweringDescriptor<SymbolicTerm>(
@@ -63,21 +60,16 @@ internal static class SymbolicKnownApiLowerer {
             MathAbsLowering,
             MathClampLowering,
         ];
-
     internal static bool IsMathAbs(IMethodSymbol method) => MathAbsLowering.Matches(method);
-
     internal static bool IsMathClamp(IMethodSymbol method) => MathClampLowering.Matches(method);
-
     internal static bool TryLowerKnownApiInvocation(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,
         out SymbolicCondition condition) => TryLowerKnownApiInvocation(invocation, context, KnownApiLowerings, out condition);
-
     internal static bool TryLowerKnownApiInvocationTerm(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,
         out SymbolicTerm term) => TryLowerKnownApiInvocation(invocation, context, KnownApiTermLowerings, out term);
-
     private static bool TryLowerKnownApiInvocation<TValue>(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,
@@ -86,12 +78,10 @@ internal static class SymbolicKnownApiLowerer {
         value = default!;
         if (context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not IInvocationOperation
             operation) return false;
-
         foreach (var descriptor in descriptors)
             if (descriptor.Matches(operation.TargetMethod) &&
                 descriptor.Handler(invocation, operation.TargetMethod, context, out value))
                 return true;
-
         return false;
     }
     internal static bool TryLowerKnownStaticValueMember(
@@ -100,9 +90,7 @@ internal static class SymbolicKnownApiLowerer {
         out SymbolicTerm term) {
         var memberSymbol = context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol ??
                            context.SemanticModel.GetSymbolInfo(memberAccess.Name, context.CancellationToken).Symbol;
-
         if (SymbolicStringLowerer.TryLowerStringStaticValueMember(memberSymbol, out term)) return true;
-
         return SymbolicNumericLowerer.TryLowerBigIntegerStaticValueMember(memberSymbol, out term);
     }
 }

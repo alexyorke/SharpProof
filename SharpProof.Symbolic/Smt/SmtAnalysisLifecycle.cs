@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Smt;
-
 internal enum SmtAnalysisHealthState {
     Ready,
     Degraded,
@@ -11,7 +10,6 @@ internal sealed class SmtSolverLifecycleOptions(
     bool recycleContextOnTransientFailure = true,
     bool disposeCurrentThreadContextOnServiceDispose = true) {
     public static readonly SmtSolverLifecycleOptions Default = new();
-
     public int MaxTransientRetries { get; } = maxTransientRetries >= 0
         ? maxTransientRetries
         : throw new ArgumentOutOfRangeException(nameof(maxTransientRetries), "Transient retry count cannot be negative.");

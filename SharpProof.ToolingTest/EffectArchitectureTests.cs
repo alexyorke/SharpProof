@@ -1,8 +1,6 @@
 using NUnit.Framework;
 using SharpProof.Symbolic;
-
 namespace SharpProof.Test;
-
 [TestFixture]
 public sealed class EffectArchitectureTests {
     [Test]
@@ -10,7 +8,6 @@ public sealed class EffectArchitectureTests {
         var root = AnalyzerTestHost.GetRepositoryRoot();
         Assert.That(File.Exists(Path.Combine(root, "Tools", "SharpProof." + "Effect" + "Summary",
             "SharpProof." + "Effect" + "Summary.csproj")), Is.False);
-
         var removedFiles = new[] {
             "SharpProof.Contracts/BclPurityFallbackHeuristics.cs",
             "SharpProof.Contracts/InferredMethodSummary.cs",
@@ -60,7 +57,6 @@ public sealed class EffectArchitectureTests {
         foreach (var relativePath in removedFiles)
             Assert.That(File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))), Is.False,
                 $"Removed compatibility file returned: {relativePath}");
-
         var roots = new[] {
             "SharpProof.Analyzer", "SharpProof.Attributes",
             "SharpProof.Package", "SharpProof.Symbolic", "Tools", "config", "docs"
@@ -119,7 +115,6 @@ public sealed class EffectArchitectureTests {
         var legacyDiagnostic = new System.Text.RegularExpressions.Regex(
             @"SP(?:000[3-9]|001[0-247]|002[0369]|003[1-9]|004[0567]|00(?:4[89]|5[0-9]|6[0-9]|7[0-6]))",
             System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-
         foreach (var relativeRoot in roots) {
             var path = Path.Combine(root, relativeRoot);
             if (!Directory.Exists(path)) continue;
@@ -149,16 +144,13 @@ public sealed class EffectArchitectureTests {
         var root = AnalyzerTestHost.GetRepositoryRoot();
         Assert.That(File.Exists(Path.Combine(root, "SharpProof.ProofCore", "SharpProof.ProofCore.csproj")), Is.True);
         Assert.That(File.Exists(Path.Combine(root, "SharpProof.ProofCore", "Z3FormulaEncoder.cs")), Is.True);
-
         var configuration = File.ReadAllText(Path.Combine(
             root, "SharpProof.Analyzer", "Configuration", "AnalyzerConfigurationOptionRegistry.cs"));
         Assert.That(configuration, Does.Contain("sharpproof_smt_mode"));
         Assert.That(configuration, Does.Not.Contain("disabled"));
-
         var session = File.ReadAllText(Path.Combine(root, "SharpProof.Analyzer", "AnalyzerSession.cs"));
         Assert.That(session, Does.Contain("ProofService.SmtAnalysis"));
         Assert.That(session, Does.Contain("MethodEffectAnalysisSession"));
-
         var api = File.ReadAllText(Path.Combine(root, "SharpProof.Symbolic", "SharpProofAnalysisApi.cs"));
         Assert.That(api, Does.Contain("new SmtAnalysisService"));
         Assert.That(api, Does.Contain("CompileSource"));

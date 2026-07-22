@@ -1,19 +1,14 @@
 using static SharpProof.Symbolic.Ir.SymbolicIndexingLowerer;
 using static SharpProof.Symbolic.Ir.SymbolicLoweringValueFacts;
-
 namespace SharpProof.Symbolic.Ir;
-
 internal static partial class SymbolicIrLowerer {
     internal static SymbolicTerm? LowerTerm(ExpressionSyntax expression, SymbolicLoweringContext context) =>
         TryLowerTerm(expression, context, out var term) ? term : null;
-
     internal static SymbolicCondition? LowerCondition(ExpressionSyntax expression, SymbolicLoweringContext context) =>
         TryLowerCondition(expression, context, out var condition) ? condition : null;
-
     private static bool TryLowerCondition(ExpressionSyntax expression, SymbolicLoweringContext context, out SymbolicCondition condition) {
         expression = UnwrapExpression(expression);
         context.CancellationToken.ThrowIfCancellationRequested();
-
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constantValue.HasValue && constantValue.Value is bool booleanValue) {
             condition = new SymbolicConstantCondition(booleanValue);
@@ -28,7 +23,6 @@ internal static partial class SymbolicIrLowerer {
             prefixUnary.IsKind(SyntaxKind.LogicalNotExpression) &&
             SymbolicRegexLowerer.TryLowerNegatedRegexInvocationPredicate(prefixUnary.Operand, context, out condition))
             return true;
-
         if (expression is PrefixUnaryExpressionSyntax prefixUnaryExpression &&
             prefixUnaryExpression.IsKind(SyntaxKind.LogicalNotExpression) &&
             TryLowerCondition(prefixUnaryExpression.Operand, context, out var operand)) {
@@ -43,7 +37,6 @@ internal static partial class SymbolicIrLowerer {
                 context,
                 out condition))
             return true;
-
         if (expression is BinaryExpressionSyntax binaryExpression) {
             if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
                 binaryExpression.Right is TypeSyntax typeSyntax &&
@@ -51,42 +44,27 @@ internal static partial class SymbolicIrLowerer {
                 SymbolicPatternLowerer.TryLowerTypeTestCondition(typeTestValue, typeSyntax, binaryExpression, false,
                     context, out condition))
                 return true;
-
             if (TryLowerLogicalBinaryCondition(binaryExpression, context, out condition)) return true;
-
             if (SymbolicOperatorLowerer.TryLowerBuiltInBooleanBitwiseCondition(binaryExpression, context, out condition)) return true;
-
             if (SymbolicTypeLowerer.TryLowerTypeOfComparison(binaryExpression, context, out condition)) return true;
-
             if (SymbolicConversionLowerer.TryLowerUnsignedCastBoundsComparison(binaryExpression, context, out condition)) return true;
-
             if (SymbolicConversionLowerer.TryLowerCheckedIntegralConversionComparison(binaryExpression, context,
                 out condition)) return true;
-
             if (SymbolicConversionLowerer.TryLowerDecimalZeroComparison(binaryExpression, context, out condition)) return true;
-
             if (SymbolicNullableLowerer.TryLowerNotNullIfNotNullNullComparison(binaryExpression, context, out condition)) return true;
-
             if (SymbolicNullableLowerer.TryLowerNullableNullComparisonCondition(binaryExpression, context, out condition)) return true;
-
             if (SymbolicRegexLowerer.TryLowerRegexMatchesCountComparison(binaryExpression, context, out condition)) return true;
-
             if (SymbolicStringLowerer.TryLowerStringSearchComparison(binaryExpression, context, out condition)) return true;
-
             if (SymbolicStringLowerer.TryLowerPrefixSubstringComparison(binaryExpression, context, out condition)) return true;
-
             if (SymbolicOperatorLowerer.IsEqualityExpression(binaryExpression) &&
                 SymbolicStringLowerer.TryLowerStringEqualityCondition(binaryExpression, context, out condition))
                 return true;
-
             if (SymbolicOperatorLowerer.IsEqualityExpression(binaryExpression) &&
                 SymbolicTupleLowerer.TryLowerTupleEqualityCondition(binaryExpression, context, out condition))
                 return true;
-
             if (SymbolicOperatorLowerer.IsEqualityExpression(binaryExpression) &&
                 SymbolicStringLengthLowerer.TryLowerStringResultLengthIdentityCondition(binaryExpression, context, out condition))
                 return true;
-
             if (SymbolicOperatorLowerer.TryGetRelationOperator(binaryExpression.Kind(), out var nullableRelationOperator) &&
                 SymbolicNullableLowerer.TryLowerNullableValueAccessRelationCondition(
                     binaryExpression,
@@ -94,7 +72,6 @@ internal static partial class SymbolicIrLowerer {
                     context,
                     out condition))
                 return true;
-
             if (SymbolicOperatorLowerer.TryGetRelationOperator(binaryExpression.Kind(), out nullableRelationOperator) &&
                 SymbolicNullableLowerer.TryLowerNullableRelationCondition(
                     binaryExpression,
@@ -102,7 +79,6 @@ internal static partial class SymbolicIrLowerer {
                     context,
                     out condition))
                 return true;
-
             if (SymbolicOperatorLowerer.TryGetRelationOperator(binaryExpression.Kind(), out var relationOperator) &&
                 TryLowerTerm(binaryExpression.Left, context, out var left) &&
                 TryLowerTerm(binaryExpression.Right, context, out var right) &&
@@ -123,17 +99,13 @@ internal static partial class SymbolicIrLowerer {
                   context,
                   out condition))))
             return true;
-
         if (SymbolicRegexLowerer.TryLowerRegexMatchSuccessCondition(expression, context, out condition)) return true;
-
         if (expression is InvocationExpressionSyntax sourceInvocation &&
             SymbolicSourcePredicateLowerer.TryLowerSourceBooleanInvocation(sourceInvocation, context, out condition))
             return true;
-
         if (expression is InvocationExpressionSyntax knownInvocation &&
             SymbolicKnownApiLowerer.TryLowerKnownApiInvocation(knownInvocation, context, out condition))
             return true;
-
         if (expression is MemberAccessExpressionSyntax sourceBooleanProperty &&
             context.SemanticModel.GetSymbolInfo(sourceBooleanProperty, context.CancellationToken).Symbol is
                 IPropertySymbol sourceBooleanPropertySymbol &&
@@ -143,7 +115,6 @@ internal static partial class SymbolicIrLowerer {
                 context,
                 out condition))
             return true;
-
         if (TryLowerTerm(expression, context, out var term) &&
             term.Kind == SmtValueKind.Bool) {
             condition = CreateFactCondition(new SymbolicTruthAtom(term), expression, "ir.truth");
@@ -173,7 +144,6 @@ internal static partial class SymbolicIrLowerer {
     private static bool TryLowerTerm(ExpressionSyntax expression, SymbolicLoweringContext context, out SymbolicTerm term) {
         expression = UnwrapExpression(expression);
         context.CancellationToken.ThrowIfCancellationRequested();
-
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constantValue.HasValue) {
             if (constantValue.Value is bool booleanValue) {
@@ -199,51 +169,40 @@ internal static partial class SymbolicIrLowerer {
             return true;
         }
         if (SymbolicNumericLowerer.TryLowerDefaultValueTerm(expression, context, out term)) return true;
-
         if (expression is CheckedExpressionSyntax checkedExpression &&
             checkedExpression.IsKind(SyntaxKind.CheckedExpression) &&
             TryLowerTerm(checkedExpression.Expression, context, out term))
             return true;
-
         if (SymbolicAsyncLowerer.TryGetKnownCompletedAsyncResultExpression(expression, context, out var completedResultExpression) &&
             TryLowerTerm(completedResultExpression, context, out term))
             return true;
-
         if (SymbolicConversionLowerer.TryLowerSupportedConversionTerm(expression, context, out term)) return true;
-
         if (expression is ThisExpressionSyntax) {
             term = context.ImplicitThis;
             return true;
         }
         if (SymbolicStringLowerer.TryLowerStringExpressionTerm(expression, context, out term)) return true;
-
         if (expression is InvocationExpressionSyntax customInvocation &&
             context.InvocationTermLowerer != null &&
             context.InvocationTermLowerer(customInvocation, context, out term))
             return true;
-
         if (expression is InvocationExpressionSyntax invocation &&
             SymbolicKnownApiLowerer.TryLowerKnownApiInvocationTerm(invocation, context, out term))
             return true;
-
         if (expression is ElementAccessExpressionSyntax elementAccess &&
             TryLowerElementAccessTerm(elementAccess, context, out term))
             return true;
-
         if (expression is ConditionalAccessExpressionSyntax conditionalAccess &&
             SymbolicReferenceLowerer.TryLowerReferenceConditionalAccessTerm(conditionalAccess, context, out term))
             return true;
-
         if (expression is BinaryExpressionSyntax nullableCoalesceExpression &&
             nullableCoalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
             SymbolicNullableLowerer.TryLowerNullableCoalesceValueTerm(nullableCoalesceExpression, context, out term))
             return true;
-
         if (expression is AssignmentExpressionSyntax coalesceAssignment &&
             coalesceAssignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
             SymbolicNullableLowerer.TryLowerCoalesceAssignmentTerm(coalesceAssignment, context, out term))
             return true;
-
         if (expression is BinaryExpressionSyntax coalesceExpression &&
             coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
             TryLowerTerm(coalesceExpression.Left, context, out var coalesceLeft) &&
@@ -297,7 +256,6 @@ internal static partial class SymbolicIrLowerer {
             asExpression.IsKind(SyntaxKind.AsExpression) &&
             SymbolicConversionLowerer.TryLowerReferenceAsTerm(asExpression, context, out term))
             return true;
-
         if (expression is BinaryExpressionSyntax binary &&
             SymbolicOperatorLowerer.TryGetBinaryTermOperator(binary.Kind(), out var binaryOperator) &&
             context.SemanticModel.GetOperation(binary, context.CancellationToken) is
@@ -323,7 +281,6 @@ internal static partial class SymbolicIrLowerer {
             out long maximum) {
             if (SymbolicTypeFacts.TryGetBoundedIntegralRange(operationType, out minimum, out maximum))
                 return true;
-
             if (context.InvocationTermTypeResolver != null)
                 foreach (var invocation in expression.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>()) {
                     var invocationType = context.InvocationTermTypeResolver(invocation);
@@ -342,14 +299,11 @@ internal static partial class SymbolicIrLowerer {
                     SyntaxKind.MultiplyExpression or SyntaxKind.DivideExpression or
                     SyntaxKind.ModuloExpression))
                 return false;
-
             // Speculative contract expressions such as old(value) can leave the
             // enclosing Roslyn operation error-typed even though both lowered
             // operands are integral. Preserve the conservative overflow marker.
             if (type == null || type.TypeKind == TypeKind.Error) return true;
-
             if (!SymbolicTypeFacts.TryGetBoundedIntegralRange(type, out _, out _)) return false;
-
             // Z3 integers are unbounded. Wrap-capable arithmetic must remain opaque.
             // Division and remainder retain their mathematical normal-completion
             // semantics; their zero and MinValue / -1 exceptional paths are modeled
@@ -359,12 +313,9 @@ internal static partial class SymbolicIrLowerer {
         if (expression is MemberAccessExpressionSyntax memberAccess &&
             SymbolicMemberLowerer.TryLowerMemberTerm(memberAccess, context, out term))
             return true;
-
         if (SymbolicMemberLowerer.TryLowerImplicitThisMemberTerm(expression, context, out term)) return true;
-
         var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
         if (symbol != null && context.TryGetSubstitution(symbol, out term)) return true;
-
         if ((symbol is ILocalSymbol || symbol is IParameterSymbol) &&
             SymbolicTypeLowerer.TryGetSymbolType(symbol, out var symbolType) &&
             SymbolicTypeLowerer.TryGetValueKind(symbolType, out var kind)) {
@@ -384,18 +335,15 @@ internal static partial class SymbolicIrLowerer {
         // A checked expression has a value only on normal completion. On that path
         // its CLR result is the mathematical result; overflow exits by exception.
         if (isChecked) return mathematicalTerm;
-
         var leftInRange = CreateIntegerInRangeCondition(mathematicalTerm.Left, minimum, maximum, syntax, provenance + ".left");
         var rightInRange = CreateIntegerInRangeCondition(mathematicalTerm.Right, minimum, maximum, syntax, provenance + ".right");
         var resultInRange = CreateIntegerInRangeCondition(mathematicalTerm, minimum, maximum, syntax, provenance + ".result");
-
         // Values outside the CLR operand domain are impossible program inputs, so
         // define the extension mathematically there. Inside the domain, only the
         // true overflow branch is opaque. This preserves guarded exact proofs
         // without assigning unsound mathematical semantics to wrapped results.
         var operandsOutOfRange = new SymbolicNotCondition(
             new SymbolicBinaryCondition(SymbolicConditionOperator.And, leftInRange, rightInRange));
-
         var modulus = unchecked((ulong)(maximum - minimum)) + 1UL;
         if ((mathematicalTerm.Operator is SymbolicBinaryTermOperator.Add or
                 SymbolicBinaryTermOperator.Subtract) &&

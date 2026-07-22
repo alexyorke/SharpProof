@@ -1,7 +1,5 @@
 using static SharpProof.Symbolic.Ir.SymbolicStatefulAssignmentTransfer;
-
 namespace SharpProof.Symbolic.Ir;
-
 internal static partial class SymbolicCfgProgramPointStateCollector {
     internal static bool TryCollectAbruptIfCompletionState(
         IfStatementSyntax statement,
@@ -64,17 +62,14 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             !tryStatement.Block.Statements.All(statement => SupportsFinallyLinearStatement(statement, semanticModel, cancellationToken)) ||
             !finallyClause.Block.Statements.All(statement => SupportsFinallyLinearStatement(statement, semanticModel, cancellationToken)))
             return false;
-
         var regions = EnumerateRegions(graph.Root)
             .Where(region => region.Kind == ControlFlowRegionKind.Finally && RegionContainsSyntax(region, graph, finallyClause.Block))
             .ToArray();
         if (regions.Length != 1)
             return false;
-
         var protectedMutations = SymbolicStateInvalidator.LowerNestedMutations(tryStatement.Block, semanticModel, cancellationToken);
         if (protectedMutations.HasUnsupportedMutation)
             return false;
-
         plan = new CfgFinallyLocalTargetPlan(regions[0], protectedMutations);
         return true;
     }
@@ -98,7 +93,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             semanticModel.GetSymbolInfo(left, cancellationToken).Symbol is not
                 (ILocalSymbol { RefKind: RefKind.None } or IParameterSymbol { RefKind: RefKind.None }))
             return false;
-
         return SupportsFinallyLinearValue(assignment.Right, semanticModel, cancellationToken);
     }
     private static bool SupportsFinallyLinearValue(
@@ -112,7 +106,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol is not
                 (ILocalSymbol { RefKind: RefKind.None } or IParameterSymbol { RefKind: RefKind.None }))
             return false;
-
         var typeInfo = semanticModel.GetTypeInfo(identifier, cancellationToken);
         return typeInfo.Type != null &&
                SymbolEqualityComparer.Default.Equals(typeInfo.Type, typeInfo.ConvertedType);
@@ -138,7 +131,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         ReferenceEquals(continuation.Regions[0], plan.Region) &&
         continuation.Parent == null &&
         continuation.TerminalBranch == null;
-
     private static bool TryObserveFinallyLocalTarget(
         CfgFinallyContinuation? continuation,
         CfgFinallyLocalTargetPlan plan,
@@ -152,15 +144,12 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         return observed == continuation;
     }
     internal readonly record struct CfgTraversalPoint(BasicBlock Block, CfgFinallyContinuation? Continuation, int OperationIndex = 0);
-
     internal sealed record CfgFinallyLocalTargetPlan(ControlFlowRegion Region, SymbolicNestedMutationInvalidationPlan ProtectedMutations);
-
     internal sealed record CfgCatchLocalTargetPlan(
         CatchClauseSyntax Clause,
         ControlFlowRegion TryRegion,
         ControlFlowRegion CatchRegion,
         SymbolicNestedMutationInvalidationPlan ProtectedMutations);
-
     private static bool TryCreateCatchLocalTargetPlan(
         SyntaxNode site,
         ControlFlowGraph graph,
@@ -173,7 +162,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             return true;
         if (clause.Parent is not TryStatementSyntax tryStatement)
             return false;
-
         var catchRegions = EnumerateRegions(graph.Root)
             .Where(region => region.Kind == ControlFlowRegionKind.Catch && RegionContainsSyntax(region, graph, clause.Block))
             .ToArray();
@@ -186,7 +174,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             .FirstOrDefault(static region => region.Kind == ControlFlowRegionKind.Try);
         if (tryRegion == null)
             return false;
-
         var protectedMutations = SymbolicStateInvalidator.LowerNestedMutations(tryStatement.Block, semanticModel, cancellationToken);
         plan = new CfgCatchLocalTargetPlan(clause, tryRegion, catchRegions[0], protectedMutations);
         return true;
@@ -224,7 +211,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 clause.Declaration,
                 false,
                 "ir.path.catch-entry.exception-not-null");
-
         if (clause.Filter?.FilterExpression is { } filterExpression &&
             !SymbolicLoopStateTransfer.AnyReferencedSymbolAssignedBeforeUse(
                 filterExpression,
@@ -241,7 +227,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         BasicBlock? Destination,
         ControlFlowBranch? TerminalBranch,
         CfgFinallyContinuation? Parent);
-
     internal static bool TryApplyPriorStatementCompletion(
         ref SymbolicState state,
         StatementSyntax statement,
@@ -329,7 +314,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 cancellationToken,
                 assignmentProvenance,
                 out invalidatedGuardTarget);
-
         var expressionOperation = operation is IExpressionStatementOperation expressionStatement
             ? expressionStatement.Operation
             : operation;
@@ -341,7 +325,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 semanticModel,
                 cancellationToken,
                 out invalidatedGuardTarget);
-
         if (expressionOperation is ICoalesceAssignmentOperation coalesce)
             return TryApplyCoalesceAssignment(
                 ref state,
@@ -352,7 +335,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 semanticModel,
                 cancellationToken,
                 out invalidatedGuardTarget);
-
         if (expressionOperation is ISimpleAssignmentOperation assignment)
             return TryGetDirectTarget(assignment.Target, out var target)
                 ? TryApplyAssignment(
@@ -373,7 +355,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                     semanticModel,
                     cancellationToken,
                     out invalidatedGuardTarget);
-
         var computedUpdate = expressionOperation is IIncrementOrDecrementOperation or ICompoundAssignmentOperation
             ? expressionOperation
             : null;
@@ -400,7 +381,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             operation is IExpressionStatementOperation
             expressionStatementOperation)
             return TryApplyExpressionStatement(ref state, expressionStatementOperation, guard, semanticModel, cancellationToken);
-
         return false;
     }
     private static bool TryApplyExpressionStatement(
@@ -444,7 +424,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         if (site is ExpressionSyntax expression &&
             CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression) is not AssignmentExpressionSyntax)
             return TryApplyFrameworkExpressionCompletion(ref state, expression, semanticModel, cancellationToken);
-
         var completedState = state;
         if (!TryApplyOperation(
                 ref completedState,
@@ -459,9 +438,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 out var invalidatedGuardTarget) ||
             invalidatedGuardTarget != null && !allowGuardedReferenceAssignments)
             return false;
-
         state = completedState;
-
         if (site is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } statement)
             state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
                 state,
@@ -473,7 +450,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 cancellationToken).State;
         else if (site is BlockSyntax)
             AddOperationNormalCompletionFacts(ref state, operation, semanticModel, cancellationToken);
-
         return true;
     }
     private static bool TryApplyFrameworkExpressionCompletion(
@@ -512,7 +488,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
     private static bool IsForInitializerSyntax(SyntaxNode syntax, ForStatementSyntax forStatement) =>
         forStatement.Declaration?.Variables.Any(variable => variable.Span.Contains(syntax.SpanStart)) == true ||
         forStatement.Initializers.Any(initializer => initializer.Span.Contains(syntax.SpanStart));
-
     private static bool TryApplyForInitializers(
         ref SymbolicState state,
         ForStatementSyntax statement,
@@ -612,7 +587,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         if (guard == null) return state;
-
         var guardKey = SymbolicState.CreateProofConditionKey(guard);
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         foreach (var variable in declaration.Declaration.Variables) {
@@ -627,7 +601,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             if (completion == null ||
                 SymbolicState.CreateProofConditionKey(completion) != guardKey)
                 continue;
-
             return new SymbolicState(
                 state.Facts,
                 state.PathConditions.Where(condition => SymbolicState.CreateProofConditionKey(condition) != guardKey),
@@ -654,7 +627,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         invalidatedGuardTarget = GuardReferencesTarget(guard, target) ? target : null;
         if (value.Syntax is not ExpressionSyntax expression)
             return false;
-
         SymbolicTerm? previousValue = null;
         var isSelfReferential = SymbolMutationFacts.ExpressionReferencesSymbol(expression, target, semanticModel, cancellationToken);
         if (isSelfReferential &&
@@ -676,7 +648,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             preInvalidationTargetValue: previousValue);
         if (!transition.IsExact)
             return false;
-
         state = transition.State;
         return true;
     }
@@ -706,7 +677,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         invalidatedGuardTarget = null;
         if (guard != null || assignment.Syntax is not AssignmentExpressionSyntax syntax)
             return false;
-
         SymbolicStateInvalidator.InvalidateMutationTarget(ref state, syntax.Left, semanticModel, cancellationToken);
         SymbolicStateInvalidator.InvalidateNestedAssignmentMutations(ref state, syntax, semanticModel, cancellationToken);
         var transition = SymbolicOperationTransfer.ApplyLowering(
@@ -714,7 +684,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             SymbolicOperationLowerer.LowerExplicitTargetAssignment(syntax, new SymbolicLoweringContext(semanticModel, cancellationToken)));
         if (!transition.IsExact)
             return false;
-
         state = transition.State;
         return true;
     }
@@ -736,7 +705,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
     internal static bool GuardReferencesTarget(SymbolicCondition? guard, ISymbol target) =>
         guard != null &&
         SymbolicIrReferenceScanner.ContainsVariableOrMember(guard, SymbolicFactFactory.GetSmtVariableName(target));
-
     internal static bool TryGetDirectTarget(IOperation operation, out ISymbol target) {
         target = operation switch {
             ILocalReferenceOperation local => local.Local,
@@ -747,7 +715,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
     }
     private static bool ContainsSite(SyntaxNode container, SyntaxNode site) =>
         container.Span.Contains(site.SpanStart) || site.Span.Contains(container.SpanStart);
-
     private static bool TryGetForInitialEntryHeader(ControlFlowGraph graph, ForStatementSyntax forStatement, out BasicBlock header) {
         var matches = graph.Blocks.Where(block =>
             block.ConditionKind != ControlFlowConditionKind.None &&
@@ -770,7 +737,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         failure = GetStatementShapeFailure(graph, statement, semanticModel, cancellationToken) ?? string.Empty;
         if (failure.Length != 0)
             return Fail(failure, out plan, out failure);
-
         var directSlices = new Dictionary<int, CfgBlockSlice>();
         foreach (var block in graph.Blocks) {
             if (!block.IsReachable)
@@ -786,7 +752,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                                   statement.Span.Contains(block.BranchValue.Syntax.SpanStart);
             if (ownedOperationIndexes.Length == 0 && !ownsBranchValue)
                 continue;
-
             var firstOperation = ownedOperationIndexes.Length == 0
                 ? block.Operations.Length
                 : ownedOperationIndexes[0];
@@ -795,7 +760,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 : ownedOperationIndexes[ownedOperationIndexes.Length - 1] + 1;
             if (!ownedOperationIndexes.SequenceEqual(Enumerable.Range(firstOperation, ownedOperationIndexes.Length)))
                 return Fail("statement-region.operation-slice", out plan, out failure);
-
             directSlices.Add(
                 block.Ordinal,
                 new CfgBlockSlice(
@@ -806,17 +770,14 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         }
         if (directSlices.Count == 0)
             return Fail("statement-region.empty", out plan, out failure);
-
         var connectorCandidates = new HashSet<int>(graph.Blocks
             .Where(static block => block.Kind == BasicBlockKind.Block && block.Operations.IsDefaultOrEmpty && block.BranchValue == null)
             .Select(static block => block.Ordinal));
         var forwardConnectors = CollectConnectorClosure(graph, directSlices.Keys, connectorCandidates, forward: true);
         forwardConnectors.IntersectWith(CollectConnectorClosure(graph, directSlices.Keys, connectorCandidates, forward: false));
-
         var slices = new Dictionary<int, CfgBlockSlice>(directSlices);
         foreach (var ordinal in forwardConnectors)
             slices.Add(ordinal, new CfgBlockSlice(0, 0, false));
-
         var entryPoints = new HashSet<CfgTraversalPoint>();
         foreach (var entry in slices) {
             var ordinal = entry.Key;
@@ -837,11 +798,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         reachableSlices.Add(entryPoint.Block.Ordinal);
         if (!reachableSlices.SetEquals(slices.Keys))
             return Fail("statement-region.disconnected", out plan, out failure);
-
         failure = GetRegionEdgeFailure(graph, slices, directSlices.Keys) ?? string.Empty;
         if (failure.Length != 0)
             return Fail(failure, out plan, out failure);
-
         plan = new CfgRegionPlan(statement, entryPoint, slices);
         failure = string.Empty;
         return true;
@@ -900,13 +859,11 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         };
         if (expression == null)
             return Unsupported(statement, "statement-region.protocol-kind");
-
         var state = entryState;
         SymbolicStateInvalidator.InvalidateNestedMutations(ref state, statement, semanticModel, cancellationToken);
         if (SymbolicLoopStateTransfer.IsLocalOrParameterReference(expression, semanticModel, cancellationToken) &&
             !SymbolicLoopStateTransfer.ReferenceIdentityFactIsInvalidatedInStatement(expression, body, semanticModel, cancellationToken))
             SymbolicProgramPointFacts.AddReferenceNullCondition(ref state, expression, false, semanticModel, cancellationToken, provenance);
-
         return Exact(state, statement);
     }
     internal static bool TryApplyCompletedSwitchExitExclusions(
@@ -920,14 +877,12 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             SymbolicControlFlowFacts.StatementDefinitelyExits(last, semanticModel, cancellationToken)).ToArray();
         if (exitingSections.Length == 0)
             return true;
-
         var conditionSymbols = SymbolicBranchCompletionStateTransfer.GetSwitchConditionSymbols(statement, semanticModel, cancellationToken);
         if (statement.Sections.Except(exitingSections)
             .SelectMany(static section => section.Statements)
             .Any(sectionStatement => conditionSymbols.Any(symbol =>
                 SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(sectionStatement, symbol, semanticModel, cancellationToken))))
             return true;
-
         foreach (var section in exitingSections) {
             if (!SwitchPathConditionBuilder.TryCreateSwitchStatementSectionSymbolicCondition(
                     statement.Expression,
@@ -1021,12 +976,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         operation is IConversionOperation conversion
             ? UnwrapConversion(conversion.Operand)
             : operation;
-
     private static bool HasUnsupportedAbruptTransfer(StatementSyntax statement, bool allowBreak) =>
         statement.DescendantNodes().Any(node =>
             node is GotoStatementSyntax or ContinueStatementSyntax or YieldStatementSyntax ||
             !allowBreak && node is BreakStatementSyntax);
-
     private static HashSet<int> CollectConnectorClosure(
         ControlFlowGraph graph,
         IEnumerable<int> directOrdinals,
@@ -1053,7 +1006,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         branch.FinallyRegions.IsDefaultOrEmpty
             ? branch.Destination
             : graph.Blocks[branch.FinallyRegions[0].FirstBlockOrdinal];
-
     private static bool Fail(string failureDetail, out CfgRegionPlan plan, out string failure) {
         plan = null!;
         failure = failureDetail;
@@ -1072,7 +1024,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             ControlFlowBranchSemantics.Throw or
             ControlFlowBranchSemantics.Rethrow or
             ControlFlowBranchSemantics.ProgramTermination;
-
     private static bool IsWithinRegion(BasicBlock block, ControlFlowRegionKind kind) {
         for (var region = block.EnclosingRegion; region != null; region = region.EnclosingRegion)
             if (region.Kind == kind)
@@ -1084,18 +1035,14 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         CfgTraversalPoint EntryPoint,
         IReadOnlyDictionary<int, CfgBlockSlice> Blocks) {
         internal bool InvalidatesExitedLocals => Target is IfStatementSyntax or SwitchStatementSyntax;
-
         internal List<(ControlFlowBranch Branch, CfgPathState Path)> CompletedPaths { get; } = [];
-
         internal List<CfgPathState> TerminalPaths { get; } = [];
-
         internal CfgTraversalPoint GetEntryPoint(BasicBlock block, CfgFinallyContinuation? continuation) =>
             Blocks.TryGetValue(block.Ordinal, out var slice)
                 ? new CfgTraversalPoint(block, continuation, slice.FirstOperationIndex)
                 : default;
     }
     internal readonly record struct CfgBlockSlice(int FirstOperationIndex, int EndOperationIndexExclusive, bool HasCursorExit);
-
     internal static bool IsTargetOperation(
         IOperation operation,
         SyntaxNode site,
@@ -1106,7 +1053,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             return ContainsSite(operation.Syntax, site);
         if (operation is IVariableDeclarationGroupOperation)
             return ContainsSite(operation.Syntax, declaration);
-
         ISymbol? target = operation switch {
             IVariableDeclaratorOperation declarator => declarator.Symbol,
             ISimpleAssignmentOperation assignment when TryGetDirectTarget(assignment.Target, out var symbol) =>
@@ -1123,12 +1069,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             block.Span.Contains(site.SpanStart) ||
             block.Span.End > site.SpanStart)
             return false;
-
         var statementIndex = block.Statements.IndexOf(statement);
         var limit = SymbolicAnalysisLimitContext.Limits.MaxScopedBlockCompletionStatements;
         if (statementIndex < 0 || statementIndex < limit)
             return false;
-
         SymbolicAnalysisLimitContext.Record(
             SymbolicAnalysisLimitKind.ScopedBlockCompletionStatements,
             limit,
@@ -1139,13 +1083,10 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
     }
     internal static SymbolicLoweringResult<SymbolicState> Exact(SymbolicState state, SyntaxNode site) =>
         SymbolicLoweringResult<SymbolicState>.Exact(state.Normalize(), Provenance(site, "exact"));
-
     internal static SymbolicLoweringResult<SymbolicState> Unsupported(SyntaxNode site, string detail) =>
         SymbolicLoweringResult<SymbolicState>.Unsupported(Provenance(site, detail));
-
     internal static SymbolicLoweringProvenance Provenance(SyntaxNode site, string detail) =>
         new("cfg-program-point", site.Span, detail);
-
     internal enum CfgProgramPointTargetKind {
         BeforeCurrent,
         CurrentCompletion,

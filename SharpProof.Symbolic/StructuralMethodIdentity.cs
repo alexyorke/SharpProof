@@ -1,9 +1,6 @@
 using System.Text;
-
 namespace SharpProof.Identity;
-
 internal readonly record struct StructuralParameterIdentity(string Type, string RefKind);
-
 internal static class StructuralRefKinds {
     internal const string None = "none";
     internal const string Ref = "ref";
@@ -13,7 +10,6 @@ internal static class StructuralRefKinds {
 }
 internal sealed class StructuralMethodIdentity {
     internal const string KeyPrefix = "spm1";
-
     internal StructuralMethodIdentity(
         string containingMetadataType,
         string methodKind,
@@ -32,7 +28,6 @@ internal sealed class StructuralMethodIdentity {
             throw new ArgumentException("Return type is required.", nameof(returnType));
         if (string.IsNullOrWhiteSpace(returnRefKind))
             throw new ArgumentException("Return ref kind is required.", nameof(returnRefKind));
-
         ContainingMetadataType = containingMetadataType.Trim();
         MethodKind = methodKind.Trim();
         Name = name.Trim();
@@ -48,7 +43,6 @@ internal sealed class StructuralMethodIdentity {
     public ImmutableArray<StructuralParameterIdentity> Parameters { get; }
     public string ReturnType { get; }
     public string ReturnRefKind { get; }
-
     internal string ToCanonicalKey() {
         var values = new List<string> {
             KeyPrefix,

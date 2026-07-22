@@ -1,5 +1,4 @@
 namespace SharpProof.ProofCore.Smt;
-
 internal static class Z3RegexPatternNormalizer {
     internal static bool TryNormalize(string pattern, RegexOptions options, out NormalizedRegexPattern normalized) {
         var multiline = (options & RegexOptions.Multiline) != 0;
@@ -26,7 +25,6 @@ internal static class Z3RegexPatternNormalizer {
         (options & RegexOptions.IgnorePatternWhitespace) != 0,
         (options & RegexOptions.Singleline) != 0,
         (options & RegexOptions.IgnoreCase) != 0);
-
     internal static bool TryReadOptionsUntil(
         string pattern,
         ref int position,
@@ -74,7 +72,6 @@ internal static class Z3RegexPatternNormalizer {
             return false;
         }
         if (!sawOption || position >= pattern.Length || pattern[position] != terminator) return false;
-
         position++;
         nextScope = new RegexOptionScope(nextIgnorePatternWhitespace, nextSingleline, nextIgnoreCase);
         return true;
@@ -83,7 +80,6 @@ internal static class Z3RegexPatternNormalizer {
         while (position < pattern.Length) {
             if (TrySkipInlineComment(pattern, ref position)) continue;
             if (!ignorePatternWhitespace) return;
-
             var current = pattern[position];
             if (char.IsWhiteSpace(current)) {
                 position++;
@@ -112,7 +108,6 @@ internal static class Z3RegexPatternNormalizer {
         while (true) {
             SkipIgnoredTrivia(pattern, ref index, optionScope.IgnorePatternWhitespace);
             if (!TryReadInlineOptionGroup(pattern, index, optionScope, canUseIgnoreCase, out var nextScope, out var nextIndex)) break;
-
             optionScope = nextScope;
             index = nextIndex;
         }
@@ -139,10 +134,8 @@ internal static class Z3RegexPatternNormalizer {
         nextScope = currentScope;
         nextIndex = start;
         if (start + 2 >= pattern.Length || pattern[start] != '(' || pattern[start + 1] != '?') return false;
-
         var index = start + 2;
         if (!TryReadOptionsUntil(pattern, ref index, ')', currentScope, canUseIgnoreCase, out nextScope)) return false;
-
         nextIndex = index;
         return true;
     }
@@ -150,17 +143,14 @@ internal static class Z3RegexPatternNormalizer {
         if (position + 2 >= pattern.Length || pattern[position] != '(' || pattern[position + 1] != '?' ||
             pattern[position + 2] != '#')
             return false;
-
         var end = position + 3;
         while (end < pattern.Length && pattern[end] != ')') end++;
         if (end >= pattern.Length) return false;
-
         position = end + 1;
         return true;
     }
     private static bool EndsWithUnescapedAnchor(string value, string anchor) =>
         value.EndsWith(anchor, StringComparison.Ordinal) && !IsEscaped(value, value.Length - anchor.Length);
-
     private static bool IsEscaped(string value, int index) {
         var slashCount = 0;
         for (var current = index - 1; current >= 0 && value[current] == '\\'; current--) slashCount++;
@@ -173,5 +163,4 @@ internal readonly record struct NormalizedRegexPattern(
     bool StrictEndAnchored,
     bool FinalNewlineEndAnchored,
     bool DollarEndAnchored);
-
 internal readonly record struct RegexOptionScope(bool IgnorePatternWhitespace, bool Singleline, bool IgnoreCase);

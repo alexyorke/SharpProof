@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicFiniteDomainLowerer {
     internal static SymbolicLoweringResult<IReadOnlyList<ExpressionSyntax>> LowerElements(ExpressionSyntax expression) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
@@ -38,7 +37,6 @@ internal static class SymbolicFiniteDomainLowerer {
         string eventDetail) {
         if (elements.IsEmpty)
             return UnsupportedElements(source, "empty");
-
         var limit = SymbolicAnalysisLimitContext.Limits.MaxFiniteForeachElementFacts;
         if (elements.Length > limit) {
             SymbolicAnalysisLimitContext.Record(SymbolicAnalysisLimitKind.ForeachElementFacts, limit, elements.Length, source, eventDetail);
@@ -50,10 +48,8 @@ internal static class SymbolicFiniteDomainLowerer {
         SyntaxNode source,
         ImmutableArray<ExpressionSyntax> elements) =>
         SymbolicLoweringResult<IReadOnlyList<ExpressionSyntax>>.Exact(elements, Provenance(source, "elements"));
-
     private static SymbolicLoweringResult<IReadOnlyList<ExpressionSyntax>> UnsupportedElements(SyntaxNode source, string detail) =>
         SymbolicLoweringResult<IReadOnlyList<ExpressionSyntax>>.Unsupported(Provenance(source, detail));
-
     private static SymbolicLoweringProvenance Provenance(SyntaxNode source, string detail) =>
         new("finite-foreach-domain", source.Span, detail);
 }

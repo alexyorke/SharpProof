@@ -1,7 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using SharpProof.Symbolic;
-
 var expectation = args.SingleOrDefault() ?? "Required";
 if (expectation is not ("Required" or "Graceful")) {
     Console.Error.WriteLine("Expected Required or Graceful as the native SMT expectation.");
@@ -21,7 +20,6 @@ const string source = """
                           }
                       }
                       """;
-
 using var session = SharpProofAnalysisSession.FromText(source, "NativeSmtProbe.cs");
 var result = session.Analyze(new SharpProofAnalysisRequest(
     new SharpProofTarget(SharpProofTargetKind.Point, Line: 10, Column: 9),
@@ -30,7 +28,6 @@ var result = session.Analyze(new SharpProofAnalysisRequest(
 var proofsHold = result.Status == SharpProofQueryStatus.Succeeded;
 var unknownProofCount = result.UnknownReasons.Length;
 var nativeAvailable = proofsHold;
-
 Console.WriteLine(JsonSerializer.Serialize(new {
     runtimeIdentifier = RuntimeInformation.RuntimeIdentifier,
     processArchitecture = RuntimeInformation.ProcessArchitecture.ToString(),
@@ -43,7 +40,6 @@ Console.WriteLine(JsonSerializer.Serialize(new {
     unknownProofCount,
     proofsHold
 }));
-
 if (result.ProofFacts.Length == 0) {
     Console.Error.WriteLine("The package probe did not execute an SMT-backed query.");
     return 2;
@@ -56,7 +52,6 @@ if (expectation == "Required") {
     return 0;
 }
 if (nativeAvailable) return proofsHold ? 0 : 4;
-
 var stableFallback = result.Status == SharpProofQueryStatus.Unknown && unknownProofCount > 0;
 if (!stableFallback) {
     Console.Error.WriteLine("SMT was unavailable without the documented permanent conservative fallback.");

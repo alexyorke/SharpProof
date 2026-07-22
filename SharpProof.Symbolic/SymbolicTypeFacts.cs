@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicTypeFacts {
     internal static bool IsBuiltInIntegralType(ITypeSymbol? typeSymbol) => typeSymbol?.SpecialType is
             SpecialType.System_Char or
@@ -13,10 +12,8 @@ internal static class SymbolicTypeFacts {
             SpecialType.System_UInt64;
     internal static bool IsBuiltInIntegralOrEnumType(ITypeSymbol? typeSymbol) =>
         IsBuiltInIntegralType(typeSymbol) || typeSymbol?.TypeKind == TypeKind.Enum;
-
     public static string? GetFullMetadataName(INamedTypeSymbol? type) {
         if (type == null) return null;
-
         var namespaceName = type.ContainingNamespace?.IsGlobalNamespace == false
             ? type.ContainingNamespace.ToDisplayString()
             : string.Empty;
@@ -26,10 +23,8 @@ internal static class SymbolicTypeFacts {
     }
     public static bool IsReferenceType(ITypeSymbol? typeSymbol) {
         if (typeSymbol == null) return false;
-
         if (typeSymbol is ITypeParameterSymbol typeParameter)
             return IsKnownReferenceTypeParameter(typeParameter, new HashSet<ITypeParameterSymbol>(SymbolEqualityComparer.Default));
-
         return typeSymbol.IsReferenceType;
     }
     public static bool IsReferenceLikeType(ITypeSymbol? typeSymbol) => typeSymbol?.TypeKind == TypeKind.Dynamic ||
@@ -95,7 +90,6 @@ internal static class SymbolicTypeFacts {
                };
     public static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol) {
         if (typeSymbol == null) return false;
-
         switch (typeSymbol.SpecialType) {
             case SpecialType.System_Byte:
             case SpecialType.System_SByte:
@@ -119,7 +113,6 @@ internal static class SymbolicTypeFacts {
         typeSymbol != null &&
         string.Equals(typeSymbol.ContainingNamespace?.ToDisplayString(), "System.Numerics", StringComparison.Ordinal) &&
         string.Equals(typeSymbol.Name, "BigInteger", StringComparison.Ordinal);
-
     public static bool TryGetCheckedIntegralRange(ITypeSymbol? typeSymbol, out long minValue, out long maxValue) {
         if (typeSymbol?.SpecialType is not (SpecialType.System_Int32 or
             SpecialType.System_UInt32 or
@@ -174,12 +167,9 @@ internal static class SymbolicTypeFacts {
     }
     private static bool IsKnownReferenceTypeParameter(ITypeParameterSymbol typeParameter, HashSet<ITypeParameterSymbol> visited) {
         if (!visited.Add(typeParameter)) return false;
-
         if (typeParameter.HasReferenceTypeConstraint) return true;
-
         foreach (var constraint in typeParameter.ConstraintTypes) {
             if (constraint.IsReferenceType) return true;
-
             if (constraint is ITypeParameterSymbol nestedTypeParameter &&
                 IsKnownReferenceTypeParameter(nestedTypeParameter, visited))
                 return true;
@@ -188,15 +178,12 @@ internal static class SymbolicTypeFacts {
     }
     public static bool HasInstanceInt32Member(ITypeSymbol? typeSymbol, string memberName) {
         if (typeSymbol == null) return false;
-
         for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
             if (HasDeclaredInstanceInt32Member(current, memberName))
                 return true;
-
         foreach (var interfaceType in typeSymbol.AllInterfaces)
             if (HasDeclaredInstanceInt32Member(interfaceType, memberName))
                 return true;
-
         return false;
     }
     public static bool IsKnownNonNegativeCollectionCountProperty(
@@ -212,7 +199,6 @@ internal static class SymbolicTypeFacts {
                 Type.SpecialType: SpecialType.System_Int32
             })
             return false;
-
         foreach (var interfaceType in EnumerateKnownNonNegativeCountInterfaces(receiverType, compilation))
             foreach (var interfaceCount in interfaceType.GetMembers("Count").OfType<IPropertySymbol>()) {
                 if (interfaceCount is not
@@ -222,9 +208,7 @@ internal static class SymbolicTypeFacts {
                         Type.SpecialType: SpecialType.System_Int32
                     })
                     continue;
-
                 if (SymbolEqualityComparer.Default.Equals(propertySymbol, interfaceCount)) return true;
-
                 if (receiverType is INamedTypeSymbol namedReceiver &&
                     namedReceiver.FindImplementationForInterfaceMember(interfaceCount) is { } implementation &&
                     implementation.DeclaringSyntaxReferences.Length == 0 &&
@@ -238,7 +222,6 @@ internal static class SymbolicTypeFacts {
         if (receiverType is INamedTypeSymbol namedReceiver &&
             IsKnownNonNegativeCountInterface(namedReceiver, compilation))
             yield return namedReceiver;
-
         foreach (var interfaceType in receiverType.AllInterfaces)
             if (IsKnownNonNegativeCountInterface(interfaceType, compilation))
                 yield return interfaceType;
@@ -252,7 +235,6 @@ internal static class SymbolicTypeFacts {
     public static bool HasDeclaredInstanceInt32Member(ITypeSymbol typeSymbol, string memberName) {
         foreach (var member in typeSymbol.GetMembers(memberName)) {
             if (member.IsStatic) continue;
-
             switch (member) {
                 case IPropertySymbol { Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 }:
                 case IFieldSymbol { Type.SpecialType: SpecialType.System_Int32 }:
@@ -263,15 +245,12 @@ internal static class SymbolicTypeFacts {
     }
     public static bool HasInt32Indexer(ITypeSymbol? typeSymbol) {
         if (typeSymbol == null) return false;
-
         for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
             if (HasDeclaredInt32Indexer(current))
                 return true;
-
         foreach (var interfaceType in typeSymbol.AllInterfaces)
             if (HasDeclaredInt32Indexer(interfaceType))
                 return true;
-
         return false;
     }
     public static bool HasDeclaredInt32Indexer(ITypeSymbol typeSymbol) {
@@ -279,16 +258,13 @@ internal static class SymbolicTypeFacts {
             if (property is { IsIndexer: true, IsStatic: false, Parameters.Length: 1 } &&
                 property.Parameters[0].Type.SpecialType == SpecialType.System_Int32)
                 return true;
-
         return false;
     }
     public static bool TryGetTuplePositionalField(ITypeSymbol? receiverType, int position, out IFieldSymbol fieldSymbol) {
         fieldSymbol = null!;
         if (receiverType is not INamedTypeSymbol namedType) return false;
-
         if (namedType.IsTupleType) {
             if (position < 0 || position >= namedType.TupleElements.Length) return false;
-
             fieldSymbol = namedType.TupleElements[position];
             return true;
         }
@@ -301,9 +277,7 @@ internal static class SymbolicTypeFacts {
     }
     public static bool IsSupportedTupleCarrierType(ITypeSymbol type) {
         if (type is not INamedTypeSymbol namedType) return false;
-
         if (namedType.IsTupleType && namedType.TupleElements.Length > 0) return true;
-
         return namedType
             .GetMembers()
             .OfType<IFieldSymbol>()

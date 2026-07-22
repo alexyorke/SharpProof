@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal enum SymbolicWitnessStatus {
     None,
     Exact,
@@ -7,7 +6,6 @@ internal enum SymbolicWitnessStatus {
     Unsupported
 }
 internal sealed record SymbolicSatisfyingAssignment(string SourceName, string Value);
-
 internal sealed record SymbolicInputWitness(
     SymbolicWitnessStatus Status,
     string Reason,
@@ -46,7 +44,6 @@ internal static class SymbolicInputWitnessFactory {
     internal static SymbolicInputWitness Unsupported(string reason) => CreateEmpty(SymbolicWitnessStatus.Unsupported, reason);
     private static SymbolicInputWitness CreateEmpty(SymbolicWitnessStatus status, string reason) =>
         new(status, reason, Array.Empty<SymbolicSatisfyingAssignment>());
-
     private static SymbolicWitnessStatus MapStatus(SmtWitnessStatus status) => status switch {
         SmtWitnessStatus.Exact => SymbolicWitnessStatus.Exact,
         SmtWitnessStatus.Approximate => SymbolicWitnessStatus.Approximate,
@@ -56,9 +53,7 @@ internal static class SymbolicInputWitnessFactory {
 }
 internal sealed class SymbolicInputNameMap {
     private readonly Dictionary<string, string> _names;
-
     private SymbolicInputNameMap(Dictionary<string, string> names) => _names = names;
-
     internal static SymbolicInputNameMap Create(SemanticModel? semanticModel, int position) {
         var names = new Dictionary<string, string>(StringComparer.Ordinal) { ["this"] = "this" };
         if (semanticModel == null) return new SymbolicInputNameMap(names);

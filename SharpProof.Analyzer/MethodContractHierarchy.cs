@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer;
-
 internal static class MethodContractHierarchy {
     internal static IEnumerable<IMethodSymbol> EnumerateSources(IMethodSymbol method, CancellationToken cancellationToken) {
         if (method == null) throw new ArgumentNullException(nameof(method));
-
         var seen = new HashSet<IMethodSymbol>(SymbolEq.Default);
         for (var current = method; current != null; current = current.OverriddenMethod) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -12,10 +10,8 @@ internal static class MethodContractHierarchy {
         foreach (var implemented in method.ExplicitInterfaceImplementations)
             if (seen.Add(implemented))
                 yield return implemented;
-
         var containingType = method.ContainingType;
         if (containingType == null) yield break;
-
         foreach (var interfaceType in containingType.AllInterfaces) {
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var interfaceMember in interfaceType.GetMembers()) {
@@ -25,7 +21,6 @@ internal static class MethodContractHierarchy {
                         when Implements(containingType, method, interfaceMethod) && seen.Add(interfaceMethod):
                         yield return interfaceMethod;
                         break;
-
                     case IPropertySymbol interfaceProperty
                         when containingType.FindImplementationForInterfaceMember(interfaceProperty) is
                             IPropertySymbol implementationProperty: {
@@ -47,11 +42,9 @@ internal static class MethodContractHierarchy {
         if (implementation.GetMethod != null &&
             TypeHierarchyEnumeration.IsSameOrOverridesTargetMethod(method, implementation.GetMethod))
             return interfaceProperty.GetMethod;
-
         if (implementation.SetMethod != null &&
             TypeHierarchyEnumeration.IsSameOrOverridesTargetMethod(method, implementation.SetMethod))
             return interfaceProperty.SetMethod;
-
         return null;
     }
 }

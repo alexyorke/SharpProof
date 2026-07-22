@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicAsyncLowerer {
     internal static bool TryGetKnownCompletedAsyncResultExpression(
         ExpressionSyntax expression,
@@ -75,7 +74,6 @@ internal static class SymbolicAsyncLowerer {
             !TryGetTaskLikeResultType(context.SemanticModel.GetTypeInfo(getAwaiterMember.Expression,
                 context.CancellationToken).Type, out _))
             return false;
-
         awaitableExpression = getAwaiterMember.Expression;
         return true;
     }
@@ -85,7 +83,6 @@ internal static class SymbolicAsyncLowerer {
             method.Parameters.Length != 1 ||
             !TryGetTaskLikeResultType(method.ReturnType, out _))
             return false;
-
         var containingType = method.ContainingType;
         return containingType.ContainingNamespace.ToDisplayString() == "System.Threading.Tasks" &&
                containingType.MetadataName is "Task" or "ValueTask";

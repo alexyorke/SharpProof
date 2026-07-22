@@ -1,7 +1,5 @@
 using static SharpProof.Symbolic.SymbolicStateFactBuilder;
-
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicLoopStateTransfer {
     private delegate bool TryLowerLoopInitializerBound(
         ExpressionSyntax expression,
@@ -10,7 +8,6 @@ internal static class SymbolicLoopStateTransfer {
         CancellationToken cancellationToken,
         out SymbolicTerm bound,
         out IReadOnlyList<ISymbol> boundSymbols);
-
     private static void AddForLoopBodyInvariantConditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
         ForStatementSyntax forStatement,
@@ -103,7 +100,6 @@ internal static class SymbolicLoopStateTransfer {
                 symbolTerm.Kind != SmtValueKind.Int ||
                 initializer.Bound.Kind != SmtValueKind.Int)
                 continue;
-
             var initializerIsInvalidated = forStatement != null
                 ? SymbolicMutationInventory.Create(loopBody, semanticModel, cancellationToken)
                       .MutatesSymbol(initializer.Symbol) ||
@@ -124,7 +120,6 @@ internal static class SymbolicLoopStateTransfer {
                 boundIsInvalidated ||
                 !mutationsPreserveBound)
                 continue;
-
             conditions.Add(SymbolicIrLowerer.CreateRelationCondition(relation, symbolTerm, initializer.Bound, loopStatement, provenance));
         }
     }
@@ -145,7 +140,6 @@ internal static class SymbolicLoopStateTransfer {
                     semanticModel,
                     cancellationToken))
                 continue;
-
             yield return (initializer.Symbol, bound, boundSymbols);
         }
     }
@@ -166,7 +160,6 @@ internal static class SymbolicLoopStateTransfer {
                 if (declarator.Initializer != null &&
                     semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol local)
                     yield return (local.OriginalDefinition, declarator.Initializer.Value, true);
-
         foreach (var expression in forStatement.Initializers)
             if (expression is AssignmentExpressionSyntax assignment &&
                 assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
@@ -199,7 +192,6 @@ internal static class SymbolicLoopStateTransfer {
                 out upperBound,
                 out upperBoundSymbols))
             return true;
-
         if (binaryExpression.IsKind(SyntaxKind.AddExpression)) {
             if (SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
                 out var rightValue) &&
@@ -212,7 +204,6 @@ internal static class SymbolicLoopStateTransfer {
                     out upperBound,
                     out upperBoundSymbols))
                 return true;
-
             if (SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken,
                 out var leftValue) &&
                 leftValue < 0 &&
@@ -287,7 +278,6 @@ internal static class SymbolicLoopStateTransfer {
             SemanticModel semanticModel,
             CancellationToken cancellationToken) {
         if (loopStatement.Parent is not BlockSyntax containingBlock) yield break;
-
         var loopIndex = containingBlock.Statements.IndexOf(loopStatement);
         for (var statementIndex = 0; statementIndex < loopIndex; statementIndex++) {
             var statement = containingBlock.Statements[statementIndex];
@@ -296,7 +286,6 @@ internal static class SymbolicLoopStateTransfer {
                 if (declarator.Initializer != null &&
                     semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
                     yield return (localSymbol.OriginalDefinition, declarator.Initializer.Value, statementIndex);
-
                 continue;
             }
             if (statement is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } &&
@@ -313,7 +302,6 @@ internal static class SymbolicLoopStateTransfer {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         if (loopStatement.Parent is not BlockSyntax containingBlock) return true;
-
         var loopIndex = containingBlock.Statements.IndexOf(loopStatement);
         for (var statementIndex = initializer.StatementIndex + 1; statementIndex < loopIndex; statementIndex++) {
             var statement = containingBlock.Statements[statementIndex];
@@ -336,7 +324,6 @@ internal static class SymbolicLoopStateTransfer {
             ForStatementSyntax forStatement => forStatement.Condition,
             _ => null
         };
-
         return headerExpression != null && SymbolicMutationInventory
             .Create(headerExpression, semanticModel, cancellationToken)
             .InvalidatesSymbol(symbol, mutableExposures: false);
@@ -349,7 +336,6 @@ internal static class SymbolicLoopStateTransfer {
         CancellationToken cancellationToken) {
         foreach (var incrementor in forStatement.Incrementors) {
             if (!SymbolMutationFacts.ExpressionReferencesSymbol(incrementor, symbol, semanticModel, cancellationToken)) continue;
-
             if (!IncrementorPreservesBound(incrementor, symbol, direction, semanticModel, cancellationToken)) return false;
         }
         return true;
@@ -366,7 +352,6 @@ internal static class SymbolicLoopStateTransfer {
             if (source is not ExpressionSyntax expression ||
                 !IncrementorPreservesBound(expression, symbol, direction, semanticModel, cancellationToken))
                 return false;
-
         return true;
     }
     private static bool IncrementorPreservesBound(
@@ -384,23 +369,18 @@ internal static class SymbolicLoopStateTransfer {
                 out var delta) &&
             SymbolEqualityComparer.Default.Equals(unarySymbol, symbol))
             return IsCompatibleDelta(delta, direction);
-
         if (expression is not AssignmentExpressionSyntax assignment ||
             semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } assignedSymbol ||
             !SymbolEqualityComparer.Default.Equals(assignedSymbol.OriginalDefinition, symbol))
             return false;
-
         if (assignment.IsKind(SyntaxKind.AddAssignmentExpression) &&
             SymbolicLoweringValueFacts.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var addedValue))
             return IsCompatibleDelta(addedValue, direction);
-
         if (assignment.IsKind(SyntaxKind.SubtractAssignmentExpression) &&
             SymbolicLoweringValueFacts.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var subtractedValue))
             return IsCompatibleSubtrahend(subtractedValue, direction);
-
         if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
             return TryIsSelfPlusCompatibleConstant(assignment.Right, symbol, direction, semanticModel, cancellationToken);
-
         return false;
     }
     private static bool TryIsSelfPlusCompatibleConstant(
@@ -411,7 +391,6 @@ internal static class SymbolicLoopStateTransfer {
         CancellationToken cancellationToken) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         if (expression is not BinaryExpressionSyntax binaryExpression) return false;
-
         if (binaryExpression.IsKind(SyntaxKind.AddExpression))
             return (IsSymbolReference(binaryExpression.Left, symbol, semanticModel, cancellationToken) &&
                     SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
@@ -421,7 +400,6 @@ internal static class SymbolicLoopStateTransfer {
                     SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken,
                         out var leftValue) &&
                     IsCompatibleDelta(leftValue, direction));
-
         return binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
                IsSymbolReference(binaryExpression.Left, symbol, semanticModel, cancellationToken) &&
                SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
@@ -430,10 +408,8 @@ internal static class SymbolicLoopStateTransfer {
     }
     private static bool IsCompatibleDelta(long delta, MonotonicDirection direction) =>
         direction == MonotonicDirection.NonDecreasing ? delta >= 0 : delta <= 0;
-
     private static bool IsCompatibleSubtrahend(long subtrahend, MonotonicDirection direction) =>
         direction == MonotonicDirection.NonDecreasing ? subtrahend <= 0 : subtrahend >= 0;
-
     enum MonotonicDirection {
         NonDecreasing,
         NonIncreasing
@@ -478,7 +454,6 @@ internal static class SymbolicLoopStateTransfer {
         if (symbol is ILocalSymbol or IParameterSymbol)
             return SymbolicMutationInventory.Create(statement, semanticModel, cancellationToken)
                 .MutatesSymbol(symbol);
-
         return AnyConditionSymbolInvalidatedInStatement(expression, statement, semanticModel, cancellationToken);
     }
     internal static bool ExpressionMutatesAnySymbol(

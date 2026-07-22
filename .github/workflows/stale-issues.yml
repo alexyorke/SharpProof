@@ -1,17 +1,13 @@
 name: Close Stale Issues
-
 on:
   schedule:
     - cron: "17 8 * * *"
   workflow_dispatch:
-
 permissions:
   issues: write
-
 jobs:
   stale:
     runs-on: ubuntu-latest
-
     steps:
       - name: Mark and close stale issues
         uses: actions/stale@v10

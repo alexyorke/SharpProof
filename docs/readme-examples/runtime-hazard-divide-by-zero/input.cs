@@ -6,7 +6,6 @@ public static class Example
         {
             return 10 / divisor;
         }
-
         return 0;
     }
 }

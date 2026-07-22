@@ -1,12 +1,10 @@
 namespace SharpProof.Analyzer;
-
 internal readonly record struct MethodNormalCompletion(
     ExpressionSyntax? ResultExpression,
     Location Location,
     SyntaxNode QueryNode,
     bool IncludeCurrentStatementCompletionFacts,
     string DisplayText);
-
 internal static class MethodCompletionAnalysis {
     internal static ImmutableArray<MethodNormalCompletion> Collect(MethodBodyAnalysisContext context,
         bool distinctByQueryPosition = false) {
@@ -17,7 +15,6 @@ internal static class MethodCompletionAnalysis {
             if (operation is not IReturnOperation returnOperation ||
                 AnalyzerSyntaxHelpers.IsCompilerMarkedUnreachable(operation.Syntax, context.SemanticModel, context.CancellationToken))
                 continue;
-
             var expression = returnOperation.ReturnedValue?.Syntax as ExpressionSyntax;
             builder.Add(new MethodNormalCompletion(
                 expression,
@@ -38,7 +35,6 @@ internal static class MethodCompletionAnalysis {
         else if (CSharpSyntaxFacts.GetBlockBody(context.Node) is { } body &&
                  AnalyzerSyntaxHelpers.BodyEndPointIsReachable(body, context.SemanticModel))
             builder.Add(new MethodNormalCompletion(null, body.CloseBraceToken.GetLocation(), body, true, "normal completion"));
-
         return distinctByQueryPosition
             ? [.. builder
                 .GroupBy(static completion => completion.QueryNode.SpanStart)
@@ -67,7 +63,6 @@ internal static class MethodCompletionAnalysis {
                 smtAnalysis,
                 completion.IncludeCurrentStatementCompletionFacts,
                 context.CancellationToken);
-
         return snapshotFailureReason == null
             ? context.State.ProveAtNode(
                 completion.QueryNode,

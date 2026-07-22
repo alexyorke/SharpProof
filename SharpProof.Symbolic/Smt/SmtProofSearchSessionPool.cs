@@ -1,27 +1,22 @@
 namespace SharpProof.Symbolic.Smt;
-
 internal sealed class SmtProofSearchSessionPool(Func<IAnalysisProofSearchSession> sessionFactory) {
     private readonly Func<IAnalysisProofSearchSession> _sessionFactory =
         sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
     private readonly ThreadLocal<IAnalysisProofSearchSession?> _sessions = new(trackAllValues: true);
     private bool _disposed;
-
     public IAnalysisProofSearchSession GetOrCreate() {
         ThrowIfDisposed();
-
         return _sessions.Value ??= _sessionFactory();
     }
     public bool RecycleCurrentThread() {
         ThrowIfDisposed();
         if (!_sessions.IsValueCreated || _sessions.Value == null) return false;
-
         DisposeSession(_sessions.Value);
         _sessions.Value = null;
         return true;
     }
     public int Dispose(bool disposeOwnedSessions) {
         if (_disposed) return 0;
-
         _disposed = true;
         var disposedCount = 0;
         if (disposeOwnedSessions) {

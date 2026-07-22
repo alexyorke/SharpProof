@@ -2,15 +2,12 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
-
 namespace SharpProof.Test;
-
 internal sealed class SymbolicSourceQueryTestSession : IDisposable {
     private readonly Compilation _compilation;
     private readonly SymbolicConditionProofEngine _proofEngine = new(new SymbolicInvariantService());
     private readonly SmtAnalysisService _smtAnalysis;
     private readonly SyntaxTree _syntaxTree;
-
     public SymbolicSourceQueryTestSession(string source, string filePath, bool allowUnsafe = false, SmtAnalysisOptions? smtOptions = null) {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         FilePath = filePath ?? throw new ArgumentNullException(nameof(filePath));
@@ -23,9 +20,7 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable {
         _smtAnalysis = new SmtAnalysisService(smtOptions ?? SmtAnalysisOptions.Default);
     }
     public string Source { get; }
-
     public string FilePath { get; }
-
     public void Dispose() => _smtAnalysis.Dispose();
     public SymbolicConditionProofResult ProveAtMarker((int Line, int Column, int Position) marker, string condition) =>
         _proofEngine.ProveAtSyntaxTree(
@@ -40,20 +35,17 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable {
         for (var index = 0; index < lines.Length; index++)
             if (lines[index].Contains(text, StringComparison.Ordinal))
                 return index + 1;
-
         throw new InvalidOperationException("Text not found: " + text);
     }
     public (int Line, int Column, int Position) FindMarker(string marker) => FindMarker(Source, marker);
     internal static (int Line, int Column, int Position) FindMarker(string source, string marker) {
         var position = source.IndexOf(marker, StringComparison.Ordinal);
         if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
-
         var lines = source.Split('\n');
         var currentPosition = 0;
         for (var index = 0; index < lines.Length; index++) {
             var nextPosition = currentPosition + lines[index].Length + 1;
             if (position < nextPosition) return (index + 1, position - currentPosition + 1, position);
-
             currentPosition = nextPosition;
         }
         throw new InvalidOperationException("Marker line was not found in source.");

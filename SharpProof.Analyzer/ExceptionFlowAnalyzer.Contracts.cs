@@ -1,5 +1,4 @@
 namespace SharpProof.Analyzer;
-
 internal static partial class ExceptionFlowAnalyzer {
     private static ImmutableArray<EffectiveExceptionContract> CollectExceptionContracts(
         MethodBodyAnalysisContext context,
@@ -12,7 +11,6 @@ internal static partial class ExceptionFlowAnalyzer {
                 [],
                 "[DoesNotThrow]",
                 GetAttributeLocation(doesNotThrow, context.CancellationToken)));
-
         var allAllowedTypes = ImmutableArray.CreateBuilder<ITypeSymbol>();
         Location? allowedLocation = null;
         var hasValidAllowedContract = false;
@@ -43,7 +41,6 @@ internal static partial class ExceptionFlowAnalyzer {
                 allAllowedTypes.ToImmutable(),
                 "[AllowedExceptions]",
                 allowedLocation));
-
         return builder.ToImmutable();
     }
     private static void AnalyzeExceptionContracts(
@@ -63,7 +60,6 @@ internal static partial class ExceptionFlowAnalyzer {
             var firstEntry = siteGroup.First();
             var disallowedSites = siteGroup.Where(site => !IsAllowedByExceptionContract(contract, site)).ToArray();
             if (disallowedSites.Length == 0) continue;
-
             var siteLocation = GetExceptionSiteLocation(firstEntry.Site);
             var operationDisplay = firstEntry.Site.ToString();
             var exceptionList = string.Join(", ", disallowedSites
@@ -157,13 +153,10 @@ internal static partial class ExceptionFlowAnalyzer {
     }
     private static bool IsAllowedByExceptionContract(EffectiveExceptionContract contract, ExceptionFactView exception) {
         if (contract.Kind == ExceptionContractKind.DoesNotThrow) return false;
-
         if (exception.Type == null) return false;
-
         foreach (var allowedType in contract.AllowedTypes)
             if (TypeHierarchyEnumeration.IsSameOrDerivedFrom(exception.Type, allowedType, TypeIdentityPolicy.ExactOrOriginalDefinition))
                 return true;
-
         return false;
     }
     private static bool ContainsSymbol(IEnumerable<ITypeSymbol> symbols, ITypeSymbol candidate) => symbols.Any(symbol
@@ -178,13 +171,11 @@ internal static partial class ExceptionFlowAnalyzer {
         => attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
     private static IEnumerable<Location>? AdditionalLocations(Location? location) =>
         location == null ? null : [location];
-
     enum ExceptionContractKind {
         DoesNotThrow,
         AllowedExceptions
     }
     readonly record struct InvalidExceptionContractArgument(string Argument, string Reason, Location? Location);
-
     readonly record struct EffectiveExceptionContract(
         ExceptionContractKind Kind,
         ImmutableArray<ITypeSymbol> AllowedTypes,

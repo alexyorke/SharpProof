@@ -1,7 +1,5 @@
 using static SharpProof.Symbolic.SymbolicRuntimeHazardSourceCandidateFactory;
-
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicRuntimeHazardCandidateFactory {
     private static readonly TryLowerOperationHazard[] OperationHazardLowerers =
     [
@@ -26,7 +24,6 @@ internal static class SymbolicRuntimeHazardCandidateFactory {
         SymbolicOperationLowerer.TryLowerNullDereferenceHazard,
         SymbolicOperationLowerer.TryLowerArgumentNullHazard
     ];
-
     internal static IEnumerable<RuntimeHazardCandidate> EnumerateCandidates(
         SyntaxNode root,
         SemanticModel semanticModel,
@@ -40,7 +37,6 @@ internal static class SymbolicRuntimeHazardCandidateFactory {
                          ReferenceEquals(candidate, root) ||
                          !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))) {
             cancellationToken.ThrowIfCancellationRequested();
-
             foreach (var candidate in EnumerateCandidatesForNode(node, semanticModel, cancellationToken)) {
                 var key = candidate.Kind + ":" + candidate.Site.SpanStart + ":" + candidate.Site.Span.End;
                 if (seen.Add(key)) yield return candidate;
@@ -57,13 +53,11 @@ internal static class SymbolicRuntimeHazardCandidateFactory {
             foreach (var lower in OperationHazardLowerers)
                 if (lower(operation, context, out var hazard))
                     yield return new RuntimeHazardCandidate(node, hazard);
-
         // Invocation targets can have no member-level operation because Roslyn owns the operation at the parent call.
         if (node is MemberAccessExpressionSyntax memberAccess &&
             (operation == null || !ReferenceEquals(operation.Syntax, memberAccess)) &&
             SymbolicOperationLowerer.TryLowerMemberAccessNullDereferenceHazard(memberAccess, context, out var memberNullHazard))
             yield return new RuntimeHazardCandidate(memberAccess, memberNullHazard);
-
         if (node is ThrowStatementSyntax or ThrowExpressionSyntax)
             foreach (var throwCandidate in CreateThrowCandidates(node, semanticModel, cancellationToken))
                 yield return throwCandidate;

@@ -1,5 +1,4 @@
 using SharpProof.Attributes;
-
 public static class TestClass
 {
     [ExpectedComplexity(ComplexityKind.Linear)]
@@ -13,7 +12,6 @@ public static class TestClass
                 sum += i + j;
             }
         }
-
         return sum;
     }
 }

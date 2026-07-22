@@ -1,7 +1,5 @@
 using NUnit.Framework;
-
 namespace SharpProof.Test;
-
 [TestFixture]
 public sealed class ModernCSharpSurfaceDocumentationTests {
     private static readonly string[] RequiredColumns =
@@ -16,7 +14,6 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
         "Complexity",
         "Ensures"
     ];
-
     private static readonly string[] RequiredFeatures =
     [
         "Primary constructors",
@@ -35,7 +32,6 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
         "Extension operators",
         "Static extension members"
     ];
-
     private static readonly string[] SurfaceStatusPrefixes =
     [
         "Covered",
@@ -43,17 +39,14 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
         "Conservative",
         "Gap"
     ];
-
     [Test]
     public void ModernCSharpSurfaceMatrix_CoversRequiredFeaturesAndSurfaces() {
         var repositoryRoot = FindRepositoryRoot();
         var documentPath = Path.Combine(repositoryRoot, "docs", "modern-csharp-surface.md");
         var document = File.ReadAllText(documentPath);
         var rows = ReadMatrixRows(document);
-
         Assert.That(document, Does.Contain("Status key:"));
         Assert.That(rows.Keys, Is.EquivalentTo(RequiredFeatures));
-
         foreach (var row in rows) {
             Assert.That(row.Value.Length, Is.EqualTo(RequiredColumns.Length), row.Key);
             for (var columnIndex = 0; columnIndex < row.Value.Length; columnIndex++) {
@@ -72,7 +65,6 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
     public void ModernCSharpSurfaceMatrix_IsLinkedFromReadme() {
         var repositoryRoot = FindRepositoryRoot();
         var readme = File.ReadAllText(Path.Combine(repositoryRoot, "README.md"));
-
         Assert.That(readme, Does.Contain("docs/modern-csharp-surface.md"));
     }
     private static IReadOnlyDictionary<string, string[]> ReadMatrixRows(string document) {
@@ -82,18 +74,14 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
             line => string.Equals(line.Trim(),
                 "| Feature | C# | Analyzer | Symbolic IR | Runtime hazards | Capability | Allocation | Complexity | Ensures |",
                 StringComparison.Ordinal));
-
         Assert.That(headerIndex, Is.GreaterThanOrEqualTo(0), "Modern C# matrix header is missing.");
         Assert.That(SplitRow(lines[headerIndex]), Is.EqualTo(RequiredColumns));
-
         var rows = new Dictionary<string, string[]>(StringComparer.Ordinal);
         for (var index = headerIndex + 1; index < lines.Length; index++) {
             var line = lines[index].Trim();
             if (!line.StartsWith("|", StringComparison.Ordinal)) break;
-
             var cells = SplitRow(line);
             if (cells.All(cell => cell.All(ch => ch == '-'))) continue;
-
             Assert.That(cells.Length, Is.EqualTo(RequiredColumns.Length), line);
             rows.Add(cells[0], cells);
         }
@@ -108,7 +96,6 @@ public sealed class ModernCSharpSurfaceDocumentationTests {
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
         while (directory != null) {
             if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
-
             directory = directory.Parent;
         }
         throw new DirectoryNotFoundException("Could not find repository root.");

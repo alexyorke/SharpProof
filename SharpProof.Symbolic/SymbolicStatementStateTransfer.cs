@@ -1,7 +1,5 @@
 using static SharpProof.Symbolic.SymbolicStateFactBuilder;
-
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicStatementStateTransfer {
     internal static void AddMethodEntryNullableFlowStateFacts(
         ref SymbolicState state,
@@ -26,7 +24,6 @@ internal static class SymbolicStatementStateTransfer {
             if (!TryCreateSymbolTerm(parameter, out var parameterTerm) ||
                 parameterTerm.Kind != SmtValueKind.Reference)
                 continue;
-
             var fact = SymbolicFact.Exact(
                 new SymbolicRelationAtom(SymbolicRelationOperator.NotEqual, parameterTerm, new SymbolicNullTerm()),
                 site,
@@ -41,7 +38,6 @@ internal static class SymbolicStatementStateTransfer {
         CancellationToken cancellationToken) {
         if (semanticModel.GetEnclosingSymbol(site.SpanStart, cancellationToken) is not IMethodSymbol method)
             yield break;
-
         foreach (var parameter in method.Parameters)
             if (NullableFlowFacts.GetParameterInputState(parameter) == NullableFlowFactState.NotNull &&
                 NullableFlowFacts.HasExplicitNotNullInputContract(parameter))
@@ -83,7 +79,6 @@ internal static class SymbolicStatementStateTransfer {
                     true,
                     semanticModel,
                     cancellationToken).State;
-
             if (completedUsingStatement.Declaration != null)
                 foreach (var declarator in completedUsingStatement.Declaration.Variables)
                     if (declarator.Initializer != null)
@@ -94,7 +89,6 @@ internal static class SymbolicStatementStateTransfer {
                             true,
                             semanticModel,
                             cancellationToken).State;
-
             return;
         }
         if (statement is IfStatementSyntax completedIf &&

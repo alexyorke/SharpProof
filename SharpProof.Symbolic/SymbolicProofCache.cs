@@ -1,11 +1,9 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicProofCacheStore {
     private const int PerServiceEntryLimit = 2048;
     private const int ProcessFallbackEntryLimit = 4096;
     private static readonly ConditionalWeakTable<SmtAnalysisService, SymbolicProofCache> ServiceCaches = new();
     private static readonly SymbolicProofCache FallbackCache = new(ProcessFallbackEntryLimit);
-
     internal static SymbolicProofCache Get(SmtAnalysisService? smtAnalysis) =>
         smtAnalysis != null
             ? ServiceCaches.GetValue(smtAnalysis, static _ => new SymbolicProofCache(PerServiceEntryLimit))
@@ -15,13 +13,11 @@ internal sealed class SymbolicProofCache {
     private const string EncodedStatePrefix = "encoded-state:";
     private const string ResultPrefix = "proof-result:";
     private readonly BoundedConcurrentCache<string, object> _values;
-
     internal SymbolicProofCache(int capacity) => _values = new BoundedConcurrentCache<string, object>(capacity, StringComparer.Ordinal);
     internal int Count => _values.Count;
     internal long HitCount => _values.HitCount;
     internal long MissCount => _values.MissCount;
     internal long EvictionCount => _values.EvictionCount;
-
     internal bool TryGetResult(string key, out SymbolicProofInfo result) {
         if (_values.TryGetValue(ResultPrefix + key, out var value) &&
             value is SymbolicProofInfo cached) {

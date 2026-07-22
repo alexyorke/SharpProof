@@ -1,30 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <Import Project="..\SharpProof.PackageMetadata.props" />
-
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
-    
     <IsPackable>true</IsPackable> 
-    
-    
-    
     <PackageId>SharpProof.Attributes</PackageId>
     <Description>Contains SharpProof contracts for composable method effects, including EnforcePureAttribute, EffectContractAttribute, ZeroAllocationsAttribute, AllowedCapabilitiesAttribute, DoesNotThrowAttribute, AllowedExceptionsAttribute, ExpectedComplexityAttribute, SharpProofEffect, and SharpProofCapability.</Description>
     <PackageTags>SharpProof;Attributes;Roslyn;Analyzer;Purity;StaticAnalysis;SymbolicAnalysis;Capabilities;ZeroAllocations;Exceptions;Complexity</PackageTags>
     <Title>SharpProof Attributes</Title>
     <PackageReleaseNotes>Public preview release of the SharpProof contract attributes package, including purity, synchronization, zero-allocation, capability-contract, exception-contract, symbolic postcondition, and complexity-contract attributes.</PackageReleaseNotes>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild> 
-    
-
   </PropertyGroup>
-
   <ItemGroup>
     <None Include="..\README.md">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
   </ItemGroup>
-
 </Project> 

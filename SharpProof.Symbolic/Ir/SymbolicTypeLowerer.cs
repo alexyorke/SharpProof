@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicTypeLowerer {
     internal static bool TryLowerTypeOfComparison(
         BinaryExpressionSyntax binaryExpression,
@@ -9,7 +8,6 @@ internal static class SymbolicTypeLowerer {
         if (!binaryExpression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.EqualsExpression) &&
             !binaryExpression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.NotEqualsExpression))
             return false;
-
         var leftIsTypeOf = TryGetTypeOfType(binaryExpression.Left, context, out var leftType);
         var rightIsTypeOf = TryGetTypeOfType(binaryExpression.Right, context, out var rightType);
         var equals = binaryExpression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.EqualsExpression);
@@ -19,7 +17,6 @@ internal static class SymbolicTypeLowerer {
                 return true;
             }
             if (ContainsTypeParameter(leftType) || ContainsTypeParameter(rightType)) return false;
-
             condition = new SymbolicConstantCondition(!equals);
             return true;
         }
@@ -46,7 +43,6 @@ internal static class SymbolicTypeLowerer {
         if (type is IArrayTypeSymbol arrayType) return ContainsTypeParameter(arrayType.ElementType);
         if (type is IPointerTypeSymbol pointerType) return ContainsTypeParameter(pointerType.PointedAtType);
         if (type.ContainingType != null && ContainsTypeParameter(type.ContainingType)) return true;
-
         return type is INamedTypeSymbol namedType && namedType.TypeArguments.Any(ContainsTypeParameter);
     }
     internal static bool TryGetSymbolType(ISymbol symbol, out ITypeSymbol type) {

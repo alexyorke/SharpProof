@@ -1,17 +1,13 @@
 namespace SharpProof.ProofCore.Smt;
-
 internal sealed class Z3FormulaEncoder : IDisposable {
     private readonly Context _context = new();
     private readonly Expr _nullReference;
     private readonly Sort _referenceSort;
-
     private readonly Dictionary<(string Pattern, RegexOptions Options), RegexTranslationPrecision>
         _regexPrecisionCache = [];
-
     private readonly Dictionary<string, FuncDecl> _runtimeTypeTests = new(StringComparer.Ordinal);
     private readonly Dictionary<SmtIntegerBinaryOperator, FuncDecl> _opaqueIntegerOperations = [];
     private readonly Dictionary<(string Name, SmtValueKind Kind), Expr> _variables = [];
-
     public Z3FormulaEncoder() {
         _referenceSort = _context.MkUninterpretedSort("Reference");
         _nullReference = _context.MkConst("null_reference", _referenceSort);
@@ -27,7 +23,6 @@ internal sealed class Z3FormulaEncoder : IDisposable {
     public BoolExpr EncodeCondition(SmtFormula formula) {
         if (formula.Kind != SmtValueKind.Bool)
             throw new InvalidOperationException("Only boolean SMT formulas can be used as conditions.");
-
         EnsureSafeRegexPolarity(formula, false);
         return (BoolExpr)Encode(formula);
     }
@@ -48,7 +43,6 @@ internal sealed class Z3FormulaEncoder : IDisposable {
         SmtWitnessStatus status = SmtWitnessStatus.Exact,
         string reason = "satisfying_model") {
         if (model == null) throw new ArgumentNullException(nameof(model));
-
         var assignments = variables
             .Distinct()
             .OrderBy(static variable => variable.Name, StringComparer.Ordinal)
@@ -62,14 +56,12 @@ internal sealed class Z3FormulaEncoder : IDisposable {
         }
         return new SmtSatisfyingWitness(status, reason, assignments);
     }
-
     public bool ContainsApproximateRegex(SmtFormula formula) {
         foreach (var candidate in SmtFormulaTraversal.Enumerate(formula))
             if (candidate is SmtRegexMatchFormula regexMatch &&
                 GetRegexTranslationPrecision(regexMatch.Pattern, regexMatch.Options) ==
                 RegexTranslationPrecision.Approximate)
                 return true;
-
         return false;
     }
     private Expr Encode(SmtFormula formula) => formula switch {
@@ -168,29 +160,24 @@ internal sealed class Z3FormulaEncoder : IDisposable {
     private ArithExpr EncodeInteger(SmtFormula formula) {
         if (formula.Kind != SmtValueKind.Int)
             throw new InvalidOperationException("Only integer SMT formulas can be encoded as arithmetic expressions.");
-
         return (ArithExpr)Encode(formula);
     }
     private SeqExpr EncodeString(SmtFormula formula) {
         if (formula.Kind != SmtValueKind.String)
             throw new InvalidOperationException("Only string SMT formulas can be encoded as string expressions.");
-
         return (SeqExpr)Encode(formula);
     }
     private BoolExpr EncodeRegexMatch(SmtRegexMatchFormula formula) {
         if (!CanEncodeRegexOptions(formula.Options))
             throw new InvalidOperationException("Unsupported SMT regex options.");
-
         var translation = Z3RegexTranslator.Translate(_context, formula.Pattern, formula.Options);
         if (!translation.Success)
             throw new InvalidOperationException("Unsupported SMT regex pattern.");
-
         return _context.MkInRe(EncodeString(formula.Value), translation.Regex!);
     }
     private BoolExpr EncodeRuntimeTypeTest(SmtRuntimeTypeTestFormula formula) {
         if (formula.Value.Kind != SmtValueKind.Reference)
             throw new InvalidOperationException("Only reference SMT formulas can be used in runtime type tests.");
-
         if (!_runtimeTypeTests.TryGetValue(formula.TypeKey, out var predicate)) {
             predicate = _context.MkFuncDecl(
                 "runtime_type_test:" + SanitizeSymbolName(formula.TypeKey),
@@ -203,7 +190,6 @@ internal sealed class Z3FormulaEncoder : IDisposable {
     private Expr EncodeReference(SmtFormula formula) {
         if (formula.Kind != SmtValueKind.Reference)
             throw new InvalidOperationException("Only reference SMT formulas can be encoded as reference expressions.");
-
         return Encode(formula);
     }
     private void EnsureSafeRegexPolarity(SmtFormula formula, bool isNegativeContext) {
@@ -211,10 +197,8 @@ internal sealed class Z3FormulaEncoder : IDisposable {
             case SmtRegexMatchFormula regexMatch:
                 if (!CanEncodeRegexOptions(regexMatch.Options))
                     throw new InvalidOperationException("Unsupported SMT regex options.");
-
                 if (isNegativeContext && IsApproximateRegexPattern(regexMatch.Pattern, regexMatch.Options))
                     throw new InvalidOperationException("Approximate SMT regex patterns cannot be safely negated.");
-
                 EnsureSafeRegexInTerm(regexMatch.Value);
                 return;
             case SmtRuntimeTypeTestFormula runtimeTypeTest:
@@ -285,18 +269,15 @@ internal sealed class Z3FormulaEncoder : IDisposable {
         foreach (var regexMatch in SmtFormulaTraversal.Enumerate(formula).OfType<SmtRegexMatchFormula>()) {
             if (!CanEncodeRegexOptions(regexMatch.Options))
                 throw new InvalidOperationException("Unsupported SMT regex options.");
-
             if (IsApproximateRegexPattern(regexMatch.Pattern, regexMatch.Options))
                 throw new InvalidOperationException("Approximate SMT regex patterns require positive polarity.");
         }
     }
     private bool IsApproximateRegexPattern(string pattern, RegexOptions options) =>
         GetRegexTranslationPrecision(pattern, options) == RegexTranslationPrecision.Approximate;
-
     private RegexTranslationPrecision GetRegexTranslationPrecision(string pattern, RegexOptions options) {
         var key = (pattern, options);
         if (_regexPrecisionCache.TryGetValue(key, out var cached)) return cached;
-
         var translation = Z3RegexTranslator.Translate(_context, pattern, options);
         var precision = translation.Success
             ? translation.IsExact
@@ -308,7 +289,6 @@ internal sealed class Z3FormulaEncoder : IDisposable {
     }
     private static bool CanEncodeRegexOptions(RegexOptions options) =>
         SmtRegexSemantics.CanEncodeOptions(options);
-
     private static bool GetBooleanComparisonOperandPolarity(SmtBinaryOperator op, bool constantValue, bool isNegativeContext) {
         var preservesPolarity =
             (op == SmtBinaryOperator.Equal && constantValue) ||
@@ -318,12 +298,10 @@ internal sealed class Z3FormulaEncoder : IDisposable {
     private static uint GetTimeoutMilliseconds(TimeSpan timeout) {
         var totalMilliseconds = timeout.TotalMilliseconds;
         if (totalMilliseconds >= uint.MaxValue) return uint.MaxValue;
-
         return (uint)Math.Max(1, totalMilliseconds);
     }
     private static string SanitizeSymbolName(string value) {
         if (string.IsNullOrEmpty(value)) return "unknown";
-
         var buffer = new char[value.Length];
         for (var index = 0; index < value.Length; index++) {
             var ch = value[index];
@@ -336,7 +314,6 @@ internal sealed class Z3FormulaEncoder : IDisposable {
     private Expr GetOrCreateVariable(SmtVariable variable) {
         var key = (variable.Name, variable.Kind);
         if (_variables.TryGetValue(key, out var existing)) return existing;
-
         var created = variable.Kind switch {
             SmtValueKind.Bool => _context.MkBoolConst(variable.Name),
             SmtValueKind.Int => _context.MkIntConst(variable.Name),
@@ -344,7 +321,6 @@ internal sealed class Z3FormulaEncoder : IDisposable {
             SmtValueKind.String => _context.MkConst(variable.Name, _context.StringSort),
             _ => throw new InvalidOperationException("Unsupported SMT variable kind.")
         };
-
         _variables.Add(key, created);
         return created;
     }
@@ -354,10 +330,8 @@ internal sealed class Z3FormulaEncoder : IDisposable {
             case SmtValueKind.Bool:
                 if (evaluated.IsTrue)
                     return new SmtModelAssignment(variable.Name, variable.Kind, "true", BooleanValue: true);
-
                 if (evaluated.IsFalse)
                     return new SmtModelAssignment(variable.Name, variable.Kind, "false", BooleanValue: false);
-
                 break;
             case SmtValueKind.Int:
                 if (evaluated is IntNum integer) {
@@ -370,7 +344,6 @@ internal sealed class Z3FormulaEncoder : IDisposable {
             case SmtValueKind.String:
                 if (evaluated.IsString)
                     return new SmtModelAssignment(variable.Name, variable.Kind, evaluated.String, StringValue: evaluated.String);
-
                 break;
             case SmtValueKind.Reference: {
                     using var nullValue = model.Evaluate(_nullReference, true);

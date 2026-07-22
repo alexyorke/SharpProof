@@ -1,5 +1,4 @@
 namespace SharpProof.ProofCore.Collections;
-
 internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull {
     private readonly int _capacity;
     private readonly Dictionary<TKey, TValue> _entries;
@@ -8,10 +7,8 @@ internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull 
     private long _evictions;
     private long _hits;
     private long _misses;
-
     internal BoundedConcurrentCache(int capacity, IEqualityComparer<TKey>? comparer = null) {
         if (capacity <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
-
         _capacity = capacity;
         _entries = new Dictionary<TKey, TValue>(comparer ?? EqualityComparer<TKey>.Default);
     }
@@ -52,7 +49,6 @@ internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull 
     }
     internal TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory) {
         if (valueFactory == null) throw new ArgumentNullException(nameof(valueFactory));
-
         lock (_gate) {
             if (_entries.TryGetValue(key, out var value)) {
                 _hits++;
@@ -67,7 +63,6 @@ internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull 
     internal bool TryAdd(TKey key, TValue value) {
         lock (_gate) {
             if (_entries.ContainsKey(key)) return false;
-
             AddMissingValue(key, value);
             return true;
         }
@@ -76,7 +71,6 @@ internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull 
         while (_entries.Count >= _capacity) {
             if (_insertionOrder.Count == 0)
                 throw new InvalidOperationException("Cache insertion order is inconsistent with its entries.");
-
             var oldest = _insertionOrder.Dequeue();
             if (_entries.Remove(oldest)) _evictions++;
         }

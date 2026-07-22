@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 [Flags]
 internal enum ExecutionRootPolicy {
     None = 0,
@@ -20,7 +19,6 @@ internal static class CSharpSyntaxFacts {
         bool includeSelf = true,
         bool includeNestedCallables = false) {
         if (root == null) throw new ArgumentNullException(nameof(root));
-
         bool DescendIntoChildren(SyntaxNode candidate) => includeNestedCallables ||
                    ReferenceEquals(candidate, root) ||
                    !IsNestedLocalCallableBoundary(candidate);
@@ -57,7 +55,6 @@ internal static class CSharpSyntaxFacts {
     public static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression) {
         while (expression is ParenthesizedExpressionSyntax parenthesized)
             expression = parenthesized.Expression;
-
         return expression;
     }
     internal static bool IsMemberOrQualifiedNameRightSide(IdentifierNameSyntax identifier)
@@ -125,7 +122,6 @@ internal static class CSharpSyntaxFacts {
     }
     public static bool IsNullLiteral(ExpressionSyntax expression) =>
         UnwrapParentheses(expression).IsKind(SyntaxKind.NullLiteralExpression);
-
     public static bool TryGetNullPatternPolarity(PatternSyntax pattern, out bool matchesNonNull) {
         if (pattern is ConstantPatternSyntax { Expression: var expression } && IsNullLiteral(expression)) {
             matchesNonNull = false;
@@ -144,7 +140,6 @@ internal static class CSharpSyntaxFacts {
         => GetContainingExecutionRoot(node, ExecutionRootPolicy.Callable | ExecutionRootPolicy.SyntaxTreeRootFallback)!;
     public static SyntaxNode? GetContainingExecutionRoot(SyntaxNode node, ExecutionRootPolicy policy) {
         if (node == null) throw new ArgumentNullException(nameof(node));
-
         foreach (var candidate in node.AncestorsAndSelf()) {
             if ((policy & ExecutionRootPolicy.Callable) != 0 && IsCallableBoundary(candidate))
                 return candidate;
@@ -168,13 +163,11 @@ internal static class CSharpSyntaxFacts {
         for (var current = node; current != null; current = current.Parent) {
             if (current is StatementSyntax statement && statement.Parent is BlockSyntax block)
                 yield return (block, statement);
-
             if (ReferenceEquals(current, executionRoot)) yield break;
         }
     }
     internal static ExpressionSyntax UnwrapParenthesesAndNullableSuppression(ExpressionSyntax expression) =>
         UnwrapExpression(expression, ExpressionCastUnwrapPolicy.None);
-
     internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression, ExpressionCastUnwrapPolicy castPolicy) {
         while (true) {
             if (expression is ParenthesizedExpressionSyntax parenthesized) {

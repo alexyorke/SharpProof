@@ -29,7 +29,6 @@ public static class Example
         {
             return value;
         }
-
         return 0;
     }
 }
@@ -63,7 +62,6 @@ public static class Example
         {
             return 10 / divisor;
         }
-
         return 0;
     }
 }
@@ -91,7 +89,6 @@ Source (`docs/readme-examples/capabilities-console/input.cs`):
 
 ```csharp
 using System;
-
 public static class Example
 {
     public static void Log()
@@ -137,7 +134,6 @@ public static class Example
         {
             sum += i;
         }
-
         return sum;
     }
 }

@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal sealed class SymbolicComplexityCallModel(
     Compilation _compilation,
     SymbolicComplexityCostModel _costModel,
@@ -25,7 +24,6 @@ internal sealed class SymbolicComplexityCallModel(
             var (invocationSyntax, invocationOperation, targetMethod) = invocation;
             if (targetMethod == null)
                 return ComplexityArtifacts.Unknown(SymbolicComplexityUnknownReason.UnknownCallee, invocationSyntax);
-
             invocationCosts.Add(AnalyzeMethodCall(
                 targetMethod,
                 invocationOperation,
@@ -55,7 +53,6 @@ internal sealed class SymbolicComplexityCallModel(
     }
     internal static ImmutableArray<SyntaxNode> GetArgumentSyntaxes(IMethodSymbol method, ImmutableArray<IArgumentOperation> arguments) {
         if (arguments.IsDefaultOrEmpty) return [];
-
         // Callee factors are parameter-ordinal based. Roslyn includes implicit optional and
         // expanded params arguments in the operation list, while source ArgumentList syntax does not.
         return [.. arguments
@@ -79,17 +76,13 @@ internal sealed class SymbolicComplexityCallModel(
                         knownCost,
                         currentMethod)
                 });
-
         if (operation != null &&
             SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(methodSymbol, operation))
             return CreateUnknownCalleeArtifacts(methodSymbol, SymbolicComplexityUnknownReason.DynamicDispatch, syntax);
-
         if (!SymbolicMethodSourceResolver.IsBackedBySource(methodSymbol))
             return CreateUnknownCalleeArtifacts(methodSymbol, SymbolicComplexityUnknownReason.ExternalCallee, syntax);
-
         if (!TryResolveSourceMethod(methodSymbol, out var declaration, out var bodyNode, out var sourceModel))
             return CreateUnknownCalleeArtifacts(methodSymbol, SymbolicComplexityUnknownReason.UnknownCallee, syntax);
-
         var calleeSummary = _analyzeMethod(methodSymbol, bodyNode, sourceModel);
         var substitutionResult = SubstituteCalleeCost(calleeSummary.Cost, argumentSyntaxes, receiverSyntax, semanticModel, currentMethod);
         var calleeInfo = SymbolicComplexityAlgebra.CreateCalleeInfo(
@@ -103,7 +96,6 @@ internal sealed class SymbolicComplexityCallModel(
                 "Call",
                 "call to " + calleeInfo.MethodDisplayName + " contributes " + calleeInfo.ComplexityText,
                 syntax));
-
         return ComplexityArtifacts.FromCost(
             substitutionResult.Cost,
             drivers.Concat(calleeSummary.Drivers),
@@ -173,12 +165,10 @@ internal sealed class SymbolicComplexityCallModel(
         if (cost.IsUnknown || cost.IsRecursiveUnknown)
             return new SubstitutionResult(cost, Array.Empty<SymbolicComplexityDriverInfo>(),
                 Array.Empty<SymbolicComplexityUnknownReason>());
-
         SymbolicCostExpression? ResolveFactor(string key) {
             if (TryParseParameterKey(key, out var parameterIndex, out var projection)) {
                 if (parameterIndex < 0 || parameterIndex >= argumentSyntaxes.Length)
                     return SymbolicCostExpression.Unknown(SymbolicComplexityUnknownReason.UnknownCallee);
-
                 return _costModel.TryCreate(
                     argumentSyntaxes[parameterIndex] as ExpressionSyntax,
                     callerSemanticModel,
@@ -199,7 +189,6 @@ internal sealed class SymbolicComplexityCallModel(
                     out var receiverCost)
                     ? receiverCost
                     : SymbolicCostExpression.Unknown(SymbolicComplexityUnknownReason.UnknownCallee);
-
             if (string.Equals(key, "$this", StringComparison.Ordinal))
                 return _costModel.TryCreate(
                     receiverSyntax as ExpressionSyntax,
@@ -210,7 +199,6 @@ internal sealed class SymbolicComplexityCallModel(
                     out var receiverCost)
                     ? receiverCost
                     : SymbolicCostExpression.Unknown(SymbolicComplexityUnknownReason.UnknownCallee);
-
             return null;
         }
         var substituted = cost.Substitute(ResolveFactor);
@@ -227,13 +215,10 @@ internal sealed class SymbolicComplexityCallModel(
         parameterIndex = -1;
         projection = CostProjection.Value;
         if (!key.StartsWith("$p", StringComparison.Ordinal)) return false;
-
         var suffixStart = key.IndexOf(':');
         if (suffixStart < 0) return false;
-
         if (!int.TryParse(key.Substring(2, suffixStart - 2), NumberStyles.None, CultureInfo.InvariantCulture,
             out parameterIndex)) return false;
-
         var suffix = key.Substring(suffixStart + 1);
         projection = string.Equals(suffix, "length", StringComparison.Ordinal)
             ? CostProjection.LengthOrCount

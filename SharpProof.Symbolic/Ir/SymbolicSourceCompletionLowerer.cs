@@ -1,7 +1,5 @@
 using static SharpProof.Symbolic.SymbolicStateFactBuilder;
-
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicSourceCompletionLowerer {
     internal static SymbolicOperationTransitionResult ApplyNormalCompletion(
         SymbolicState state,
@@ -22,14 +20,12 @@ internal static class SymbolicSourceCompletionLowerer {
                     semanticModel,
                     cancellationToken,
                     "ir.path.normal-completion.throw-guarded-not-null"));
-
         var frameworkLowering = SymbolicFrameworkPostconditionLowerer.Lower(expression, statement, semanticModel, cancellationToken);
         if (frameworkLowering is { IsExact: true, Value: { } frameworkPlan })
             AdoptExact(
                 ref state,
                 provenance,
                 ApplyConditions(state, frameworkPlan.BeforeDoesNotReturnIf, expression, "ir.path.normal-completion.framework-before"));
-
         foreach (var (_, _, parameter, argumentSyntax) in
                  SymbolicFrameworkPostconditionLowerer.EnumerateExplicitInvocationArguments(expression, semanticModel, cancellationToken)) {
             if (parameter.RefKind != RefKind.None ||
@@ -41,7 +37,6 @@ internal static class SymbolicSourceCompletionLowerer {
                     semanticModel,
                     cancellationToken))
                 continue;
-
             AdoptExact(
                 ref state,
                 provenance,
@@ -52,11 +47,9 @@ internal static class SymbolicSourceCompletionLowerer {
                 ref state,
                 provenance,
                 ApplyConditions(state, afterPlan.AfterDoesNotReturnIf, expression, "ir.path.normal-completion.framework-after"));
-
         var sourceLowering = Lower(expression, statement, semanticModel, cancellationToken);
         if (sourceLowering is { IsExact: true, Value: { } sourcePlan })
             AdoptExact(ref state, provenance, ApplyConditions(state, sourcePlan, expression, "ir.path.normal-completion.source"));
-
         return SymbolicOperationTransitionResult.Exact(state, provenance);
     }
     internal static SymbolicOperationTransitionResult ApplyConditions(
@@ -67,7 +60,6 @@ internal static class SymbolicSourceCompletionLowerer {
         conditions.Count == 0
             ? Exact(state, source, "no-conditions")
             : SymbolicOperationTransferKernel.AssumeAll(state, conditions, source.Span, provenance);
-
     internal static SymbolicOperationTransitionResult ApplyThrowGuard(
         SymbolicState state,
         ExpressionSyntax expression,
@@ -97,7 +89,6 @@ internal static class SymbolicSourceCompletionLowerer {
             return SymbolicOperationTransferKernel.Complete(state, guardedValue.EffectiveValueExpression.Span);
         if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(guardedValue.EffectiveValueExpression, semanticModel, cancellationToken))
             return Exact(state, expression, "known-non-null");
-
         var lowering = SymbolicSemanticPipeline.LowerTerm(
             guardedValue.EffectiveValueExpression,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
@@ -136,7 +127,6 @@ internal static class SymbolicSourceCompletionLowerer {
         expression = SymbolicFrameworkPostconditionLowerer.UnwrapAwaited(expression);
         if (expression is not ArrayCreationExpressionSyntax arrayCreation)
             return;
-
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         foreach (var sizeExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
             if (!SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(
@@ -178,7 +168,6 @@ internal static class SymbolicSourceCompletionLowerer {
                 elementAccess,
                 new SymbolicLoweringContext(semanticModel, cancellationToken)) is { IsExact: true, Value: { } inRange })
             conditions.Add(inRange);
-
         if (TryGetDereferenceReceiver(expression, semanticModel, cancellationToken, out var receiver))
             AddStableNonNull(
                 conditions,
@@ -235,7 +224,6 @@ internal static class SymbolicSourceCompletionLowerer {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) =>
         semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation { TargetMethod.ReducedFrom: not null };
-
     private static void AdoptExact(
         ref SymbolicState state,
         ImmutableArray<SymbolicLoweringProvenance>.Builder provenance,
@@ -249,7 +237,6 @@ internal static class SymbolicSourceCompletionLowerer {
         SymbolicOperationTransitionResult.Exact(
             state,
             ImmutableArray.Create(new SymbolicLoweringProvenance("source-completion", source.Span, detail)));
-
     private static SymbolicOperationTransitionResult Unsupported(SymbolicState state, SyntaxNode source, string detail) =>
         SymbolicOperationTransitionResult.Unsupported(
             state,

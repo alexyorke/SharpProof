@@ -1,5 +1,4 @@
 using NUnit.Framework;
-
 // Fixture-level parallelism is the measured sweet spot: proof outcomes are
 // load-independent since SMT budgets moved to deterministic Z3 rlimit units
 // (SharpProof.ProofCore.Smt.SmtResourceBudget), but concurrent Z3 solving scales poorly in

@@ -1,13 +1,10 @@
 is_global = true
-
 sharpproof_enable_effect_summary_json = false
-
 # IDE0005 cannot run during command-line builds unless every project emits an
 # XML documentation file. Use its compiler-native counterpart so unused imports
 # are still reported without changing package contents.
 dotnet_diagnostic.IDE0005.severity = none
 dotnet_diagnostic.CS8019.severity = warning
-
 # Build-visible dead-code inventory. This remains a warning because reflection,
 # MEF, analyzer registration, and serialization can be invisible to static
 # reachability analysis.

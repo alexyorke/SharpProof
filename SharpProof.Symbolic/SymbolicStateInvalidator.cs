@@ -1,14 +1,11 @@
 namespace SharpProof.Symbolic;
-
 internal readonly record struct SymbolicMutationInvalidationStep(
     ImmutableArray<SymbolicInvalidationTarget> Targets,
     Microsoft.CodeAnalysis.Text.TextSpan SourceSpan,
     string Provenance);
-
 internal sealed record SymbolicNestedMutationInvalidationPlan(
     ImmutableArray<SymbolicMutationInvalidationStep> Steps,
     bool HasUnsupportedMutation);
-
 internal static class SymbolicStateInvalidator {
     internal static void InvalidateNestedAssignmentMutations(
         ref SymbolicState state,
@@ -29,7 +26,6 @@ internal static class SymbolicStateInvalidator {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) =>
         SymbolicMutationInventory.Create(root, semanticModel, cancellationToken).ToInvalidationPlan();
-
     internal static SymbolicState ApplyNestedMutationInvalidations(SymbolicState state, SymbolicNestedMutationInvalidationPlan plan) {
         foreach (var step in plan.Steps)
             state = SymbolicOperationTransferKernel.Invalidate(state, step.Targets, step.SourceSpan, step.Provenance).State;

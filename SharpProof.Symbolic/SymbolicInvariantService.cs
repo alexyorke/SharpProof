@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal sealed class SymbolicInvariantService {
     internal SymbolicProgramPointQueryContext Analyze(
         SemanticModel semanticModel,
@@ -16,7 +15,6 @@ internal sealed class SymbolicInvariantService {
             node is ForStatementSyntax forStatement
             ? AnalyzeForInitialEntry(forStatement, semanticModel, smtAnalysis, cancellationToken)
             : AnalyzeAt(node, semanticModel, smtAnalysis, cancellationToken, includeCurrentStatementCompletionFacts, initialState));
-
     public SymbolicProgramPointAnalysis AnalyzeAt(
         SyntaxNode site,
         SemanticModel semanticModel,
@@ -35,7 +33,6 @@ internal sealed class SymbolicInvariantService {
         using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
         var pathState = SymbolicReachabilityService.CollectForInitialEntryState(forStatement, semanticModel, cancellationToken);
         var formulas = EncodePathState(pathState);
-
         return CreateAnalysis(formulas, pathState, smtAnalysis, limitScope.Snapshot());
     }
     private static IReadOnlyList<SmtFormula> EncodePathState(SymbolicState pathState) {
@@ -68,7 +65,6 @@ internal sealed class SymbolicInvariantService {
         if (formulas.Count == 0 &&
             pathState.IsContradictory)
             formulas = new[] { new SmtBooleanConstant(false) };
-
         var shouldCheckState = (pathState.Facts.Length != 0 || pathState.PathConditions.Length != 0) || formulas.Count != 0;
         var stateProof = smtAnalysis == null || !shouldCheckState
             ? null
@@ -81,7 +77,6 @@ internal sealed class SymbolicInvariantService {
                 stateProof.Reason,
                 truncation,
                 stateProof.RawResult);
-
         if (formulas.Count == 0) {
             if (stateProof != null)
                 return new SymbolicProgramPointAnalysis(
@@ -91,7 +86,6 @@ internal sealed class SymbolicInvariantService {
                     stateProof.Reason,
                     truncation,
                     stateProof.RawResult);
-
             return new SymbolicProgramPointAnalysis(formulas, pathState, SymbolicReachability.Reachable, "no_path_conditions", truncation);
         }
         return new SymbolicProgramPointAnalysis(
@@ -105,7 +99,6 @@ internal sealed class SymbolicInvariantService {
     private static IReadOnlyList<SmtFormula> FlattenProjectedConjunctions(IEnumerable<SmtFormula> formulas) {
         var projected = new List<SmtFormula>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
-
         void Add(SmtFormula formula) {
             if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } conjunction) {
                 Add(conjunction.Left);
@@ -117,7 +110,6 @@ internal sealed class SymbolicInvariantService {
         foreach (var formula in formulas)
             if (formula != null)
                 Add(formula);
-
         return projected;
     }
     private static SymbolicReachability MapReachability(SymbolicProofStatus status) => status switch {
@@ -134,15 +126,12 @@ internal sealed class SymbolicInvariantService {
 }
 internal sealed record SymbolicInvariantFactSummary(IReadOnlyList<string> Facts) {
     public string MergedInvariantText { get; } = FormatMergedInvariantFacts(Facts);
-
     internal static SymbolicInvariantFactSummary Merge(IEnumerable<IEnumerable<string>> factSets) {
         if (factSets == null) throw new ArgumentNullException(nameof(factSets));
-
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var facts = new List<string>();
         foreach (var factSet in factSets) {
             if (factSet == null) continue;
-
             foreach (var fact in factSet)
                 if (!string.IsNullOrWhiteSpace(fact) && seen.Add(fact))
                     facts.Add(fact);
@@ -170,7 +159,6 @@ internal sealed record SymbolicProgramPointAnalysis(
     string ReachabilityReason,
     SymbolicAnalysisTruncationInfo AnalysisTruncation,
     AnalysisProofResult? ReachabilityProof = null);
-
 internal enum SymbolicReachability {
     NotChecked,
     Unknown,

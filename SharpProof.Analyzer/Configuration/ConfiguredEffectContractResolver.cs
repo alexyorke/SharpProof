@@ -1,17 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
 using SharpProof.Attributes;
-
 namespace SharpProof.Analyzer.Configuration;
-
 internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions options) {
     private const string Prefix = "sharpproof_effect_contract.";
-
     internal MethodEffects? Resolve(IMethodSymbol method) {
         var canonicalKey = RoslynStructuralMethodIdentity.GetCanonicalKey(method);
         var optionKey = Prefix + Sha256(canonicalKey);
         if (!options.TryGetValue(optionKey, out var json) || string.IsNullOrWhiteSpace(json)) return null;
-
         try {
             using var document = JsonDocument.Parse(json);
             var root = document.RootElement;
@@ -20,7 +16,6 @@ internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions opt
                 !string.Equals(keyElement.GetString(), canonicalKey, StringComparison.Ordinal) ||
                 !string.Equals(optionKey, Prefix + Sha256(keyElement.GetString() ?? string.Empty), StringComparison.Ordinal))
                 return Unknown("effect_contract_hash_or_key_mismatch");
-
             var effects = ReadFlags(root, "effects", SharpProofEffect.None);
             var capabilities = ReadFlags(root, "capabilities", SharpProofCapability.None);
             var complete = root.TryGetProperty("complete", out var completeElement) &&
@@ -29,7 +24,6 @@ internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions opt
                                 deterministicElement.ValueKind != JsonValueKind.False;
             if (!deterministic) effects |= SharpProofEffect.UsesNondeterminism;
             if (!complete) effects |= SharpProofEffect.Unknown;
-
             var exceptions = ImmutableArray.CreateBuilder<string>();
             if (root.TryGetProperty("exceptions", out var exceptionElement) &&
                 exceptionElement.ValueKind == JsonValueKind.Array)
@@ -37,7 +31,6 @@ internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions opt
                     if (item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
                         exceptions.Add(item.GetString()!);
             if (exceptions.Count != 0) effects |= SharpProofEffect.Throws;
-
             return new MethodEffects(
                 effects,
                 capabilities,
@@ -78,6 +71,5 @@ internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions opt
             SharpProofVerdict.Unknown)],
         [],
         [Reason(reason)]);
-
     private static SharpProofUnknownReason Reason(string reason) => new("SP-EFFECT-CONTRACT", "Configuration", reason, false, true);
 }

@@ -1,5 +1,4 @@
 namespace SharpProof.Tools.Fuzz;
-
 public enum RoslynShapeSurface {
     OperationKind,
     SyntaxKind
@@ -18,48 +17,38 @@ public sealed record RoslynShapeManifestEntry(
     string ShapeId,
     string DisplayName,
     ShapeClassification Classification);
-
 public static class RoslynShapeManifest {
     private static readonly ImmutableHashSet<string> GeneratorBackedOperationShapeIds =
         FuzzCaseGenerator.RegistryEntries
             .SelectMany(static entry => entry.PrimaryShapeIds)
             .Where(static shapeId => shapeId.StartsWith("operation:", StringComparison.Ordinal))
             .ToImmutableHashSet(StringComparer.Ordinal);
-
     public static ImmutableArray<RoslynShapeManifestEntry> OperationEntries { get; } =
         [.. Enum.GetValues<OperationKind>().Select(CreateOperationEntry)];
-
     public static ImmutableArray<RoslynShapeManifestEntry> SyntaxEntries { get; } =
         [.. Enum.GetValues<SyntaxKind>().Select(CreateSyntaxEntry)];
-
     public static ImmutableDictionary<string, RoslynShapeManifestEntry> EntriesByShapeId { get; } =
         OperationEntries.Concat(SyntaxEntries).ToImmutableDictionary(static entry => entry.ShapeId, StringComparer.Ordinal);
-
     public static ImmutableDictionary<string, bool> ActionSurfaceEntries { get; } =
         new[] {
             "CompilationStart", "CompilationEnd", "Operation", "OperationBlock", "OperationBlockStart",
             "SemanticModel", "Symbol", "SyntaxNode", "SyntaxTree"
         }.ToImmutableDictionary(static name => name, IsActionSurfaceUsed, StringComparer.Ordinal);
-
     public static ImmutableArray<string> GeneratorBackedShapeIds { get; } =
         [.. EntriesByShapeId.Values
             .Where(static entry => entry.Classification == ShapeClassification.GeneratorBacked)
             .Select(static entry => entry.ShapeId)
             .OrderBy(static shapeId => shapeId, StringComparer.Ordinal)];
-
     public static bool IsActionableUnobservedOperationKind(OperationKind kind) {
         if (kind is OperationKind.Invalid or OperationKind.InterpolatedStringAppendInvalid ||
             IsParentHandled(kind))
             return false;
-
         return EntriesByShapeId.TryGetValue(OperationShapeId(kind), out var entry) &&
                entry.Classification is not (ShapeClassification.ParentHandled or
                    ShapeClassification.CSharpNotApplicable or ShapeClassification.SyntaxShadow);
     }
     public static string OperationShapeId(OperationKind operationKind) => "operation:" + operationKind;
-
     public static string SyntaxShapeId(SyntaxKind syntaxKind) => "syntax:" + syntaxKind;
-
     private static RoslynShapeManifestEntry CreateOperationEntry(OperationKind kind) {
         var classification = ClassifyOperation(kind);
         return new RoslynShapeManifestEntry(RoslynShapeSurface.OperationKind, OperationShapeId(kind), kind.ToString(), classification);
@@ -111,7 +100,6 @@ public static class RoslynShapeManifest {
         OperationKind.SwitchExpressionArm or
         OperationKind.YieldBreak ||
         kind == OperationKindValue("CollectionElementInitializer");
-
     private static RoslynShapeManifestEntry CreateSyntaxEntry(SyntaxKind kind) {
         var name = kind.ToString();
         var classification = kind == SyntaxKind.None
@@ -150,16 +138,12 @@ public static class RoslynShapeManifest {
             nameof(SyntaxKind.BadDirectiveTrivia) or
             nameof(SyntaxKind.SkippedTokensTrivia) or
             nameof(SyntaxKind.PrimaryConstructorBaseType);
-
     private static bool IsActionSurfaceUsed(string name) =>
         name is "CompilationStart" or "CompilationEnd" or "OperationBlock" or "SyntaxNode" or "SyntaxTree";
-
     private static bool IsTokenOnlyKind(string name) =>
         name.EndsWith("Token", StringComparison.Ordinal) || name.EndsWith("Keyword", StringComparison.Ordinal);
-
     private static bool IsTriviaOnlyKind(string name) =>
         name.EndsWith("Trivia", StringComparison.Ordinal) || name.StartsWith("Xml", StringComparison.Ordinal);
-
     private static OperationKind OperationKindValue(string name) =>
         (OperationKind)Enum.Parse(typeof(OperationKind), name);
 }

@@ -7,7 +7,6 @@ public static class Example
         {
             sum += i;
         }
-
         return sum;
     }
 }

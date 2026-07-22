@@ -1,9 +1,7 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicProofStateFacts {
     internal static SymbolicState NormalizeState(SymbolicState state) =>
         state.Normalize();
-
     internal static SymbolicCondition RewriteQueryConditionToCurrentVersions(SymbolicCondition condition, SymbolicState state)
         => state.SymbolVersions.Count == 0
             ? condition
@@ -39,14 +37,11 @@ internal static class SymbolicProofStateFacts {
     }
     internal static bool StateContradictsFact(SymbolicState state, SymbolicFact fact) =>
         StateContainsFact(state, fact.Negate());
-
     internal static bool StateContainsCondition(SymbolicState state, SymbolicCondition condition) {
         if (TryEvaluateConditionFromState(state, condition, out var value)) return value;
-
         if (condition is SymbolicFactCondition factCondition &&
             StateContainsFact(state, factCondition.Fact))
             return true;
-
         var conditionKey = SymbolicState.CreateProofConditionKey(condition);
         return state.Facts.Any(candidate => string.Equals(
                    "fact-condition:" + SymbolicState.CreateProofFactKey(candidate),
@@ -59,7 +54,6 @@ internal static class SymbolicProofStateFacts {
     }
     internal static bool StateContradictsCondition(SymbolicState state, SymbolicCondition condition) {
         if (TryEvaluateConditionFromState(state, condition, out var value)) return !value;
-
         return StateContainsCondition(state, new SymbolicNotCondition(condition));
     }
     internal static bool TryEvaluateConditionFromState(SymbolicState state, SymbolicCondition condition, out bool value)
@@ -71,7 +65,6 @@ internal static class SymbolicProofStateFacts {
         out bool value) {
         var conditionKey = SymbolicState.CreateProofConditionKey(condition);
         if (memo.TryGetValue(conditionKey, out value)) return true;
-
         if (state.Facts.Any(fact => string.Equals(
                 "fact-condition:" + SymbolicState.CreateProofFactKey(fact),
                 conditionKey,

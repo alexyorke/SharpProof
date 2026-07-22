@@ -1,18 +1,14 @@
 using SharpProof.Attributes;
-
 namespace SharpProof.Analyzer;
-
 internal static class MethodCapabilityAnalyzer {
     internal static void AnalyzeSymbolForCapabilities(MethodBodyAnalysisContext context,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         if (!TryGetAllowedCapabilities(context, attributePolicy, out var allowed)) return;
-
         var method = context.MethodSymbol;
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         foreach (var site in effects.Sites) {
             var disallowed = site.Capabilities & ~allowed;
             if (disallowed == SharpProofCapability.None) continue;
-
             var location = Location.Create(context.Node.SyntaxTree, new TextSpan(site.SpanStart, site.SpanLength));
             var text = disallowed.ToString();
             context.ReportDiagnostic(Diagnostic.Create(

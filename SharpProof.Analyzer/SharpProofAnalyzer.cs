@@ -1,19 +1,15 @@
 namespace SharpProof.Analyzer;
-
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class SharpProofAnalyzer : DiagnosticAnalyzer {
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         AnalyzerDiagnosticCatalog.SupportedDiagnostics;
-
     public override void Initialize(AnalysisContext context) {
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-
         context.RegisterCompilationStartAction(startContext => {
             SmtNativeLibraryBootstrap.TryLoadFromAnalyzerLocatorPaths(startContext.Options.AdditionalFiles.Select(static
                 file => file.Path));
             var session = new AnalyzerSession(startContext.Compilation, startContext.Options, startContext.CancellationToken);
-
             startContext.RegisterCompilationEndAction(endContext => {
                 try {
                     foreach (var invalidConfigurationValue in session.Configuration.InvalidConfigurationValues) {
@@ -25,7 +21,6 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
                     session.Dispose();
                 }
             });
-
             startContext.RegisterOperationBlockAction(c => AnalyzerFeaturePipeline.AnalyzeOperationBlock(c, session));
             startContext.RegisterSyntaxNodeAction(
                 c => AnalyzerFeaturePipeline.AnalyzeSyntaxFallback(c, session),
@@ -41,7 +36,6 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer {
                 SyntaxKind.ConversionOperatorDeclaration,
                 SyntaxKind.OperatorDeclaration,
                 SyntaxKind.LocalFunctionStatement);
-
             startContext.RegisterSyntaxTreeAction(AnalyzeTreeConfiguration);
         });
     }

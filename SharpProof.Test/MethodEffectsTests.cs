@@ -1,9 +1,7 @@
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.Symbolic;
-
 namespace SharpProof.Test;
-
 [TestFixture]
 public sealed class MethodEffectsTests {
     [TestCase("return new object();", SharpProofVerdict.Proven, SharpProofVerdict.Disproven)]
@@ -16,10 +14,8 @@ public sealed class MethodEffectsTests {
                 object M() { {{statement}} }
             }
             """);
-
         var result = session.Analyze(new SharpProofAnalysisRequest(new SharpProofTarget(SharpProofTargetKind.Line, Line: 3),
             SharpProofAnalysisFacet.Effects));
-
         Assert.Multiple(() => {
             Assert.That(result.Status, Is.EqualTo(SharpProofQueryStatus.Succeeded));
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(expectedPurity));
@@ -34,10 +30,8 @@ public sealed class MethodEffectsTests {
                 static void M() { value++; }
             }
             """);
-
         var result = session.Analyze(new SharpProofAnalysisRequest(new SharpProofTarget(SharpProofTargetKind.Line, Line: 3),
             SharpProofAnalysisFacet.Effects));
-
         Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
         Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
     }
@@ -45,7 +39,6 @@ public sealed class MethodEffectsTests {
     [TestCase("static int[] M(int x) => [1, x, 3];", SharpProofVerdict.Disproven)]
     public void ArrayIntrinsicsHaveStructuralEffects(string method, SharpProofVerdict expectedAllocationFree) {
         var result = Analyze("class C {\n" + method + "\n}");
-
         Assert.Multiple(() => {
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(result.MethodEffects.AllocationFree, Is.EqualTo(expectedAllocationFree));
@@ -69,7 +62,6 @@ public sealed class MethodEffectsTests {
         var span = session.Analyze(new SharpProofAnalysisRequest(
             new SharpProofTarget(SharpProofTargetKind.Span, SpanStart: methodStart, SpanEnd: methodEnd),
             SharpProofAnalysisFacet.Effects));
-
         Assert.Multiple(() => {
             Assert.That(all.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
             Assert.That(all.MethodEffects.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
@@ -85,10 +77,8 @@ public sealed class MethodEffectsTests {
                 static int M(I value) => value.Read();
             }
             """);
-
         var result = session.Analyze(new SharpProofAnalysisRequest(new SharpProofTarget(SharpProofTargetKind.Line, Line: 3),
             SharpProofAnalysisFacet.Effects));
-
         Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
         Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.True);
     }
@@ -101,7 +91,6 @@ public sealed class MethodEffectsTests {
                 static int M() { {{body}} }
             }
             """, 3);
-
         Assert.Multiple(() => {
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven), string.Join(" | ",
                 result.UnknownReasons.Select(static reason => reason.Message)));
@@ -122,7 +111,6 @@ public sealed class MethodEffectsTests {
                 }
             }
             """, 3);
-
         Assert.That(result.MethodEffects!.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven),
             string.Join(" | ", result.MethodEffects!.ExceptionFacts.Select(static fact =>
                 fact.ExceptionType + ":" + fact.Escape + ":" + fact.Reason)));
@@ -137,7 +125,6 @@ public sealed class MethodEffectsTests {
                 static int M() => Throw();
             }
             """, 3);
-
         Assert.That(result.MethodEffects!.ExceptionFacts, Has.Some.Matches<MethodExceptionFact>(fact =>
             fact.Source == MethodExceptionSource.Callee && fact.IsTransitive &&
             fact.ExceptionType == "System.FormatException"));
@@ -149,7 +136,6 @@ public sealed class MethodEffectsTests {
                 static int M(int value) => value == 0 ? 0 : M(value - 1);
             }
             """);
-
         Assert.Multiple(() => {
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
             Assert.That(result.UnknownReasons, Has.Some.Property(nameof(SharpProofUnknownReason.Message)).EqualTo("recursive_call"));
@@ -169,7 +155,6 @@ public sealed class MethodEffectsTests {
                 static int M() => Call();
             }
             """, 4);
-
         Assert.Multiple(() => {
             Assert.That(lockResult.MethodEffects!.Effects.HasFlag(SharpProofEffect.Synchronizes), Is.True);
             Assert.That(lockResult.MethodEffects.Capabilities.HasFlag(SharpProofCapability.Synchronization), Is.True);

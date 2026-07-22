@@ -1,5 +1,4 @@
 namespace SharpProof.Analyzer;
-
 internal static class ContractConditionHelpers {
     internal static ImmutableArray<TContract> Collect<TContract>(
         IMethodSymbol methodSymbol,
@@ -18,7 +17,6 @@ internal static class ContractConditionHelpers {
                 var argument = AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken);
                 var key = condition ?? "<invalid>:" + argument;
                 if (!seen.Add(key)) continue;
-
                 builder.Add(createContract(new ContractAttributeCondition(
                     condition ?? string.Empty,
                     attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation(),
@@ -57,7 +55,6 @@ internal static class ContractConditionHelpers {
         if (attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0].Value is not string)
             return "expected a string condition";
-
         return string.IsNullOrWhiteSpace(condition)
             ? "condition must not be empty"
             : null;

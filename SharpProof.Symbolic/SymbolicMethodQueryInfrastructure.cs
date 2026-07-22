@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicMethodLikeQueryDispatcher {
     internal static TResult Execute<TResult>(
         SymbolicSourceInput source,
@@ -50,11 +49,9 @@ internal static class SymbolicMethodLikeTargetResolver {
         var text = syntaxTree.GetText(cancellationToken);
         if (position < 0 || position > text.Length)
             throw new ArgumentOutOfRangeException(nameof(position), "--position must be within the source text span.");
-
         var node = root.FindToken(position).Parent;
         if (node == null)
             throw new ArgumentException("Could not resolve a method-like body at the requested position.", nameof(position));
-
         return ResolveContaining(node, semanticModel, isMethodLikeDeclaration, cancellationToken);
     }
     private static ResolvedMethodLikeTarget ResolveLine(
@@ -73,11 +70,9 @@ internal static class SymbolicMethodLikeTargetResolver {
             .ThenBy(candidate => candidate.SpanStart)
             .FirstOrDefault();
         if (declaration != null) return ResolvedMethodLikeTarget.Create(declaration, semanticModel, cancellationToken);
-
         var node = root.FindToken(lineSpan.Start).Parent;
         if (node == null)
             throw new ArgumentException("Could not resolve a method-like body on the requested line.", nameof(line));
-
         return ResolveContaining(node, semanticModel, isMethodLikeDeclaration, cancellationToken);
     }
     private static ResolvedMethodLikeTarget ResolveContaining(
@@ -111,7 +106,6 @@ internal sealed record ResolvedMethodLikeTarget(
 internal static class SymbolicMethodSourceResolver {
     internal static bool IsBackedBySource(IMethodSymbol method) =>
         method.OriginalDefinition.DeclaringSyntaxReferences.Length != 0;
-
     internal static bool TryResolve(
         Compilation compilation,
         IMethodSymbol method,
@@ -127,7 +121,6 @@ internal static class SymbolicMethodSourceResolver {
             cancellationToken.ThrowIfCancellationRequested();
             var candidate = syntaxReference.GetSyntax(cancellationToken);
             if (!acceptsDeclaration(candidate)) continue;
-
             var candidateBody = GetBodyNode(candidate);
             var candidateSemanticModel = compilation.GetSemanticModel(candidate.SyntaxTree);
             if (candidateBody != null) {

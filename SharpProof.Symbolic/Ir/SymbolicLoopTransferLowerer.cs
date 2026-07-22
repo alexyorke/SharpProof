@@ -1,12 +1,10 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal sealed record SymbolicLoopTransferPlan(
     StatementSyntax Loop,
     SymbolicCondition EntryCondition,
     SymbolicCondition ExitCondition,
     ImmutableArray<SymbolicInvalidationTarget> BackEdgeInvalidations,
     IReadOnlyList<SymbolicCondition> Invariants);
-
 internal static class SymbolicLoopTransferLowerer {
     internal static SymbolicLoweringResult<SymbolicLoopTransferPlan> Lower(
         StatementSyntax loop,
@@ -37,7 +35,6 @@ internal static class SymbolicLoopTransferLowerer {
         }
         if (!TryCollectBackEdgeInvalidations(loop, semanticModel, cancellationToken, out var invalidations))
             return Unsupported(loop, "invalidation");
-
         var invariantLowering = SymbolicLoopStateTransfer.LowerLoopBodyInvariants(loop, semanticModel, cancellationToken);
         if (invariantLowering is not { IsExact: true, Value: { } invariantPlan } &&
             !allowAbruptCompletion)
@@ -95,7 +92,6 @@ internal static class SymbolicLoopTransferLowerer {
     }
     private static SymbolicLoweringResult<SymbolicLoopTransferPlan> Unsupported(SyntaxNode source, string detail) =>
         SymbolicLoweringResult<SymbolicLoopTransferPlan>.Unsupported(Provenance(source, detail));
-
     private static SymbolicLoweringProvenance Provenance(SyntaxNode source, string detail) =>
         new("cfg-loop", source.Span, detail);
 }

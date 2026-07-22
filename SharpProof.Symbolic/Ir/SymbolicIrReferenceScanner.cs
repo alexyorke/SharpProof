@@ -1,18 +1,13 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicIrReferenceScanner {
     internal static bool ContainsVariablePrefix(SymbolicFact fact, string variablePrefix) =>
         ContainsVariable(fact, name => MatchesVariablePrefix(name, variablePrefix));
-
     internal static bool ContainsVariablePrefix(SymbolicCondition condition, string variablePrefix) =>
         ContainsVariable(condition, name => MatchesVariablePrefix(name, variablePrefix));
-
     internal static bool ContainsVariableOrMember(SymbolicFact fact, string variableName) =>
         ContainsVariable(fact, name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
-
     internal static bool ContainsVariableOrMember(SymbolicCondition condition, string variableName) => ContainsVariable(condition,
             name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
-
     internal static bool ContainsVariableOrMember(SymbolicTerm term, string variableName) {
         var scanner = new VariableReferenceVisitor(name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
         scanner.Visit(term);
@@ -22,12 +17,10 @@ internal static class SymbolicIrReferenceScanner {
             state,
             fact => ContainsVariablePrefix(fact, variablePrefix),
             condition => ContainsVariablePrefix(condition, variablePrefix));
-
     internal static SymbolicState RemoveVariableOrMemberReferences(SymbolicState state, string variableName) => RemoveReferences(
             state,
             fact => ContainsVariableOrMember(fact, variableName),
             condition => ContainsVariableOrMember(condition, variableName));
-
     private static SymbolicState RemoveReferences(
         SymbolicState state,
         Func<SymbolicFact, bool> containsReferenceInFact,
@@ -35,7 +28,6 @@ internal static class SymbolicIrReferenceScanner {
             state.Facts.Where(fact => !containsReferenceInFact(fact)),
             state.PathConditions.Where(condition => !containsReferenceInCondition(condition)),
             state.SymbolVersions).Normalize();
-
     private static bool ContainsVariable(SymbolicFact fact, Func<string, bool> match) {
         var scanner = new VariableReferenceVisitor(match);
         scanner.Visit(fact);
@@ -62,24 +54,18 @@ internal static class SymbolicIrReferenceScanner {
     }
     private static bool MatchesVariablePrefix(string candidate, string variablePrefix) {
         if (SymbolicFactFactory.MatchesVariableOrMemberName(candidate, variablePrefix)) return true;
-
         var versionPrefix = variablePrefix + "@v";
         if (!candidate.StartsWith(versionPrefix, StringComparison.Ordinal)) return false;
-
         var index = versionPrefix.Length;
         var digitStart = index;
         while (index < candidate.Length && char.IsDigit(candidate[index])) index++;
-
         return index > digitStart &&
                (index == candidate.Length || candidate[index] is '.' or '[');
     }
     sealed class VariableReferenceVisitor : SymbolicIrVisitor {
         private readonly Func<string, bool> _match;
-
         internal VariableReferenceVisitor(Func<string, bool> match) => _match = match;
-
         internal bool Found { get; private set; }
-
         protected override void OnTerm(SymbolicTerm term) {
             if (!Found &&
                 term is SymbolicMemberTerm &&

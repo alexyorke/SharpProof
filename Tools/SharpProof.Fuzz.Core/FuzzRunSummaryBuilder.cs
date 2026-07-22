@@ -1,22 +1,17 @@
 namespace SharpProof.Tools.Fuzz;
-
 internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset startedUtc, string samplerMode) {
     private readonly SortedDictionary<string, int> _familyCounts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _diagnosticCounts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _findingIndices = new(StringComparer.Ordinal);
     private readonly ImmutableArray<FuzzFinding>.Builder _findings = ImmutableArray.CreateBuilder<FuzzFinding>();
     private readonly SortedDictionary<string, int> _operationKinds = new(StringComparer.Ordinal);
-
     private readonly FuzzOptions _options = options;
     private readonly SortedDictionary<string, int> _primaryShapeCounts = new(StringComparer.Ordinal);
     private readonly string _samplerMode = samplerMode;
     private readonly DateTimeOffset _startedUtc = startedUtc;
     private readonly SortedDictionary<string, int> _syntaxKinds = new(StringComparer.Ordinal);
-
     private int _compilationErrorCount;
-
     public int CasesAnalyzed { get; private set; }
-
     public void Add(FuzzCaseAnalysis analysis) {
         CasesAnalyzed++;
         _familyCounts.Increment(analysis.Case.Family);
@@ -25,10 +20,8 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
         if (!analysis.Case.PrimaryShapeIds.IsDefaultOrEmpty)
             foreach (var shapeId in analysis.Case.PrimaryShapeIds)
                 _primaryShapeCounts.Increment(shapeId);
-
         _compilationErrorCount += analysis.CompilationErrors.Length > 0 ? 1 : 0;
         foreach (var finding in analysis.Findings) AddFinding(analysis.NormalizedSourceHash, finding);
-
         foreach (var diagnostic in analysis.Diagnostics) _diagnosticCounts.Increment(diagnostic.Id);
     }
     public FuzzRunSummary Build(DateTimeOffset completedUtc, TimeSpan elapsed, string outputDirectory, int interestingCasesSaved) {
@@ -75,7 +68,6 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
             .Where(shapeId => !_primaryShapeCounts.ContainsKey(shapeId))
             .OrderBy(shapeId => shapeId, StringComparer.Ordinal)
             .ToImmutableArray();
-
         return new FuzzRunSummary(
             "1.3",
             _options.Seed,
@@ -124,7 +116,6 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
             StringComparer.Ordinal);
     }
     private int DiagnosticCount(string id) => _diagnosticCounts.GetValueOrDefault(id);
-
     private void AddFinding(string normalizedSourceHash, FuzzFinding finding) {
         var aggregationKey = normalizedSourceHash + "|" + finding.Identity;
         if (_findingIndices.TryGetValue(aggregationKey, out var index)) {

@@ -1,7 +1,5 @@
 using static SharpProof.Symbolic.Ir.SymbolicIrLowerer;
-
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicObjectLowerer {
     internal static bool TryLowerObjectReferenceEqualsInvocation(
         InvocationExpressionSyntax invocation,
@@ -17,7 +15,6 @@ internal static class SymbolicObjectLowerer {
             !SymbolicOperatorLowerer.CanCompareTerms(left, right, SymbolicRelationOperator.Equal) ||
             (left.Kind != SmtValueKind.Reference && right.Kind != SmtValueKind.Reference))
             return false;
-
         condition = CreateFactCondition(
             new SymbolicRelationAtom(SymbolicRelationOperator.Equal, left, right),
             invocation,

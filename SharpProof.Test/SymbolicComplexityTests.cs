@@ -1,8 +1,6 @@
 using NUnit.Framework;
 using SharpProof.Symbolic;
-
 namespace SharpProof.Test;
-
 [TestFixture]
 public sealed class SymbolicComplexityTests {
     private sealed record ComplexityCase(
@@ -18,7 +16,6 @@ public sealed class SymbolicComplexityTests {
         bool ExactUnknowns = false,
         int? UnknownDriverCount = null,
         int? NamedCalleeCount = null);
-
     private static IEnumerable<TestCaseData> ComplexityCases() {
         yield return Case("StraightLineMethod_IsConstant",
             """public static class C { public static int Work(int n) { var value=n+1; return value; } }""",
@@ -127,7 +124,6 @@ public sealed class SymbolicComplexityTests {
         int? namedCalleeCount = null) => new TestCaseData(new ComplexityCase(
         source, marker, kind, text, unknowns, driver, callee, calleeUnknown,
         useLineTarget, exactUnknowns, unknownDriverCount, namedCalleeCount)).SetName(name);
-
     private static SymbolicComplexityResult QueryComplexityAtMarker(string source, string marker, bool useLineTarget = false) {
         var position = source.IndexOf(marker, StringComparison.Ordinal);
         if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
@@ -139,7 +135,6 @@ public sealed class SymbolicComplexityTests {
     }
     private static int GetLineNumber(string source, int position) =>
         source.Take(position).Count(static character => character == '\n') + 1;
-
     [Test]
     public void QueryComplexity_AllLinesTarget_ThrowsNotSupportedException() {
         var (tree, compilation) = SymbolicSourceCompilation.Create(

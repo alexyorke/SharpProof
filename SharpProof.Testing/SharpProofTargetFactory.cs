@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SharpProofTargetFactory {
     internal static SharpProofTarget Point(int line, int column = 1) {
         ValidatePositive(line, nameof(line));
@@ -20,7 +19,6 @@ internal static class SharpProofTargetFactory {
         return new SharpProofTarget(SharpProofTargetKind.Span, SpanStart: start, SpanEnd: end);
     }
     internal static SharpProofTarget AllLines() => new(SharpProofTargetKind.AllLines);
-
     private static void ValidatePositive(int value, string parameterName) {
         if (value <= 0) throw new ArgumentOutOfRangeException(parameterName);
     }

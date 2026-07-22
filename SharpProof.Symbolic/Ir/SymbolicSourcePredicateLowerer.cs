@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicSourcePredicateLowerer {
     internal static bool TryLowerSourceBooleanInvocation(
         InvocationExpressionSyntax invocation,
@@ -10,10 +9,8 @@ internal static class SymbolicSourcePredicateLowerer {
             context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not
                 IInvocationOperation operation)
             return false;
-
         if (operation.TargetMethod.MethodKind == MethodKind.DelegateInvoke)
             return TryLowerLocalDelegateBooleanInvocation(invocation, operation, context, out condition);
-
         return TryLowerSourceMethodBooleanInvocation(operation, context, out condition);
     }
     private static bool TryLowerSourceMethodBooleanInvocation(
@@ -25,14 +22,12 @@ internal static class SymbolicSourcePredicateLowerer {
         if (!CanInlineSourceBooleanPredicate(method) ||
             !TryCreateParameterSubstitutions(method.Parameters, invocation, context, out var substitutions))
             return false;
-
         var implicitThis = context.ImplicitThis;
         if (!method.IsStatic) {
             if (invocation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
                 !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(receiverExpression, context), out var loweredImplicitThis) ||
                 loweredImplicitThis.Kind != SharpProof.ProofCore.Smt.SmtValueKind.Reference)
                 return false;
-
             implicitThis = loweredImplicitThis;
         }
         return TryLowerReturnedBoolean(method, context, substitutions, implicitThis, out condition);
@@ -45,7 +40,6 @@ internal static class SymbolicSourcePredicateLowerer {
         DeclaringSyntaxReferences.Length: > 0
     } &&
                method.Parameters.All(static parameter => parameter.RefKind == RefKind.None);
-
     internal static bool TryLowerReturnedBoolean(
         ISymbol symbol,
         SymbolicLoweringContext callerContext,
@@ -57,7 +51,6 @@ internal static class SymbolicSourcePredicateLowerer {
             .Select(reference => reference.GetSyntax(callerContext.CancellationToken))
             .FirstOrDefault();
         if (callable == null) return false;
-
         var semanticModel = callerContext.Compilation.GetSemanticModel(callable.SyntaxTree);
         var nestedContext = new SymbolicLoweringContext(
             semanticModel,
@@ -96,7 +89,6 @@ internal static class SymbolicSourcePredicateLowerer {
                         .FirstOrDefault(static accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
                     if (getter != null)
                         return TryLowerReturnedBooleanSyntax(getter, context, substitutions, out condition);
-
                     condition = null!;
                     return false;
                 }
@@ -136,7 +128,6 @@ internal static class SymbolicSourcePredicateLowerer {
         foreach (var variable in declaration.Declaration.Variables) {
             if (context.SemanticModel.GetDeclaredSymbol(variable, context.CancellationToken) is not ILocalSymbol local)
                 return false;
-
             if (variable.Initializer == null) continue;
             if (!TryLowerBooleanValueTerm(variable.Initializer.Value, context, out var value)) return false;
             substitutions[local.OriginalDefinition] = value;
@@ -151,13 +142,11 @@ internal static class SymbolicSourcePredicateLowerer {
                 ILocalSymbol local ||
             !TryLowerBooleanValueTerm(assignment.Right, context, out var value))
             return false;
-
         substitutions[local.OriginalDefinition] = value;
         return true;
     }
     internal static bool TryLowerBooleanValueTerm(ExpressionSyntax expression, SymbolicLoweringContext context, out SymbolicTerm term) {
         if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out term)) return true;
-
         if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(expression, context), out var condition)) {
             term = new SymbolicConditionalTerm(condition, new SymbolicBooleanConstantTerm(true), new SymbolicBooleanConstantTerm(false));
             return true;
@@ -175,21 +164,18 @@ internal static class SymbolicSourcePredicateLowerer {
         if (remaining == 1) {
             if (statements[statementIndex] is ReturnStatementSyntax { Expression: { } returned })
                 return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(returned, context), out condition);
-
             if (statements[statementIndex] is IfStatementSyntax {
                 Else.Statement: { } whenFalseStatement
             } ifStatement &&
                 TryGetSingleReturnExpression(ifStatement.Statement, out var whenTrue) &&
                 TryGetSingleReturnExpression(whenFalseStatement, out var whenFalse))
                 return TryLowerBooleanConditional(ifStatement.Condition, whenTrue, whenFalse, context, out condition);
-
             if (statements[statementIndex] is SwitchStatementSyntax switchStatement)
                 return TryLowerReturnedBooleanSwitch(switchStatement, null, context, out condition);
         }
         if (remaining >= 2 &&
             TryLowerGuardReturnChain(statements, statementIndex, context, out condition))
             return true;
-
         return remaining == 2 &&
                statements[statementIndex] is SwitchStatementSyntax switchWithFallback &&
                statements[statementIndex + 1] is ReturnStatementSyntax { Expression: { } fallback } &&
@@ -206,7 +192,6 @@ internal static class SymbolicSourcePredicateLowerer {
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(whenTrueExpression, context), out var whenTrue) ||
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(whenFalseExpression, context), out var whenFalse))
             return false;
-
         condition = CreateBooleanConditional(testCondition, whenTrue, whenFalse);
         return true;
     }
@@ -217,7 +202,6 @@ internal static class SymbolicSourcePredicateLowerer {
             SymbolicConditionOperator.Or,
             new SymbolicBinaryCondition(SymbolicConditionOperator.And, test, whenTrue),
             new SymbolicBinaryCondition(SymbolicConditionOperator.And, new SymbolicNotCondition(test), whenFalse));
-
     private static bool TryLowerGuardReturnChain(
         SyntaxList<StatementSyntax> statements,
         int statementIndex,
@@ -227,13 +211,11 @@ internal static class SymbolicSourcePredicateLowerer {
         if (statements[statements.Count - 1] is not ReturnStatementSyntax { Expression: { } finalReturn } ||
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(finalReturn, context), out condition))
             return false;
-
         var guards = new List<(ExpressionSyntax Test, ExpressionSyntax Result)>();
         for (var index = statementIndex; index < statements.Count - 1; index++) {
             if (statements[index] is not IfStatementSyntax { Else: null } guard ||
                 !TryGetSingleReturnExpression(guard.Statement, out var guardReturn))
                 return false;
-
             guards.Add((guard.Condition, guardReturn));
         }
         if (guards.Count == 0) return false;
@@ -241,7 +223,6 @@ internal static class SymbolicSourcePredicateLowerer {
             if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(guards[index].Test, context), out var test) ||
                 !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(guards[index].Result, context), out var result))
                 return false;
-
             condition = CreateBooleanConditional(test, result, condition);
         }
         return true;
@@ -262,7 +243,6 @@ internal static class SymbolicSourcePredicateLowerer {
                     out var selected) ||
                 !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(returned, context), out var result))
                 return false;
-
             selections.Add(selected);
             condition = new SymbolicBinaryCondition(
                 SymbolicConditionOperator.Or,
@@ -313,7 +293,6 @@ internal static class SymbolicSourcePredicateLowerer {
             if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(invocation, parameter.Ordinal, out var argumentExpression) ||
                 !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argumentExpression, context), out var argument))
                 return false;
-
             substitutions[parameter.OriginalDefinition] = argument;
         }
         return true;
@@ -329,12 +308,10 @@ internal static class SymbolicSourcePredicateLowerer {
             !TryGetLocalDelegateReceiver(invocationSyntax, context, out var delegateLocal) ||
             !TryGetLocalDelegateInitializer(delegateLocal, invocationSyntax, context, out var initializer))
             return false;
-
         if (initializer is AnonymousFunctionExpressionSyntax lambda)
             return LambdaBodyReferencesOnlyParameters(lambda, context) &&
                    TryCreateLambdaParameterSubstitutions(lambda, invocation, context, out var substitutions) &&
                    TryLowerLambdaBooleanBody(lambda, context, substitutions, out condition);
-
         var methodInfo = context.SemanticModel.GetSymbolInfo(initializer, context.CancellationToken);
         var method = methodInfo.Symbol ??
                      (methodInfo.CandidateSymbols.Length == 1 ? methodInfo.CandidateSymbols[0] : null);
@@ -342,7 +319,6 @@ internal static class SymbolicSourcePredicateLowerer {
             !CanInlineSourceBooleanPredicate(sourceMethod) ||
             !TryCreateParameterSubstitutions(sourceMethod.Parameters, invocation, context, out var methodSubstitutions))
             return false;
-
         return TryLowerReturnedBoolean(sourceMethod, context, methodSubstitutions, context.ImplicitThis, out condition);
     }
     private static bool TryGetLocalDelegateReceiver(
@@ -358,7 +334,6 @@ internal static class SymbolicSourcePredicateLowerer {
         if (receiver == null ||
             context.SemanticModel.GetSymbolInfo(receiver, context.CancellationToken).Symbol is not ILocalSymbol symbol)
             return false;
-
         local = (ILocalSymbol)symbol.OriginalDefinition;
         return true;
     }
@@ -377,17 +352,14 @@ internal static class SymbolicSourcePredicateLowerer {
             declaration.Parent is not BlockSyntax block ||
             !ReferenceEquals(block, invocationStatement.Parent))
             return false;
-
         var declarationIndex = block.Statements.IndexOf(declaration);
         var invocationIndex = block.Statements.IndexOf(invocationStatement);
         if (declarationIndex < 0 || invocationIndex <= declarationIndex ||
             CountLocalSymbolReferences(invocationStatement, local, context) != 1)
             return false;
-
         for (var index = declarationIndex + 1; index < invocationIndex; index++)
             if (CountLocalSymbolReferences(block.Statements[index], local, context) != 0)
                 return false;
-
         initializer = value;
         return true;
     }
@@ -397,12 +369,10 @@ internal static class SymbolicSourcePredicateLowerer {
             .Count(identifier => SymbolEqualityComparer.Default.Equals(
                 context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol,
                 local));
-
     private static bool LambdaBodyReferencesOnlyParameters(AnonymousFunctionExpressionSyntax lambda, SymbolicLoweringContext context) {
         var parameters = GetLambdaParameterSymbols(lambda, context)
             .ToImmutableHashSet<ISymbol>(SymbolEqualityComparer.Default);
         if (parameters.Count == 0) return false;
-
         foreach (var identifier in GetLambdaBody(lambda)?.DescendantNodesAndSelf()
                      .OfType<IdentifierNameSyntax>() ?? []) {
             var symbol = context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol;
@@ -420,7 +390,6 @@ internal static class SymbolicSourcePredicateLowerer {
                ReferenceEquals(member.Name, identifier) &&
                context.SemanticModel.GetSymbolInfo(member.Expression, context.CancellationToken).Symbol is { } receiver &&
                parameters.Contains(receiver);
-
     private static bool TryCreateLambdaParameterSubstitutions(
         AnonymousFunctionExpressionSyntax lambda,
         IInvocationOperation invocation,
@@ -430,7 +399,6 @@ internal static class SymbolicSourcePredicateLowerer {
             invocation,
             context,
             out substitutions);
-
     private static IEnumerable<IParameterSymbol> GetLambdaParameterSymbols(
         AnonymousFunctionExpressionSyntax lambda,
         SymbolicLoweringContext context) {
@@ -445,7 +413,6 @@ internal static class SymbolicSourcePredicateLowerer {
         AnonymousMethodExpressionSyntax { ParameterList: { } list } => list.Parameters,
         _ => []
     };
-
     private static SyntaxNode? GetLambdaBody(AnonymousFunctionExpressionSyntax lambda) => lambda switch {
         SimpleLambdaExpressionSyntax { ExpressionBody: { } expression } => expression,
         ParenthesizedLambdaExpressionSyntax { ExpressionBody: { } expression } => expression,
@@ -454,7 +421,6 @@ internal static class SymbolicSourcePredicateLowerer {
         AnonymousMethodExpressionSyntax { Block: { } block } => block,
         _ => null
     };
-
     private static bool TryLowerLambdaBooleanBody(
         AnonymousFunctionExpressionSyntax lambda,
         SymbolicLoweringContext callerContext,

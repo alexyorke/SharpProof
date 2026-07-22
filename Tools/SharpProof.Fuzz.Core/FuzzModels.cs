@@ -1,5 +1,4 @@
 namespace SharpProof.Tools.Fuzz;
-
 public sealed record FuzzCase(
     string Name,
     string Family,
@@ -9,7 +8,6 @@ public sealed record FuzzCase(
     ImmutableArray<string> PrimaryShapeIds = default,
     ImmutableArray<string> ExpectedOperationKinds = default,
     ImmutableArray<string> ExpectedSyntaxKinds = default);
-
 public sealed record FuzzCaseAnalysis(
     FuzzCase Case,
     ImmutableSortedDictionary<string, int> OperationKinds,
@@ -20,7 +18,6 @@ public sealed record FuzzCaseAnalysis(
     ImmutableArray<string> CompilationErrors,
     string NormalizedSourceHash,
     ImmutableArray<FuzzFinding> Findings);
-
 public sealed record FuzzFinding(
     string CaseName,
     string Family,

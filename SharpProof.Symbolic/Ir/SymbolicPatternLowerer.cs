@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicPatternLowerer {
     internal static bool TryLowerNullablePatternCondition(
         IsPatternExpressionSyntax expression,
@@ -9,7 +8,6 @@ internal static class SymbolicPatternLowerer {
         if (!SymbolicNullableLowerer.TryLowerNullableHasValueTerm(expression.Expression, context, out var hasValue) ||
             !SymbolicNullableLowerer.TryLowerNullableValueTerm(expression.Expression, context, out var value))
             return false;
-
         var hasValueCondition = SymbolicIrLowerer.CreateFactCondition(
             new SymbolicTruthAtom(hasValue),
             expression.Expression,
@@ -28,7 +26,6 @@ internal static class SymbolicPatternLowerer {
             TryLowerNullablePattern(value, hasValue, binaryPattern.Left, binaryPattern.Left, context, out var left) &&
             TryLowerNullablePattern(value, hasValue, binaryPattern.Right, binaryPattern.Right, context, out var right))
             return TryCombineBinaryPatternConditions(binaryPattern, left, right, out condition);
-
         if (pattern is UnaryPatternSyntax unaryPattern &&
             unaryPattern.IsKind(SyntaxKind.NotPattern) &&
             TryLowerNullablePattern(value, hasValue, unaryPattern.Pattern, unaryPattern.Pattern, context, out var operand)) {
@@ -44,11 +41,9 @@ internal static class SymbolicPatternLowerer {
             return true;
         }
         if (TryLowerTrivialPatternCondition(pattern, out condition)) return true;
-
         var typeInfo = context.SemanticModel.GetTypeInfo(pattern, context.CancellationToken);
         if (!TryLowerPatternCondition(value, typeInfo.ConvertedType ?? typeInfo.Type, pattern, sourceNode, context, out var valueCondition))
             return false;
-
         condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, hasValue, valueCondition);
         return true;
     }
@@ -60,7 +55,6 @@ internal static class SymbolicPatternLowerer {
         SymbolicLoweringContext context,
         out SymbolicCondition condition) {
         context.CancellationToken.ThrowIfCancellationRequested();
-
         return TryLowerDesignationPatternCondition(value, pattern, sourceNode, context, out condition) ||
                TryLowerTypedBinaryPatternCondition(value, valueType, pattern, sourceNode, context, out condition) ||
                TryLowerTrivialPatternCondition(pattern, out condition) ||
@@ -86,7 +80,6 @@ internal static class SymbolicPatternLowerer {
             !TryLowerPatternCondition(value, valueType, binaryPattern.Left, sourceNode, context, out var left) ||
             !TryLowerPatternCondition(value, valueType, binaryPattern.Right, sourceNode, context, out var right))
             return false;
-
         return TryCombineBinaryPatternConditions(binaryPattern, left, right, out condition);
     }
     private static bool TryLowerTypedUnaryPatternCondition(
@@ -102,7 +95,6 @@ internal static class SymbolicPatternLowerer {
             !unaryPattern.IsKind(SyntaxKind.NotPattern) ||
             !TryLowerPatternCondition(value, valueType, unaryPattern.Pattern, sourceNode, context, out var operand))
             return false;
-
         condition = new SymbolicNotCondition(operand);
         return true;
     }
@@ -123,18 +115,15 @@ internal static class SymbolicPatternLowerer {
             if (pattern is DeclarationPatternSyntax { Type.IsVar: false } discardedDeclaration &&
                 TryLowerTypeTestCondition(value, discardedDeclaration.Type, sourceNode, false, context, out condition))
                 return true;
-
             condition = new SymbolicConstantCondition(true);
             return true;
         }
         if (!TryLowerVariableDesignationCondition(value, designation, sourceNode, context, includeProjections: false, out var binding))
             return false;
-
         condition = pattern is DeclarationPatternSyntax { Type.IsVar: false } declaration &&
             TryLowerTypeTestCondition(value, declaration.Type, sourceNode, false, context, out var typeCondition)
             ? new SymbolicBinaryCondition(SymbolicConditionOperator.And, typeCondition, binding)
             : binding;
-
         return true;
     }
     private static bool TryLowerVariableDesignationCondition(
@@ -154,11 +143,9 @@ internal static class SymbolicPatternLowerer {
                 ILocalSymbol local ||
             !SymbolicTypeLowerer.TryGetValueKind(local.Type, out var localKind))
             return false;
-
         var localTerm = new SymbolicVariableTerm(context.GetVariableName(local), localKind);
         if (!SymbolicOperatorLowerer.CanCompareTerms(value, localTerm, SymbolicRelationOperator.Equal))
             return false;
-
         condition = SymbolicIrLowerer.CreateRelationCondition(
             SymbolicRelationOperator.Equal,
             localTerm,
@@ -180,7 +167,6 @@ internal static class SymbolicPatternLowerer {
                         exactValueLength,
                         sourceNode,
                         "ir.pattern.designation-length"));
-
             if (local.Type.SpecialType == SpecialType.System_String &&
                 SymbolicSemanticPipeline.ProjectStringContentTerm(localTerm, sourceNode) is { IsExact: true, Value: { } localString } &&
                 SymbolicSemanticPipeline.ProjectStringContentTerm(value, sourceNode) is { IsExact: true, Value: { } valueString })
@@ -197,7 +183,6 @@ internal static class SymbolicPatternLowerer {
     }
     private static SymbolicCondition And(SymbolicCondition left, SymbolicCondition right) =>
         new SymbolicBinaryCondition(SymbolicConditionOperator.And, left, right);
-
     private static bool TryLowerRecursivePatternCondition(
         SymbolicTerm value,
         ITypeSymbol? valueType,
@@ -211,7 +196,6 @@ internal static class SymbolicPatternLowerer {
             recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 } &&
             recursivePattern.PositionalPatternClause is not { Subpatterns.Count: > 0 })
             return false;
-
         SymbolicCondition? combined = null;
         if (value.Kind == SmtValueKind.Reference)
             combined = SymbolicIrLowerer.CreateRelationCondition(
@@ -220,7 +204,6 @@ internal static class SymbolicPatternLowerer {
                 new SymbolicNullTerm(),
                 sourceNode,
                 "ir.pattern.recursive.non-null");
-
         if (recursivePattern.Designation != null) {
             if (!TryLowerVariableDesignationCondition(
                     value,
@@ -246,7 +229,6 @@ internal static class SymbolicPatternLowerer {
                         out var accessCondition) ||
                     !TryLowerPatternCondition(member, memberType, subpattern.Pattern, subpattern, context, out var memberCondition))
                     return false;
-
                 combined = combined == null
                     ? memberCondition
                     : new SymbolicBinaryCondition(SymbolicConditionOperator.And, combined, memberCondition);
@@ -266,13 +248,11 @@ internal static class SymbolicPatternLowerer {
                         out var memberType) ||
                     !TryLowerPatternCondition(memberTerm, memberType, subpattern.Pattern, subpattern, context, out var memberCondition))
                     return false;
-
                 combined = combined == null
                     ? memberCondition
                     : new SymbolicBinaryCondition(SymbolicConditionOperator.And, combined, memberCondition);
             }
         if (combined == null) return false;
-
         condition = combined;
         return true;
     }
@@ -297,15 +277,12 @@ internal static class SymbolicPatternLowerer {
             context.SemanticModel.GetOperation(recursivePattern, context.CancellationToken) is not
                 IRecursivePatternOperation { DeconstructSymbol: IMethodSymbol deconstructMethod })
             return false;
-
         var outputParameters = deconstructMethod.Parameters
             .Where(static parameter => parameter.RefKind is RefKind.Out or RefKind.Ref)
             .ToArray();
         if (index < 0 || index >= outputParameters.Length) return false;
-
         var outputParameter = outputParameters[index];
         if (!SymbolicTypeLowerer.TryGetValueKind(outputParameter.Type, out var outputKind)) return false;
-
         var projectionName = "$deconstruct." +
                              deconstructMethod.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
                              "." + outputParameter.Ordinal;
@@ -327,11 +304,9 @@ internal static class SymbolicPatternLowerer {
         var nameSyntax = (ExpressionSyntax?)subpattern.NameColon?.Name ?? subpattern.ExpressionColon?.Expression;
         if (nameSyntax == null || receiver.Kind != SmtValueKind.Reference)
             return false;
-
         var memberNames = new List<SimpleNameSyntax>();
         CollectPropertyPatternMemberNames(nameSyntax, memberNames);
         if (memberNames.Count == 0) return false;
-
         var current = receiver;
         var currentType = receiverType;
         for (var index = 0; index < memberNames.Count; index++) {
@@ -344,7 +319,6 @@ internal static class SymbolicPatternLowerer {
                 _ => null
             };
             if (member == null || memberType == null || !SymbolicTypeLowerer.TryGetValueKind(memberType, out var memberKind)) return false;
-
             current = member.Name is "Length" or "Count" &&
                 memberKind == SmtValueKind.Int &&
                 SymbolicIndexingLowerer.TryCreateBuiltInLengthReferenceTerm(currentType, current, out var lengthTerm)
@@ -352,7 +326,6 @@ internal static class SymbolicPatternLowerer {
                 : new SymbolicMemberTerm(current, member.Name, memberKind);
             if (index < memberNames.Count - 1) {
                 if (current.Kind != SmtValueKind.Reference) return false;
-
                 var nonNull = SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.NotEqual,
                     current,
@@ -370,7 +343,6 @@ internal static class SymbolicPatternLowerer {
     }
     private static ISymbol? ResolvePropertyPatternMember(ITypeSymbol? receiverType, string name) {
         if (receiverType is not INamedTypeSymbol namedType) return null;
-
         for (INamedTypeSymbol? current = namedType; current != null; current = current.BaseType) {
             var member = current.GetMembers(name)
                 .FirstOrDefault(static candidate => candidate is IPropertySymbol or IFieldSymbol);
@@ -416,7 +388,6 @@ internal static class SymbolicPatternLowerer {
         if (value.Kind != SmtValueKind.Reference ||
             !TryGetListPatternShape(value, valueType, out var length, out var elementType, out var elementKind))
             return false;
-
         SymbolicCondition combined = SymbolicIrLowerer.CreateRelationCondition(
             SymbolicRelationOperator.NotEqual,
             value,
@@ -454,7 +425,6 @@ internal static class SymbolicPatternLowerer {
                             baseSuffixCount + listPattern.Patterns.Count - patternIndex - 1,
                             out var nestedCondition))
                         return false;
-
                     combined = new SymbolicBinaryCondition(SymbolicConditionOperator.And, combined, nestedCondition);
                 }
                 continue;
@@ -466,7 +436,6 @@ internal static class SymbolicPatternLowerer {
             var element = new SymbolicElementTerm(value, indexTerm, elementKind);
             if (!TryLowerPatternCondition(element, elementType, elementPattern, elementPattern, context, out var elementCondition))
                 return false;
-
             combined = new SymbolicBinaryCondition(SymbolicConditionOperator.And, combined, elementCondition);
         }
         condition = combined;
@@ -518,7 +487,6 @@ internal static class SymbolicPatternLowerer {
     }
     private static bool TryLowerTrivialPatternCondition(PatternSyntax pattern, out SymbolicCondition condition) {
         pattern = UnwrapPattern(pattern);
-
         if (pattern is DiscardPatternSyntax or VarPatternSyntax) {
             condition = new SymbolicConstantCondition(true);
             return true;
@@ -557,7 +525,6 @@ internal static class SymbolicPatternLowerer {
         if (!TryLowerNullPattern(pattern, context, out var negate) ||
             value.Kind != SmtValueKind.Reference)
             return false;
-
         condition = SymbolicIrLowerer.CreateRelationCondition(
             negate ? SymbolicRelationOperator.NotEqual : SymbolicRelationOperator.Equal,
             value,
@@ -569,14 +536,12 @@ internal static class SymbolicPatternLowerer {
     private static bool TryLowerNullPattern(PatternSyntax pattern, SymbolicLoweringContext context, out bool negate) {
         pattern = UnwrapPattern(pattern);
         negate = false;
-
         if (pattern is ConstantPatternSyntax constantPattern &&
             context.SemanticModel.GetConstantValue(constantPattern.Expression, context.CancellationToken) is {
                 HasValue: true,
                 Value: null
             })
             return true;
-
         if (pattern is UnaryPatternSyntax unaryPattern &&
             unaryPattern.IsKind(SyntaxKind.NotPattern) &&
             TryLowerNullPattern(unaryPattern.Pattern, context, out var nestedNegate)) {
@@ -596,7 +561,6 @@ internal static class SymbolicPatternLowerer {
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(constantExpression, context), out var constant) ||
             !SymbolicOperatorLowerer.CanCompareTerms(value, constant, SymbolicRelationOperator.Equal))
             return false;
-
         condition = SymbolicIrLowerer.CreateRelationCondition(
             negate ? SymbolicRelationOperator.NotEqual : SymbolicRelationOperator.Equal,
             value,
@@ -608,7 +572,6 @@ internal static class SymbolicPatternLowerer {
     private static bool TryLowerConstantPattern(PatternSyntax pattern, out ExpressionSyntax constantExpression, out bool negate) {
         pattern = UnwrapPattern(pattern);
         negate = false;
-
         if (pattern is ConstantPatternSyntax constantPattern &&
             !constantPattern.Expression.IsKind(SyntaxKind.NullLiteralExpression)) {
             constantExpression = constantPattern.Expression;
@@ -636,7 +599,6 @@ internal static class SymbolicPatternLowerer {
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(relationalExpression, context), out var relationalValue) ||
             relationalValue.Kind != SmtValueKind.Int)
             return false;
-
         condition = SymbolicIrLowerer.CreateRelationCondition(relationOperator, value, relationalValue, sourceNode,
             "ir.pattern.relational");
         return true;
@@ -648,7 +610,6 @@ internal static class SymbolicPatternLowerer {
         out bool negate) {
         pattern = UnwrapPattern(pattern);
         negate = false;
-
         if (pattern is RelationalPatternSyntax relationalPattern) {
             operatorKind = relationalPattern.OperatorToken.Kind();
             relationalExpression = relationalPattern.Expression;
@@ -673,14 +634,12 @@ internal static class SymbolicPatternLowerer {
         condition = null!;
         if (!TryLowerEmptyRecursivePattern(pattern, out var negate))
             return false;
-
         if (valueType is { IsValueType: true } &&
             valueType.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T) {
             condition = new SymbolicConstantCondition(!negate);
             return true;
         }
         if (value.Kind != SmtValueKind.Reference) return false;
-
         condition = SymbolicIrLowerer.CreateRelationCondition(
             negate ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
             value,
@@ -692,12 +651,10 @@ internal static class SymbolicPatternLowerer {
     private static bool TryLowerEmptyRecursivePattern(PatternSyntax pattern, out bool negate) {
         pattern = UnwrapPattern(pattern);
         negate = false;
-
         if (pattern is RecursivePatternSyntax recursivePattern &&
             recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 } &&
             recursivePattern.PositionalPatternClause is not { Subpatterns.Count: > 0 })
             return true;
-
         if (pattern is UnaryPatternSyntax unaryPattern &&
             unaryPattern.IsKind(SyntaxKind.NotPattern) &&
             TryLowerEmptyRecursivePattern(unaryPattern.Pattern, out var nestedNegate)) {
@@ -714,7 +671,6 @@ internal static class SymbolicPatternLowerer {
         out SymbolicCondition condition) {
         condition = null!;
         if (!TryLowerTypePattern(pattern, out var typeSyntax, out var negate)) return false;
-
         return TryLowerTypeTestCondition(value, typeSyntax, sourceNode, negate, context, out condition);
     }
     internal static bool TryLowerTypeTestCondition(
@@ -729,7 +685,6 @@ internal static class SymbolicPatternLowerer {
         if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(type, out var typeKey) ||
             value.Kind != SmtValueKind.Reference)
             return false;
-
         var nonNull = SymbolicIrLowerer.CreateRelationCondition(
             SymbolicRelationOperator.NotEqual,
             value,
@@ -744,7 +699,6 @@ internal static class SymbolicPatternLowerer {
     private static bool TryLowerTypePattern(PatternSyntax pattern, out TypeSyntax type, out bool negate) {
         pattern = UnwrapPattern(pattern);
         negate = false;
-
         if (pattern is TypePatternSyntax typePattern) {
             type = typePattern.Type;
             return true;
@@ -764,7 +718,6 @@ internal static class SymbolicPatternLowerer {
     }
     private static PatternSyntax UnwrapPattern(PatternSyntax pattern) {
         while (pattern is ParenthesizedPatternSyntax parenthesizedPattern) pattern = parenthesizedPattern.Pattern;
-
         return pattern;
     }
 }

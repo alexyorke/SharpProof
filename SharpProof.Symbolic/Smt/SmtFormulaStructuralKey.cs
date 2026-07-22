@@ -1,9 +1,7 @@
 namespace SharpProof.Symbolic.Smt;
-
 internal static class SmtFormulaStructuralKey {
     internal static string Create(SmtFormula formula) {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
-
         return formula switch {
             SmtBooleanConstant boolean => "bool:" + (boolean.Value ? "true" : "false"),
             SmtIntegerConstant integer => "int:" + integer.Value.ToString(CultureInfo.InvariantCulture),

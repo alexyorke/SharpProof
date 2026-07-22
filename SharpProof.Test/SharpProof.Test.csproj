@@ -1,24 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <Import Project="..\SharpProof.Testing.props" />
-
   <PropertyGroup>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="System.CodeDom" Version="10.0.9" PrivateAssets="all" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" PrivateAssets="all" />
     <PackageReference Include="System.IO.Hashing" Version="8.0.0" PrivateAssets="all" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" />
     <ProjectReference Include="..\SharpProof.Testing\SharpProof.Testing.csproj" />
   </ItemGroup>
-
   <ItemGroup>
   </ItemGroup>
-
 </Project>

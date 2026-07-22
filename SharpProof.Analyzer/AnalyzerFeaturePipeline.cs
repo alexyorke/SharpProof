@@ -1,16 +1,13 @@
 namespace SharpProof.Analyzer;
-
 internal static class AnalyzerFeaturePipeline {
     internal static void AnalyzeOperationBlock(OperationBlockAnalysisContext context, AnalyzerSession session) {
         if (!TryCreateOperationBlockContext(context, session, out var methodContext)) return;
-
         AnalyzeCallable(methodContext, session);
     }
     internal static void AnalyzeSyntaxFallback(SyntaxNodeAnalysisContext context, AnalyzerSession session) {
         if (!RequiresSyntaxFallback(context.Node) ||
             !TryCreateSyntaxContext(context, session, out var methodContext))
             return;
-
         AnalyzeCallable(methodContext, session);
     }
     internal static bool RequiresSyntaxFallback(SyntaxNode node) {
@@ -18,7 +15,6 @@ internal static class AnalyzerFeaturePipeline {
             IndexerDeclarationSyntax { ExpressionBody: not null } or
             LocalFunctionStatementSyntax)
             return true;
-
         return node switch {
             MethodDeclarationSyntax method => method.Body == null && method.ExpressionBody == null,
             ConstructorDeclarationSyntax constructor =>
@@ -50,10 +46,8 @@ internal static class AnalyzerFeaturePipeline {
         methodContext = null!;
         if (context.OwningSymbol is not IMethodSymbol methodSymbol || methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty)
             return false;
-
         var declaration = FindDeclaration(methodSymbol, context.OperationBlocks, context.CancellationToken);
         if (declaration == null || RequiresSyntaxFallback(declaration)) return false;
-
         var semanticModel = context.Compilation.GetSemanticModel(declaration.SyntaxTree);
         var state = session.GetOrCreateMethodBodyAnalysis(
             methodSymbol,
@@ -77,9 +71,7 @@ internal static class AnalyzerFeaturePipeline {
             context.Node is PropertyDeclarationSyntax { ExpressionBody: not null } or
                 IndexerDeclarationSyntax { ExpressionBody: not null })
             methodSymbol = propertySymbol.GetMethod;
-
         if (methodSymbol == null || methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return false;
-
         var state = session.GetOrCreateMethodBodyAnalysis(
             methodSymbol,
             context.Node,
@@ -106,7 +98,6 @@ internal static class AnalyzerFeaturePipeline {
                 if (syntaxReference.SyntaxTree == operationSyntax.SyntaxTree &&
                     syntaxReference.Span.Contains(operationSyntax.Span))
                     return NormalizeDeclaration(syntaxReference.GetSyntax(cancellationToken));
-
         var declaration = references.FirstOrDefault()?.GetSyntax(cancellationToken);
         return declaration == null ? null : NormalizeDeclaration(declaration);
     }

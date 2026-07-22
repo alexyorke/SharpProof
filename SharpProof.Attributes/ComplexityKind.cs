@@ -1,5 +1,4 @@
 namespace SharpProof.Attributes;
-
 /// <summary>
 ///     Declarable asymptotic complexity bounds for <see cref="ExpectedComplexityAttribute" />.
 /// </summary>
@@ -14,22 +13,16 @@ namespace SharpProof.Attributes;
 public enum ComplexityKind {
     /// <summary><c>O(1)</c>.</summary>
     Constant = 0,
-
     /// <summary><c>O(n)</c>.</summary>
     Linear = 1,
-
     /// <summary><c>O(n^2)</c>.</summary>
     Quadratic = 2,
-
     /// <summary><c>O(log n)</c>.</summary>
     Logarithmic = 3,
-
     /// <summary><c>O(n log n)</c>.</summary>
     Linearithmic = 4,
-
     /// <summary><c>O(n*m)</c> over independent size parameters.</summary>
     Product = 5,
-
     /// <summary><c>O(max(n, m))</c> over independent size parameters.</summary>
     Max = 6
 }

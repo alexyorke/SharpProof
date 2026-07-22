@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicLoweringValueFacts {
     internal static bool TryGetStableVariableSymbol(ExpressionSyntax expression, SymbolicLoweringContext context, out ISymbol symbol) {
         if (expression is IdentifierNameSyntax) {
@@ -54,7 +53,6 @@ internal static class SymbolicLoweringValueFacts {
         var constant = semanticModel.GetConstantValue(UnwrapExpression(expression), cancellationToken);
         if (constant is { HasValue: true, Value: not null })
             return TryGetIntegralConstant(constant.Value, out result);
-
         result = 0;
         return false;
     }

@@ -1,5 +1,4 @@
 namespace SharpProof.Analyzer;
-
 /// <summary>
 /// Centralizes the analyzer's symbol-identity comparisons on
 /// <see cref="SymbolEqualityComparer.Default"/> so the idiom is declared in one
@@ -9,7 +8,6 @@ namespace SharpProof.Analyzer;
 internal static class SymbolEq {
     /// <summary>The shared default symbol comparer.</summary>
     public static readonly SymbolEqualityComparer Default = SymbolEqualityComparer.Default;
-
     /// <summary>Compares two symbols for identity using <see cref="Default"/>.</summary>
     public static bool AreEqual(ISymbol? x, ISymbol? y) => Default.Equals(x, y);
 }

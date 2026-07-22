@@ -1,8 +1,6 @@
 using NUnit.Framework;
 using SharpProof.Symbolic;
-
 namespace SharpProof.Test;
-
 [TestFixture]
 public sealed class SymbolicQueryWitnessTests {
     private const string WitnessSource = """
@@ -16,7 +14,6 @@ public sealed class SymbolicQueryWitnessTests {
             }
         }
         """;
-
     [Test]
     public void QueryScopesAndImplication_ExposePublicProofResults() {
         const string marker = "return values[index] + value;";
@@ -40,7 +37,6 @@ public sealed class SymbolicQueryWitnessTests {
             "value > 5"));
         Assert.That(proof.ProofFacts.Single().Status, Is.EqualTo("Unknown"));
         Assert.That(proof.ProofFacts.Single().Counterexample, Does.Contain("value="));
-
         var sourcePath = Path.Combine(Path.GetTempPath(), "SharpProof.ProofQuery." + Guid.NewGuid() + ".cs");
         try {
             File.WriteAllText(sourcePath, WitnessSource);

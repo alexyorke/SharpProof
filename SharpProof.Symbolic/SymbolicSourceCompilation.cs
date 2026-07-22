@@ -1,9 +1,7 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicSourceCompilation {
     private static readonly ConcurrentDictionary<string, ImmutableArray<MetadataReference>>
         TrustedPlatformReferenceCache = new(StringComparer.Ordinal);
-
     public static ImmutableArray<MetadataReference> GetTrustedPlatformReferences() {
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
         var cacheKey = trustedPlatformAssemblies ?? string.Empty;
@@ -32,14 +30,11 @@ internal static class SymbolicSourceCompilation {
         IEnumerable<MetadataReference>? references,
         CancellationToken cancellationToken) {
         if (sourceText == null) throw new ArgumentNullException(nameof(sourceText));
-
         if (string.IsNullOrWhiteSpace(filePath)) filePath = defaultFilePath;
-
         var parseOptions = new CSharpParseOptions(LanguageVersion.Preview, DocumentationMode.Parse, SourceCodeKind.Regular);
         var syntaxTree = CSharpSyntaxTree.ParseText(sourceText, parseOptions, filePath, cancellationToken: cancellationToken);
         var referenceArray = NormalizeReferences(references);
         if (referenceArray.IsDefaultOrEmpty) referenceArray = GetTrustedPlatformReferences();
-
         var compilationOptions = new CSharpCompilationOptions(
             OutputKind.DynamicallyLinkedLibrary,
             optimizationLevel: OptimizationLevel.Debug,

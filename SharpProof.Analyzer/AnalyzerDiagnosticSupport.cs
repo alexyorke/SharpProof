@@ -1,11 +1,9 @@
 namespace SharpProof.Analyzer;
-
 internal static class ContractDiagnosticSupport {
     internal static string FormatUnknownReason(SymbolicConditionProofResult proof, string contractAttributeName) {
         if (proof.UnknownReason != SymbolicUnknownReason.None &&
             proof.UnknownReason != SymbolicUnknownReason.Unknown)
             return proof.UnknownReason.ToString();
-
         return proof.Reason switch {
             "condition_parse_failure" => "condition parse failure",
             "condition_binding_failure" => "condition binding failure",

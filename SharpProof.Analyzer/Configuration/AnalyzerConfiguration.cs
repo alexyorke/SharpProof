@@ -1,5 +1,4 @@
 namespace SharpProof.Analyzer.Configuration;
-
 internal sealed record AnalyzerConfiguration(
     SmtAnalysisOptions SmtOptions,
     SharpProofAnalysisBudget AnalysisLimits,
@@ -25,7 +24,6 @@ internal sealed record AnalyzerConfiguration(
         foreach (var option in AnalyzerConfigurationOptionRegistry.All) {
             if (!TryGetAnalyzerConfigOption(options, option.Key, out var value)) continue;
             if (TryGetMatchingGlobalOption(globalOptions, option.Key, value)) continue;
-
             builder.Add(new InvalidAnalyzerConfigurationValue(
                 option.Key,
                 value.Trim(),
@@ -38,7 +36,6 @@ internal sealed record AnalyzerConfiguration(
         TryGetConfigurationOption tryGetOption,
         AnalyzerConfigurationOption option) {
         if (!tryGetOption(option.Key, out var value)) return;
-
         var reason = option.ValueKind switch {
             AnalyzerConfigurationValueKind.Bool when !TryParseBool(value) =>
                 "expected a boolean value",
@@ -57,13 +54,11 @@ internal sealed record AnalyzerConfiguration(
         value.Trim().ToLowerInvariant() is
             "1" or "true" or "yes" or "on" or
             "0" or "false" or "no" or "off";
-
     private static string? GetIntegerError(string value, int minimum, string reason) =>
         int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
         parsed >= minimum
             ? null
             : reason;
-
     private static bool TryGetMatchingGlobalOption(AnalyzerConfigOptions? globalOptions, string key, string treeValue) {
         if (globalOptions == null) return false;
         if (globalOptions.TryGetValue(key, out var value) &&
@@ -74,7 +69,6 @@ internal sealed record AnalyzerConfiguration(
     }
     private static bool TryGetAnalyzerConfigOption(AnalyzerConfigOptions options, string key, out string value)
         => AnalyzerConfigurationValueReader.TryGetNonEmpty(options, key, out value);
-
     private delegate bool TryGetConfigurationOption(string key, out string value);
 }
 internal readonly record struct InvalidAnalyzerConfigurationValue(string Key, string Value, string Reason);

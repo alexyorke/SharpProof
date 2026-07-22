@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <Import Project="..\SharpProof.PackageMetadata.props" />
-
   <PropertyGroup>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
@@ -11,7 +9,6 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
-
   <PropertyGroup>
     <PackageId>SharpProof</PackageId>
     <Title>$(SharpProofProductName)</Title>
@@ -20,32 +17,26 @@
     <Copyright>Copyright (c) Alex Yorke</Copyright>
     <PackageTags>SharpProof;Roslyn;Analyzer;Purity;StaticAnalysis;SymbolicAnalysis;SMT;Z3;Invariants;RuntimeHazards;Capabilities;Complexity;Async;Concurrency;LINQ</PackageTags>
     <NoPackageAnalysis>true</NoPackageAnalysis>
-
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_AddAnalyzersToOutput</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
     <PackageReference Include="Microsoft.Z3" Version="$(MicrosoftZ3PackageVersion)" GeneratePathProperty="true" PrivateAssets="all" />
   </ItemGroup>
-
   <ItemGroup>
     <None Include="buildTransitive/SharpProof.targets" Pack="true" PackagePath="buildTransitive/SharpProof.targets" />
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="\" />
   </ItemGroup>
-
   <PropertyGroup>
     <AnalyzerPayloadDirectory>..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0</AnalyzerPayloadDirectory>
     <AttributesPayloadPath>..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll</AttributesPayloadPath>
   </PropertyGroup>
-
   <ItemDefinitionGroup>
     <TfmSpecificPackageFile>
       <PackagePath>analyzers/dotnet/cs</PackagePath>
     </TfmSpecificPackageFile>
   </ItemDefinitionGroup>
-
   <Target Name="_AddAnalyzersToOutput">
     <ItemGroup>
       <TfmSpecificPackageFile Include="$(AnalyzerPayloadDirectory)\SharpProof.Analyzer.dll;$(AnalyzerPayloadDirectory)\SharpProof.Symbolic.dll;$(AnalyzerPayloadDirectory)\SharpProof.ProofCore.dll;$(AttributesPayloadPath)" />
@@ -53,5 +44,4 @@
       <TfmSpecificPackageFile Include="$(AttributesPayloadPath)" PackagePath="lib/netstandard2.0" />
     </ItemGroup>
   </Target>
-
 </Project>

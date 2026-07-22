@@ -1,7 +1,5 @@
 using SharpProof.Attributes;
-
 namespace SharpProof.Symbolic;
-
 internal enum SymbolicComplexityKind {
     Constant,
     Linear,
@@ -18,7 +16,6 @@ internal enum SymbolicComplexityComparison {
 }
 internal static class SymbolicComplexityFacts {
     internal static bool IsDefinedBound(int value) => Enum.IsDefined(typeof(ComplexityKind), value);
-
     internal static string GetBoundText(int value) => ((ComplexityKind)value) switch {
         ComplexityKind.Constant => "O(1)",
         ComplexityKind.Logarithmic => "O(log n)",
@@ -29,7 +26,6 @@ internal static class SymbolicComplexityFacts {
         ComplexityKind.Max => "O(max(n, m))",
         _ => value.ToString(CultureInfo.InvariantCulture)
     };
-
     private static bool TryGetBound(SymbolicComplexityKind kind, out ComplexityKind bound) {
         bound = kind switch {
             SymbolicComplexityKind.Constant => ComplexityKind.Constant,
@@ -49,7 +45,6 @@ internal static class SymbolicComplexityFacts {
         if (actualBound == declared || actualBound == ComplexityKind.Constant)
             return SymbolicComplexityComparison.Within;
         if (declared == ComplexityKind.Constant) return SymbolicComplexityComparison.Exceeds;
-
         var actualRank = GetChainRank(actualBound);
         var declaredRank = GetChainRank(declared);
         if (actualRank >= 0 && declaredRank >= 0)
@@ -87,16 +82,13 @@ internal sealed record SymbolicComplexityInfo(
     bool IsConservative,
     bool IsUnknown,
     bool IsRecursiveUnknown);
-
 internal sealed record SymbolicComplexityDriverInfo(string Kind, string Description, int SourceSpanStart, int SourceSpanLength);
-
 internal sealed record SymbolicComplexityCalleeInfo(
     string MethodDisplayName,
     string ComplexityText,
     SymbolicComplexityKind Kind,
     bool IsConservative,
     SymbolicComplexityUnknownReason UnknownReason);
-
 internal sealed record SymbolicComplexityResult(
     SymbolicComplexityInfo Complexity,
     IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,

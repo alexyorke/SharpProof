@@ -1,7 +1,5 @@
 using SharpProof.ProofCore.Smt;
-
 namespace SharpProof.Test;
-
 internal static class SmtTestFormula {
     internal static SmtVariable Int(string name) => new(name, SmtValueKind.Int);
     internal static SmtVariable Bool(string name) => new(name, SmtValueKind.Bool);

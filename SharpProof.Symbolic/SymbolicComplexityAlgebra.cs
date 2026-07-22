@@ -1,24 +1,18 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicComplexityAlgebra {
     internal static ComplexityArtifacts CombineSequence(IEnumerable<ComplexityArtifacts> parts) =>
         Combine(parts);
-
     internal static ComplexityArtifacts CombineSequence(params ComplexityArtifacts[] parts) =>
         Combine(parts);
-
     internal static ComplexityArtifacts CombineBranch(IEnumerable<ComplexityArtifacts> parts) =>
         Combine(parts);
-
     internal static ComplexityArtifacts CombineBranch(params ComplexityArtifacts[] parts) =>
         Combine(parts);
-
     internal static ComplexityArtifacts Multiply(SymbolicCostExpression multiplier, ComplexityArtifacts body) {
         var cost = SymbolicCostExpression.Multiply(multiplier, body.Cost);
         var reasons = new List<SymbolicComplexityUnknownReason>(body.UnknownReasons);
         if (cost.IsUnknown && cost.UnknownReason != SymbolicComplexityUnknownReason.None)
             reasons.Add(cost.UnknownReason);
-
         return ComplexityArtifacts.FromCost(cost, body.Drivers, reasons, body.CalleeSummaries);
     }
     internal static MethodAnalysisSummary CreateSummary(
@@ -51,7 +45,6 @@ internal static class SymbolicComplexityAlgebra {
         var combinedCost = SymbolicCostExpression.Max(costExpressions);
         if (combinedCost.IsUnknown && combinedCost.UnknownReason != SymbolicComplexityUnknownReason.None)
             reasons.Add(combinedCost.UnknownReason);
-
         return ComplexityArtifacts.FromCost(combinedCost, drivers, reasons, callees);
     }
 }

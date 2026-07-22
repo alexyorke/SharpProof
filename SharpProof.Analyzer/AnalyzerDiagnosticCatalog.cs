@@ -1,10 +1,7 @@
 #pragma warning disable RS1037
-
 namespace SharpProof.Analyzer;
-
 internal static class AnalyzerDiagnosticCatalog {
     private const string HelpBase = "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#";
-
     private static readonly Definition[] Definitions = [
         new("PurityNotVerifiedRule", "SP0002", "Purity Not Proven",
             "Method '{0}' is marked [EnforcePure], but its effects do not prove observable purity", "Purity", DiagnosticSeverity.Error,
@@ -57,15 +54,11 @@ internal static class AnalyzerDiagnosticCatalog {
             "Null-forgiving operator can suppress a feasible null value for '{0}'", "Nullability", DiagnosticSeverity.Warning,
             "Reports null-forgiving operators reached by a proven feasible null value.")
     ];
-
     private static readonly ImmutableDictionary<string, DiagnosticDescriptor> DescriptorsByField = Definitions
         .ToImmutableDictionary(static value => value.Field, static value => value.Create(), StringComparer.Ordinal);
-
     internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [.. Definitions.Select(static value
         => value.Create())];
-
     internal static DiagnosticDescriptor Get(string fieldName) => DescriptorsByField[fieldName];
-
     private sealed record Definition(
         string Field, string Id, string Title, string Message, string Category,
         DiagnosticSeverity Severity, string Description) {

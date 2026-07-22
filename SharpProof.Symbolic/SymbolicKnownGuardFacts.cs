@@ -1,8 +1,6 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicKnownGuardFacts {
     private const string ArgumentOutOfRangeExceptionType = "System.ArgumentOutOfRangeException";
-
     internal static bool TryCreateArgumentOutOfRangeGuardConditions(
         InvocationExpressionSyntax invocation,
         SemanticModel semanticModel,
@@ -29,7 +27,6 @@ internal static class SymbolicKnownGuardFacts {
                 out guardKey) ||
             !TryGetArgumentExpression(operation, 0, out var subjectExpression))
             return false;
-
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var subjectLowering = SymbolicSemanticPipeline.LowerTerm(subjectExpression, context);
         if (subjectLowering is not { IsExact: true, Value: { } loweredSubject } ||
@@ -38,7 +35,6 @@ internal static class SymbolicKnownGuardFacts {
             return false;
         }
         subject = loweredSubject;
-
         SymbolicTerm comparisonValue;
         if (requiresComparisonValue) {
             if (!TryGetArgumentExpression(operation, 1, out var comparisonExpression)) {

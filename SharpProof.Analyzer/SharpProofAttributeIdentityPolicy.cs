@@ -1,16 +1,12 @@
 namespace SharpProof.Analyzer;
-
 internal sealed class SharpProofAttributeIdentityPolicy {
     private const string OfficialNamespace = "SharpProof.Attributes";
     private static readonly SharpProofAttributeIdentityPolicy Instance = new();
-
     private SharpProofAttributeIdentityPolicy() {
     }
     internal static SharpProofAttributeIdentityPolicy Create() => Instance;
-
     internal bool HasAttribute(ISymbol symbol, string attributeTypeName) =>
         GetAcceptedAttributes(symbol, attributeTypeName).Any();
-
     internal IEnumerable<AttributeData> GetAcceptedAttributes(ISymbol symbol, string attributeTypeName) {
         foreach (var attribute in SymbolAttributeTraversal.GetAttributes(symbol, GetAssociatedAttributePolicy(attributeTypeName)))
             if (IsAccepted(attribute.AttributeClass, attributeTypeName))

@@ -4,7 +4,6 @@
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>preview</LangVersion>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="System.Text.Json" Version="9.0.0" />
     <ProjectReference Include="..\..\SharpProof.Attributes\SharpProof.Attributes.csproj" />

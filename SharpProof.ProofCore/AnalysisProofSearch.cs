@@ -1,21 +1,17 @@
 namespace SharpProof.ProofCore.Analysis;
-
 internal enum AnalysisProofOutcome {
     Proven,
     Disproven,
     Unknown
 }
 internal sealed record ProofCheckInfo(bool WasAttempted, Feasibility Feasibility, SmtSatisfyingWitness? Witness = null);
-
 internal sealed record AnalysisProofResult(
     AnalysisProofOutcome Outcome,
     ProofCheckInfo PathCheck,
     ProofCheckInfo HazardCheck,
     string Reason);
-
 internal interface IAnalysisProofSearchSession : IDisposable {
     long ConsumedResourceCount { get; }
-
     AnalysisProofResult Classify(AnalysisProofQuery query, TimeSpan timeout);
 }
 internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
@@ -48,28 +44,22 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
                 "divide_by_zero_reachable",
                 "divide_by_zero_feasibility_unknown")
         };
-
     private readonly SmtSolver _solver = new();
-
     /// <summary>
     ///     Total Z3 rlimit units consumed by classifications on this instance; see
     ///     <see cref="SmtSolver.ConsumedResourceCount" />.
     /// </summary>
     public long ConsumedResourceCount => _solver.ConsumedResourceCount;
-
     public void Dispose() => _solver.Dispose();
     public AnalysisProofResult Classify(AnalysisProofQuery query, TimeSpan timeout) {
         if (query == null || query.Hazard == null)
             return UnknownWithoutProof("invalid_proof_query");
-
         var pathConditions = query.PathConditions ?? [];
         if (!HazardDescriptors.TryGetValue(query.Hazard.Kind, out var descriptor))
             return UnknownWithoutProof("unsupported_hazard_kind");
-
         if (query.Hazard.Visibility == AnalysisEffectVisibility.InternalOnly &&
             !descriptor.AcceptsInternalOnlyVisibility)
             return UnknownWithoutProof("invalid_internal_only_hazard");
-
         return ClassifyKnownHazard(query.Hazard.Kind, pathConditions, query.Hazard.TriggerCondition, timeout);
     }
     private AnalysisProofResult ClassifyInternalOnlyEffect(IEnumerable<SmtFormula> pathConditions, TimeSpan timeout, string pureReason) {
@@ -89,7 +79,6 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
             _ => new AnalysisProofResult(AnalysisProofOutcome.Proven, Attempted(path), NotAttempted(), pureReason)
         };
     }
-
     private AnalysisProofResult ClassifyKnownHazard(
         AnalysisHazardKind kind,
         IEnumerable<SmtFormula> pathConditions,
@@ -111,21 +100,18 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
         var impurityFeasibility = check.Impurity.Feasibility;
         if (pathFeasibility == Feasibility.Unsatisfiable)
             return new AnalysisProofResult(AnalysisProofOutcome.Proven, Attempted(check.Path), NotAttempted(), "path_unsatisfiable");
-
         if (impurityFeasibility == Feasibility.Unsatisfiable)
             return new AnalysisProofResult(
                 AnalysisProofOutcome.Proven,
                 Attempted(check.Path),
                 Attempted(check.Impurity),
                 descriptor.PureReason);
-
         if (pathFeasibility == Feasibility.Unknown)
             return new AnalysisProofResult(
                 AnalysisProofOutcome.Unknown,
                 Attempted(check.Path),
                 Attempted(check.Impurity),
                 "path_feasibility_unknown");
-
         return impurityFeasibility switch {
             Feasibility.Satisfiable => new AnalysisProofResult(
                 AnalysisProofOutcome.Disproven,
@@ -143,10 +129,8 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
         => new(AnalysisProofOutcome.Unknown, NotAttempted(), NotAttempted(), reason);
     private static ProofCheckInfo Attempted(SmtFeasibilityResult result) =>
         new(true, result.Feasibility, result.Witness);
-
     private static ProofCheckInfo NotAttempted() =>
         new(false, Feasibility.Unknown);
-
     enum HazardClassificationMode {
         Triggered,
         InternalEffect

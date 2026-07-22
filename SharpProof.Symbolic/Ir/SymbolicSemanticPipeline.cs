@@ -1,10 +1,8 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicSemanticPipeline {
     internal static SymbolicLoweringResult<SymbolicTerm> LowerTerm(ExpressionSyntax expression, SymbolicLoweringContext context) {
         if (!IsStructuralReferenceDepthSupported(expression, context, 0))
             return Unsupported<SymbolicTerm>(expression, "term");
-
         return LowerExactOrUnsupported(SymbolicIrLowerer.LowerTerm(expression, context), expression, "term");
     }
     internal static SymbolicLoweringResult<SymbolicCondition> LowerCondition(ExpressionSyntax expression,
@@ -12,7 +10,6 @@ internal static class SymbolicSemanticPipeline {
             SymbolicIrLowerer.LowerCondition(expression, context),
             expression,
             "condition");
-
     internal static SymbolicLoweringResult<SymbolicCondition> LowerBranchCondition(
         ExpressionSyntax expression,
         bool branchWhenTrue,
@@ -20,11 +17,9 @@ internal static class SymbolicSemanticPipeline {
         if (TryLowerNotNullWhenBranchCondition(expression, branchWhenTrue, context, out var flowCondition) ||
             TryLowerMemberNotNullWhenBranchCondition(expression, branchWhenTrue, context, out flowCondition))
             return Exact(flowCondition, expression, "branch-facts");
-
         var lowered = LowerCondition(expression, context);
         if (!lowered.IsExact || lowered.Value == null)
             return Unsupported<SymbolicCondition>(expression, "branch-facts");
-
         var condition = branchWhenTrue
             ? lowered.Value
             : new SymbolicNotCondition(lowered.Value);
@@ -52,13 +47,11 @@ internal static class SymbolicSemanticPipeline {
             asExpression.Right is not TypeSyntax typeSyntax ||
             !TryCreateReferenceSymbolTerm(targetSymbol, targetContext, out var target))
             return Unsupported<SymbolicState>(valueExpression, "as-expression-assignment");
-
         var targetType = context.SemanticModel.GetTypeInfo(typeSyntax, context.CancellationToken).Type;
         var sourceLowering = LowerTerm(asExpression.Left, context);
         if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey) ||
             sourceLowering is not { IsExact: true, Value: { Kind: SmtValueKind.Reference } source })
             return Unsupported<SymbolicState>(valueExpression, "as-expression-assignment");
-
         var targetIsNull = CreateRelationCondition(
             SymbolicRelationOperator.Equal,
             target,
@@ -109,7 +102,6 @@ internal static class SymbolicSemanticPipeline {
             context,
             TryLowerNotNullWhenInvocationBranchCondition,
             out condition);
-
     private static bool TryLowerNotNullWhenInvocationBranchCondition(
         InvocationExpressionSyntax invocation,
         bool branchWhenTrue,
@@ -120,7 +112,6 @@ internal static class SymbolicSemanticPipeline {
                 IInvocationOperation invocationOperation ||
             invocationOperation.TargetMethod.ReturnType.SpecialType != SpecialType.System_Boolean)
             return false;
-
         var conditions = new List<SymbolicCondition>();
         foreach (var argument in invocationOperation.Arguments) {
             if (argument.ArgumentKind != ArgumentKind.Explicit ||
@@ -130,7 +121,6 @@ internal static class SymbolicSemanticPipeline {
                 NullableFlowFacts.GetParameterOutputState(parameter, branchWhenTrue) != NullableFlowFactState.NotNull ||
                 !TryLowerNotNullWhenArgumentCondition(argumentSyntax.Expression, context, out var argumentCondition))
                 continue;
-
             conditions.Add(argumentCondition);
         }
         return TryCombineConditions(conditions, out condition);
@@ -140,7 +130,6 @@ internal static class SymbolicSemanticPipeline {
         RefKind.Out => argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword),
         _ => false
     };
-
     private static bool TryLowerNotNullWhenArgumentCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -149,7 +138,6 @@ internal static class SymbolicSemanticPipeline {
         if (!TryGetLocalOrParameterArgumentSymbol(expression, context, out var symbol) ||
             !TryCreateReferenceSymbolTerm(symbol, context, out var referenceTerm))
             return false;
-
         condition = CreateRelationCondition(
             SymbolicRelationOperator.NotEqual,
             referenceTerm,
@@ -190,7 +178,6 @@ internal static class SymbolicSemanticPipeline {
             context,
             TryLowerMemberNotNullWhenInvocationBranchCondition,
             out condition);
-
     private static bool TryLowerAttributedBranchCondition(
         ExpressionSyntax expression,
         bool branchWhenTrue,
@@ -202,7 +189,6 @@ internal static class SymbolicSemanticPipeline {
         if (expression is PrefixUnaryExpressionSyntax negation &&
             negation.IsKind(SyntaxKind.LogicalNotExpression))
             return TryLowerAttributedBranchCondition(negation.Operand, !branchWhenTrue, context, lowerInvocation, out condition);
-
         if (expression is BinaryExpressionSyntax binaryExpression &&
             (binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
              binaryExpression.IsKind(SyntaxKind.NotEqualsExpression))) {
@@ -213,7 +199,6 @@ internal static class SymbolicSemanticPipeline {
                     context,
                     lowerInvocation,
                     out condition);
-
             if (TryGetBooleanLiteral(binaryExpression.Right, out var rightValue))
                 return TryLowerAttributedBranchCondition(
                     binaryExpression.Left,
@@ -237,7 +222,6 @@ internal static class SymbolicSemanticPipeline {
             invocationOperation.TargetMethod.IsStatic ||
             !IsCurrentInstanceInvocation(invocation))
             return false;
-
         var conditions = new List<SymbolicCondition>();
         foreach (var memberTarget in NullableFlowFacts.GetMemberNotNullWhenTargets(invocationOperation.TargetMethod, branchWhenTrue)) {
             if (!NullableFlowFacts.TryResolveInstanceMemberTarget(
@@ -246,7 +230,6 @@ internal static class SymbolicSemanticPipeline {
                     out var member) ||
                 !TryLowerImplicitThisMemberNonNullCondition(member, invocation, context, out var memberCondition))
                 continue;
-
             conditions.Add(memberCondition);
         }
         return TryCombineConditions(conditions, out condition);
@@ -265,7 +248,6 @@ internal static class SymbolicSemanticPipeline {
                 out var memberKind) ||
             memberKind != SmtValueKind.Reference)
             return false;
-
         condition = CreateRelationCondition(
             SymbolicRelationOperator.NotEqual,
             new SymbolicMemberTerm(context.ImplicitThis, member.Name, memberKind),
@@ -293,7 +275,6 @@ internal static class SymbolicSemanticPipeline {
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
         var type = typeInfo.ConvertedType ?? typeInfo.Type;
         if (type?.IsReferenceType != true) return true;
-
         var limit = SymbolicAnalysisLimitContext.Limits.MaxStructuralNullStateDepth;
         if (depth > limit) {
             SymbolicAnalysisLimitContext.Record(
@@ -329,11 +310,9 @@ internal static class SymbolicSemanticPipeline {
     private static bool TryCombineConditions(IReadOnlyList<SymbolicCondition> conditions, out SymbolicCondition condition) {
         condition = null!;
         if (conditions.Count == 0) return false;
-
         condition = conditions[0];
         for (var index = 1; index < conditions.Count; index++)
             condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, condition, conditions[index]);
-
         return true;
     }
     private static bool TryGetBooleanLiteral(ExpressionSyntax expression, out bool value) {
@@ -353,7 +332,6 @@ internal static class SymbolicSemanticPipeline {
         => comparison.IsKind(SyntaxKind.EqualsExpression)
             ? literalValue == branchWhenTrue
             : literalValue != branchWhenTrue;
-
     private static bool IsCurrentInstanceInvocation(InvocationExpressionSyntax invocation) {
         var invokedExpression = UnwrapBranchExpression(invocation.Expression);
         return invokedExpression is IdentifierNameSyntax ||
@@ -387,7 +365,6 @@ internal static class SymbolicSemanticPipeline {
             source,
             provenance,
             evidenceKey: provenance));
-
     internal static SymbolicLoweringResult<SymbolicCondition> LowerPatternCondition(
         SymbolicTerm value,
         ITypeSymbol? valueType,
@@ -399,11 +376,9 @@ internal static class SymbolicSemanticPipeline {
                 : null,
             source,
             "pattern");
-
     internal static SymbolicLoweringResult<SymbolicTerm> LowerReferenceTerm(ExpressionSyntax expression, SymbolicLoweringContext context) {
         if (!IsStructuralReferenceDepthSupported(expression, context, 0))
             return Unsupported<SymbolicTerm>(expression, "reference-term");
-
         return LowerExactOrUnsupported(
             SymbolicReferenceLowerer.TryLowerReferenceTerm(expression, context, out var term) ? term : null,
             expression,
@@ -414,13 +389,11 @@ internal static class SymbolicSemanticPipeline {
             SymbolicStringLowerer.TryLowerStringTerm(expression, context, out var term) ? term : null,
             expression,
             "string-term");
-
     internal static SymbolicLoweringResult<SymbolicTerm> LowerBooleanValueTerm(ExpressionSyntax expression,
         SymbolicLoweringContext context) => LowerExactOrUnsupported(
             SymbolicSourcePredicateLowerer.TryLowerBooleanValueTerm(expression, context, out var term) ? term : null,
             expression,
             "boolean-term");
-
     internal static SymbolicLoweringResult<SymbolicTerm> LowerNotNullIfNotNullAssignedResultTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context) => LowerExactOrUnsupported(
@@ -429,14 +402,12 @@ internal static class SymbolicSemanticPipeline {
                 : null,
             expression,
             "not-null-if-not-null-assigned-result");
-
     internal static SymbolicLoweringResult<SymbolicTerm> LowerBuiltInLengthTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context) => LowerExactOrUnsupported(
             SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(expression, context, out var term) ? term : null,
             expression,
             "built-in-length");
-
     internal static SymbolicLoweringResult<SymbolicTerm> LowerLengthProjectionTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context) {
@@ -444,7 +415,6 @@ internal static class SymbolicSemanticPipeline {
         if (value is { IsExact: true, Value: { } valueTerm } &&
             valueTerm.Kind is SmtValueKind.String or SmtValueKind.Reference)
             return Exact<SymbolicTerm>(new SymbolicLengthTerm(valueTerm), expression, "length-projection");
-
         return Unsupported<SymbolicTerm>(expression, "length-projection");
     }
     internal static SymbolicLoweringResult<SymbolicTerm> ProjectBuiltInLengthTerm(
@@ -456,13 +426,11 @@ internal static class SymbolicSemanticPipeline {
                 : null,
             source,
             "built-in-length-projection");
-
     internal static SymbolicLoweringResult<SymbolicTerm> ProjectStringContentTerm(SymbolicTerm receiver, SyntaxNode source)
         => LowerExactOrUnsupported(
             SymbolicStringLowerer.TryCreateStringContentReferenceTerm(receiver, out var term) ? term : null,
             source,
             "string-content-projection");
-
     internal static SymbolicLoweringResult<SymbolicTerm> LowerArrayDimensionLengthTerm(
         ExpressionSyntax expression,
         int dimension,
@@ -472,21 +440,18 @@ internal static class SymbolicSemanticPipeline {
                 : null,
             expression,
             "array-dimension-length");
-
     internal static SymbolicLoweringResult<SymbolicTerm> LowerNullableHasValueTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context) => LowerExactOrUnsupported(
             SymbolicNullableLowerer.TryLowerNullableHasValueTerm(expression, context, out var term) ? term : null,
             expression,
             "nullable-has-value");
-
     internal static SymbolicLoweringResult<SymbolicTerm> LowerNullableValueTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context) => LowerExactOrUnsupported(
             SymbolicNullableLowerer.TryLowerNullableValueTerm(expression, context, out var term) ? term : null,
             expression,
             "nullable-value");
-
     internal static SymbolicLoweringResult<SymbolicCondition> LowerStringNonNullCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context) => LowerExactOrUnsupported(
@@ -495,7 +460,6 @@ internal static class SymbolicSemanticPipeline {
                 : null,
             expression,
             "string-non-null");
-
     internal static SymbolicLoweringResult<SymbolicCondition> LowerBuiltInElementAccessInRangeCondition(
         ElementAccessExpressionSyntax elementAccess,
         SymbolicLoweringContext context) {
@@ -511,14 +475,12 @@ internal static class SymbolicSemanticPipeline {
                 out var multidimensionalCondition,
                 out _))
             return Exact(multidimensionalCondition, elementAccess, "element-access-in-range");
-
         if (elementAccess.ArgumentList.Arguments.Count == 1)
             return LowerBuiltInElementAccessInRangeCondition(
                 elementAccess.Expression,
                 elementAccess.ArgumentList.Arguments[0].Expression,
                 elementAccess,
                 context);
-
         return Unsupported<SymbolicCondition>(elementAccess, "element-access-in-range");
     }
     internal static SymbolicLoweringResult<SymbolicCondition> LowerBuiltInElementAccessOutOfRangeCondition(
@@ -527,7 +489,6 @@ internal static class SymbolicSemanticPipeline {
         var inRangeLowering = LowerBuiltInElementAccessInRangeCondition(elementAccess, context);
         if (inRangeLowering is not { IsExact: true, Value: { } inRangeCondition })
             return Unsupported<SymbolicCondition>(elementAccess, "element-access-out-of-range");
-
         var condition = (SymbolicCondition)new SymbolicNotCondition(inRangeCondition);
         foreach (var candidate in elementAccess.ArgumentList.Arguments
                      .SelectMany(static argument => argument.Expression.DescendantNodesAndSelf())) {
@@ -535,7 +496,6 @@ internal static class SymbolicSemanticPipeline {
                 LowerTerm(valueExpression, context) is not
                     { IsExact: true, Value: { Kind: SmtValueKind.Int } value })
                 continue;
-
             var normalCompletion = new SymbolicFactCondition(SymbolicFact.Exact(
                 new SymbolicRelationAtom(SymbolicRelationOperator.GreaterThanOrEqual, value, new SymbolicIntegerConstantTerm(0)),
                 candidate,
@@ -551,7 +511,6 @@ internal static class SymbolicSemanticPipeline {
             LowerTerm(valueExpression, context) is not
                 { IsExact: true, Value: { Kind: SmtValueKind.Int } value })
             return Unsupported<SymbolicCondition>(indexConstructionExpression, "index-construction-argument-out-of-range");
-
         SymbolicCondition condition = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicRelationAtom(SymbolicRelationOperator.LessThan, value, new SymbolicIntegerConstantTerm(0)),
             indexConstructionExpression,
@@ -576,7 +535,6 @@ internal static class SymbolicSemanticPipeline {
             SymbolicTypeFacts.IsSystemIndexType(containingType) &&
             SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out valueExpression))
             return true;
-
         if (candidate is ObjectCreationExpressionSyntax objectCreation &&
             context.SemanticModel.GetOperation(objectCreation, context.CancellationToken) is IObjectCreationOperation {
                 Constructor.ContainingType: { } objectType
@@ -612,7 +570,6 @@ internal static class SymbolicSemanticPipeline {
                 : null,
             source,
             "element-access-in-range");
-
     internal static SymbolicLoweringResult<SymbolicCondition> LowerArrayElementBoundsCondition(
         ExpressionSyntax arrayExpression,
         IReadOnlyList<ExpressionSyntax> indexExpressions,
@@ -630,7 +587,6 @@ internal static class SymbolicSemanticPipeline {
                 : null,
             source,
             "array-element-in-range");
-
     internal static SymbolicLoweringResult<SymbolicCondition> LowerSubsequenceInRangeCondition(
         ExpressionSyntax receiverExpression,
         ExpressionSyntax startExpression,
@@ -651,7 +607,6 @@ internal static class SymbolicSemanticPipeline {
                 : null,
             source,
             "subsequence-in-range");
-
     internal static SymbolicLoweringResult<SymbolicCondition> LowerIntegerBinaryInRangeCondition(
         ExpressionSyntax leftExpression,
         ExpressionSyntax rightExpression,
@@ -675,7 +630,6 @@ internal static class SymbolicSemanticPipeline {
                     "ir.integer.binary.in-range"),
                 source,
                 "integer-binary-in-range");
-
         return Unsupported<SymbolicCondition>(source, "integer-binary-in-range");
     }
     internal static SymbolicLoweringResult<SymbolicCondition> LowerNumericZeroCondition(
@@ -687,12 +641,10 @@ internal static class SymbolicSemanticPipeline {
             context.SemanticModel.GetOperation(unary, context.CancellationToken) is
                 Microsoft.CodeAnalysis.Operations.IUnaryOperation { OperatorMethod: null })
             return LowerNumericZeroCondition(unary.Operand, context);
-
         var constant = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constant.HasValue) {
             if (SymbolicValueFacts.IsIntegralOrDecimalZero(constant.Value))
                 return Exact<SymbolicCondition>(new SymbolicConstantCondition(true), expression, "numeric-zero");
-
             if (constant.Value is byte or sbyte or short or ushort or int or uint or long or ulong or decimal)
                 return Exact<SymbolicCondition>(new SymbolicConstantCondition(false), expression, "numeric-zero");
         }
@@ -708,24 +660,18 @@ internal static class SymbolicSemanticPipeline {
             value = context.TryGetSubstitution(symbol, out var substituted)
                 ? substituted
                 : new SymbolicVariableTerm(context.GetVariableName(symbol), SmtValueKind.Int);
-
         if (value is { Kind: SmtValueKind.Int })
             return Exact(SymbolicIrLowerer.CreateIntegerZeroCondition(value, expression, "ir.numeric-zero"), expression, "numeric-zero");
-
         return Unsupported<SymbolicCondition>(expression, "numeric-zero");
     }
     private static SymbolicLoweringResult<T> LowerExactOrUnsupported<T>(T? value, SyntaxNode source, string stage)
         where T : class => value == null ? Unsupported<T>(source, stage) : Exact(value, source, stage);
-
     private static SymbolicLoweringResult<T> Exact<T>(T value, SyntaxNode source, string stage)
         where T : class => SymbolicLoweringResult<T>.Exact(value, CreateProvenance(source, stage, "exact"));
-
     private static SymbolicLoweringResult<T> Unsupported<T>(SyntaxNode source, string stage)
         where T : class => SymbolicLoweringResult<T>.Unsupported(CreateProvenance(source, stage, "unsupported"));
-
     private static SymbolicLoweringProvenance CreateProvenance(SyntaxNode source, string stage, string detail)
         => new("roslyn-to-ir." + stage, source.Span, detail);
-
     private delegate bool TryLowerInvocationBranchCondition(
         InvocationExpressionSyntax invocation,
         bool branchWhenTrue,

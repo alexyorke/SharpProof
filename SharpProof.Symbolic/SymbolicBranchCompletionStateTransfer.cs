@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicBranchCompletionStateTransfer {
     internal static IReadOnlyList<ISymbol> GetLocalsDeclaredInside(
         StatementSyntax statement,
@@ -14,7 +13,6 @@ internal static class SymbolicBranchCompletionStateTransfer {
                 CatchDeclarationSyntax catchDeclaration => semanticModel.GetDeclaredSymbol(catchDeclaration, cancellationToken),
                 _ => null
             };
-
             if (symbol is ILocalSymbol &&
                 symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol.OriginalDefinition)))
                 symbols.Add(symbol.OriginalDefinition);
@@ -38,7 +36,6 @@ internal static class SymbolicBranchCompletionStateTransfer {
                         AddDeclaredPatternSymbols(patternLabel.Pattern, semanticModel, cancellationToken, symbols);
                         if (patternLabel.WhenClause != null)
                             AddReferencedSymbols(patternLabel.WhenClause.Condition, semanticModel, cancellationToken, symbols);
-
                         break;
                 }
         return symbols;
@@ -49,7 +46,6 @@ internal static class SymbolicBranchCompletionStateTransfer {
         CancellationToken cancellationToken) {
         var symbols = new List<ISymbol>();
         AddReferencedSymbols(switchExpression.GoverningExpression, semanticModel, cancellationToken, symbols);
-
         foreach (var arm in switchExpression.Arms) {
             AddReferencedSymbols(arm.Pattern, semanticModel, cancellationToken, symbols);
             AddDeclaredPatternSymbols(arm.Pattern, semanticModel, cancellationToken, symbols);
@@ -91,7 +87,6 @@ internal static class SymbolicBranchCompletionStateTransfer {
                 invocationOperation.TargetMethod.IsStatic ||
                 !SymbolicFrameworkPostconditionLowerer.IsCurrentInstanceInvocation(invocation))
                 continue;
-
             foreach (var target in NullableFlowFacts.GetMemberNotNullWhenTargets(invocationOperation.TargetMethod))
                 if (NullableFlowFacts.TryResolveInstanceMemberTarget(
                         invocationOperation.TargetMethod.ContainingType,

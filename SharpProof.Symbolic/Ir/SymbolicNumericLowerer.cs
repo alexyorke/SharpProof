@@ -1,16 +1,13 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicNumericLowerer {
     internal static bool TryLowerDefaultValueTerm(ExpressionSyntax expression, SymbolicLoweringContext context, out SymbolicTerm term) {
         term = null!;
         if (!expression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression) &&
             expression is not DefaultExpressionSyntax)
             return false;
-
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
         var type = typeInfo.ConvertedType ?? typeInfo.Type;
         if (type == null) return false;
-
         if (type.SpecialType == SpecialType.System_Boolean) {
             term = new SymbolicBooleanConstantTerm(false);
             return true;
@@ -39,7 +36,6 @@ internal static class SymbolicNumericLowerer {
             max is SymbolicIntegerConstantTerm maxConstant &&
             minConstant.Value > maxConstant.Value)
             return false;
-
         var belowMin = SymbolicIrLowerer.CreateRelationCondition(
             SymbolicRelationOperator.LessThan,
             value,
@@ -64,7 +60,6 @@ internal static class SymbolicNumericLowerer {
         if (!TryGetIntegralMathInvocation(invocation, method, 1, context, out var operation) ||
             !TryLowerIntegralMathArgument(operation, 0, context, out var value))
             return false;
-
         var nonNegative = SymbolicIrLowerer.CreateRelationCondition(
             SymbolicRelationOperator.GreaterThanOrEqual,
             value,
@@ -87,7 +82,6 @@ internal static class SymbolicNumericLowerer {
             !TryLowerIntegralMathArgument(operation, 0, context, out var left) ||
             !TryLowerIntegralMathArgument(operation, 1, context, out var right))
             return false;
-
         var comparisonOperator = method.Name == nameof(Math.Min)
             ? SymbolicRelationOperator.LessThanOrEqual
             : SymbolicRelationOperator.GreaterThanOrEqual;

@@ -1,17 +1,14 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicFactFactory {
     internal static bool MatchesVariableOrMemberName(string candidate, string variableName)
         => string.Equals(candidate, variableName, StringComparison.Ordinal) ||
                candidate.StartsWith(variableName + ".", StringComparison.Ordinal) ||
                candidate.StartsWith(variableName + "[", StringComparison.Ordinal);
-
     internal static string GetSmtVariableName(ISymbol symbol) {
         var sourceLocation = symbol.Locations.FirstOrDefault(static location => location.IsInSource);
         if (sourceLocation != null)
             return symbol.Name + "#" +
                    sourceLocation.SourceSpan.Start.ToString(CultureInfo.InvariantCulture);
-
         var containingIdentity = symbol.ContainingSymbol == null
             ? string.Empty
             : DocumentationCommentId.CreateDeclarationId(symbol.ContainingSymbol.OriginalDefinition) ??
@@ -91,10 +88,8 @@ internal static class SymbolicFactFactory {
     }
     internal static bool IsSupportedSmtIntegralOrEnumType(ITypeSymbol? typeSymbol) {
         if (typeSymbol == null) return false;
-
         if (SymbolicTypeFacts.IsBuiltInIntegralType(typeSymbol))
             return true;
-
         return typeSymbol is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } underlyingType } &&
                IsSupportedSmtIntegralOrEnumType(underlyingType);
     }

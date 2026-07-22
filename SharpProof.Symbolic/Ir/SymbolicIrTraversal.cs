@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 /// <summary>
 /// The direct children of an IR atom or term, in the one shape every structural
 /// walker needs: at most two term children, an optional condition child, and the
@@ -32,7 +31,6 @@ internal readonly record struct SymbolicIrChildren(
             new(precondition.Subject, Condition: precondition.Trigger),
         _ => default,
     };
-
     /// <summary>
     /// Children of the terms whose sub-terms are traversed uniformly. Leaves and the
     /// name-carrying terms yield nothing; <see cref="SymbolicBinaryTerm"/> and
@@ -56,7 +54,6 @@ internal readonly record struct SymbolicIrChildren(
             new(conditional.WhenTrue, conditional.WhenFalse, conditional.Condition),
         _ => default,
     };
-
     /// <summary>
     /// Returns whether any child term satisfies <paramref name="predicate"/>. Pass a
     /// static method group so the delegate is cached rather than allocated per call.
@@ -78,7 +75,6 @@ internal abstract class SymbolicIrRewriter {
         SymbolicBinaryCondition binaryCondition => RewriteBinaryCondition(binaryCondition),
         _ => condition
     };
-
     internal SymbolicAtom Rewrite(SymbolicAtom atom) => atom switch {
         SymbolicTruthAtom truth => new SymbolicTruthAtom(Rewrite(truth.Condition)),
         SymbolicRelationAtom relation => new SymbolicRelationAtom(relation.Operator, Rewrite(relation.Left), Rewrite(relation.Right)),
@@ -102,10 +98,8 @@ internal abstract class SymbolicIrRewriter {
             Rewrite(precondition.Trigger)),
         _ => atom
     };
-
     internal SymbolicTerm Rewrite(SymbolicTerm term) {
         if (TryRewriteTerm(term, out var rewritten)) return rewritten;
-
         return term switch {
             SymbolicBooleanConstantTerm or
                 SymbolicIntegerConstantTerm or
@@ -163,7 +157,6 @@ internal abstract class SymbolicIrRewriter {
 }
 internal abstract class SymbolicIrVisitor {
     internal void Visit(SymbolicFact fact) => Visit(fact.Atom);
-
     internal void Visit(SymbolicCondition condition) {
         switch (condition) {
             case SymbolicFactCondition factCondition:
@@ -179,7 +172,6 @@ internal abstract class SymbolicIrVisitor {
         }
     }
     internal void Visit(SymbolicAtom atom) => VisitChildren(SymbolicIrChildren.OfAtom(atom));
-
     internal void Visit(SymbolicTerm term) {
         OnTerm(term);
         switch (term) {

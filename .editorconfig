@@ -1,5 +1,4 @@
 root = true
-
 [*.cs]
 max_line_length = 140
 csharp_new_line_before_open_brace = none
@@ -15,7 +14,6 @@ csharp_style_expression_bodied_properties = true:warning
 csharp_style_implicit_object_creation_when_type_is_apparent = true:warning
 csharp_style_prefer_primary_constructors = true:warning
 dotnet_style_prefer_collection_expression = true:warning
-
 [{SharpProof.Analyzer,SharpProof.Attributes,SharpProof.ProofCore,SharpProof.Symbolic,Tools}/**/*.cs]
 csharp_prefer_braces = false:warning
 csharp_style_namespace_declarations = file_scoped:warning
@@ -23,11 +21,9 @@ csharp_style_prefer_simple_using_statement = true:warning
 csharp_style_prefer_switch_expression = true:warning
 dotnet_style_collection_initializer = true:warning
 dotnet_style_object_initializer = true:warning
-
 [{SharpProof.Test,SharpProof.Testing,SharpProof.ToolingTest}/*.cs]
 csharp_new_line_before_open_brace = none
 dotnet_diagnostic.IDE0055.severity = none
-
 [{SharpProof.Test,SharpProof.Testing,SharpProof.ToolingTest}/**/*.cs]
 csharp_new_line_before_open_brace = none
 dotnet_diagnostic.IDE0055.severity = none

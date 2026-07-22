@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicRuntimeTypeFacts {
     internal static bool TryGetExactRuntimeType(
         ExpressionSyntax expression,
@@ -10,7 +9,6 @@ internal static class SymbolicRuntimeTypeFacts {
         int inlineDepth = 0) {
         exactType = null!;
         if (inlineDepth > 8) return false;
-
         expression = UnwrapRuntimeTypeExpression(expression);
         if (SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
                 expression,
@@ -20,14 +18,12 @@ internal static class SymbolicRuntimeTypeFacts {
                 out var currentValueExpression))
             return TryGetExactRuntimeType(currentValueExpression, useNode, semanticModel, cancellationToken, out exactType,
                 inlineDepth + 1);
-
         var expressionType = GetNaturalExpressionType(expression, semanticModel, cancellationToken);
         if (expressionType != null && IsNonNullableValueType(expressionType)) {
             exactType = expressionType;
             return true;
         }
         if (expressionType?.TypeKind == TypeKind.Dynamic) return false;
-
         if (expression is ConditionalExpressionSyntax conditionalExpression)
             return TryGetCommonExactRuntimeType(
                 conditionalExpression.WhenTrue,
@@ -37,7 +33,6 @@ internal static class SymbolicRuntimeTypeFacts {
                 cancellationToken,
                 out exactType,
                 inlineDepth);
-
         if (expression is BinaryExpressionSyntax {
             RawKind: (int)SyntaxKind.CoalesceExpression
         } coalesceExpression)
@@ -49,13 +44,11 @@ internal static class SymbolicRuntimeTypeFacts {
                 cancellationToken,
                 out exactType,
                 inlineDepth);
-
         if (expression is CastExpressionSyntax castExpression) {
             var targetType = CSharpSyntaxFacts.GetExpressionType(castExpression, semanticModel, cancellationToken);
             if (targetType == null ||
                 targetType.TypeKind == TypeKind.Dynamic)
                 return false;
-
             if (SymbolicTypeFacts.IsReferenceType(targetType)) {
                 var operandType = CSharpSyntaxFacts.GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
                 if (IsNonNullableValueType(operandType) &&
@@ -134,12 +127,10 @@ internal static class SymbolicRuntimeTypeFacts {
         if (exactRuntimeType.TypeKind == TypeKind.Dynamic ||
             elementType.TypeKind == TypeKind.Dynamic)
             return true;
-
         return CanCastExactRuntimeTypeToReferenceType(exactRuntimeType, elementType, compilation);
     }
     internal static bool CanUnboxExactRuntimeTypeToValueType(ITypeSymbol exactRuntimeType, ITypeSymbol targetType) {
         if (!IsNonNullableValueType(targetType)) return false;
-
         return SymbolEqualityComparer.Default.Equals(exactRuntimeType, targetType);
     }
     internal static bool CanCastExactRuntimeTypeToReferenceType(
@@ -149,11 +140,9 @@ internal static class SymbolicRuntimeTypeFacts {
         if (targetType.TypeKind == TypeKind.Dynamic ||
             exactRuntimeType.TypeKind == TypeKind.Dynamic)
             return true;
-
         if (SymbolicTypeFacts.IsReferenceType(targetType) &&
             targetType.SpecialType == SpecialType.System_Object)
             return true;
-
         var conversion = compilation.ClassifyCommonConversion(exactRuntimeType, targetType);
         return conversion.Exists &&
                (conversion.IsIdentity || conversion.IsImplicit);
@@ -183,7 +172,6 @@ internal static class SymbolicRuntimeTypeFacts {
                !IsNullableType(typeSymbol);
     private static bool IsNullableType(ITypeSymbol? typeSymbol) =>
         SymbolicTypeFacts.IsNullableType(typeSymbol);
-
     private static ExpressionSyntax UnwrapRuntimeTypeExpression(ExpressionSyntax expression) =>
         CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
 }

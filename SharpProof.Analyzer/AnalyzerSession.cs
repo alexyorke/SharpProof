@@ -1,15 +1,11 @@
 namespace SharpProof.Analyzer;
-
 internal sealed class AnalyzerSession : IDisposable {
     private readonly ConcurrentDictionary<IMethodSymbol, Lazy<MethodBodyAnalysisState>> _methodBodyAnalyses =
         new(SymbolEq.Default);
-
     private readonly MethodEffectAnalysisSession _effectAnalysis;
-
     internal AnalyzerSession(Compilation compilation, AnalyzerOptions options, CancellationToken cancellationToken) {
         Configuration = AnalyzerConfiguration.FromOptions(options);
         AttributePolicy = SharpProofAttributeIdentityPolicy.Create();
-
         ProofService = new AnalyzerProofService(Configuration.SmtOptions, Configuration.AnalysisLimits);
         var configuredEffects = new ConfiguredEffectContractResolver(options.AnalyzerConfigOptionsProvider.GlobalOptions);
         _effectAnalysis = new MethodEffectAnalysisSession(
@@ -19,11 +15,8 @@ internal sealed class AnalyzerSession : IDisposable {
             ProofService.SmtAnalysis);
     }
     internal AnalyzerConfiguration Configuration { get; }
-
     internal SharpProofAttributeIdentityPolicy AttributePolicy { get; }
-
     internal AnalyzerProofService ProofService { get; }
-
     internal MethodBodyAnalysisState GetOrCreateMethodBodyAnalysis(
         IMethodSymbol methodSymbol,
         SyntaxNode declaration,
@@ -44,7 +37,6 @@ internal sealed class AnalyzerSession : IDisposable {
             if (_methodBodyAnalyses.TryGetValue(methodSymbol, out var current) &&
                 ReferenceEquals(current, lazy))
                 _methodBodyAnalyses.TryRemove(methodSymbol, out _);
-
             throw;
         }
     }

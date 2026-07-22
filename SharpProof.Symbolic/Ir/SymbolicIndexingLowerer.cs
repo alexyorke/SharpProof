@@ -1,18 +1,14 @@
 using static SharpProof.Symbolic.Ir.SymbolicIrLowerer;
 using static SharpProof.Symbolic.Ir.SymbolicLoweringValueFacts;
-
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicIndexingLowerer {
     private delegate bool TryCreateLengthShape<TShape>(ExpressionSyntax expression, SymbolicLoweringContext context, out TShape shape)
         where TShape : struct;
-
     internal static bool TryLowerElementAccessTerm(
         ElementAccessExpressionSyntax elementAccess,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         if (TryLowerFiniteArrayElementAccessTerm(elementAccess, context, out term)) return true;
-
         var receiverTypeInfo = context.SemanticModel.GetTypeInfo(elementAccess.Expression, context.CancellationToken);
         var receiverType = receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type;
         if (!TryGetBuiltInElementAccessElementType(receiverType, context.SemanticModel.Compilation, out var elementType) ||
@@ -20,17 +16,14 @@ internal static class SymbolicIndexingLowerer {
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(elementAccess.Expression, context), out var receiver) ||
             receiver.Kind != SmtValueKind.Reference)
             return false;
-
         if (receiverType is IArrayTypeSymbol { Rank: > 1 } arrayType) {
             if (elementAccess.ArgumentList.Arguments.Count != arrayType.Rank) return false;
-
             var indices = ImmutableArray.CreateBuilder<SymbolicTerm>(arrayType.Rank);
             foreach (var argument in elementAccess.ArgumentList.Arguments) {
                 if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(UnwrapExpression(argument.Expression), context),
                     out var dimensionIndex) ||
                     dimensionIndex.Kind != SmtValueKind.Int)
                     return false;
-
                 indices.Add(dimensionIndex);
             }
             term = new SymbolicMultiElementTerm(receiver, indices.MoveToImmutable(), elementKind);
@@ -41,7 +34,6 @@ internal static class SymbolicIndexingLowerer {
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(indexShape.ValueExpression, context), out var index) ||
             index.Kind != SmtValueKind.Int)
             return false;
-
         term = new SymbolicElementTerm(receiver, indexShape.FromEnd ? new SymbolicFromEndIndexTerm(index) : index, elementKind);
         return true;
     }
@@ -53,13 +45,11 @@ internal static class SymbolicIndexingLowerer {
         if (elementAccess.ArgumentList.Arguments.Count != 1 ||
             !TryResolveBuiltInIndexLengthShape(elementAccess.ArgumentList.Arguments[0].Expression, context, out var indexShape))
             return false;
-
         var constantIndex = context.SemanticModel.GetConstantValue(indexShape.ValueExpression, context.CancellationToken);
         if (!constantIndex.HasValue ||
             constantIndex.Value == null ||
             !TryGetIntegralConstant(constantIndex.Value, out var indexValue))
             return false;
-
         var receiver = UnwrapExpression(elementAccess.Expression);
         SeparatedSyntaxList<ExpressionSyntax>? initializerExpressions = receiver switch {
             ArrayCreationExpressionSyntax { Initializer: { } initializer } => initializer.Expressions,
@@ -67,12 +57,10 @@ internal static class SymbolicIndexingLowerer {
             _ => null
         };
         if (initializerExpressions is not { } expressions || expressions.Count == 0) return false;
-
         var resolvedIndex = indexShape.FromEnd
             ? expressions.Count - indexValue
             : indexValue;
         if (resolvedIndex < 0 || resolvedIndex >= expressions.Count) return false;
-
         return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expressions[(int)resolvedIndex], context), out term);
     }
     private static bool TryGetBuiltInElementAccessElementType(
@@ -94,7 +82,6 @@ internal static class SymbolicIndexingLowerer {
             return true;
         }
         if (TryGetInt32IndexerElementType(receiverType, out elementType)) return true;
-
         elementType = null!;
         return false;
     }
@@ -106,11 +93,9 @@ internal static class SymbolicIndexingLowerer {
         for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
             if (TryGetDeclaredInt32IndexerElementType(current, out elementType))
                 return true;
-
         foreach (var interfaceType in typeSymbol.AllInterfaces)
             if (TryGetDeclaredInt32IndexerElementType(interfaceType, out elementType))
                 return true;
-
         elementType = null!;
         return false;
     }
@@ -132,12 +117,10 @@ internal static class SymbolicIndexingLowerer {
         term = null!;
         if (!TryGetArrayDimensionInvocation(invocation, method, context, out var receiverExpression, out var dimension))
             return false;
-
         if (dimension == 0 &&
             SymbolicStringLengthLowerer.GetPreferredLengthSemanticType(receiverExpression, context) is IArrayTypeSymbol { Rank: 1 } &&
             TryLowerBuiltInLengthTerm(receiverExpression, context, out term))
             return true;
-
         return TryLowerArrayDimensionLengthTerm(receiverExpression, dimension, context, out term);
     }
     internal static bool TryLowerArrayBoundInvocation(
@@ -148,20 +131,16 @@ internal static class SymbolicIndexingLowerer {
         term = null!;
         if (!TryGetArrayDimensionInvocation(invocation, method, context, out var receiverExpression, out var dimension))
             return false;
-
         var receiverType = SymbolicStringLengthLowerer.GetPreferredLengthSemanticType(receiverExpression, context);
         if (receiverType is not IArrayTypeSymbol) return false;
-
         if (string.Equals(method.Name, nameof(Array.GetLowerBound), StringComparison.Ordinal)) {
             if (!TryLowerArrayDimensionLengthTerm(receiverExpression, dimension, context, out _)) return false;
-
             term = new SymbolicIntegerConstantTerm(0);
             return true;
         }
         if (!string.Equals(method.Name, nameof(Array.GetUpperBound), StringComparison.Ordinal) ||
             !TryLowerArrayDimensionLengthTerm(receiverExpression, dimension, context, out var length))
             return false;
-
         term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, length, new SymbolicIntegerConstantTerm(1));
         return true;
     }
@@ -179,12 +158,10 @@ internal static class SymbolicIndexingLowerer {
             method.Parameters.Length != 1 ||
             method.Parameters[0].Type.SpecialType != SpecialType.System_Int32)
             return false;
-
         var dimensionValue = context.SemanticModel.GetConstantValue(
             invocation.ArgumentList.Arguments[0].Expression,
             context.CancellationToken);
         if (dimensionValue is not { HasValue: true, Value: int constantDimension }) return false;
-
         receiverExpression = memberAccess.Expression;
         dimension = constantDimension;
         return true;
@@ -204,10 +181,8 @@ internal static class SymbolicIndexingLowerer {
         }
         if (TryLowerArrayCreationDimensionLengthTerm(arrayExpression, arrayType, dimension, context, out term))
             return true;
-
         if (TryLowerReferenceCastArrayDimensionLengthTerm(arrayExpression, arrayType, dimension, context, out term))
             return true;
-
         if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(arrayExpression, context), out var arrayTerm) ||
             arrayTerm.Kind != SmtValueKind.Reference) {
             term = null!;
@@ -217,7 +192,6 @@ internal static class SymbolicIndexingLowerer {
             dimension == 0 &&
             CreateLengthTerm(arrayTerm, out term))
             return true;
-
         term = new SymbolicArrayDimensionLengthTerm(arrayTerm, dimension);
         return true;
     }
@@ -229,16 +203,12 @@ internal static class SymbolicIndexingLowerer {
         out SymbolicTerm term) {
         term = null!;
         if (arrayExpression is not CastExpressionSyntax castExpression) return false;
-
         var targetType = context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type;
         if (!SymbolEqualityComparer.Default.Equals(targetType, arrayType)) return false;
-
         if (TryLowerArrayCreationDimensionLengthTerm(castExpression.Expression, arrayType, dimension, context, out term)) return true;
-
         if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var operand) ||
             operand.Kind != SmtValueKind.Reference)
             return false;
-
         term = new SymbolicArrayDimensionLengthTerm(operand, dimension);
         return true;
     }
@@ -250,9 +220,7 @@ internal static class SymbolicIndexingLowerer {
         term = null!;
         arrayExpression = UnwrapExpression(arrayExpression);
         if (arrayType.Rank <= 0) return false;
-
         if (TryLowerArrayCreationTotalLengthTerm(arrayExpression, arrayType, context, out term)) return true;
-
         return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(arrayExpression, context), out var arrayTerm) &&
                TryCreateArrayTotalLengthReferenceTerm(arrayTerm, arrayType, out term);
     }
@@ -261,15 +229,12 @@ internal static class SymbolicIndexingLowerer {
         if (reference.Kind != SmtValueKind.Reference ||
             type == null)
             return false;
-
         if (type.SpecialType == SpecialType.System_String)
             return SymbolicStringLowerer.TryCreateStringContentReferenceTerm(reference, out var stringContent) &&
                    CreateLengthTerm(stringContent, out term);
-
         if (type is IArrayTypeSymbol { Rank: 1 } ||
             SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type))
             return CreateLengthTerm(reference, out term);
-
         if (type is not IArrayTypeSymbol &&
             HasCountBackedIntIndexer(type)) {
             term = new SymbolicCountTerm(reference);
@@ -286,20 +251,17 @@ internal static class SymbolicIndexingLowerer {
     internal static bool HasCountBackedIntIndexer(ITypeSymbol? typeSymbol)
         => SymbolicTypeFacts.HasInstanceInt32Member(typeSymbol, "Count") &&
                SymbolicTypeFacts.HasInt32Indexer(typeSymbol);
-
     private static bool TryCreateArrayTotalLengthReferenceTerm(SymbolicTerm arrayTerm, IArrayTypeSymbol arrayType, out SymbolicTerm term) {
         term = null!;
         if (arrayTerm.Kind != SmtValueKind.Reference ||
             arrayType.Rank <= 0)
             return false;
-
         SymbolicTerm totalLength = new SymbolicArrayDimensionLengthTerm(arrayTerm, 0);
         for (var dimension = 1; dimension < arrayType.Rank; dimension++)
             totalLength = new SymbolicBinaryTerm(
                 SymbolicBinaryTermOperator.Multiply,
                 totalLength,
                 new SymbolicArrayDimensionLengthTerm(arrayTerm, dimension));
-
         term = totalLength;
         return true;
     }
@@ -316,11 +278,9 @@ internal static class SymbolicIndexingLowerer {
         if (arrayType.Rank <= 0 ||
             !TryLowerArrayCreationDimensionLengthTerm(arrayExpression, arrayType, 0, context, out var totalLength))
             return false;
-
         for (var dimension = 1; dimension < arrayType.Rank; dimension++) {
             if (!TryLowerArrayCreationDimensionLengthTerm(arrayExpression, arrayType, dimension, context,
                 out var dimensionLength)) return false;
-
             totalLength = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Multiply, totalLength, dimensionLength);
         }
         term = totalLength;
@@ -337,7 +297,6 @@ internal static class SymbolicIndexingLowerer {
             arrayExpression is not ImplicitArrayCreationExpressionSyntax implicitArrayCreation ||
             implicitArrayCreation.Initializer == null)
             return LowerExplicitArrayCreationDimensionLengthTerm(arrayExpression, arrayType, dimension, context, out term);
-
         term = new SymbolicIntegerConstantTerm(implicitArrayCreation.Initializer.Expressions.Count);
         return true;
     }
@@ -351,7 +310,6 @@ internal static class SymbolicIndexingLowerer {
         if (arrayExpression is not ArrayCreationExpressionSyntax arrayCreation ||
             arrayCreation.Type.RankSpecifiers.Count == 0)
             return false;
-
         var rankSpecifier = arrayCreation.Type.RankSpecifiers[0];
         if (rankSpecifier.Sizes.Count != arrayType.Rank ||
             rankSpecifier.Sizes[dimension].IsKind(SyntaxKind.OmittedArraySizeExpression)) {
@@ -367,7 +325,6 @@ internal static class SymbolicIndexingLowerer {
         if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(rankSpecifier.Sizes[dimension], context), out var sizeTerm) ||
             sizeTerm.Kind != SmtValueKind.Int)
             return false;
-
         term = sizeTerm;
         return true;
     }
@@ -385,14 +342,12 @@ internal static class SymbolicIndexingLowerer {
         if (arrayType is not IArrayTypeSymbol { Rank: > 0 } typedArray ||
             indexExpressions.Count != typedArray.Rank)
             return false;
-
         SymbolicCondition? combined = null;
         for (var dimension = 0; dimension < typedArray.Rank; dimension++) {
             if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(indexExpressions[dimension], context), out var index) ||
                 index.Kind != SmtValueKind.Int ||
                 !TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var length))
                 return false;
-
             subject ??= index;
             var dimensionInRange = new SymbolicFactCondition(SymbolicFact.Exact(
                 new SymbolicBoundsAtom(index, length, true, true),
@@ -403,7 +358,6 @@ internal static class SymbolicIndexingLowerer {
                 : new SymbolicBinaryCondition(SymbolicConditionOperator.And, combined, dimensionInRange);
         }
         if (combined == null) return false;
-
         condition = combined;
         return true;
     }
@@ -421,21 +375,17 @@ internal static class SymbolicIndexingLowerer {
         if (!IsSupportedBuiltInElementAccessReceiver(receiverType) ||
             !TryLowerBuiltInLengthTerm(receiverExpression, context, out var sourceLength))
             return false;
-
         if (TryResolveBuiltInRangeLengthShape(argumentExpression, context, out var rangeShape))
             return TryCreateBuiltInRangeAccessInRangeCondition(rangeShape, sourceLength, source, provenance, context, out condition);
-
         if (!TryResolveBuiltInIndexLengthShape(argumentExpression, context, out var indexShape) ||
             !TryLowerIndexShapeTerm(indexShape, sourceLength, context, out var effectiveIndex))
             return false;
-
         var inRange = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicBoundsAtom(effectiveIndex, sourceLength, true, true),
             source,
             provenance));
         if (!TryCreateIndexShapeWellFormedCondition(indexShape, source, provenance + ".well-formed", context, out var wellFormed))
             return false;
-
         condition = ApplyWellFormedPrecondition(wellFormed, inRange);
         return true;
     }
@@ -451,7 +401,6 @@ internal static class SymbolicIndexingLowerer {
         condition = null!;
         if (!TryLowerBuiltInLengthTerm(receiverExpression, context, out var sourceLength))
             return false;
-
         if (lengthExpression == null &&
             IsDefinitelyPastReceiverLength(receiverExpression, startExpression, context)) {
             condition = new SymbolicConstantCondition(false);
@@ -461,14 +410,12 @@ internal static class SymbolicIndexingLowerer {
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(startExpression, context), out var start) ||
             start.Kind != SmtValueKind.Int)
             return false;
-
         var startNonNegative = CreateRelationCondition(
             SymbolicRelationOperator.GreaterThanOrEqual,
             start,
             new SymbolicIntegerConstantTerm(0),
             source,
             provenance + ".start-non-negative");
-
         if (lengthExpression == null) {
             var upperBound = CreateRelationCondition(
                 oneArgumentUpperBoundIsInclusive
@@ -484,7 +431,6 @@ internal static class SymbolicIndexingLowerer {
         if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(lengthExpression, context), out var count) ||
             count.Kind != SmtValueKind.Int)
             return false;
-
         var countNonNegative = CreateRelationCondition(
             SymbolicRelationOperator.GreaterThanOrEqual,
             count,
@@ -512,7 +458,6 @@ internal static class SymbolicIndexingLowerer {
                 new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, new SymbolicIntegerConstantTerm(int.MaxValue), count),
                 source,
                 provenance + ".addition-does-not-overflow");
-
         condition = new SymbolicBinaryCondition(
             SymbolicConditionOperator.And,
             startNonNegative,
@@ -535,24 +480,20 @@ internal static class SymbolicIndexingLowerer {
             context.SemanticModel.GetOperation(binary, context.CancellationToken) is not
                 IBinaryOperation { OperatorMethod: null, IsChecked: false })
             return false;
-
         return IsReceiverLengthPlusPositiveConstant(binary.Left, binary.Right) ||
                IsReceiverLengthPlusPositiveConstant(binary.Right, binary.Left);
-
         bool IsReceiverLengthPlusPositiveConstant(ExpressionSyntax lengthCandidate, ExpressionSyntax constantCandidate) {
             lengthCandidate = UnwrapExpression(lengthCandidate);
             if (lengthCandidate is not MemberAccessExpressionSyntax memberAccess ||
                 !string.Equals(memberAccess.Name.Identifier.ValueText, "Length", StringComparison.Ordinal) ||
                 !SyntaxFactory.AreEquivalent(UnwrapExpression(memberAccess.Expression), UnwrapExpression(receiverExpression)))
                 return false;
-
             var constant = context.SemanticModel.GetConstantValue(UnwrapExpression(constantCandidate), context.CancellationToken);
             return constant.HasValue && constant.Value is int value && value > 0;
         }
     }
     internal static bool TryLowerBuiltInLengthTerm(ExpressionSyntax expression, SymbolicLoweringContext context, out SymbolicTerm term) {
         expression = UnwrapExpression(expression);
-
         if (expression is CastExpressionSyntax castExpression) {
             var castTargetType = context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type;
             if (castTargetType?.SpecialType == SpecialType.System_String) {
@@ -569,7 +510,6 @@ internal static class SymbolicIndexingLowerer {
                         or ImplicitArrayCreationExpressionSyntax &&
                     TryLowerArrayCreationTotalLengthTerm(castExpression.Expression, castArrayType, context, out term))
                     return true;
-
                 if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var castReference) &&
                     TryCreateBuiltInLengthReferenceTerm(castArrayType, castReference, out term))
                     return true;
@@ -578,15 +518,10 @@ internal static class SymbolicIndexingLowerer {
         if (expression is CollectionExpressionSyntax collectionExpression &&
             TryLowerCollectionExpressionLengthTerm(collectionExpression, context, out term))
             return true;
-
         if (TryLowerDirectRangeAccessResultLengthTerm(expression, context, out term)) return true;
-
         if (TryLowerBuiltInViewResultLengthTerm(expression, context, out term)) return true;
-
         if (SymbolicStringLengthLowerer.TryLowerStringCreationResultLengthTerm(expression, context, out term)) return true;
-
         if (SymbolicStringLengthLowerer.TryLowerStringInvocationResultLengthTerm(expression, context, out term)) return true;
-
         var type = SymbolicStringLengthLowerer.GetPreferredLengthSemanticType(expression, context);
         if (type?.SpecialType == SpecialType.System_String) {
             if (SymbolicStringLowerer.TryLowerStringTerm(expression, context, out var stringValue)) {
@@ -601,7 +536,6 @@ internal static class SymbolicIndexingLowerer {
             type is IArrayTypeSymbol arrayCreationType &&
             TryLowerArrayTotalLengthTerm(expression, arrayCreationType, context, out term))
             return true;
-
         if (expression is InvocationExpressionSyntax arrayEmptyInvocation &&
             context.SemanticModel.GetSymbolInfo(arrayEmptyInvocation, context.CancellationToken).Symbol is IMethodSymbol {
                 Name: "Empty",
@@ -643,7 +577,6 @@ internal static class SymbolicIndexingLowerer {
         if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var receiver) &&
             TryCreateBuiltInLengthReferenceTerm(type, receiver, out term))
             return true;
-
         term = null!;
         return false;
     }
@@ -680,7 +613,6 @@ internal static class SymbolicIndexingLowerer {
         SymbolicLoweringContext context,
         out SymbolicTerm term) => TryLowerBuiltInSliceInvocationResultLengthTerm(expression, context, out term) ||
                TryLowerMemoryExtensionsViewResultLengthTerm(expression, context, out term);
-
     private static bool TryLowerBuiltInSliceInvocationResultLengthTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -688,7 +620,6 @@ internal static class SymbolicIndexingLowerer {
         term = null!;
         if (!TryGetInvocationOperation(expression, context, out var invocationExpression, out var invocationOperation))
             return false;
-
         var method = invocationOperation.TargetMethod;
         if (method.IsStatic ||
             method.Name != "Slice" ||
@@ -696,7 +627,6 @@ internal static class SymbolicIndexingLowerer {
             !SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(method.ReturnType) ||
             invocationOperation.Instance?.Syntax is not ExpressionSyntax sourceExpression)
             return false;
-
         return TryLowerViewLengthFromInvocationArguments(invocationExpression, sourceExpression, 0, false, context, out term);
     }
     private static bool TryLowerMemoryExtensionsViewResultLengthTerm(
@@ -711,7 +641,6 @@ internal static class SymbolicIndexingLowerer {
                 out var firstArgumentIndex) ||
             !SymbolicStringLengthLowerer.IsSupportedMemoryExtensionsViewSource(sourceExpression, context))
             return false;
-
         return TryLowerViewLengthFromInvocationArguments(
             invocationExpression,
             sourceExpression,
@@ -729,7 +658,6 @@ internal static class SymbolicIndexingLowerer {
         out SymbolicTerm term) {
         term = null!;
         if (!TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength)) return false;
-
         var remainingArgumentCount = invocationExpression.ArgumentList.Arguments.Count - firstArgumentIndex;
         if (remainingArgumentCount == 0) {
             term = sourceLength;
@@ -740,11 +668,9 @@ internal static class SymbolicIndexingLowerer {
             if (allowDirectRangeArgument &&
                 TryCreateRangeLengthTerm(argument, sourceExpression, context, out term))
                 return true;
-
             if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argument, context), out var start) ||
                 start.Kind != SmtValueKind.Int)
                 return false;
-
             term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, start);
             return true;
         }
@@ -755,7 +681,6 @@ internal static class SymbolicIndexingLowerer {
                 1].Expression, context), out var resultLength) ||
             resultLength.Kind != SmtValueKind.Int)
             return false;
-
         term = resultLength;
         return true;
     }
@@ -767,18 +692,15 @@ internal static class SymbolicIndexingLowerer {
         if (expression is not ElementAccessExpressionSyntax elementAccess ||
             elementAccess.ArgumentList.Arguments.Count != 1)
             return false;
-
         var sourceType = SymbolicStringLengthLowerer.GetPreferredLengthSemanticType(elementAccess.Expression, context);
         if (!IsSupportedBuiltInRangeLengthSourceType(sourceType) ||
             !TryCreateRangeLengthTerm(elementAccess.ArgumentList.Arguments[0].Expression, elementAccess.Expression, context, out term))
             return false;
-
         return true;
     }
     private static bool IsSupportedBuiltInRangeLengthSourceType(ITypeSymbol? type) => type?.SpecialType == SpecialType.System_String ||
                type is IArrayTypeSymbol { Rank: 1 } ||
                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type);
-
     private static bool TryCreateDirectRangeLengthTerm(
         ExpressionSyntax rangeExpression,
         ExpressionSyntax sourceExpression,
@@ -786,7 +708,6 @@ internal static class SymbolicIndexingLowerer {
         out SymbolicTerm term) {
         term = null!;
         if (!TryCreateDirectRangeExpressionShape(rangeExpression, context, out var rangeShape)) return false;
-
         return TryCreateRangeLengthTerm(rangeShape, sourceExpression, context, out term);
     }
     private static bool TryCreateRangeLengthTerm(
@@ -795,9 +716,7 @@ internal static class SymbolicIndexingLowerer {
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         if (TryCreateDirectRangeLengthTerm(rangeExpression, sourceExpression, context, out term)) return true;
-
         if (!TryResolveBuiltInRangeLengthShape(rangeExpression, context, out var rangeShape)) return false;
-
         return TryCreateRangeLengthTerm(rangeShape, sourceExpression, context, out term);
     }
     private static bool TryCreateRangeLengthTerm(
@@ -809,7 +728,6 @@ internal static class SymbolicIndexingLowerer {
         if (!TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength) ||
             !TryLowerRangeEndpointTerms(rangeShape, sourceLength, context, out var start, out var end))
             return false;
-
         term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, end, start);
         return true;
     }
@@ -831,7 +749,6 @@ internal static class SymbolicIndexingLowerer {
             TryCreateRangeObjectCreationShape(expression, context, out rangeShape) ||
             TryCreateRangeAllPropertyShape(expression, context, out rangeShape))
             return true;
-
         rangeShape = default;
         return false;
     }
@@ -858,7 +775,6 @@ internal static class SymbolicIndexingLowerer {
         out RangeLengthShape rangeShape) {
         argumentExpression = UnwrapExpression(argumentExpression);
         if (TryCreateDirectRangeExpressionShape(argumentExpression, context, out rangeShape)) return true;
-
         if (!IsSystemRangeExpression(argumentExpression, context) ||
             !TryGetLocalOrParameterShapeSymbol(argumentExpression, context, IsSystemRangeType, out var rangeSymbol)) {
             rangeShape = default;
@@ -904,11 +820,9 @@ internal static class SymbolicIndexingLowerer {
         out SymbolicCondition? condition) {
         condition = null;
         if (!indexShape.RequiresNonNegativeValue) return true;
-
         if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(indexShape.ValueExpression, context), out var rawIndex) ||
             rawIndex.Kind != SmtValueKind.Int)
             return false;
-
         condition = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicRelationAtom(SymbolicRelationOperator.GreaterThanOrEqual, rawIndex, new SymbolicIntegerConstantTerm(0)),
             source,
@@ -925,7 +839,6 @@ internal static class SymbolicIndexingLowerer {
         condition = null!;
         if (!TryLowerRangeEndpointTerms(rangeShape, sourceLength, context, out var start, out var end))
             return false;
-
         var nonNegativeStart = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicRelationAtom(SymbolicRelationOperator.GreaterThanOrEqual, start, new SymbolicIntegerConstantTerm(0)),
             source,
@@ -944,7 +857,6 @@ internal static class SymbolicIndexingLowerer {
             new SymbolicBinaryCondition(SymbolicConditionOperator.And, orderedEndpoints, endWithinLength));
         if (!TryCreateRangeShapeWellFormedCondition(rangeShape, source, provenance + ".well-formed", context, out var wellFormed))
             return false;
-
         condition = ApplyWellFormedPrecondition(wellFormed, inRange);
         return true;
     }
@@ -970,32 +882,26 @@ internal static class SymbolicIndexingLowerer {
         if (rangeShape.HasStart &&
             !TryCreateIndexShapeWellFormedCondition(rangeShape.Start, source, provenance + ".start", context, out startWellFormedCondition))
             return false;
-
         if (rangeShape.HasEnd &&
             !TryCreateIndexShapeWellFormedCondition(rangeShape.End, source, provenance + ".end", context, out endWellFormedCondition))
             return false;
-
         if (startWellFormedCondition != null) condition = startWellFormedCondition;
-
         if (endWellFormedCondition != null)
             condition = condition == null
                 ? endWellFormedCondition
                 : new SymbolicBinaryCondition(SymbolicConditionOperator.And, condition, endWellFormedCondition);
-
         return true;
     }
     private static SymbolicCondition ApplyWellFormedPrecondition(SymbolicCondition? wellFormed, SymbolicCondition inRange)
         => wellFormed == null
             ? inRange
             : new SymbolicBinaryCondition(SymbolicConditionOperator.And, wellFormed, inRange);
-
     private static bool TryResolveBuiltInIndexLengthShape(
         ExpressionSyntax argumentExpression,
         SymbolicLoweringContext context,
         out IndexLengthShape indexShape) {
         argumentExpression = UnwrapExpression(argumentExpression);
         if (TryCreateDirectIndexExpressionShape(argumentExpression, context, out indexShape)) return true;
-
         if (!IsSystemIndexExpression(argumentExpression, context) ||
             !TryGetLocalOrParameterShapeSymbol(argumentExpression, context, IsSystemIndexType, out var indexSymbol)) {
             indexShape = default;
@@ -1037,7 +943,6 @@ internal static class SymbolicIndexingLowerer {
                 out var currentValue) &&
             tryCreateShape(currentValue, context, out shape))
             return true;
-
         shape = default;
         return false;
     }
@@ -1055,7 +960,6 @@ internal static class SymbolicIndexingLowerer {
         if (TryCreateIndexInvocationShape(expression, context, out indexShape) ||
             TryCreateIndexObjectCreationShape(expression, context, out indexShape))
             return true;
-
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
         if (SymbolicTypeFacts.IsBuiltInIntegralOrEnumType(typeInfo.Type)) {
             indexShape = new IndexLengthShape(expression, false);
@@ -1076,12 +980,10 @@ internal static class SymbolicIndexingLowerer {
             invocationOperation.TargetMethod.ContainingType is not { } containingType ||
             !IsSystemRangeType(containingType, context.SemanticModel.Compilation))
             return false;
-
         if (invocationOperation.TargetMethod.Name == "StartAt") {
             if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var startExpression) ||
                 !TryResolveBuiltInIndexLengthShape(startExpression, context, out var start))
                 return false;
-
             rangeShape = new RangeLengthShape(true, start, false, default);
             return true;
         }
@@ -1089,7 +991,6 @@ internal static class SymbolicIndexingLowerer {
             if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var endExpression) ||
                 !TryResolveBuiltInIndexLengthShape(endExpression, context, out var end))
                 return false;
-
             rangeShape = new RangeLengthShape(false, default, true, end);
             return true;
         }
@@ -1109,7 +1010,6 @@ internal static class SymbolicIndexingLowerer {
             !TryResolveBuiltInIndexLengthShape(startExpression, context, out var start) ||
             !TryResolveBuiltInIndexLengthShape(endExpression, context, out var end))
             return false;
-
         rangeShape = new RangeLengthShape(true, start, true, end);
         return true;
     }
@@ -1125,7 +1025,6 @@ internal static class SymbolicIndexingLowerer {
             !IsSystemRangeType(propertySymbol.ContainingType, context.SemanticModel.Compilation) ||
             !IsSystemRangeType(propertySymbol.Type, context.SemanticModel.Compilation))
             return false;
-
         rangeShape = new RangeLengthShape(false, default, false, default);
         return true;
     }
@@ -1142,7 +1041,6 @@ internal static class SymbolicIndexingLowerer {
             !IsSystemIndexType(containingType, context.SemanticModel.Compilation) ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var valueExpression))
             return false;
-
         if (invocationOperation.TargetMethod.Name == "FromStart") {
             indexShape = new IndexLengthShape(valueExpression, false, true);
             return true;
@@ -1164,13 +1062,11 @@ internal static class SymbolicIndexingLowerer {
             !IsSystemIndexType(objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
             !TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var valueExpression))
             return false;
-
         if (!TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var fromEndExpression)) {
             indexShape = new IndexLengthShape(valueExpression, false, true);
             return true;
         }
         if (!TryGetConstantBool(fromEndExpression, context, out var fromEnd)) return false;
-
         indexShape = new IndexLengthShape(valueExpression, fromEnd, true);
         return true;
     }
@@ -1178,7 +1074,6 @@ internal static class SymbolicIndexingLowerer {
                typeSymbol?.SpecialType == SpecialType.System_String ||
                SymbolicTypeFacts.IsBuiltInSpanType(typeSymbol) ||
                HasCountBackedIntIndexer(typeSymbol);
-
     internal static bool TryGetInvocationOperation(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -1204,7 +1099,6 @@ internal static class SymbolicIndexingLowerer {
             parameterIndex < 0 ||
             parameterIndex >= objectCreationOperation.Constructor.Parameters.Length)
             return false;
-
         var parameter = objectCreationOperation.Constructor.Parameters[parameterIndex];
         foreach (var argument in objectCreationOperation.Arguments)
             if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
@@ -1225,14 +1119,12 @@ internal static class SymbolicIndexingLowerer {
     }
     private static bool IsSystemRangeType(ITypeSymbol? typeSymbol, Compilation compilation) =>
         IsSystemType(typeSymbol, compilation, "System.Range");
-
     private static bool IsSystemIndexExpression(ExpressionSyntax expression, SymbolicLoweringContext context) {
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
         return IsSystemIndexType(typeInfo.ConvertedType ?? typeInfo.Type, context.SemanticModel.Compilation);
     }
     private static bool IsSystemIndexType(ITypeSymbol? typeSymbol, Compilation compilation) =>
         IsSystemType(typeSymbol, compilation, "System.Index");
-
     private static bool IsSystemType(ITypeSymbol? typeSymbol, Compilation compilation, string metadataName) {
         var systemType = compilation.GetTypeByMetadataName(metadataName);
         return typeSymbol != null &&
@@ -1249,6 +1141,5 @@ internal static class SymbolicIndexingLowerer {
         return false;
     }
     readonly record struct IndexLengthShape(ExpressionSyntax ValueExpression, bool FromEnd, bool RequiresNonNegativeValue = false);
-
     readonly record struct RangeLengthShape(bool HasStart, IndexLengthShape Start, bool HasEnd, IndexLengthShape End);
 }

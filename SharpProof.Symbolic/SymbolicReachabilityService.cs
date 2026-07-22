@@ -1,12 +1,9 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicReachabilityService {
     private const int StructuralPathStateCacheEntryLimit = 512;
-
     private static readonly ConditionalWeakTable<SemanticModel,
         ConditionalWeakTable<SyntaxNode, BoundedConcurrentCache<PathStateCacheKey, SymbolicState>>>
         s_structuralPathStateCache = new();
-
     internal static SymbolicState CollectPathStateAt(
         SyntaxNode site,
         SemanticModel semanticModel,
@@ -21,7 +18,6 @@ internal static class SymbolicReachabilityService {
                 cancellationToken,
                 initialState,
                 includeCurrentStatementCompletionFacts);
-
         var key = new PathStateCacheKey(site.SpanStart, site.Span.Length, site.RawKind, includeCurrentStatementCompletionFacts);
         var methodCaches = s_structuralPathStateCache.GetOrCreateValue(semanticModel);
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(site);
@@ -39,13 +35,11 @@ internal static class SymbolicReachabilityService {
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis) {
         if (forStatement.Condition == null) return false;
-
         var initialEntryState = CollectForInitialEntryState(forStatement, semanticModel, cancellationToken);
         var lowering = SymbolicSemanticPipeline.LowerCondition(
             forStatement.Condition,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
         if (lowering is not { IsExact: true, Value: { } initialEntryCondition }) return false;
-
         var proof = new SymbolicProofService(smtAnalysis)
             .ClassifyConditionTruth(initialEntryState, initialEntryCondition);
         return proof.Status is SymbolicProofStatus.ProvenFalse or SymbolicProofStatus.Unreachable;
@@ -81,6 +75,5 @@ internal static class SymbolicReachabilityService {
             ? SymbolicUnknownReason.UnsupportedIrEncoding
             : result.UnknownReason,
         provenance: result.Provenance);
-
     readonly record struct PathStateCacheKey(int SiteStart, int SiteLength, int SiteRawKind, bool IncludeCurrentStatementCompletionFacts);
 }

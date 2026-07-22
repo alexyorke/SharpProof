@@ -1,10 +1,7 @@
 namespace SharpProof.ProofCore.Smt;
-
 internal sealed class SmtQuerySafety {
     private readonly SmtRegexValidator _regexValidator = new();
-
     internal int RegexValidationCacheCount => _regexValidator.CacheCount;
-
     internal bool TryPrepare(IReadOnlyList<SmtFormula> conditions, out SmtFormula[] prepared, out bool changed) {
         var strings = CollectConcreteStrings(conditions);
         changed = false;
@@ -32,7 +29,6 @@ internal sealed class SmtQuerySafety {
     internal static bool ContainsUnsafeArithmetic(SmtFormula formula) =>
         SmtFormulaTraversal.Contains(formula, static item =>
             item is SmtIntegerBinaryTerm { Operator: SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder });
-
     private SmtFormula RewriteConcreteRegex(
         SmtFormula formula,
         IReadOnlyDictionary<SmtFormula, string> strings,

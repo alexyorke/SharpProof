@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicControlFlowFacts {
     internal static bool StatementDefinitelyExits(
         StatementSyntax statement,
@@ -13,12 +12,10 @@ internal static class SymbolicControlFlowFacts {
             return true;
         if (statement is YieldStatementSyntax yieldStatement)
             return yieldStatement.IsKind(SyntaxKind.YieldBreakStatement);
-
         statement = UnwrapSingleStatementBlock(statement);
         if (statement is ExpressionStatementSyntax expressionStatement &&
             ExpressionStatementDefinitelyExits(expressionStatement, semanticModel, cancellationToken))
             return true;
-
         try {
             var controlFlow = semanticModel.AnalyzeControlFlow(statement);
             return controlFlow is { Succeeded: true } && !controlFlow.EndPointIsReachable;
@@ -38,7 +35,6 @@ internal static class SymbolicControlFlowFacts {
     }
     internal static StatementSyntax UnwrapSingleStatementBlock(StatementSyntax statement) {
         while (statement is BlockSyntax { Statements.Count: 1 } block) statement = block.Statements[0];
-
         return statement;
     }
 }

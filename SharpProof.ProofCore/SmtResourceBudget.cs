@@ -1,5 +1,4 @@
 namespace SharpProof.ProofCore.Smt;
-
 /// <summary>
 ///     Converts wall-clock-denominated SMT budgets into deterministic Z3 resource
 ///     limits. Z3's rlimit counts internal solver operations, so the same query with
@@ -16,31 +15,24 @@ internal static class SmtResourceBudget {
     ///     hardware.
     /// </summary>
     public const long RlimitPerMillisecond = 4000;
-
     /// <summary>
     ///     The wall-clock timeout is kept only as a safety net (e.g. a wedged native
     ///     solver). It is scaled up so it does not bind under CPU contention, which
     ///     would reintroduce load-dependent proof outcomes.
     /// </summary>
     public const int WallClockSafetyFactor = 8;
-
     public static uint GetRlimit(TimeSpan budget) =>
         (uint)GetSaturatedRlimit(budget, uint.MaxValue, 1);
-
     public static TimeSpan GetWallClockSafetyNet(TimeSpan budget) {
         if (budget <= TimeSpan.Zero) return TimeSpan.Zero;
-
         if (budget.Ticks > TimeSpan.MaxValue.Ticks / WallClockSafetyFactor) return TimeSpan.MaxValue;
-
         return TimeSpan.FromTicks(budget.Ticks * WallClockSafetyFactor);
     }
     public static long GetMethodRlimitBudget(TimeSpan methodBudget) =>
         GetSaturatedRlimit(methodBudget, long.MaxValue, 0);
-
     private static long GetSaturatedRlimit(TimeSpan budget, long maximum, long minimum) {
         var rlimit = budget.TotalMilliseconds * RlimitPerMillisecond;
         if (rlimit >= maximum) return maximum;
-
         return Math.Max(minimum, (long)rlimit);
     }
 }

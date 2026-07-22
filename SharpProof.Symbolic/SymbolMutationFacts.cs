@@ -1,11 +1,9 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolMutationFacts {
     internal static bool TryGetMutationTarget(SyntaxNode node, out ExpressionSyntax expression) {
         if (node is ExpressionSyntax mutationExpression &&
             CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(mutationExpression, out expression, out _))
             return true;
-
         switch (node) {
             case AssignmentExpressionSyntax assignment:
                 expression = assignment.Left;
@@ -46,7 +44,6 @@ internal static class SymbolMutationFacts {
             if (TryGetLocalOrParameterSymbol(expression, semanticModel, cancellationToken, out var symbol) &&
                 symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
                 symbols.Add(symbol);
-
         return symbols;
     }
     internal static bool ExpressionReferencesSymbol(

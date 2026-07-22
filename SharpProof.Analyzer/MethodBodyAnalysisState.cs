@@ -1,5 +1,4 @@
 namespace SharpProof.Analyzer;
-
 internal sealed record AnalyzerQueryOutcome<T>(T? Value, SharpProofError? Error) where T : class {
     internal bool IsSuccess => Error == null;
 }
@@ -10,13 +9,11 @@ internal sealed class MethodBodyAnalysisState {
     private readonly object _gate = new();
     private AnalyzerQueryOutcome<SymbolicComplexityResult>? _complexity;
     private MethodEffects? _effects;
-
     internal MethodBodyAnalysisState(MethodAnalysisSnapshot snapshot, MethodEffectAnalysisSession? effectAnalysis = null) {
         Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
         _effectAnalysis = effectAnalysis ?? new MethodEffectAnalysisSession(snapshot.SemanticModel.Compilation, CancellationToken.None);
     }
     internal MethodAnalysisSnapshot Snapshot { get; }
-
     internal MethodEffects GetMethodEffects(CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         lock (_gate)
@@ -89,11 +86,9 @@ internal static class AnalyzerSymbolicQueryBoundary {
         string condition,
         CancellationToken cancellationToken) {
         if (outcome.IsSuccess && outcome.Value != null) return outcome.Value;
-
         cancellationToken.ThrowIfCancellationRequested();
         if (outcome.Error?.Category == SharpProofErrorCategory.Cancellation)
             throw new OperationCanceledException(outcome.Error.Message);
-
         var reason = outcome.Error == null
             ? "symbolic proof failed without error details"
             : outcome.Error.Code + ": " + outcome.Error.Message;
@@ -107,16 +102,10 @@ internal sealed class MethodBodyAnalysisContext(
     private readonly Action<Diagnostic> _reportDiagnostic =
         reportDiagnostic ?? throw new ArgumentNullException(nameof(reportDiagnostic));
     internal MethodBodyAnalysisState State { get; } = state ?? throw new ArgumentNullException(nameof(state));
-
     internal MethodAnalysisSnapshot Snapshot => State.Snapshot;
-
     internal IMethodSymbol MethodSymbol => Snapshot.MethodSymbol;
-
     internal SyntaxNode Node => Snapshot.Declaration;
-
     internal SemanticModel SemanticModel => Snapshot.SemanticModel;
-
     internal CancellationToken CancellationToken { get; } = cancellationToken;
-
     internal void ReportDiagnostic(Diagnostic diagnostic) => _reportDiagnostic(diagnostic);
 }

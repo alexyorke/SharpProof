@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicValueFacts {
     internal static bool IsIntegralOrDecimalZero(object? value) {
         switch (value) {
@@ -33,7 +32,6 @@ internal static class SymbolicValueFacts {
         if (parameterIndex < 0 ||
             parameterIndex >= invocationOperation.TargetMethod.Parameters.Length)
             return false;
-
         var parameter = invocationOperation.TargetMethod.Parameters[parameterIndex];
         foreach (var argument in invocationOperation.Arguments)
             if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&

@@ -8,41 +8,28 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
-
 namespace SharpProof.Test;
-
 internal static class AnalyzerTestHost {
     private static readonly CSharpParseOptions PreviewParseOptions = new(LanguageVersion.Preview);
-
     private static readonly CSharpCompilationOptions DefaultCompilationOptions =
         new(OutputKind.DynamicallyLinkedLibrary);
-
     private static readonly ImmutableArray<DiagnosticAnalyzer> AnalyzerInstances =
         [new SharpProofAnalyzer()];
-
     private static readonly Lazy<ImmutableArray<MetadataReference>> TrustedPlatformReferences =
         new(CreateTrustedPlatformReferences);
-
     private static readonly Lazy<ImmutableArray<MetadataReference>> TrustedPlatformReferencesWithEnforcePure =
         new(CreateTrustedPlatformReferencesWithEnforcePure);
-
     private static readonly Lazy<ImmutableArray<MetadataReference>> MinimalFrameworkReferences =
         new(CreateMinimalFrameworkReferences);
-
     private static readonly Lazy<MetadataReference> EnforcePureAttributeReference =
         new(() => MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location));
-
     private static readonly ConcurrentDictionary<string, ConditionContext> ConditionContextCache =
         new(StringComparer.Ordinal);
-
     private static readonly ConcurrentDictionary<string, ConditionImplicationContext> ConditionImplicationContextCache =
         new(StringComparer.Ordinal);
-
     private static readonly ConcurrentDictionary<SourceContextCacheKey, SourceContext> SourceContextCache = new();
-
     private static readonly AnalyzerOptions EmptyAnalyzerOptions =
         new([], new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
-
     public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(string source) {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions, string.Empty);
         var compilation = CreateCompilation(
@@ -53,13 +40,11 @@ internal static class AnalyzerTestHost {
         var compilationWithAnalyzers = compilation.WithAnalyzers(
             AnalyzerInstances,
             new CompilationWithAnalyzersOptions(EmptyAnalyzerOptions, null, false, false, false));
-
         return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
     }
     public static AnalyzerOptions CreateAnalyzerOptions(ImmutableDictionary<string, string>? globalOptions = null) {
         var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
         if (analyzerGlobalOptions.Count == 0) return EmptyAnalyzerOptions;
-
         return new AnalyzerOptions([], new TestAnalyzerConfigOptionsProvider(analyzerGlobalOptions));
     }
     public static ConditionContext CreateConditionContext(string parameterList, string conditionExpression)
@@ -75,13 +60,11 @@ internal static class AnalyzerTestHost {
                 }
             }
             """;
-
         return ConditionContextCache.GetOrAdd(source, static conditionSource => CreateConditionContextCore(conditionSource));
     }
     private static ConditionContext CreateConditionContextCore(string source) {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions);
         var compilation = CreateCompilation("ConditionHost", GetMinimalFrameworkReferences(), DefaultCompilationOptions, syntaxTree);
-
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var returnExpression = syntaxTree.GetRoot()
             .DescendantNodes()
@@ -92,7 +75,6 @@ internal static class AnalyzerTestHost {
             .OfType<ReturnStatementSyntax>()
             .Single()
             .Expression!;
-
         return new ConditionContext(semanticModel, returnExpression);
     }
     public static SourceContext CreateSourceContext(
@@ -104,7 +86,6 @@ internal static class AnalyzerTestHost {
             return SourceContextCache.GetOrAdd(
                 new SourceContextCacheKey(source, compilationName),
                 static key => CreateSourceContextCore(key.Source, key.CompilationName, GetMinimalFrameworkReferences()));
-
         return CreateSourceContextCore(source, compilationName, references);
     }
     private static SourceContext CreateSourceContextCore(
@@ -113,7 +94,6 @@ internal static class AnalyzerTestHost {
         ImmutableArray<MetadataReference> references) {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions, string.Empty);
         var compilation = CreateCompilation(compilationName, references, DefaultCompilationOptions, syntaxTree);
-
         return new SourceContext(compilation, compilation.GetSemanticModel(syntaxTree), syntaxTree, syntaxTree.GetRoot());
     }
     public static ConditionImplicationContext CreateConditionImplicationContext(
@@ -131,7 +111,6 @@ internal static class AnalyzerTestHost {
                            }
                        }
                        """;
-
         return ConditionImplicationContextCache.GetOrAdd(
             source,
             static implicationSource => CreateConditionImplicationContextCore(implicationSource));
@@ -139,14 +118,12 @@ internal static class AnalyzerTestHost {
     private static ConditionImplicationContext CreateConditionImplicationContextCore(string source) {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions);
         var compilation = CreateCompilation("ConditionHost", GetMinimalFrameworkReferences(), DefaultCompilationOptions, syntaxTree);
-
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var variables = syntaxTree.GetRoot()
             .DescendantNodes()
             .OfType<VariableDeclaratorSyntax>()
             .Select(variable => variable.Initializer!.Value)
             .ToArray();
-
         return new ConditionImplicationContext(semanticModel, variables[0], variables[1]);
     }
     internal static ImmutableArray<MetadataReference> GetTrustedPlatformReferences() => TrustedPlatformReferences.Value;
@@ -167,7 +144,6 @@ internal static class AnalyzerTestHost {
                 MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
             ];
-
         return [.. trustedPlatformAssemblies
             .Split(Path.PathSeparator)
             .Select(path => MetadataReference.CreateFromFile(path))
@@ -176,7 +152,6 @@ internal static class AnalyzerTestHost {
     private static ImmutableArray<MetadataReference> CreateTrustedPlatformReferencesWithEnforcePure() {
         var references = TrustedPlatformReferences.Value;
         if (references.IsDefault) references = [];
-
         return references.Add(EnforcePureAttributeReference.Value);
     }
     private static ImmutableArray<MetadataReference> CreateMinimalFrameworkReferences() {
@@ -191,7 +166,6 @@ internal static class AnalyzerTestHost {
             [typeof(NotNullIfNotNullAttribute).Assembly.Location] =
                 MetadataReference.CreateFromFile(typeof(NotNullIfNotNullAttribute).Assembly.Location)
         };
-
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
         if (!string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
             foreach (var path in trustedPlatformAssemblies.Split(Path.PathSeparator)) {
@@ -215,35 +189,27 @@ internal static class AnalyzerTestHost {
             new[] { syntaxTree },
             references,
             options);
-
     internal readonly record struct ConditionContext(SemanticModel SemanticModel, ExpressionSyntax Expression);
-
     internal readonly record struct ConditionImplicationContext(
         SemanticModel SemanticModel,
         ExpressionSyntax PathCondition,
         ExpressionSyntax Conclusion);
-
     internal readonly record struct SourceContext(
         CSharpCompilation Compilation,
         SemanticModel SemanticModel,
         SyntaxTree SyntaxTree,
         SyntaxNode Root);
-
     private readonly record struct SourceContextCacheKey(string Source, string CompilationName);
-
     private sealed class TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string,
         string> globalOptions) : AnalyzerConfigOptionsProvider {
         private readonly AnalyzerConfigOptions _emptyOptions =
             new TestAnalyzerConfigOptions(ImmutableDictionary<string, string>.Empty);
-
         public override AnalyzerConfigOptions GlobalOptions { get; } = new TestAnalyzerConfigOptions(globalOptions);
-
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _emptyOptions;
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _emptyOptions;
     }
     private sealed class TestAnalyzerConfigOptions(ImmutableDictionary<string, string> values) : AnalyzerConfigOptions {
         private readonly ImmutableDictionary<string, string> _values = values;
-
         public override bool TryGetValue(string key, out string value) {
             if (_values.TryGetValue(key, out var found)) {
                 value = found;

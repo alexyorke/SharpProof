@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicStateFactBuilder {
     internal static bool TryCreateSymbolTerm(ISymbol symbol, out SymbolicTerm term) {
         if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not { } type ||
@@ -21,7 +20,6 @@ internal static class SymbolicStateFactBuilder {
         string provenance) {
         if (!TryCreateSymbolTerm(symbol, out var term) || term.Kind != SmtValueKind.Reference)
             return;
-
         state = SymbolicOperationTransferKernel.Assume(
             state, CreateReferenceNullCondition(term, source, isNull, provenance), true, source.Span, provenance).State;
     }
@@ -31,7 +29,6 @@ internal static class SymbolicStateFactBuilder {
             new SymbolicRelationAtom(isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
                 reference, new SymbolicNullTerm()),
             source, provenance, evidenceKey: evidenceKey));
-
     internal static bool TryCreateReferenceNullCondition(
         ExpressionSyntax expression,
         bool isNull,

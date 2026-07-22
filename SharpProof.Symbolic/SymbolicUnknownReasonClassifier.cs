@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicUnknownReasonClassifier {
     private static readonly (SymbolicUnknownReason Reason, string[] Fragments)[] Rules =
     [
@@ -14,14 +13,11 @@ internal static class SymbolicUnknownReasonClassifier {
         (SymbolicUnknownReason.SmtDisabled, ["smt_required", "smt_disabled", "smt_off"]),
         (SymbolicUnknownReason.SmtUnavailable, ["transient_failure", "z3", "native", "unavailable", "load"])
     ];
-
     internal static SymbolicUnknownReason Classify(string reason) {
         if (string.IsNullOrWhiteSpace(reason)) return SymbolicUnknownReason.Unknown;
-
         foreach (var rule in Rules)
             if (rule.Fragments.Any(fragment => reason.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0))
                 return rule.Reason;
-
         return SymbolicUnknownReason.Unknown;
     }
 }

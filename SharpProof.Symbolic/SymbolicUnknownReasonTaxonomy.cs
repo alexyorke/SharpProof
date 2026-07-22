@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal enum SymbolicUnknownReasonSource {
     Proof,
     Complexity,
@@ -33,10 +32,8 @@ internal sealed record SymbolicUnknownReasonInfo(
 internal static class SymbolicUnknownReasonTaxonomy {
     internal static SymbolicUnknownReasonInfo ForProof(SymbolicUnknownReason reason, string? rawReason = null) =>
         Create(SymbolicUnknownReasonSource.Proof, "proof", Describe(reason), rawReason);
-
     internal static SymbolicUnknownReasonInfo ForComplexity(SymbolicComplexityUnknownReason reason) =>
         Create(SymbolicUnknownReasonSource.Complexity, "complexity", Describe(reason), reason.ToString());
-
     internal static SymbolicUnknownReasonInfo ForRuntimeHazard(
         SymbolicRuntimeHazardStatus status,
         string? rawReason,
@@ -44,14 +41,11 @@ internal static class SymbolicUnknownReasonTaxonomy {
         if (status is SymbolicRuntimeHazardStatus.Proven or SymbolicRuntimeHazardStatus.Unreachable)
             return Create(SymbolicUnknownReasonSource.RuntimeHazard, "runtime_hazard",
                 new(SymbolicUnknownReasonCategory.None, "none"), rawReason);
-
         if (Contains(rawReason, "unsupported_typed_projection"))
             return Create(SymbolicUnknownReasonSource.RuntimeHazard, "runtime_hazard",
                 new(SymbolicUnknownReasonCategory.UnsupportedOperation, "unsupported_typed_projection"), rawReason);
-
         if (proofReason is not (SymbolicUnknownReason.None or SymbolicUnknownReason.Unknown))
             return ChangeSource(ForProof(proofReason, rawReason), SymbolicUnknownReasonSource.RuntimeHazard, "runtime_hazard");
-
         var unsupported = status == SymbolicRuntimeHazardStatus.Unsupported;
         return Create(SymbolicUnknownReasonSource.RuntimeHazard, "runtime_hazard",
             new(unsupported ? SymbolicUnknownReasonCategory.UnsupportedOperation : SymbolicUnknownReasonCategory.Unknown,
@@ -71,7 +65,6 @@ internal static class SymbolicUnknownReasonTaxonomy {
         SymbolicUnknownReason.EncodingFailure => new(SymbolicUnknownReasonCategory.SolverEncodingFailure, "solver_encoding_failure"),
         _ => new(SymbolicUnknownReasonCategory.Unknown, "unknown")
     };
-
     private static ReasonDescriptor Describe(SymbolicComplexityUnknownReason reason) => reason switch {
         SymbolicComplexityUnknownReason.None => new(SymbolicUnknownReasonCategory.None, "none"),
         SymbolicComplexityUnknownReason.UnsupportedTarget => Syntax("unsupported_target"),
@@ -92,13 +85,10 @@ internal static class SymbolicUnknownReasonTaxonomy {
             new(SymbolicUnknownReasonCategory.Cancellation, "canceled", true),
         _ => new(SymbolicUnknownReasonCategory.Unknown, "unknown")
     };
-
     private static ReasonDescriptor Syntax(string suffix) =>
         new(SymbolicUnknownReasonCategory.UnsupportedSyntax, suffix);
-
     private static ReasonDescriptor Budget(string suffix) =>
         new(SymbolicUnknownReasonCategory.SolverBudget, suffix, true, true);
-
     private static SymbolicUnknownReasonInfo ChangeSource(SymbolicUnknownReasonInfo info, SymbolicUnknownReasonSource source,
         string prefix) => new(
         source,
@@ -107,7 +97,6 @@ internal static class SymbolicUnknownReasonTaxonomy {
         info.RawReason,
         info.IsRetryable,
         info.IsConfigurationRelated);
-
     private static SymbolicUnknownReasonInfo Create(
         SymbolicUnknownReasonSource source,
         string prefix,
@@ -119,10 +108,8 @@ internal static class SymbolicUnknownReasonTaxonomy {
         rawReason ?? string.Empty,
         descriptor.IsRetryable,
         descriptor.IsConfigurationRelated);
-
     private static bool Contains(string? value, string fragment) =>
         value?.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
-
     readonly record struct ReasonDescriptor(
         SymbolicUnknownReasonCategory Category,
         string Suffix,

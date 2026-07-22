@@ -1,6 +1,5 @@
 using System;
 using SharpProof.Attributes;
-
 public static class TestClass
 {
     [ExpectedComplexity(ComplexityKind.Linear)]

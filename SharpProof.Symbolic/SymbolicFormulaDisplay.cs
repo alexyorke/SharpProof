@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicFormulaDisplay {
     internal static string Format(SymbolicCondition condition) {
         if (condition == null) throw new ArgumentNullException(nameof(condition));
@@ -9,7 +8,6 @@ internal static class SymbolicFormulaDisplay {
     }
     internal static string Format(SmtFormula formula) {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
-
         switch (formula) {
             case SmtBooleanConstant boolean:
                 return boolean.Value ? "true" : "false";
@@ -62,7 +60,6 @@ internal static class SymbolicFormulaDisplay {
     }
     internal static string GetMergeTarget(SmtFormula formula) {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
-
         switch (formula) {
             case SmtUnaryFormula unary:
                 return GetMergeTarget(unary.Operand);
@@ -102,16 +99,13 @@ internal static class SymbolicFormulaDisplay {
             SmtBinaryOperator.GreaterThanOrEqual => ">=",
             _ => binary.Operator.ToString()
         };
-
         if (binary.Operator == SmtBinaryOperator.And ||
             binary.Operator == SmtBinaryOperator.Or)
             return FormatConditionTerm(binary.Left) + " " + op + " " + FormatConditionTerm(binary.Right);
-
         return FormatTerm(binary.Left) + " " + op + " " + FormatTerm(binary.Right);
     }
     private static string FormatIntegerBinary(SmtIntegerBinaryTerm binary) =>
         FormatIntegerBinary(binary.Operator, binary.Left, binary.Right);
-
     private static string FormatIntegerBinary(SmtIntegerBinaryOperator binaryOperator, SmtFormula left, SmtFormula right) {
         var op = binaryOperator switch {
             SmtIntegerBinaryOperator.Add => "+",
@@ -121,7 +115,6 @@ internal static class SymbolicFormulaDisplay {
             SmtIntegerBinaryOperator.Remainder => "%",
             _ => binaryOperator.ToString()
         };
-
         return FormatTerm(left) + " " + op + " " + FormatTerm(right);
     }
     private static string FormatConditionTerm(SmtFormula formula) => formula is SmtBinaryFormula or SmtConditionalFormula
@@ -156,10 +149,8 @@ internal static class SymbolicFormulaDisplay {
                op == SmtBinaryOperator.GreaterThanOrEqual;
     private static bool IsConstant(SmtFormula formula) =>
         formula is SmtBooleanConstant or SmtIntegerConstant or SmtStringConstant or SmtNullConstant;
-
     private static string FormatVariableName(string name) {
         if (string.IsNullOrWhiteSpace(name)) return name ?? string.Empty;
-
         const string recordPrefix = "SmtVariable {";
         if (name.StartsWith(recordPrefix, StringComparison.Ordinal)) {
             var nameMarker = "Name = ";
@@ -179,7 +170,6 @@ internal static class SymbolicFormulaDisplay {
         if (hashIndex > 0 && hashIndex + 1 < name.Length) {
             var index = hashIndex + 1;
             while (index < name.Length && char.IsDigit(name[index])) index++;
-
             if (index > hashIndex + 1) return name.Substring(0, hashIndex) + name.Substring(index);
         }
         return name;

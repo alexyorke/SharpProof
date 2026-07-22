@@ -1,7 +1,5 @@
 using static SharpProof.Symbolic.SymbolicStateFactBuilder;
-
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicReachabilityLowerer {
     internal static SymbolicOperationTransitionResult Apply(
         SymbolicState state,
@@ -18,10 +16,8 @@ internal static class SymbolicReachabilityLowerer {
             condition is BinaryExpressionSyntax orCondition &&
             orCondition.IsKind(SyntaxKind.LogicalOrExpression))
             return ApplyBoth(state, orCondition.Left, orCondition.Right, branchWhenTrue: false, semanticModel, cancellationToken);
-
         if (TryApplyInlineAssignment(state, condition, branchWhenTrue, semanticModel, cancellationToken, out var inlineTransition))
             return inlineTransition;
-
         var transition = ApplyCondition(state, condition, branchWhenTrue, semanticModel, cancellationToken);
         return transition.IsExact
             ? ApplyPatternBinding(transition.State, condition, branchWhenTrue, semanticModel, cancellationToken)
@@ -40,7 +36,6 @@ internal static class SymbolicReachabilityLowerer {
             new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion));
         if (lowering is not { IsExact: true, Value: { } exactCondition })
             return Unsupported(state, condition, "condition");
-
         return SymbolicOperationTransferKernel.Assume(
             state,
             exactCondition,
@@ -128,7 +123,6 @@ internal static class SymbolicReachabilityLowerer {
         if (condition is PrefixUnaryExpressionSyntax negation &&
             negation.IsKind(SyntaxKind.LogicalNotExpression))
             return TryApplyInlineAssignment(state, negation.Operand, !branchWhenTrue, semanticModel, cancellationToken, out transition);
-
         if (condition is not BinaryExpressionSyntax comparison ||
             !SymbolicOperatorLowerer.TryGetRelationOperator(comparison.Kind(), out var relation)) {
             transition = null!;
@@ -267,7 +261,6 @@ internal static class SymbolicReachabilityLowerer {
             return ApplyPatternBinding(state, negation.Operand, !branchWhenTrue, semanticModel, cancellationToken);
         if (!branchWhenTrue || condition is not IsPatternExpressionSyntax pattern)
             return Exact(state, condition, "no-pattern");
-
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var term = SymbolicSemanticPipeline.LowerTerm(pattern.Expression, context);
         var typeInfo = semanticModel.GetTypeInfo(pattern.Expression, cancellationToken);
@@ -279,7 +272,6 @@ internal static class SymbolicReachabilityLowerer {
                 pattern.Pattern,
                 context) is not { IsExact: true, Value: { } patternCondition })
             return Exact(state, condition, "pattern-unsupported");
-
         return SymbolicOperationTransferKernel.Assume(
             state,
             patternCondition,
@@ -291,7 +283,6 @@ internal static class SymbolicReachabilityLowerer {
         SymbolicOperationTransitionResult.Exact(
             state,
             ImmutableArray.Create(new SymbolicLoweringProvenance("reachability", source.Span, detail)));
-
     private static SymbolicOperationTransitionResult Unsupported(SymbolicState state, SyntaxNode source, string detail) =>
         SymbolicOperationTransitionResult.Unsupported(
             state,

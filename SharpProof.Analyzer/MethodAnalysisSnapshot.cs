@@ -1,5 +1,4 @@
 namespace SharpProof.Analyzer;
-
 internal sealed record MethodAnalysisSnapshot(
     IMethodSymbol MethodSymbol,
     SyntaxNode Declaration,
@@ -31,7 +30,6 @@ internal sealed record MethodAnalysisSnapshot(
     }
     private static IOperation? SelectRootOperation(ImmutableArray<IOperation> operationBlocks) {
         if (operationBlocks.IsDefaultOrEmpty) return null;
-
         return operationBlocks
             .OrderByDescending(static operation => operation.Syntax.Span.Length)
             .First();

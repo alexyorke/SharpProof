@@ -1,5 +1,4 @@
 using SharpProof.Attributes;
-
 public sealed class Example
 {
     [Impure]

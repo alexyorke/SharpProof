@@ -1,21 +1,18 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SharpProof.Symbolic;
-
 const string usage = """
 Usage:
   sharpproof analyze --file <path> --target <line:N[:column]|position:N|span:start:end|all-lines>
     --facets <effects,proofs,hazards,complexity> [--condition <text>] [--format <text|json>]
     [--fail-on-unknown] [--fail-on-disproven]
 """;
-
 try {
     if (args.Length == 0 || args.Contains("--help", StringComparer.Ordinal)) {
         Console.WriteLine(usage);
         return args.Length == 0 ? 2 : 0;
     }
     if (!string.Equals(args[0], "analyze", StringComparison.Ordinal)) return Usage("Expected 'analyze'.");
-
     var values = new Dictionary<string, string>(StringComparer.Ordinal);
     var flags = new HashSet<string>(StringComparer.Ordinal);
     for (var index = 1; index < args.Length; index++) {
@@ -39,7 +36,6 @@ try {
         return Usage("--facets must contain effects, proofs, hazards, or complexity.");
     var format = values.TryGetValue("--format", out var selectedFormat) ? selectedFormat : "text";
     if (format is not ("text" or "json")) return Usage("--format must be text or json.");
-
     using var session = SharpProofAnalysisSession.FromFile(file);
     var result = session.Analyze(new SharpProofAnalysisRequest(target, facets, values.GetValueOrDefault("--condition")));
     if (result.Status is SharpProofQueryStatus.Failed or SharpProofQueryStatus.Canceled) {

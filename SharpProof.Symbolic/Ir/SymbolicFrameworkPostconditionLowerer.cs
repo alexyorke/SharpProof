@@ -1,11 +1,8 @@
 using static SharpProof.Symbolic.SymbolicStateFactBuilder;
-
 namespace SharpProof.Symbolic.Ir;
-
 internal sealed record SymbolicFrameworkPostconditionPlan(
     ImmutableArray<SymbolicCondition> BeforeDoesNotReturnIf,
     ImmutableArray<SymbolicCondition> AfterDoesNotReturnIf);
-
 internal static class SymbolicFrameworkPostconditionLowerer {
     internal static SymbolicLoweringResult<SymbolicFrameworkPostconditionPlan> Lower(
         ExpressionSyntax expression,
@@ -15,7 +12,6 @@ internal static class SymbolicFrameworkPostconditionLowerer {
         var before = ImmutableArray.CreateBuilder<SymbolicCondition>();
         AddParameterNotNullConditions(before, expression, statement, semanticModel, cancellationToken);
         AddKnownGuardCondition(before, expression, semanticModel, cancellationToken);
-
         var after = ImmutableArray.CreateBuilder<SymbolicCondition>();
         AddMemberNotNullConditions(after, expression, semanticModel, cancellationToken);
         return Exact(expression, before.ToImmutable(), after.ToImmutable());
@@ -95,7 +91,6 @@ internal static class SymbolicFrameworkPostconditionLowerer {
             operation.TargetMethod.IsStatic ||
             !IsCurrentInstanceInvocation(invocation))
             return;
-
         foreach (var target in NullableFlowFacts.GetMemberNotNullTargets(operation.TargetMethod))
             if (NullableFlowFacts.TryResolveInstanceMemberTarget(operation.TargetMethod.ContainingType, target, out var member) &&
                 TryCreateImplicitThisMemberTerm(member, out var memberTerm) &&
@@ -139,7 +134,6 @@ internal static class SymbolicFrameworkPostconditionLowerer {
         if (UnwrapAwaited(expression) is not InvocationExpressionSyntax invocation ||
             semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation)
             yield break;
-
         foreach (var argument in operation.Arguments)
             if (argument is {
                 ArgumentKind: ArgumentKind.Explicit,
@@ -153,7 +147,6 @@ internal static class SymbolicFrameworkPostconditionLowerer {
             ? NullableFlowFacts.HasNotNullPostcondition(parameter) ||
               NullableFlowFacts.HasInferredNotNullNormalCompletionPostcondition(parameter, cancellationToken)
             : NullableFlowFacts.GetParameterOutputState(parameter) == NullableFlowFactState.NotNull;
-
     private static bool ArgumentRefKindMatches(IParameterSymbol parameter, ArgumentSyntax argument) =>
         parameter.RefKind switch {
             RefKind.None => argument.RefKindKeyword.IsKind(SyntaxKind.None),
@@ -161,7 +154,6 @@ internal static class SymbolicFrameworkPostconditionLowerer {
             RefKind.Out => argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword),
             _ => false
         };
-
     private static bool IsUniqueOutputArgumentTarget(
         IInvocationOperation invocation,
         IArgumentOperation argument,
@@ -170,7 +162,6 @@ internal static class SymbolicFrameworkPostconditionLowerer {
         if (argument.Syntax is not ArgumentSyntax syntax ||
             !NullableFlowFacts.TryGetArgumentTargetSymbol(syntax.Expression, semanticModel, cancellationToken, out var target))
             return false;
-
         foreach (var other in invocation.Arguments)
             if (!ReferenceEquals(argument, other) &&
                 other.Syntax is ArgumentSyntax otherSyntax &&

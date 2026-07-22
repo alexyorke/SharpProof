@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicRuntimeHazardSourceCandidateFactory {
     internal static IEnumerable<RuntimeHazardCandidate> CreateThrowCandidates(
         SyntaxNode throwNode,

@@ -1,5 +1,4 @@
 namespace SharpProof.ProofCore.Smt;
-
 internal static class SmtFormulaTraversal {
     internal static IEnumerable<SmtFormula> EnumerateConjuncts(SmtFormula formula) {
         if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } conjunction) {
@@ -12,7 +11,6 @@ internal static class SmtFormulaTraversal {
     }
     internal static IEnumerable<SmtFormula> Enumerate(SmtFormula root) {
         if (root == null) throw new ArgumentNullException(nameof(root));
-
         var stack = new Stack<SmtFormula>();
         stack.Push(root);
         while (stack.Count > 0) {
@@ -23,7 +21,6 @@ internal static class SmtFormulaTraversal {
     }
     internal static bool Contains(SmtFormula root, Func<SmtFormula, bool> predicate) {
         if (predicate == null) throw new ArgumentNullException(nameof(predicate));
-
         return Enumerate(root).Any(predicate);
     }
     internal static IEnumerable<SmtFormula> EnumerateChildren(SmtFormula formula) {
@@ -33,26 +30,21 @@ internal static class SmtFormulaTraversal {
     internal static SmtFormula MapChildren(SmtFormula formula, Func<SmtFormula, SmtFormula> map) {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
         if (map == null) throw new ArgumentNullException(nameof(map));
-
         var children = GetChildren(formula);
         if (children.Count == 0) return formula;
-
         var mapped = new SmtFormula[children.Count];
         for (var index = 0; index < children.Count; index++)
             mapped[index] = map(children[index]) ??
                             throw new InvalidOperationException("Formula child mapping returned null.");
-
         return Rebuild(formula, mapped);
     }
     internal static SmtFormula RewriteBottomUp(SmtFormula root, Func<SmtFormula, SmtFormula> rewrite, out bool changed) {
         if (root == null) throw new ArgumentNullException(nameof(root));
         if (rewrite == null) throw new ArgumentNullException(nameof(rewrite));
-
         changed = false;
         var frames = new Stack<TraversalFrame>();
         var results = new Stack<SmtFormula>();
         frames.Push(new TraversalFrame(root, false));
-
         while (frames.Count > 0) {
             var frame = frames.Pop();
             if (!frame.Visited) {
@@ -63,7 +55,6 @@ internal static class SmtFormulaTraversal {
             var childCount = GetChildren(frame.Formula).Count;
             var children = childCount == 0 ? [] : new SmtFormula[childCount];
             for (var index = childCount - 1; index >= 0; index--) children[index] = results.Pop();
-
             var rebuilt = Rebuild(frame.Formula, children);
             var rewritten = rewrite(rebuilt) ?? throw new InvalidOperationException("Formula rewrite returned null.");
             if (!AreStructurallyEqual(frame.Formula, rewritten)) changed = true;
@@ -73,13 +64,11 @@ internal static class SmtFormulaTraversal {
     }
     internal static bool IsWithinDepth(SmtFormula root, int maxDepth) {
         if (root == null) throw new ArgumentNullException(nameof(root));
-
         var stack = new Stack<(SmtFormula Formula, int Depth)>();
         stack.Push((root, 1));
         while (stack.Count > 0) {
             var (formula, depth) = stack.Pop();
             if (depth > maxDepth) return false;
-
             var children = GetChildren(formula);
             for (var index = children.Count - 1; index >= 0; index--)
                 stack.Push((children[index], depth + 1));
@@ -116,7 +105,6 @@ internal static class SmtFormulaTraversal {
     };
     private static SmtFormula Rebuild(SmtFormula formula, IReadOnlyList<SmtFormula> children) {
         bool Same(int index, SmtFormula child) => ReferenceEquals(children[index], child);
-
         return formula switch {
             SmtUnaryFormula value => Same(0, value.Operand)
                 ? formula
@@ -165,10 +153,8 @@ internal static class SmtFormulaTraversal {
         };
     }
     readonly record struct TraversalFrame(SmtFormula Formula, bool Visited);
-
     readonly record struct FormulaChildren(SmtFormula? First, SmtFormula? Second = null, SmtFormula? Third = null) {
         internal int Count => Third != null ? 3 : Second != null ? 2 : First != null ? 1 : 0;
-
         internal SmtFormula this[int index] => index switch {
             0 when First != null => First,
             1 when Second != null => Second,

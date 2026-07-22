@@ -1,5 +1,4 @@
 namespace SharpProof.Analyzer.Configuration;
-
 internal static class AnalyzerConfigurationOptionRegistry {
     public static ImmutableArray<AnalyzerConfigurationOption> All { get; } = [
         Positive("sharpproof_analysis_max_fact_choice_combinations_per_target"),
@@ -22,13 +21,10 @@ internal static class AnalyzerConfigurationOptionRegistry {
         Positive("sharpproof_smt_timeout_ms"),
         new("sharpproof_smt_transient_retry_count", AnalyzerConfigurationValueKind.NonNegativeInteger)
     ];
-
     internal static bool IsAcceptedValue(AnalyzerConfigurationOption option, string? value) =>
         !string.IsNullOrWhiteSpace(value) && option.AllowedValues.Contains(value!.Trim().ToLowerInvariant(), StringComparer.Ordinal);
-
     private static AnalyzerConfigurationOption Positive(string key) =>
         new(key, AnalyzerConfigurationValueKind.PositiveInteger);
-
     private static AnalyzerConfigurationOption Bool(string key) =>
         new(key, AnalyzerConfigurationValueKind.Bool);
 }
@@ -36,5 +32,4 @@ internal sealed record AnalyzerConfigurationOption(
     string Key,
     AnalyzerConfigurationValueKind ValueKind,
     ImmutableArray<string> AllowedValues = default);
-
 internal enum AnalyzerConfigurationValueKind { Bool, NonNegativeInteger, PositiveInteger, SmtMode }

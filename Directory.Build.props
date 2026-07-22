@@ -1,6 +1,5 @@
 <Project>
   <Import Project="$(MSBuildThisFileDirectory)SharpProof.Release.props" />
-
   <PropertyGroup>
     <MicrosoftZ3PackageVersion>4.12.2</MicrosoftZ3PackageVersion>
     <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
@@ -9,8 +8,6 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <WarningsAsErrors>$(WarningsAsErrors);CA1811;CS8019;IDE0051;IDE0052;IDE0060</WarningsAsErrors>
-    
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-
   </PropertyGroup>
 </Project>

@@ -1,8 +1,6 @@
 using System.Text.Json;
 using NUnit.Framework;
-
 namespace SharpProof.Test;
-
 [TestFixture]
 public sealed class UnifiedCliTests {
     [Test]

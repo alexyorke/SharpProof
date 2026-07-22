@@ -1,26 +1,18 @@
 using SharpProof.ProofCore.Collections;
-
 namespace SharpProof.ProofCore.Smt;
-
 internal static class Z3RegexCharacterRanges {
     private const int CacheLimit = 1024;
     private const int MaxRangeCount = 512;
     private static readonly TimeSpan ValidationTimeout = TimeSpan.FromMilliseconds(50);
-
     private static readonly BoundedConcurrentCache<(string Pattern, RegexOptions Options), CharacterRange[]> Cache =
         new(CacheLimit);
-
     private static readonly Lazy<CharacterRange[]> DecimalDigits =
         new(() => CreateOrEmpty((@"\d", RegexOptions.None)));
-
     private static readonly Lazy<CharacterRange[]> Whitespace =
         new(() => CreateOrEmpty((@"\s", RegexOptions.None)));
-
     private static readonly Lazy<CharacterRange[]> Words =
         new(() => CreateOrEmpty((@"\w", RegexOptions.None)));
-
     internal static CharacterRange[] Word => Words.Value;
-
     internal static bool TryGetShorthand(char escaped, out CharacterRange[] ranges) {
         var baseRanges = escaped switch {
             'd' or 'D' => DecimalDigits.Value,
@@ -37,7 +29,6 @@ internal static class Z3RegexCharacterRanges {
     }
     internal static bool TryGet(string atomPattern, out CharacterRange[] ranges) =>
         TryGet(atomPattern, RegexOptions.None, out ranges);
-
     internal static bool TryGet(string atomPattern, RegexOptions options, out CharacterRange[] ranges) {
         ranges = [];
         try {
@@ -55,7 +46,6 @@ internal static class Z3RegexCharacterRanges {
             .ThenBy(static range => range.End)
             .ToArray();
         if (ordered.Length == 0) return [];
-
         var merged = new List<CharacterRange>();
         var currentStart = ordered[0].Start;
         var currentEnd = ordered[0].End;
@@ -80,7 +70,6 @@ internal static class Z3RegexCharacterRanges {
         foreach (var range in merged) {
             if (nextStart < range.Start)
                 complement.Add(new CharacterRange((char)nextStart, (char)(range.Start - 1)));
-
             if (range.End == char.MaxValue) {
                 nextStart = char.MaxValue + 1;
                 break;

@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicOperatorLowerer {
     internal static bool TryLowerBuiltInBooleanBitwiseCondition(
         BinaryExpressionSyntax expression,
@@ -17,7 +16,6 @@ internal static class SymbolicOperatorLowerer {
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(expression.Left, context), out var left) ||
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(expression.Right, context), out var right))
             return false;
-
         condition = expression.Kind() switch {
             SyntaxKind.BitwiseAndExpression =>
                 new SymbolicBinaryCondition(SymbolicConditionOperator.And, left, right),
@@ -34,7 +32,6 @@ internal static class SymbolicOperatorLowerer {
         if (op is not SymbolicRelationOperator.Equal and not SymbolicRelationOperator.NotEqual &&
             left.Kind != SmtValueKind.Int)
             return false;
-
         return left.Kind == right.Kind ||
                (left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference) ||
                (right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference);
@@ -42,7 +39,6 @@ internal static class SymbolicOperatorLowerer {
     internal static bool IsEqualityExpression(BinaryExpressionSyntax binaryExpression)
         => binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
                binaryExpression.IsKind(SyntaxKind.NotEqualsExpression);
-
     internal static bool TryGetRelationOperator(SyntaxKind kind, out SymbolicRelationOperator op) {
         switch (kind) {
             case SyntaxKind.EqualsExpression:

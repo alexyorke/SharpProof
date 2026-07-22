@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicDynamicNullBindingFacts {
     internal const string RuntimeBinderExceptionType = "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException";
     internal const string MemberCategory = "definite_dynamic_member_null_binding";
@@ -8,7 +7,6 @@ internal static class SymbolicDynamicNullBindingFacts {
     internal const string MemberSource = "dynamic_member";
     internal const string IndexSource = "dynamic_index";
     internal const string InvocationSource = "dynamic_invocation";
-
     internal static bool TryGetDynamicNullBindingShape(
         SyntaxNode node,
         Func<ExpressionSyntax, ExpressionSyntax> unwrapExpression,
@@ -20,26 +18,22 @@ internal static class SymbolicDynamicNullBindingFacts {
         receiver = null!;
         category = string.Empty;
         source = string.Empty;
-
         switch (node) {
             case MemberAccessExpressionSyntax memberAccess:
                 if (memberAccess.Parent is InvocationExpressionSyntax { Expression: var invocationExpression } &&
                     ReferenceEquals(invocationExpression, memberAccess))
                     return false;
-
                 site = memberAccess;
                 receiver = memberAccess.Expression;
                 category = MemberCategory;
                 source = MemberSource;
                 return true;
-
             case ElementAccessExpressionSyntax elementAccess:
                 site = elementAccess;
                 receiver = elementAccess.Expression;
                 category = IndexCategory;
                 source = IndexSource;
                 return true;
-
             case InvocationExpressionSyntax invocation:
                 var unwrappedInvocationExpression = unwrapExpression(invocation.Expression);
                 site = invocation;
@@ -49,7 +43,6 @@ internal static class SymbolicDynamicNullBindingFacts {
                 category = InvocationCategory;
                 source = InvocationSource;
                 return true;
-
             default:
                 return false;
         }

@@ -1,5 +1,4 @@
 namespace SharpProof.Attributes;
-
 [Flags]
 public enum SharpProofCapability {
     None = 0,

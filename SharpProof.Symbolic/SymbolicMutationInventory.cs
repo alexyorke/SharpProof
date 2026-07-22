@@ -1,7 +1,5 @@
 namespace SharpProof.Symbolic;
-
 internal readonly record struct SymbolicMutationInventoryEntry(SyntaxNode Source, ExpressionSyntax? Target, ExpressionSyntax? Exposure);
-
 internal sealed class SymbolicMutationInventory(
     SyntaxNode root,
     SemanticModel semanticModel,
@@ -29,27 +27,21 @@ internal sealed class SymbolicMutationInventory(
     }
     internal bool MutatesSymbol(ISymbol symbol) =>
         entries.Any(entry => entry.Target is { } target && References(target, symbol));
-
     internal bool MutatesAny(IReadOnlyCollection<ISymbol> symbols, bool exactTargets = false) =>
         symbols.Count != 0 && entries.Any(entry => entry.Target is { } target &&
             (exactTargets ? ExactTargetMatchesAny(target, symbols) : symbols.Any(symbol => References(target, symbol))));
-
     internal bool ExposesSymbol(ISymbol symbol, bool mutableOnly) =>
         (!mutableOnly || IsMutableReference(SymbolicFactFactory.GetTrackedSymbolType(symbol))) &&
         entries.Any(entry => entry.Exposure is { } exposure && References(exposure, symbol));
-
     internal bool InvalidatesSymbol(ISymbol symbol, bool mutableExposures) =>
         MutatesSymbol(symbol) || ExposesSymbol(symbol, mutableExposures);
-
     internal IEnumerable<SyntaxNode> MutationSources(ISymbol symbol) =>
         entries.Where(entry => entry.Target is { } target && References(target, symbol))
             .Select(static entry => entry.Source);
-
     internal bool MutatesBetween(int after, int before, ISymbol symbol) =>
         entries.Any(entry => entry.Target is { } target &&
             !ReferenceEquals(entry.Source, root) && entry.Source.SpanStart > after &&
             entry.Source.SpanStart < before && References(target, symbol));
-
     internal SymbolicNestedMutationInvalidationPlan ToInvalidationPlan() {
         var steps = ImmutableArray.CreateBuilder<SymbolicMutationInvalidationStep>();
         var unsupported = false;
@@ -88,7 +80,6 @@ internal sealed class SymbolicMutationInventory(
             invalidations.Add(new(
                 SymbolicStateValueFacts.ImplicitThisVariableName + "." + symbol.Name,
                 SymbolicInvalidationMatchKind.VariableOrMember));
-
         var receiver = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(target) switch {
             ElementAccessExpressionSyntax element => element.Expression,
             MemberAccessExpressionSyntax member => member.Expression,
@@ -111,7 +102,6 @@ internal sealed class SymbolicMutationInventory(
     }
     private bool References(SyntaxNode node, ISymbol symbol) =>
         SymbolMutationFacts.ExpressionReferencesSymbol(node, symbol, semanticModel, cancellationToken);
-
     internal static ISymbol? GetMutatedSymbol(ExpressionSyntax target, SemanticModel semanticModel, CancellationToken cancellationToken) {
         var symbol = semanticModel.GetSymbolInfo(target, cancellationToken).Symbol;
         if (symbol != null) return symbol is IMethodSymbol { AssociatedSymbol: IPropertySymbol property } ? property : symbol;
@@ -123,7 +113,6 @@ internal sealed class SymbolicMutationInventory(
     }
     private static SymbolicInvalidationTarget ForSymbol(ISymbol symbol) =>
         new(SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition));
-
     private static bool IsMutableReference(ITypeSymbol? type) =>
         type is IArrayTypeSymbol || type?.IsReferenceType == true && type.SpecialType != SpecialType.System_String;
 }

@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal sealed record SymbolicOperationTransitionResult(
     SymbolicState State,
     SymbolicLoweringSupport Support,
@@ -7,11 +6,8 @@ internal sealed record SymbolicOperationTransitionResult(
     ImmutableArray<SymbolicLoweringProvenance> Provenance,
     SymbolicAnalysisTruncationInfo Truncation) {
     internal bool IsExact => Support == SymbolicLoweringSupport.Exact;
-
     internal bool IsApproximate => Support == SymbolicLoweringSupport.Approximate;
-
     internal bool IsUnsupported => Support == SymbolicLoweringSupport.Unsupported;
-
     internal static SymbolicOperationTransitionResult Exact(
         SymbolicState state,
         IEnumerable<SymbolicLoweringProvenance> provenance,
@@ -21,8 +17,6 @@ internal sealed record SymbolicOperationTransitionResult(
             SymbolicUnknownReason.None,
             provenance,
             truncation);
-
-
     internal static SymbolicOperationTransitionResult Unsupported(
         SymbolicState unchangedState,
         SymbolicUnknownReason unknownReason,
@@ -30,7 +24,6 @@ internal sealed record SymbolicOperationTransitionResult(
         SymbolicAnalysisTruncationInfo? truncation = null) {
         if (unknownReason == SymbolicUnknownReason.None)
             throw new ArgumentException("Unsupported transitions require an unknown reason.", nameof(unknownReason));
-
         return Create(unchangedState, SymbolicLoweringSupport.Unsupported, unknownReason, provenance, truncation);
     }
     private static SymbolicOperationTransitionResult Create(
@@ -41,7 +34,6 @@ internal sealed record SymbolicOperationTransitionResult(
         SymbolicAnalysisTruncationInfo? truncation) {
         if (state == null) throw new ArgumentNullException(nameof(state));
         if (provenance == null) throw new ArgumentNullException(nameof(provenance));
-
         var normalizedTruncation = truncation == null || !truncation.IsTruncated
             ? SymbolicAnalysisTruncationInfo.None
             : SymbolicAnalysisTruncationInfo.Combine(new[] { truncation });

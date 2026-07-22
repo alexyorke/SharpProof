@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicIrFormulaEncoder {
     internal static bool TryEncode(SymbolicCondition condition, out SmtFormula formula) {
         switch (condition) {
@@ -37,7 +36,6 @@ internal static class SymbolicIrFormulaEncoder {
             return false;
         }
         if (!fact.Polarity) formula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
-
         return true;
     }
     internal static bool TryEncode(SymbolicAtom atom, out SmtFormula formula) {
@@ -87,7 +85,6 @@ internal static class SymbolicIrFormulaEncoder {
                         receiver => new SymbolicMemberTerm(receiver, member.MemberName, member.Kind),
                         out formula))
                     return true;
-
                 if (TryEncodeTerm(member.Receiver, out var receiver) &&
                     receiver.Kind == SmtValueKind.Reference) {
                     formula = new SmtVariable(GetReferenceFormulaName(receiver) + "." + member.MemberName, member.Kind);
@@ -132,7 +129,6 @@ internal static class SymbolicIrFormulaEncoder {
                         static receiver => new SymbolicStringContentTerm(receiver),
                         out formula))
                     return true;
-
                 if (TryEncodeTerm(stringContent.Reference, out var reference) &&
                     SymbolicFactFactory.TryCreateReferenceStringContentFormula(reference, out var stringFormula)) {
                     formula = stringFormula;
@@ -168,7 +164,6 @@ internal static class SymbolicIrFormulaEncoder {
             case SymbolicLengthTerm length:
                 if (TryEncodeStringLengthTerm(length.Value, out formula))
                     return true;
-
                 if (TryEncodeTerm(length.Value, out var value)) {
                     if (SymbolicFactFactory.TryCreateReferenceBuiltInLengthFormula(value, out var lengthFormula)) {
                         formula = lengthFormula;
@@ -190,7 +185,6 @@ internal static class SymbolicIrFormulaEncoder {
                 if (count.Value is SymbolicConditionalTerm conditionalCountValue &&
                     TryEncodeConditionalProjection(conditionalCountValue, static receiver => new SymbolicCountTerm(receiver), out formula))
                     return true;
-
                 if (TryEncodeTerm(count.Value, out var countReference) &&
                     countReference.Kind == SmtValueKind.Reference) {
                     formula = new SmtVariable(GetReferenceFormulaName(countReference) + ".Count", SmtValueKind.Int);
@@ -254,7 +248,6 @@ internal static class SymbolicIrFormulaEncoder {
         if (term.Kind == SmtValueKind.Bool &&
             TryEncodeTerm(term, out formula))
             return true;
-
         formula = null!;
         return false;
     }
@@ -293,7 +286,6 @@ internal static class SymbolicIrFormulaEncoder {
             SymbolicStringPredicateKind.EndsWith => new SmtStringEndsWithFormula(value, argument),
             _ => null!
         };
-
         return formula != null;
     }
     private static bool TryEncodeBounds(SymbolicBoundsAtom bounds, out SmtFormula formula) {
@@ -310,7 +302,6 @@ internal static class SymbolicIrFormulaEncoder {
         SmtFormula? upper = bounds.IncludeUpperBound
             ? new SmtBinaryFormula(SmtBinaryOperator.LessThan, index, length)
             : null;
-
         formula = lower != null && upper != null
             ? new SmtBinaryFormula(SmtBinaryOperator.And, lower, upper)
             : lower ?? upper!;
@@ -319,7 +310,6 @@ internal static class SymbolicIrFormulaEncoder {
     private static bool CanCompareSmtValues(SmtFormula left, SmtFormula right) => left.Kind == right.Kind ||
                (left is SmtNullConstant && right.Kind == SmtValueKind.Reference) ||
                (right is SmtNullConstant && left.Kind == SmtValueKind.Reference);
-
     private static SmtBinaryOperator ToSmtOperator(SymbolicRelationOperator op) => op switch {
         SymbolicRelationOperator.Equal => SmtBinaryOperator.Equal,
         SymbolicRelationOperator.NotEqual => SmtBinaryOperator.NotEqual,
@@ -329,11 +319,9 @@ internal static class SymbolicIrFormulaEncoder {
         SymbolicRelationOperator.GreaterThanOrEqual => SmtBinaryOperator.GreaterThanOrEqual,
         _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
     };
-
     private static string GetReferenceFormulaName(SmtFormula formula) => formula is SmtVariable variable
             ? variable.Name
             : "?";
-
     private static bool TryEncodeConditionalProjection(
         SymbolicConditionalTerm conditional,
         Func<SymbolicTerm, SymbolicTerm> project,

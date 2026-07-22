@@ -4,9 +4,7 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using SharpProof.Attributes;
-
 namespace SharpProof.Symbolic;
-
 internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     private const int MaxDepth = 32;
     private const int MaxMethods = 256;
@@ -17,7 +15,6 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         .Select(static field => (OpCode)field.GetValue(null)!)
         .ToImmutableDictionary(static opcode => opcode.Value);
     private readonly ConcurrentDictionary<(Guid Mvid, int Token, string Context), Lazy<MethodEffects>> _cache = new();
-
     internal MethodEffects Analyze(IMethodSymbol method) {
         if (method.ContainingAssembly == null) return Unknown("metadata_assembly_unavailable");
         var reference = compilation.GetMetadataReference(method.ContainingAssembly) as PortableExecutableReference;
@@ -26,7 +23,6 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             return Unknown("metadata_implementation_path_unavailable");
         if (!SymbolEqualityComparer.Default.Equals(compilation.GetAssemblyOrModuleSymbol(reference!), method.ContainingAssembly))
             return Unknown("metadata_assembly_identity_mismatch");
-
         try {
             using var stream = File.OpenRead(path!);
             using var pe = new PEReader(stream, PEStreamOptions.PrefetchMetadata);
@@ -53,7 +49,6 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         var unknowns = ImmutableArray.CreateBuilder<SharpProofUnknownReason>();
         var exceptions = ImmutableArray.CreateBuilder<string>();
         var instructionCount = 0;
-
         void Visit(MethodDefinitionHandle handle, int depth) {
             var token = MetadataTokens.GetToken(handle);
             if (depth > MaxDepth || visited.Count >= MaxMethods) {
@@ -163,7 +158,6 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         OperandType.InlineSwitch when offset + 4 <= bytes.Length => 4 + BitConverter.ToInt32(bytes, offset) * 4,
         _ => -1
     };
-
     private static MethodEffects Unknown(string code) => new(
         SharpProofEffect.Unknown,
         SharpProofCapability.None,
@@ -174,6 +168,5 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             SharpProofVerdict.Unknown)],
         [],
         [Reason(code)]);
-
     private static SharpProofUnknownReason Reason(string code) => new("SP-EFFECT-METADATA", "Effects", code, false, false);
 }

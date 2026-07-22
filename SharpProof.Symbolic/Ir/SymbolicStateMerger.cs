@@ -1,24 +1,18 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicStateMerger {
     internal readonly record struct GuardedState(SymbolicCondition Condition, SymbolicState State);
-
     internal static ImmutableArray<SymbolicCondition> MergePathConditionsAcrossAll(IReadOnlyList<SymbolicState> states)
         => MergePathConditionsAcrossAll(
             states.Select(static state => (IReadOnlyList<SymbolicCondition>)state.PathConditions).ToArray());
-
     internal static ImmutableArray<SymbolicCondition> MergePathConditionsAcrossAll(
         IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets) =>
         PathConditionMergeEngine.MergeAcrossAll(conditionSets, SymbolicAnalysisLimitContext.Limits);
-
     internal static SymbolicCondition CreateGuardedChoice(SymbolicCondition guard, SymbolicCondition value) =>
         value is SymbolicConstantCondition { Value: false }
             ? new SymbolicNotCondition(guard)
             : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, new SymbolicNotCondition(guard), value);
-
     internal static SymbolicState MergeCommonStates(SymbolicState baseline, IReadOnlyList<SymbolicState> states) {
         if (states.Count == 0) return baseline;
-
         var conditionKeys = GetCommonConditionKeys(states);
         return new SymbolicState(
             baseline.Facts.Concat(IntersectFactsAcrossAll(states)),
@@ -46,7 +40,6 @@ internal static class SymbolicStateMerger {
                 if (!commonFactKeys.Contains(SymbolicState.CreateProofFactKey(fact)) &&
                     !TryAddGuardedFact(ref state, branch.Condition, new SymbolicFactCondition(fact)))
                     return state;
-
             var branchConditionKey = SymbolicState.CreateProofConditionKey(branch.Condition);
             foreach (var condition in branch.State.PathConditions) {
                 var key = SymbolicState.CreateProofConditionKey(condition);
@@ -55,7 +48,6 @@ internal static class SymbolicStateMerger {
             }
         }
         return state;
-
         bool TryAddGuardedFact(ref SymbolicState target, SymbolicCondition branchCondition, SymbolicCondition branchFact) {
             if (addedCount >= limit) {
                 SymbolicAnalysisLimitContext.Record(limitKind, limit, addedCount + 1, source, provenance);
@@ -76,7 +68,6 @@ internal static class SymbolicStateMerger {
         IReadOnlyList<SymbolicState> states,
         Func<SymbolicFact, SymbolicFact, bool>? equivalent = null) {
         if (states.Count == 0) return [];
-
         var common = states[0].Facts;
         for (var index = 1; index < states.Count && !common.IsEmpty; index++) {
             var candidateFacts = states[index].Facts;
@@ -90,7 +81,6 @@ internal static class SymbolicStateMerger {
         Func<SymbolicFact, SymbolicFact, bool> equivalent,
         int phiScope) {
         if (states.Count == 0) return new SymbolicState();
-
         var versions = MergePhiVersions(states, phiScope);
         var normalized = states.Select(state => RewriteToVersions(state, versions)).ToArray();
         var facts = IntersectFactsAcrossAll(normalized, equivalent);
@@ -115,20 +105,17 @@ internal static class SymbolicStateMerger {
             state.PathConditions.Select(condition => SymbolicIrVersionRewriter.RewriteToCurrentVersions(condition, versions)),
             versions,
             state.IsContradictory);
-
     internal static bool AreEvidenceEquivalentFacts(SymbolicFact first, SymbolicFact second) =>
         first.Polarity == second.Polarity &&
         first.Confidence == second.Confidence &&
         Equals(first.Atom, second.Atom) &&
         SymbolEqualityComparer.Default.Equals(first.Symbol, second.Symbol) &&
         string.Equals(first.EvidenceKey, second.EvidenceKey, StringComparison.Ordinal);
-
     internal static SymbolicState MergeCompletionStates(
         IReadOnlyList<SymbolicState> states,
         SymbolicState entryState,
         Microsoft.CodeAnalysis.SyntaxNode source) {
         if (states.Count == 1) return states[0];
-
         var retainedFacts = entryState.Facts.ToList();
         var retainedConditions = entryState.PathConditions.ToList();
         var addedCount = 0;
@@ -142,7 +129,6 @@ internal static class SymbolicStateMerger {
             retainedConditions,
             entryState.PathConditions.Select(SymbolicState.CreateProofConditionKey),
             SymbolicState.CreateProofConditionKey, source, ref addedCount);
-
         var commonVersions = states[0].SymbolVersions.Where(pair => states.Skip(1).All(state =>
             state.SymbolVersions.TryGetValue(pair.Key, out var version) && version == pair.Value));
         return new SymbolicState(retainedFacts, retainedConditions, commonVersions, states.All(static state
@@ -172,7 +158,6 @@ internal static class SymbolicStateMerger {
         var result = conditions[0];
         for (var index = 1; index < conditions.Count; index++)
             result = new SymbolicBinaryCondition(op, result, conditions[index]);
-
         return result;
     }
     internal static bool TryGetMergeTargetKey(SymbolicCondition condition, out string targetKey) {
@@ -185,11 +170,9 @@ internal static class SymbolicStateMerger {
     }
     private static bool TryGetMergeTarget(SymbolicCondition condition, out SymbolicTerm target) {
         if (condition is SymbolicNotCondition { Operand: { } operand }) condition = operand;
-
         if (condition is SymbolicFactCondition { Fact.Atom: SymbolicRelationAtom relation } &&
             (TryGetTargetTerm(relation.Left, out target) || TryGetTargetTerm(relation.Right, out target)))
             return true;
-
         if (condition is SymbolicFactCondition {
             Fact.Atom: SymbolicTruthAtom { Condition: SymbolicVariableTerm variable }
         }) {

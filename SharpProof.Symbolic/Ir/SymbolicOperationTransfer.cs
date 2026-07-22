@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicOperationTransfer {
     internal static SymbolicOperationTransitionResult ApplyAssignment(
         SymbolicState state,

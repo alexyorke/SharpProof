@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <Import Project="..\SharpProof.PackageMetadata.props" />
-
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>12.0</LangVersion>
@@ -10,13 +8,11 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-
     <PackageId>SharpProof.Symbolic</PackageId>
     <Title>SharpProof Symbolic</Title>
     <Description>Public .NET query API for SharpProof bounded symbolic C# invariants, reachability, runtime hazards, capabilities, complexity, and SMT-backed proofs.</Description>
     <PackageTags>SharpProof;Roslyn;SymbolicAnalysis;SMT;Z3;Invariants;RuntimeHazards;Capabilities;Complexity</PackageTags>
     <PackageReleaseNotes>Canonical method effects and bounded Z3-backed proofs through one compact analysis API.</PackageReleaseNotes>
-
     <DebugType>portable</DebugType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
@@ -24,31 +20,26 @@
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_AddSymbolicRuntimeDependency</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
     <PackageReference Include="Microsoft.Z3" Version="$(MicrosoftZ3PackageVersion)" GeneratePathProperty="true" />
     <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
     <PackageReference Include="System.Reflection.Metadata" Version="9.0.0" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
     <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" PrivateAssets="all" />
   </ItemGroup>
-
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\samples\SharpProof.Symbolic\README.md" Pack="true" PackagePath="samples/SharpProof.Symbolic/README.md" />
     <None Include="..\samples\SharpProof.Symbolic\Program.cs" Pack="true" PackagePath="samples/SharpProof.Symbolic/Program.cs" />
     <None Include="..\samples\SharpProof.Symbolic\SharpProof.Symbolic.Sample.csproj" Pack="true" PackagePath="samples/SharpProof.Symbolic/SharpProof.Symbolic.Sample.csproj" />
   </ItemGroup>
-
   <Target Name="_AddSymbolicRuntimeDependency">
     <ItemGroup>
     <TfmSpecificPackageFile Include="..\SharpProof.ProofCore\bin\$(Configuration)\$(TargetFramework)\SharpProof.ProofCore.dll" PackagePath="lib/$(TargetFramework)" />
     <TfmSpecificPackageFile Include="..\SharpProof.ProofCore\bin\$(Configuration)\$(TargetFramework)\SharpProof.ProofCore.pdb" PackagePath="lib/$(TargetFramework)" />
     </ItemGroup>
   </Target>
-
 </Project>

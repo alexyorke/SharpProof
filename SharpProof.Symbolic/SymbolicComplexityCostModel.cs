@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal sealed class SymbolicComplexityCostModel(CancellationToken _cancellationToken) {
     internal bool TryCreate(
         ExpressionSyntax? expression,
@@ -10,9 +9,7 @@ internal sealed class SymbolicComplexityCostModel(CancellationToken _cancellatio
         out SymbolicCostExpression cost) {
         cost = SymbolicCostExpression.Unknown(SymbolicComplexityUnknownReason.Unknown);
         if (expression == null) return false;
-
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-
         if (allowConstants && TryGetIntegralConstant(expression, semanticModel, out _)) {
             cost = SymbolicCostExpression.Constant();
             return true;
@@ -29,7 +26,6 @@ internal sealed class SymbolicComplexityCostModel(CancellationToken _cancellatio
             if (TryGetIntegralConstant(binaryExpression.Right, semanticModel, out _) &&
                 TryCreate(binaryExpression.Left, semanticModel, currentMethod, projection, allowConstants, out cost))
                 return true;
-
             if (binaryExpression.IsKind(SyntaxKind.AddExpression) &&
                 TryGetIntegralConstant(binaryExpression.Left, semanticModel, out _) &&
                 TryCreate(binaryExpression.Right, semanticModel, currentMethod, projection, allowConstants, out cost))
@@ -53,7 +49,6 @@ internal sealed class SymbolicComplexityCostModel(CancellationToken _cancellatio
         typeSymbol?.SpecialType == SpecialType.System_String ||
         SymbolicTypeFacts.HasInstanceInt32Member(typeSymbol, "Length") ||
         SymbolicTypeFacts.HasInstanceInt32Member(typeSymbol, "Count");
-
     private bool TryCreateScalar(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -64,7 +59,6 @@ internal sealed class SymbolicComplexityCostModel(CancellationToken _cancellatio
              string.Equals(memberAccess.Name.Identifier.ValueText, "Count", StringComparison.Ordinal)) &&
             TryCreateLengthOrCount(expression, semanticModel, currentMethod, out cost))
             return true;
-
         if (semanticModel.GetSymbolInfo(expression, _cancellationToken).Symbol is IParameterSymbol parameter &&
             SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol.OriginalDefinition, currentMethod.OriginalDefinition)) {
             cost = SymbolicCostExpression.Variable("$p" + parameter.Ordinal + ":value");

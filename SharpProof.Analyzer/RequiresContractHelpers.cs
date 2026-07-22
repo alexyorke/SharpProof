@@ -1,9 +1,7 @@
 namespace SharpProof.Analyzer;
-
 internal static class RequiresContractHelpers {
     internal const string AttributeTypeName = "RequiresAttribute";
     internal const string AttributeDisplayName = "[Requires]";
-
     internal static ImmutableArray<RequiresContract> CollectContracts(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
@@ -30,14 +28,12 @@ internal static class RequiresContractHelpers {
             .Any(static identifier => string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal));
     internal static string CombineAsImplication(ImmutableArray<RequiresContract> requiresContracts, string consequent) {
         if (requiresContracts.IsDefaultOrEmpty) return consequent;
-
         var validConditions = requiresContracts
             .Where(static contract => contract.InvalidReason == null)
             .Select(static contract => contract.Condition)
             .Where(static condition => !string.IsNullOrWhiteSpace(condition))
             .ToArray();
         if (validConditions.Length == 0) return consequent;
-
         var antecedent = string.Join(" && ", validConditions.Select(static condition => "(" + condition + ")"));
         return "!(" + antecedent + ") || (" + consequent + ")";
     }
@@ -49,7 +45,6 @@ internal static class RequiresContractHelpers {
         out string rewrittenCondition) {
         rewrittenCondition = conditionText;
         if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
-
         var typeReplacements = CreateTypeParameterReplacements(contractMethod, invokedMethod);
         var rewriter = new ParameterPlaceholderRewriter(arguments, typeReplacements);
         var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
@@ -61,13 +56,11 @@ internal static class RequiresContractHelpers {
         IMethodSymbol invokedMethod) {
         var replacements = new Dictionary<string, TypeSyntax>(StringComparer.Ordinal);
         AddTypeParameterReplacements(contractMethod.TypeParameters, invokedMethod.TypeArguments, replacements);
-
         if (contractMethod.ContainingType != null)
             AddTypeParameterReplacements(
                 contractMethod.ContainingType.OriginalDefinition.TypeParameters,
                 contractMethod.ContainingType.TypeArguments,
                 replacements);
-
         return replacements;
     }
     private static void AddTypeParameterReplacements(
@@ -84,20 +77,15 @@ internal static class RequiresContractHelpers {
         IReadOnlyDictionary<string, TypeSyntax> typeReplacements) : CSharpSyntaxRewriter {
         private readonly IReadOnlyDictionary<string, ExpressionSyntax> _replacements = replacements;
         private readonly IReadOnlyDictionary<string, TypeSyntax> _typeReplacements = typeReplacements;
-
         public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node) {
             if (CSharpSyntaxFacts.IsMemberOrQualifiedNameRightSide(node))
                 return base.VisitIdentifierName(node);
-
             if (_typeReplacements.TryGetValue(node.Identifier.ValueText, out var typeReplacement))
                 return typeReplacement.WithTriviaFrom(node);
-
             if (!_replacements.TryGetValue(node.Identifier.ValueText, out var replacement))
                 return base.VisitIdentifierName(node);
-
             if (IsShadowedByNestedCallableParameter(node, node.Identifier.ValueText))
                 return base.VisitIdentifierName(node);
-
             return SyntaxFactory.ParenthesizedExpression(replacement).WithTriviaFrom(node);
         }
         private static bool IsShadowedByNestedCallableParameter(IdentifierNameSyntax node, string name) {

@@ -1,5 +1,4 @@
 namespace SharpProof.Analyzer.Engine.Analysis;
-
 internal enum TypeIdentityPolicy {
     Exact,
     ExactOrOriginalDefinition
@@ -9,7 +8,6 @@ internal static class TypeHierarchyEnumeration {
         for (var current = method; current != null; current = current.OverriddenMethod)
             if (SymbolEq.AreEqual(current.OriginalDefinition, target.OriginalDefinition))
                 return true;
-
         return false;
     }
     internal static IEnumerable<INamedTypeSymbol> EnumerateBaseTypes(ITypeSymbol type, bool includeSelf = true) {

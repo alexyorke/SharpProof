@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class MethodBodyOperationResolver {
     internal static IOperation? GetMethodBodyRootOperation(
         SyntaxNode methodNode,
@@ -14,7 +13,6 @@ internal static class MethodBodyOperationResolver {
               (CSharpSyntaxFacts.TryGetExpressionBody(methodNode, out var expressionBody)
                   ? expressionBody
                   : methodNode);
-
         return semanticModel.GetOperation(operationNode, cancellationToken);
     }
 }

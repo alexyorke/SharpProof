@@ -1,43 +1,34 @@
 name: CI/CD
-
 on:
   push:
     branches: ["**"]
   pull_request:
     branches: ["**"]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
           global-json-file: global.json
-
       - name: Restore dependencies
         shell: pwsh
         run: .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
-
       - name: Verify generated README
         shell: pwsh
         run: .\scripts\Generate-Readme.ps1 -Verify
-
       - name: Build solution
         shell: pwsh
         run: .\scripts\Invoke-SharpProofDotnet.ps1 build SharpProof.sln --configuration Release --no-restore
-
       - name: Test solution
         shell: pwsh
         run: .\scripts\Invoke-SharpProofDotnet.ps1 test SharpProof.sln --configuration Release --no-build
-
       - name: Package NuGet packages
         shell: pwsh
         run: |
@@ -46,7 +37,6 @@ jobs:
             .\scripts\Invoke-SharpProofDotnet.ps1 pack $project --configuration Release --no-build --output nupkgs
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-
       - name: Validate NuGet package contents
         shell: pwsh
         run: |
@@ -60,22 +50,18 @@ jobs:
             Sort-Object Name)
           $symbolicPackages = @(Get-ChildItem nupkgs -Filter SharpProof.Symbolic.*.nupkg -File |
             Sort-Object Name)
-
           if ($analyzerPackages.Count -ne 1) {
             $found = if ($analyzerPackages.Count -eq 0) { "<none>" } else { $analyzerPackages.Name -join ", " }
             throw "Expected exactly one SharpProof analyzer package, found $($analyzerPackages.Count): $found"
           }
-
           if ($attributePackages.Count -ne 1) {
             $found = if ($attributePackages.Count -eq 0) { "<none>" } else { $attributePackages.Name -join ", " }
             throw "Expected exactly one SharpProof.Attributes package, found $($attributePackages.Count): $found"
           }
-
           if ($symbolicPackages.Count -ne 1) {
             $found = if ($symbolicPackages.Count -eq 0) { "<none>" } else { $symbolicPackages.Name -join ", " }
             throw "Expected exactly one SharpProof.Symbolic package, found $($symbolicPackages.Count): $found"
           }
-
           $package = $analyzerPackages[0]
           $entries = tar -tf $package.FullName
           $requiredEntries = @(
@@ -88,51 +74,43 @@ jobs:
             "lib/netstandard2.0/SharpProof.Attributes.dll",
             "THIRD-PARTY-NOTICES.txt"
           )
-
           foreach ($entry in $requiredEntries) {
             if ($entries -notcontains $entry) {
               throw "Package $($package.Name) is missing required entry: $entry"
             }
           }
-
           $legacyInstallEntries = @(
             "tools/install.ps1",
             "tools/uninstall.ps1"
           )
-
           foreach ($entry in $legacyInstallEntries) {
             if ($entries -contains $entry) {
               throw "Package $($package.Name) unexpectedly contains legacy install entry: $entry"
             }
           }
-
           $attributesPackage = $attributePackages[0]
           $attributesEntries = tar -tf $attributesPackage.FullName
           $requiredAttributeEntries = @(
             "README.md",
             "lib/netstandard2.0/SharpProof.Attributes.dll"
           )
-
           foreach ($entry in $requiredAttributeEntries) {
             if ($attributesEntries -notcontains $entry) {
               throw "Package $($attributesPackage.Name) is missing required entry: $entry"
             }
           }
-
           $symbolicBaseline = Get-Content SharpProof.Symbolic/PackageBaseline.json -Raw | ConvertFrom-Json
           $symbolicPackage = $symbolicPackages[0]
           $expectedSymbolicName = "$($symbolicBaseline.packageId).$($symbolicBaseline.packageVersion).nupkg"
           if ($symbolicPackage.Name -ne $expectedSymbolicName) {
             throw "Expected symbolic package $expectedSymbolicName, found $($symbolicPackage.Name)"
           }
-
           $symbolicEntries = tar -tf $symbolicPackage.FullName
           foreach ($entry in $symbolicBaseline.requiredEntries) {
             if ($symbolicEntries -notcontains $entry) {
               throw "Package $($symbolicPackage.Name) is missing baseline entry: $entry"
             }
           }
-
       - name: Upload NuGet artifact
         uses: actions/upload-artifact@v4
         with:

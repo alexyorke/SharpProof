@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Smt;
-
 internal enum SmtAnalysisMode {
     Bounded,
     Deep
@@ -13,7 +12,6 @@ internal sealed record SmtAnalysisOptions(
     bool UseSharedResultCache,
     SmtSolverLifecycleOptions Lifecycle) {
     public static readonly SmtAnalysisOptions Default = ForMode(SmtAnalysisMode.Bounded);
-
     public SmtAnalysisOptions(
         SmtAnalysisMode mode,
         TimeSpan queryTimeout,
@@ -40,7 +38,6 @@ internal sealed record SmtAnalysisOptions(
                             false),
         _ => CreateBoundedDefaults(),
     };
-
     private static SmtAnalysisOptions CreateBoundedDefaults() => new(
             SmtAnalysisMode.Bounded,
             TimeSpan.FromMilliseconds(750),
@@ -48,7 +45,6 @@ internal sealed record SmtAnalysisOptions(
             192,
             2048,
             false);
-
     public SmtAnalysisOptions WithOverrides(
         TimeSpan? queryTimeout = null,
         TimeSpan? methodBudget = null,
@@ -59,7 +55,6 @@ internal sealed record SmtAnalysisOptions(
             MaxPathConditions = maxPathConditions ?? MaxPathConditions,
             MaxExpressionNodes = maxExpressionNodes ?? MaxExpressionNodes
         };
-
     public SmtAnalysisOptions WithLifecycle(SmtSolverLifecycleOptions lifecycle) =>
         this with { Lifecycle = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle)) };
 }

@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicDispatchFacts {
     public static bool ShouldTreatAsDynamicDispatch(IMethodSymbol methodSymbol, IOperation operation) {
         var originalMethod = methodSymbol.OriginalDefinition;
@@ -7,17 +6,12 @@ internal static class SymbolicDispatchFacts {
             originalMethod.MethodKind is MethodKind.Constructor or MethodKind.StaticConstructor ||
             IsBaseReference(GetReceiverOperation(operation)))
             return false;
-
         if (originalMethod.ContainingType?.TypeKind == TypeKind.Interface) return !HasExactReceiverType(operation);
-
         if (originalMethod.IsSealed ||
             originalMethod.ContainingType?.IsSealed == true)
             return false;
-
         if (originalMethod.IsAbstract) return true;
-
         if (!originalMethod.IsVirtual && !originalMethod.IsOverride) return false;
-
         return !HasExactReceiverType(operation);
     }
     public static IOperation? GetReceiverOperation(IOperation operation) => operation switch {
@@ -35,7 +29,6 @@ internal static class SymbolicDispatchFacts {
         var current = operation;
         while (current is IConversionOperation conversionOperation && conversionOperation.IsImplicit)
             current = conversionOperation.Operand;
-
         return current;
     }
     public static bool IsBaseReference(IOperation? operation) {

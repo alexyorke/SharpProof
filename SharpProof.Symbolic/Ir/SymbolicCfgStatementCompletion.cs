@@ -1,7 +1,5 @@
 using static SharpProof.Symbolic.Ir.SymbolicCfgProgramPointStateCollector;
-
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicCfgStatementCompletion {
     internal static SymbolicLoweringResult<SymbolicState> CollectCompletedStatementState(
         StatementSyntax statement,
@@ -38,7 +36,6 @@ internal static class SymbolicCfgStatementCompletion {
             return Unsupported(statement, "loop-lowering");
         if (!TryCreateRegionPlan(graph, statement, semanticModel, cancellationToken, out var region, out var failure))
             return Unsupported(statement, failure);
-
         var entryPoint = region.EntryPoint;
         var incoming = new Dictionary<CfgTraversalPoint, Dictionary<CfgIncomingEdge, CfgPathState>> {
             [entryPoint] = new() {
@@ -117,7 +114,6 @@ internal static class SymbolicCfgStatementCompletion {
             return TryCreateCompletedLoopSummary(entryState, region, loopPlans, semanticModel, cancellationToken, out var loopState)
                 ? Exact(loopState, statement)
                 : Unsupported(statement, "statement-region.loop-summary");
-
         SymbolicState? result = null;
         if (region.CompletedPaths.Count != 0) {
             var path = MergeIncomingStates(region.CompletedPaths.Select(static completion => completion.Path).ToArray(), statement);

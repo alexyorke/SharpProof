@@ -1,14 +1,11 @@
 namespace SharpProof.Analyzer;
-
 internal static class MethodExpectedComplexityAnalyzer {
     internal static void AnalyzeSymbolForExpectedComplexity(
         MethodBodyAnalysisContext context,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
         Action<Diagnostic> report = context.ReportDiagnostic;
-
         if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
-
         if (!TryGetExpectedComplexity(
                 methodSymbol,
                 attributePolicy,
@@ -17,7 +14,6 @@ internal static class MethodExpectedComplexityAnalyzer {
                 out var attributeLocation,
                 out var invalidContract))
             return;
-
         if (invalidContract != null) {
             var diagnostic = InvalidContractArgumentDiagnostics.Create(
                 "[ExpectedComplexity]",
@@ -26,11 +22,9 @@ internal static class MethodExpectedComplexityAnalyzer {
                 attributeLocation ??
                 AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken));
             report(diagnostic);
-
             return;
         }
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
-
         var outcome = context.State.GetComplexityOutcome(context.CancellationToken);
         if (!outcome.IsSuccess) {
             context.CancellationToken.ThrowIfCancellationRequested();
@@ -42,16 +36,13 @@ internal static class MethodExpectedComplexityAnalyzer {
                 "complexity query failed: " + error.Message,
                 context.CancellationToken);
             report(diagnostic);
-
             return;
         }
         var result = outcome.Value!;
-
         var classification = Classify(result, declaredComplexity);
         switch (classification.Kind) {
             case ComplexityVerificationKind.Verified:
                 return;
-
             case ComplexityVerificationKind.Exceeded:
                 var exceededDiagnostic = CreateExceededDiagnostic(
                     methodSymbol,
@@ -60,9 +51,7 @@ internal static class MethodExpectedComplexityAnalyzer {
                     attributeLocation,
                     context.CancellationToken);
                 report(exceededDiagnostic);
-
                 return;
-
             default:
                 var unknownDiagnostic = CreateUnknownDiagnostic(
                     methodSymbol,
@@ -71,7 +60,6 @@ internal static class MethodExpectedComplexityAnalyzer {
                     classification.Reason,
                     context.CancellationToken);
                 report(unknownDiagnostic);
-
                 return;
         }
     }
@@ -85,7 +73,6 @@ internal static class MethodExpectedComplexityAnalyzer {
         declaredComplexity = default;
         attributeLocation = null;
         invalidContract = null;
-
         foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
             foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, "ExpectedComplexityAttribute")) {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -120,7 +107,6 @@ internal static class MethodExpectedComplexityAnalyzer {
         if (result.Complexity.IsConservative)
             return ComplexityVerificationClassification.Unknown(
                 "inferred complexity '" + result.Complexity.Text + "' contains conservative alternatives");
-
         return SymbolicComplexityFacts.Compare(result.Complexity.Kind, declaredComplexity.Kind) switch {
             SymbolicComplexityComparison.Within => ComplexityVerificationClassification.Verified,
             SymbolicComplexityComparison.Exceeds => ComplexityVerificationClassification.Exceeded,
@@ -165,10 +151,8 @@ internal static class MethodExpectedComplexityAnalyzer {
     readonly record struct ComplexityVerificationClassification(ComplexityVerificationKind Kind, string Reason) {
         public static readonly ComplexityVerificationClassification Verified =
             new(ComplexityVerificationKind.Verified, string.Empty);
-
         public static readonly ComplexityVerificationClassification Exceeded =
             new(ComplexityVerificationKind.Exceeded, string.Empty);
-
         public static ComplexityVerificationClassification Unknown(string reason) =>
             new(ComplexityVerificationKind.Unknown, reason);
     }

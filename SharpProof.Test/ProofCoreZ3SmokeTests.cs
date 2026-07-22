@@ -3,13 +3,10 @@ using NUnit.Framework;
 using SharpProof.ProofCore.Analysis;
 using SharpProof.ProofCore.Smt;
 using static SharpProof.Test.SmtTestFormula;
-
 namespace SharpProof.Test;
-
 [TestFixture]
 internal class ProofCoreZ3SmokeTests {
     private static readonly TimeSpan SolverTimeout = TimeSpan.FromMilliseconds(50);
-
     [TestCase("^[a-z]+$", RegexTranslationFallback.None)]
     [TestCase("[", RegexTranslationFallback.InvalidPattern)]
     public void RegexTranslationValidator_ClassifiesInput(string pattern, RegexTranslationFallback expected)
@@ -42,7 +39,6 @@ internal class ProofCoreZ3SmokeTests {
         var enabled = new SmtVariable("enabled", SmtValueKind.Bool);
         var text = new SmtVariable("text", SmtValueKind.String);
         var receiver = new SmtVariable("receiver", SmtValueKind.Reference);
-
         var result = solver.CheckSatisfiability(
             new SmtFormula[] {
                 new SmtBinaryFormula(SmtBinaryOperator.Equal, count, new SmtIntegerConstant(3)),
@@ -51,7 +47,6 @@ internal class ProofCoreZ3SmokeTests {
                 new SmtBinaryFormula(SmtBinaryOperator.Equal, receiver, new SmtNullConstant())
             },
             TimeSpan.FromMilliseconds(100));
-
         Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
         Assert.That(result.Witness.Status, Is.EqualTo(SmtWitnessStatus.Exact));
         Assert.Multiple(() => {
@@ -65,14 +60,12 @@ internal class ProofCoreZ3SmokeTests {
     public void SmtSolver_CheckSatisfiability_ExposesRangeModel() {
         using var solver = new SmtSolver();
         var index = new SmtVariable("index", SmtValueKind.Int);
-
         var result = solver.CheckSatisfiability(
             new SmtFormula[] {
                 new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, index, new SmtIntegerConstant(2)),
                 new SmtBinaryFormula(SmtBinaryOperator.LessThan, index, new SmtIntegerConstant(5))
             },
             TimeSpan.FromMilliseconds(100));
-
         var assignment = result.Witness.Assignments.Single();
         Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
         Assert.That(assignment.IntegerValue, Is.InRange(2, 4));
@@ -81,13 +74,11 @@ internal class ProofCoreZ3SmokeTests {
     public void SmtSolver_CheckSatisfiability_MarksOpaqueReferenceModelApproximate() {
         using var solver = new SmtSolver();
         var receiver = new SmtVariable("receiver", SmtValueKind.Reference);
-
         var result = solver.CheckSatisfiability(
             new SmtFormula[] {
                 new SmtBinaryFormula(SmtBinaryOperator.NotEqual, receiver, new SmtNullConstant())
             },
             TimeSpan.FromMilliseconds(100));
-
         Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
         Assert.That(result.Witness.Status, Is.EqualTo(SmtWitnessStatus.Approximate));
         Assert.That(result.Witness.Assignments.Single().IsNull, Is.False);
@@ -96,13 +87,11 @@ internal class ProofCoreZ3SmokeTests {
     public void SmtSolver_CheckSatisfiability_PreservesApproximateRegexCandidateModel() {
         using var solver = new SmtSolver();
         var text = new SmtVariable("text", SmtValueKind.String);
-
         var result = solver.CheckSatisfiability(
             new SmtFormula[] {
                 new SmtRegexMatchFormula(text, "(?>ab)c")
             },
             TimeSpan.FromMilliseconds(100));
-
         Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Unknown));
         Assert.That(result.Witness.Status, Is.EqualTo(SmtWitnessStatus.Approximate));
         Assert.That(result.Witness.Assignments.Single().StringValue, Is.Not.Null);
@@ -112,14 +101,12 @@ internal class ProofCoreZ3SmokeTests {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xNotZero = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, x, new SmtIntegerConstant(0));
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
-
         AssertImplication(Feasibility.Satisfiable, new[] { xNotZero }, xIsZero);
     }
     [Test]
     public void SmtSolver_ZeroGuardImpliesZero_IsUnsatisfiable() {
         var x = new SmtVariable("x", SmtValueKind.Int);
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
-
         AssertImplication(Feasibility.Unsatisfiable, new[] { xIsZero }, xIsZero);
     }
     [TestCase(SmtIntegerBinaryOperator.Divide)]
@@ -129,7 +116,6 @@ internal class ProofCoreZ3SmokeTests {
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var term = new SmtIntegerBinaryTerm(op, dividend, divisor);
         var contradiction = new SmtUnaryFormula(SmtUnaryOperator.Not, new SmtBinaryFormula(SmtBinaryOperator.Equal, term, term));
-
         AssertSatisfiability(Feasibility.Unknown, new[] { contradiction });
     }
     [TestCase(SmtIntegerBinaryOperator.Divide)]
@@ -137,7 +123,6 @@ internal class ProofCoreZ3SmokeTests {
     public void SmtSolver_DivisorRangeIncludingZero_ReturnsUnknown(SmtIntegerBinaryOperator op) {
         var divisor = new SmtVariable("divisor", SmtValueKind.Int);
         var term = new SmtIntegerBinaryTerm(op, new SmtIntegerConstant(10), divisor);
-
         AssertSatisfiability(
             Feasibility.Unknown,
             new SmtFormula[] {
@@ -152,13 +137,10 @@ internal class ProofCoreZ3SmokeTests {
         var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(1));
         var affineEquality = new SmtBinaryFormula(SmtBinaryOperator.Equal, xPlusOne, new SmtIntegerConstant(0));
         var xIsNonNegative = new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(0));
-
         AssertSatisfiability(Feasibility.Unsatisfiable, new SmtFormula[] { affineEquality, xIsNonNegative });
     }
     public enum RegexConstraint { None, Equal, NotEqual, StartsWith, LengthEqual, StartsWithAndLength, NegatedMatchAndLength }
-
     public enum RegexConclusion { Equal, LengthEqual, LengthAtMost }
-
     public sealed record RegexCase(
         Feasibility Expected,
         string Pattern,
@@ -167,10 +149,8 @@ internal class ProofCoreZ3SmokeTests {
         int Length = 0,
         RegexOptions Options = RegexOptions.None,
         bool ExtendedTimeout = false);
-
     public sealed record RegexImplicationCase(string Pattern, RegexConclusion Conclusion, string? Value = null, int Length = 0,
         RegexOptions Options = RegexOptions.None);
-
     private static IEnumerable<TestCaseData> RegexSatisfiabilityCases() {
         yield return CreateRegexCase("SmtSolver_UnsupportedRegexWithoutConcreteInput_ReturnsUnknown", Feasibility.Unknown, "(");
         yield return CreateRegexCase("SmtSolver_UnsupportedRegexOptionsWithoutConcreteInput_ReturnsUnknown", Feasibility.Unknown,
@@ -337,7 +317,6 @@ internal class ProofCoreZ3SmokeTests {
         RegexOptions options = RegexOptions.None,
         bool extendedTimeout = false) => new TestCaseData(
         new RegexCase(expected, pattern, constraint, value, length, options, extendedTimeout)).SetName(name);
-
     private static TestCaseData CreateRegexImplicationCase(
         string name,
         string pattern,
@@ -346,13 +325,10 @@ internal class ProofCoreZ3SmokeTests {
         int length = 0,
         RegexOptions options = RegexOptions.None)
             => new TestCaseData(new RegexImplicationCase(pattern, conclusion, value, length, options)).SetName(name);
-
     private static SmtBinaryFormula Compare(SmtBinaryOperator operation, SmtFormula left, string right) =>
         new(operation, left, new SmtStringConstant(right));
-
     private static SmtBinaryFormula Compare(SmtBinaryOperator operation, SmtFormula left, int right) =>
         new(operation, left, new SmtIntegerConstant(right));
-
     private static SmtStringStartsWithFormula RegexStartsWith(SmtFormula text, string prefix) =>
         new(text, new SmtStringConstant(prefix));
     [TestCase(@"\A.\z")]
@@ -363,16 +339,13 @@ internal class ProofCoreZ3SmokeTests {
     public void SmtSolver_CharacterClassFallback_DoesNotRejectAValidLanguage(string pattern) {
         using var solver = new SmtSolver();
         var text = new SmtVariable("text", SmtValueKind.String);
-
         var result = solver.CheckSatisfiability(new SmtFormula[] { new SmtRegexMatchFormula(text, pattern) },
             TimeSpan.FromMilliseconds(250)).Feasibility;
-
         Assert.That(result, Is.Not.EqualTo(Feasibility.Unsatisfiable));
     }
     [Test]
     public void SmtSolver_NegatedUnicodeCategoryRegexContradictsPunctuationPrefix() {
         var text = new SmtVariable("text", SmtValueKind.String);
-
         AssertSatisfiability(
             Feasibility.Unsatisfiable,
             new SmtFormula[] {
@@ -385,7 +358,6 @@ internal class ProofCoreZ3SmokeTests {
     [Test]
     public void SmtSolver_NegatedUnicodeCategoryClassContradictsPunctuationPrefix() {
         var text = new SmtVariable("text", SmtValueKind.String);
-
         AssertSatisfiability(
             Feasibility.Unsatisfiable,
             new SmtFormula[] {
@@ -400,14 +372,12 @@ internal class ProofCoreZ3SmokeTests {
         var text = new SmtVariable("text", SmtValueKind.String);
         var lengthIsOne = new SmtBinaryFormula(SmtBinaryOperator.Equal, new SmtStringLengthTerm(text), new SmtIntegerConstant(1));
         var textIsUppercaseLetter = new SmtRegexMatchFormula(text, @"\A\p{Lu}\z");
-
         AssertImplication(Feasibility.Unknown, new[] { lengthIsOne }, textIsUppercaseLetter, TimeSpan.FromMilliseconds(250));
     }
     [Test]
     public void SmtSolver_WordBoundaryRegexPathProvesLengthImplication() {
         var text = new SmtVariable("text", SmtValueKind.String);
         var lengthIsOne = new SmtBinaryFormula(SmtBinaryOperator.Equal, new SmtStringLengthTerm(text), new SmtIntegerConstant(1));
-
         AssertImplication(
             Feasibility.Unsatisfiable,
             new[] {
@@ -420,12 +390,10 @@ internal class ProofCoreZ3SmokeTests {
         var text = new SmtVariable("text", SmtValueKind.String);
         var lengthIsOne = new SmtBinaryFormula(SmtBinaryOperator.Equal, new SmtStringLengthTerm(text), new SmtIntegerConstant(1));
         var textIsBoundaryA = new SmtRegexMatchFormula(text, @"\A\bA\z");
-
         AssertImplication(Feasibility.Unknown, new[] { lengthIsOne }, textIsBoundaryA);
     }
     private sealed record SolverCase(SmtFormula[] Conditions, Feasibility Expected, SmtFormula? Conclusion = null,
         bool ZeroTimeout = false);
-
     private static IEnumerable<TestCaseData> SolverCases() {
         yield return CreateSolverCase("SmtSolver_NonPositiveTimeout_ReturnsUnknown", [Equal(Int("x"), Integer(1))], Feasibility.Unknown,
             zeroTimeout: true);
@@ -516,10 +484,8 @@ internal class ProofCoreZ3SmokeTests {
         var s = new SmtVariable("s", SmtValueKind.Reference);
         var sIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, s, new SmtNullConstant());
         var sIsNotNull = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, s, new SmtNullConstant());
-
         var result = search.Classify(new AnalysisProofQuery(new[] { sIsNotNull }, new AnalysisHazard(AnalysisHazardKind.NullDereference,
             sIsNull)), TimeSpan.FromSeconds(2));
-
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("null_dereference_unreachable"));
     }

@@ -1,5 +1,4 @@
 namespace SharpProof.Analyzer;
-
 internal static class AnalyzerSyntaxHelpers {
     internal static bool IsBodylessAutoPropertyGetter(MethodBodyAnalysisContext context)
         => context.MethodSymbol.MethodKind == MethodKind.PropertyGet &&
@@ -47,7 +46,6 @@ internal static class AnalyzerSyntaxHelpers {
     internal static string GetFirstAttributeArgumentText(AttributeData attribute, CancellationToken cancellationToken) {
         if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
             return attributeSyntax.ArgumentList?.Arguments.FirstOrDefault()?.ToString() ?? "<missing>";
-
         return "<missing>";
     }
     internal static string GetAttributeArgumentListText(AttributeData attribute, CancellationToken cancellationToken) {
@@ -55,7 +53,6 @@ internal static class AnalyzerSyntaxHelpers {
             return attributeSyntax.ArgumentList == null
                 ? "<missing>"
                 : string.Join(", ", attributeSyntax.ArgumentList.Arguments.Select(static argument => argument.ToString()));
-
         return "<missing>";
     }
 }

@@ -1,6 +1,5 @@
 using System;
 using SharpProof.Attributes;
-
 public sealed class Worker
 {
     [DoesNotThrow]

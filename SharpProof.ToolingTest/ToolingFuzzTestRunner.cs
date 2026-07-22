@@ -1,8 +1,6 @@
 using System.Collections.Immutable;
 using SharpProof.Tools.Fuzz;
-
 namespace SharpProof.Test;
-
 internal static class ToolingFuzzTestRunner {
     internal static Task<ImmutableArray<FuzzCaseAnalysis>> AnalyzeCasesAsync(
         IEnumerable<FuzzCase> fuzzCases,

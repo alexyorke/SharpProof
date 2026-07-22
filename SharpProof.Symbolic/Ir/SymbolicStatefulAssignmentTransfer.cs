@@ -1,9 +1,7 @@
 using System.Numerics;
 using static SharpProof.Symbolic.Ir.SymbolicCfgProgramPointStateCollector;
 using static SharpProof.Symbolic.SymbolicStateFactBuilder;
-
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicStatefulAssignmentTransfer {
     internal static bool TryApplyCoalesceAssignment(
         ref SymbolicState state,
@@ -25,13 +23,11 @@ internal static class SymbolicStatefulAssignmentTransfer {
         }
         if (RequiresStructuralAssignmentFallback(target, guard, allowGuardedReferenceAssignments, allowGuardMutation))
             return false;
-
         invalidatedGuardTarget = GuardReferencesTarget(guard, target) ? target : null;
         target = target.OriginalDefinition;
         if (SymbolicStateValueFacts.IsKnownNonNullReference(state, target) ||
             SymbolicStateValueFacts.IsKnownNullableHasValue(state, target))
             return true;
-
         SymbolicStateValueFacts.TryGetCurrentValue(state, target, out var previousValue);
         SymbolicOperationTransitionResult transition;
         if (SymbolicStateValueFacts.IsKnownNullReference(state, target) ||
@@ -76,7 +72,6 @@ internal static class SymbolicStatefulAssignmentTransfer {
                 operation => ResolveDeconstructionTarget(operation, semanticModel, cancellationToken),
                 out var targets))
             return false;
-
         var targetSymbols = targets.Select(static target => target.Symbol).ToArray();
         foreach (var target in targetSymbols)
             if (target != null)
@@ -86,7 +81,6 @@ internal static class SymbolicStatefulAssignmentTransfer {
             SymbolicAssignmentStateTransfer.ExpressionReferencesAnySymbol(syntax.Right, nonDiscardTargets, semanticModel,
                 cancellationToken))
             return true;
-
         var right = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(syntax.Right);
         if (right is TupleExpressionSyntax rightTuple) {
             if (rightTuple.Arguments.Count != targetSymbols.Length)
@@ -152,7 +146,6 @@ internal static class SymbolicStatefulAssignmentTransfer {
                 semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
             _ => null
         };
-
     internal static bool TryApplyComputedUpdate(
         ref SymbolicState state,
         ISymbol target,
@@ -167,7 +160,6 @@ internal static class SymbolicStatefulAssignmentTransfer {
             previous.Kind != SharpProof.ProofCore.Smt.SmtValueKind.Int ||
             !SymbolicTypeFacts.TryGetBoundedIntegralRange(targetType, out var minimum, out var maximum))
             return false;
-
         SymbolicBinaryTermOperator binaryOperator;
         SymbolicTerm right;
         bool isChecked;
@@ -197,7 +189,6 @@ internal static class SymbolicStatefulAssignmentTransfer {
         }
         else
             return false;
-
         SymbolicTerm updated;
         if (previous is SymbolicIntegerConstantTerm leftConstant &&
             right is SymbolicIntegerConstantTerm rightConstant) {

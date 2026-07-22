@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicIrVersionRewriter {
     internal static SymbolicCondition RewriteToCurrentVersions(SymbolicCondition condition, ImmutableDictionary<string,
         int> symbolVersions) {
@@ -12,9 +11,7 @@ internal static class SymbolicIrVersionRewriter {
     }
     sealed class CurrentVersionRewriter : SymbolicIrRewriter {
         private readonly ImmutableDictionary<string, int> _symbolVersions;
-
         internal CurrentVersionRewriter(ImmutableDictionary<string, int> symbolVersions) => _symbolVersions = symbolVersions;
-
         protected override bool TryRewriteTerm(SymbolicTerm term, out SymbolicTerm rewritten) {
             switch (term) {
                 case SymbolicVariableTerm variable:
@@ -56,12 +53,10 @@ internal static class SymbolicIrVersionRewriter {
         }
         private string RewriteVariableLikeName(string name) {
             if (string.IsNullOrEmpty(name)) return name;
-
             var (baseName, currentVersion) = SplitVersionedName(name);
             if (!_symbolVersions.TryGetValue(baseName, out var targetVersion) ||
                 currentVersion == targetVersion)
                 return name;
-
             return targetVersion > 0
                 ? baseName + "@v" + targetVersion.ToString(CultureInfo.InvariantCulture)
                 : baseName;
@@ -73,7 +68,6 @@ internal static class SymbolicIrVersionRewriter {
             markerIndex + 2 >= name.Length ||
             !int.TryParse(name.Substring(markerIndex + 2), NumberStyles.None, CultureInfo.InvariantCulture, out var version))
             return (name, 0);
-
         return (name.Substring(0, markerIndex), version);
     }
 }

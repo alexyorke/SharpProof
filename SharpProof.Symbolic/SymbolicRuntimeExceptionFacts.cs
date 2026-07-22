@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicRuntimeExceptionFacts {
     internal static bool TryGetThrowExpression(SyntaxNode throwNode, out ExpressionSyntax expression) {
         switch (throwNode) {
@@ -21,7 +20,6 @@ internal static class SymbolicRuntimeExceptionFacts {
         bool stopAtUntypedCatch) {
         if (!TryGetThrowExpression(throwNode, out var exceptionExpression))
             return GetRethrownExceptionType(throwNode, semanticModel, cancellationToken, stopAtUntypedCatch);
-
         var typeInfo = semanticModel.GetTypeInfo(exceptionExpression, cancellationToken);
         return typeInfo.Type ?? typeInfo.ConvertedType;
     }
@@ -32,10 +30,8 @@ internal static class SymbolicRuntimeExceptionFacts {
         bool stopAtUntypedCatch) {
         foreach (var catchClause in throwNode.Ancestors().OfType<CatchClauseSyntax>()) {
             if (!catchClause.Block.Span.Contains(throwNode.SpanStart)) continue;
-
             if (catchClause.Declaration == null) {
                 if (stopAtUntypedCatch) return null;
-
                 continue;
             }
             return semanticModel.GetTypeInfo(catchClause.Declaration.Type, cancellationToken).Type;
@@ -89,13 +85,10 @@ internal static class SymbolicRuntimeExceptionFacts {
         internal const string DefiniteStringSubstringOutOfRange = "definite_string_substring_out_of_range";
         internal const string DefiniteStringRemoveOutOfRange = "definite_string_remove_out_of_range";
         internal const string DefiniteSliceOutOfRange = "definite_slice_out_of_range";
-
         internal const string DefiniteMemoryExtensionsAsSpanOutOfRange =
             "definite_memory_extensions_as_span_out_of_range";
-
         internal const string DefiniteMemoryExtensionsAsMemoryOutOfRange =
             "definite_memory_extensions_as_memory_out_of_range";
-
         internal const string DefiniteSwitchExpressionNoMatch = "definite_switch_expression_no_match";
     }
 }

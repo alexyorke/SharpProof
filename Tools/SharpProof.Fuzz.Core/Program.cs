@@ -1,6 +1,4 @@
 namespace SharpProof.Tools.Fuzz;
-
-
 public static class Program {
     public static async Task<int> Main(string[] args) {
         try {
@@ -19,7 +17,6 @@ public static class Program {
         }
         var options = FuzzOptions.Parse(args);
         var summary = await FuzzRunner.RunAsync(options);
-
         if (!options.Quiet) {
             Console.WriteLine(
                 $"SharpProof fuzz run complete: {summary.CasesAnalyzed} cases, {summary.FindingCount} findings ({summary.UniqueFindingCount} unique), {summary.AnalyzerExceptionCount} analyzer exceptions.");

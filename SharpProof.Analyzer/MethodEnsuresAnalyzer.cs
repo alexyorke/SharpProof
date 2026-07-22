@@ -1,22 +1,16 @@
 namespace SharpProof.Analyzer;
-
 internal static class MethodEnsuresAnalyzer {
     internal static void AnalyzeSymbolForEnsures(
         MethodBodyAnalysisContext context,
         AnalyzerProofService proofService,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
-
         Action<Diagnostic> report = context.ReportDiagnostic;
-
         if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
-
         var contracts = CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);
         if (contracts.Length == 0) return;
-
         contracts = ReportAndFilterInvalidContracts(contracts, context);
         if (contracts.Length == 0) return;
-
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) {
             foreach (var contract in contracts) {
                 var diagnostic = CreateUnsupportedDiagnostic(
@@ -39,9 +33,7 @@ internal static class MethodEnsuresAnalyzer {
         var requiresAssumptions = CollectRequiresAssumptions(methodSymbol, attributePolicy, context.CancellationToken);
         var completionSites = MethodCompletionAnalysis.Collect(context);
         if (completionSites.Length == 0) return;
-
         var seen = new HashSet<string>(StringComparer.Ordinal);
-
         foreach (var contract in contracts) {
             if (!ContractConditionHelpers.TryParse(contract.Condition, out var conditionStatement, out var conditionExpression)) {
                 var diagnostic = CreateUnsupportedDiagnostic(
@@ -51,7 +43,6 @@ internal static class MethodEnsuresAnalyzer {
                     "condition parse failure",
                     null);
                 report(diagnostic);
-
                 continue;
             }
             if (!ContractConditionHelpers.TryCreateSpeculativeModel(
@@ -66,7 +57,6 @@ internal static class MethodEnsuresAnalyzer {
                     "condition binding failure",
                     null);
                 report(diagnostic);
-
                 continue;
             }
             if (!completionSites.All(static site => site.ResultExpression != null) &&
@@ -78,7 +68,6 @@ internal static class MethodEnsuresAnalyzer {
                     "result is not available for [Ensures] on void-returning members or constructors",
                     null);
                 report(diagnostic);
-
                 continue;
             }
             if (ReferencesUserLocalOrUnsupportedParameter(conditionExpression, speculativeModel, methodSymbol, context.CancellationToken)) {
@@ -89,7 +78,6 @@ internal static class MethodEnsuresAnalyzer {
                     "local variables are not supported in [Ensures] conditions",
                     null);
                 report(diagnostic);
-
                 continue;
             }
             foreach (var completionSite in completionSites) {
@@ -106,17 +94,14 @@ internal static class MethodEnsuresAnalyzer {
                         "result placeholder rewrite failed",
                         [completionSite.Location]);
                     report(diagnostic);
-
                     continue;
                 }
                 var proofCondition =
                     RequiresContractHelpers.CombineAsImplication(requiresAssumptions, rewrittenCondition);
                 var proof = MethodCompletionAnalysis.Prove(context, proofService.SmtAnalysis, completionSite, proofCondition);
-
                 if (proof.TruthValue == SymbolicTruthValue.ProvenTrue ||
                     proof.TruthValue == SymbolicTruthValue.Unreachable)
                     continue;
-
                 var key = string.Join(
                     ":",
                     contract.Condition,
@@ -125,11 +110,9 @@ internal static class MethodEnsuresAnalyzer {
                     proof.UnknownReason.ToString(),
                     proof.Reason);
                 if (!seen.Add(key)) continue;
-
                 if (proof.TruthValue == SymbolicTruthValue.ProvenFalse) {
                     var diagnostic = CreateNotProvenDiagnostic(methodSymbol, contract.Condition, completionSite, contract.Location);
                     report(diagnostic);
-
                     continue;
                 }
                 var unsupportedDiagnostic = CreateUnsupportedDiagnostic(
@@ -196,10 +179,8 @@ internal static class MethodEnsuresAnalyzer {
         foreach (var identifier in conditionExpression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()) {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal)) continue;
-
             var symbol = speculativeModel.GetSymbolInfo(identifier, cancellationToken).Symbol;
             if (symbol is ILocalSymbol) return true;
-
             if (symbol is IParameterSymbol parameter &&
                 !IsSupportedEnsuresParameter(parameter, methodSymbol))
                 return true;
@@ -217,14 +198,12 @@ internal static class MethodEnsuresAnalyzer {
         rewrittenCondition = conditionText;
         rewrittenExpression = null!;
         if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
-
         if (completionSite.ResultExpression == null) {
             rewrittenExpression = conditionExpression;
             return true;
         }
         if (resultState == NullableFlowFactState.NotNull)
             conditionExpression = (ExpressionSyntax)new NullableResultContractRewriter().Visit(conditionExpression)!;
-
         var rewriter = new ResultPlaceholderRewriter((ExpressionSyntax)completionSite.ResultExpression.WithoutTrivia());
         var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
         rewrittenCondition = rewritten.ToFullString();
@@ -243,13 +222,11 @@ internal static class MethodEnsuresAnalyzer {
         symbolicCondition = null!;
         initialState = new SymbolicState();
         failureReason = null;
-
         if (!ContractConditionHelpers.TryParse(proofCondition, out var proofStatement, out var proofExpression)) {
             failureReason = "condition parse failure";
             return false;
         }
         if (!ContainsOldValueInvocation(proofExpression)) return false;
-
         if (!ContractConditionHelpers.TryCreateSpeculativeModel(
                 semanticModel,
                 speculativePosition,
@@ -271,7 +248,6 @@ internal static class MethodEnsuresAnalyzer {
             return false;
         }
         symbolicCondition = loweredCondition;
-
         if (!snapshots.HasSnapshots) {
             failureReason = "old(...) expression is not supported by the current bounded proof engine";
             return false;
@@ -311,14 +287,11 @@ internal static class MethodEnsuresAnalyzer {
             reason);
     sealed class ResultPlaceholderRewriter(ExpressionSyntax replacement) : CSharpSyntaxRewriter {
         private readonly ExpressionSyntax _replacement = SyntaxFactory.ParenthesizedExpression(replacement);
-
         public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node) {
             if (!string.Equals(node.Identifier.ValueText, "result", StringComparison.Ordinal))
                 return base.VisitIdentifierName(node);
-
             if (CSharpSyntaxFacts.IsMemberOrQualifiedNameRightSide(node))
                 return base.VisitIdentifierName(node);
-
             return _replacement.WithTriviaFrom(node);
         }
     }
@@ -333,14 +306,12 @@ internal static class MethodEnsuresAnalyzer {
                             ? SyntaxKind.TrueLiteralExpression
                             : SyntaxKind.FalseLiteralExpression)
                     .WithTriviaFrom(node);
-
             return base.VisitBinaryExpression(node);
         }
         public override SyntaxNode? VisitIsPatternExpression(IsPatternExpressionSyntax node) {
             if (!IsResult(node.Expression) ||
                 !CSharpSyntaxFacts.TryGetNullPatternPolarity(node.Pattern, out var matchesNonNull))
                 return base.VisitIsPatternExpression(node);
-
             return SyntaxFactory.LiteralExpression(matchesNonNull ? SyntaxKind.TrueLiteralExpression : SyntaxKind.FalseLiteralExpression)
                 .WithTriviaFrom(node);
         }
@@ -356,16 +327,12 @@ internal static class MethodEnsuresAnalyzer {
         private readonly List<SymbolicFact> _snapshotFacts = [];
         private readonly Dictionary<string, SymbolicTerm> _snapshotTerms = new(StringComparer.Ordinal);
         private int _nextSnapshotId;
-
         public string? FailureReason { get; private set; }
-
         public bool HasSnapshots => _snapshotFacts.Count != 0;
-
         public bool TryLowerInvocationTerm(InvocationExpressionSyntax invocation, SymbolicLoweringContext context, out SymbolicTerm term) {
             _ = context;
             term = null!;
             if (!IsOldValueInvocation(invocation)) return false;
-
             if (invocation.ArgumentList.Arguments.Count != 1) {
                 FailureReason = "old(...) requires exactly one argument";
                 return false;
@@ -385,7 +352,6 @@ internal static class MethodEnsuresAnalyzer {
             }
             var key = argument.WithoutTrivia().ToString();
             if (_snapshotTerms.TryGetValue(key, out term)) return true;
-
             var entryContext = new SymbolicLoweringContext(_semanticModel, _cancellationToken);
             var lowering = SymbolicSemanticPipeline.LowerTerm(argument, entryContext);
             if (lowering is not { IsExact: true, Value: { } entryTerm }) {
@@ -404,7 +370,6 @@ internal static class MethodEnsuresAnalyzer {
         public ITypeSymbol? ResolveInvocationTermType(InvocationExpressionSyntax invocation) {
             if (!IsOldValueInvocation(invocation) || invocation.ArgumentList.Arguments.Count != 1)
                 return null;
-
             var argument = invocation.ArgumentList.Arguments[0].Expression;
             var typeInfo = _semanticModel.GetTypeInfo(argument, _cancellationToken);
             return typeInfo.ConvertedType ?? typeInfo.Type;

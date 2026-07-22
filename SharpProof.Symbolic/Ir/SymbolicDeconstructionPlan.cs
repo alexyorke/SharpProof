@@ -1,7 +1,5 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal readonly record struct SymbolicDeconstructionTarget(ISymbol? Symbol);
-
 internal static class SymbolicDeconstructionPlan {
     internal static bool TryCollectTargets(
         IOperation operation,

@@ -1,13 +1,10 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-
 namespace SharpProof.Test;
-
 internal static class RoslynTestFixture {
     private static readonly MetadataReference ObjectReference =
         MetadataReference.CreateFromFile(typeof(object).Assembly.Location);
-
     internal static CompilationFixture CreateCompilation(
         string source,
         string assemblyName,
@@ -51,15 +48,11 @@ internal static class RoslynTestFixture {
         CSharpCompilation Compilation,
         SemanticModel SemanticModel,
         CompilationUnitSyntax Root);
-
     internal readonly record struct NodeFixture<TNode>(CompilationFixture Fixture, TNode Node)
         where TNode : SyntaxNode {
         internal SyntaxTree SyntaxTree => Fixture.SyntaxTree;
-
         internal CSharpCompilation Compilation => Fixture.Compilation;
-
         internal SemanticModel SemanticModel => Fixture.SemanticModel;
-
         internal CompilationUnitSyntax Root => Fixture.Root;
     }
 }

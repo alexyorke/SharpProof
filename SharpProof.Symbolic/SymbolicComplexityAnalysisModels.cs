@@ -1,11 +1,9 @@
 namespace SharpProof.Symbolic;
-
 internal sealed record MethodAnalysisSummary(
     SymbolicCostExpression Cost,
     ImmutableArray<SymbolicComplexityDriverInfo> Drivers,
     ImmutableArray<SymbolicComplexityUnknownReason> UnknownReasons,
     ImmutableArray<SymbolicComplexityCalleeInfo> CalleeSummaries);
-
 internal sealed record ComplexityArtifacts(
     SymbolicCostExpression Cost,
     IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,
@@ -16,7 +14,6 @@ internal sealed record ComplexityArtifacts(
         Array.Empty<SymbolicComplexityDriverInfo>(),
         Array.Empty<SymbolicComplexityUnknownReason>(),
         Array.Empty<SymbolicComplexityCalleeInfo>());
-
     public static ComplexityArtifacts FromCost(
         SymbolicCostExpression cost,
         IEnumerable<SymbolicComplexityDriverInfo>? drivers = null,
@@ -43,7 +40,6 @@ internal sealed record ComplexityArtifacts(
                 callees.AddRange(part.CalleeSummaries);
             }
         if (calleeSummaries != null) callees.AddRange(calleeSummaries);
-
         drivers.Add(CreateUnknownDriver(reason, syntax));
         return FromCost(SymbolicCostExpression.Unknown(reason), drivers, reasons, callees);
     }
@@ -59,9 +55,7 @@ internal sealed record SubstitutionResult(
     SymbolicCostExpression Cost,
     IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,
     IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons);
-
 internal readonly record struct LoopBoundInfo(SymbolicCostExpression Cost, string Description);
-
 internal enum StepDirection {
     None,
     Up,

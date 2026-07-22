@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <Import Project="..\SharpProof.AnalyzerConsumer.props" />
-
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
     <LangVersion>latest</LangVersion>
@@ -9,5 +7,4 @@
     <AssemblyName>SharpProof.Smoke.Net472</AssemblyName>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
-
 </Project>

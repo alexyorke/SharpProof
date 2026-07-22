@@ -6,7 +6,6 @@ public static class Example
         {
             return value;
         }
-
         return 0;
     }
 }

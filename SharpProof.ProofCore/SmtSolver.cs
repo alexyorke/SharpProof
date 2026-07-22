@@ -1,7 +1,5 @@
 using System.Diagnostics;
-
 namespace SharpProof.ProofCore.Smt;
-
 internal enum Feasibility {
     Satisfiable,
     Unsatisfiable,
@@ -12,22 +10,18 @@ internal sealed class SmtSolver : IDisposable {
     private readonly Z3FormulaEncoder _encoder = new();
     private readonly SmtQuerySafety _safety = new();
     private long _lastObservedRlimitCount;
-
     /// <summary>
     ///     Total Z3 rlimit units consumed by checks on this solver instance. Grows
     ///     deterministically with solver work, so callers can enforce cumulative
     ///     budgets that do not depend on machine speed or load.
     /// </summary>
     public long ConsumedResourceCount { get; private set; }
-
     internal int RegexValidationCacheCount => _safety.RegexValidationCacheCount;
-
     public void Dispose() => _encoder.Dispose();
     private Status CheckAndAccountResources(Solver solver) {
         var status = solver.Check();
         foreach (var entry in solver.Statistics.Entries) {
             if (!string.Equals(entry.Key, "rlimit count", StringComparison.Ordinal) || !entry.IsUInt) continue;
-
             // The statistic is cumulative per Z3 context; account the delta. A
             // smaller observation means the 32-bit counter wrapped - count the
             // post-wrap portion rather than losing the observation entirely.
@@ -78,7 +72,6 @@ internal sealed class SmtSolver : IDisposable {
             return new SmtPathAndHazardCheckResult(
                 path,
                 new SmtFeasibilityResult(Feasibility.Unknown, SmtSatisfyingWitness.None("path_not_satisfiable")));
-
         var remaining = timeout - deadline.Elapsed;
         var impurity = remaining <= TimeSpan.Zero
             ? new SmtFeasibilityResult(Feasibility.Unknown, SmtSatisfyingWitness.Unsupported("solver_timeout"))
@@ -98,14 +91,11 @@ internal sealed class SmtSolver : IDisposable {
         using var solver = _encoder.CreateSolver(timeout);
         foreach (var formula in conditions) solver.Assert(_encoder.EncodeCondition(formula));
         AssertIntegerDomains(solver, conditions);
-
         var feasibility = ToFeasibility(CheckAndAccountResources(solver));
         if (feasibility == Feasibility.Unsatisfiable)
             return new SmtFeasibilityResult(feasibility, SmtSatisfyingWitness.None("constraints_unsatisfiable"));
-
         if (feasibility != Feasibility.Satisfiable)
             return new SmtFeasibilityResult(feasibility, SmtSatisfyingWitness.Unsupported("solver_unknown"));
-
         var witnessStatus = isApproximate || preprocessedModel
             ? SmtWitnessStatus.Approximate
             : SmtWitnessStatus.Exact;
@@ -126,7 +116,6 @@ internal sealed class SmtSolver : IDisposable {
     private bool HasSafeArithmetic(IReadOnlyList<SmtFormula> conditions, TimeSpan timeout) {
         var checks = SmtQuerySafety.CreateUnsafeArithmeticChecks(conditions);
         if (checks.Count == 0) return true;
-
         using var solver = _encoder.CreateSolver(timeout);
         foreach (var condition in conditions)
             if (!SmtQuerySafety.ContainsUnsafeArithmetic(condition))
@@ -169,7 +158,6 @@ internal sealed class SmtSolver : IDisposable {
             foreach (var candidate in SmtFormulaTraversal.Enumerate(formula))
                 if (candidate is SmtVariable variable)
                     variables.Add(variable);
-
         return variables.ToArray();
     }
 }

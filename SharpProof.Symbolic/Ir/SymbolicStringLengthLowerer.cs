@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal static class SymbolicStringLengthLowerer {
     internal static bool TryLowerStringCreationResultLengthTerm(
         ExpressionSyntax expression,
@@ -12,7 +11,6 @@ internal static class SymbolicStringLengthLowerer {
             objectCreationOperation.Constructor is not { } constructor ||
             constructor.ContainingType.SpecialType != SpecialType.System_String)
             return false;
-
         if (constructor.Parameters.Length == 2 &&
             constructor.Parameters[0].Type.SpecialType == SpecialType.System_Char &&
             constructor.Parameters[1].Type.SpecialType == SpecialType.System_Int32 &&
@@ -20,12 +18,10 @@ internal static class SymbolicStringLengthLowerer {
             SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(countExpression, context), out term) &&
             term.Kind == SmtValueKind.Int)
             return true;
-
         if (constructor.Parameters.Length == 1 &&
             SymbolicTypeFacts.IsCharArrayType(constructor.Parameters[0].Type) &&
             SymbolicIndexingLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var charArrayExpression))
             return SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(charArrayExpression, context, out term);
-
         if (constructor.Parameters.Length == 3 &&
             SymbolicTypeFacts.IsCharArrayType(constructor.Parameters[0].Type) &&
             constructor.Parameters[1].Type.SpecialType == SpecialType.System_Int32 &&
@@ -34,12 +30,10 @@ internal static class SymbolicStringLengthLowerer {
             SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(lengthExpression, context), out term) &&
             term.Kind == SmtValueKind.Int)
             return true;
-
         if (constructor.Parameters.Length == 1 &&
             SymbolicTypeFacts.IsReadOnlySpanOfCharType(constructor.Parameters[0].Type) &&
             SymbolicIndexingLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var spanExpression))
             return SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(spanExpression, context, out term);
-
         term = null!;
         return false;
     }
@@ -51,20 +45,16 @@ internal static class SymbolicStringLengthLowerer {
         if (!SymbolicIndexingLowerer.TryGetInvocationOperation(expression, context, out var invocationExpression,
             out var invocationOperation))
             return false;
-
         var method = invocationOperation.TargetMethod;
         if (method.IsStatic ||
             method.ContainingType?.SpecialType != SpecialType.System_String ||
             method.ReturnType.SpecialType != SpecialType.System_String ||
             invocationOperation.Instance?.Syntax is not ExpressionSyntax sourceExpression)
             return false;
-
         // Substring is not handled here: it lowers to a slice term in SymbolicStringLowerer,
         // and CreateStringResultLengthTerm projects that slice's requested length.
-
         if (string.Equals(method.Name, nameof(string.Remove), StringComparison.Ordinal)) {
             if (!SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength)) return false;
-
             if (method.Parameters.Length == 1 &&
                 SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var startExpression) &&
                 SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(startExpression, context), out var start) &&
@@ -123,16 +113,13 @@ internal static class SymbolicStringLengthLowerer {
     internal static SymbolicTerm CreateStringResultLengthTerm(SymbolicTerm stringValue, SyntaxNode source, string provenance) {
         if (stringValue is SymbolicStringConstantTerm constant)
             return new SymbolicIntegerConstantTerm(constant.Value.Length);
-
         // A slice reaches here only on a path where the call completed, so its length is
         // the length that was asked for. Projecting it keeps this exact, where deferring
         // to the solver's total substring would only yield an upper bound.
         if (stringValue is SymbolicStringSliceTerm slice)
             return slice.Length;
-
         if (stringValue is not SymbolicStringConcatTerm concat)
             return new SymbolicLengthTerm(stringValue);
-
         var leftLength = CreateStringResultLengthTerm(concat.Left, source, provenance + ".left");
         var rightLength = CreateStringResultLengthTerm(concat.Right, source, provenance + ".right");
         return SymbolicIrLowerer.CreateOverflowAwareBinaryTerm(
@@ -153,13 +140,11 @@ internal static class SymbolicStringLengthLowerer {
             (!TryLowerStringConstructionLengthSum(binaryExpression.Right, context, out constructedLength) ||
              !TryLowerNonNegativeLengthSum(binaryExpression.Left, context, out comparedLength)))
             return false;
-
         if (!string.Equals(
                 SymbolicState.CreateProofTermKey(constructedLength),
                 SymbolicState.CreateProofTermKey(comparedLength),
                 StringComparison.Ordinal))
             return false;
-
         condition = new SymbolicConstantCondition(binaryExpression.IsKind(SyntaxKind.EqualsExpression));
         return true;
     }
@@ -181,16 +166,13 @@ internal static class SymbolicStringLengthLowerer {
     private static SymbolicTerm CreateMathematicalStringLengthSum(SymbolicTerm stringValue) {
         if (stringValue is SymbolicStringConstantTerm constant)
             return new SymbolicIntegerConstantTerm(constant.Value.Length);
-
         if (stringValue is SymbolicConditionalTerm {
             WhenTrue: SymbolicStringConstantTerm { Value.Length: 0 },
             WhenFalse: { Kind: SmtValueKind.String } nonNullValue
         })
             return CreateMathematicalStringLengthSum(nonNullValue);
-
         if (stringValue is not SymbolicStringConcatTerm concat)
             return new SymbolicLengthTerm(stringValue);
-
         return new SymbolicBinaryTerm(
             SymbolicBinaryTermOperator.Add,
             CreateMathematicalStringLengthSum(concat.Left),
@@ -265,7 +247,6 @@ internal static class SymbolicStringLengthLowerer {
             HasLengthLikeShape(sourceType) &&
             !HasLengthLikeShape(convertedType))
             return sourceType;
-
         return convertedType ?? sourceType;
     }
     private static bool HasLengthLikeShape(ITypeSymbol? type) => type?.SpecialType == SpecialType.System_String ||

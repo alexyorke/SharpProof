@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic;
-
 internal static class SymbolicProgramPointFacts {
     internal static void AddReachabilityCondition(
         ref SymbolicState state,
@@ -21,13 +20,11 @@ internal static class SymbolicProgramPointFacts {
         if (NullableFlowFacts.IsDefinitelyNullReferenceValue(expression, semanticModel, cancellationToken)) {
             if (!isNull)
                 state = SymbolicOperationTransferKernel.Complete(state, expression.Span).State;
-
             return;
         }
         if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(expression, semanticModel, cancellationToken)) {
             if (isNull)
                 state = SymbolicOperationTransferKernel.Complete(state, expression.Span).State;
-
             return;
         }
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
@@ -35,7 +32,6 @@ internal static class SymbolicProgramPointFacts {
         if (lowering is not { IsExact: true, Value: { } subject } ||
             subject.Kind != SmtValueKind.Reference)
             return;
-
         var fact = SymbolicFact.Exact(
             new SymbolicRelationAtom(
                 isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,

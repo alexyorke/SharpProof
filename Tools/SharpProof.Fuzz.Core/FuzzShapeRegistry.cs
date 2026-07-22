@@ -1,12 +1,13 @@
 namespace SharpProof.Tools.Fuzz;
-
 internal static class FuzzShapeRegistry {
     private const string ClassNamePlaceholder = "__CLASS__";
-
     internal static ImmutableArray<ShapeRegistryEntry> Load(IReadOnlyDictionary<string, Func<int, Random, string, string>> generators) {
-        var json = FuzzOptions.LoadResource("SharpProof.Fuzz.ShapeRegistry.json");
-        var definitions = JsonSerializer.Deserialize<RegistryDefinition[]>(json) ??
-                          throw new InvalidOperationException("The fuzz shape registry is empty.");
+        var definitions = FuzzOptions.LoadResource("SharpProof.Fuzz.ShapeRegistry.jsonl")
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select((line, index) => JsonSerializer.Deserialize<RegistryDefinition>(line) ??
+                throw new InvalidOperationException($"Fuzz shape registry line {index + 1} is empty."))
+            .ToArray();
+        if (definitions.Length == 0) throw new InvalidOperationException("The fuzz shape registry is empty.");
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
         var usedGenerators = new HashSet<string>(StringComparer.Ordinal);
         var entries = ImmutableArray.CreateBuilder<ShapeRegistryEntry>(definitions.Length);
@@ -17,7 +18,6 @@ internal static class FuzzShapeRegistry {
             if (hasGenerator == (definition.SourceTemplate != null))
                 throw new InvalidOperationException(
                     $"Fuzz shape '{definition.Id}' must define exactly one generator or source template.");
-
             Func<int, Random, string, string> build;
             if (hasGenerator) {
                 if (!generators.TryGetValue(definition.Generator!, out build!))
@@ -64,12 +64,10 @@ internal static class FuzzShapeRegistry {
     }
     private static IEnumerable<string> Compact(string[]? values) =>
         (values ?? []).Where(static value => !string.IsNullOrWhiteSpace(value));
-
     private static SharpProofEffect ParseEffect(string value) =>
         Enum.TryParse<SharpProofEffect>(value, out var effect) && Enum.IsDefined(effect)
             ? effect
             : throw new InvalidOperationException("Invalid fuzz effect expectation: " + value);
-
     sealed record RegistryDefinition(
         string Id,
         string[] PrimaryShapes,

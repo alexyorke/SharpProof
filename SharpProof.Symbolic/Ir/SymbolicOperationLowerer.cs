@@ -1,5 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-
 internal enum SymbolicAssignmentPostconditionProfile {
     Analyzer,
     Symbolic
@@ -60,7 +59,6 @@ internal static partial class SymbolicOperationLowerer {
             IConversionOperation conversion => TryLowerCheckedConversionOverflow(conversion, context, out hazard),
             _ => NoHazard(out hazard)
         };
-
     internal static bool TryLowerReferenceNullHazard(
         ExpressionSyntax subjectExpression,
         SymbolicRuntimeHazardKind hazardKind,
@@ -74,7 +72,6 @@ internal static partial class SymbolicOperationLowerer {
         if (suppressDefinitelyNotNull &&
             NullableFlowFacts.IsDefinitelyNotNullReferenceValue(subjectExpression, context.SemanticModel, context.CancellationToken))
             return NoHazard(out hazard);
-
         var lowering = SymbolicSemanticPipeline.LowerTerm(subjectExpression, context);
         var subject = lowering is {
             IsExact: true,
@@ -123,7 +120,6 @@ internal static partial class SymbolicOperationLowerer {
         if (operation.Syntax is not MemberAccessExpressionSyntax memberAccess ||
             !SymbolicTypeFacts.IsNullableValueAccess(memberAccess, context.SemanticModel, context.CancellationToken))
             return NoHazard(out hazard);
-
         if (SymbolicRuntimeHazardSyntaxFacts.HasLaterLoopAssignmentOfMissingNullableValue(
                 memberAccess.Expression,
                 memberAccess,
@@ -152,7 +148,6 @@ internal static partial class SymbolicOperationLowerer {
                 out _) ||
             !SymbolicRuntimeHazardSyntaxFacts.IsDynamicExpression(receiver, context.SemanticModel, context.CancellationToken))
             return NoHazard(out hazard);
-
         return TryLowerReferenceNullHazard(
             receiver,
             SymbolicRuntimeHazardKind.DynamicNullBinding,
@@ -168,12 +163,10 @@ internal static partial class SymbolicOperationLowerer {
         IOperation operation,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard) => TryLowerNullDereferenceHazardCore(operation.Syntax, context, out hazard);
-
     internal static bool TryLowerMemberAccessNullDereferenceHazard(
         MemberAccessExpressionSyntax memberAccess,
         SymbolicLoweringContext context,
         out SymbolicHazardOperation hazard) => TryLowerNullDereferenceHazardCore(memberAccess, context, out hazard);
-
     private static bool TryLowerNullDereferenceHazardCore(
         SyntaxNode site,
         SymbolicLoweringContext context,
@@ -221,7 +214,6 @@ internal static partial class SymbolicOperationLowerer {
                 context.SemanticModel,
                 context.CancellationToken)))
             return NoHazard(out hazard);
-
         return TryLowerReferenceNullHazard(
             receiver,
             SymbolicRuntimeHazardKind.NullDereference,
@@ -257,7 +249,6 @@ internal static partial class SymbolicOperationLowerer {
                 context.SemanticModel,
                 context.CancellationToken)))
             return NoHazard(out hazard);
-
         return TryLowerReferenceNullHazard(
             argument,
             SymbolicRuntimeHazardKind.ArgumentNull,
@@ -277,12 +268,10 @@ internal static partial class SymbolicOperationLowerer {
                 "System.Text.RegularExpressions.Regex",
                 StringComparison.Ordinal))
             return false;
-
         for (var index = 0; index < operation.TargetMethod.Parameters.Length; index++)
             if (string.Equals(operation.TargetMethod.Parameters[index].Name, "input", StringComparison.Ordinal) &&
                 SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, index, out inputExpression))
                 return true;
-
         return false;
     }
     internal static SymbolicHazardOperation LowerLoopCarriedNullableValueHazard(SyntaxNode site) => CreateHazard(
@@ -294,7 +283,6 @@ internal static partial class SymbolicOperationLowerer {
             ExceptionTypes.InvalidOperationException,
             ExceptionCategories.DefiniteNullableValueWithoutValue,
             "ir.runtime-hazard.nullable-value.loop-carried");
-
     internal static bool TryLowerNegativeLengthHazard(
         IOperation operation,
         SymbolicLoweringContext context,
@@ -315,7 +303,6 @@ internal static partial class SymbolicOperationLowerer {
             _ => default
         };
         if (shape.Lengths == null) return NoHazard(out hazard);
-
         return TryLowerNegativeLengthHazardCore(
             operation.Syntax,
             shape.Lengths,
@@ -384,12 +371,10 @@ internal static partial class SymbolicOperationLowerer {
             !IsKnownCardinalityCheckedCollection(method.ContainingType) ||
             invocation.Expression is not MemberAccessExpressionSyntax instanceMember)
             return NoHazard(out hazard);
-
         var receiver = instanceMember.Expression;
         var lowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(receiver, context);
         if (lowering is not { IsExact: true, Value: { Kind: SmtValueKind.Int } count })
             return NoHazard(out hazard);
-
         const string provenance = "ir.runtime-hazard.collection-cardinality";
         hazard = CreateHazard(
             receiver,
@@ -410,7 +395,6 @@ internal static partial class SymbolicOperationLowerer {
     private static bool IsKnownCardinalityCheckedCollection(INamedTypeSymbol type)
         => type.ContainingNamespace.ToDisplayString() == "System.Collections.Generic" &&
                type.OriginalDefinition.MetadataName is "Queue`1" or "Stack`1" or "PriorityQueue`2";
-
     internal static bool TryLowerElementAccessBoundsHazard(
         IOperation operation,
         SymbolicLoweringContext context,
@@ -424,7 +408,6 @@ internal static partial class SymbolicOperationLowerer {
                 out var exceptionType,
                 out var category))
             return NoHazard(out hazard);
-
         SymbolicTerm? subject = null;
         SymbolicCondition? trigger = null;
         var provenance = "ir.runtime-hazard.index.out-of-range";
@@ -502,7 +485,6 @@ internal static partial class SymbolicOperationLowerer {
             invocationOperation.Instance.Type is not IArrayTypeSymbol arrayType ||
             invocationOperation.Arguments.Length != arrayType.Rank)
             return NoHazard(out hazard);
-
         SymbolicTerm? subject = null;
         SymbolicCondition? trigger = null;
         var provenance = "ir.runtime-hazard.array-get-value.index-out-of-range";
@@ -541,11 +523,9 @@ internal static partial class SymbolicOperationLowerer {
         out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not ExpressionSyntax expression)
             return NoHazard(out hazard);
-
         var lowering = SymbolicSemanticPipeline.LowerIndexConstructionArgumentOutOfRangeCondition(expression, context);
         if (lowering is not { IsExact: true, Value: { } trigger })
             return NoHazard(out hazard);
-
         hazard = CreateHazard(
             expression,
             SymbolicRuntimeHazardKind.ArgumentOutOfRange,
@@ -571,7 +551,6 @@ internal static partial class SymbolicOperationLowerer {
                 out var oneArgumentUpperBoundIsInclusive,
                 out var category))
             return NoHazard(out hazard);
-
         var inRange = SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition(
             sourceExpression,
             startExpression,
@@ -601,7 +580,6 @@ internal static partial class SymbolicOperationLowerer {
                 context.SemanticModel,
                 context.CancellationToken))
             return NoHazard(out hazard);
-
         return TryLowerNullableValueHazard(
             castExpression.Expression,
             ExceptionTypes.InvalidOperationException,
@@ -621,7 +599,6 @@ internal static partial class SymbolicOperationLowerer {
                 context.SemanticModel,
                 context.CancellationToken))
             return NoHazard(out hazard);
-
         return TryLowerReferenceNullHazard(
             castExpression.Expression,
             SymbolicRuntimeHazardKind.UnboxNull,
@@ -639,7 +616,6 @@ internal static partial class SymbolicOperationLowerer {
         out SymbolicHazardOperation hazard) {
         if (!TryGetBuiltInNonIdentityCast(operation, out var castExpression, out var targetType))
             return NoHazard(out hazard);
-
         var isUnboxing = SymbolicRuntimeHazardSyntaxFacts.IsUnboxingCastShape(
             castExpression,
             targetType,
@@ -658,7 +634,6 @@ internal static partial class SymbolicOperationLowerer {
         var operandLowering = SymbolicSemanticPipeline.LowerTerm(operand, context);
         if (operandLowering is { IsExact: true, Value: SymbolicNullTerm })
             return NoHazard(out hazard);
-
         SymbolicTerm? subject = operandLowering is { IsExact: true, Value: { Kind: SmtValueKind.Reference } reference }
             ? reference
             : null;
@@ -675,7 +650,6 @@ internal static partial class SymbolicOperationLowerer {
                 : SymbolicRuntimeTypeFacts.CanCastExactRuntimeTypeToReferenceType(
                     exactRuntimeType, targetType, context.SemanticModel.Compilation);
             if (valid) return NoHazard(out hazard);
-
             if (subject != null) {
                 trigger = SymbolicIrLowerer.CreateReferenceNullCondition(
                     subject, false, operand, "ir.runtime-hazard.reference.non-null.guard");
@@ -723,7 +697,6 @@ internal static partial class SymbolicOperationLowerer {
             conversion.Conversion.IsIdentity ||
             conversion.Type is not { TypeKind: not TypeKind.Dynamic } resolvedTargetType)
             return false;
-
         castExpression = resolvedCast;
         targetType = resolvedTargetType;
         return true;
@@ -743,7 +716,6 @@ internal static partial class SymbolicOperationLowerer {
                 out var declaredArrayType) ||
             !SymbolicTypeFacts.IsReferenceType(declaredArrayType.ElementType))
             return NoHazard(out hazard);
-
         var receiver = SymbolicSemanticPipeline.LowerTerm(elementAccess.Expression, context);
         var subject = receiver is { IsExact: true, Value: { Kind: SmtValueKind.Reference } value }
             ? value
@@ -810,7 +782,6 @@ internal static partial class SymbolicOperationLowerer {
         out SymbolicHazardOperation hazard) {
         if (operation.Syntax is not SwitchExpressionSyntax switchExpression)
             return NoHazard(out hazard);
-
         SymbolicCondition? selected = null;
         foreach (var arm in switchExpression.Arms) {
             if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmSymbolicCondition(
@@ -904,10 +875,8 @@ internal static partial class SymbolicOperationLowerer {
             overflowingValue >= 0 ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var operand))
             return NoHazard(out hazard);
-
         var value = LowerIntegerTerm(operand, context);
         if (value == null) return NoHazard(out hazard);
-
         const string provenance = "ir.runtime-hazard.math.abs-overflow";
         hazard = CreateHazard(
             invocation,
@@ -932,11 +901,9 @@ internal static partial class SymbolicOperationLowerer {
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1, out var minExpression) ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 2, out var maxExpression))
             return NoHazard(out hazard);
-
         var min = LowerIntegerTerm(minExpression, context);
         var max = LowerIntegerTerm(maxExpression, context);
         if (min == null || max == null) return NoHazard(out hazard);
-
         const string provenance = "ir.runtime-hazard.math.clamp.invalid-bounds";
         hazard = CreateHazard(
             invocation,
@@ -963,7 +930,6 @@ internal static partial class SymbolicOperationLowerer {
                 out _,
                 out var guardKey))
             return NoHazard(out hazard);
-
         hazard = CreateHazard(
             invocation,
             SymbolicRuntimeHazardKind.ArgumentOutOfRange,
@@ -984,7 +950,6 @@ internal static partial class SymbolicOperationLowerer {
             !TryGetCheckedIntegralRange(expression, context, out var minValue, out var maxValue) ||
             !TryGetOverflowOperator(expression.Kind(), operation.IsChecked, minValue, out var smtOperator))
             return NoHazard(out hazard);
-
         if (smtOperator is SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder) {
             const string provenance = "ir.runtime-hazard.checked-integral.signed-division-overflow";
             var left = LowerIntegerTerm(expression.Left, context);
@@ -1023,7 +988,6 @@ internal static partial class SymbolicOperationLowerer {
             !operation.IsChecked ||
             !TryGetCheckedIntegralRange(expression, context, out var minValue, out _))
             return NoHazard(out hazard);
-
         const string provenance = "ir.runtime-hazard.checked-integral.unary-minus-overflow";
         var value = LowerIntegerTerm(expression.Operand, context);
         hazard = CreateCheckedOverflowHazard(
@@ -1044,7 +1008,6 @@ internal static partial class SymbolicOperationLowerer {
             !operation.IsChecked ||
             !SymbolicTypeFacts.TryGetBoundedIntegralRange(operation.Target.Type, out var minValue, out var maxValue))
             return NoHazard(out hazard);
-
         var increment = operation.Kind == OperationKind.Increment;
         var provenance = increment
             ? "ir.runtime-hazard.checked-integral.increment-overflow"
@@ -1072,7 +1035,6 @@ internal static partial class SymbolicOperationLowerer {
             !CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind(assignment.Kind(), out var binaryKind) ||
             !TryGetOverflowOperator(binaryKind, operation.IsChecked, minValue, out var smtOperator))
             return NoHazard(out hazard);
-
         var left = LowerIntegerTerm(leftExpression, context);
         if (smtOperator is SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder) {
             const string provenance = "ir.runtime-hazard.checked-integral.compound-signed-division-overflow";
@@ -1121,7 +1083,6 @@ internal static partial class SymbolicOperationLowerer {
                 out var minValue,
                 out var maxValue))
             return NoHazard(out hazard);
-
         if (SymbolicTypeFacts.TryGetCheckedNumericConversionRange(
                 SymbolicRuntimeTypeFacts.GetNaturalExpressionType(operand, context.SemanticModel, context.CancellationToken),
                 out var sourceMinValue,
@@ -1129,7 +1090,6 @@ internal static partial class SymbolicOperationLowerer {
             sourceMinValue >= minValue &&
             sourceMaxValue <= maxValue)
             return NoHazard(out hazard);
-
         const string provenance = "ir.runtime-hazard.checked-conversion.overflow";
         var value = LowerIntegerTerm(operand, context);
         var trigger = value == null
@@ -1154,7 +1114,6 @@ internal static partial class SymbolicOperationLowerer {
             ExceptionTypes.OverflowException,
             category,
             provenance);
-
     private static SymbolicHazardOperation CreateHazard(
         SyntaxNode site,
         SymbolicRuntimeHazardKind hazardKind,
@@ -1188,7 +1147,6 @@ internal static partial class SymbolicOperationLowerer {
             new SymbolicIntegerConstantTerm(constant),
             source,
             provenance);
-
     private static SymbolicTerm? LowerIntegerTerm(ExpressionSyntax expression, SymbolicLoweringContext context) {
         var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
         return lowering is { IsExact: true, Value: { Kind: SmtValueKind.Int } value } ? value : null;
@@ -1197,7 +1155,6 @@ internal static partial class SymbolicOperationLowerer {
         hazardKind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
             ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
             : SymbolicExceptionPreconditionKind.IndexOutOfRange;
-
     private static bool TryGetCheckedIntegralRange(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -1218,7 +1175,6 @@ internal static partial class SymbolicOperationLowerer {
             (binaryOperator is SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder) &&
             minimum >= 0)
             return false;
-
         smtOperator = SymbolicOperatorLowerer.GetSmtIntegerBinaryOperator(binaryOperator);
         return true;
     }

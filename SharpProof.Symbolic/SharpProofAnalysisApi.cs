@@ -1,7 +1,5 @@
 using SharpProof.Attributes;
-
 namespace SharpProof.Symbolic;
-
 public enum SharpProofQueryStatus {
     Succeeded,
     Unknown,
@@ -31,9 +29,7 @@ public sealed record SharpProofTarget(
     int? Position = null,
     int? SpanStart = null,
     int? SpanEnd = null);
-
 public sealed record SharpProofAnalysisOptions(SharpProofAnalysisBudget? AnalysisBudget = null);
-
 public sealed record SharpProofAnalysisBudget(
     int MaxMergedIfElseFacts = 16,
     int MaxMergedSwitchFacts = 32,
@@ -47,7 +43,6 @@ public sealed record SharpProofAnalysisBudget(
     int MaxFactChoiceCombinationsPerTarget = 64,
     int MaxGuardFactsPerTargetPerState = 6) {
     public static SharpProofAnalysisBudget Default { get; } = new();
-
     private static readonly (string Name, Func<SharpProofAnalysisBudget, int> Read)[] NamedLimits =
     [
         ("merged-if-else-facts", static value => value.MaxMergedIfElseFacts),
@@ -62,7 +57,6 @@ public sealed record SharpProofAnalysisBudget(
         ("fact-choice-combinations-per-target", static value => value.MaxFactChoiceCombinationsPerTarget),
         ("guard-facts-per-target-per-state", static value => value.MaxGuardFactsPerTargetPerState)
     ];
-
     internal static SharpProofAnalysisBudget FromNamedValues(SharpProofAnalysisBudget defaults, Func<string, int, int> getValue) {
         var values = NamedLimits.Select(limit => getValue(limit.Name, limit.Read(defaults))).ToArray();
         return new SharpProofAnalysisBudget(
@@ -80,13 +74,9 @@ public sealed record SharpProofAnalysisRequest(
     SharpProofTarget Target,
     SharpProofAnalysisFacet Facets = SharpProofAnalysisFacet.All,
     string? Condition = null);
-
 public sealed record SharpProofUnknownReason(string Code, string Category, string Message, bool IsRetryable, bool IsConfigurationRelated);
-
 public sealed record SharpProofTruncationReason(string Code, int Limit, int Observed, string Provenance, int? SourceSpanStart);
-
 public sealed record SharpProofProofFact(string Condition, string Status, string Reason, string SymbolicCondition, string? Counterexample);
-
 public sealed record SharpProofHazard(
     string Kind,
     string Status,
@@ -96,7 +86,6 @@ public sealed record SharpProofHazard(
     int? SpanStart,
     int? SpanEnd,
     string? Counterexample);
-
 public enum SharpProofErrorCategory {
     Usage,
     Input,
@@ -115,7 +104,6 @@ public sealed record SharpProofError(
     int RecommendedExitCode,
     bool IsRetryable,
     ImmutableDictionary<string, string> Details);
-
 public sealed record SharpProofAnalysisResult(
     SharpProofTarget Target,
     SharpProofQueryStatus Status,
@@ -126,7 +114,6 @@ public sealed record SharpProofAnalysisResult(
     ImmutableArray<SharpProofUnknownReason> UnknownReasons,
     ImmutableArray<SharpProofTruncationReason> Truncations,
     SharpProofError? Error);
-
 public sealed class SharpProofAnalysisSession : IDisposable {
     private readonly ConcurrentDictionary<SharpProofAnalysisRequest, Lazy<SharpProofAnalysisResult>> _results = new();
     private readonly SharpProofAnalysisBudget _analysisLimits;
@@ -136,7 +123,6 @@ public sealed class SharpProofAnalysisSession : IDisposable {
     private readonly SymbolicRuntimeHazardQueryService _runtimeHazardService;
     private readonly SymbolicSourceInput _source;
     private bool _disposed;
-
     private SharpProofAnalysisSession(
         SymbolicSourceInput source,
         SharpProofAnalysisBudget analysisLimits,
@@ -166,7 +152,6 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         if (request == null) throw new ArgumentNullException(nameof(request));
         if (_disposed) throw new ObjectDisposedException(nameof(SharpProofAnalysisSession));
         if (cancellationToken.CanBeCanceled) return Execute(request, cancellationToken);
-
         var lazy = _results.GetOrAdd(request, value => new Lazy<SharpProofAnalysisResult>(
             () => Execute(value, cancellationToken),
             LazyThreadSafetyMode.ExecutionAndPublication));
@@ -198,13 +183,10 @@ public sealed class SharpProofAnalysisSession : IDisposable {
             }
             if ((request.Facets & SharpProofAnalysisFacet.ProofFacts) != 0)
                 AnalyzeProofFacts(request, proofFacts, unknowns, truncations, cancellationToken);
-
             if ((request.Facets & SharpProofAnalysisFacet.RuntimeHazards) != 0)
                 AnalyzeHazards(request.Target, hazards, unknowns, truncations, cancellationToken);
-
             if ((request.Facets & SharpProofAnalysisFacet.Complexity) != 0)
                 complexity = AnalyzeComplexity(request.Target, unknowns, cancellationToken);
-
             return new SharpProofAnalysisResult(
                 request.Target,
                 unknowns.Count == 0 && truncations.Count == 0
@@ -237,7 +219,6 @@ public sealed class SharpProofAnalysisSession : IDisposable {
     private MethodEffects AnalyzeMethodEffects(SharpProofTarget target, CancellationToken cancellationToken) {
         if (target.Kind is SharpProofTargetKind.Span or SharpProofTargetKind.AllLines)
             return AnalyzeSyntaxTree(_source.SyntaxTree, _source.Compilation, target, cancellationToken);
-
         return SymbolicMethodLikeQueryDispatcher.Execute(
             _source,
             target,
@@ -397,11 +378,9 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var root = syntaxTree.GetRoot(cancellationToken);
         var points = new List<SymbolicProgramPointAnalysis>();
-
         void Add(SyntaxNode node) => points.Add(node is ForStatementSyntax forStatement
             ? _invariantService.AnalyzeForInitialEntry(forStatement, semanticModel, _ownedSmtAnalysis, cancellationToken)
             : _invariantService.AnalyzeAt(node, semanticModel, _ownedSmtAnalysis, cancellationToken));
-
         switch (target.Kind) {
             case SharpProofTargetKind.Point:
                 var pointPosition = SymbolicSourceLocation.GetPosition(
@@ -441,14 +420,12 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         reason.RawReason,
         reason.IsRetryable,
         reason.IsConfigurationRelated);
-
     private static SharpProofProofFact Project(SymbolicConditionProofResult proof) => new(
         proof.Condition,
         proof.TruthValue.ToString(),
         proof.Reason,
         proof.FormulaText,
         FormatCounterexample(proof.CounterexampleWitness));
-
     private static string? FormatCounterexample(SymbolicInputWitness witness) {
         if (!witness.IsAvailable || witness.Assignments.Count == 0) return null;
         return string.Join(", ", witness.Assignments
@@ -463,10 +440,8 @@ public sealed class SharpProofAnalysisSession : IDisposable {
             item.Observed,
             item.Provenance,
             item.SourceSpanStart)));
-
     private static SharpProofAnalysisBudget ResolveAnalysisLimits(SharpProofAnalysisOptions options) =>
         (options.AnalysisBudget ?? SharpProofAnalysisBudget.Default).Validate();
-
     private static SymbolicSourceInput CompileSource(string sourceText, string filePath) {
         var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
             sourceText,

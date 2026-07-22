@@ -1,15 +1,11 @@
 using System.Collections.Immutable;
 using NUnit.Framework;
-
 namespace SharpProof.Test;
-
 [TestFixture]
 public sealed class NullableContractVerificationTests {
     public sealed record NullableCase(string Source, string DiagnosticId, bool Expected);
-
     private const string Nullable = "#nullable enable";
     private const string CodeAnalysis = "#nullable enable\nusing System.Diagnostics.CodeAnalysis;";
-
     private static IEnumerable<TestCaseData> Cases() {
         yield return Case("AsyncNullableResult_NullReturnDoesNotReportViolation",
             Class("public static async System.Threading.Tasks.Task<string?> GetName()\n{\n    await System.Threading.Tasks.Task.Yield();\n    return null;\n}", Nullable), "SP0041", false);
@@ -69,23 +65,19 @@ public sealed class NullableContractVerificationTests {
     [Test]
     public Task NonNullableReturn_NullLiteral_ReportsViolation() =>
         AssertDiagnosticAsync(Class("public static string GetName() => null;", Nullable), "SP0041");
-
     [ReadmeExample("sp0042-nullable-parameter-contract")]
     [Test]
     public Task NotNullWhen_TrueWithNullOutValue_ReportsViolation() => AssertDiagnosticAsync(
         Class("public static bool TryGet([NotNullWhen(true)] out string? value)\n{\n    value = null;\n    return true;\n}", CodeAnalysis),
             "SP0042");
-
     [ReadmeExample("sp0043-nullable-member-contract")]
     [Test]
     public Task MemberNotNull_EmptyInitializer_ReportsViolation() => AssertDiagnosticAsync(
         Class("private string? _name;\n\n[MemberNotNull(nameof(_name))]\npublic void Initialize() { }", CodeAnalysis, false), "SP0043");
-
     [ReadmeExample("sp0044-unsafe-null-forgiving")]
     [Test]
     public Task NullForgivingOperator_ReportsUnsafeUse() => AssertDiagnosticAsync(
         Class("public static int Unsafe()\n{\n    string? value = null;\n    return value!.Length;\n}\n\npublic static int Unnecessary(string value) => value!.Length;", Nullable), "SP0044");
-
     [Test]
     public async Task MultipleReturns_ReportOnlyReachableViolatingCompletion() {
         var diagnostics = await AnalyzeAsync(Class(
@@ -96,13 +88,10 @@ public sealed class NullableContractVerificationTests {
         SemanticTestSource.Class(members, directives).Replace(
             "public class TestClass",
             isStatic ? "public static class TestClass" : "public sealed class TestClass");
-
     private static TestCaseData Case(string name, string source, string diagnosticId, bool expected) =>
         new TestCaseData(new NullableCase(source, diagnosticId, expected)).SetName(name);
-
     private static async Task AssertDiagnosticAsync(string source, string diagnosticId) => Assert.That(
         (await AnalyzeAsync(source)).Select(static diagnostic => diagnostic.Id), Does.Contain(diagnosticId));
-
     private static Task<ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> AnalyzeAsync(string source) =>
         AnalyzerTestHost.GetDiagnosticsAsync(source);
 }
