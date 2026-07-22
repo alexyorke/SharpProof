@@ -488,8 +488,12 @@ internal sealed class MethodEffectAnalysisSession(
                             Assign(compound.Target, compoundTarget.Merge(compoundValue), false, ref state);
                         return compoundTarget;
                     }
-                    var compoundResult = compound.OperatorMethod == null
-                        ? compoundTarget
+                    var compoundResult = compound.OperatorMethod == null &&
+                                         (compound.Target.Type?.TypeKind == TypeKind.Dynamic ||
+                                          compound.Value.Type?.TypeKind == TypeKind.Dynamic)
+                        ? DynamicDispatch(compound, "dynamic_operator_dispatch")
+                        : compound.OperatorMethod == null
+                            ? compoundTarget
                         : InvokeCore(compound.OperatorMethod, EffectFlowValue.None,
                             [compoundTarget, compoundValue], [], compound, ref state);
                     effects.Write(compoundTarget, compound.Syntax, compound.Target.Type as ISymbol, "compound_assignment");
@@ -501,8 +505,11 @@ internal sealed class MethodEffectAnalysisSession(
                             loop.Type.ToString().StartsWith("ref ", StringComparison.Ordinal)) is { } refLoop &&
                         semanticModel.GetOperation(refLoop.Expression, session.CancellationToken) is IConversionOperation refConversion)
                         incrementTarget = EvaluateConversion(refConversion, ref state);
-                    var incrementResult = increment.OperatorMethod == null
-                        ? incrementTarget
+                    var incrementResult = increment.OperatorMethod == null &&
+                                          increment.Target.Type?.TypeKind == TypeKind.Dynamic
+                        ? DynamicDispatch(increment, "dynamic_operator_dispatch")
+                        : increment.OperatorMethod == null
+                            ? incrementTarget
                         : InvokeCore(increment.OperatorMethod, EffectFlowValue.None,
                             [incrementTarget], [], increment, ref state);
                     effects.Write(incrementTarget, increment.Syntax, null, "increment_assignment");
@@ -620,13 +627,19 @@ internal sealed class MethodEffectAnalysisSession(
                 case IBinaryOperation binary:
                     var left = Evaluate(binary.LeftOperand, ref state);
                     var right = Evaluate(binary.RightOperand, ref state);
-                    return binary.OperatorMethod == null
-                        ? right
+                    return binary.OperatorMethod == null &&
+                           (binary.LeftOperand.Type?.TypeKind == TypeKind.Dynamic ||
+                            binary.RightOperand.Type?.TypeKind == TypeKind.Dynamic)
+                        ? DynamicDispatch(binary, "dynamic_operator_dispatch")
+                        : binary.OperatorMethod == null
+                            ? right
                         : InvokeCore(binary.OperatorMethod, EffectFlowValue.None, [left, right], [], binary, ref state);
                 case IUnaryOperation unary:
                     var unaryOperand = Evaluate(unary.Operand, ref state);
-                    return unary.OperatorMethod == null
-                        ? unaryOperand
+                    return unary.OperatorMethod == null && unary.Operand.Type?.TypeKind == TypeKind.Dynamic
+                        ? DynamicDispatch(unary, "dynamic_operator_dispatch")
+                        : unary.OperatorMethod == null
+                            ? unaryOperand
                         : InvokeCore(unary.OperatorMethod, EffectFlowValue.None, [unaryOperand], [], unary, ref state);
                 case ISwitchExpressionOperation switchExpression:
                     Evaluate(switchExpression.Value, ref state);
@@ -884,6 +897,11 @@ internal sealed class MethodEffectAnalysisSession(
                 effects.Add(SharpProofEffect.Allocates, conversion.Syntax, conversion.Type, "boxing_allocation");
             if (conversion.OperatorMethod == null) return operand;
             return InvokeCore(conversion.OperatorMethod, EffectFlowValue.None, [operand], [], conversion, ref state);
+        }
+        private EffectFlowValue DynamicDispatch(IOperation operation, string reason) {
+            effects.Add(SharpProofEffect.DispatchUncertainty, operation.Syntax, operation.Type, reason);
+            effects.AddUnknown(operation.Syntax, reason);
+            return EffectFlowValue.Unknown;
         }
         private EffectFlowValue EvaluateField(IFieldReferenceOperation field, ref EffectFlowState state) {
             if (field.Field.IsConst) return EffectFlowValue.None;
