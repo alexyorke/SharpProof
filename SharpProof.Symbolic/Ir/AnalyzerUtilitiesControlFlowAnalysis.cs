@@ -17,6 +17,10 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             InterproceduralAnalysisKind.None,
             0,
             0);
+        var pointsTo = graph.Blocks.Any(static block => block.BranchValue is IIsNullOperation)
+            ? TryGetPointsToResult(graph, owningSymbol, options, compilation, interprocedural)
+            : null;
+        domain.SetControlFlowGraph(graph, pointsTo);
         var valueDomain = new EffectAbstractValueDomain();
         var context = new EffectAnalysisContext(
             valueDomain,
@@ -25,6 +29,7 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             options,
             interprocedural,
             Analyzer.Utilities.WellKnownTypeProvider.GetOrCreate(compilation),
+            pointsTo,
             initialState,
             domain,
             cancellationToken);
@@ -32,6 +37,30 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
         var analysis = new EffectDataFlowAnalysis(new EffectAnalysisDomain(domain), visitor);
         var result = analysis.Run(context) ?? throw new InvalidOperationException("AnalyzerUtilities data-flow analysis failed.");
         return new(result.ExitBlockOutput.State, context.Truncated);
+    }
+
+    private static PointsToAnalysisResult? TryGetPointsToResult(
+        ControlFlowGraph graph,
+        ISymbol owningSymbol,
+        AnalyzerOptions options,
+        Compilation compilation,
+        InterproceduralAnalysisConfiguration interprocedural) {
+        try {
+            return PointsToAnalysis.TryGetOrComputeResult(
+                graph,
+                owningSymbol,
+                options,
+                Analyzer.Utilities.WellKnownTypeProvider.GetOrCreate(compilation),
+                PointsToAnalysisKind.Complete,
+                interprocedural,
+                interproceduralAnalysisPredicate: null,
+                pessimisticAnalysis: true,
+                performCopyAnalysis: true,
+                exceptionPathsAnalysis: true);
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or NotSupportedException) {
+            return null;
+        }
     }
 
     internal sealed record AnalyzerControlFlowResult(EffectFlowState ExitState, bool Truncated);
@@ -82,6 +111,7 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             AnalyzerOptions options,
             InterproceduralAnalysisConfiguration interprocedural,
             Analyzer.Utilities.WellKnownTypeProvider wellKnownTypeProvider,
+            PointsToAnalysisResult? pointsTo,
             EffectFlowState initialState,
             IControlFlowDomain<EffectFlowState> domain,
             CancellationToken cancellationToken) : base(
@@ -95,7 +125,7 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
                 predicateAnalysis: false,
                 exceptionPathsAnalysis: true,
                 copyAnalysisResult: null,
-                pointsToAnalysisResult: null,
+                pointsToAnalysisResult: pointsTo,
                 valueContentAnalysisResult: null,
                 tryGetOrComputeAnalysisResult: static _ => null,
                 parentControlFlowGraph: null,
@@ -136,6 +166,7 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
                     AnalyzerOptions,
                     InterproceduralAnalysisConfiguration,
                     WellKnownTypeProvider,
+                    pointsToAnalysisResult,
                     InitialState,
                     Domain,
                     CancellationToken);

@@ -93,7 +93,6 @@ internal sealed class MethodEffectAnalysisSession(
                     finalState = domain.Transfer(finalState, operation);
             }
             else {
-                domain.SetControlFlowGraph(graph);
                 var result = AnalyzerUtilitiesControlFlowAnalysis.Run(
                     graph, state, domain, compilation, method, cancellationToken);
                 if (result.Truncated) accumulator.AddUnknown(declaration, "effect_cfg_budget_exhausted");
@@ -418,11 +417,8 @@ internal sealed class MethodEffectAnalysisSession(
                 _ => state
             };
         }
-        internal void SetControlFlowGraph(ControlFlowGraph graph) {
-            if (graph.Blocks.Any(block => block.BranchValue is IIsNullOperation isNull &&
-                    CanUseFlowNullFact(semanticModel.GetSymbolInfo(isNull.Operand.Syntax,
-                        session.CancellationToken).Symbol)))
-                _flowFacts = AnalyzerUtilitiesFlowFacts.TryCreate(graph, method, session.Compilation);
+        public void SetControlFlowGraph(ControlFlowGraph graph, PointsToAnalysisResult? pointsToAnalysisResult) {
+            if (pointsToAnalysisResult != null) _flowFacts = new(pointsToAnalysisResult, graph);
             foreach (var block in graph.Blocks) {
                 foreach (var operation in block.Operations.Append(block.BranchValue).Where(static value => value != null)
                              .SelectMany(static value => value!.DescendantsAndSelf())) {

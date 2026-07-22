@@ -1,6 +1,7 @@
 namespace SharpProof.Symbolic.Ir;
 
 internal interface IControlFlowDomain<TState> {
+    void SetControlFlowGraph(ControlFlowGraph graph, PointsToAnalysisResult? pointsToAnalysisResult);
     TState Transfer(TState state, IOperation operation);
     TState Refine(TState state, IOperation? condition, ControlFlowConditionKind kind, bool conditionalSuccessor);
     TState Merge(TState current, TState incoming);
