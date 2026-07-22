@@ -599,7 +599,7 @@ internal sealed class MethodEffectAnalysisSession(
                             ? compoundTarget
                         : InvokeCore(compound.OperatorMethod, EffectFlowValue.None,
                             [compoundTarget, compoundValue], [], compound, ref state);
-                    effects.Write(compoundTarget, compound.Syntax, compound.Target.Type as ISymbol, "compound_assignment");
+                    Assign(compound.Target, compoundResult, false, ref state);
                     return compoundResult;
                 case IIncrementOrDecrementOperation increment:
                     var incrementTarget = Evaluate(increment.Target, ref state);
@@ -615,7 +615,7 @@ internal sealed class MethodEffectAnalysisSession(
                             ? incrementTarget
                         : InvokeCore(increment.OperatorMethod, EffectFlowValue.None,
                             [incrementTarget], [], increment, ref state);
-                    effects.Write(incrementTarget, increment.Syntax, null, "increment_assignment");
+                    Assign(increment.Target, incrementResult, false, ref state);
                     return incrementResult;
                 case IEventAssignmentOperation {
                     EventReference: IEventReferenceOperation eventReference
