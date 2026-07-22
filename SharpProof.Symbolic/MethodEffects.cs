@@ -320,6 +320,17 @@ internal sealed class MethodEffectAnalysisSession(
                         builder,
                         receiverReadEffect: isConstructor ? SharpProofEffect.None : null,
                         receiverWriteEffect: isConstructor ? SharpProofEffect.WritesFreshOwnedState : null);
+                    if (isConstructor) {
+                        foreach (var element in collection.Elements) {
+                            if (element is ISpreadOperation) continue;
+                            AnalyzeCall(
+                                ResolveCollectionAddMethod(collection, element, semanticModel),
+                                element,
+                                builder,
+                                receiverReadEffect: SharpProofEffect.None,
+                                receiverWriteEffect: SharpProofEffect.WritesFreshOwnedState);
+                        }
+                    }
                 }
                 break;
             case IAnonymousObjectCreationOperation anonymousObject:
@@ -428,6 +439,25 @@ internal sealed class MethodEffectAnalysisSession(
                 builder.AddUnknown(operation, "dynamic_dispatch");
                 break;
         }
+    }
+    private static IMethodSymbol? ResolveCollectionAddMethod(
+        ICollectionExpressionOperation collection,
+        IOperation element,
+        SemanticModel semanticModel) {
+        if (collection.Type == null || element.Syntax is not ExpressionSyntax expression) return null;
+        var receiver = SyntaxFactory.DefaultExpression(SyntaxFactory.ParseTypeName(
+            collection.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+        var invocation = SyntaxFactory.InvocationExpression(
+            SyntaxFactory.MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                receiver,
+                SyntaxFactory.IdentifierName("Add")),
+            SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(
+                SyntaxFactory.Argument(expression.WithoutTrivia()))));
+        return semanticModel.GetSpeculativeSymbolInfo(
+            collection.Syntax.SpanStart,
+            invocation,
+            SpeculativeBindingOption.BindAsExpression).Symbol as IMethodSymbol;
     }
     private void AssignTrackedLocal(Builder builder, ILocalSymbol local, IOperation value) {
         builder.AssignLocal(local, value);
