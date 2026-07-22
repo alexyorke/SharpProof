@@ -463,6 +463,30 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void AwaitUsingIncludesDisposalAwaiterEffects() {
+        var result = Analyze("""
+            sealed class D {
+                public Awaitable DisposeAsync() => default;
+            }
+            readonly struct Awaitable {
+                private static int state;
+                public Awaiter GetAwaiter() { state++; return default; }
+            }
+            readonly struct Awaiter : System.Runtime.CompilerServices.INotifyCompletion {
+                public bool IsCompleted => true;
+                public void OnCompleted(System.Action continuation) { }
+                public void GetResult() { }
+            }
+            class C {
+                static async System.Threading.Tasks.Task M() { await using var value = new D(); }
+            }
+            """, 14);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {
