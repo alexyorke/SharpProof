@@ -992,9 +992,19 @@ internal sealed class MethodEffectAnalysisSession(
             selected = null;
             if (expression == null || semanticModel.GetConstantValue(expression.GoverningExpression, session.CancellationToken) is not
                 { HasValue: true } value) return false;
-            selected = expression.Arms.FirstOrDefault(arm => Matches(arm.Pattern, value.Value) &&
-                (arm.WhenClause == null || semanticModel.GetConstantValue(arm.WhenClause.Condition, session.CancellationToken).Value as bool? == true));
-            return selected != null;
+            foreach (var arm in expression.Arms) {
+                if (!Matches(arm.Pattern, value.Value)) continue;
+                if (arm.WhenClause == null) {
+                    selected = arm;
+                    return true;
+                }
+                var guard = semanticModel.GetConstantValue(arm.WhenClause.Condition, session.CancellationToken);
+                if (guard is not { HasValue: true, Value: bool condition }) return false;
+                if (!condition) continue;
+                selected = arm;
+                return true;
+            }
+            return false;
         }
         private bool TrySelectSection(SwitchStatementSyntax? statement, out SwitchSectionSyntax? selected) {
             selected = null;
@@ -1002,13 +1012,24 @@ internal sealed class MethodEffectAnalysisSession(
                     branch.IsKind(SyntaxKind.GotoCaseStatement) || branch.IsKind(SyntaxKind.GotoDefaultStatement)) ||
                 semanticModel.GetConstantValue(statement.Expression, session.CancellationToken) is not
                 { HasValue: true } value) return false;
-            selected = statement.Sections.FirstOrDefault(section => section.Labels.Any(label => label switch {
-                CaseSwitchLabelSyntax constant => Equals(semanticModel.GetConstantValue(constant.Value,
-                    session.CancellationToken).Value, value.Value),
-                CasePatternSwitchLabelSyntax pattern => Matches(pattern.Pattern, value.Value) && (pattern.WhenClause == null ||
-                    semanticModel.GetConstantValue(pattern.WhenClause.Condition, session.CancellationToken).Value as bool? == true),
-                _ => false
-            }));
+            foreach (var section in statement.Sections)
+                foreach (var label in section.Labels) {
+                    if (label is CaseSwitchLabelSyntax constant && Equals(semanticModel.GetConstantValue(constant.Value,
+                            session.CancellationToken).Value, value.Value)) {
+                        selected = section;
+                        return true;
+                    }
+                    if (label is not CasePatternSwitchLabelSyntax pattern || !Matches(pattern.Pattern, value.Value)) continue;
+                    if (pattern.WhenClause == null) {
+                        selected = section;
+                        return true;
+                    }
+                    var guard = semanticModel.GetConstantValue(pattern.WhenClause.Condition, session.CancellationToken);
+                    if (guard is not { HasValue: true, Value: bool condition }) return false;
+                    if (!condition) continue;
+                    selected = section;
+                    return true;
+                }
             selected ??= statement.Sections.FirstOrDefault(section =>
                 section.Labels.Any(static label => label is DefaultSwitchLabelSyntax));
             return selected != null;
