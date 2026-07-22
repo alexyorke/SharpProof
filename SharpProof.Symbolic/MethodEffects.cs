@@ -287,7 +287,7 @@ internal sealed class MethodEffectAnalysisSession(
                     invocation.Instance is ILocalReferenceOperation delegateLocal &&
                     builder.GetDelegateTargets(delegateLocal.Local) is { Length: > 0 } targets) {
                     foreach (var target in targets)
-                        preservesFreshArguments &= AnalyzeCall(target, invocation, builder);
+                        preservesFreshArguments &= AnalyzeCall(target.Method, invocation, builder, target.Receiver);
                 }
                 else
                     preservesFreshArguments = AnalyzeCall(invocation.TargetMethod, invocation, builder, invocation.Instance);
@@ -1007,6 +1007,7 @@ internal sealed class MethodEffectAnalysisSession(
     private static SharpProofUnknownReason CreateContractConfigurationReason(string reason) =>
         new("SP-EFFECT-CONTRACT", "Configuration", reason, false, true);
     sealed class Builder(Func<IOperation, string, bool> isCaught) {
+        internal sealed record DelegateTarget(IMethodSymbol Method, IOperation? Receiver);
         private readonly ImmutableArray<MethodExceptionFact>.Builder _exceptions =
             ImmutableArray.CreateBuilder<MethodExceptionFact>();
         private readonly ImmutableArray<MethodEffectSite>.Builder _sites =
@@ -1020,7 +1021,7 @@ internal sealed class MethodEffectAnalysisSession(
             new(SymbolEqualityComparer.Default);
         private readonly HashSet<ILocalSymbol> _flowUncertainLocals = new(SymbolEqualityComparer.Default);
         private readonly Dictionary<ILocalSymbol, INamedTypeSymbol> _exactTypes = new(SymbolEqualityComparer.Default);
-        private readonly Dictionary<ILocalSymbol, ImmutableArray<IMethodSymbol>> _delegateTargets =
+        private readonly Dictionary<ILocalSymbol, ImmutableArray<DelegateTarget>> _delegateTargets =
             new(SymbolEqualityComparer.Default);
         internal void MarkFresh(ILocalSymbol local) => _freshLocals.Add(local);
         internal bool IsFresh(ILocalSymbol local) => _freshLocals.Contains(local);
@@ -1045,14 +1046,16 @@ internal sealed class MethodEffectAnalysisSession(
         internal INamedTypeSymbol? GetExactType(ILocalSymbol local) =>
             _exactTypes.TryGetValue(local, out var type) ? type : null;
         internal void MarkDelegateTargets(ILocalSymbol local, IOperation value) {
-            var methods = value.DescendantsAndSelf()
+            var targets = value.DescendantsAndSelf()
                 .OfType<IMethodReferenceOperation>()
-                .Select(static reference => reference.Method.OriginalDefinition)
+                .Select(static reference => new DelegateTarget(
+                    reference.Method.OriginalDefinition,
+                    reference.Instance))
                 .Concat(value.DescendantsAndSelf()
                     .OfType<IAnonymousFunctionOperation>()
-                    .Select(static function => function.Symbol.OriginalDefinition))
+                    .Select(static function => new DelegateTarget(function.Symbol.OriginalDefinition, null)))
                 .ToImmutableArray();
-            if (!methods.IsDefaultOrEmpty) _delegateTargets[local] = methods;
+            if (!targets.IsDefaultOrEmpty) _delegateTargets[local] = targets;
         }
         internal void AssignLocal(ILocalSymbol local, IOperation value) {
             local = (ILocalSymbol)local.OriginalDefinition;
@@ -1108,8 +1111,8 @@ internal sealed class MethodEffectAnalysisSession(
                 }
             }
         }
-        internal ImmutableArray<IMethodSymbol> GetDelegateTargets(ILocalSymbol local) =>
-            _delegateTargets.TryGetValue(local, out var methods) ? methods : [];
+        internal ImmutableArray<DelegateTarget> GetDelegateTargets(ILocalSymbol local) =>
+            _delegateTargets.TryGetValue(local, out var targets) ? targets : [];
         private void CollectMemberOrigins(
             IOperation value,
             string prefix,
