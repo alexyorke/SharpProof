@@ -2879,12 +2879,150 @@ internal sealed class MethodEffectAnalysisSession(
                 }
                 return switchExpression.Arms.Length != 0;
             }
+            if (value is IInvocationOperation returnedInvocation)
+                return TryGetCapturedInvocationResultEffects(
+                    returnedInvocation,
+                    callSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
             if (value is not (IObjectCreationOperation or IArrayCreationOperation or
                 IAnonymousObjectCreationOperation or IDelegateCreationOperation or
                 ICollectionExpressionOperation))
                 return false;
             readEffect = GetInstanceReadEffect(value, this);
             writeEffect = GetInstanceWriteEffect(value, this);
+            return true;
+        }
+        private bool TryGetCapturedInvocationResultEffects(
+            IInvocationOperation invocation,
+            IOperation outerCallSite,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
+            out SharpProofEffect readEffect,
+            out SharpProofEffect writeEffect) {
+            readEffect = SharpProofEffect.None;
+            writeEffect = SharpProofEffect.None;
+            var method = invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod;
+            method = (method.PartialImplementationPart ?? method).OriginalDefinition;
+            var declaration = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+            var expressions = GetDirectReturnExpressions(declaration);
+            if (expressions.IsDefaultOrEmpty) return false;
+            foreach (var expression in expressions) {
+                var model = compilation.GetSemanticModel(expression.SyntaxTree);
+                if (model.GetOperation(expression) is not { } returnedValue ||
+                    !TryGetNestedReturnedValueEffects(
+                        returnedValue,
+                        invocation,
+                        outerCallSite,
+                        compilation,
+                        visited,
+                        out var returnedReadEffect,
+                        out var returnedWriteEffect))
+                    return false;
+                readEffect |= returnedReadEffect;
+                writeEffect |= returnedWriteEffect;
+            }
+            return true;
+        }
+        private bool TryGetNestedReturnedValueEffects(
+            IOperation value,
+            IInvocationOperation invocation,
+            IOperation outerCallSite,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
+            out SharpProofEffect readEffect,
+            out SharpProofEffect writeEffect) {
+            readEffect = SharpProofEffect.None;
+            writeEffect = SharpProofEffect.None;
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is IParenthesizedOperation parenthesized)
+                return TryGetNestedReturnedValueEffects(
+                    parenthesized.Operand,
+                    invocation,
+                    outerCallSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
+            IOperation? mapped = value switch {
+                IParameterReferenceOperation parameter =>
+                    invocation.Arguments.FirstOrDefault(argument =>
+                        string.Equals(
+                            argument.Parameter?.Name,
+                            parameter.Parameter.Name,
+                            StringComparison.Ordinal))?.Value ??
+                    (parameter.Parameter.Ordinal == 0 && invocation.TargetMethod.ReducedFrom != null
+                        ? invocation.Instance
+                        : null),
+                IInstanceReferenceOperation => invocation.Instance,
+                _ => null
+            };
+            if (mapped != null)
+                return TryGetCapturedValueEffects(
+                    mapped,
+                    outerCallSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
+            if (value is IConditionalOperation { WhenFalse: { } whenFalse } conditional)
+                return TryGetNestedCompositeReturnedValueEffects(
+                    conditional.WhenTrue,
+                    whenFalse,
+                    invocation,
+                    outerCallSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
+            if (value is ICoalesceOperation coalesce)
+                return TryGetNestedCompositeReturnedValueEffects(
+                    coalesce.Value,
+                    coalesce.WhenNull,
+                    invocation,
+                    outerCallSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
+            if (value is not (IObjectCreationOperation or IArrayCreationOperation or
+                IAnonymousObjectCreationOperation or IDelegateCreationOperation or
+                ICollectionExpressionOperation))
+                return false;
+            readEffect = GetInstanceReadEffect(value, this);
+            writeEffect = GetInstanceWriteEffect(value, this);
+            return true;
+        }
+        private bool TryGetNestedCompositeReturnedValueEffects(
+            IOperation left,
+            IOperation right,
+            IInvocationOperation invocation,
+            IOperation outerCallSite,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
+            out SharpProofEffect readEffect,
+            out SharpProofEffect writeEffect) {
+            if (!TryGetNestedReturnedValueEffects(
+                    left,
+                    invocation,
+                    outerCallSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect) ||
+                !TryGetNestedReturnedValueEffects(
+                    right,
+                    invocation,
+                    outerCallSite,
+                    compilation,
+                    visited,
+                    out var rightReadEffect,
+                    out var rightWriteEffect))
+                return false;
+            readEffect |= rightReadEffect;
+            writeEffect |= rightWriteEffect;
             return true;
         }
         private bool TryGetCompositeCapturedValueEffects(
