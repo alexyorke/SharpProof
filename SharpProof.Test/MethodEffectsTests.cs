@@ -1338,6 +1338,26 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void AssignmentExpressionReceiverUsesAssignedOrigin() {
+        var result = Analyze("""
+            sealed class Box {
+                public int State;
+                public void Mutate() { State++; }
+            }
+            class C {
+                static void M(Box input) {
+                    var local = new Box();
+                    (local = input).Mutate();
+                }
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void PointerIndirectionAssignmentWritesArgumentState() {
         var result = Analyze("""
             unsafe class C {
