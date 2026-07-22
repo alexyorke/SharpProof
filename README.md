@@ -85,5 +85,3 @@ Use the repository wrapper so .NET processes remain inside the configured Window
 ```
 
 The repository contains the analyzer, attributes, symbolic API, CLI, NuGet packaging, fuzzing, and net472 smoke project.
-
-See [the supported modern C# surface](docs/modern-csharp-surface.md) for language-version coverage.
