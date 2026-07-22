@@ -1361,6 +1361,25 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void CollectionExpressionIncludesInheritedAddEffects() {
+        var result = Analyze("""
+            class BagBase {
+                private static int state;
+                public void Add(int value) { state++; }
+            }
+            sealed class Bag : BagBase, System.Collections.Generic.IEnumerable<int> {
+                public Bag() { }
+                public System.Collections.Generic.IEnumerator<int> GetEnumerator() => throw null!;
+                System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+            }
+            class C { static Bag M() => [1, 2]; }
+            """, 10);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void CollectionExpressionIncludesSpreadEnumerationEffects() {
         var result = Analyze("""
             sealed class Bag : System.Collections.Generic.IEnumerable<int> {
