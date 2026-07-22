@@ -1172,6 +1172,21 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void RethrowPreservesCaughtExceptionType() {
+        var result = Analyze("""
+            sealed class E : System.Exception { }
+            class C {
+                static void M() {
+                    try { throw new E(); }
+                    catch (E) { throw; }
+                }
+            }
+            """, 3);
+        Assert.That(result.MethodEffects, Is.Not.Null);
+        Assert.That(result.MethodEffects!.ExceptionFacts, Has.Some.Matches<MethodExceptionFact>(fact =>
+            fact.ExceptionType == "E" && fact.Escape == SharpProofVerdict.Proven));
+    }
+    [Test]
     public void CaughtCalleeExceptionDoesNotEscape() {
         var result = Analyze("""
             sealed class E : System.Exception { }
