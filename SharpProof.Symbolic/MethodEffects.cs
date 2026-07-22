@@ -1299,8 +1299,20 @@ internal sealed class MethodEffectAnalysisSession(
                                     method.Name is nameof(string.IsNullOrEmpty) or nameof(string.IsNullOrWhiteSpace);
         var typeDefinition = containingType?.OriginalDefinition.ToDisplayString();
         var isListType = typeDefinition == "System.Collections.Generic.List<T>";
+        var isListIndexerGet = isListType &&
+                               method.MethodKind == MethodKind.PropertyGet &&
+                               method.AssociatedSymbol is IPropertySymbol { IsIndexer: true };
         var isSpanToArray = string.Equals(method.Name, "ToArray", StringComparison.Ordinal) &&
                             typeDefinition is "System.Span<T>" or "System.ReadOnlySpan<T>";
+        if (isListIndexerGet) {
+            effects = new MethodEffects(
+                SharpProofEffect.ReadsReceiverState,
+                SharpProofCapability.None,
+                [],
+                [],
+                []);
+            return true;
+        }
         if (isListType && (method.MethodKind == MethodKind.Constructor ||
                            string.Equals(method.Name, "Add", StringComparison.Ordinal) &&
                            method.Parameters.Length == 1)) {
@@ -2762,14 +2774,24 @@ internal sealed class MethodEffectAnalysisSession(
                         continue;
                     case IPropertyReferenceOperation { Instance: { } instance } property
                         when ReferenceEquals(instance, current):
-                        path.Add(GetMemberPathPart(property.Property.OriginalDefinition));
+                        if (property.Property.IsIndexer &&
+                            property.Arguments.Length == 1 &&
+                            property.Arguments[0].Value.ConstantValue is {
+                                HasValue: true,
+                                Value: int propertyIndex
+                            })
+                            path.Add("#indexer:" + propertyIndex.ToString(CultureInfo.InvariantCulture));
+                        else if (property.Property.IsIndexer)
+                            hasUnresolvedPath = true;
+                        else
+                            path.Add(GetMemberPathPart(property.Property.OriginalDefinition));
                         current = property;
                         continue;
                     case IArrayElementReferenceOperation { ArrayReference: { } arrayReference } array
                         when ReferenceEquals(arrayReference, current):
                         if (array.Indices.Length == 1 &&
-                            array.Indices[0].ConstantValue is { HasValue: true, Value: int index })
-                            path.Add("#array:" + index.ToString(CultureInfo.InvariantCulture));
+                            array.Indices[0].ConstantValue is { HasValue: true, Value: int arrayIndex })
+                            path.Add("#array:" + arrayIndex.ToString(CultureInfo.InvariantCulture));
                         else
                             hasUnresolvedPath = true;
                         current = array;
@@ -2878,6 +2900,28 @@ internal sealed class MethodEffectAnalysisSession(
             out IOperation initializer) {
             initializer = null!;
             while (value is IConversionOperation conversion) value = conversion.Operand;
+            const string indexerPrefix = "#indexer:";
+            if (path[index].StartsWith(indexerPrefix, StringComparison.Ordinal)) {
+                if (value is not IObjectCreationOperation { Initializer: { } collectionInitializer } ||
+                    !int.TryParse(
+                        path[index].Substring(indexerPrefix.Length),
+                        NumberStyles.None,
+                        CultureInfo.InvariantCulture,
+                        out var elementIndex))
+                    return false;
+                var elements = collectionInitializer.Initializers
+                    .OfType<IInvocationOperation>()
+                    .Where(invocation => invocation.Arguments.Length != 0)
+                    .Select(invocation => invocation.Arguments[0].Value)
+                    .ToArray();
+                if (elementIndex < 0 || elementIndex >= elements.Length) return false;
+                var element = elements[elementIndex];
+                if (index == path.Count - 1) {
+                    initializer = element;
+                    return true;
+                }
+                return TryGetObjectInitializerMember(element, path, index + 1, out initializer);
+            }
             const string arrayPrefix = "#array:";
             if (path[index].StartsWith(arrayPrefix, StringComparison.Ordinal)) {
                 ImmutableArray<IOperation> elements = value switch {
