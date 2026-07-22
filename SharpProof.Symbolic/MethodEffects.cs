@@ -3188,7 +3188,12 @@ internal sealed class MethodEffectAnalysisSession(
             }
             if (declaration == null) {
                 return TryGetImplicitConstructorMemberInitializer(
-                    constructor, memberPath, compilation, out values);
+                    constructor,
+                    creation,
+                    memberPath,
+                    compilation,
+                    new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
+                    out values);
             }
             return TryGetConstructorDeclarationMemberOrigins(
                 constructor,
@@ -3345,8 +3350,10 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private static bool TryGetImplicitConstructorMemberInitializer(
             IMethodSymbol constructor,
+            IOperation constructorCallSite,
             string memberPath,
             Compilation compilation,
+            HashSet<IMethodSymbol> visitedConstructors,
             out ImmutableArray<IOperation> values) {
             values = [];
             var current = constructor;
@@ -3361,7 +3368,18 @@ internal sealed class MethodEffectAnalysisSession(
                 if (baseType == null) return false;
                 var next = baseType.InstanceConstructors.FirstOrDefault(candidate =>
                     candidate.Parameters.Length == 0);
-                if (next == null || !next.IsImplicitlyDeclared) return false;
+                if (next == null) return false;
+                if (!next.IsImplicitlyDeclared) {
+                    var declaration = next.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                    return declaration != null && TryGetConstructorDeclarationMemberOrigins(
+                        next,
+                        constructorCallSite,
+                        declaration,
+                        memberPath,
+                        compilation,
+                        visitedConstructors,
+                        out values);
+                }
                 current = next;
             }
             return false;
@@ -3402,8 +3420,10 @@ internal sealed class MethodEffectAnalysisSession(
             else {
                 if (!TryGetImplicitConstructorMemberInitializer(
                         targetConstructor,
+                        initializer,
                         memberPath,
                         compilation,
+                        visitedConstructors,
                         out chainedValues))
                     return false;
             }
