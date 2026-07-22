@@ -2702,11 +2702,16 @@ internal sealed class MethodEffectAnalysisSession(
             if (locals.Length == 0) return false;
             var visited = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
             foreach (var local in locals) {
-                if (!TryGetCapturedLocalInitializer(
-                        local, callSite, compilation, visited, out var initializer))
+                if (!TryGetCapturedLocalEffects(
+                        local,
+                        callSite,
+                        compilation,
+                        visited,
+                        out var localReadEffect,
+                        out var localWriteEffect))
                     return false;
-                readEffect |= GetInstanceReadEffect(initializer, this);
-                writeEffect |= GetInstanceWriteEffect(initializer, this);
+                readEffect |= localReadEffect;
+                writeEffect |= localWriteEffect;
             }
             return true;
         }
@@ -2753,61 +2758,160 @@ internal sealed class MethodEffectAnalysisSession(
             }
             return true;
         }
-        private static bool TryGetCapturedLocalInitializer(
+        private bool TryGetCapturedLocalEffects(
             ILocalSymbol local,
             IOperation callSite,
             Compilation compilation,
             HashSet<ILocalSymbol> visited,
-            out IOperation initializer) {
-            initializer = null!;
+            out SharpProofEffect readEffect,
+            out SharpProofEffect writeEffect) {
+            readEffect = SharpProofEffect.None;
+            writeEffect = SharpProofEffect.None;
             if (!visited.Add(local)) return false;
-            if (local.DeclaringSyntaxReferences.Length != 1) return false;
-            var syntaxReference = local.DeclaringSyntaxReferences[0];
-            var syntax = syntaxReference.GetSyntax();
-            var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-            if (model.GetOperation(syntax) is not IVariableDeclaratorOperation declarator ||
-                declarator.Initializer?.Value is not { } value)
-                return false;
-            var root = (IOperation)declarator;
-            while (root.Parent != null) root = root.Parent;
-            if (root.DescendantsAndSelf()
-                .OfType<ILocalReferenceOperation>()
-                .Any(reference => SymbolEqualityComparer.Default.Equals(reference.Local, local) &&
-                                  IsDirectLocalWrite(reference)))
-                return false;
-            while (value is IConversionOperation conversion) value = conversion.Operand;
-            if (value is ILocalReferenceOperation source) {
-                if (!TryGetCapturedLocalInitializer(
-                        source.Local, callSite, compilation, visited, out initializer))
+            try {
+                if (local.DeclaringSyntaxReferences.Length != 1) return false;
+                var syntaxReference = local.DeclaringSyntaxReferences[0];
+                var syntax = syntaxReference.GetSyntax();
+                var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+                if (model.GetOperation(syntax) is not IVariableDeclaratorOperation declarator ||
+                    declarator.Initializer?.Value is not { } value)
                     return false;
-                return true;
+                var root = (IOperation)declarator;
+                while (root.Parent != null) root = root.Parent;
+                if (root.DescendantsAndSelf()
+                    .OfType<ILocalReferenceOperation>()
+                    .Any(reference => SymbolEqualityComparer.Default.Equals(reference.Local, local) &&
+                                      IsDirectLocalWrite(reference)))
+                    return false;
+                return TryGetCapturedValueEffects(
+                    value,
+                    callSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
             }
+            finally {
+                visited.Remove(local);
+            }
+        }
+        private bool TryGetCapturedValueEffects(
+            IOperation value,
+            IOperation callSite,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
+            out SharpProofEffect readEffect,
+            out SharpProofEffect writeEffect) {
+            readEffect = SharpProofEffect.None;
+            writeEffect = SharpProofEffect.None;
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is IParenthesizedOperation parenthesized)
+                return TryGetCapturedValueEffects(
+                    parenthesized.Operand,
+                    callSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
+            if (value is ILocalReferenceOperation source)
+                return TryGetCapturedLocalEffects(
+                    source.Local,
+                    callSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
+            IOperation? mapped = null;
             if (value is IParameterReferenceOperation parameter &&
                 callSite is IInvocationOperation invocation) {
-                initializer = invocation.Arguments.FirstOrDefault(argument =>
+                mapped = invocation.Arguments.FirstOrDefault(argument =>
                     string.Equals(
                         argument.Parameter?.Name,
                         parameter.Parameter.Name,
-                        StringComparison.Ordinal))?.Value!;
-                if (initializer == null &&
+                        StringComparison.Ordinal))?.Value;
+                if (mapped == null &&
                     parameter.Parameter.Ordinal == 0 &&
                     invocation.TargetMethod.ReducedFrom != null)
-                    initializer = invocation.Instance!;
-                return initializer != null;
+                    mapped = invocation.Instance;
             }
-            if (value is IInstanceReferenceOperation) {
-                initializer = callSite switch {
-                    IInvocationOperation receiverInvocation => receiverInvocation.Instance!,
-                    IPropertyReferenceOperation property => property.Instance!,
-                    _ => null!
+            else if (value is IInstanceReferenceOperation) {
+                mapped = callSite switch {
+                    IInvocationOperation receiverInvocation => receiverInvocation.Instance,
+                    IPropertyReferenceOperation property => property.Instance,
+                    _ => null
                 };
-                return initializer != null;
+            }
+            if (mapped != null) {
+                readEffect = GetInstanceReadEffect(mapped, this);
+                writeEffect = GetInstanceWriteEffect(mapped, this);
+                return true;
+            }
+            if (value is IConditionalOperation { WhenFalse: { } whenFalse } conditional)
+                return TryGetCompositeCapturedValueEffects(
+                    conditional.WhenTrue,
+                    whenFalse,
+                    callSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
+            if (value is ICoalesceOperation coalesce)
+                return TryGetCompositeCapturedValueEffects(
+                    coalesce.Value,
+                    coalesce.WhenNull,
+                    callSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
+            if (value is ISwitchExpressionOperation switchExpression) {
+                foreach (var arm in switchExpression.Arms) {
+                    if (!TryGetCapturedValueEffects(
+                            arm.Value,
+                            callSite,
+                            compilation,
+                            visited,
+                            out var armReadEffect,
+                            out var armWriteEffect))
+                        return false;
+                    readEffect |= armReadEffect;
+                    writeEffect |= armWriteEffect;
+                }
+                return switchExpression.Arms.Length != 0;
             }
             if (value is not (IObjectCreationOperation or IArrayCreationOperation or
                 IAnonymousObjectCreationOperation or IDelegateCreationOperation or
                 ICollectionExpressionOperation))
                 return false;
-            initializer = value;
+            readEffect = GetInstanceReadEffect(value, this);
+            writeEffect = GetInstanceWriteEffect(value, this);
+            return true;
+        }
+        private bool TryGetCompositeCapturedValueEffects(
+            IOperation left,
+            IOperation right,
+            IOperation callSite,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
+            out SharpProofEffect readEffect,
+            out SharpProofEffect writeEffect) {
+            if (!TryGetCapturedValueEffects(
+                    left,
+                    callSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect) ||
+                !TryGetCapturedValueEffects(
+                    right,
+                    callSite,
+                    compilation,
+                    visited,
+                    out var rightReadEffect,
+                    out var rightWriteEffect))
+                return false;
+            readEffect |= rightReadEffect;
+            writeEffect |= rightWriteEffect;
             return true;
         }
         private static bool IsDirectLocalWrite(ILocalReferenceOperation reference) {
