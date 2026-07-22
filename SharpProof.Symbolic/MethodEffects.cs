@@ -2498,15 +2498,24 @@ internal sealed class MethodEffectAnalysisSession(
                 var value = model.GetOperation(expression);
                 while (value is IConversionOperation conversion) value = conversion.Operand;
                 if (value is IDelegateCreationOperation creation) value = creation.Target;
-                var receiverOverride = value is IMethodReferenceOperation {
-                    Instance: IInstanceReferenceOperation
-                }
-                    ? callSite switch {
+                IOperation? receiverOverride = value switch {
+                    IMethodReferenceOperation { Instance: IInstanceReferenceOperation } => callSite switch {
                         IInvocationOperation invocation => invocation.Instance,
                         IPropertyReferenceOperation property => property.Instance,
                         _ => null
-                    }
-                    : null;
+                    },
+                    IMethodReferenceOperation { Instance: IParameterReferenceOperation parameter }
+                        when callSite is IInvocationOperation invocation =>
+                        invocation.Arguments.FirstOrDefault(argument =>
+                            string.Equals(
+                                argument.Parameter?.Name,
+                                parameter.Parameter.Name,
+                                StringComparison.Ordinal))?.Value ??
+                        (parameter.Parameter.Ordinal == 0 && invocation.TargetMethod.ReducedFrom != null
+                            ? invocation.Instance
+                            : null),
+                    _ => null
+                };
                 var target = value == null ? null : CreateDelegateTarget(value, receiverOverride);
                 if (target == null) return [];
                 targets.Add(target);
