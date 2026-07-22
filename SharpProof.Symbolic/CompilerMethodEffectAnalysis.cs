@@ -7,7 +7,8 @@ internal sealed record CompilerMethodEffectSummary(
     EffectFlowValue Receiver,
     ImmutableArray<EffectFlowValue> Parameters,
     ImmutableArray<int> WrittenArgumentOrdinals = default,
-    ImmutableArray<int> ReadArgumentOrdinals = default);
+    ImmutableArray<int> ReadArgumentOrdinals = default,
+    SharpProofEffect BoundArgumentEffects = SharpProofEffect.None);
 
 internal sealed class MethodEffectAnalysisSession(
     Compilation compilation,
@@ -49,7 +50,7 @@ internal sealed class MethodEffectAnalysisSession(
         if (captures == null && _cache.TryGetValue(method, out var cached)) return cached;
         if (!_active.Add(method)) return UnknownSummary("recursive_call", declaration, method);
         try {
-            var accumulator = new EffectAccumulator();
+            var accumulator = new EffectAccumulator(method);
             var state = EffectFlowState.Create(method);
             var domain = new EffectFlowDomain(this, method, semanticModel, accumulator, captures);
             if (method.MethodKind == MethodKind.StaticConstructor)
@@ -98,7 +99,7 @@ internal sealed class MethodEffectAnalysisSession(
             finalState = domain.AnalyzeExpressionBody(declaration, finalState);
             var summary = new CompilerMethodEffectSummary(
                 accumulator.Build(), domain.ReturnValue, finalState.Receiver, finalState.Parameters,
-                accumulator.WrittenArgumentOrdinals, accumulator.ReadArgumentOrdinals);
+                accumulator.WrittenArgumentOrdinals, accumulator.ReadArgumentOrdinals, accumulator.BoundArgumentEffects);
             summary = summary with { Effects = AddCompilerAllocations(summary.Effects, declaration, semanticModel) };
             if (smtAnalysis != null) summary = summary with { Effects = AddRuntimeHazards(summary.Effects, declaration, semanticModel) };
             if (captures == null) _cache[method] = summary;
@@ -466,7 +467,7 @@ internal sealed class MethodEffectAnalysisSession(
             var summary = GetSummary(target, null);
             AddSummary(summary.Effects, state.Receiver, values, semanticModel.GetOperation(site, session.CancellationToken) ??
                 semanticModel.GetOperation(declaration, session.CancellationToken)!, target,
-                summary.WrittenArgumentOrdinals, summary.ReadArgumentOrdinals);
+                summary.WrittenArgumentOrdinals, summary.ReadArgumentOrdinals, summary.BoundArgumentEffects);
             return state with { Receiver = summary.Receiver.Instantiate(state.Receiver, values) };
         }
         internal EffectFlowState AnalyzePrimaryInitializers(TypeDeclarationSyntax declaration, EffectFlowState state) {
@@ -484,7 +485,8 @@ internal sealed class MethodEffectAnalysisSession(
                 effects.Add(SharpProofEffect.DirectCall, baseType, constructor, "direct_call");
                 var summary = GetSummary(constructor, null);
                 AddSummary(summary.Effects, state.Receiver, values, semanticModel.GetOperation(baseType,
-                    session.CancellationToken)!, constructor, summary.WrittenArgumentOrdinals, summary.ReadArgumentOrdinals);
+                    session.CancellationToken)!, constructor, summary.WrittenArgumentOrdinals,
+                    summary.ReadArgumentOrdinals, summary.BoundArgumentEffects);
                 state = state with { Receiver = summary.Receiver.Instantiate(state.Receiver, values) };
             }
             return state;
@@ -1130,7 +1132,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (creation.Constructor != null) {
                 var summary = GetSummary(creation.Constructor, null);
                 AddSummary(summary.Effects, value, arguments, creation, creation.Constructor,
-                    summary.WrittenArgumentOrdinals, summary.ReadArgumentOrdinals);
+                    summary.WrittenArgumentOrdinals, summary.ReadArgumentOrdinals, summary.BoundArgumentEffects);
                 value = summary.Receiver.Instantiate(value, arguments);
                 ApplyRefArguments(summary, creation.Arguments, value, arguments, ref state);
             }
@@ -1143,7 +1145,8 @@ internal sealed class MethodEffectAnalysisSession(
                     var baseArguments = baseConstructor.Parameters.Select(static _ => EffectFlowValue.None).ToArray();
                     var baseSummary = GetSummary(baseConstructor, null);
                     AddSummary(baseSummary.Effects, value, baseArguments, creation, baseConstructor,
-                        baseSummary.WrittenArgumentOrdinals, baseSummary.ReadArgumentOrdinals);
+                        baseSummary.WrittenArgumentOrdinals, baseSummary.ReadArgumentOrdinals,
+                        baseSummary.BoundArgumentEffects);
                     value = baseSummary.Receiver.Instantiate(value, baseArguments);
                 }
             }
@@ -1220,9 +1223,10 @@ internal sealed class MethodEffectAnalysisSession(
                     var bound = BindCallable(local, null, ref state).Callables.FirstOrDefault();
                     if (bound != null) {
                         var localSummary = GetSummary(bound.Method, bound.Captures);
-                        if (CapturesAreFreshOrRootless(bound.Captures))
+                        if (CapturesCanMapArgumentEffects(bound.Captures))
                             AddSummary(localSummary.Effects, bound.Receiver, values, site, bound.Method,
-                                localSummary.WrittenArgumentOrdinals, localSummary.ReadArgumentOrdinals);
+                                localSummary.WrittenArgumentOrdinals, localSummary.ReadArgumentOrdinals,
+                                localSummary.BoundArgumentEffects);
                         else
                             effects.AddTransitive(localSummary.Effects, site.Syntax, bound.Method, "source_call");
                         return localSummary.ReturnValue.Instantiate(bound.Receiver, values, bound.Captures);
@@ -1236,11 +1240,12 @@ internal sealed class MethodEffectAnalysisSession(
                         AddTypeInitializerEffects(callable.Method.ContainingType, site);
                     var callableSummary = GetSummary(callable.Method, callable.Captures);
                     if (callable.Method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction &&
-                        callable.Captures.Count != 0)
+                        !CapturesCanMapArgumentEffects(callable.Captures))
                         effects.AddTransitive(callableSummary.Effects, site.Syntax, callable.Method, "source_call");
                     else
                         AddSummary(callableSummary.Effects, callable.Receiver, values, site, callable.Method,
-                            callableSummary.WrittenArgumentOrdinals, callableSummary.ReadArgumentOrdinals);
+                            callableSummary.WrittenArgumentOrdinals, callableSummary.ReadArgumentOrdinals,
+                            callableSummary.BoundArgumentEffects);
                     var value = callableSummary.ReturnValue.Instantiate(callable.Receiver, values, callable.Captures);
                     returned = ReferenceEquals(returned, EffectFlowValue.None) ? value : returned.Merge(value);
                 }
@@ -1269,7 +1274,7 @@ internal sealed class MethodEffectAnalysisSession(
             }
             var summary = GetSummary(target, null);
             AddSummary(summary.Effects, receiver, values, site, target,
-                summary.WrittenArgumentOrdinals, summary.ReadArgumentOrdinals);
+                summary.WrittenArgumentOrdinals, summary.ReadArgumentOrdinals, summary.BoundArgumentEffects);
             if ((summary.Effects.Effects & SharpProofEffect.WritesStaticState) != 0 &&
                 values.Any(value => value.Roots.Any(static root => root.Kind == EffectValueRootKind.Fresh)) &&
                 PublishesArgument(target, receiver.Roots.Count == 0 ||
@@ -1281,8 +1286,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ? ResolveRefReturn(target, receiver, values)
                 : returnedValue;
         }
-        private static bool CapturesAreFreshOrRootless(ImmutableDictionary<string, EffectFlowValue> captures) =>
-            captures.Values.All(static capture => capture.Roots.All(static root => root.Kind == EffectValueRootKind.Fresh));
+        private static bool CapturesCanMapArgumentEffects(ImmutableDictionary<string, EffectFlowValue> captures) =>
+            captures.Values.All(static capture => capture.Roots.All(static root =>
+                root.Kind is EffectValueRootKind.Fresh or EffectValueRootKind.Argument));
         private void AddTypeInitializerEffects(ITypeSymbol? type, IOperation site) {
             if (type is not INamedTypeSymbol named || method.MethodKind == MethodKind.StaticConstructor &&
                 SymbolEqualityComparer.Default.Equals(method.ContainingType, named) ||
@@ -1622,7 +1628,8 @@ internal sealed class MethodEffectAnalysisSession(
             IOperation site,
             IMethodSymbol target,
             ImmutableArray<int> writtenArgumentOrdinals = default,
-            ImmutableArray<int> readArgumentOrdinals = default) {
+            ImmutableArray<int> readArgumentOrdinals = default,
+            SharpProofEffect boundArgumentEffects = SharpProofEffect.None) {
             summary = ApplyCatches(summary, site);
             const SharpProofEffect relative = SharpProofEffect.ReadsReceiverState | SharpProofEffect.WritesReceiverState |
                                                 SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState;
@@ -1652,6 +1659,7 @@ internal sealed class MethodEffectAnalysisSession(
                 else if (writtenArgumentOrdinals.IsDefault)
                     mapped |= SharpProofEffect.WritesArgumentState | SharpProofEffect.Unknown;
             }
+            mapped |= boundArgumentEffects;
             effects.AddTransitive(summary with { Effects = mapped }, site.Syntax, target, "source_call");
         }
         private void ApplyRefArguments(
@@ -1885,7 +1893,7 @@ internal sealed class MethodEffectAnalysisSession(
         }
     }
 
-    private sealed class EffectAccumulator {
+    private sealed class EffectAccumulator(IMethodSymbol method) {
         private SharpProofEffect _effects;
         private SharpProofCapability _capabilities;
         private readonly ImmutableArray<MethodEffectSite>.Builder _sites = ImmutableArray.CreateBuilder<MethodEffectSite>();
@@ -1895,6 +1903,7 @@ internal sealed class MethodEffectAnalysisSession(
         private readonly HashSet<int> _readArgumentOrdinals = [];
         internal ImmutableArray<int> WrittenArgumentOrdinals => [.. _writtenArgumentOrdinals.OrderBy(static ordinal => ordinal)];
         internal ImmutableArray<int> ReadArgumentOrdinals => [.. _readArgumentOrdinals.OrderBy(static ordinal => ordinal)];
+        internal SharpProofEffect BoundArgumentEffects { get; private set; }
         internal void Add(SharpProofEffect effect, SyntaxNode syntax, ISymbol? symbol, string reason) {
             _effects |= effect;
             _sites.Add(Site(effect, syntax, symbol, reason));
@@ -1906,16 +1915,22 @@ internal sealed class MethodEffectAnalysisSession(
         }
         internal void Read(EffectFlowValue value, SyntaxNode syntax, ISymbol? symbol, string reason) {
             foreach (var root in value.Roots)
-                if (root is { Kind: EffectValueRootKind.Argument, Ordinal: >= 0 })
-                    _readArgumentOrdinals.Add(root.Ordinal);
+                if (root is { Kind: EffectValueRootKind.Argument, Ordinal: >= 0 }) {
+                    if (IsFormalArgumentRoot(root)) _readArgumentOrdinals.Add(root.Ordinal);
+                    else BoundArgumentEffects |= SharpProofEffect.ReadsArgumentState;
+                }
             Add(ReadEffect(value), syntax, symbol, reason);
         }
         internal void Write(EffectFlowValue value, SyntaxNode syntax, ISymbol? symbol, string reason) {
             foreach (var root in value.Roots)
-                if (root is { Kind: EffectValueRootKind.Argument, Ordinal: >= 0 })
-                    _writtenArgumentOrdinals.Add(root.Ordinal);
+                if (root is { Kind: EffectValueRootKind.Argument, Ordinal: >= 0 }) {
+                    if (IsFormalArgumentRoot(root)) _writtenArgumentOrdinals.Add(root.Ordinal);
+                    else BoundArgumentEffects |= SharpProofEffect.WritesArgumentState;
+                }
             Add(WriteEffect(value), syntax, symbol, reason);
         }
+        private bool IsFormalArgumentRoot(EffectValueRoot root) => root.Ordinal < method.Parameters.Length &&
+            string.Equals(root.Key, EffectFlowState.SymbolKey(method.Parameters[root.Ordinal]), StringComparison.Ordinal);
         internal SharpProofEffect ReadEffect(EffectFlowValue value) => Map(value, write: false);
         internal SharpProofEffect WriteEffect(EffectFlowValue value) => Map(value, write: true);
         private static SharpProofEffect Map(EffectFlowValue value, bool write) {

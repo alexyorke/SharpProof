@@ -116,7 +116,7 @@ internal sealed record EffectFlowState(
     internal static EffectFlowState Create(IMethodSymbol method) => new(
         method.IsStatic ? EffectFlowValue.None : EffectFlowValue.FromRoot(new(EffectValueRootKind.Receiver), KnownInputType(method.ContainingType)),
         [.. method.Parameters.Select(parameter => EffectFlowValue.FromRoot(
-            new(EffectValueRootKind.Argument, parameter.Ordinal), KnownInputType(parameter.Type)))],
+            new(EffectValueRootKind.Argument, parameter.Ordinal, Key: SymbolKey(parameter)), KnownInputType(parameter.Type)))],
         ImmutableDictionary.Create<ILocalSymbol, EffectFlowValue>(SymbolEqualityComparer.Default),
         ImmutableDictionary<CaptureId, EffectFlowValue>.Empty,
         ImmutableDictionary.Create<ILocalSymbol, EffectFlowValue>(SymbolEqualityComparer.Default));
