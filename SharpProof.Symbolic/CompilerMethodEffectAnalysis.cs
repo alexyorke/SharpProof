@@ -972,6 +972,7 @@ internal sealed class MethodEffectAnalysisSession(
             var arguments = EvaluateArguments(creation.Arguments, ref state);
             var value = EffectFlowValue.Fresh(creation.Type);
             effects.Add(SharpProofEffect.Allocates, creation.Syntax, creation.Type, "object_allocation");
+            AddExplicitTypeInitializerEffects(creation.Type, creation);
             if (creation.Constructor != null) {
                 var summary = GetSummary(creation.Constructor, null);
                 AddSummary(summary.Effects, value, arguments, creation, creation.Constructor);
@@ -1081,12 +1082,8 @@ internal sealed class MethodEffectAnalysisSession(
             var exactTarget = SymbolicDispatchFacts.ResolveExactDispatchTarget(target, null, receiver.ExactType);
             if (exactTarget != null) target = exactTarget;
             effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
-            if (target.IsStatic && target.MethodKind != MethodKind.StaticConstructor &&
-                target.ContainingType.GetMembers().OfType<IMethodSymbol>().FirstOrDefault(static candidate =>
-                    candidate.MethodKind == MethodKind.StaticConstructor && !candidate.IsImplicitlyDeclared) is { } initializer) {
-                var initializerSummary = GetSummary(initializer, null);
-                AddSummary(initializerSummary.Effects, EffectFlowValue.None, [], site, initializer);
-            }
+            if (target.IsStatic && target.MethodKind != MethodKind.StaticConstructor)
+                AddExplicitTypeInitializerEffects(target.ContainingType, site);
             if (target.IsImplicitlyDeclared) return EffectFlowValue.None;
             if (exactTarget == null && (target.IsVirtual || target.ContainingType?.TypeKind == TypeKind.Interface)) {
                 effects.Add(SharpProofEffect.DispatchUncertainty, site.Syntax, target, "dispatch_uncertainty");
@@ -1113,6 +1110,14 @@ internal sealed class MethodEffectAnalysisSession(
             return target.ReturnsByRef && returnedValue.Roots.Any(static root => root.Kind == EffectValueRootKind.Unknown)
                 ? ResolveRefReturn(target, receiver, values)
                 : returnedValue;
+        }
+        private void AddExplicitTypeInitializerEffects(ITypeSymbol? type, IOperation site) {
+            if (type is not INamedTypeSymbol named ||
+                named.GetMembers().OfType<IMethodSymbol>().FirstOrDefault(static candidate =>
+                    candidate.MethodKind == MethodKind.StaticConstructor && !candidate.IsImplicitlyDeclared) is not { } initializer)
+                return;
+            var initializerSummary = GetSummary(initializer, null);
+            AddSummary(initializerSummary.Effects, EffectFlowValue.None, [], site, initializer);
         }
         private EffectFlowValue ResolveRefReturn(
             IMethodSymbol target,
