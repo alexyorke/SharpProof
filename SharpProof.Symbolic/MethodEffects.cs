@@ -3366,16 +3366,29 @@ internal sealed class MethodEffectAnalysisSession(
             var targetConstructor = initializer.TargetMethod.OriginalDefinition;
             var targetDeclaration = targetConstructor.DeclaringSyntaxReferences
                 .FirstOrDefault()?.GetSyntax();
-            if (targetDeclaration == null ||
-                !TryGetConstructorDeclarationMemberOrigins(
-                    targetConstructor,
-                    initializer,
-                    targetDeclaration,
-                    memberPath,
-                    compilation,
-                    visitedConstructors,
-                    out var chainedValues))
-                return false;
+            ImmutableArray<IOperation> chainedValues;
+            if (targetDeclaration != null) {
+                if (!TryGetConstructorDeclarationMemberOrigins(
+                        targetConstructor,
+                        initializer,
+                        targetDeclaration,
+                        memberPath,
+                        compilation,
+                        visitedConstructors,
+                        out chainedValues))
+                    return false;
+            }
+            else {
+                var targetTypeDeclaration = targetConstructor.ContainingType
+                    .DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                if (targetTypeDeclaration == null ||
+                    !TryGetDeclaredMemberInitializer(
+                        targetTypeDeclaration,
+                        memberPath,
+                        compilation,
+                        out chainedValues))
+                    return false;
+            }
             var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
             foreach (var chainedValue in chainedValues) {
                 if (!TryMapConstructorAssignedValue(
