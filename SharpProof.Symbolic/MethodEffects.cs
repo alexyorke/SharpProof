@@ -503,6 +503,15 @@ internal sealed class MethodEffectAnalysisSession(
                         "string_foreach_read");
                     break;
                 }
+                var foreachTypeDefinition = foreachCollection.Type?.OriginalDefinition.ToDisplayString();
+                if (foreachTypeDefinition is "System.Span<T>" or "System.ReadOnlySpan<T>") {
+                    builder.Add(
+                        GetInstanceReadEffect(foreachCollection, builder),
+                        loop,
+                        foreachCollection.Type,
+                        "span_foreach_read");
+                    break;
+                }
                 var info = semanticModel.GetForEachStatementInfo(syntax);
                 AnalyzeCall(info.GetEnumeratorMethod, loop, builder, loop.Collection);
                 var enumeratorType = info.GetEnumeratorMethod?.ReturnType;
