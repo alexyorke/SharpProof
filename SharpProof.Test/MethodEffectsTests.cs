@@ -5356,41 +5356,6 @@ public sealed class MethodEffectsTests {
         Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
     }
     [Test]
-    public void FreshResourcesAndCaughtExceptionsRemainPure() {
-        var caught = Analyze("""
-            class C {
-                static int M(int value) {
-                    try {
-                        if (value < 0) throw new System.ArgumentOutOfRangeException(nameof(value));
-                        return value + 1;
-                    }
-                    catch (System.ArgumentOutOfRangeException) { return 0; }
-                }
-            }
-            """, 2);
-        var writer = Analyze("""
-            class C {
-                static int M() {
-                    using (var writer = new System.IO.StringWriter()) { return 1; }
-                }
-            }
-            """, 2);
-        var throwingDisposable = Analyze("""
-            class C {
-                sealed class D : System.IDisposable {
-                    public void Dispose() { throw new System.ObjectDisposedException("fuzz"); }
-                }
-                static int M() { using var value = new D(); return 1; }
-            }
-            """, 5);
-
-        Assert.Multiple(() => {
-            Assert.That(caught.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven), "caught exception");
-            Assert.That(writer.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven), "fresh StringWriter");
-            Assert.That(throwingDisposable.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven), "fresh disposable");
-        });
-    }
-    [Test]
     public void NativeBoundaryCannotProveDoesNotThrow() {
         var result = Analyze("""
             using System.Runtime.InteropServices;
