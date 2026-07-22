@@ -1701,9 +1701,13 @@ internal sealed class MethodEffectAnalysisSession(
         var targetMethod = invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod;
         targetMethod = (targetMethod.PartialImplementationPart ?? targetMethod).OriginalDefinition;
         var declaration = targetMethod.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
-        var expression = GetDirectReturnExpression(declaration);
-        if (expression == null) return SharpProofEffect.Unknown;
-        return GetInvocationReturnedExpressionEffect(expression, targetMethod, invocation, builder, write);
+        var expressions = GetDirectReturnExpressions(declaration);
+        if (expressions.IsDefaultOrEmpty) return SharpProofEffect.Unknown;
+        return expressions.Aggregate(
+            SharpProofEffect.None,
+            (effects, expression) => effects |
+                                     GetInvocationReturnedExpressionEffect(
+                                         expression, targetMethod, invocation, builder, write));
     }
     private static SharpProofEffect GetInvocationReturnedExpressionEffect(
         ExpressionSyntax expression,
@@ -1790,6 +1794,10 @@ internal sealed class MethodEffectAnalysisSession(
             : GetInstanceReadEffect(property.Instance, builder);
     }
     private static ExpressionSyntax? GetDirectReturnExpression(SyntaxNode? declaration) {
+        var expressions = GetDirectReturnExpressions(declaration);
+        return expressions.Length == 1 ? expressions[0] : null;
+    }
+    private static ImmutableArray<ExpressionSyntax> GetDirectReturnExpressions(SyntaxNode? declaration) {
         ExpressionSyntax? expression = declaration switch {
             MethodDeclarationSyntax method => method.ExpressionBody?.Expression,
             LocalFunctionStatementSyntax localFunction => localFunction.ExpressionBody?.Expression,
@@ -1800,18 +1808,21 @@ internal sealed class MethodEffectAnalysisSession(
             ArrowExpressionClauseSyntax arrow => arrow.Expression,
             _ => null
         };
-        if (expression != null) return expression;
-        var statements = declaration switch {
-            MethodDeclarationSyntax method => method.Body?.Statements,
-            LocalFunctionStatementSyntax localFunction => localFunction.Body?.Statements,
-            OperatorDeclarationSyntax @operator => @operator.Body?.Statements,
-            ConversionOperatorDeclarationSyntax conversion => conversion.Body?.Statements,
-            AccessorDeclarationSyntax accessor => accessor.Body?.Statements,
+        if (expression != null) return [expression];
+        var body = declaration switch {
+            MethodDeclarationSyntax method => method.Body,
+            LocalFunctionStatementSyntax localFunction => localFunction.Body,
+            OperatorDeclarationSyntax @operator => @operator.Body,
+            ConversionOperatorDeclarationSyntax conversion => conversion.Body,
+            AccessorDeclarationSyntax accessor => accessor.Body,
             _ => null
         };
-        if (statements == null) return null;
-        var returns = statements.Value.OfType<ReturnStatementSyntax>().ToArray();
-        return returns.Length == 1 ? returns[0].Expression : null;
+        if (body == null) return [];
+        return [.. body.DescendantNodes(node =>
+                node is not AnonymousFunctionExpressionSyntax and not LocalFunctionStatementSyntax)
+            .OfType<ReturnStatementSyntax>()
+            .Select(static returned => returned.Expression)
+            .OfType<ExpressionSyntax>()];
     }
     private static ExpressionSyntax UnwrapReturnExpression(ExpressionSyntax expression) {
         while (true) {
