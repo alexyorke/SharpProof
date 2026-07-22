@@ -1130,6 +1130,23 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void BaseExceptionCatchCatchesRuntimeHazard() {
+        var result = Analyze("""
+            class C {
+                static int M() {
+                    var zero = 0;
+                    try { return 10 / zero; }
+                    catch (System.Exception) { return 0; }
+                }
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.ExceptionFacts, Has.Some.Matches<MethodExceptionFact>(fact =>
+                fact.ExceptionType == "System.DivideByZeroException" && fact.Escape == SharpProofVerdict.Disproven));
+        });
+    }
+    [Test]
     public void CatchFilterIncludesEffectsWithoutEscapingItsException() {
         var result = Analyze("""
             static class Globals { public static int Count; }
