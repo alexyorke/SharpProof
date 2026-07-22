@@ -666,6 +666,21 @@ public sealed class MethodEffectsTests {
             Assert.That(result.UnknownReasons, Is.Empty);
         });
     }
+    [TestCase("System.Span<int>")]
+    [TestCase("System.ReadOnlySpan<int>")]
+    public void SpanForeachUsesIntrinsicEffects(string spanType) {
+        var result = Analyze($$"""
+            class C {
+                static void M({{spanType}} values) {
+                    foreach (var value in values) { }
+                }
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.UnknownReasons, Is.Empty);
+        });
+    }
     [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
