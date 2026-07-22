@@ -222,6 +222,12 @@ internal sealed class MethodEffectAnalysisSession(
                 break;
             case ICompoundAssignmentOperation compound:
                 AddWrite(compound.Target, builder);
+                if (compound.Target is ILocalReferenceOperation compoundLocal &&
+                    compoundLocal.Type?.TypeKind == TypeKind.Delegate)
+                    builder.ApplyDelegateCompoundAssignment(
+                        compoundLocal.Local,
+                        compound.Value,
+                        compound.OperatorKind == BinaryOperatorKind.Add);
                 if (compound.Target is IPropertyReferenceOperation compoundProperty) {
                     AnalyzeCall(compoundProperty.Property.GetMethod, compound, builder, compoundProperty.Instance);
                     AnalyzeCall(compoundProperty.Property.SetMethod, compound, builder, compoundProperty.Instance);
@@ -1165,6 +1171,20 @@ internal sealed class MethodEffectAnalysisSession(
                 _ => null
             };
             return target == null ? [] : [target];
+        }
+        internal void ApplyDelegateCompoundAssignment(ILocalSymbol local, IOperation value, bool adds) {
+            local = (ILocalSymbol)local.OriginalDefinition;
+            if (!adds) {
+                _delegateTargets.Remove(local);
+                return;
+            }
+            var addedTargets = GetDelegateTargets(value);
+            if (addedTargets.IsDefaultOrEmpty) {
+                _delegateTargets.Remove(local);
+                return;
+            }
+            var existingTargets = _delegateTargets.TryGetValue(local, out var existing) ? existing : [];
+            _delegateTargets[local] = existingTargets.AddRange(addedTargets);
         }
         private DelegateTarget CreateAnonymousFunctionTarget(IAnonymousFunctionOperation function) {
             var hasCapture = TryGetCapturedEffects(
