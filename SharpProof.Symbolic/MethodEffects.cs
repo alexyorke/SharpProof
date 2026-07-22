@@ -2880,16 +2880,23 @@ internal sealed class MethodEffectAnalysisSession(
             while (value is IConversionOperation conversion) value = conversion.Operand;
             const string arrayPrefix = "#array:";
             if (path[index].StartsWith(arrayPrefix, StringComparison.Ordinal)) {
-                if (value is not IArrayCreationOperation { Initializer: { } arrayInitializer } ||
-                    !int.TryParse(
+                ImmutableArray<IOperation> elements = value switch {
+                    IArrayCreationOperation { Initializer: { } arrayInitializer } =>
+                        arrayInitializer.ElementValues,
+                    ICollectionExpressionOperation collection
+                        when collection.Elements.All(element => element is not ISpreadOperation) =>
+                        collection.Elements,
+                    _ => []
+                };
+                if (!int.TryParse(
                         path[index].Substring(arrayPrefix.Length),
                         NumberStyles.None,
                         CultureInfo.InvariantCulture,
                         out var elementIndex) ||
                     elementIndex < 0 ||
-                    elementIndex >= arrayInitializer.ElementValues.Length)
+                    elementIndex >= elements.Length)
                     return false;
-                var element = arrayInitializer.ElementValues[elementIndex];
+                var element = elements[elementIndex];
                 if (index == path.Count - 1) {
                     initializer = element;
                     return true;
