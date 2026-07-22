@@ -2635,6 +2635,31 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ReceiverCapturingLocalFunctionSeparatesCaptureReadFromParameterWrite() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            sealed class C {
+                private int state;
+                void M(Box external) {
+                    var fresh = new Box();
+                    Local(fresh, external);
+                    void Local(Box first, Box second) {
+                        _ = state;
+                        first.Value = 1;
+                    }
+                }
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+                string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                    site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.ReadsReceiverState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+        });
+    }
+    [Test]
     public void LambdaMutationMapsOnlyMutatedArgument() {
         var result = Analyze("""
             sealed class Box { public int Value; }
