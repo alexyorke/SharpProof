@@ -1,4 +1,7 @@
 using NUnit.Framework;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Attributes;
 using SharpProof.Symbolic;
 namespace SharpProof.Test;
@@ -2219,6 +2222,37 @@ public sealed class MethodEffectsTests {
         Assert.Multiple(() => {
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
+    public void CrossFilePartialEventInitializerEffectsAreIncluded() {
+        var options = new CSharpParseOptions(LanguageVersion.Preview);
+        var constructorTree = CSharpSyntaxTree.ParseText("""
+            partial class D { public D() { } }
+            class C { static D M() => new D(); }
+            """, options, "Constructor.cs");
+        var initializerTree = CSharpSyntaxTree.ParseText("""
+            static class Globals { public static int Count; }
+            partial class D {
+                public event System.Action Changed = CreateHandler();
+                private static System.Action CreateHandler() { Globals.Count++; return () => { }; }
+            }
+            """, options, "Initializer.cs");
+        var compilation = CSharpCompilation.Create(
+            "PartialInitializer",
+            [constructorTree, initializerTree],
+            SymbolicSourceCompilation.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+            Is.Empty);
+        var model = compilation.GetSemanticModel(constructorTree);
+        var declaration = constructorTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "M");
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
+        var effects = new MethodEffectAnalysisSession(compilation, default).Analyze(method, declaration, model);
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
         });
     }
     [Test]
