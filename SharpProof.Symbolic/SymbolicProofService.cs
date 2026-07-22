@@ -113,8 +113,16 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
         if (condition == null) throw new ArgumentNullException(nameof(condition));
         normalizedState = SymbolicProofStateFacts.NormalizeState(state);
         rewrittenCondition = SymbolicProofStateFacts.RewriteQueryConditionToCurrentVersions(condition, normalizedState);
+        var hasSyntacticStatus =
+            SymbolicProofStateFacts.TryClassifySyntacticConditionTruth(rewrittenCondition, out var syntacticStatus);
         if (!normalizedState.IsExact) {
-            result = SymbolicProofInfo.Unknown(normalizedState.UnknownReason);
+            result = hasSyntacticStatus && syntacticStatus == SymbolicProofStatus.ProvenTrue
+                ? SymbolicProofInfo.Syntactic(
+                    SymbolicProofStatus.ProvenTrue,
+                    mode == ConditionClassificationMode.Implication
+                        ? "ir_condition_syntactic_truth"
+                        : "ir_condition_syntactic_true")
+                : SymbolicProofInfo.Unknown(normalizedState.UnknownReason);
             return true;
         }
         if (normalizedState.IsContradictory) {
@@ -125,7 +133,7 @@ internal sealed class SymbolicProofService(SmtAnalysisService? smtAnalysis) {
                 ContradictoryStateReason);
             return true;
         }
-        if (SymbolicProofStateFacts.TryClassifySyntacticConditionTruth(rewrittenCondition, out var syntacticStatus)) {
+        if (hasSyntacticStatus) {
             if (mode == ConditionClassificationMode.Implication &&
                 syntacticStatus == SymbolicProofStatus.ProvenFalse)
                 result = ClassifySyntacticallyFalseImplication(normalizedState, "ir_condition_syntactic_false_reachable");

@@ -72,7 +72,14 @@ public sealed class SharpProofAnalysisSessionTests {
             new SharpProofTarget(SharpProofTargetKind.Point, Line: 3, Column: 9),
             SharpProofAnalysisFacet.ProofFacts,
             "left == left"));
-        Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("ProvenTrue"));
+        var falseResult = session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Point, Line: 3, Column: 9),
+            SharpProofAnalysisFacet.ProofFacts,
+            "left != left"));
+        Assert.Multiple(() => {
+            Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("ProvenTrue"));
+            Assert.That(falseResult.ProofFacts.Single().Status, Is.EqualTo("Unknown"));
+        });
     }
     [Test]
     public void RequestsAreSafeToReuseConcurrently() {
