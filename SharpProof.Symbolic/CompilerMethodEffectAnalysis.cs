@@ -1258,9 +1258,15 @@ internal sealed class MethodEffectAnalysisSession(
             }
             return EffectFlowValue.Unknown;
         }
-        private static IMethodSymbol? FindProtocolMethod(ITypeSymbol? type, string name, int parameterCount) =>
-            type?.GetMembers(name).OfType<IMethodSymbol>()
-                .FirstOrDefault(method => !method.IsStatic && method.Parameters.Length == parameterCount);
+        private static IMethodSymbol? FindProtocolMethod(ITypeSymbol? type, string name, int parameterCount) {
+            if (type is not INamedTypeSymbol named) return null;
+            for (var current = named; current != null; current = current.BaseType) {
+                var method = current.GetMembers(name).OfType<IMethodSymbol>()
+                    .FirstOrDefault(candidate => !candidate.IsStatic && candidate.Parameters.Length == parameterCount);
+                if (method != null) return method;
+            }
+            return null;
+        }
         private static IMethodSymbol? FindImplementedProtocolMethod(
             ITypeSymbol? type,
             string name,
