@@ -428,6 +428,22 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ArraySliceListPatternRemainsPure() {
+        var result = Analyze("""
+            class C {
+                static int M(int[] values) {
+                    return values is [_, .. var rest] ? rest.Length : 0;
+                }
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+                string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                    site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void SlicePatternIncludesSliceMethodEffects() {
         var result = Analyze("""
             sealed class D {
