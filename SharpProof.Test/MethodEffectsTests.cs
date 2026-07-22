@@ -1850,6 +1850,28 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ConditionalVirtualInvocationRetainsExactDispatch() {
+        var result = Analyze("""
+            class Base { public virtual void Work() { } }
+            sealed class Derived : Base {
+                private static int state;
+                public override void Work() { state++; }
+            }
+            class C {
+                static void M() {
+                    Base value = new Derived();
+                    value?.Work();
+                }
+            }
+            """, 7);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.False);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void CopiedDelegateTargetIsIndependentOfSourceReassignment() {
         var result = Analyze("""
             class C {
