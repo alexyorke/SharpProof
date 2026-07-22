@@ -3659,18 +3659,23 @@ internal sealed class MethodEffectAnalysisSession(
                     return;
                 }
             }
-            if (!callSites.IsDefaultOrEmpty &&
-                value is IFieldReferenceOperation { Instance: IInstanceReferenceOperation }) {
-                var receiver = GetConstructorCallInstance(callSites[0].Operation);
-                if (receiver == null) return;
+            if (value is IFieldReferenceOperation { Instance: { } fieldInstance }) {
+                var mappedInstance = fieldInstance;
+                var remainingCallSites = callSites;
+                if (fieldInstance is IInstanceReferenceOperation &&
+                    !callSites.IsDefaultOrEmpty) {
+                    mappedInstance = GetConstructorCallInstance(callSites[0].Operation);
+                    if (mappedInstance == null) return;
+                    remainingCallSites = callSites.RemoveAt(0);
+                }
                 AddDeconstructionMemberAssignments(
                     target,
-                    receiver,
+                    mappedInstance,
                     syntax,
                     memberPath,
                     compilation,
                     visited,
-                    callSites.RemoveAt(0),
+                    remainingCallSites,
                     assignments);
                 return;
             }
