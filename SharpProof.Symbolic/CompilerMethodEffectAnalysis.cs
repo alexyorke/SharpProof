@@ -674,7 +674,11 @@ internal sealed class MethodEffectAnalysisSession(
                         InvokeCoreOrValue(info.IsCompletedProperty?.GetMethod, awaiter, awaited, ref state);
                         InvokeCoreOrValue(info.GetResultMethod, awaiter, awaited, ref state);
                         var continuation = FindProtocolMethod(info.GetAwaiterMethod?.ReturnType, "UnsafeOnCompleted", 1) ??
-                                           FindProtocolMethod(info.GetAwaiterMethod?.ReturnType, "OnCompleted", 1);
+                                           FindImplementedProtocolMethod(
+                                               info.GetAwaiterMethod?.ReturnType, "UnsafeOnCompleted", 1) ??
+                                           FindProtocolMethod(info.GetAwaiterMethod?.ReturnType, "OnCompleted", 1) ??
+                                           FindImplementedProtocolMethod(
+                                               info.GetAwaiterMethod?.ReturnType, "OnCompleted", 1);
                         InvokeCoreOrValue(continuation, awaiter, awaited, ref state);
                     }
                     return awaitedValue;
@@ -1247,7 +1251,9 @@ internal sealed class MethodEffectAnalysisSession(
             var awaiter = InvokeCoreOrValue(getAwaiter, receiver, site, ref state);
             InvokeCoreOrValue(FindProtocolMethod(getAwaiter?.ReturnType, "GetResult", 0), awaiter, site, ref state);
             var continuation = FindProtocolMethod(getAwaiter?.ReturnType, "UnsafeOnCompleted", 1) ??
-                               FindProtocolMethod(getAwaiter?.ReturnType, "OnCompleted", 1);
+                               FindImplementedProtocolMethod(getAwaiter?.ReturnType, "UnsafeOnCompleted", 1) ??
+                               FindProtocolMethod(getAwaiter?.ReturnType, "OnCompleted", 1) ??
+                               FindImplementedProtocolMethod(getAwaiter?.ReturnType, "OnCompleted", 1);
             InvokeCoreOrValue(continuation, awaiter, site, ref state);
         }
         private EffectFlowValue FindPatternInput(IOperation pattern, ref EffectFlowState state) {
