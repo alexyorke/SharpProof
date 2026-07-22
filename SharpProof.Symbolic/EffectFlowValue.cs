@@ -101,9 +101,15 @@ internal sealed record EffectBoundCallable(
     IMethodSymbol Method,
     EffectFlowValue? Receiver,
     ImmutableDictionary<string, EffectFlowValue> Captures) {
-    internal string Key => RoslynStructuralMethodIdentity.GetCanonicalKey(Method) + "|" + Receiver?.Key + "|" +
+    internal string Key => RoslynStructuralMethodIdentity.GetCanonicalKey(Method) + "@" + SourceKey(Method) + "|" + Receiver?.Key + "|" +
                            string.Join(",", Captures.OrderBy(static capture => capture.Key, StringComparer.Ordinal)
                                .Select(static capture => capture.Key + "=" + capture.Value.Key));
+    private static string SourceKey(IMethodSymbol method) {
+        var location = method.Locations.FirstOrDefault(static candidate => candidate.IsInSource);
+        return location == null
+            ? string.Empty
+            : (location.SourceTree?.FilePath ?? string.Empty) + ":" + location.SourceSpan.Start;
+    }
     internal EffectBoundCallable Instantiate(
         EffectFlowValue? receiver,
         IReadOnlyList<EffectFlowValue> arguments,
