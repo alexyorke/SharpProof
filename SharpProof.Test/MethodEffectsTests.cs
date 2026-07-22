@@ -167,6 +167,22 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
         });
     }
+    [TestCase("> 0 and < 10")]
+    [TestCase("< 0 or > 2")]
+    [TestCase("not < 0")]
+    public void ConstantCompoundSwitchSkipsUnselectedArm(string pattern) {
+        var result = Analyze($$"""
+            class C {
+                static int state;
+                static int Mutate() { state++; return 1; }
+                static int M() => 5 switch { {{pattern}} => 1, _ => Mutate() };
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
+        });
+    }
     [Test]
     public void NullConditionalSkipsGetterForConstantNullReceiver() {
         var result = Analyze("""
