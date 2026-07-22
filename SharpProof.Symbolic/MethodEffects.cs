@@ -1620,6 +1620,8 @@ internal sealed class MethodEffectAnalysisSession(
             IConditionalOperation conditional =>
                 GetInstanceWriteEffect(conditional.WhenTrue, builder) |
                 GetInstanceWriteEffect(conditional.WhenFalse, builder),
+            IConditionalAccessInstanceOperation conditionalAccess =>
+                GetInstanceWriteEffect(FindConditionalAccessReceiver(conditionalAccess), builder),
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceWriteEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IConversionOperation conversion => GetInstanceWriteEffect(conversion.Operand, builder),
@@ -1646,12 +1648,20 @@ internal sealed class MethodEffectAnalysisSession(
             IConditionalOperation conditional =>
                 GetInstanceReadEffect(conditional.WhenTrue, builder) |
                 GetInstanceReadEffect(conditional.WhenFalse, builder),
+            IConditionalAccessInstanceOperation conditionalAccess =>
+                GetInstanceReadEffect(FindConditionalAccessReceiver(conditionalAccess), builder),
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceReadEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IConversionOperation conversion => GetInstanceReadEffect(conversion.Operand, builder),
             ILocalReferenceOperation => SharpProofEffect.ReadsCapturedState,
             _ => SharpProofEffect.Unknown
         };
+    }
+    private static IOperation? FindConditionalAccessReceiver(IOperation operation) {
+        for (var parent = operation.Parent; parent != null; parent = parent.Parent)
+            if (parent is IConditionalAccessOperation conditionalAccess)
+                return conditionalAccess.Operation;
+        return null;
     }
     private static SharpProofEffect GetWriteEffect(MethodEffectOrigin origin) => origin switch {
         MethodEffectOrigin.Receiver => SharpProofEffect.WritesReceiverState,
