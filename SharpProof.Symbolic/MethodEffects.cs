@@ -679,6 +679,9 @@ internal sealed class MethodEffectAnalysisSession(
         ISpreadOperation spread,
         SemanticModel semanticModel,
         Builder builder) {
+        if (spread.Operand.Type is IArrayTypeSymbol ||
+            spread.Operand.Type?.SpecialType == SpecialType.System_String)
+            return;
         if (spread.Operand.Syntax is not ExpressionSyntax expression) {
             builder.AddUnknown(spread, "unresolved_collection_spread");
             return;
@@ -2943,16 +2946,16 @@ internal sealed class MethodEffectAnalysisSession(
             if (path[index].StartsWith(indexerPrefix, StringComparison.Ordinal)) {
                 const string intIndexPrefix = "#indexer:System.Int32:";
                 if (value is ICollectionExpressionOperation collection &&
-                    collection.Elements.All(element => element is not ISpreadOperation) &&
+                    TryGetStaticCollectionElements(collection, out var collectionElements) &&
                     path[index].StartsWith(intIndexPrefix, StringComparison.Ordinal) &&
                     int.TryParse(
                         path[index].Substring(intIndexPrefix.Length),
                         NumberStyles.None,
                         CultureInfo.InvariantCulture,
-                        out var collectionIndex) &&
+                    out var collectionIndex) &&
                     collectionIndex >= 0 &&
-                    collectionIndex < collection.Elements.Length) {
-                    var collectionElement = collection.Elements[collectionIndex];
+                    collectionIndex < collectionElements.Length) {
+                    var collectionElement = collectionElements[collectionIndex];
                     if (index == path.Count - 1) {
                         initializer = collectionElement;
                         return true;
@@ -3026,8 +3029,8 @@ internal sealed class MethodEffectAnalysisSession(
                     IArrayCreationOperation { Initializer: { } arrayInitializer } =>
                         arrayInitializer.ElementValues,
                     ICollectionExpressionOperation collection
-                        when collection.Elements.All(element => element is not ISpreadOperation) =>
-                        collection.Elements,
+                        when TryGetStaticCollectionElements(collection, out var collectionElements) =>
+                        collectionElements,
                     _ => []
                 };
                 if (!int.TryParse(
@@ -3106,6 +3109,63 @@ internal sealed class MethodEffectAnalysisSession(
             path = prefix + value.GetType().FullName + ":" +
                    Convert.ToString(value, CultureInfo.InvariantCulture);
             return true;
+        }
+        private static bool TryGetStaticCollectionElements(
+            ICollectionExpressionOperation collection,
+            out ImmutableArray<IOperation> elements) {
+            elements = [];
+            if (collection.SemanticModel?.Compilation is not { } compilation) return false;
+            var builder = ImmutableArray.CreateBuilder<IOperation>();
+            foreach (var element in collection.Elements) {
+                if (element is not ISpreadOperation spread) {
+                    builder.Add(element);
+                    continue;
+                }
+                if (!TryAppendStaticCollectionValue(
+                        spread.Operand,
+                        compilation,
+                        new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                        builder))
+                    return false;
+            }
+            elements = builder.ToImmutable();
+            return true;
+        }
+        private static bool TryAppendStaticCollectionValue(
+            IOperation value,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
+            ImmutableArray<IOperation>.Builder elements) {
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is IParenthesizedOperation parenthesized)
+                return TryAppendStaticCollectionValue(
+                    parenthesized.Operand, compilation, visited, elements);
+            if (value is ILocalReferenceOperation local) {
+                if (!TryGetStableLocalInitializers(
+                        local.Local, compilation, visited, out var initializers) ||
+                    initializers.Length != 1)
+                    return false;
+                return TryAppendStaticCollectionValue(
+                    initializers[0], compilation, visited, elements);
+            }
+            if (value is IArrayCreationOperation { Initializer: { } arrayInitializer }) {
+                elements.AddRange(arrayInitializer.ElementValues);
+                return true;
+            }
+            if (value is ICollectionExpressionOperation collection) {
+                foreach (var element in collection.Elements) {
+                    if (element is ISpreadOperation spread) {
+                        if (!TryAppendStaticCollectionValue(
+                                spread.Operand, compilation, visited, elements))
+                            return false;
+                    }
+                    else {
+                        elements.Add(element);
+                    }
+                }
+                return true;
+            }
+            return false;
         }
         private bool TryGetReturnedLambdaCapturedEffects(
             IAnonymousFunctionOperation function,
