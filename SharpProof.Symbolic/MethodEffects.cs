@@ -2751,6 +2751,7 @@ internal sealed class MethodEffectAnalysisSession(
             out ImmutableArray<IOperation> initializers) {
             initializers = [];
             var path = new List<string>();
+            var hasUnresolvedPath = false;
             IOperation current = reference;
             while (true) {
                 switch (current.Parent) {
@@ -2764,14 +2765,23 @@ internal sealed class MethodEffectAnalysisSession(
                         path.Add(GetMemberPathPart(property.Property.OriginalDefinition));
                         current = property;
                         continue;
+                    case IArrayElementReferenceOperation { ArrayReference: { } arrayReference } array
+                        when ReferenceEquals(arrayReference, current):
+                        if (array.Indices.Length == 1 &&
+                            array.Indices[0].ConstantValue is { HasValue: true, Value: int index })
+                            path.Add("#array:" + index.ToString(CultureInfo.InvariantCulture));
+                        else
+                            hasUnresolvedPath = true;
+                        current = array;
+                        continue;
                 }
                 break;
             }
             var isInvocationReceiver = current.Parent is IInvocationOperation invocation &&
                                        ReferenceEquals(invocation.Instance, current);
             if (!isInvocationReceiver && path.Count != 0) path.RemoveAt(path.Count - 1);
-            hasMemberPath = path.Count != 0;
-            if (!hasMemberPath ||
+            hasMemberPath = hasUnresolvedPath || path.Count != 0;
+            if (hasUnresolvedPath || !hasMemberPath ||
                 !TryGetStableLocalInitializers(
                     local,
                     compilation,
@@ -2868,6 +2878,24 @@ internal sealed class MethodEffectAnalysisSession(
             out IOperation initializer) {
             initializer = null!;
             while (value is IConversionOperation conversion) value = conversion.Operand;
+            const string arrayPrefix = "#array:";
+            if (path[index].StartsWith(arrayPrefix, StringComparison.Ordinal)) {
+                if (value is not IArrayCreationOperation { Initializer: { } arrayInitializer } ||
+                    !int.TryParse(
+                        path[index].Substring(arrayPrefix.Length),
+                        NumberStyles.None,
+                        CultureInfo.InvariantCulture,
+                        out var elementIndex) ||
+                    elementIndex < 0 ||
+                    elementIndex >= arrayInitializer.ElementValues.Length)
+                    return false;
+                var element = arrayInitializer.ElementValues[elementIndex];
+                if (index == path.Count - 1) {
+                    initializer = element;
+                    return true;
+                }
+                return TryGetObjectInitializerMember(element, path, index + 1, out initializer);
+            }
             if (value is not IObjectCreationOperation { Initializer: { } objectInitializer }) return false;
             foreach (var assignment in objectInitializer.Initializers.OfType<ISimpleAssignmentOperation>()) {
                 var member = assignment.Target switch {
