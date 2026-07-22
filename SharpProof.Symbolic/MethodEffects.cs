@@ -1628,6 +1628,10 @@ internal sealed class MethodEffectAnalysisSession(
             ICoalesceOperation coalesce =>
                 GetInstanceWriteEffect(coalesce.Value, builder) |
                 GetInstanceWriteEffect(coalesce.WhenNull, builder),
+            ISimpleAssignmentOperation assignment => GetInstanceWriteEffect(assignment.Value, builder),
+            ICoalesceAssignmentOperation assignment =>
+                GetInstanceWriteEffect(assignment.Target, builder) |
+                GetInstanceWriteEffect(assignment.Value, builder),
             ISwitchExpressionOperation switchExpression => switchExpression.Arms.Aggregate(
                 SharpProofEffect.None,
                 (effects, arm) => effects | GetInstanceWriteEffect(arm.Value, builder)),
@@ -1668,6 +1672,10 @@ internal sealed class MethodEffectAnalysisSession(
             ICoalesceOperation coalesce =>
                 GetInstanceReadEffect(coalesce.Value, builder) |
                 GetInstanceReadEffect(coalesce.WhenNull, builder),
+            ISimpleAssignmentOperation assignment => GetInstanceReadEffect(assignment.Value, builder),
+            ICoalesceAssignmentOperation assignment =>
+                GetInstanceReadEffect(assignment.Target, builder) |
+                GetInstanceReadEffect(assignment.Value, builder),
             ISwitchExpressionOperation switchExpression => switchExpression.Arms.Aggregate(
                 SharpProofEffect.None,
                 (effects, arm) => effects | GetInstanceReadEffect(arm.Value, builder)),
