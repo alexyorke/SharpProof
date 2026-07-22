@@ -816,11 +816,18 @@ internal sealed class MethodEffectAnalysisSession(
                     var exception = Evaluate(thrown.Exception, ref state);
                     if (thrown.Exception?.ConstantValue is not { HasValue: true, Value: null }) {
                         var thrownType = thrown.Syntax.AncestorsAndSelf().OfType<ThrowStatementSyntax>()
-                            .Select(statement => semanticModel.GetTypeInfo(statement.Expression!, session.CancellationToken).Type).FirstOrDefault() ??
+                                             .Where(static statement => statement.Expression != null)
+                                             .Select(statement => semanticModel.GetTypeInfo(statement.Expression!,
+                                                 session.CancellationToken).Type).FirstOrDefault() ??
                                          thrown.Syntax.AncestorsAndSelf().OfType<ThrowExpressionSyntax>()
                                              .Select(expression => semanticModel.GetTypeInfo(expression.Expression,
                                                  session.CancellationToken).Type).FirstOrDefault() ??
-                                         thrown.Exception?.Type;
+                                         thrown.Exception?.Type ??
+                                         thrown.Syntax.Ancestors().OfType<CatchClauseSyntax>()
+                                             .Select(clause => clause.Declaration == null
+                                                 ? session.Compilation.GetTypeByMetadataName("System.Exception")
+                                                 : semanticModel.GetTypeInfo(clause.Declaration.Type,
+                                                     session.CancellationToken).Type).FirstOrDefault();
                         if (thrown.Syntax.AncestorsAndSelf().Any(static syntax => syntax is CatchFilterClauseSyntax))
                             effects.Caught(thrownType, thrown.Syntax, "catch_filter_exception");
                         else if (IsOverriddenByFinally(thrown.Syntax))
