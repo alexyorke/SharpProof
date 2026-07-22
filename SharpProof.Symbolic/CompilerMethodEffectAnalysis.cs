@@ -1317,10 +1317,11 @@ internal sealed class MethodEffectAnalysisSession(
             return EffectFlowValue.Unknown;
         }
         private static bool PublishesArgument(IMethodSymbol target) => target.DeclaringSyntaxReferences.Any(reference =>
-            reference.GetSyntax() is { } declaration && declaration.DescendantNodes().OfType<AssignmentExpressionSyntax>().Any(
-                assignment => assignment.Left is IdentifierNameSyntax or MemberAccessExpressionSyntax &&
-                              assignment.Right.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(identifier =>
-                                  target.Parameters.Any(parameter => parameter.Name == identifier.Identifier.ValueText))));
+            reference.GetSyntax() is { } declaration && CSharpSyntaxFacts.DescendantNodesInExecution(declaration)
+                .OfType<AssignmentExpressionSyntax>().Any(assignment =>
+                    assignment.Left is IdentifierNameSyntax or MemberAccessExpressionSyntax &&
+                    assignment.Right.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(identifier =>
+                        target.Parameters.Any(parameter => parameter.Name == identifier.Identifier.ValueText))));
         private EffectFlowValue InvokeCoreOrValue(
             IMethodSymbol? target,
             EffectFlowValue receiver,
