@@ -3210,7 +3210,7 @@ internal sealed class MethodEffectAnalysisSession(
                 var candidates = GetConstructorMemberAssignments(
                     declaration, memberPath, compilation);
                 if (candidates.Length == 0)
-                    return TryGetChainedConstructorMemberOrigins(
+                    return TryGetConstructorFallbackMemberOrigins(
                         constructor,
                         constructorCallSite,
                         declaration,
@@ -3220,6 +3220,8 @@ internal sealed class MethodEffectAnalysisSession(
                         out values);
                 if (candidates.Length > 1 && !AreExhaustiveAlternativeAssignments(candidates))
                     return false;
+                var needsFallback = candidates.Length == 1 &&
+                                    IsPotentiallyConditionalAssignment(candidates[0], declaration);
                 var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
                 foreach (var candidate in candidates) {
                     IOperation assignedValue = candidate.Value;
@@ -3247,12 +3249,95 @@ internal sealed class MethodEffectAnalysisSession(
                         mappedValues.AddRange(mapped);
                     }
                 }
+                if (needsFallback) {
+                    if (!TryGetConstructorFallbackMemberOrigins(
+                            constructor,
+                            constructorCallSite,
+                            declaration,
+                            memberPath,
+                            compilation,
+                            visitedConstructors,
+                            out var fallbackValues))
+                        return false;
+                    mappedValues.AddRange(fallbackValues);
+                }
                 values = mappedValues.ToImmutable();
                 return !values.IsDefaultOrEmpty;
             }
             finally {
                 visitedConstructors.Remove(constructor);
             }
+        }
+        private static bool IsPotentiallyConditionalAssignment(
+            ISimpleAssignmentOperation assignment,
+            SyntaxNode declaration) => assignment.Syntax.Ancestors()
+            .TakeWhile(ancestor => !ReferenceEquals(ancestor, declaration))
+            .Any(ancestor => ancestor is IfStatementSyntax or SwitchStatementSyntax or
+                ForStatementSyntax or ForEachStatementSyntax or WhileStatementSyntax or
+                DoStatementSyntax or TryStatementSyntax);
+        private static bool TryGetConstructorFallbackMemberOrigins(
+            IMethodSymbol constructor,
+            IOperation constructorCallSite,
+            SyntaxNode declaration,
+            string memberPath,
+            Compilation compilation,
+            HashSet<IMethodSymbol> visitedConstructors,
+            out ImmutableArray<IOperation> values) {
+            if (TryGetChainedConstructorMemberOrigins(
+                    constructor,
+                    constructorCallSite,
+                    declaration,
+                    memberPath,
+                    compilation,
+                    visitedConstructors,
+                    out values))
+                return true;
+            if (declaration is ConstructorDeclarationSyntax {
+                Initializer.ThisOrBaseKeyword.RawKind: (int)SyntaxKind.ThisKeyword
+            }) {
+                values = [];
+                return false;
+            }
+            return TryGetDeclaredMemberInitializer(
+                declaration, memberPath, compilation, out values);
+        }
+        private static bool TryGetDeclaredMemberInitializer(
+            SyntaxNode declaration,
+            string memberPath,
+            Compilation compilation,
+            out ImmutableArray<IOperation> values) {
+            values = [];
+            var type = declaration.AncestorsAndSelf().OfType<TypeDeclarationSyntax>().FirstOrDefault();
+            if (type == null) return false;
+            var model = compilation.GetSemanticModel(type.SyntaxTree);
+            var initializers = new List<IOperation>();
+            foreach (var member in type.Members) {
+                switch (member) {
+                    case FieldDeclarationSyntax field:
+                        foreach (var variable in field.Declaration.Variables) {
+                            if (variable.Initializer?.Value is not { } expression ||
+                                !MemberNameMatches(
+                                    model.GetDeclaredSymbol(variable),
+                                    variable.Identifier.ValueText,
+                                    memberPath) ||
+                                model.GetOperation(expression) is not { } operation)
+                                continue;
+                            initializers.Add(operation);
+                        }
+                        break;
+                    case PropertyDeclarationSyntax { Initializer.Value: { } expression } property
+                        when MemberNameMatches(
+                                 model.GetDeclaredSymbol(property),
+                                 property.Identifier.ValueText,
+                                 memberPath) &&
+                             model.GetOperation(expression) is { } operation:
+                        initializers.Add(operation);
+                        break;
+                }
+            }
+            if (initializers.Count != 1) return false;
+            values = [initializers[0]];
+            return true;
         }
         private static bool TryGetChainedConstructorMemberOrigins(
             IMethodSymbol constructor,
@@ -3765,6 +3850,11 @@ internal sealed class MethodEffectAnalysisSession(
                     visited,
                     out readEffect,
                     out writeEffect);
+            if (value is IFieldReferenceOperation { Field.IsStatic: true }) {
+                readEffect = GetInstanceReadEffect(value, this);
+                writeEffect = GetInstanceWriteEffect(value, this);
+                return true;
+            }
             if (value is IPropertyReferenceOperation { Property.GetMethod: { } getter } returnedProperty)
                 return TryGetCapturedCallResultEffects(
                     getter,
