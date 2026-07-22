@@ -3366,8 +3366,10 @@ internal sealed class MethodEffectAnalysisSession(
                     return true;
                 var baseType = current.ContainingType.BaseType;
                 if (baseType == null) return false;
-                var next = baseType.InstanceConstructors.FirstOrDefault(candidate =>
-                    candidate.Parameters.Length == 0);
+                var next = baseType.InstanceConstructors
+                    .Where(candidate => candidate.Parameters.All(parameter => parameter.IsOptional))
+                    .OrderBy(candidate => candidate.Parameters.Length)
+                    .FirstOrDefault();
                 if (next == null) return false;
                 if (!next.IsImplicitlyDeclared) {
                     var declaration = next.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
