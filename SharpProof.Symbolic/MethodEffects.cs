@@ -1450,9 +1450,51 @@ internal sealed class MethodEffectAnalysisSession(
             matches = patternValue.HasValue && Equals(value, patternValue.Value);
             return patternValue.HasValue;
         }
+        if (pattern is RelationalPatternSyntax relational) {
+            var patternValue = semanticModel.GetConstantValue(relational.Expression);
+            if (patternValue.HasValue)
+                return TryCompareConstants(value, patternValue.Value, relational.OperatorToken.Kind(), out matches);
+            matches = false;
+            return false;
+        }
         matches = false;
         return false;
     }
+    private static bool TryCompareConstants(
+        object? left,
+        object? right,
+        SyntaxKind operatorKind,
+        out bool matches) {
+        matches = false;
+        if (left == null || right == null || !IsNumericConstant(left) || !IsNumericConstant(right))
+            return false;
+        if (left is float or double || right is float or double) {
+            var first = Convert.ToDouble(left, CultureInfo.InvariantCulture);
+            var second = Convert.ToDouble(right, CultureInfo.InvariantCulture);
+            matches = operatorKind switch {
+                SyntaxKind.LessThanToken => first < second,
+                SyntaxKind.LessThanEqualsToken => first <= second,
+                SyntaxKind.GreaterThanToken => first > second,
+                SyntaxKind.GreaterThanEqualsToken => first >= second,
+                _ => false
+            };
+        }
+        else {
+            var first = Convert.ToDecimal(left, CultureInfo.InvariantCulture);
+            var second = Convert.ToDecimal(right, CultureInfo.InvariantCulture);
+            matches = operatorKind switch {
+                SyntaxKind.LessThanToken => first < second,
+                SyntaxKind.LessThanEqualsToken => first <= second,
+                SyntaxKind.GreaterThanToken => first > second,
+                SyntaxKind.GreaterThanEqualsToken => first >= second,
+                _ => false
+            };
+        }
+        return operatorKind is SyntaxKind.LessThanToken or SyntaxKind.LessThanEqualsToken or
+            SyntaxKind.GreaterThanToken or SyntaxKind.GreaterThanEqualsToken;
+    }
+    private static bool IsNumericConstant(object value) =>
+        value is byte or sbyte or short or ushort or int or uint or long or ulong or char or float or double or decimal;
     private static bool TryGetSelectedConstantSwitchSection(
         SwitchStatementSyntax statement,
         SemanticModel semanticModel,
