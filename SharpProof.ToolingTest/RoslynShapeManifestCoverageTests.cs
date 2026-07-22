@@ -84,6 +84,16 @@ public class RoslynShapeManifestCoverageTests {
         }
     }
     [Test]
+    public async Task WithExpressionRegistryExpectationMatchesAnalysis() {
+        var analyses = await AnalyzeRegistryEntriesAsync();
+        var analysis = analyses["WithExpression"];
+        Assert.That(
+            analysis.Findings,
+            Is.Empty,
+            string.Join(" | ", analysis.Findings.Select(finding =>
+                finding.Category + ":" + finding.Description)));
+    }
+    [Test]
     public void DeterministicSampler_CoversAllGeneratorBackedShapesWithoutRandomSearch() {
         var generator = new FuzzCaseGenerator(20260614);
         var observed = new HashSet<string>(StringComparer.Ordinal);
