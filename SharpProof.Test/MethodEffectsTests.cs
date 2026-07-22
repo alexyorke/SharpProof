@@ -929,6 +929,24 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.True);
         });
     }
+    [Test]
+    public void UserDefinedBinaryOperatorIncludesOperatorEffects() {
+        var result = Analyze("""
+            static class Globals { public static int Count; }
+            readonly struct Value {
+                public static Value operator +(Value left, Value right) {
+                    Globals.Count++;
+                    return left;
+                }
+            }
+            class C { static Value M(Value left, Value right) => left + right; }
+            """, 8);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
     [TestCase("throw new E();", "E", MethodExceptionSource.ExplicitThrow)]
     [TestCase("var zero = 0; return 10 / zero;", "System.DivideByZeroException", MethodExceptionSource.RuntimeHazard)]
     public void EscapingExceptionsAreCanonicalStructuredFacts(string body, string exceptionType, MethodExceptionSource source) {
