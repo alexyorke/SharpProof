@@ -565,6 +565,27 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void DelegateRetainsCallerReceiverAfterLocalReassignment() {
+        var result = Analyze("""
+            sealed class Box {
+                public int Value;
+                public void SetValue() { Value = 1; }
+            }
+            class C {
+                static void M(Box input) {
+                    var box = input;
+                    System.Action action = box.SetValue;
+                    box = new Box();
+                    action();
+                }
+            }
+            """, 7);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.False);
+        });
+    }
+    [Test]
     public void ReassignedDelegateUsesTheCurrentTarget() {
         var result = Analyze("""
             class C {

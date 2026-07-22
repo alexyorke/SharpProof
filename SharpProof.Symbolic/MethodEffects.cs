@@ -287,7 +287,13 @@ internal sealed class MethodEffectAnalysisSession(
                     invocation.Instance is ILocalReferenceOperation delegateLocal &&
                     builder.GetDelegateTargets(delegateLocal.Local) is { Length: > 0 } targets) {
                     foreach (var target in targets)
-                        preservesFreshArguments &= AnalyzeCall(target.Method, invocation, builder, target.Receiver);
+                        preservesFreshArguments &= AnalyzeCall(
+                            target.Method,
+                            invocation,
+                            builder,
+                            target.Receiver,
+                            target.ReceiverReadEffect,
+                            target.ReceiverWriteEffect);
                 }
                 else
                     preservesFreshArguments = AnalyzeCall(invocation.TargetMethod, invocation, builder, invocation.Instance);
@@ -341,7 +347,13 @@ internal sealed class MethodEffectAnalysisSession(
                 break;
         }
     }
-    private bool AnalyzeCall(IMethodSymbol? method, IOperation site, Builder builder, IOperation? receiver = null) {
+    private bool AnalyzeCall(
+        IMethodSymbol? method,
+        IOperation site,
+        Builder builder,
+        IOperation? receiver = null,
+        SharpProofEffect? receiverReadEffect = null,
+        SharpProofEffect? receiverWriteEffect = null) {
         if (method == null) {
             builder.AddUnknown(site, "unresolved_call");
             return false;
@@ -373,7 +385,8 @@ internal sealed class MethodEffectAnalysisSession(
         if (method.GetDllImportData() != null) {
             builder.Add(SharpProofEffect.UsesNativeCode, SharpProofCapability.NativeInterop, site, method, "native_call");
             if (hasContract && IsCompleteContract(contracted))
-                AddCallEffects(contracted, site, method, "complete_native_effect_contract", receiver, builder);
+                AddCallEffects(contracted, site, method, "complete_native_effect_contract", receiver, builder,
+                    receiverReadEffect, receiverWriteEffect);
             else
                 builder.AddUnknown(site, "native_exception_boundary", method);
             return false;
@@ -383,24 +396,36 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsStructurallyEffectFreeIntrinsic(method)) return true;
             if (TryGetKnownFrameworkSummary(method, out var frameworkSummary)) {
                 var remappedFramework = AddCallEffects(
-                    frameworkSummary, site, method, "framework_method_model", receiver, builder);
-                return CanPreserveFreshArguments(remappedFramework, site, receiver, builder);
+                    frameworkSummary, site, method, "framework_method_model", receiver, builder,
+                    receiverReadEffect, receiverWriteEffect);
+                return CanPreserveFreshArguments(
+                    remappedFramework, site, receiver, builder, receiverWriteEffect);
             }
             var metadata = _metadata.Analyze(method);
             if (hasContract && metadata.Effects == SharpProofEffect.Unknown)
-                AddCallEffects(contracted, site, method, "complete_effect_contract", receiver, builder);
+                AddCallEffects(contracted, site, method, "complete_effect_contract", receiver, builder,
+                    receiverReadEffect, receiverWriteEffect);
             else {
-                AddCallEffects(metadata, site, method, "metadata_call", receiver, builder);
-                if (hasContract) AddCallEffects(contracted, site, method, "effect_contract", receiver, builder);
+                AddCallEffects(metadata, site, method, "metadata_call", receiver, builder,
+                    receiverReadEffect, receiverWriteEffect);
+                if (hasContract)
+                    AddCallEffects(contracted, site, method, "effect_contract", receiver, builder,
+                        receiverReadEffect, receiverWriteEffect);
             }
             return false;
         }
         var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var remappedSource = AddCallEffects(Analyze(method, syntax, model), site, method, "source_call", receiver, builder);
-        var preservesFresh = CanPreserveFreshArguments(remappedSource, site, receiver, builder);
+        var remappedSource = AddCallEffects(
+            Analyze(method, syntax, model), site, method, "source_call", receiver, builder,
+            receiverReadEffect, receiverWriteEffect);
+        var preservesFresh = CanPreserveFreshArguments(
+            remappedSource, site, receiver, builder, receiverWriteEffect);
         if (hasContract) {
-            var remappedContract = AddCallEffects(contracted, site, method, "effect_contract", receiver, builder);
-            preservesFresh &= CanPreserveFreshArguments(remappedContract, site, receiver, builder);
+            var remappedContract = AddCallEffects(
+                contracted, site, method, "effect_contract", receiver, builder,
+                receiverReadEffect, receiverWriteEffect);
+            preservesFresh &= CanPreserveFreshArguments(
+                remappedContract, site, receiver, builder, receiverWriteEffect);
         }
         return preservesFresh;
     }
@@ -410,7 +435,9 @@ internal sealed class MethodEffectAnalysisSession(
         IMethodSymbol method,
         string reason,
         IOperation? receiver,
-        Builder builder) {
+        Builder builder,
+        SharpProofEffect? receiverReadEffect = null,
+        SharpProofEffect? receiverWriteEffect = null) {
         const SharpProofEffect callRelativeEffects =
             SharpProofEffect.ReadsReceiverState |
             SharpProofEffect.WritesReceiverState |
@@ -418,17 +445,20 @@ internal sealed class MethodEffectAnalysisSession(
             SharpProofEffect.WritesArgumentState;
         var remapped = effects.Effects & ~callRelativeEffects;
         if ((effects.Effects & SharpProofEffect.ReadsReceiverState) != 0) {
-            if (receiver != null)
+            if (receiverReadEffect.HasValue)
+                remapped |= receiverReadEffect.Value;
+            else if (receiver != null)
                 remapped |= GetInstanceReadEffect(receiver, builder);
             else if (site is not IObjectCreationOperation)
                 remapped |= SharpProofEffect.Unknown;
         }
         if ((effects.Effects & SharpProofEffect.WritesReceiverState) != 0) {
-            remapped |= receiver != null
-                ? GetInstanceWriteEffect(receiver, builder)
-                : site is IObjectCreationOperation
-                    ? SharpProofEffect.WritesFreshOwnedState
-                    : SharpProofEffect.Unknown;
+            remapped |= receiverWriteEffect ??
+                        (receiver != null
+                            ? GetInstanceWriteEffect(receiver, builder)
+                            : site is IObjectCreationOperation
+                                ? SharpProofEffect.WritesFreshOwnedState
+                                : SharpProofEffect.Unknown);
         }
         if ((effects.Effects & SharpProofEffect.ReadsArgumentState) != 0) {
             remapped |= GetArgumentEffect(site, builder, write: false);
@@ -480,7 +510,8 @@ internal sealed class MethodEffectAnalysisSession(
         MethodEffects effects,
         IOperation site,
         IOperation? receiver,
-        Builder builder) {
+        Builder builder,
+        SharpProofEffect? receiverWriteEffect = null) {
         const SharpProofEffect externalWrites =
             SharpProofEffect.WritesAmbientState |
             SharpProofEffect.WritesReceiverState |
@@ -490,9 +521,12 @@ internal sealed class MethodEffectAnalysisSession(
         if ((effects.Effects & (externalWrites | SharpProofEffect.Unknown)) != 0 ||
             !effects.UnknownReasons.IsDefaultOrEmpty)
             return false;
-        if (receiver != null && receiver.Type?.IsReferenceType == true &&
-            (!builder.TryGetFreshRootOrigin(receiver, out var receiverOrigin) ||
-             receiverOrigin != MethodEffectOrigin.FreshOwned))
+        if (receiverWriteEffect.HasValue) {
+            if (receiverWriteEffect.Value != SharpProofEffect.WritesFreshOwnedState) return false;
+        }
+        else if (receiver != null && receiver.Type?.IsReferenceType == true &&
+                 (!builder.TryGetFreshRootOrigin(receiver, out var receiverOrigin) ||
+                  receiverOrigin != MethodEffectOrigin.FreshOwned))
             return false;
         var arguments = site is IInvocationOperation invocation
             ? invocation.Arguments
@@ -1007,7 +1041,11 @@ internal sealed class MethodEffectAnalysisSession(
     private static SharpProofUnknownReason CreateContractConfigurationReason(string reason) =>
         new("SP-EFFECT-CONTRACT", "Configuration", reason, false, true);
     sealed class Builder(Func<IOperation, string, bool> isCaught) {
-        internal sealed record DelegateTarget(IMethodSymbol Method, IOperation? Receiver);
+        internal sealed record DelegateTarget(
+            IMethodSymbol Method,
+            IOperation? Receiver,
+            SharpProofEffect? ReceiverReadEffect,
+            SharpProofEffect? ReceiverWriteEffect);
         private readonly ImmutableArray<MethodExceptionFact>.Builder _exceptions =
             ImmutableArray.CreateBuilder<MethodExceptionFact>();
         private readonly ImmutableArray<MethodEffectSite>.Builder _sites =
@@ -1048,12 +1086,18 @@ internal sealed class MethodEffectAnalysisSession(
         internal void MarkDelegateTargets(ILocalSymbol local, IOperation value) {
             var targets = value.DescendantsAndSelf()
                 .OfType<IMethodReferenceOperation>()
-                .Select(static reference => new DelegateTarget(
+                .Select(reference => new DelegateTarget(
                     reference.Method.OriginalDefinition,
-                    reference.Instance))
+                    reference.Instance,
+                    reference.Instance == null ? null : GetInstanceReadEffect(reference.Instance, this),
+                    reference.Instance == null ? null : GetInstanceWriteEffect(reference.Instance, this)))
                 .Concat(value.DescendantsAndSelf()
                     .OfType<IAnonymousFunctionOperation>()
-                    .Select(static function => new DelegateTarget(function.Symbol.OriginalDefinition, null)))
+                    .Select(static function => new DelegateTarget(
+                        function.Symbol.OriginalDefinition,
+                        null,
+                        null,
+                        null)))
                 .ToImmutableArray();
             if (!targets.IsDefaultOrEmpty) _delegateTargets[local] = targets;
         }
