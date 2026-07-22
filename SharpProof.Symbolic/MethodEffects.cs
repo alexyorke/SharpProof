@@ -2718,32 +2718,38 @@ internal sealed class MethodEffectAnalysisSession(
                                                  SymbolEqualityComparer.Default.Equals(
                                                      reference.Local,
                                                      local))) {
-                    if (!TryGetCapturedMemberInitializer(
+                    if (!TryGetCapturedMemberInitializers(
                             local,
                             reference,
                             compilation,
-                            out var memberInitializer))
+                            out var hasMemberPath,
+                            out var memberInitializers)) {
+                        if (hasMemberPath) return false;
                         continue;
-                    if (!TryGetCapturedValueEffects(
-                            memberInitializer,
-                            callSite,
-                            compilation,
-                            visited,
-                            out var memberReadEffect,
-                            out var memberWriteEffect))
-                        return false;
-                    readEffect |= memberReadEffect;
-                    writeEffect |= memberWriteEffect;
+                    }
+                    foreach (var memberInitializer in memberInitializers) {
+                        if (!TryGetCapturedValueEffects(
+                                memberInitializer,
+                                callSite,
+                                compilation,
+                                visited,
+                                out var memberReadEffect,
+                                out var memberWriteEffect))
+                            return false;
+                        readEffect |= memberReadEffect;
+                        writeEffect |= memberWriteEffect;
+                    }
                 }
             }
             return true;
         }
-        private static bool TryGetCapturedMemberInitializer(
+        private static bool TryGetCapturedMemberInitializers(
             ILocalSymbol local,
             ILocalReferenceOperation reference,
             Compilation compilation,
-            out IOperation initializer) {
-            initializer = null!;
+            out bool hasMemberPath,
+            out ImmutableArray<IOperation> initializers) {
+            initializers = [];
             var path = new List<string>();
             IOperation current = reference;
             while (true) {
@@ -2764,38 +2770,95 @@ internal sealed class MethodEffectAnalysisSession(
             var isInvocationReceiver = current.Parent is IInvocationOperation invocation &&
                                        ReferenceEquals(invocation.Instance, current);
             if (!isInvocationReceiver && path.Count != 0) path.RemoveAt(path.Count - 1);
-            if (path.Count == 0 ||
-                !TryGetStableLocalInitializer(
+            hasMemberPath = path.Count != 0;
+            if (!hasMemberPath ||
+                !TryGetStableLocalInitializers(
                     local,
                     compilation,
                     new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
-                    out var value))
+                    out var values))
                 return false;
-            return TryGetObjectInitializerMember(value, path, 0, out initializer);
+            var members = ImmutableArray.CreateBuilder<IOperation>();
+            foreach (var value in values) {
+                if (!TryGetObjectInitializerMember(value, path, 0, out var initializer)) return false;
+                members.Add(initializer);
+            }
+            initializers = members.ToImmutable();
+            return !initializers.IsDefaultOrEmpty;
         }
-        private static bool TryGetStableLocalInitializer(
+        private static bool TryGetStableLocalInitializers(
             ILocalSymbol local,
             Compilation compilation,
             HashSet<ILocalSymbol> visited,
-            out IOperation initializer) {
-            initializer = null!;
+            out ImmutableArray<IOperation> initializers) {
+            initializers = [];
             if (!visited.Add(local) || local.DeclaringSyntaxReferences.Length != 1) return false;
-            var syntax = local.DeclaringSyntaxReferences[0].GetSyntax();
-            var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-            if (model.GetOperation(syntax) is not IVariableDeclaratorOperation declarator ||
-                declarator.Initializer?.Value is not { } value)
-                return false;
-            var root = (IOperation)declarator;
-            while (root.Parent != null) root = root.Parent;
-            if (root.DescendantsAndSelf()
-                .OfType<ILocalReferenceOperation>()
-                .Any(reference => SymbolEqualityComparer.Default.Equals(reference.Local, local) &&
-                                  IsDirectLocalWrite(reference)))
-                return false;
+            try {
+                var syntax = local.DeclaringSyntaxReferences[0].GetSyntax();
+                var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+                if (model.GetOperation(syntax) is not IVariableDeclaratorOperation declarator ||
+                    declarator.Initializer?.Value is not { } value)
+                    return false;
+                var root = (IOperation)declarator;
+                while (root.Parent != null) root = root.Parent;
+                if (root.DescendantsAndSelf()
+                    .OfType<ILocalReferenceOperation>()
+                    .Any(reference => SymbolEqualityComparer.Default.Equals(reference.Local, local) &&
+                                      IsDirectLocalWrite(reference)))
+                    return false;
+                return TryCollectStableInitializerValues(
+                    value, compilation, visited, out initializers);
+            }
+            finally {
+                visited.Remove(local);
+            }
+        }
+        private static bool TryCollectStableInitializerValues(
+            IOperation value,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
+            out ImmutableArray<IOperation> initializers) {
             while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is IParenthesizedOperation parenthesized)
+                return TryCollectStableInitializerValues(
+                    parenthesized.Operand, compilation, visited, out initializers);
             if (value is ILocalReferenceOperation source)
-                return TryGetStableLocalInitializer(source.Local, compilation, visited, out initializer);
-            initializer = value;
+                return TryGetStableLocalInitializers(
+                    source.Local, compilation, visited, out initializers);
+            if (value is IConditionalOperation { WhenFalse: { } whenFalse } conditional)
+                return TryCollectCompositeStableInitializerValues(
+                    conditional.WhenTrue, whenFalse, compilation, visited, out initializers);
+            if (value is ICoalesceOperation coalesce)
+                return TryCollectCompositeStableInitializerValues(
+                    coalesce.Value, coalesce.WhenNull, compilation, visited, out initializers);
+            if (value is ISwitchExpressionOperation switchExpression) {
+                var values = ImmutableArray.CreateBuilder<IOperation>();
+                foreach (var arm in switchExpression.Arms) {
+                    if (!TryCollectStableInitializerValues(
+                            arm.Value, compilation, visited, out var armValues)) {
+                        initializers = [];
+                        return false;
+                    }
+                    values.AddRange(armValues);
+                }
+                initializers = values.ToImmutable();
+                return !initializers.IsDefaultOrEmpty;
+            }
+            initializers = [value];
+            return true;
+        }
+        private static bool TryCollectCompositeStableInitializerValues(
+            IOperation left,
+            IOperation right,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
+            out ImmutableArray<IOperation> initializers) {
+            if (!TryCollectStableInitializerValues(left, compilation, visited, out var leftValues) ||
+                !TryCollectStableInitializerValues(right, compilation, visited, out var rightValues)) {
+                initializers = [];
+                return false;
+            }
+            initializers = leftValues.AddRange(rightValues);
             return true;
         }
         private static bool TryGetObjectInitializerMember(
