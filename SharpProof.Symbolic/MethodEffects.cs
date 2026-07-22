@@ -869,14 +869,24 @@ internal sealed class MethodEffectAnalysisSession(
         Builder builder,
         SharpProofEffect? receiverReadEffect = null,
         SharpProofEffect? receiverWriteEffect = null) {
-        if (info.Method != null)
+        if (info.Method is { } method) {
+            var isExtensionMethod = method.ReducedFrom != null || method.IsExtensionMethod;
+            SharpProofEffect? argumentReadEffect = isExtensionMethod
+                ? receiver == null ? null : GetInstanceReadEffect(receiver, builder)
+                : SharpProofEffect.None;
+            SharpProofEffect? argumentWriteEffect = isExtensionMethod
+                ? receiver == null ? null : GetInstanceWriteEffect(receiver, builder)
+                : SharpProofEffect.WritesFreshOwnedState;
             AnalyzeCall(
-                info.Method,
+                method,
                 site,
                 builder,
                 receiver,
                 receiverReadEffect,
-                receiverWriteEffect);
+                receiverWriteEffect,
+                argumentReadEffect: argumentReadEffect,
+                argumentWriteEffect: argumentWriteEffect);
+        }
         foreach (var nested in info.Nested)
             AnalyzeDeconstructionInfo(nested, null, site, builder);
     }
