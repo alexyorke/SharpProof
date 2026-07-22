@@ -2715,6 +2715,18 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
         });
     }
+    [TestCase("value += 2;")]
+    [TestCase("value++;")]
+    [TestCase("value--;")]
+    public void UpdatingLocalCopyDoesNotWriteArgumentState(string update) {
+        var result = Analyze("class C {\nstatic int M(int input) { var value = input; " + update + " return value; }\n}");
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+                string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                    site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+        });
+    }
     [Test]
     public void AssigningRefParameterWritesArgumentState() {
         var result = Analyze("""
