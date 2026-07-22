@@ -530,6 +530,25 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ForeachWithoutDisposalRemainsPure() {
+        var result = Analyze("""
+            sealed class Enumerable {
+                public Enumerator GetEnumerator() => default;
+            }
+            struct Enumerator {
+                public bool MoveNext() => false;
+                public int Current => 0;
+            }
+            class C {
+                static void M(Enumerable values) {
+                    foreach (var value in values) { }
+                }
+            }
+            """, 9);
+        Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+            string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
+    }
+    [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {
