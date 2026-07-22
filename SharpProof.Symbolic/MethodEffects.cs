@@ -3178,14 +3178,16 @@ internal sealed class MethodEffectAnalysisSession(
             IOperation assignedValue = candidates[0].Value;
             while (assignedValue is IConversionOperation conversion)
                 assignedValue = conversion.Operand;
-            var assignedValues = assignedValue is ILocalReferenceOperation local &&
-                                 TryGetStableLocalInitializers(
-                                     local.Local,
-                                     compilation,
-                                     new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
-                                     out var localInitializers)
-                ? localInitializers
-                : [assignedValue];
+            var visited = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
+            ImmutableArray<IOperation> assignedValues;
+            if (assignedValue is ILocalReferenceOperation local) {
+                if (!TryGetStableLocalInitializers(
+                        local.Local, compilation, visited, out assignedValues))
+                    return false;
+            }
+            else if (!TryCollectStableInitializerValues(
+                         assignedValue, compilation, visited, out assignedValues))
+                return false;
             var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
             foreach (var assigned in assignedValues) {
                 var value = assigned;
