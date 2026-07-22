@@ -2821,7 +2821,9 @@ internal sealed class MethodEffectAnalysisSession(
                             compilation,
                             out var hasMemberPath,
                             out var memberInitializers)) {
-                        if (hasMemberPath) return false;
+                        if (hasMemberPath &&
+                            !CanUseDefiniteContainerOriginForMember(localWriteEffect))
+                            return false;
                         continue;
                     }
                     foreach (var memberInitializer in memberInitializers) {
@@ -2840,6 +2842,12 @@ internal sealed class MethodEffectAnalysisSession(
             }
             return true;
         }
+        private static bool CanUseDefiniteContainerOriginForMember(SharpProofEffect writeEffect) =>
+            (writeEffect & SharpProofEffect.Unknown) == 0 &&
+            (writeEffect & (SharpProofEffect.WritesReceiverState |
+                            SharpProofEffect.WritesArgumentState |
+                            SharpProofEffect.WritesCapturedState |
+                            SharpProofEffect.WritesStaticState)) != 0;
         private static bool TryGetCapturedMemberInitializers(
             ILocalSymbol local,
             ILocalReferenceOperation reference,
@@ -2988,7 +2996,8 @@ internal sealed class MethodEffectAnalysisSession(
             Compilation compilation,
             out ImmutableArray<IOperation> initializers) {
             initializers = [];
-            while (value is IConversionOperation conversion) value = conversion.Operand;
+            while (value is IConversionOperation { OperatorMethod: null } conversion)
+                value = conversion.Operand;
             const string indexerPrefix = "#indexer:";
             if (path[index].StartsWith(indexerPrefix, StringComparison.Ordinal)) {
                 const string intIndexPrefix = "#indexer:System.Int32:";
