@@ -412,6 +412,14 @@ internal sealed class MethodEffectAnalysisSession(
                     argumentReadEffect: SharpProofEffect.None,
                     argumentWriteEffect: SharpProofEffect.WritesFreshOwnedState);
                 break;
+            case IListPatternOperation listPattern:
+                var patternInput = FindPatternInput(listPattern);
+                if (listPattern.LengthSymbol is IPropertySymbol lengthProperty)
+                    AnalyzeCall(lengthProperty.GetMethod, listPattern, builder, patternInput);
+                if (listPattern.Patterns.Any(static pattern => pattern is not ISlicePatternOperation) &&
+                    listPattern.IndexerSymbol is IPropertySymbol indexerProperty)
+                    AnalyzeCall(indexerProperty.GetMethod, listPattern, builder, patternInput);
+                break;
             case IAwaitOperation { Syntax: AwaitExpressionSyntax syntax } awaited:
                 var awaitInfo = semanticModel.GetAwaitExpressionInfo(syntax);
                 AnalyzeCall(awaitInfo.GetAwaiterMethod, awaited, builder, awaited.Operation);
@@ -482,9 +490,9 @@ internal sealed class MethodEffectAnalysisSession(
             invocation,
             SpeculativeBindingOption.BindAsExpression).Symbol as IMethodSymbol;
     }
-    private static IOperation? FindPatternInput(IRecursivePatternOperation pattern) {
+    private static IOperation? FindPatternInput(IOperation pattern) {
         for (var parent = pattern.Parent; parent != null; parent = parent.Parent) {
-            if (parent is IRecursivePatternOperation) return null;
+            if (parent is IRecursivePatternOperation or IListPatternOperation) return null;
             if (parent is IIsPatternOperation isPattern) return isPattern.Value;
             if (parent is ISwitchOperation switchOperation) return switchOperation.Value;
             if (parent is ISwitchExpressionOperation switchExpression) return switchExpression.Value;
