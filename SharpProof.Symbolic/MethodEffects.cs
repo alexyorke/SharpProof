@@ -449,12 +449,20 @@ internal sealed class MethodEffectAnalysisSession(
                 AnalyzeCall(info.DisposeMethod, loop, builder);
                 break;
             case IUsingOperation usingOperation:
-                AnalyzeDisposal(usingOperation.Resources.Type, usingOperation, builder);
+                AnalyzeDisposal(
+                    usingOperation.Resources.Type,
+                    usingOperation,
+                    builder,
+                    usingOperation.IsAsynchronous);
                 break;
             case IUsingDeclarationOperation usingDeclaration:
                 foreach (var declarator in usingDeclaration.DeclarationGroup.Declarations
                              .SelectMany(static declaration => declaration.Declarators))
-                    AnalyzeDisposal(declarator.Symbol.Type, usingDeclaration, builder);
+                    AnalyzeDisposal(
+                        declarator.Symbol.Type,
+                        usingDeclaration,
+                        builder,
+                        usingDeclaration.IsAsynchronous);
                 break;
             case IEventAssignmentOperation { EventReference: IEventReferenceOperation eventReference } eventAssignment:
                 builder.Add(eventReference.Event.IsStatic
@@ -996,12 +1004,18 @@ internal sealed class MethodEffectAnalysisSession(
         effects = null!;
         return false;
     }
-    private void AnalyzeDisposal(ITypeSymbol? type, IOperation site, Builder builder) {
+    private void AnalyzeDisposal(
+        ITypeSymbol? type,
+        IOperation site,
+        Builder builder,
+        bool asynchronous) {
         if (type is not INamedTypeSymbol named) return;
-        var disposable = compilation.GetTypeByMetadataName("System.IDisposable");
-        var member = disposable?.GetMembers("Dispose").OfType<IMethodSymbol>().FirstOrDefault();
+        var interfaceName = asynchronous ? "System.IAsyncDisposable" : "System.IDisposable";
+        var methodName = asynchronous ? "DisposeAsync" : "Dispose";
+        var disposable = compilation.GetTypeByMetadataName(interfaceName);
+        var member = disposable?.GetMembers(methodName).OfType<IMethodSymbol>().FirstOrDefault();
         var implementation = member == null ? null : named.FindImplementationForInterfaceMember(member) as IMethodSymbol;
-        implementation ??= named.GetMembers("Dispose").OfType<IMethodSymbol>()
+        implementation ??= named.GetMembers(methodName).OfType<IMethodSymbol>()
             .FirstOrDefault(static method => !method.IsStatic && method.Parameters.Length == 0);
         if (implementation != null) AnalyzeCall(implementation, site, builder);
     }
