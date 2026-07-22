@@ -3167,7 +3167,18 @@ internal sealed class MethodEffectAnalysisSession(
                 : GetConstructorMemberAssignments(declaration, memberPath, compilation);
             if (candidates.Length != 1) return false;
             value = candidates[0].Value;
-            while (value is IConversionOperation conversion) value = conversion.Operand;
+            while (true) {
+                while (value is IConversionOperation conversion) value = conversion.Operand;
+                if (value is not ILocalReferenceOperation local ||
+                    !TryGetStableLocalInitializers(
+                        local.Local,
+                        compilation,
+                        new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                        out var initializers) ||
+                    initializers.Length != 1)
+                    break;
+                value = initializers[0];
+            }
             if (value is not IParameterReferenceOperation parameter) return true;
             value = creation.Arguments.FirstOrDefault(argument =>
                 string.Equals(
