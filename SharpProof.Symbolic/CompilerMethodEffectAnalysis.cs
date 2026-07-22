@@ -1446,6 +1446,7 @@ internal sealed class MethodEffectAnalysisSession(
                     Assign(declaration.Expression, value, isRef, ref state);
                     return;
                 case IFieldReferenceOperation field:
+                    if (field.Field.IsStatic) AddExplicitTypeInitializerEffects(field.Field.ContainingType, field);
                     AssignMember(field.Instance, MemberKey(field.Field), value, field.Field.IsStatic, field.Syntax, field.Field, ref state);
                     return;
                 case IPropertyReferenceOperation property:
