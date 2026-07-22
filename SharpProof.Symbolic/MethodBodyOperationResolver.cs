@@ -18,7 +18,6 @@ internal static class MethodBodyOperationResolver {
         return semanticModel.GetOperation(methodNode, cancellationToken) switch {
             ILocalFunctionOperation { Body: { } body } => body,
             IAnonymousFunctionOperation { Body: { } body } => body,
-            IMethodBodyOperation methodBody => methodBody,
             _ => null
         };
     }
