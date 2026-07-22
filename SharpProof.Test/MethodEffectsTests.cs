@@ -785,6 +785,21 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void UnusedLocalIncrementDoesNotMakeRefForeachWrite() {
+        var result = Analyze("""
+            class C {
+                static void M(System.Span<int> values) {
+                    foreach (ref var value in values) {
+                        static void Local() { var other = 0; other++; }
+                    }
+                }
+            }
+            """, 2);
+        Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False,
+            string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+    }
+    [Test]
     public void ForeachDeconstructionIncludesDeconstructEffects() {
         var result = Analyze("""
             sealed class Item {
