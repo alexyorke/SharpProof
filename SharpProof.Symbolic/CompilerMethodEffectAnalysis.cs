@@ -993,6 +993,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (expression == null || semanticModel.GetConstantValue(expression.GoverningExpression, session.CancellationToken) is not
                 { HasValue: true } value) return false;
             foreach (var arm in expression.Arms) {
+                if (!CanEvaluatePattern(arm.Pattern, value.Value)) return false;
                 if (!Matches(arm.Pattern, value.Value)) continue;
                 if (arm.WhenClause == null) {
                     selected = arm;
@@ -1019,7 +1020,9 @@ internal sealed class MethodEffectAnalysisSession(
                         selected = section;
                         return true;
                     }
-                    if (label is not CasePatternSwitchLabelSyntax pattern || !Matches(pattern.Pattern, value.Value)) continue;
+                    if (label is not CasePatternSwitchLabelSyntax pattern) continue;
+                    if (!CanEvaluatePattern(pattern.Pattern, value.Value)) return false;
+                    if (!Matches(pattern.Pattern, value.Value)) continue;
                     if (pattern.WhenClause == null) {
                         selected = section;
                         return true;
@@ -1034,8 +1037,25 @@ internal sealed class MethodEffectAnalysisSession(
                 section.Labels.Any(static label => label is DefaultSwitchLabelSyntax));
             return selected != null;
         }
+        private bool CanEvaluatePattern(PatternSyntax pattern, object? value) => pattern switch {
+            DiscardPatternSyntax or VarPatternSyntax => true,
+            ConstantPatternSyntax constant => semanticModel.GetConstantValue(constant.Expression,
+                session.CancellationToken).HasValue,
+            ParenthesizedPatternSyntax parenthesized => CanEvaluatePattern(parenthesized.Pattern, value),
+            UnaryPatternSyntax unary when unary.IsKind(SyntaxKind.NotPattern) => CanEvaluatePattern(unary.Pattern, value),
+            BinaryPatternSyntax binary when binary.IsKind(SyntaxKind.AndPattern) || binary.IsKind(SyntaxKind.OrPattern) =>
+                CanEvaluatePattern(binary.Left, value) && CanEvaluatePattern(binary.Right, value),
+            RelationalPatternSyntax relational => CanCompare(value, semanticModel.GetConstantValue(relational.Expression,
+                session.CancellationToken).Value),
+            TypePatternSyntax type => IsSupportedConstantType(semanticModel.GetTypeInfo(type.Type,
+                session.CancellationToken).Type),
+            DeclarationPatternSyntax declaration => IsSupportedConstantType(semanticModel.GetTypeInfo(declaration.Type,
+                session.CancellationToken).Type),
+            _ => false
+        };
         private bool Matches(PatternSyntax pattern, object? value) => pattern switch {
             DiscardPatternSyntax => true,
+            VarPatternSyntax => true,
             ConstantPatternSyntax constant => Equals(semanticModel.GetConstantValue(constant.Expression, session.CancellationToken).Value, value),
             ParenthesizedPatternSyntax parenthesized => Matches(parenthesized.Pattern, value),
             UnaryPatternSyntax unary when unary.IsKind(SyntaxKind.NotPattern) => !Matches(unary.Pattern, value),
@@ -1048,6 +1068,17 @@ internal sealed class MethodEffectAnalysisSession(
                 semanticModel.GetTypeInfo(declaration.Type, session.CancellationToken).Type),
             _ => false
         };
+        private static bool CanCompare(object? left, object? right) {
+            if (left == null || right == null) return false;
+            try {
+                Convert.ToDecimal(left, CultureInfo.InvariantCulture);
+                Convert.ToDecimal(right, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (Exception exception) when (exception is FormatException or InvalidCastException or OverflowException) {
+                return false;
+            }
+        }
         private static bool Compare(object? left, object? right, SyntaxKind kind) {
             if (left == null || right == null) return false;
             try {
@@ -1071,6 +1102,9 @@ internal sealed class MethodEffectAnalysisSession(
             SpecialType.System_Int64 => value is long,
             _ => false
         };
+        private static bool IsSupportedConstantType(ITypeSymbol? type) => type?.SpecialType is
+            SpecialType.System_Boolean or SpecialType.System_String or SpecialType.System_Char or
+            SpecialType.System_Int32 or SpecialType.System_Int64;
         private static bool IsOmittedInvocation(IInvocationOperation invocation) {
             var target = invocation.TargetMethod;
             if (target.PartialDefinitionPart != null && target.PartialImplementationPart == null ||
