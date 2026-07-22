@@ -3674,6 +3674,25 @@ internal sealed class MethodEffectAnalysisSession(
                     assignments);
                 return;
             }
+            if (!callSites.IsDefaultOrEmpty &&
+                value is IPropertyReferenceOperation {
+                    Instance: IInstanceReferenceOperation,
+                    Property: var returnedProperty
+                } &&
+                CanMapAutoPropertyToReceiver(returnedProperty)) {
+                var receiver = GetConstructorCallInstance(callSites[0].Operation);
+                if (receiver == null) return;
+                AddDeconstructionMemberAssignments(
+                    target,
+                    receiver,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites.RemoveAt(0),
+                    assignments);
+                return;
+            }
             if (value is IInvocationOperation invocation) {
                 AddDeconstructionCallResultAssignments(
                     target,
@@ -3736,6 +3755,17 @@ internal sealed class MethodEffectAnalysisSession(
             }
             if (ConstructorTargetMatches(target, memberPath))
                 assignments.Add(new ConstructorMemberAssignment(syntax, value));
+        }
+        private static bool CanMapAutoPropertyToReceiver(IPropertySymbol property) {
+            if (property.IsStatic ||
+                property.GetMethod is not { IsAbstract: false, IsVirtual: false, IsExtern: false })
+                return false;
+            if (property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() is not
+                PropertyDeclarationSyntax { AccessorList: { } accessorList, ExpressionBody: null })
+                return false;
+            var getter = accessorList.Accessors.FirstOrDefault(accessor =>
+                accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
+            return getter is { Body: null, ExpressionBody: null };
         }
         private static void AddDeconstructionCallResultAssignments(
             IOperation target,
