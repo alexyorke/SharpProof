@@ -282,14 +282,16 @@ internal sealed class MethodEffectAnalysisSession(
                 builder.Add(SharpProofEffect.Synchronizes, SharpProofCapability.Synchronization, locked, null, "synchronization");
                 break;
             case IInvocationOperation invocation:
+                var preservesFreshArguments = true;
                 if (invocation.TargetMethod.MethodKind == MethodKind.DelegateInvoke &&
                     invocation.Instance is ILocalReferenceOperation delegateLocal &&
                     builder.GetDelegateTargets(delegateLocal.Local) is { Length: > 0 } targets) {
-                    foreach (var target in targets) AnalyzeCall(target, invocation, builder);
+                    foreach (var target in targets)
+                        preservesFreshArguments &= AnalyzeCall(target, invocation, builder);
                 }
                 else
-                    AnalyzeCall(invocation.TargetMethod, invocation, builder, invocation.Instance);
-                builder.MarkEscapedArguments(invocation.Arguments);
+                    preservesFreshArguments = AnalyzeCall(invocation.TargetMethod, invocation, builder, invocation.Instance);
+                builder.MarkEscapedArguments(invocation.Arguments, preservesFreshArguments);
                 break;
             case IBinaryOperation { OperatorMethod: not null } binary:
                 AnalyzeCall(binary.OperatorMethod, binary, builder);
@@ -339,10 +341,10 @@ internal sealed class MethodEffectAnalysisSession(
                 break;
         }
     }
-    private void AnalyzeCall(IMethodSymbol? method, IOperation site, Builder builder, IOperation? receiver = null) {
+    private bool AnalyzeCall(IMethodSymbol? method, IOperation site, Builder builder, IOperation? receiver = null) {
         if (method == null) {
             builder.AddUnknown(site, "unresolved_call");
-            return;
+            return false;
         }
         method = (method.ReducedFrom ?? method).OriginalDefinition;
         var knownExactReceiverType = receiver is ILocalReferenceOperation localReceiver
@@ -354,14 +356,14 @@ internal sealed class MethodEffectAnalysisSession(
             knownExactReceiverType);
         method = exactDispatchTarget ?? method;
         builder.Add(SharpProofEffect.DirectCall, site, method, "direct_call");
-        if (method.IsImplicitlyDeclared) return;
+        if (method.IsImplicitlyDeclared) return true;
         if (exactDispatchTarget == null &&
             (method.IsVirtual || method.ContainingType?.TypeKind == TypeKind.Interface)) {
             builder.Add(SharpProofEffect.DispatchUncertainty, site, method, "dispatch_uncertainty");
             builder.AddUnknown(site, "unresolved_dispatch", method);
-            return;
+            return false;
         }
-        if (IsBodylessAutoPropertyAccessor(method)) return;
+        if (IsBodylessAutoPropertyAccessor(method)) return false;
         var hasContract = TryReadEffectContract(method, out var contracted);
         var configured = externalContractResolver?.Invoke(method);
         if (configured != null) {
@@ -374,14 +376,15 @@ internal sealed class MethodEffectAnalysisSession(
                 AddCallEffects(contracted, site, method, "complete_native_effect_contract", receiver, builder);
             else
                 builder.AddUnknown(site, "native_exception_boundary", method);
-            return;
+            return false;
         }
         var syntax = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
         if (syntax == null) {
-            if (IsStructurallyEffectFreeIntrinsic(method)) return;
+            if (IsStructurallyEffectFreeIntrinsic(method)) return true;
             if (TryGetKnownFrameworkSummary(method, out var frameworkSummary)) {
-                AddCallEffects(frameworkSummary, site, method, "framework_method_model", receiver, builder);
-                return;
+                var remappedFramework = AddCallEffects(
+                    frameworkSummary, site, method, "framework_method_model", receiver, builder);
+                return CanPreserveFreshArguments(remappedFramework, site, receiver, builder);
             }
             var metadata = _metadata.Analyze(method);
             if (hasContract && metadata.Effects == SharpProofEffect.Unknown)
@@ -390,13 +393,18 @@ internal sealed class MethodEffectAnalysisSession(
                 AddCallEffects(metadata, site, method, "metadata_call", receiver, builder);
                 if (hasContract) AddCallEffects(contracted, site, method, "effect_contract", receiver, builder);
             }
-            return;
+            return false;
         }
         var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        AddCallEffects(Analyze(method, syntax, model), site, method, "source_call", receiver, builder);
-        if (hasContract) AddCallEffects(contracted, site, method, "effect_contract", receiver, builder);
+        var remappedSource = AddCallEffects(Analyze(method, syntax, model), site, method, "source_call", receiver, builder);
+        var preservesFresh = CanPreserveFreshArguments(remappedSource, site, receiver, builder);
+        if (hasContract) {
+            var remappedContract = AddCallEffects(contracted, site, method, "effect_contract", receiver, builder);
+            preservesFresh &= CanPreserveFreshArguments(remappedContract, site, receiver, builder);
+        }
+        return preservesFresh;
     }
-    private static void AddCallEffects(
+    private static MethodEffects AddCallEffects(
         MethodEffects effects,
         IOperation site,
         IMethodSymbol method,
@@ -428,7 +436,9 @@ internal sealed class MethodEffectAnalysisSession(
         if ((effects.Effects & SharpProofEffect.WritesArgumentState) != 0) {
             remapped |= GetArgumentEffect(site, builder, write: true);
         }
-        builder.AddTransitive(effects with { Effects = remapped }, site, method, reason);
+        var remappedEffects = effects with { Effects = remapped };
+        builder.AddTransitive(remappedEffects, site, method, reason);
+        return remappedEffects;
     }
     private static SharpProofEffect GetArgumentEffect(IOperation site, Builder builder, bool write) {
         var arguments = site switch {
@@ -448,6 +458,35 @@ internal sealed class MethodEffectAnalysisSession(
                 : GetInstanceReadEffect(argument.Value, builder);
         }
         return hasCandidate ? effect : SharpProofEffect.Unknown;
+    }
+    private static bool CanPreserveFreshArguments(
+        MethodEffects effects,
+        IOperation site,
+        IOperation? receiver,
+        Builder builder) {
+        const SharpProofEffect externalWrites =
+            SharpProofEffect.WritesAmbientState |
+            SharpProofEffect.WritesReceiverState |
+            SharpProofEffect.WritesArgumentState |
+            SharpProofEffect.WritesCapturedState |
+            SharpProofEffect.WritesStaticState;
+        if ((effects.Effects & (externalWrites | SharpProofEffect.Unknown)) != 0 ||
+            !effects.UnknownReasons.IsDefaultOrEmpty)
+            return false;
+        if (receiver != null && receiver.Type?.IsReferenceType == true &&
+            (!builder.TryGetFreshRootOrigin(receiver, out var receiverOrigin) ||
+             receiverOrigin != MethodEffectOrigin.FreshOwned))
+            return false;
+        var arguments = site is IInvocationOperation invocation
+            ? invocation.Arguments
+            : [];
+        foreach (var argument in arguments) {
+            if (argument.Parameter is not { Type.IsReferenceType: true }) continue;
+            if (!builder.TryGetFreshRootOrigin(argument.Value, out var origin) ||
+                origin != MethodEffectOrigin.FreshOwned)
+                return false;
+        }
+        return true;
     }
     private bool IsBodylessAutoPropertyAccessor(IMethodSymbol method) {
         if (method.AssociatedSymbol is not IPropertySymbol) return false;
@@ -1036,7 +1075,10 @@ internal sealed class MethodEffectAnalysisSession(
             _exactTypes.Remove(local);
             _delegateTargets.Remove(local);
         }
-        internal void MarkEscapedArguments(ImmutableArray<IArgumentOperation> arguments) {
+        internal void MarkEscapedArguments(
+            ImmutableArray<IArgumentOperation> arguments,
+            bool preservesFreshArguments) {
+            if (preservesFreshArguments) return;
             foreach (var argument in arguments) {
                 var value = argument.Value;
                 while (value is IConversionOperation conversion) value = conversion.Operand;
