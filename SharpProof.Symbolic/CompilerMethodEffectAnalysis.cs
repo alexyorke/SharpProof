@@ -232,6 +232,9 @@ internal sealed class MethodEffectAnalysisSession(
         for (var current = node; current != null; current = current.Parent) {
             if (current is not TryStatementSyntax statement || !statement.Block.Span.Contains(position)) continue;
             foreach (var clause in statement.Catches) {
+                if (clause.Filter != null && model.GetConstantValue(clause.Filter.FilterExpression) is not
+                    { HasValue: true, Value: true })
+                    continue;
                 if (clause.Declaration == null) return true;
                 var caught = model.GetTypeInfo(clause.Declaration.Type).Type;
                 if (caught != null && (caught.ToDisplayString() == exceptionType || caught.Name == exceptionType)) return true;
