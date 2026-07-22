@@ -438,6 +438,22 @@ internal sealed class MethodEffectAnalysisSession(
                                  SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Int32 or
                                  SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64 or
                                  SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
+        var isNumericTryParse = method.IsStatic &&
+                                string.Equals(method.Name, "TryParse", StringComparison.Ordinal) &&
+                                method.ReturnType.SpecialType == SpecialType.System_Boolean &&
+                                containingType?.SpecialType is SpecialType.System_Byte or SpecialType.System_SByte or
+                                    SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Int32 or
+                                    SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64 or
+                                    SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
+        if (isNumericTryParse) {
+            effects = new MethodEffects(
+                SharpProofEffect.None,
+                SharpProofCapability.None,
+                [],
+                [],
+                []);
+            return true;
+        }
         if (isNumericParse) {
             effects = new MethodEffects(
                 SharpProofEffect.Throws,
