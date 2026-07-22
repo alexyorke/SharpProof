@@ -397,6 +397,12 @@ internal sealed class MethodEffectAnalysisSession(
     }
     private static bool IsStructurallyEffectFreeIntrinsic(IMethodSymbol method) =>
         method is { MethodKind: MethodKind.Constructor, ContainingType.SpecialType: SpecialType.System_Object } ||
+        method.MethodKind == MethodKind.Conversion &&
+        method.IsStatic &&
+        string.Equals(
+            method.ContainingType?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+            "System.Index",
+            StringComparison.Ordinal) ||
         method is {
             MethodKind: MethodKind.PropertyGet, AssociatedSymbol: IPropertySymbol {
                 Name: "Length",

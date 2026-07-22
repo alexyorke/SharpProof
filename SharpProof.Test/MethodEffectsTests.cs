@@ -205,7 +205,8 @@ public sealed class MethodEffectsTests {
         var result = Analyze("class C {\nstatic int M(string text) => text[1..^1].Length;\n}");
         Assert.Multiple(() => {
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
-                string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
+                string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                    site.Symbol + ":" + site.Effect + ":" + site.Reason)));
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
         });
     }
