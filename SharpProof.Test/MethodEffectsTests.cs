@@ -2551,6 +2551,22 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void HelperReadMapsOnlyReadArgument() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            class C {
+                static int ReadFirst(Box first, Box second) => first.Value;
+                static void M(Box external) {
+                    var fresh = new Box();
+                    _ = ReadFirst(fresh, external);
+                }
+            }
+            """, 4);
+        Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.ReadsArgumentState), Is.False,
+            string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+    }
+    [Test]
     public void ReassigningByValueParameterDoesNotWriteArgumentState() {
         var result = Analyze("""
             sealed class Box { }
