@@ -872,6 +872,13 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private EffectFlowValue EvaluateConversion(IConversionOperation conversion, ref EffectFlowState state) {
             var operand = Evaluate(conversion.Operand, ref state);
+            if (conversion.Operand.Type?.TypeKind == TypeKind.Dynamic &&
+                conversion.Type?.TypeKind != TypeKind.Dynamic) {
+                effects.Add(SharpProofEffect.DispatchUncertainty, conversion.Syntax, conversion.Type,
+                    "dynamic_conversion_dispatch");
+                effects.AddUnknown(conversion.Syntax, "dynamic_conversion_dispatch");
+                return EffectFlowValue.Unknown;
+            }
             if (conversion.Conversion.IsImplicit && conversion.Operand.Type?.IsValueType == true &&
                 conversion.Type?.IsReferenceType == true)
                 effects.Add(SharpProofEffect.Allocates, conversion.Syntax, conversion.Type, "boxing_allocation");
