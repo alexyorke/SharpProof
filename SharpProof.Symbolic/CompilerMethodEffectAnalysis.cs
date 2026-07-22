@@ -1324,7 +1324,9 @@ internal sealed class MethodEffectAnalysisSession(
                 foreach (var assignment in CSharpSyntaxFacts.DescendantNodesInExecution(declaration)
                              .OfType<AssignmentExpressionSyntax>()) {
                     if (model.GetSymbolInfo(assignment.Left, session.CancellationToken).Symbol is not
-                        (IFieldSymbol or IPropertySymbol))
+                        (IFieldSymbol or IPropertySymbol) ||
+                        assignment.Left is MemberAccessExpressionSyntax memberAccess &&
+                        IsEphemeralFreshReceiver(memberAccess.Expression, declaration, model))
                         continue;
                     if (assignment.Right.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(identifier =>
                             model.GetSymbolInfo(identifier, session.CancellationToken).Symbol is IParameterSymbol parameter &&
@@ -1333,6 +1335,21 @@ internal sealed class MethodEffectAnalysisSession(
                 }
             }
             return false;
+        }
+        private bool IsEphemeralFreshReceiver(
+            ExpressionSyntax receiver,
+            SyntaxNode declaration,
+            SemanticModel model) {
+            if (model.GetSymbolInfo(receiver, session.CancellationToken).Symbol is not ILocalSymbol local ||
+                local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(session.CancellationToken) is not
+                    VariableDeclaratorSyntax { Initializer.Value: { } initializer } ||
+                initializer is not (ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax or
+                    ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax or CollectionExpressionSyntax or
+                    StackAllocArrayCreationExpressionSyntax))
+                return false;
+            return CSharpSyntaxFacts.DescendantNodesInExecution(declaration).OfType<IdentifierNameSyntax>().Count(identifier =>
+                SymbolEqualityComparer.Default.Equals(
+                    model.GetSymbolInfo(identifier, session.CancellationToken).Symbol, local)) == 1;
         }
         private EffectFlowValue InvokeCoreOrValue(
             IMethodSymbol? target,
