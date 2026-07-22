@@ -615,6 +615,12 @@ internal sealed class MethodEffectAnalysisSession(
                 case IInvocationOperation invocation:
                     if (IsOmittedInvocation(invocation)) return EffectFlowValue.None;
                     return Invoke(invocation.TargetMethod, invocation.Instance, invocation.Arguments, invocation, ref state);
+                case IDynamicInvocationOperation or IDynamicObjectCreationOperation or
+                    IDynamicIndexerAccessOperation or IDynamicMemberReferenceOperation:
+                    foreach (var child in operation.ChildOperations) Evaluate(child, ref state);
+                    effects.Add(SharpProofEffect.DispatchUncertainty, operation.Syntax, null, "dynamic_dispatch");
+                    effects.AddUnknown(operation.Syntax, "dynamic_dispatch");
+                    return EffectFlowValue.Unknown;
                 case IAwaitOperation awaited:
                     var awaitedValue = Evaluate(awaited.Operation, ref state);
                     if (awaited.Syntax is AwaitExpressionSyntax awaitSyntax) {
