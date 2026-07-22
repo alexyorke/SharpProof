@@ -1628,6 +1628,9 @@ internal sealed class MethodEffectAnalysisSession(
             ICoalesceOperation coalesce =>
                 GetInstanceWriteEffect(coalesce.Value, builder) |
                 GetInstanceWriteEffect(coalesce.WhenNull, builder),
+            ISwitchExpressionOperation switchExpression => switchExpression.Arms.Aggregate(
+                SharpProofEffect.None,
+                (effects, arm) => effects | GetInstanceWriteEffect(arm.Value, builder)),
             IConditionalOperation conditional =>
                 GetInstanceWriteEffect(conditional.WhenTrue, builder) |
                 GetInstanceWriteEffect(conditional.WhenFalse, builder),
@@ -1635,6 +1638,7 @@ internal sealed class MethodEffectAnalysisSession(
                 GetInstanceWriteEffect(FindConditionalAccessReceiver(conditionalAccess), builder),
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceWriteEffect(pointer.ChildOperations.FirstOrDefault(), builder),
+            IParenthesizedOperation parenthesized => GetInstanceWriteEffect(parenthesized.Operand, builder),
             IConversionOperation conversion => GetInstanceWriteEffect(conversion.Operand, builder),
             ILocalReferenceOperation => SharpProofEffect.WritesCapturedState,
             _ => SharpProofEffect.Unknown
@@ -1664,6 +1668,9 @@ internal sealed class MethodEffectAnalysisSession(
             ICoalesceOperation coalesce =>
                 GetInstanceReadEffect(coalesce.Value, builder) |
                 GetInstanceReadEffect(coalesce.WhenNull, builder),
+            ISwitchExpressionOperation switchExpression => switchExpression.Arms.Aggregate(
+                SharpProofEffect.None,
+                (effects, arm) => effects | GetInstanceReadEffect(arm.Value, builder)),
             IConditionalOperation conditional =>
                 GetInstanceReadEffect(conditional.WhenTrue, builder) |
                 GetInstanceReadEffect(conditional.WhenFalse, builder),
@@ -1671,6 +1678,7 @@ internal sealed class MethodEffectAnalysisSession(
                 GetInstanceReadEffect(FindConditionalAccessReceiver(conditionalAccess), builder),
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceReadEffect(pointer.ChildOperations.FirstOrDefault(), builder),
+            IParenthesizedOperation parenthesized => GetInstanceReadEffect(parenthesized.Operand, builder),
             IConversionOperation conversion => GetInstanceReadEffect(conversion.Operand, builder),
             ILocalReferenceOperation => SharpProofEffect.ReadsCapturedState,
             _ => SharpProofEffect.Unknown
