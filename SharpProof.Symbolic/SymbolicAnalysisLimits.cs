@@ -49,8 +49,6 @@ internal static class SymbolicAnalysisLimitContext {
     internal static SharpProofAnalysisBudget Limits => CurrentScope.Value?.Limits ?? SharpProofAnalysisBudget.Default;
     internal static Scope Push(SharpProofAnalysisBudget? limits = null, SyntaxNode? sourceNode = null)
         => Push(limits, sourceNode, propagateEvents: true);
-    internal static Scope PushIsolated(SharpProofAnalysisBudget? limits = null, SyntaxNode? sourceNode = null)
-        => Push(limits, sourceNode, propagateEvents: false);
     private static Scope Push(SharpProofAnalysisBudget? limits, SyntaxNode? sourceNode, bool propagateEvents) {
         var parent = CurrentScope.Value;
         var scope = new Scope(

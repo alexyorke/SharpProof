@@ -10,6 +10,11 @@ internal static class SymbolicTypeFacts {
             SpecialType.System_UInt32 or
             SpecialType.System_Int64 or
             SpecialType.System_UInt64;
+    internal static bool IsBuiltInNumericSpecialType(SpecialType type) => type is
+        SpecialType.System_SByte or SpecialType.System_Byte or SpecialType.System_Int16 or
+        SpecialType.System_UInt16 or SpecialType.System_Char or SpecialType.System_Int32 or
+        SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64 or
+        SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
     internal static bool IsBuiltInIntegralOrEnumType(ITypeSymbol? typeSymbol) =>
         IsBuiltInIntegralType(typeSymbol) || typeSymbol?.TypeKind == TypeKind.Enum;
     public static string? GetFullMetadataName(INamedTypeSymbol? type) {
@@ -88,23 +93,11 @@ internal static class SymbolicTypeFacts {
                    Name: "Value",
                    ContainingType.OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
                };
-    public static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol) {
-        if (typeSymbol == null) return false;
-        switch (typeSymbol.SpecialType) {
-            case SpecialType.System_Byte:
-            case SpecialType.System_SByte:
-            case SpecialType.System_Int16:
-            case SpecialType.System_UInt16:
-            case SpecialType.System_Int32:
-            case SpecialType.System_UInt32:
-            case SpecialType.System_Int64:
-            case SpecialType.System_UInt64:
-            case SpecialType.System_Decimal:
-                return true;
-            default:
-                return IsBigIntegerType(typeSymbol);
-        }
-    }
+    public static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol) => typeSymbol?.SpecialType is
+        SpecialType.System_Byte or SpecialType.System_SByte or SpecialType.System_Int16 or
+        SpecialType.System_UInt16 or SpecialType.System_Int32 or SpecialType.System_UInt32 or
+        SpecialType.System_Int64 or SpecialType.System_UInt64 or SpecialType.System_Decimal ||
+        IsBigIntegerType(typeSymbol);
     /// <summary>
     /// The single owner of the BigInteger check. Matched on namespace and name rather
     /// than a display string so it holds for any <see cref="ITypeSymbol" />.
@@ -126,44 +119,20 @@ internal static class SymbolicTypeFacts {
     public static bool TryGetBoundedIntegralRange(ITypeSymbol? typeSymbol, out long minValue, out long maxValue)
         => TryGetCheckedNumericConversionRange(typeSymbol, out minValue, out maxValue);
     public static bool TryGetCheckedNumericConversionRange(ITypeSymbol? typeSymbol, out long minValue, out long maxValue) {
-        switch (typeSymbol?.SpecialType) {
-            case SpecialType.System_Char:
-                minValue = char.MinValue;
-                maxValue = char.MaxValue;
-                return true;
-            case SpecialType.System_SByte:
-                minValue = sbyte.MinValue;
-                maxValue = sbyte.MaxValue;
-                return true;
-            case SpecialType.System_Byte:
-                minValue = byte.MinValue;
-                maxValue = byte.MaxValue;
-                return true;
-            case SpecialType.System_Int16:
-                minValue = short.MinValue;
-                maxValue = short.MaxValue;
-                return true;
-            case SpecialType.System_UInt16:
-                minValue = ushort.MinValue;
-                maxValue = ushort.MaxValue;
-                return true;
-            case SpecialType.System_Int32:
-                minValue = int.MinValue;
-                maxValue = int.MaxValue;
-                return true;
-            case SpecialType.System_UInt32:
-                minValue = uint.MinValue;
-                maxValue = uint.MaxValue;
-                return true;
-            case SpecialType.System_Int64:
-                minValue = long.MinValue;
-                maxValue = long.MaxValue;
-                return true;
-            default:
-                minValue = default;
-                maxValue = default;
-                return false;
-        }
+        (minValue, maxValue) = typeSymbol?.SpecialType switch {
+            SpecialType.System_Char => (char.MinValue, char.MaxValue),
+            SpecialType.System_SByte => (sbyte.MinValue, sbyte.MaxValue),
+            SpecialType.System_Byte => (byte.MinValue, byte.MaxValue),
+            SpecialType.System_Int16 => (short.MinValue, short.MaxValue),
+            SpecialType.System_UInt16 => (ushort.MinValue, ushort.MaxValue),
+            SpecialType.System_Int32 => (int.MinValue, int.MaxValue),
+            SpecialType.System_UInt32 => (uint.MinValue, uint.MaxValue),
+            SpecialType.System_Int64 => (long.MinValue, long.MaxValue),
+            _ => (default, default)
+        };
+        return typeSymbol?.SpecialType is SpecialType.System_Char or SpecialType.System_SByte or
+            SpecialType.System_Byte or SpecialType.System_Int16 or SpecialType.System_UInt16 or
+            SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Int64;
     }
     private static bool IsKnownReferenceTypeParameter(ITypeParameterSymbol typeParameter, HashSet<ITypeParameterSymbol> visited) {
         if (!visited.Add(typeParameter)) return false;
@@ -232,17 +201,10 @@ internal static class SymbolicTypeFacts {
                IsSameOriginalType(typeSymbol, compilation.GetTypeByMetadataName("System.Collections.Generic.IReadOnlyCollection`1"));
     private static bool IsSameOriginalType(INamedTypeSymbol candidate, INamedTypeSymbol? target) => target != null &&
                SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, target);
-    public static bool HasDeclaredInstanceInt32Member(ITypeSymbol typeSymbol, string memberName) {
-        foreach (var member in typeSymbol.GetMembers(memberName)) {
-            if (member.IsStatic) continue;
-            switch (member) {
-                case IPropertySymbol { Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 }:
-                case IFieldSymbol { Type.SpecialType: SpecialType.System_Int32 }:
-                    return true;
-            }
-        }
-        return false;
-    }
+    public static bool HasDeclaredInstanceInt32Member(ITypeSymbol typeSymbol, string memberName) =>
+        typeSymbol.GetMembers(memberName).Any(static member => !member.IsStatic && member is
+            IPropertySymbol { Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 } or
+            IFieldSymbol { Type.SpecialType: SpecialType.System_Int32 });
     public static bool HasInt32Indexer(ITypeSymbol? typeSymbol) {
         if (typeSymbol == null) return false;
         for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)

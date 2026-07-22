@@ -1,17 +1,12 @@
 namespace SharpProof.Symbolic;
 internal static class SymbolicRuntimeExceptionFacts {
     internal static bool TryGetThrowExpression(SyntaxNode throwNode, out ExpressionSyntax expression) {
-        switch (throwNode) {
-            case ThrowStatementSyntax { Expression: { } statementExpression }:
-                expression = statementExpression;
-                return true;
-            case ThrowExpressionSyntax throwExpression:
-                expression = throwExpression.Expression;
-                return true;
-            default:
-                expression = null!;
-                return false;
-        }
+        expression = throwNode switch {
+            ThrowStatementSyntax { Expression: { } value } => value,
+            ThrowExpressionSyntax value => value.Expression,
+            _ => null!
+        };
+        return expression != null;
     }
     internal static ITypeSymbol? GetThrownExceptionType(
         SyntaxNode throwNode,

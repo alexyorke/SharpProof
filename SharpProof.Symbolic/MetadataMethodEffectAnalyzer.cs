@@ -51,49 +51,44 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         var exceptions = ImmutableArray.CreateBuilder<string>();
         var hasUnknownExceptionBoundary = false;
         var instructionCount = 0;
+        void MarkUnknown(string reason, SharpProofEffect additional = SharpProofEffect.None, bool exceptionBoundary = false) {
+            effects |= SharpProofEffect.Unknown | additional;
+            hasUnknownExceptionBoundary |= exceptionBoundary;
+            unknowns.Add(Reason(reason));
+        }
         void Visit(MethodDefinitionHandle handle, int depth) {
             var token = MetadataTokens.GetToken(handle);
             if (depth > MaxDepth || analyzed.Count >= MaxMethods) {
-                effects |= SharpProofEffect.Unknown | SharpProofEffect.BudgetExhaustion;
-                unknowns.Add(Reason("metadata_budget_exhausted"));
+                MarkUnknown("metadata_budget_exhausted", SharpProofEffect.BudgetExhaustion);
                 return;
             }
             if (analyzed.Contains(token)) return;
             if (!active.Add(token)) {
-                effects |= SharpProofEffect.Unknown;
-                unknowns.Add(Reason("metadata_recursive_cycle"));
+                MarkUnknown("metadata_recursive_cycle");
                 return;
             }
             try {
                 var definition = reader.GetMethodDefinition(handle);
                 if ((definition.Attributes & MethodAttributes.PinvokeImpl) != 0) {
-                    effects |= SharpProofEffect.UsesNativeCode | SharpProofEffect.Unknown;
-                    hasUnknownExceptionBoundary = true;
-                    unknowns.Add(Reason("metadata_native_exception_boundary"));
+                    MarkUnknown("metadata_native_exception_boundary", SharpProofEffect.UsesNativeCode, true);
                     return;
                 }
                 if (definition.RelativeVirtualAddress == 0) {
-                    effects |= SharpProofEffect.Unknown;
-                    hasUnknownExceptionBoundary = true;
-                    unknowns.Add(Reason("metadata_body_unavailable"));
+                    MarkUnknown("metadata_body_unavailable", exceptionBoundary: true);
                     return;
                 }
                 var body = pe.GetMethodBody(definition.RelativeVirtualAddress);
                 if (body.ExceptionRegions.Length != 0) {
-                    effects |= SharpProofEffect.Unknown | SharpProofEffect.UnsupportedOperation;
-                    hasUnknownExceptionBoundary = true;
-                    unknowns.Add(Reason("metadata_exception_regions_unsupported"));
+                    MarkUnknown("metadata_exception_regions_unsupported", SharpProofEffect.UnsupportedOperation, true);
                 }
                 var bytes = body.GetILBytes() ?? [];
                 for (var offset = 0; offset < bytes.Length;) {
                     if (++instructionCount > MaxInstructions) {
-                        effects |= SharpProofEffect.Unknown | SharpProofEffect.BudgetExhaustion;
-                        unknowns.Add(Reason("metadata_instruction_budget_exhausted"));
+                        MarkUnknown("metadata_instruction_budget_exhausted", SharpProofEffect.BudgetExhaustion);
                         return;
                     }
                     if (!TryRead(bytes, ref offset, out var opcode, out var operand)) {
-                        effects |= SharpProofEffect.Unknown | SharpProofEffect.UnsupportedOperation;
-                        unknowns.Add(Reason("malformed_il"));
+                        MarkUnknown("malformed_il", SharpProofEffect.UnsupportedOperation);
                         return;
                     }
                     if (opcode == OpCodes.Newobj || opcode == OpCodes.Newarr || opcode == OpCodes.Box) {
@@ -103,9 +98,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                             if (TryResolveMethod(reader, constructor, out var constructorDefinition))
                                 Visit(constructorDefinition, depth + 1);
                             else {
-                                effects |= SharpProofEffect.Unknown;
-                                hasUnknownExceptionBoundary = true;
-                                unknowns.Add(Reason("metadata_constructor_unresolved"));
+                                MarkUnknown("metadata_constructor_unresolved", exceptionBoundary: true);
                             }
                         }
                     }
@@ -125,34 +118,24 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                     else if (opcode == OpCodes.Call || opcode == OpCodes.Callvirt) {
                         effects |= SharpProofEffect.DirectCall;
                         if (opcode == OpCodes.Callvirt) {
-                            effects |= SharpProofEffect.DispatchUncertainty | SharpProofEffect.Unknown;
-                            hasUnknownExceptionBoundary = true;
-                            unknowns.Add(Reason("metadata_virtual_dispatch_unresolved"));
+                            MarkUnknown("metadata_virtual_dispatch_unresolved", SharpProofEffect.DispatchUncertainty, true);
                         }
                         var called = MetadataTokens.Handle(operand);
                         if (opcode == OpCodes.Call && TryResolveMethod(reader, called, out var calledDefinition))
                             Visit(calledDefinition, depth + 1);
                         else if (opcode == OpCodes.Call || !TryResolveMethod(reader, called, out _)) {
-                            effects |= SharpProofEffect.Unknown;
-                            hasUnknownExceptionBoundary = true;
-                            unknowns.Add(Reason("metadata_external_call_unresolved"));
+                            MarkUnknown("metadata_external_call_unresolved", exceptionBoundary: true);
                         }
                     }
                     else if (IsIndirectOrElementWrite(opcode)) {
-                        effects |= SharpProofEffect.WritesArgumentState | SharpProofEffect.Unknown |
-                                   SharpProofEffect.UnsupportedOperation;
-                        hasUnknownExceptionBoundary = true;
-                        unknowns.Add(Reason("metadata_indirect_write_origin_unknown"));
+                        MarkUnknown("metadata_indirect_write_origin_unknown",
+                            SharpProofEffect.WritesArgumentState | SharpProofEffect.UnsupportedOperation, true);
                     }
                     else if (MayThrowImplicitly(opcode)) {
-                        effects |= SharpProofEffect.Unknown;
-                        hasUnknownExceptionBoundary = true;
-                        unknowns.Add(Reason("metadata_implicit_exception"));
+                        MarkUnknown("metadata_implicit_exception", exceptionBoundary: true);
                     }
                     else if (!IsModeledNoEffectOpcode(opcode)) {
-                        effects |= SharpProofEffect.Unknown | SharpProofEffect.UnsupportedOperation;
-                        hasUnknownExceptionBoundary = true;
-                        unknowns.Add(Reason("metadata_opcode_unsupported"));
+                        MarkUnknown("metadata_opcode_unsupported", SharpProofEffect.UnsupportedOperation, true);
                     }
                 }
             }

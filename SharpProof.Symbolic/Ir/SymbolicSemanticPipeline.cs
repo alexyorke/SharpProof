@@ -1,5 +1,9 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicSemanticPipeline {
+    private delegate bool TryLowerExpression<T>(ExpressionSyntax expression, SymbolicLoweringContext context, out T value) where T : class;
+    private static SymbolicLoweringResult<T> Lower<T>(ExpressionSyntax expression, SymbolicLoweringContext context,
+        TryLowerExpression<T> lower, string stage) where T : class =>
+        LowerExactOrUnsupported(lower(expression, context, out var value) ? value : default, expression, stage);
     internal static SymbolicLoweringResult<SymbolicTerm> LowerTerm(ExpressionSyntax expression, SymbolicLoweringContext context) {
         if (!IsStructuralReferenceDepthSupported(expression, context, 0))
             return Unsupported<SymbolicTerm>(expression, "term");
@@ -385,15 +389,10 @@ internal static class SymbolicSemanticPipeline {
             "reference-term");
     }
     internal static SymbolicLoweringResult<SymbolicTerm> LowerStringTerm(ExpressionSyntax expression,
-        SymbolicLoweringContext context) => LowerExactOrUnsupported(
-            SymbolicStringLowerer.TryLowerStringTerm(expression, context, out var term) ? term : null,
-            expression,
-            "string-term");
+        SymbolicLoweringContext context) => Lower<SymbolicTerm>(expression, context, SymbolicStringLowerer.TryLowerStringTerm, "string-term");
     internal static SymbolicLoweringResult<SymbolicTerm> LowerBooleanValueTerm(ExpressionSyntax expression,
-        SymbolicLoweringContext context) => LowerExactOrUnsupported(
-            SymbolicSourcePredicateLowerer.TryLowerBooleanValueTerm(expression, context, out var term) ? term : null,
-            expression,
-            "boolean-term");
+        SymbolicLoweringContext context) => Lower<SymbolicTerm>(expression, context,
+            SymbolicSourcePredicateLowerer.TryLowerBooleanValueTerm, "boolean-term");
     internal static SymbolicLoweringResult<SymbolicTerm> LowerNotNullIfNotNullAssignedResultTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context) => LowerExactOrUnsupported(
@@ -404,10 +403,8 @@ internal static class SymbolicSemanticPipeline {
             "not-null-if-not-null-assigned-result");
     internal static SymbolicLoweringResult<SymbolicTerm> LowerBuiltInLengthTerm(
         ExpressionSyntax expression,
-        SymbolicLoweringContext context) => LowerExactOrUnsupported(
-            SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(expression, context, out var term) ? term : null,
-            expression,
-            "built-in-length");
+        SymbolicLoweringContext context) => Lower<SymbolicTerm>(expression, context,
+            SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm, "built-in-length");
     internal static SymbolicLoweringResult<SymbolicTerm> LowerLengthProjectionTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context) {
@@ -442,24 +439,16 @@ internal static class SymbolicSemanticPipeline {
             "array-dimension-length");
     internal static SymbolicLoweringResult<SymbolicTerm> LowerNullableHasValueTerm(
         ExpressionSyntax expression,
-        SymbolicLoweringContext context) => LowerExactOrUnsupported(
-            SymbolicNullableLowerer.TryLowerNullableHasValueTerm(expression, context, out var term) ? term : null,
-            expression,
-            "nullable-has-value");
+        SymbolicLoweringContext context) => Lower<SymbolicTerm>(expression, context,
+            SymbolicNullableLowerer.TryLowerNullableHasValueTerm, "nullable-has-value");
     internal static SymbolicLoweringResult<SymbolicTerm> LowerNullableValueTerm(
         ExpressionSyntax expression,
-        SymbolicLoweringContext context) => LowerExactOrUnsupported(
-            SymbolicNullableLowerer.TryLowerNullableValueTerm(expression, context, out var term) ? term : null,
-            expression,
-            "nullable-value");
+        SymbolicLoweringContext context) => Lower<SymbolicTerm>(expression, context,
+            SymbolicNullableLowerer.TryLowerNullableValueTerm, "nullable-value");
     internal static SymbolicLoweringResult<SymbolicCondition> LowerStringNonNullCondition(
         ExpressionSyntax expression,
-        SymbolicLoweringContext context) => LowerExactOrUnsupported(
-            SymbolicStringLowerer.TryLowerStringNonNullCondition(expression, context, out var condition)
-                ? condition
-                : null,
-            expression,
-            "string-non-null");
+        SymbolicLoweringContext context) => Lower<SymbolicCondition>(expression, context,
+            SymbolicStringLowerer.TryLowerStringNonNullCondition, "string-non-null");
     internal static SymbolicLoweringResult<SymbolicCondition> LowerBuiltInElementAccessInRangeCondition(
         ElementAccessExpressionSyntax elementAccess,
         SymbolicLoweringContext context) {

@@ -27,17 +27,6 @@ internal static class SmtFormulaTraversal {
         var children = GetChildren(formula);
         for (var index = 0; index < children.Count; index++) yield return children[index];
     }
-    internal static SmtFormula MapChildren(SmtFormula formula, Func<SmtFormula, SmtFormula> map) {
-        if (formula == null) throw new ArgumentNullException(nameof(formula));
-        if (map == null) throw new ArgumentNullException(nameof(map));
-        var children = GetChildren(formula);
-        if (children.Count == 0) return formula;
-        var mapped = new SmtFormula[children.Count];
-        for (var index = 0; index < children.Count; index++)
-            mapped[index] = map(children[index]) ??
-                            throw new InvalidOperationException("Formula child mapping returned null.");
-        return Rebuild(formula, mapped);
-    }
     internal static SmtFormula RewriteBottomUp(SmtFormula root, Func<SmtFormula, SmtFormula> rewrite, out bool changed) {
         if (root == null) throw new ArgumentNullException(nameof(root));
         if (rewrite == null) throw new ArgumentNullException(nameof(rewrite));

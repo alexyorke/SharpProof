@@ -34,12 +34,10 @@ public static class FuzzRunner {
             deadline,
             cancellationToken);
     }
-    private static DateTimeOffset CreateDeadline(DateTimeOffset startedUtc, TimeSpan duration) {
-        var maxDuration = DateTimeOffset.MaxValue - startedUtc;
-        return duration >= maxDuration
+    private static DateTimeOffset CreateDeadline(DateTimeOffset startedUtc, TimeSpan duration) =>
+        duration >= DateTimeOffset.MaxValue - startedUtc
             ? DateTimeOffset.MaxValue
             : startedUtc + duration;
-    }
     internal static async Task<FuzzRunSummary> RunCoreAsync(
         FuzzOptions options,
         DateTimeOffset startedUtc,
@@ -403,8 +401,7 @@ public static class FuzzRunner {
             new[] { syntaxTree },
             GetMetadataReferences(),
             allowUnsafe ? UnsafeCompilationOptions : SafeCompilationOptions);
-    private static ImmutableArray<MetadataReference> GetMetadataReferences() =>
-        MetadataReferences.Value;
+    private static ImmutableArray<MetadataReference> GetMetadataReferences() => MetadataReferences.Value;
     private static CSharpCompilationOptions CreateCompilationOptions(bool allowUnsafe) => new(
             OutputKind.DynamicallyLinkedLibrary,
             allowUnsafe: allowUnsafe,
@@ -479,13 +476,8 @@ public static class FuzzRunner {
                 .Select(static finding => finding.Identity));
         return analysis.NormalizedSourceHash + "|" + findingIdentity;
     }
-    private static string NormalizeSource(string source) {
-        var normalized = source.Replace("\r\n", "\n", StringComparison.Ordinal).Trim();
-        return GeneratedTypeNameRegex.Replace(normalized, "GeneratedTypeX");
-    }
-    private static string SanitizeFileName(string value) {
-        var invalid = Path.GetInvalidFileNameChars().ToImmutableHashSet();
-        var chars = value.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray();
-        return new string(chars);
-    }
+    private static string NormalizeSource(string source) => GeneratedTypeNameRegex.Replace(
+        source.Replace("\r\n", "\n", StringComparison.Ordinal).Trim(), "GeneratedTypeX");
+    private static string SanitizeFileName(string value) => new([.. value.Select(ch =>
+        Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch)]);
 }

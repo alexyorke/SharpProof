@@ -29,21 +29,6 @@ internal static class SymbolicReachabilityService {
         }
         return state;
     }
-    internal static bool IsForInitialEntryConditionAlwaysFalse(
-        ForStatementSyntax forStatement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis) {
-        if (forStatement.Condition == null) return false;
-        var initialEntryState = CollectForInitialEntryState(forStatement, semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerCondition(
-            forStatement.Condition,
-            new SymbolicLoweringContext(semanticModel, cancellationToken));
-        if (lowering is not { IsExact: true, Value: { } initialEntryCondition }) return false;
-        var proof = new SymbolicProofService(smtAnalysis)
-            .ClassifyConditionTruth(initialEntryState, initialEntryCondition);
-        return proof.Status is SymbolicProofStatus.ProvenFalse or SymbolicProofStatus.Unreachable;
-    }
     internal static SymbolicState CollectForInitialEntryState(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,

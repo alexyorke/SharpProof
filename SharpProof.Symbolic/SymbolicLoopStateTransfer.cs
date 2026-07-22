@@ -8,79 +8,50 @@ internal static class SymbolicLoopStateTransfer {
         CancellationToken cancellationToken,
         out SymbolicTerm bound,
         out IReadOnlyList<ISymbol> boundSymbols);
-    private static void AddForLoopBodyInvariantConditions(
+    private static void AddLoopInvariantConditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
-        ForStatementSyntax forStatement,
+        StatementSyntax loop,
+        StatementSyntax body,
+        string prefix,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
-        var initializerBounds = EnumerateLoopBoundTerms(forStatement, semanticModel, cancellationToken, TryLowerInitializerBoundTerm);
+        var initializers = EnumerateLoopBoundTerms(
+            loop,
+            semanticModel,
+            cancellationToken,
+            TryLowerInitializerBoundTerm).ToArray();
         AddLoopMonotonicBoundConditions(
             conditions,
-            forStatement,
-            forStatement.Statement,
-            initializerBounds,
+            loop,
+            body,
+            initializers,
             SymbolicRelationOperator.GreaterThanOrEqual,
             MonotonicDirection.NonDecreasing,
-            "ir.path.for-loop-invariant.lower-bound",
+            prefix + ".lower-bound",
             semanticModel,
             cancellationToken);
         AddLoopMonotonicBoundConditions(
             conditions,
-            forStatement,
-            forStatement.Statement,
-            initializerBounds,
+            loop,
+            body,
+            initializers,
             SymbolicRelationOperator.LessThanOrEqual,
             MonotonicDirection.NonIncreasing,
-            "ir.path.for-loop-invariant.initial-upper-bound",
+            prefix + ".initial-upper-bound",
             semanticModel,
             cancellationToken);
         AddLoopMonotonicBoundConditions(
             conditions,
-            forStatement,
-            forStatement.Statement,
-            EnumerateLoopBoundTerms(forStatement, semanticModel, cancellationToken, TryGetStrictUpperBoundInitializerTerm),
+            loop,
+            body,
+            EnumerateLoopBoundTerms(
+                loop,
+                semanticModel,
+                cancellationToken,
+                TryGetStrictUpperBoundInitializerTerm),
             SymbolicRelationOperator.LessThan,
             MonotonicDirection.NonIncreasing,
-            "ir.path.for-loop-invariant.strict-upper-bound",
-            semanticModel,
-            cancellationToken);
-    }
-    private static void AddPreLoopBodyInvariantConditions(
-        ImmutableArray<SymbolicCondition>.Builder conditions,
-        StatementSyntax loopStatement,
-        StatementSyntax loopBody,
-        string provenancePrefix,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        var initializerBounds = EnumerateLoopBoundTerms(loopStatement, semanticModel, cancellationToken, TryLowerInitializerBoundTerm);
-        AddLoopMonotonicBoundConditions(
-            conditions,
-            loopStatement,
-            loopBody,
-            initializerBounds,
-            SymbolicRelationOperator.GreaterThanOrEqual,
-            MonotonicDirection.NonDecreasing,
-            provenancePrefix + ".lower-bound",
-            semanticModel,
-            cancellationToken);
-        AddLoopMonotonicBoundConditions(
-            conditions,
-            loopStatement,
-            loopBody,
-            initializerBounds,
-            SymbolicRelationOperator.LessThanOrEqual,
-            MonotonicDirection.NonIncreasing,
-            provenancePrefix + ".initial-upper-bound",
-            semanticModel,
-            cancellationToken);
-        AddLoopMonotonicBoundConditions(
-            conditions,
-            loopStatement,
-            loopBody,
-            EnumerateLoopBoundTerms(loopStatement, semanticModel, cancellationToken, TryGetStrictUpperBoundInitializerTerm),
-            SymbolicRelationOperator.LessThan,
-            MonotonicDirection.NonIncreasing,
-            provenancePrefix + ".strict-upper-bound",
+            prefix + ".strict-upper-bound",
             semanticModel,
             cancellationToken);
     }
@@ -153,19 +124,19 @@ internal static class SymbolicLoopStateTransfer {
         foreach (var initializer in EnumeratePreLoopInitializerExpressions(loopStatement, semanticModel, cancellationToken))
             yield return (initializer.Symbol, initializer.Value, initializer.StatementIndex);
     }
-    private static IEnumerable<(ISymbol Symbol, ExpressionSyntax Value, bool IsDeclaration)>
+    private static IEnumerable<(ISymbol Symbol, ExpressionSyntax Value)>
         EnumerateForLoopInitializers(ForStatementSyntax forStatement, SemanticModel semanticModel, CancellationToken cancellationToken) {
         if (forStatement.Declaration != null)
             foreach (var declarator in forStatement.Declaration.Variables)
                 if (declarator.Initializer != null &&
                     semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol local)
-                    yield return (local.OriginalDefinition, declarator.Initializer.Value, true);
+                    yield return (local.OriginalDefinition, declarator.Initializer.Value);
         foreach (var expression in forStatement.Initializers)
             if (expression is AssignmentExpressionSyntax assignment &&
                 assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
                 semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is { } symbol &&
                 symbol is ILocalSymbol or IParameterSymbol)
-                yield return (symbol.OriginalDefinition, assignment.Right, false);
+                yield return (symbol.OriginalDefinition, assignment.Right);
     }
     private static bool TryGetStrictUpperBoundInitializerTerm(
         ExpressionSyntax expression,
@@ -180,42 +151,22 @@ internal static class SymbolicLoopStateTransfer {
             upperBoundSymbols = [];
             return false;
         }
+        ExpressionSyntax? candidate = null;
         if (binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
             SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
-                out var subtractedValue) &&
-            subtractedValue > 0 &&
-            TryLowerInitializerBoundTerm(
-                binaryExpression.Left,
-                initializedSymbol,
-                semanticModel,
-                cancellationToken,
-                out upperBound,
-                out upperBoundSymbols))
-            return true;
+                out var subtractedValue) && subtractedValue > 0)
+            candidate = binaryExpression.Left;
         if (binaryExpression.IsKind(SyntaxKind.AddExpression)) {
             if (SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
-                out var rightValue) &&
-                rightValue < 0 &&
-                TryLowerInitializerBoundTerm(
-                    binaryExpression.Left,
-                    initializedSymbol,
-                    semanticModel,
-                    cancellationToken,
-                    out upperBound,
-                    out upperBoundSymbols))
-                return true;
-            if (SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken,
-                out var leftValue) &&
-                leftValue < 0 &&
-                TryLowerInitializerBoundTerm(
-                    binaryExpression.Right,
-                    initializedSymbol,
-                    semanticModel,
-                    cancellationToken,
-                    out upperBound,
-                    out upperBoundSymbols))
-                return true;
+                out var rightValue) && rightValue < 0)
+                candidate = binaryExpression.Left;
+            else if (SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken,
+                out var leftValue) && leftValue < 0)
+                candidate = binaryExpression.Right;
         }
+        if (candidate != null)
+            return TryLowerInitializerBoundTerm(candidate, initializedSymbol, semanticModel, cancellationToken,
+                out upperBound, out upperBoundSymbols);
         upperBound = null!;
         upperBoundSymbols = [];
         return false;
@@ -245,29 +196,20 @@ internal static class SymbolicLoopStateTransfer {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         var conditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
-        switch (loopStatement) {
-            case ForStatementSyntax forStatement:
-                AddForLoopBodyInvariantConditions(conditions, forStatement, semanticModel, cancellationToken);
-                break;
-            case WhileStatementSyntax whileStatement:
-                AddPreLoopBodyInvariantConditions(
-                    conditions,
-                    whileStatement,
-                    whileStatement.Statement,
-                    "ir.path.while-loop-invariant",
-                    semanticModel,
-                    cancellationToken);
-                break;
-            case DoStatementSyntax doStatement:
-                AddPreLoopBodyInvariantConditions(
-                    conditions,
-                    doStatement,
-                    doStatement.Statement,
-                    "ir.path.do-loop-invariant",
-                    semanticModel,
-                    cancellationToken);
-                break;
-        }
+        (StatementSyntax? Body, string? Prefix) loop = loopStatement switch {
+            ForStatementSyntax statement => (statement.Statement, "ir.path.for-loop-invariant"),
+            WhileStatementSyntax statement => (statement.Statement, "ir.path.while-loop-invariant"),
+            DoStatementSyntax statement => (statement.Statement, "ir.path.do-loop-invariant"),
+            _ => default
+        };
+        if (loop.Body != null)
+            AddLoopInvariantConditions(
+                conditions,
+                loopStatement,
+                loop.Body,
+                loop.Prefix!,
+                semanticModel,
+                cancellationToken);
         return SymbolicLoweringResult<IReadOnlyList<SymbolicCondition>>.Exact(
             conditions.ToImmutable(),
             new SymbolicLoweringProvenance("loop-invariants", loopStatement.Span, "exact"));
@@ -472,15 +414,6 @@ internal static class SymbolicLoopStateTransfer {
                    new[] { symbol },
                    semanticModel,
                    cancellationToken);
-    internal static bool IsLocalOrParameterReference(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        var symbol = semanticModel.GetSymbolInfo(CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression),
-            cancellationToken).Symbol
-            ?.OriginalDefinition;
-        return symbol is ILocalSymbol or IParameterSymbol;
-    }
     internal static bool AnyReferencedSymbolAssignedBeforeUse(
         SyntaxNode condition,
         SyntaxNode branchRoot,

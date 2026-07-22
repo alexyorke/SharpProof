@@ -30,19 +30,6 @@ internal static class SymbolicSourceTargetSelector {
         var index = QueryNodeIndexes.GetValue(syntaxTree, tree => new QueryNodeIndex(tree, cancellationToken));
         return index.FindIntersecting(span, cancellationToken);
     }
-    internal static SyntaxNode SelectNearest(IReadOnlyList<SyntaxNode> nodes, int position) => nodes
-            .OrderBy(candidate => GetDistance(candidate, position))
-            .ThenBy(candidate => candidate.Span.Length)
-            .ThenBy(candidate => Math.Abs(position - candidate.SpanStart))
-            .ThenBy(candidate => candidate.SpanStart)
-            .First();
-    internal static int GetDistance(SyntaxNode candidate, int targetPosition) {
-        if (ContainsPosition(candidate, targetPosition)) return 0;
-        var span = candidate.Span;
-        return targetPosition < span.Start
-            ? span.Start - targetPosition
-            : targetPosition - span.End;
-    }
     internal static bool ContainsPosition(SyntaxNode candidate, int targetPosition) =>
         candidate.Span.Contains(targetPosition);
     private static SyntaxNode? FindExpressionContextNode(SyntaxToken token, int position) {

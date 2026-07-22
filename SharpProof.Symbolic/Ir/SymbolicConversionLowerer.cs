@@ -260,7 +260,7 @@ internal static class SymbolicConversionLowerer {
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         term = null!;
-        if (!IsNumericSpecialType(sourceType.SpecialType) ||
+        if (!SymbolicTypeFacts.IsBuiltInNumericSpecialType(sourceType.SpecialType) ||
             !TryGetIntegralShape(targetType.SpecialType, out _, out _))
             return false;
         string operandIdentity;
@@ -279,18 +279,6 @@ internal static class SymbolicConversionLowerer {
         term = new SymbolicNumericConversionTerm(operandIdentity, sourceType.SpecialType, targetType.SpecialType, isChecked);
         return true;
     }
-    private static bool IsNumericSpecialType(SpecialType specialType) => specialType is SpecialType.System_SByte or
-            SpecialType.System_Byte or
-            SpecialType.System_Int16 or
-            SpecialType.System_UInt16 or
-            SpecialType.System_Char or
-            SpecialType.System_Int32 or
-            SpecialType.System_UInt32 or
-            SpecialType.System_Int64 or
-            SpecialType.System_UInt64 or
-            SpecialType.System_Single or
-            SpecialType.System_Double or
-            SpecialType.System_Decimal;
     private static bool IsValuePreservingIntegralConversion(ITypeSymbol sourceType, ITypeSymbol targetType) {
         if (sourceType is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } enumUnderlyingType })
             sourceType = enumUnderlyingType;

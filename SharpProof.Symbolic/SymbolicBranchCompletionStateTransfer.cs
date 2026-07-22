@@ -1,45 +1,5 @@
 namespace SharpProof.Symbolic;
 internal static class SymbolicBranchCompletionStateTransfer {
-    internal static IReadOnlyList<ISymbol> GetLocalsDeclaredInside(
-        StatementSyntax statement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        var symbols = new List<ISymbol>();
-        foreach (var node in statement.DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))) {
-            var symbol = node switch {
-                VariableDeclaratorSyntax declarator => semanticModel.GetDeclaredSymbol(declarator, cancellationToken),
-                SingleVariableDesignationSyntax designation => semanticModel.GetDeclaredSymbol(designation, cancellationToken),
-                ForEachStatementSyntax forEachStatement => semanticModel.GetDeclaredSymbol(forEachStatement, cancellationToken),
-                CatchDeclarationSyntax catchDeclaration => semanticModel.GetDeclaredSymbol(catchDeclaration, cancellationToken),
-                _ => null
-            };
-            if (symbol is ILocalSymbol &&
-                symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol.OriginalDefinition)))
-                symbols.Add(symbol.OriginalDefinition);
-        }
-        return symbols;
-    }
-    internal static IReadOnlyList<ISymbol> GetSwitchConditionSymbols(
-        SwitchStatementSyntax switchStatement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        var symbols = new List<ISymbol>();
-        AddReferencedSymbols(switchStatement.Expression, semanticModel, cancellationToken, symbols);
-        foreach (var section in switchStatement.Sections)
-            foreach (var label in section.Labels)
-                switch (label) {
-                    case CaseSwitchLabelSyntax caseLabel:
-                        AddReferencedSymbols(caseLabel.Value, semanticModel, cancellationToken, symbols);
-                        break;
-                    case CasePatternSwitchLabelSyntax patternLabel:
-                        AddReferencedSymbols(patternLabel.Pattern, semanticModel, cancellationToken, symbols);
-                        AddDeclaredPatternSymbols(patternLabel.Pattern, semanticModel, cancellationToken, symbols);
-                        if (patternLabel.WhenClause != null)
-                            AddReferencedSymbols(patternLabel.WhenClause.Condition, semanticModel, cancellationToken, symbols);
-                        break;
-                }
-        return symbols;
-    }
     internal static IReadOnlyList<ISymbol> GetSwitchExpressionConditionSymbols(
         SwitchExpressionSyntax switchExpression,
         SemanticModel semanticModel,

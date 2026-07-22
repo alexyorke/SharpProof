@@ -29,24 +29,6 @@ internal static class SymbolicStateFactBuilder {
             new SymbolicRelationAtom(isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
                 reference, new SymbolicNullTerm()),
             source, provenance, evidenceKey: evidenceKey));
-    internal static bool TryCreateReferenceNullCondition(
-        ExpressionSyntax expression,
-        bool isNull,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string provenance,
-        out SymbolicCondition condition,
-        Func<ISymbol, int>? getSymbolVersion = null) {
-        var lowering = SymbolicSemanticPipeline.LowerReferenceTerm(
-            expression,
-            new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion));
-        if (lowering is not { IsExact: true, Value: { } reference }) {
-            condition = null!;
-            return false;
-        }
-        condition = CreateReferenceNullCondition(reference, expression, isNull, provenance);
-        return true;
-    }
     internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind) => SymbolicFactFactory.TryGetValueKind(
             type,
             SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,

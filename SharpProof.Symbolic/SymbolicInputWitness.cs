@@ -13,17 +13,6 @@ internal sealed record SymbolicInputWitness(
     public bool IsAvailable => Status is SymbolicWitnessStatus.Exact or SymbolicWitnessStatus.Approximate;
 }
 internal static class SymbolicInputWitnessFactory {
-    internal static SymbolicInputWitness CreateReachability(
-        SmtSatisfyingWitness? witness,
-        SemanticModel? semanticModel,
-        int position,
-        SymbolicReachability reachability,
-        string reason) {
-        if (reachability == SymbolicReachability.Unreachable) return None(reason);
-        if (reachability == SymbolicReachability.Reachable && witness == null) return Unconstrained();
-        return Create(witness, semanticModel, position, SymbolicWitnessStatus.Unsupported,
-            string.IsNullOrWhiteSpace(reason) ? "reachability_witness_unavailable" : reason);
-    }
     internal static SymbolicInputWitness Create(
         SmtSatisfyingWitness? witness,
         SemanticModel? semanticModel,
@@ -39,7 +28,6 @@ internal static class SymbolicInputWitnessFactory {
             witness?.Reason ?? missingReason,
             assignments);
     }
-    internal static SymbolicInputWitness Unconstrained() => CreateEmpty(SymbolicWitnessStatus.Exact, "unconstrained_inputs");
     internal static SymbolicInputWitness None(string reason) => CreateEmpty(SymbolicWitnessStatus.None, reason);
     internal static SymbolicInputWitness Unsupported(string reason) => CreateEmpty(SymbolicWitnessStatus.Unsupported, reason);
     private static SymbolicInputWitness CreateEmpty(SymbolicWitnessStatus status, string reason) =>

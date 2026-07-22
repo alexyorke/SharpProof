@@ -10,37 +10,6 @@ internal static class SymbolicProgramPointFacts {
         if (transition.IsExact)
             state = transition.State;
     }
-    internal static void AddReferenceNullCondition(
-        ref SymbolicState state,
-        ExpressionSyntax expression,
-        bool isNull,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        string? provenance = null) {
-        if (NullableFlowFacts.IsDefinitelyNullReferenceValue(expression, semanticModel, cancellationToken)) {
-            if (!isNull)
-                state = SymbolicOperationTransferKernel.Complete(state, expression.Span).State;
-            return;
-        }
-        if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(expression, semanticModel, cancellationToken)) {
-            if (isNull)
-                state = SymbolicOperationTransferKernel.Complete(state, expression.Span).State;
-            return;
-        }
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
-        if (lowering is not { IsExact: true, Value: { } subject } ||
-            subject.Kind != SmtValueKind.Reference)
-            return;
-        var fact = SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
-                subject,
-                new SymbolicNullTerm()),
-            expression,
-            provenance ?? (isNull ? "ir.path.reference-null" : "ir.path.reference-not-null"));
-        state = state.AddPathCondition(new SymbolicFactCondition(fact));
-    }
     internal static bool StatementInvalidatesSymbolValue(
         StatementSyntax statement,
         ISymbol symbol,
