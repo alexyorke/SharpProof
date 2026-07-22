@@ -2091,6 +2091,23 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ConditionalInvocationResultRetainsDelegateTargets() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static void Pure() { }
+                static void Impure() { state++; }
+                static System.Action Choose(bool impure) => impure ? Impure : Pure;
+                static void M(bool impure) { Choose(impure)(); }
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void InvocationDelegateTargetRetainsFreshArgumentReceiver() {
         var result = Analyze("""
             sealed class Box {
