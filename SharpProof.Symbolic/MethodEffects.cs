@@ -128,7 +128,13 @@ internal sealed class MethodEffectAnalysisSession(
         if (!_active.Add(method)) return Unknown("recursive_call", declaration);
         try {
             var root = MethodBodyOperationResolver.GetMethodBodyRootOperation(declaration, semanticModel, cancellationToken, true);
-            if (root == null) return Cache(method, AnalyzeMetadata(method, declaration));
+            if (root == null) {
+                if (method.MethodKind == MethodKind.Constructor &&
+                    declaration is TypeDeclarationSyntax { ParameterList: not null } primaryType &&
+                    primaryType.BaseList?.Types.Any(type => type is PrimaryConstructorBaseTypeSyntax) != true)
+                    return Cache(method, AnalyzePrimaryConstructor(primaryType, semanticModel));
+                return Cache(method, AnalyzeMetadata(method, declaration));
+            }
             var builder = new Builder(IsCaught);
             var reachableOperations = GetReachableOperationSpans(declaration, semanticModel);
             MarkFlowUncertainLocals(root, declaration, builder);
@@ -150,6 +156,21 @@ internal sealed class MethodEffectAnalysisSession(
         finally {
             _active.Remove(method);
         }
+    }
+    private MethodEffects AnalyzePrimaryConstructor(
+        TypeDeclarationSyntax declaration,
+        SemanticModel semanticModel) {
+        var builder = new Builder(IsCaught);
+        foreach (var initializer in GetPrimaryConstructorInitializers(declaration)) {
+            if (semanticModel.GetOperation(initializer.Value, cancellationToken) is not { } root)
+                return Unknown("primary_constructor_initializer_unavailable", initializer);
+            foreach (var operation in root.DescendantsAndSelf()) {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (IsVisible(operation, declaration, semanticModel))
+                    AnalyzeOperation(operation, semanticModel, builder);
+            }
+        }
+        return builder.Build();
     }
     private bool ReturnsFreshValue(IMethodSymbol? method) {
         if (method == null) return false;
@@ -1121,26 +1142,30 @@ internal sealed class MethodEffectAnalysisSession(
         SemanticModel model) {
         if (declaration.BaseList?.Types.Any(type => type is PrimaryConstructorBaseTypeSyntax) == true)
             return false;
-        var initializers = declaration.Members
-            .OfType<FieldDeclarationSyntax>()
-            .SelectMany(field => field.Declaration.Variables)
-            .Select(variable => variable.Initializer)
-            .Where(initializer => initializer != null)
-            .Cast<EqualsValueClauseSyntax>()
-            .Concat(declaration.Members
-                .OfType<PropertyDeclarationSyntax>()
-                .Select(property => property.Initializer)
-                .Where(initializer => initializer != null)
-                .Cast<EqualsValueClauseSyntax>());
-        foreach (var initializer in initializers) {
+        foreach (var initializer in GetPrimaryConstructorInitializers(declaration)) {
             if (model.GetOperation(initializer.Value) is not { } operation ||
                 !IsEffectFreePrimaryConstructorInitializer(operation))
                 return false;
         }
         return true;
     }
+    private static IEnumerable<EqualsValueClauseSyntax> GetPrimaryConstructorInitializers(
+        TypeDeclarationSyntax declaration) => declaration.Members
+            .OfType<FieldDeclarationSyntax>()
+            .Where(field => !field.Modifiers.Any(SyntaxKind.StaticKeyword))
+            .SelectMany(field => field.Declaration.Variables)
+            .Select(variable => variable.Initializer)
+            .Where(initializer => initializer != null)
+            .Cast<EqualsValueClauseSyntax>()
+            .Concat(declaration.Members
+                .OfType<PropertyDeclarationSyntax>()
+                .Where(property => !property.Modifiers.Any(SyntaxKind.StaticKeyword))
+                .Select(property => property.Initializer)
+                .Where(initializer => initializer != null)
+                .Cast<EqualsValueClauseSyntax>());
     private static bool IsEffectFreePrimaryConstructorInitializer(IOperation operation) {
-        while (operation is IConversionOperation conversion) operation = conversion.Operand;
+        while (operation is IConversionOperation { OperatorMethod: null } conversion)
+            operation = conversion.Operand;
         if (operation is IParenthesizedOperation parenthesized)
             return IsEffectFreePrimaryConstructorInitializer(parenthesized.Operand);
         return operation switch {
