@@ -280,13 +280,18 @@ internal sealed class MethodEffectAnalysisSession(
             sites.Add(Site(SharpProofEffect.Allocates, expression, type, "compiler_generated_allocation"));
         }
         if (declaration.DescendantNodes().OfType<YieldStatementSyntax>().Any() ||
-            declaration is MethodDeclarationSyntax { Modifiers: var modifiers } &&
-            modifiers.Any(SyntaxKind.AsyncKeyword) && declaration.DescendantNodes().OfType<AwaitExpressionSyntax>().Any()) {
+            IsAsyncDeclaration(declaration) && declaration.DescendantNodes().OfType<AwaitExpressionSyntax>().Any()) {
             flags |= SharpProofEffect.Allocates;
             sites.Add(Site(SharpProofEffect.Allocates, declaration, null, "state_machine_allocation"));
         }
         return effects with { Effects = flags, Sites = sites.ToImmutable() };
     }
+    private static bool IsAsyncDeclaration(SyntaxNode declaration) => declaration switch {
+        MethodDeclarationSyntax method => method.Modifiers.Any(SyntaxKind.AsyncKeyword),
+        LocalFunctionStatementSyntax localFunction => localFunction.Modifiers.Any(SyntaxKind.AsyncKeyword),
+        AnonymousFunctionExpressionSyntax anonymousFunction => anonymousFunction.AsyncKeyword.RawKind != 0,
+        _ => false
+    };
     private static bool EnumFlagsDefined<T>(T value) where T : struct, Enum {
         var all = Enum.GetValues(typeof(T)).Cast<T>().Aggregate(0L, static (bits, item) => bits | Convert.ToInt64(item));
         return (Convert.ToInt64(value) & ~all) == 0;
