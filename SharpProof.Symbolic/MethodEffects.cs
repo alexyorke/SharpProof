@@ -2883,6 +2883,7 @@ internal sealed class MethodEffectAnalysisSession(
                 return TryGetCapturedCallResultEffects(
                     returnedInvocation.TargetMethod,
                     returnedInvocation,
+                    [],
                     callSite,
                     compilation,
                     visited,
@@ -2892,6 +2893,7 @@ internal sealed class MethodEffectAnalysisSession(
                 return TryGetCapturedCallResultEffects(
                     getter,
                     returnedProperty,
+                    [],
                     callSite,
                     compilation,
                     visited,
@@ -2908,6 +2910,7 @@ internal sealed class MethodEffectAnalysisSession(
         private bool TryGetCapturedCallResultEffects(
             IMethodSymbol targetMethod,
             IOperation nestedCallSite,
+            ImmutableArray<IOperation> outerNestedCallSites,
             IOperation outerCallSite,
             Compilation compilation,
             HashSet<ILocalSymbol> visited,
@@ -2917,15 +2920,22 @@ internal sealed class MethodEffectAnalysisSession(
             writeEffect = SharpProofEffect.None;
             var method = targetMethod.ReducedFrom ?? targetMethod;
             method = (method.PartialImplementationPart ?? method).OriginalDefinition;
+            if (outerNestedCallSites.Any(site =>
+                    GetNestedCallSiteMethod(site) is { } outerMethod &&
+                    SymbolEqualityComparer.Default.Equals(
+                        (outerMethod.PartialImplementationPart ?? outerMethod).OriginalDefinition,
+                        method)))
+                return false;
             var declaration = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
             var expressions = GetDirectReturnExpressions(declaration);
             if (expressions.IsDefaultOrEmpty) return false;
+            var nestedCallSites = outerNestedCallSites.Insert(0, nestedCallSite);
             foreach (var expression in expressions) {
                 var model = compilation.GetSemanticModel(expression.SyntaxTree);
                 if (model.GetOperation(expression) is not { } returnedValue ||
                     !TryGetNestedReturnedValueEffects(
                         returnedValue,
-                        nestedCallSite,
+                        nestedCallSites,
                         outerCallSite,
                         compilation,
                         visited,
@@ -2939,7 +2949,7 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private bool TryGetNestedReturnedValueEffects(
             IOperation value,
-            IOperation nestedCallSite,
+            ImmutableArray<IOperation> nestedCallSites,
             IOperation outerCallSite,
             Compilation compilation,
             HashSet<ILocalSymbol> visited,
@@ -2951,13 +2961,14 @@ internal sealed class MethodEffectAnalysisSession(
             if (value is IParenthesizedOperation parenthesized)
                 return TryGetNestedReturnedValueEffects(
                     parenthesized.Operand,
-                    nestedCallSite,
+                    nestedCallSites,
                     outerCallSite,
                     compilation,
                     visited,
                     out readEffect,
                     out writeEffect);
             IOperation? mapped = null;
+            var nestedCallSite = nestedCallSites[0];
             if (value is IParameterReferenceOperation parameter) {
                 mapped = nestedCallSite switch {
                     IInvocationOperation invocation =>
@@ -2985,19 +2996,29 @@ internal sealed class MethodEffectAnalysisSession(
                     _ => null
                 };
             }
-            if (mapped != null)
-                return TryGetCapturedValueEffects(
+            if (mapped != null) {
+                if (nestedCallSites.Length == 1)
+                    return TryGetCapturedValueEffects(
+                        mapped,
+                        outerCallSite,
+                        compilation,
+                        visited,
+                        out readEffect,
+                        out writeEffect);
+                return TryGetNestedReturnedValueEffects(
                     mapped,
+                    nestedCallSites.RemoveAt(0),
                     outerCallSite,
                     compilation,
                     visited,
                     out readEffect,
                     out writeEffect);
+            }
             if (value is IConditionalOperation { WhenFalse: { } whenFalse } conditional)
                 return TryGetNestedCompositeReturnedValueEffects(
                     conditional.WhenTrue,
                     whenFalse,
-                    nestedCallSite,
+                    nestedCallSites,
                     outerCallSite,
                     compilation,
                     visited,
@@ -3007,7 +3028,7 @@ internal sealed class MethodEffectAnalysisSession(
                 return TryGetNestedCompositeReturnedValueEffects(
                     coalesce.Value,
                     coalesce.WhenNull,
-                    nestedCallSite,
+                    nestedCallSites,
                     outerCallSite,
                     compilation,
                     visited,
@@ -3017,7 +3038,7 @@ internal sealed class MethodEffectAnalysisSession(
                 foreach (var arm in switchExpression.Arms) {
                     if (!TryGetNestedReturnedValueEffects(
                             arm.Value,
-                            nestedCallSite,
+                            nestedCallSites,
                             outerCallSite,
                             compilation,
                             visited,
@@ -3029,6 +3050,26 @@ internal sealed class MethodEffectAnalysisSession(
                 }
                 return switchExpression.Arms.Length != 0;
             }
+            if (value is IInvocationOperation nestedInvocation)
+                return TryGetCapturedCallResultEffects(
+                    nestedInvocation.TargetMethod,
+                    nestedInvocation,
+                    nestedCallSites,
+                    outerCallSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
+            if (value is IPropertyReferenceOperation { Property.GetMethod: { } getter } nestedProperty)
+                return TryGetCapturedCallResultEffects(
+                    getter,
+                    nestedProperty,
+                    nestedCallSites,
+                    outerCallSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
             if (value is not (IObjectCreationOperation or IArrayCreationOperation or
                 IAnonymousObjectCreationOperation or IDelegateCreationOperation or
                 ICollectionExpressionOperation))
@@ -3040,7 +3081,7 @@ internal sealed class MethodEffectAnalysisSession(
         private bool TryGetNestedCompositeReturnedValueEffects(
             IOperation left,
             IOperation right,
-            IOperation nestedCallSite,
+            ImmutableArray<IOperation> nestedCallSites,
             IOperation outerCallSite,
             Compilation compilation,
             HashSet<ILocalSymbol> visited,
@@ -3048,7 +3089,7 @@ internal sealed class MethodEffectAnalysisSession(
             out SharpProofEffect writeEffect) {
             if (!TryGetNestedReturnedValueEffects(
                     left,
-                    nestedCallSite,
+                    nestedCallSites,
                     outerCallSite,
                     compilation,
                     visited,
@@ -3056,7 +3097,7 @@ internal sealed class MethodEffectAnalysisSession(
                     out writeEffect) ||
                 !TryGetNestedReturnedValueEffects(
                     right,
-                    nestedCallSite,
+                    nestedCallSites,
                     outerCallSite,
                     compilation,
                     visited,
@@ -3067,6 +3108,11 @@ internal sealed class MethodEffectAnalysisSession(
             writeEffect |= rightWriteEffect;
             return true;
         }
+        private static IMethodSymbol? GetNestedCallSiteMethod(IOperation site) => site switch {
+            IInvocationOperation invocation => invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod,
+            IPropertyReferenceOperation property => property.Property.GetMethod,
+            _ => null
+        };
         private bool TryGetCompositeCapturedValueEffects(
             IOperation left,
             IOperation right,
