@@ -3098,7 +3098,59 @@ internal sealed class MethodEffectAnalysisSession(
                     index + 1,
                     out initializer);
             }
+            if (value is IObjectCreationOperation creation &&
+                TryGetConstructorAssignedMember(creation, path[index], out var constructorValue)) {
+                if (index == path.Count - 1) {
+                    initializer = constructorValue;
+                    return true;
+                }
+                return TryGetObjectInitializerMember(
+                    constructorValue,
+                    path,
+                    index + 1,
+                    out initializer);
+            }
             return false;
+        }
+        private static bool TryGetConstructorAssignedMember(
+            IObjectCreationOperation creation,
+            string memberPath,
+            out IOperation value) {
+            value = null!;
+            var declaration = creation.Constructor?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+            if (declaration == null || creation.SemanticModel?.Compilation is not { } compilation) return false;
+            var model = compilation.GetSemanticModel(declaration.SyntaxTree);
+            var candidates = declaration.DescendantNodes()
+                .OfType<AssignmentExpressionSyntax>()
+                .Where(node => !node.Ancestors()
+                    .TakeWhile(ancestor => !ReferenceEquals(ancestor, declaration))
+                    .Any(ancestor => ancestor is AnonymousFunctionExpressionSyntax or
+                        LocalFunctionStatementSyntax))
+                .Select(node => model.GetOperation(node))
+                .OfType<ISimpleAssignmentOperation>()
+                .Where(assignment => {
+                    var member = assignment.Target switch {
+                        IFieldReferenceOperation field => (ISymbol)field.Field.OriginalDefinition,
+                        IPropertyReferenceOperation property => property.Property.OriginalDefinition,
+                        _ => null
+                    };
+                    return member != null &&
+                           string.Equals(
+                               GetMemberPathPart(member),
+                               memberPath,
+                               StringComparison.Ordinal);
+                })
+                .ToArray();
+            if (candidates.Length != 1) return false;
+            value = candidates[0].Value;
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is not IParameterReferenceOperation parameter) return true;
+            value = creation.Arguments.FirstOrDefault(argument =>
+                string.Equals(
+                    argument.Parameter?.Name,
+                    parameter.Parameter.Name,
+                    StringComparison.Ordinal))?.Value!;
+            return value != null;
         }
         private static bool TryGetConstantPathPart(
             IOperation operation,
