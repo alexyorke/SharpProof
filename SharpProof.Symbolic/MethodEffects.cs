@@ -2606,7 +2606,54 @@ internal sealed class MethodEffectAnalysisSession(
                     ArgumentReadEffect = argumentReadEffect,
                     ArgumentWriteEffect = argumentWriteEffect
                 };
+            if (target != null &&
+                value is IAnonymousFunctionOperation receiverFunction &&
+                TryGetReturnedLambdaReceiverEffects(
+                    receiverFunction,
+                    callSite,
+                    out var receiverReadEffect,
+                    out var receiverWriteEffect))
+                target = target with {
+                    ReceiverReadEffect = receiverReadEffect,
+                    ReceiverWriteEffect = receiverWriteEffect,
+                    CapturedReadEffect = receiverReadEffect,
+                    CapturedWriteEffect = receiverWriteEffect
+                };
             return target == null ? [] : [target];
+        }
+        private bool TryGetReturnedLambdaReceiverEffects(
+            IAnonymousFunctionOperation function,
+            IOperation callSite,
+            out SharpProofEffect readEffect,
+            out SharpProofEffect writeEffect) {
+            readEffect = SharpProofEffect.None;
+            writeEffect = SharpProofEffect.None;
+            var receiver = callSite switch {
+                IInvocationOperation invocation => invocation.Instance,
+                IPropertyReferenceOperation property => property.Instance,
+                _ => null
+            };
+            if (receiver == null) return false;
+            var found = false;
+            foreach (var operation in function.Body.DescendantsAndSelf()) {
+                if (!BelongsDirectlyTo(function, operation)) continue;
+                switch (operation) {
+                    case IInstanceReferenceOperation:
+                        found = true;
+                        break;
+                    case ILocalReferenceOperation local when
+                        !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, function.Symbol):
+                    case IParameterReferenceOperation parameter when
+                        !SymbolEqualityComparer.Default.Equals(
+                            parameter.Parameter.ContainingSymbol,
+                            function.Symbol):
+                        return false;
+                }
+            }
+            if (!found) return false;
+            readEffect = GetInstanceReadEffect(receiver, this);
+            writeEffect = GetInstanceWriteEffect(receiver, this);
+            return true;
         }
         private bool TryGetReturnedLambdaArgumentEffects(
             IAnonymousFunctionOperation function,
