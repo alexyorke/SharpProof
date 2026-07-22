@@ -31,11 +31,19 @@ internal sealed class MethodEffectAnalysisSession(
             var accumulator = new EffectAccumulator();
             var state = EffectFlowState.Create(method);
             var domain = new EffectFlowDomain(this, method, semanticModel, accumulator, captures);
+            if (method.MethodKind == MethodKind.StaticConstructor)
+                state = AnalyzeStaticInitializers(method, accumulator, state);
             var root = MethodBodyOperationResolver.GetMethodBodyRootOperation(declaration, semanticModel, cancellationToken, true);
             if (root == null && declaration is AnonymousFunctionExpressionSyntax &&
                 semanticModel.GetOperation(declaration, cancellationToken) is IAnonymousFunctionOperation anonymous)
                 root = anonymous.Body;
             if (root == null && declaration is TypeDeclarationSyntax typeDeclaration) {
+                if (method.MethodKind == MethodKind.StaticConstructor) {
+                    var initializer = new CompilerMethodEffectSummary(accumulator.Build(), EffectFlowValue.None,
+                        state.Receiver, state.Parameters);
+                    if (captures == null) _cache[method] = initializer;
+                    return initializer;
+                }
                 state = domain.AnalyzePrimaryInitializers(typeDeclaration, state);
                 var primary = new CompilerMethodEffectSummary(accumulator.Build(), EffectFlowValue.None,
                     state.Receiver, state.Parameters);
@@ -75,6 +83,35 @@ internal sealed class MethodEffectAnalysisSession(
             return summary;
         }
         finally { _active.Remove(method); }
+    }
+    private EffectFlowState AnalyzeStaticInitializers(
+        IMethodSymbol method,
+        EffectAccumulator accumulator,
+        EffectFlowState state) {
+        foreach (var reference in method.ContainingType.DeclaringSyntaxReferences) {
+            if (reference.GetSyntax(cancellationToken) is not TypeDeclarationSyntax declaration) continue;
+            var model = compilation.GetSemanticModel(declaration.SyntaxTree);
+            var domain = new EffectFlowDomain(this, method, model, accumulator, null);
+            foreach (var member in declaration.Members) {
+                if (member is BaseFieldDeclarationSyntax field) {
+                    foreach (var variable in field.Declaration.Variables) {
+                        if (variable.Initializer == null ||
+                            model.GetDeclaredSymbol(variable, cancellationToken) is not { IsStatic: true } symbol)
+                            continue;
+                        accumulator.Add(SharpProofEffect.WritesStaticState, variable, symbol, "static_initializer_write");
+                        if (model.GetOperation(variable.Initializer.Value, cancellationToken) is { } operation)
+                            state = domain.Transfer(state, operation);
+                    }
+                }
+                else if (member is PropertyDeclarationSyntax { Initializer: { } initializer } property &&
+                         model.GetDeclaredSymbol(property, cancellationToken) is { IsStatic: true } symbol) {
+                    accumulator.Add(SharpProofEffect.WritesStaticState, property, symbol, "static_initializer_write");
+                    if (model.GetOperation(initializer.Value, cancellationToken) is { } operation)
+                        state = domain.Transfer(state, operation);
+                }
+            }
+        }
+        return state;
     }
     private CompilerMethodEffectSummary MetadataSummary(IMethodSymbol method) {
         if (TryReadEffectContract(method, out var contract))
@@ -909,7 +946,7 @@ internal sealed class MethodEffectAnalysisSession(
         private EffectFlowValue EvaluateField(IFieldReferenceOperation field, ref EffectFlowState state) {
             if (field.Field.IsConst) return EffectFlowValue.None;
             if (field.Field.IsStatic) {
-                AddExplicitTypeInitializerEffects(field.Field.ContainingType, field);
+                AddTypeInitializerEffects(field.Field.ContainingType, field);
                 effects.Add(SharpProofEffect.ReadsStaticState, field.Syntax, field.Field, "static_field_read");
                 return EffectFlowValue.FromRoot(new(EffectValueRootKind.Static, Key: MemberKey(field.Field)), field.Type);
             }
@@ -1084,7 +1121,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (exactTarget != null) target = exactTarget;
             effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
             if (target.IsStatic && target.MethodKind != MethodKind.StaticConstructor)
-                AddExplicitTypeInitializerEffects(target.ContainingType, site);
+                AddTypeInitializerEffects(target.ContainingType, site);
             if (target.IsImplicitlyDeclared) return EffectFlowValue.None;
             if (exactTarget == null && (target.IsVirtual || target.ContainingType?.TypeKind == TypeKind.Interface)) {
                 effects.Add(SharpProofEffect.DispatchUncertainty, site.Syntax, target, "dispatch_uncertainty");
@@ -1112,11 +1149,11 @@ internal sealed class MethodEffectAnalysisSession(
                 ? ResolveRefReturn(target, receiver, values)
                 : returnedValue;
         }
-        private void AddExplicitTypeInitializerEffects(ITypeSymbol? type, IOperation site) {
+        private void AddTypeInitializerEffects(ITypeSymbol? type, IOperation site) {
             if (type is not INamedTypeSymbol named || method.MethodKind == MethodKind.StaticConstructor &&
                 SymbolEqualityComparer.Default.Equals(method.ContainingType, named) ||
                 named.GetMembers().OfType<IMethodSymbol>().FirstOrDefault(static candidate =>
-                    candidate.MethodKind == MethodKind.StaticConstructor && !candidate.IsImplicitlyDeclared) is not { } initializer)
+                    candidate.MethodKind == MethodKind.StaticConstructor) is not { } initializer)
                 return;
             var initializerSummary = GetSummary(initializer, null);
             AddSummary(initializerSummary.Effects, EffectFlowValue.None, [], site, initializer);
@@ -1125,7 +1162,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (type is not INamedTypeSymbol named) return;
             var hierarchy = new Stack<INamedTypeSymbol>();
             for (var current = named; current != null; current = current.BaseType) hierarchy.Push(current);
-            while (hierarchy.Count != 0) AddExplicitTypeInitializerEffects(hierarchy.Pop(), site);
+            while (hierarchy.Count != 0) AddTypeInitializerEffects(hierarchy.Pop(), site);
         }
         private EffectFlowValue ResolveRefReturn(
             IMethodSymbol target,
@@ -1347,6 +1384,11 @@ internal sealed class MethodEffectAnalysisSession(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
             target = Normalize(target);
+            if (target is { MethodKind: MethodKind.StaticConstructor, IsImplicitlyDeclared: true } &&
+                target.ContainingType.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(session.CancellationToken) is
+                    TypeDeclarationSyntax typeDeclaration)
+                return session.AnalyzeSummary(target, typeDeclaration,
+                    session.Compilation.GetSemanticModel(typeDeclaration.SyntaxTree), captures);
             if (target.IsImplicitlyDeclared) {
                 if (target.MethodKind == MethodKind.Constructor && target.ContainingType.BaseType is { } baseType &&
                     baseType.InstanceConstructors.FirstOrDefault(static constructor => constructor.Parameters.All(
@@ -1452,7 +1494,7 @@ internal sealed class MethodEffectAnalysisSession(
                     Assign(declaration.Expression, value, isRef, ref state);
                     return;
                 case IFieldReferenceOperation field:
-                    if (field.Field.IsStatic) AddExplicitTypeInitializerEffects(field.Field.ContainingType, field);
+                    if (field.Field.IsStatic) AddTypeInitializerEffects(field.Field.ContainingType, field);
                     AssignMember(field.Instance, MemberKey(field.Field), value, field.Field.IsStatic, field.Syntax, field.Field, ref state);
                     return;
                 case IPropertyReferenceOperation property:
