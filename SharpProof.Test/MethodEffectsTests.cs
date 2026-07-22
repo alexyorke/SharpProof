@@ -500,6 +500,36 @@ public sealed class MethodEffectsTests {
             string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
     }
     [Test]
+    public void AwaitForeachIncludesMoveNextAwaiterEffects() {
+        var result = Analyze("""
+            sealed class AsyncEnumerable {
+                public Enumerator GetAsyncEnumerator(System.Threading.CancellationToken cancellationToken = default) => default;
+            }
+            struct Enumerator {
+                public Awaitable MoveNextAsync() => default;
+                public int Current => 0;
+            }
+            readonly struct Awaitable {
+                private static int state;
+                public Awaiter GetAwaiter() { state++; return default; }
+            }
+            readonly struct Awaiter : System.Runtime.CompilerServices.INotifyCompletion {
+                public bool IsCompleted => true;
+                public void OnCompleted(System.Action continuation) { }
+                public bool GetResult() => false;
+            }
+            class C {
+                static async System.Threading.Tasks.Task M() {
+                    await foreach (var item in new AsyncEnumerable()) { }
+                }
+            }
+            """, 18);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {
