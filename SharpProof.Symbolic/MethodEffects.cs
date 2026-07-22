@@ -869,7 +869,7 @@ internal sealed class MethodEffectAnalysisSession(
             left.Sites.AddRange(right.Sites),
             [.. unknowns.Distinct()]);
     }
-    private static void AddWrite(IOperation target, Builder builder) {
+    private void AddWrite(IOperation target, Builder builder) {
         if (target.Syntax.Ancestors().Any(static syntax =>
                 syntax is InitializerExpressionSyntax or WithExpressionSyntax or
                     AnonymousObjectCreationExpressionSyntax)) {
@@ -903,12 +903,67 @@ internal sealed class MethodEffectAnalysisSession(
                 builder.Add(GetInstanceWriteEffect(implicitIndexer.Instance, builder), implicitIndexer,
                     implicitIndexer.Type, "implicit_indexer_write");
                 break;
+            case IInvocationOperation invocation when invocation.TargetMethod.ReturnsByRef ||
+                                                      invocation.TargetMethod.ReturnsByRefReadonly:
+                builder.Add(GetRefReturnWriteEffect(invocation, builder), invocation, invocation.TargetMethod,
+                    "ref_return_write");
+                break;
             case var pointer when IsPointerIndirection(pointer) &&
                                   pointer.ChildOperations.FirstOrDefault() is { } pointerOperand:
                 builder.Add(GetInstanceWriteEffect(pointerOperand, builder), pointer, pointer.Type,
                     "pointer_indirection_write");
                 break;
         }
+    }
+    private SharpProofEffect GetRefReturnWriteEffect(IInvocationOperation invocation, Builder builder) {
+        var method = invocation.TargetMethod.OriginalDefinition;
+        var syntax = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+        if (syntax != null) {
+            var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+            var root = MethodBodyOperationResolver.GetMethodBodyRootOperation(
+                syntax, model, cancellationToken, includeConversionOperators: true);
+            if (root != null) {
+                var returnedValues = root.DescendantsAndSelf()
+                    .OfType<IReturnOperation>()
+                    .Select(static returned => returned.ReturnedValue)
+                    .Where(static value => value != null)
+                    .Cast<IOperation>()
+                    .ToArray();
+                if (returnedValues.Length == 0) returnedValues = [root];
+                var relative = returnedValues.Aggregate(
+                    SharpProofEffect.None,
+                    static (effect, value) => effect | GetRelativeRefWriteEffect(value));
+                var remapped = relative & ~(SharpProofEffect.WritesReceiverState |
+                                            SharpProofEffect.WritesArgumentState);
+                if ((relative & SharpProofEffect.WritesReceiverState) != 0)
+                    remapped |= invocation.Instance != null
+                        ? GetInstanceWriteEffect(invocation.Instance, builder)
+                        : SharpProofEffect.Unknown;
+                if ((relative & SharpProofEffect.WritesArgumentState) != 0)
+                    remapped |= GetArgumentEffect(invocation, builder, write: true);
+                return remapped == SharpProofEffect.None ? SharpProofEffect.Unknown : remapped;
+            }
+        }
+        var fallback = SharpProofEffect.Unknown;
+        if (invocation.Instance != null) fallback |= GetInstanceWriteEffect(invocation.Instance, builder);
+        fallback |= GetArgumentEffect(invocation, builder, write: true);
+        return fallback;
+    }
+    private static SharpProofEffect GetRelativeRefWriteEffect(IOperation value) {
+        while (value is IConversionOperation conversion) value = conversion.Operand;
+        return value switch {
+            IParameterReferenceOperation => SharpProofEffect.WritesArgumentState,
+            IInstanceReferenceOperation => SharpProofEffect.WritesReceiverState,
+            IFieldReferenceOperation { Field.IsStatic: true } => SharpProofEffect.WritesStaticState,
+            IFieldReferenceOperation field when field.Instance != null => GetRelativeRefWriteEffect(field.Instance),
+            IArrayElementReferenceOperation array => GetRelativeRefWriteEffect(array.ArrayReference),
+            IInlineArrayAccessOperation inlineArray => GetRelativeRefWriteEffect(inlineArray.Instance),
+            IImplicitIndexerReferenceOperation implicitIndexer => GetRelativeRefWriteEffect(implicitIndexer.Instance),
+            IOperation pointer when IsPointerIndirection(pointer) &&
+                                    pointer.ChildOperations.FirstOrDefault() is { } operand =>
+                GetRelativeRefWriteEffect(operand),
+            _ => SharpProofEffect.Unknown
+        };
     }
     private static bool IsPointerIndirection(IOperation operation) =>
         operation.Syntax.IsKind(SyntaxKind.PointerIndirectionExpression);
