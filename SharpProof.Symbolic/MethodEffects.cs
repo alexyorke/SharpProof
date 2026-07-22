@@ -358,8 +358,20 @@ internal sealed class MethodEffectAnalysisSession(
                             target.CapturedReadEffect,
                             target.CapturedWriteEffect);
                 }
-                else
-                    preservesFreshArguments = AnalyzeCall(invocation.TargetMethod, invocation, builder, invocation.Instance);
+                else {
+                    var isFreshInitializerCall = invocation.IsImplicit &&
+                                                 invocation.Syntax.AncestorsAndSelf().Any(static syntax =>
+                                                     syntax is InitializerExpressionSyntax or
+                                                         WithExpressionSyntax or
+                                                         AnonymousObjectCreationExpressionSyntax);
+                    preservesFreshArguments = AnalyzeCall(
+                        invocation.TargetMethod,
+                        invocation,
+                        builder,
+                        invocation.Instance,
+                        isFreshInitializerCall ? SharpProofEffect.None : null,
+                        isFreshInitializerCall ? SharpProofEffect.WritesFreshOwnedState : null);
+                }
                 builder.MarkEscapedArguments(invocation.Arguments, preservesFreshArguments);
                 break;
             case IBinaryOperation { OperatorMethod: not null } binary:
@@ -774,8 +786,21 @@ internal sealed class MethodEffectAnalysisSession(
                                     containingType?.SpecialType == SpecialType.System_String &&
                                     method.Name is nameof(string.IsNullOrEmpty) or nameof(string.IsNullOrWhiteSpace);
         var typeDefinition = containingType?.OriginalDefinition.ToDisplayString();
+        var isListType = typeDefinition == "System.Collections.Generic.List<T>";
         var isSpanToArray = string.Equals(method.Name, "ToArray", StringComparison.Ordinal) &&
                             typeDefinition is "System.Span<T>" or "System.ReadOnlySpan<T>";
+        if (isListType && (method.MethodKind == MethodKind.Constructor ||
+                           string.Equals(method.Name, "Add", StringComparison.Ordinal) &&
+                           method.Parameters.Length == 1)) {
+            effects = new MethodEffects(
+                SharpProofEffect.WritesReceiverState |
+                (method.MethodKind == MethodKind.Constructor ? SharpProofEffect.None : SharpProofEffect.Allocates),
+                SharpProofCapability.None,
+                [],
+                [],
+                []);
+            return true;
+        }
         if (isStringNullPredicate) {
             effects = new MethodEffects(
                 SharpProofEffect.None,
