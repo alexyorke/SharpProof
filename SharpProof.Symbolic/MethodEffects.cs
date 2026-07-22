@@ -3179,15 +3179,21 @@ internal sealed class MethodEffectAnalysisSession(
             Compilation compilation,
             out ImmutableArray<IOperation> values) {
             values = [];
-            var declaration = creation.Constructor?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+            if (creation.Constructor is not { } constructor) return false;
+            var declaration = constructor.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
             if (declaration is TypeDeclarationSyntax { ParameterList: not null } primaryType &&
                 TryGetPrimaryConstructorMemberInitializer(
                     creation, primaryType, memberPath, compilation, out values)) {
                 return true;
             }
-            if (creation.Constructor == null || declaration == null) return false;
+            if (declaration == null) {
+                var typeDeclaration = constructor.ContainingType.DeclaringSyntaxReferences
+                    .FirstOrDefault()?.GetSyntax();
+                return typeDeclaration != null && TryGetDeclaredMemberInitializer(
+                    typeDeclaration, memberPath, compilation, out values);
+            }
             return TryGetConstructorDeclarationMemberOrigins(
-                creation.Constructor,
+                constructor,
                 creation,
                 declaration,
                 memberPath,
