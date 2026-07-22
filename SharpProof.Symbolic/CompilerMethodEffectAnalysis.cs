@@ -1081,6 +1081,12 @@ internal sealed class MethodEffectAnalysisSession(
             var exactTarget = SymbolicDispatchFacts.ResolveExactDispatchTarget(target, null, receiver.ExactType);
             if (exactTarget != null) target = exactTarget;
             effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+            if (target.IsStatic && target.MethodKind != MethodKind.StaticConstructor &&
+                target.ContainingType.GetMembers().OfType<IMethodSymbol>().FirstOrDefault(static candidate =>
+                    candidate.MethodKind == MethodKind.StaticConstructor && !candidate.IsImplicitlyDeclared) is { } initializer) {
+                var initializerSummary = GetSummary(initializer, null);
+                AddSummary(initializerSummary.Effects, EffectFlowValue.None, [], site, initializer);
+            }
             if (target.IsImplicitlyDeclared) return EffectFlowValue.None;
             if (exactTarget == null && (target.IsVirtual || target.ContainingType?.TypeKind == TypeKind.Interface)) {
                 effects.Add(SharpProofEffect.DispatchUncertainty, site.Syntax, target, "dispatch_uncertainty");
