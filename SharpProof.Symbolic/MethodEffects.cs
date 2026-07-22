@@ -457,7 +457,10 @@ internal sealed class MethodEffectAnalysisSession(
                         isFreshInitializerCall ? SharpProofEffect.None : null,
                         isFreshInitializerCall ? SharpProofEffect.WritesFreshOwnedState : null);
                 }
-                builder.MarkEscapedArguments(invocation.Arguments, preservesFreshArguments);
+                builder.MarkEscapedArguments(
+                    invocation.Arguments,
+                    preservesFreshArguments,
+                    conversion => CanPreserveFreshConversionOperand(conversion, builder));
                 break;
             case IBinaryOperation { OperatorMethod: not null } binary:
                 AnalyzeCall(binary.OperatorMethod, binary, builder);
@@ -1304,6 +1307,24 @@ internal sealed class MethodEffectAnalysisSession(
                 return false;
         }
         return true;
+    }
+    private bool CanPreserveFreshConversionOperand(
+        IConversionOperation conversion,
+        Builder builder) {
+        if (conversion.OperatorMethod is not { } operatorMethod) return false;
+        var method = (operatorMethod.PartialImplementationPart ?? operatorMethod).OriginalDefinition;
+        var syntax = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+        if (syntax == null) return false;
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var effects = Analyze(method, syntax, model).Effects;
+        const SharpProofEffect externalWrites =
+            SharpProofEffect.WritesAmbientState |
+            SharpProofEffect.WritesReceiverState |
+            SharpProofEffect.WritesArgumentState |
+            SharpProofEffect.WritesCapturedState |
+            SharpProofEffect.WritesStaticState;
+        return (effects & (externalWrites | SharpProofEffect.Unknown)) == 0 &&
+               builder.GetTrackedValueOrigin(conversion) == MethodEffectOrigin.Static;
     }
     private bool IsBodylessAutoPropertyAccessor(IMethodSymbol method) {
         if (method.AssociatedSymbol is not IPropertySymbol) return false;
@@ -4863,11 +4884,20 @@ internal sealed class MethodEffectAnalysisSession(
         }
         internal void MarkEscapedArguments(
             ImmutableArray<IArgumentOperation> arguments,
-            bool preservesFreshArguments) {
+            bool preservesFreshArguments,
+            Func<IConversionOperation, bool> preservesConversionOperand) {
             if (preservesFreshArguments) return;
             foreach (var argument in arguments) {
                 var value = argument.Value;
-                while (value is IConversionOperation conversion) value = conversion.Operand;
+                while (value is IConversionOperation { OperatorMethod: null } conversion)
+                    value = conversion.Operand;
+                if (value is IConversionOperation userConversion &&
+                    preservesConversionOperand(userConversion))
+                    continue;
+                if (value is IConversionOperation conversionWithOperator)
+                    value = conversionWithOperator.Operand;
+                while (value is IConversionOperation { OperatorMethod: null } conversion)
+                    value = conversion.Operand;
                 if (value is not ILocalReferenceOperation local) continue;
                 _freshLocals.Remove(local.Local);
                 _memberOrigins.Remove(local.Local);
@@ -4878,6 +4908,7 @@ internal sealed class MethodEffectAnalysisSession(
                 }
             }
         }
+        internal MethodEffectOrigin GetTrackedValueOrigin(IOperation value) => GetValueOrigin(value);
         internal bool TryGetRefLocalEffects(
             IOperation? value,
             out SharpProofEffect readEffect,
