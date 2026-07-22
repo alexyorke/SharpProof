@@ -332,6 +332,8 @@ internal sealed class MethodEffectAnalysisSession(
                         }
                     }
                 }
+                foreach (var spread in collection.Elements.OfType<ISpreadOperation>())
+                    AnalyzeCollectionSpread(spread, semanticModel, builder);
                 break;
             case IAnonymousObjectCreationOperation anonymousObject:
                 builder.Add(SharpProofEffect.Allocates, anonymousObject, anonymousObject.Type, "anonymous_object_allocation");
@@ -458,6 +460,43 @@ internal sealed class MethodEffectAnalysisSession(
             collection.Syntax.SpanStart,
             invocation,
             SpeculativeBindingOption.BindAsExpression).Symbol as IMethodSymbol;
+    }
+    private void AnalyzeCollectionSpread(
+        ISpreadOperation spread,
+        SemanticModel semanticModel,
+        Builder builder) {
+        if (spread.Operand.Syntax is not ExpressionSyntax expression) {
+            builder.AddUnknown(spread, "unresolved_collection_spread");
+            return;
+        }
+        var invocation = SyntaxFactory.InvocationExpression(
+            SyntaxFactory.MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                expression.WithoutTrivia(),
+                SyntaxFactory.IdentifierName("GetEnumerator")));
+        var getEnumerator = semanticModel.GetSpeculativeSymbolInfo(
+            spread.Syntax.SpanStart,
+            invocation,
+            SpeculativeBindingOption.BindAsExpression).Symbol as IMethodSymbol;
+        AnalyzeCall(getEnumerator, spread, builder, spread.Operand);
+        if (getEnumerator == null) return;
+        var enumeratorType = getEnumerator.ReturnType;
+        AnalyzeCall(FindProtocolMethod(enumeratorType, "MoveNext"), spread, builder);
+        AnalyzeCall(FindProtocolProperty(enumeratorType, "Current")?.GetMethod, spread, builder);
+        AnalyzeCall(FindProtocolMethod(enumeratorType, "Dispose"), spread, builder);
+    }
+    private static IMethodSymbol? FindProtocolMethod(ITypeSymbol type, string name) =>
+        GetProtocolTypes(type)
+            .SelectMany(candidate => candidate.GetMembers(name).OfType<IMethodSymbol>())
+            .FirstOrDefault(static method => method.Parameters.Length == 0);
+    private static IPropertySymbol? FindProtocolProperty(ITypeSymbol type, string name) =>
+        GetProtocolTypes(type)
+            .SelectMany(candidate => candidate.GetMembers(name).OfType<IPropertySymbol>())
+            .FirstOrDefault(static property => property.Parameters.Length == 0);
+    private static IEnumerable<INamedTypeSymbol> GetProtocolTypes(ITypeSymbol type) {
+        if (type is not INamedTypeSymbol named) yield break;
+        for (var current = named; current != null; current = current.BaseType) yield return current;
+        foreach (var @interface in named.AllInterfaces) yield return @interface;
     }
     private void AssignTrackedLocal(Builder builder, ILocalSymbol local, IOperation value) {
         builder.AssignLocal(local, value);
