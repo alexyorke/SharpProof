@@ -195,6 +195,21 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
         });
     }
+    [TestCase("true || Mutate()")]
+    [TestCase("false && Mutate()")]
+    public void ConstantBooleanShortCircuitSkipsRightOperand(string expression) {
+        var result = Analyze($$"""
+            class C {
+                static int state;
+                static bool Mutate() { state++; return true; }
+                static bool M() => {{expression}};
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
+        });
+    }
     [TestCase("static int M(int[] values) => values.Length;", SharpProofVerdict.Proven)]
     [TestCase("static int[] M(int x) => [1, x, 3];", SharpProofVerdict.Disproven)]
     public void ArrayIntrinsicsHaveStructuralEffects(string method, SharpProofVerdict expectedAllocationFree) {
