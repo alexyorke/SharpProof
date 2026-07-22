@@ -1572,12 +1572,29 @@ internal sealed class MethodEffectAnalysisSession(
                     defaultSection = section;
                     continue;
                 }
-                if (label is not CaseSwitchLabelSyntax caseLabel) continue;
-                var caseValue = semanticModel.GetConstantValue(caseLabel.Value);
-                if (caseValue.HasValue && Equals(governing.Value, caseValue.Value)) {
+                if (label is CaseSwitchLabelSyntax caseLabel) {
+                    var caseValue = semanticModel.GetConstantValue(caseLabel.Value);
+                    if (!caseValue.HasValue) return false;
+                    if (Equals(governing.Value, caseValue.Value)) {
+                        selected = section;
+                        return true;
+                    }
+                    continue;
+                }
+                if (label is CasePatternSwitchLabelSyntax patternLabel) {
+                    if (!TryMatchConstantPattern(
+                            patternLabel.Pattern, governing.Value, semanticModel, out var matches))
+                        return false;
+                    if (!matches) continue;
+                    if (patternLabel.WhenClause != null) {
+                        var guard = semanticModel.GetConstantValue(patternLabel.WhenClause.Condition);
+                        if (!guard.HasValue || guard.Value is not bool enabled) return false;
+                        if (!enabled) continue;
+                    }
                     selected = section;
                     return true;
                 }
+                return false;
             }
         selected = defaultSection!;
         return true;
