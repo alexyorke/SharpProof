@@ -419,6 +419,18 @@ internal sealed class MethodEffectAnalysisSession(
             return false;
         }
         var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        if (method.MethodKind == MethodKind.LocalFunction &&
+            model.GetOperation(syntax, cancellationToken) is ILocalFunctionOperation localFunction &&
+            localFunction.Body is { } localFunctionBody &&
+            builder.TryGetCapturedEffects(
+                localFunction,
+                localFunctionBody,
+                localFunction.Symbol,
+                out var localCapturedReadEffect,
+                out var localCapturedWriteEffect)) {
+            capturedReadEffect = localCapturedReadEffect;
+            capturedWriteEffect = localCapturedWriteEffect;
+        }
         var remappedSource = AddCallEffects(
             Analyze(method, syntax, model), site, method, "source_call", receiver, builder,
             receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
@@ -1116,24 +1128,12 @@ internal sealed class MethodEffectAnalysisSession(
             if (target != null) _delegateTargets[local] = [target];
         }
         private DelegateTarget CreateAnonymousFunctionTarget(IAnonymousFunctionOperation function) {
-            var capturedReadEffect = SharpProofEffect.None;
-            var capturedWriteEffect = SharpProofEffect.None;
-            var hasCapture = false;
-            foreach (var operation in function.Body.DescendantsAndSelf()) {
-                if (!BelongsDirectlyTo(function, operation)) continue;
-                IOperation? captured = operation switch {
-                    ILocalReferenceOperation local when
-                        !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, function.Symbol) => local,
-                    IParameterReferenceOperation parameter when
-                        !SymbolEqualityComparer.Default.Equals(parameter.Parameter.ContainingSymbol, function.Symbol) => parameter,
-                    IInstanceReferenceOperation instance => instance,
-                    _ => null
-                };
-                if (captured == null) continue;
-                hasCapture = true;
-                capturedReadEffect |= GetInstanceReadEffect(captured, this);
-                capturedWriteEffect |= GetInstanceWriteEffect(captured, this);
-            }
+            var hasCapture = TryGetCapturedEffects(
+                function,
+                function.Body,
+                function.Symbol,
+                out var capturedReadEffect,
+                out var capturedWriteEffect);
             return new DelegateTarget(
                 function.Symbol.OriginalDefinition,
                 null,
@@ -1142,10 +1142,37 @@ internal sealed class MethodEffectAnalysisSession(
                 hasCapture ? capturedReadEffect : null,
                 hasCapture ? capturedWriteEffect : null);
         }
-        private static bool BelongsDirectlyTo(IAnonymousFunctionOperation function, IOperation operation) {
-            for (var current = operation.Parent; current != null; current = current.Parent)
-                if (current is IAnonymousFunctionOperation ancestor)
-                    return ReferenceEquals(ancestor, function);
+        internal bool TryGetCapturedEffects(
+            IOperation function,
+            IOperation body,
+            IMethodSymbol functionSymbol,
+            out SharpProofEffect capturedReadEffect,
+            out SharpProofEffect capturedWriteEffect) {
+            capturedReadEffect = SharpProofEffect.None;
+            capturedWriteEffect = SharpProofEffect.None;
+            var hasCapture = false;
+            foreach (var operation in body.DescendantsAndSelf()) {
+                if (!BelongsDirectlyTo(function, operation)) continue;
+                IOperation? captured = operation switch {
+                    ILocalReferenceOperation local when
+                        !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, functionSymbol) => local,
+                    IParameterReferenceOperation parameter when
+                        !SymbolEqualityComparer.Default.Equals(parameter.Parameter.ContainingSymbol, functionSymbol) => parameter,
+                    IInstanceReferenceOperation instance => instance,
+                    _ => null
+                };
+                if (captured == null) continue;
+                hasCapture = true;
+                capturedReadEffect |= GetInstanceReadEffect(captured, this);
+                capturedWriteEffect |= GetInstanceWriteEffect(captured, this);
+            }
+            return hasCapture;
+        }
+        private static bool BelongsDirectlyTo(IOperation function, IOperation operation) {
+            for (var current = operation.Parent; current != null; current = current.Parent) {
+                if (ReferenceEquals(current, function)) return true;
+                if (current is IAnonymousFunctionOperation or ILocalFunctionOperation) return false;
+            }
             return false;
         }
         internal void AssignLocal(ILocalSymbol local, IOperation value) {

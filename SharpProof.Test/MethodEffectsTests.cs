@@ -685,6 +685,41 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void LocalFunctionMutationOfCallerCaptureRemainsArgumentOwned() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            class C {
+                static void M(Box input) {
+                    void SetValue() { input.Value = 1; }
+                    SetValue();
+                }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.False);
+        });
+    }
+    [Test]
+    public void LocalFunctionUsesCaptureOwnershipAtInvocation() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            class C {
+                static void M(Box input) {
+                    var box = new Box();
+                    void SetValue() { box.Value = 1; }
+                    box = input;
+                    SetValue();
+                }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.False);
+        });
+    }
+    [Test]
     public void ReassignedDelegateUsesTheCurrentTarget() {
         var result = Analyze("""
             class C {
