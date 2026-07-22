@@ -1716,6 +1716,14 @@ internal sealed class MethodEffectAnalysisSession(
                     ? GetInstanceWriteEffect(source, builder)
                     : GetInstanceReadEffect(source, builder);
             }
+            var member = targetMethod.ContainingType.GetMembers(identifier.Identifier.ValueText)
+                .FirstOrDefault(candidate => candidate is IFieldSymbol or IPropertySymbol);
+            if (member?.IsStatic == true)
+                return write ? SharpProofEffect.WritesStaticState : SharpProofEffect.ReadsStaticState;
+            if (member != null)
+                return write
+                    ? GetInstanceWriteEffect(invocation.Instance, builder)
+                    : GetInstanceReadEffect(invocation.Instance, builder);
         }
         if (expression is ThisExpressionSyntax)
             return write
