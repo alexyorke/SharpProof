@@ -1339,6 +1339,10 @@ internal sealed class MethodEffectAnalysisSession(
                 IsNullConstant(conditionalAccess.Operation) &&
                 !IsWithinOperation(operation, conditionalAccess.Operation))
                 return false;
+            if (parent is ICoalesceOperation coalesce &&
+                IsNonNullConstant(coalesce.Value) &&
+                IsWithinOperation(operation, coalesce.WhenNull))
+                return false;
         }
         for (var current = operation.Syntax; current != null && current != declaration; current = current.Parent)
             if (current is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax)
@@ -1371,6 +1375,9 @@ internal sealed class MethodEffectAnalysisSession(
                 return true;
         return false;
     }
+    private static bool IsNonNullConstant(IOperation operation) =>
+        operation.ConstantValue is { HasValue: true, Value: not null } ||
+        operation is IConversionOperation conversion && IsNonNullConstant(conversion.Operand);
     private static bool IsOmittedInvocation(
         IInvocationOperation invocation,
         SemanticModel semanticModel) =>
