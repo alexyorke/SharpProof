@@ -441,6 +441,24 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void FixedPointerWriteToFreshObjectRemainsFreshOwned() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            unsafe class C {
+                static void M() {
+                    var fresh = new Box();
+                    fixed (int* pointer = &fresh.Value) {
+                        *pointer = 1;
+                    }
+                }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+        });
+    }
+    [Test]
     public void NestedFreshObjectGraphWritesRemainFreshOwned() {
         var result = Analyze("""
             sealed class Box { public int Value; }
