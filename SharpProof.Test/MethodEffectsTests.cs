@@ -1377,6 +1377,20 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void UnusedLocalFunctionAssignmentDoesNotAffectConstructor() {
+        var result = Analyze("""
+            class C {
+                private static int state;
+                C() {
+                    static void Local() { state = 1; }
+                }
+            }
+            """, 3);
+        Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False,
+            string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+    }
+    [Test]
     public void WithExpressionIncludesCopyConstructorEffects() {
         var result = Analyze("""
             sealed record R {
