@@ -973,7 +973,7 @@ internal sealed class MethodEffectAnalysisSession(
             var arguments = EvaluateArguments(creation.Arguments, ref state);
             var value = EffectFlowValue.Fresh(creation.Type);
             effects.Add(SharpProofEffect.Allocates, creation.Syntax, creation.Type, "object_allocation");
-            AddExplicitTypeInitializerEffects(creation.Type, creation);
+            AddConstructionTypeInitializerEffects(creation.Type, creation);
             if (creation.Constructor != null) {
                 var summary = GetSummary(creation.Constructor, null);
                 AddSummary(summary.Effects, value, arguments, creation, creation.Constructor);
@@ -1120,6 +1120,12 @@ internal sealed class MethodEffectAnalysisSession(
                 return;
             var initializerSummary = GetSummary(initializer, null);
             AddSummary(initializerSummary.Effects, EffectFlowValue.None, [], site, initializer);
+        }
+        private void AddConstructionTypeInitializerEffects(ITypeSymbol? type, IOperation site) {
+            if (type is not INamedTypeSymbol named) return;
+            var hierarchy = new Stack<INamedTypeSymbol>();
+            for (var current = named; current != null; current = current.BaseType) hierarchy.Push(current);
+            while (hierarchy.Count != 0) AddExplicitTypeInitializerEffects(hierarchy.Pop(), site);
         }
         private EffectFlowValue ResolveRefReturn(
             IMethodSymbol target,
