@@ -1327,6 +1327,9 @@ internal sealed class MethodEffectAnalysisSession(
         _ => false
     };
     private static bool IsVisible(IOperation operation, SyntaxNode declaration, SemanticModel semanticModel) {
+        for (var parent = operation.Parent; parent != null; parent = parent.Parent)
+            if (parent is INameOfOperation)
+                return false;
         for (var current = operation.Syntax; current != null && current != declaration; current = current.Parent)
             if (current is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax)
                 return false;
