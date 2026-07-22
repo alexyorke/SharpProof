@@ -571,6 +571,28 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ForeachTreatsStructEnumeratorAsCompilerOwned() {
+        var result = Analyze("""
+            sealed class Enumerable {
+                public Enumerator GetEnumerator() => default;
+            }
+            struct Enumerator {
+                private int index;
+                public bool MoveNext() => index++ < 0;
+                public int Current => 0;
+            }
+            class C {
+                static void M(Enumerable values) {
+                    foreach (var value in values) { }
+                }
+            }
+            """, 10);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+        });
+    }
+    [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {
