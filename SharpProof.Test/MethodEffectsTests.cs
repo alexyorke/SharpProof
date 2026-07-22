@@ -1139,6 +1139,26 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void DeconstructionAssignmentIncludesDeconstructEffects() {
+        var result = Analyze("""
+            sealed class Pair {
+                private static int state;
+                public void Deconstruct(out int left, out int right) {
+                    state++;
+                    left = 1;
+                    right = 2;
+                }
+            }
+            class C {
+                static void M(Pair value) { var (left, right) = value; }
+            }
+            """, 10);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void CoalesceAssignmentWritesArgumentState() {
         var result = Analyze("""
             #nullable enable
