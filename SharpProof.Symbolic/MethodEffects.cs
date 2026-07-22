@@ -2468,20 +2468,43 @@ internal sealed class MethodEffectAnalysisSession(
             if (value is ILocalReferenceOperation local &&
                 _delegateTargets.TryGetValue(local.Local, out var localTargets))
                 return localTargets;
+            if (value is IInvocationOperation invocation &&
+                GetInvocationDelegateTargets(invocation) is { IsDefaultOrEmpty: false } invocationTargets)
+                return invocationTargets;
             if (value is IDelegateCreationOperation creation) value = creation.Target;
-            var target = value switch {
-                IMethodReferenceOperation reference => new DelegateTarget(
-                    reference.Method.OriginalDefinition,
-                    reference.Instance,
-                    reference.Instance == null ? null : GetInstanceReadEffect(reference.Instance, this),
-                    reference.Instance == null ? null : GetInstanceWriteEffect(reference.Instance, this),
-                    null,
-                    null),
-                IAnonymousFunctionOperation function => CreateAnonymousFunctionTarget(function),
-                _ => null
-            };
+            var target = CreateDelegateTarget(value);
             return target == null ? [] : [target];
         }
+        private ImmutableArray<DelegateTarget> GetInvocationDelegateTargets(IInvocationOperation invocation) {
+            var targetMethod = invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod;
+            targetMethod = (targetMethod.PartialImplementationPart ?? targetMethod).OriginalDefinition;
+            var declaration = targetMethod.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+            var expressions = GetDirectReturnExpressions(declaration);
+            if (expressions.IsDefaultOrEmpty || invocation.SemanticModel?.Compilation is not { } compilation)
+                return [];
+            var targets = ImmutableArray.CreateBuilder<DelegateTarget>();
+            foreach (var expression in expressions) {
+                var model = compilation.GetSemanticModel(expression.SyntaxTree);
+                var value = model.GetOperation(expression);
+                while (value is IConversionOperation conversion) value = conversion.Operand;
+                if (value is IDelegateCreationOperation creation) value = creation.Target;
+                var target = value == null ? null : CreateDelegateTarget(value);
+                if (target == null) return [];
+                targets.Add(target);
+            }
+            return targets.ToImmutable();
+        }
+        private DelegateTarget? CreateDelegateTarget(IOperation value) => value switch {
+            IMethodReferenceOperation reference => new DelegateTarget(
+                reference.Method.OriginalDefinition,
+                reference.Instance,
+                reference.Instance == null ? null : GetInstanceReadEffect(reference.Instance, this),
+                reference.Instance == null ? null : GetInstanceWriteEffect(reference.Instance, this),
+                null,
+                null),
+            IAnonymousFunctionOperation function => CreateAnonymousFunctionTarget(function),
+            _ => null
+        };
         internal void ApplyDelegateCompoundAssignment(ILocalSymbol local, IOperation value, bool adds) {
             local = (ILocalSymbol)local.OriginalDefinition;
             if (!adds) {
