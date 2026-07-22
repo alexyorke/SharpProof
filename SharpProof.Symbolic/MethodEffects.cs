@@ -2903,6 +2903,30 @@ internal sealed class MethodEffectAnalysisSession(
                 }
                 return TryGetObjectInitializerMember(element, path, index + 1, out initializer);
             }
+            if (value is ITupleOperation tuple && value.Type is INamedTypeSymbol tupleType) {
+                for (var elementIndex = 0;
+                     elementIndex < tuple.Elements.Length && elementIndex < tupleType.TupleElements.Length;
+                     elementIndex++) {
+                    var field = tupleType.TupleElements[elementIndex];
+                    var matches = string.Equals(
+                        GetMemberPathPart(field.OriginalDefinition),
+                        path[index],
+                        StringComparison.Ordinal);
+                    if (!matches && field.CorrespondingTupleField is { } corresponding)
+                        matches = string.Equals(
+                            GetMemberPathPart(corresponding.OriginalDefinition),
+                            path[index],
+                            StringComparison.Ordinal);
+                    if (!matches) continue;
+                    var element = tuple.Elements[elementIndex];
+                    if (index == path.Count - 1) {
+                        initializer = element;
+                        return true;
+                    }
+                    return TryGetObjectInitializerMember(element, path, index + 1, out initializer);
+                }
+                return false;
+            }
             IEnumerable<ISimpleAssignmentOperation> assignments = value switch {
                 IObjectCreationOperation { Initializer: { } objectInitializer } =>
                     objectInitializer.Initializers.OfType<ISimpleAssignmentOperation>(),
@@ -3115,6 +3139,7 @@ internal sealed class MethodEffectAnalysisSession(
                     visited,
                     out readEffect,
                     out writeEffect);
+            if (value is ITupleOperation) return true;
             if (value is not (IObjectCreationOperation or IArrayCreationOperation or
                 IAnonymousObjectCreationOperation or IDelegateCreationOperation or
                 ICollectionExpressionOperation))
