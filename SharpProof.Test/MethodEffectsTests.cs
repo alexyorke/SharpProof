@@ -1190,6 +1190,28 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void AwaitIncludesInheritedContinuationEffects() {
+        var result = Analyze("""
+            static class Globals { public static int Count; }
+            class BaseAwaiter : System.Runtime.CompilerServices.INotifyCompletion {
+                public void OnCompleted(System.Action continuation) { Globals.Count++; }
+            }
+            sealed class Awaiter : BaseAwaiter {
+                public bool IsCompleted => false;
+                public int GetResult() => 1;
+            }
+            sealed class Awaitable { public Awaiter GetAwaiter() => new(); }
+            class C {
+                static async System.Threading.Tasks.Task<int> M(Awaitable value) => await value;
+            }
+            """, 11);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ListCollectionExpressionAllocates() {
         var result = Analyze("""
             class C {
