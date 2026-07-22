@@ -18,10 +18,14 @@ internal sealed class MethodEffectAnalysisSession(
     SmtAnalysisService? smtAnalysis = null) {
     private readonly Dictionary<IMethodSymbol, CompilerMethodEffectSummary> _cache = new(SymbolEqualityComparer.Default);
     private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
+    private readonly object _gate = new();
     private readonly MetadataMethodEffectAnalyzer _metadata = new(compilation);
     private Compilation Compilation => compilation;
     private CancellationToken CancellationToken => cancellationToken;
     internal MethodEffects Analyze(IMethodSymbol method, SyntaxNode declaration, SemanticModel semanticModel) {
+        lock (_gate) return AnalyzeCore(method, declaration, semanticModel);
+    }
+    private MethodEffects AnalyzeCore(IMethodSymbol method, SyntaxNode declaration, SemanticModel semanticModel) {
         var result = AnalyzeSummary(method, declaration, semanticModel, null).Effects;
         if (method.MethodKind == MethodKind.StaticConstructor) return result;
         if (method.IsStatic) return IncludeTypeInitializerEffects(result, method.ContainingType);
