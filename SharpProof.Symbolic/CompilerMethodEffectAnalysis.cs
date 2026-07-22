@@ -1220,7 +1220,8 @@ internal sealed class MethodEffectAnalysisSession(
                     var bound = BindCallable(local, null, ref state).Callables.FirstOrDefault();
                     if (bound != null) {
                         var localSummary = GetSummary(bound.Method, bound.Captures);
-                        if (bound.Captures.Count == 0)
+                        if (bound.Captures.Values.All(static capture => capture.Roots.All(static root =>
+                                root.Kind == EffectValueRootKind.Fresh)))
                             AddSummary(localSummary.Effects, bound.Receiver, values, site, bound.Method,
                                 localSummary.WrittenArgumentOrdinals, localSummary.ReadArgumentOrdinals);
                         else
