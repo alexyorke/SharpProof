@@ -812,10 +812,20 @@ internal sealed class MethodEffectAnalysisSession(
                     var original = Evaluate(withOperation.Operand, ref state);
                     var clone = EffectFlowValue.Fresh(withOperation.Type);
                     var cloneMethod = withOperation.CloneMethod;
-                    if (cloneMethod?.IsImplicitlyDeclared == true && withOperation.Type is INamedTypeSymbol recordType)
-                        cloneMethod = recordType.InstanceConstructors.FirstOrDefault(candidate => candidate.Parameters.Length == 1 &&
-                            SymbolEqualityComparer.Default.Equals(candidate.Parameters[0].Type, recordType));
-                    if (cloneMethod != null) InvokeCore(cloneMethod, clone, [original], [], withOperation, ref state);
+                    if (cloneMethod != null) {
+                        var exactClone = SymbolicDispatchFacts.ResolveExactDispatchTarget(cloneMethod, null, original.ExactType);
+                        if (exactClone == null && (cloneMethod.IsVirtual || cloneMethod.IsOverride))
+                            InvokeCore(cloneMethod, original, [], [], withOperation, ref state);
+                        else if ((exactClone ?? cloneMethod).ContainingType is { } cloneType) {
+                            clone = EffectFlowValue.Fresh(cloneType);
+                            var copyConstructor = cloneType.InstanceConstructors.FirstOrDefault(candidate =>
+                                candidate.Parameters.Length == 1 &&
+                                SymbolEqualityComparer.Default.Equals(candidate.Parameters[0].Type, cloneType));
+                            if (copyConstructor != null)
+                                InvokeCore(copyConstructor, clone, [original], [], withOperation, ref state);
+                            else InvokeCore(exactClone ?? cloneMethod, original, [], [], withOperation, ref state);
+                        }
+                    }
                     Evaluate(withOperation.Initializer, ref state);
                     return clone;
                 case IRecursivePatternOperation { DeconstructSymbol: IMethodSymbol deconstruct } recursivePattern:
