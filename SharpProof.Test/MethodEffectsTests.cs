@@ -916,6 +916,19 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void DynamicBinaryOperatorRemainsUnknown() {
+        var result = Analyze("""
+            class C {
+                static dynamic M(dynamic left, dynamic right) => left + right;
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.True);
+        });
+    }
+    [Test]
     public void FunctionPointerInvocationRemainsUnknown() {
         var result = Analyze("""
             unsafe class C {
