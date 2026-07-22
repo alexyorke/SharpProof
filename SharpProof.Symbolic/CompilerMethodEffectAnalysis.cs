@@ -409,6 +409,11 @@ internal sealed class MethodEffectAnalysisSession(
                     var target = Evaluate(semanticModel.GetOperation(assignment.Left, session.CancellationToken), ref state);
                     effects.Write(target, assignment.Left, null, "ref_return_write");
                 }
+            foreach (var filter in root.Syntax.DescendantNodes().OfType<CatchFilterClauseSyntax>()) {
+                var filterState = state;
+                Evaluate(semanticModel.GetOperation(filter.FilterExpression, session.CancellationToken), ref filterState);
+                state = state.Merge(filterState);
+            }
             return state;
         }
         internal EffectFlowState AnalyzeConstructorInitializer(SyntaxNode declaration, EffectFlowState state) {
@@ -806,7 +811,9 @@ internal sealed class MethodEffectAnalysisSession(
                                              .Select(expression => semanticModel.GetTypeInfo(expression.Expression,
                                                  session.CancellationToken).Type).FirstOrDefault() ??
                                          thrown.Exception?.Type;
-                        if (IsCaught(thrown, thrownType)) effects.Caught(thrownType, thrown.Syntax, "caught_explicit_throw");
+                        if (thrown.Syntax.AncestorsAndSelf().Any(static syntax => syntax is CatchFilterClauseSyntax))
+                            effects.Caught(thrownType, thrown.Syntax, "catch_filter_exception");
+                        else if (IsCaught(thrown, thrownType)) effects.Caught(thrownType, thrown.Syntax, "caught_explicit_throw");
                         else effects.Throw(thrownType, thrown.Syntax, "explicit_throw");
                     }
                     return exception;
@@ -879,12 +886,15 @@ internal sealed class MethodEffectAnalysisSession(
             var value = semanticModel.GetConstantValue(clause.Filter.FilterExpression, session.CancellationToken);
             return value is { HasValue: true, Value: true };
         }
-        private MethodEffects ApplyCatches(MethodEffects summary, IOperation site) => summary with {
-            ExceptionFacts = [.. summary.ExceptionFacts.Select(fact =>
-                fact.Escape != SharpProofVerdict.Disproven && IsCaught(site.Syntax, fact.ExceptionType)
-                    ? fact with { Escape = SharpProofVerdict.Disproven }
-                    : fact)]
-        };
+        private MethodEffects ApplyCatches(MethodEffects summary, IOperation site) {
+            var inFilter = site.Syntax.AncestorsAndSelf().Any(static syntax => syntax is CatchFilterClauseSyntax);
+            return summary with {
+                ExceptionFacts = [.. summary.ExceptionFacts.Select(fact =>
+                    fact.Escape != SharpProofVerdict.Disproven && (inFilter || IsCaught(site.Syntax, fact.ExceptionType))
+                        ? fact with { Escape = SharpProofVerdict.Disproven }
+                        : fact)]
+            };
+        }
         private bool IsCompileTimeSkipped(IOperation operation) {
             var key = (operation.Kind, operation.Syntax.Span);
             if (operation.IsImplicit && operation is IObjectCreationOperation { Type.Name: "SwitchExpressionException" } &&
