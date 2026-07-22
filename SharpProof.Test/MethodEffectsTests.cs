@@ -3769,6 +3769,26 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void RefForeachPreservesUserDefinedSpanConversionOrigin() {
+        var result = Analyze("""
+            static class Globals { public static int[] Shared = [0]; }
+            sealed class Source {
+                public static implicit operator System.Span<int>(Source source) => Globals.Shared;
+            }
+            class C {
+                static void M(Source input) {
+                    foreach (ref var value in (System.Span<int>)input) { value++; }
+                }
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void DirectMutationDoesNotBypassUserDefinedConversionOrigin() {
         var result = Analyze("""
             sealed class Box { public int State; }
