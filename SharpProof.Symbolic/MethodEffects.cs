@@ -312,8 +312,15 @@ internal sealed class MethodEffectAnalysisSession(
                     collection.ConstructMethod == null && collection.Type?.IsReferenceType == true)
                     builder.Add(SharpProofEffect.Allocates, collection, collection.Type,
                         "collection_expression_allocation");
-                else if (collection.ConstructMethod is { } builderMethod)
-                    AnalyzeCall(builderMethod, collection, builder);
+                if (collection.ConstructMethod is { } constructMethod) {
+                    var isConstructor = constructMethod.MethodKind == MethodKind.Constructor;
+                    AnalyzeCall(
+                        constructMethod,
+                        collection,
+                        builder,
+                        receiverReadEffect: isConstructor ? SharpProofEffect.None : null,
+                        receiverWriteEffect: isConstructor ? SharpProofEffect.WritesFreshOwnedState : null);
+                }
                 break;
             case IAnonymousObjectCreationOperation anonymousObject:
                 builder.Add(SharpProofEffect.Allocates, anonymousObject, anonymousObject.Type, "anonymous_object_allocation");
