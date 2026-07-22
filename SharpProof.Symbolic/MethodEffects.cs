@@ -512,6 +512,17 @@ internal sealed class MethodEffectAnalysisSession(
                         "span_foreach_read");
                     break;
                 }
+                if (foreachCollection.Type is INamedTypeSymbol inlineArrayType &&
+                    inlineArrayType.GetAttributes().Any(static attribute =>
+                        attribute.AttributeClass?.ToDisplayString() ==
+                        "System.Runtime.CompilerServices.InlineArrayAttribute")) {
+                    builder.Add(
+                        GetInstanceReadEffect(foreachCollection, builder),
+                        loop,
+                        inlineArrayType,
+                        "inline_array_foreach_read");
+                    break;
+                }
                 var info = semanticModel.GetForEachStatementInfo(syntax);
                 AnalyzeCall(info.GetEnumeratorMethod, loop, builder, loop.Collection);
                 var enumeratorType = info.GetEnumeratorMethod?.ReturnType;
