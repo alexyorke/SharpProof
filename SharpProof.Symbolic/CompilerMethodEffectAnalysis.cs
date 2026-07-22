@@ -813,6 +813,8 @@ internal sealed class MethodEffectAnalysisSession(
                                          thrown.Exception?.Type;
                         if (thrown.Syntax.AncestorsAndSelf().Any(static syntax => syntax is CatchFilterClauseSyntax))
                             effects.Caught(thrownType, thrown.Syntax, "catch_filter_exception");
+                        else if (IsOverriddenByFinally(thrown.Syntax))
+                            effects.Caught(thrownType, thrown.Syntax, "finally_replaces_exception");
                         else if (IsCaught(thrown, thrownType)) effects.Caught(thrownType, thrown.Syntax, "caught_explicit_throw");
                         else effects.Throw(thrownType, thrown.Syntax, "explicit_throw");
                     }
@@ -886,11 +888,23 @@ internal sealed class MethodEffectAnalysisSession(
             var value = semanticModel.GetConstantValue(clause.Filter.FilterExpression, session.CancellationToken);
             return value is { HasValue: true, Value: true };
         }
+        private bool IsOverriddenByFinally(SyntaxNode syntax) {
+            for (var current = syntax.Parent; current != null; current = current.Parent) {
+                if (current is not TryStatementSyntax { Finally: { } finallyClause } tryStatement ||
+                    finallyClause.Block.Span.Contains(syntax.Span) ||
+                    !tryStatement.Block.Span.Contains(syntax.Span) &&
+                    !tryStatement.Catches.Any(clause => clause.Block.Span.Contains(syntax.Span)))
+                    continue;
+                if (semanticModel.AnalyzeControlFlow(finallyClause.Block) is { EndPointIsReachable: false }) return true;
+            }
+            return false;
+        }
         private MethodEffects ApplyCatches(MethodEffects summary, IOperation site) {
             var inFilter = site.Syntax.AncestorsAndSelf().Any(static syntax => syntax is CatchFilterClauseSyntax);
             return summary with {
                 ExceptionFacts = [.. summary.ExceptionFacts.Select(fact =>
-                    fact.Escape != SharpProofVerdict.Disproven && (inFilter || IsCaught(site.Syntax, fact.ExceptionType))
+                    fact.Escape != SharpProofVerdict.Disproven &&
+                    (inFilter || IsOverriddenByFinally(site.Syntax) || IsCaught(site.Syntax, fact.ExceptionType))
                         ? fact with { Escape = SharpProofVerdict.Disproven }
                         : fact)]
             };
