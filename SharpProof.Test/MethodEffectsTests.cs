@@ -376,6 +376,23 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
         });
     }
+    [Test]
+    public void ListPatternIncludesLengthEffects() {
+        var result = Analyze("""
+            sealed class D {
+                private static int state;
+                public int Length { get { state++; return 0; } }
+                public int this[int index] => 0;
+            }
+            class C {
+                static bool M(D value) => value is [];
+            }
+            """, 7);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
     [TestCase("static int M(int[] values) => values.Length;", SharpProofVerdict.Proven)]
     [TestCase("static int[] M(int x) => [1, x, 3];", SharpProofVerdict.Disproven)]
     public void ArrayIntrinsicsHaveStructuralEffects(string method, SharpProofVerdict expectedAllocationFree) {
