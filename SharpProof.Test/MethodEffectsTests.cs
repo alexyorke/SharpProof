@@ -2137,6 +2137,18 @@ public sealed class MethodEffectsTests {
         Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
     }
     [Test]
+    public void StaticFieldReadIncludesImplicitTypeInitializerEffects() {
+        var result = Analyze("""
+            static class Globals {
+                public static int Count;
+                public static int Increment() { Count++; return Count; }
+            }
+            sealed class D { public static int Value = Globals.Increment(); }
+            class C { static int M() => D.Value; }
+            """, 6);
+        Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+    }
+    [Test]
     public void StaticFieldWriteIncludesTypeInitializerEffects() {
         var result = Analyze("""
             static class Globals { public static object? Value; }
