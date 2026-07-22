@@ -301,6 +301,23 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void FreshWrapperDoesNotTakeOwnershipOfNestedArgument() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            sealed class Outer { public Box Value { get; init; } }
+            class C {
+                static void M(Box input) {
+                    var outer = new Outer { Value = input };
+                    outer.Value.Value = 1;
+                }
+            }
+            """, 5);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+        });
+    }
+    [Test]
     public void ReassignedDelegateUsesTheCurrentTarget() {
         var result = Analyze("""
             class C {

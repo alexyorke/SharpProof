@@ -230,14 +230,14 @@ internal sealed class MethodEffectAnalysisSession(
             case IFieldReferenceOperation field
                 when field.Parent is not IAssignmentOperation { Target: var target } ||
                      !ReferenceEquals(target, field):
-                builder.Add(GetInstanceReadEffect(field.Instance), field, field.Field, "instance_field_read");
+                builder.Add(GetInstanceReadEffect(field.Instance, builder), field, field.Field, "instance_field_read");
                 break;
             case IPropertyReferenceOperation property
                 when property.Parent is not IAssignmentOperation { Target: var target } ||
                      !ReferenceEquals(target, property):
                 builder.Add(property.Property.IsStatic
                         ? SharpProofEffect.ReadsStaticState
-                        : GetInstanceReadEffect(property.Instance),
+                        : GetInstanceReadEffect(property.Instance, builder),
                     property,
                     property.Property,
                     "property_read");
@@ -361,6 +361,7 @@ internal sealed class MethodEffectAnalysisSession(
             builder.AddUnknown(site, "unresolved_dispatch", method);
             return;
         }
+        if (IsBodylessAutoPropertyAccessor(method)) return;
         var hasContract = TryReadEffectContract(method, out var contracted);
         var configured = externalContractResolver?.Invoke(method);
         if (configured != null) {
@@ -394,6 +395,17 @@ internal sealed class MethodEffectAnalysisSession(
         var model = compilation.GetSemanticModel(syntax.SyntaxTree);
         builder.AddTransitive(Analyze(method, syntax, model), site, method, "source_call");
         if (hasContract) builder.AddTransitive(contracted, site, method, "effect_contract");
+    }
+    private bool IsBodylessAutoPropertyAccessor(IMethodSymbol method) {
+        if (method.AssociatedSymbol is not IPropertySymbol) return false;
+        foreach (var reference in method.DeclaringSyntaxReferences)
+            if (reference.GetSyntax(cancellationToken) is AccessorDeclarationSyntax {
+                Body: null,
+                ExpressionBody: null,
+                SemicolonToken.IsMissing: false
+            })
+                return true;
+        return false;
     }
     private static bool IsStructurallyEffectFreeIntrinsic(IMethodSymbol method) =>
         method is { MethodKind: MethodKind.Constructor, ContainingType.SpecialType: SpecialType.System_Object } ||
@@ -620,21 +632,52 @@ internal sealed class MethodEffectAnalysisSession(
                 break;
         }
     }
-    private static SharpProofEffect GetInstanceWriteEffect(IOperation? instance, Builder builder) => instance switch {
-        IInstanceReferenceOperation => SharpProofEffect.WritesReceiverState,
-        IParameterReferenceOperation => SharpProofEffect.WritesArgumentState,
-        IFieldReferenceOperation { Field.IsStatic: true } => SharpProofEffect.WritesStaticState,
-        ILocalReferenceOperation local when builder.IsFresh(local.Local) => SharpProofEffect.WritesFreshOwnedState,
-        ILocalReferenceOperation => SharpProofEffect.WritesCapturedState,
+    private static SharpProofEffect GetInstanceWriteEffect(IOperation? instance, Builder builder) {
+        if (builder.TryGetFreshRootOrigin(instance, out var origin)) return GetWriteEffect(origin);
+        return instance switch {
+            IInstanceReferenceOperation => SharpProofEffect.WritesReceiverState,
+            IParameterReferenceOperation => SharpProofEffect.WritesArgumentState,
+            IFieldReferenceOperation { Field.IsStatic: true } => SharpProofEffect.WritesStaticState,
+            IFieldReferenceOperation field => GetInstanceWriteEffect(field.Instance, builder),
+            IPropertyReferenceOperation { Property.IsStatic: true } => SharpProofEffect.WritesStaticState,
+            IPropertyReferenceOperation property => GetInstanceWriteEffect(property.Instance, builder),
+            IArrayElementReferenceOperation array => GetInstanceWriteEffect(array.ArrayReference, builder),
+            IConversionOperation conversion => GetInstanceWriteEffect(conversion.Operand, builder),
+            ILocalReferenceOperation => SharpProofEffect.WritesCapturedState,
+            _ => SharpProofEffect.Unknown
+        };
+    }
+    private static SharpProofEffect GetInstanceReadEffect(IOperation? instance, Builder builder) {
+        if (builder.TryGetFreshRootOrigin(instance, out var origin)) return GetReadEffect(origin);
+        if (instance is { Type.SpecialType: SpecialType.System_String } or { Type.IsValueType: true })
+            return SharpProofEffect.None;
+        return instance switch {
+            IInstanceReferenceOperation => SharpProofEffect.ReadsReceiverState,
+            IParameterReferenceOperation => SharpProofEffect.ReadsArgumentState,
+            IFieldReferenceOperation { Field.IsStatic: true } => SharpProofEffect.ReadsStaticState,
+            IFieldReferenceOperation field => GetInstanceReadEffect(field.Instance, builder),
+            IPropertyReferenceOperation { Property.IsStatic: true } => SharpProofEffect.ReadsStaticState,
+            IPropertyReferenceOperation property => GetInstanceReadEffect(property.Instance, builder),
+            IArrayElementReferenceOperation array => GetInstanceReadEffect(array.ArrayReference, builder),
+            IConversionOperation conversion => GetInstanceReadEffect(conversion.Operand, builder),
+            ILocalReferenceOperation => SharpProofEffect.ReadsCapturedState,
+            _ => SharpProofEffect.Unknown
+        };
+    }
+    private static SharpProofEffect GetWriteEffect(MethodEffectOrigin origin) => origin switch {
+        MethodEffectOrigin.Receiver => SharpProofEffect.WritesReceiverState,
+        MethodEffectOrigin.Argument => SharpProofEffect.WritesArgumentState,
+        MethodEffectOrigin.Captured => SharpProofEffect.WritesCapturedState,
+        MethodEffectOrigin.Static => SharpProofEffect.WritesStaticState,
+        MethodEffectOrigin.FreshOwned => SharpProofEffect.WritesFreshOwnedState,
         _ => SharpProofEffect.Unknown
     };
-    private static SharpProofEffect GetInstanceReadEffect(IOperation? instance) => instance switch {
-        { Type.SpecialType: SpecialType.System_String } => SharpProofEffect.None,
-        { Type.IsValueType: true } => SharpProofEffect.None,
-        IInstanceReferenceOperation => SharpProofEffect.ReadsReceiverState,
-        IParameterReferenceOperation => SharpProofEffect.ReadsArgumentState,
-        IFieldReferenceOperation { Field.IsStatic: true } => SharpProofEffect.ReadsStaticState,
-        ILocalReferenceOperation => SharpProofEffect.ReadsCapturedState,
+    private static SharpProofEffect GetReadEffect(MethodEffectOrigin origin) => origin switch {
+        MethodEffectOrigin.Receiver => SharpProofEffect.ReadsReceiverState,
+        MethodEffectOrigin.Argument => SharpProofEffect.ReadsArgumentState,
+        MethodEffectOrigin.Captured => SharpProofEffect.ReadsCapturedState,
+        MethodEffectOrigin.Static => SharpProofEffect.ReadsStaticState,
+        MethodEffectOrigin.FreshOwned => SharpProofEffect.None,
         _ => SharpProofEffect.Unknown
     };
     private static MethodEffectOrigin GetOrigin(SharpProofEffect effect) {
@@ -864,12 +907,28 @@ internal sealed class MethodEffectAnalysisSession(
         private SharpProofCapability _capabilities;
         private SharpProofEffect _effects;
         private readonly HashSet<ILocalSymbol> _freshLocals = new(SymbolEqualityComparer.Default);
+        private readonly Dictionary<ILocalSymbol, Dictionary<string, MethodEffectOrigin>> _memberOrigins =
+            new(SymbolEqualityComparer.Default);
         private readonly HashSet<ILocalSymbol> _flowUncertainLocals = new(SymbolEqualityComparer.Default);
         private readonly Dictionary<ILocalSymbol, INamedTypeSymbol> _exactTypes = new(SymbolEqualityComparer.Default);
         private readonly Dictionary<ILocalSymbol, ImmutableArray<IMethodSymbol>> _delegateTargets =
             new(SymbolEqualityComparer.Default);
         internal void MarkFresh(ILocalSymbol local) => _freshLocals.Add(local);
         internal bool IsFresh(ILocalSymbol local) => _freshLocals.Contains(local);
+        internal bool TryGetFreshRootOrigin(IOperation? operation, out MethodEffectOrigin origin) {
+            if (!TryGetLocalMemberPath(operation, out var local, out var path) || !IsFresh(local)) {
+                origin = MethodEffectOrigin.Unknown;
+                return false;
+            }
+            if (path.Length == 0) {
+                origin = MethodEffectOrigin.FreshOwned;
+                return true;
+            }
+            origin = _memberOrigins.TryGetValue(local, out var origins) && origins.TryGetValue(path, out var recorded)
+                ? recorded
+                : MethodEffectOrigin.Unknown;
+            return true;
+        }
         internal void MarkExactType(ILocalSymbol local, ITypeSymbol? type) {
             if (type is INamedTypeSymbol { TypeKind: not (TypeKind.Interface or TypeKind.Dynamic), IsAbstract: false } named)
                 _exactTypes[local] = named;
@@ -889,16 +948,24 @@ internal sealed class MethodEffectAnalysisSession(
         internal void AssignLocal(ILocalSymbol local, IOperation value) {
             local = (ILocalSymbol)local.OriginalDefinition;
             _freshLocals.Remove(local);
+            _memberOrigins.Remove(local);
             _exactTypes.Remove(local);
             _delegateTargets.Remove(local);
             if (_flowUncertainLocals.Contains(local) || IsFlowDependent(value.Syntax)) return;
             var unwrapped = value;
             while (unwrapped is IConversionOperation conversion) unwrapped = conversion.Operand;
             if (unwrapped is IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
-                IDelegateCreationOperation)
+                IDelegateCreationOperation) {
                 _freshLocals.Add(local);
-            else if (unwrapped is ILocalReferenceOperation sourceLocal && IsFresh(sourceLocal.Local))
+                var origins = new Dictionary<string, MethodEffectOrigin>(StringComparer.Ordinal);
+                CollectMemberOrigins(unwrapped, string.Empty, origins);
+                if (origins.Count != 0) _memberOrigins[local] = origins;
+            }
+            else if (unwrapped is ILocalReferenceOperation sourceLocal && IsFresh(sourceLocal.Local)) {
                 _freshLocals.Add(local);
+                if (_memberOrigins.TryGetValue(sourceLocal.Local, out var sourceOrigins))
+                    _memberOrigins[local] = new Dictionary<string, MethodEffectOrigin>(sourceOrigins, StringComparer.Ordinal);
+            }
             var exactType = unwrapped switch {
                 IObjectCreationOperation { Type: INamedTypeSymbol created } => created,
                 IAnonymousObjectCreationOperation { Type: INamedTypeSymbol created } => created,
@@ -912,6 +979,7 @@ internal sealed class MethodEffectAnalysisSession(
             local = (ILocalSymbol)local.OriginalDefinition;
             _flowUncertainLocals.Add(local);
             _freshLocals.Remove(local);
+            _memberOrigins.Remove(local);
             _exactTypes.Remove(local);
             _delegateTargets.Remove(local);
         }
@@ -921,6 +989,7 @@ internal sealed class MethodEffectAnalysisSession(
                 while (value is IConversionOperation conversion) value = conversion.Operand;
                 if (value is not ILocalReferenceOperation local) continue;
                 _freshLocals.Remove(local.Local);
+                _memberOrigins.Remove(local.Local);
                 if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out) {
                     _exactTypes.Remove(local.Local);
                     _delegateTargets.Remove(local.Local);
@@ -929,6 +998,73 @@ internal sealed class MethodEffectAnalysisSession(
         }
         internal ImmutableArray<IMethodSymbol> GetDelegateTargets(ILocalSymbol local) =>
             _delegateTargets.TryGetValue(local, out var methods) ? methods : [];
+        private void CollectMemberOrigins(
+            IOperation value,
+            string prefix,
+            IDictionary<string, MethodEffectOrigin> origins) {
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is not IObjectCreationOperation { Initializer: { } initializer }) return;
+            foreach (var assignment in initializer.Initializers.OfType<ISimpleAssignmentOperation>()) {
+                var member = assignment.Target switch {
+                    IPropertyReferenceOperation property => (ISymbol)property.Property.OriginalDefinition,
+                    IFieldReferenceOperation field => field.Field.OriginalDefinition,
+                    _ => null
+                };
+                if (member == null) continue;
+                var path = prefix.Length == 0 ? GetMemberPathPart(member) : prefix + "/" + GetMemberPathPart(member);
+                var assigned = assignment.Value;
+                while (assigned is IConversionOperation conversion) assigned = conversion.Operand;
+                origins[path] = GetValueOrigin(assigned);
+                if (assigned is not (IObjectCreationOperation or IArrayCreationOperation or
+                    IAnonymousObjectCreationOperation or IDelegateCreationOperation))
+                    continue;
+                CollectMemberOrigins(assigned, path, origins);
+            }
+        }
+        private MethodEffectOrigin GetValueOrigin(IOperation value) {
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (TryGetFreshRootOrigin(value, out var freshRootOrigin)) return freshRootOrigin;
+            return value switch {
+                IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
+                    IDelegateCreationOperation => MethodEffectOrigin.FreshOwned,
+                IInstanceReferenceOperation => MethodEffectOrigin.Receiver,
+                IParameterReferenceOperation => MethodEffectOrigin.Argument,
+                IFieldReferenceOperation { Field.IsStatic: true } => MethodEffectOrigin.Static,
+                IFieldReferenceOperation field => GetValueOrigin(field.Instance!),
+                IPropertyReferenceOperation { Property.IsStatic: true } => MethodEffectOrigin.Static,
+                IPropertyReferenceOperation property => GetValueOrigin(property.Instance!),
+                IArrayElementReferenceOperation array => GetValueOrigin(array.ArrayReference),
+                ILocalReferenceOperation => MethodEffectOrigin.Captured,
+                _ => MethodEffectOrigin.Unknown
+            };
+        }
+        private static bool TryGetLocalMemberPath(IOperation? operation, out ILocalSymbol local, out string path) {
+            while (operation is IConversionOperation conversion) operation = conversion.Operand;
+            switch (operation) {
+                case ILocalReferenceOperation localReference:
+                    local = (ILocalSymbol)localReference.Local.OriginalDefinition;
+                    path = string.Empty;
+                    return true;
+                case IPropertyReferenceOperation { IsImplicit: false, Instance: { } instance } property
+                    when TryGetLocalMemberPath(instance, out local, out var parentPath):
+                    path = parentPath.Length == 0
+                        ? GetMemberPathPart(property.Property.OriginalDefinition)
+                        : parentPath + "/" + GetMemberPathPart(property.Property.OriginalDefinition);
+                    return true;
+                case IFieldReferenceOperation { Instance: { } instance } field
+                    when TryGetLocalMemberPath(instance, out local, out var parentPath):
+                    path = parentPath.Length == 0
+                        ? GetMemberPathPart(field.Field.OriginalDefinition)
+                        : parentPath + "/" + GetMemberPathPart(field.Field.OriginalDefinition);
+                    return true;
+                default:
+                    local = null!;
+                    path = string.Empty;
+                    return false;
+            }
+        }
+        private static string GetMemberPathPart(ISymbol member) =>
+            member.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         internal void Add(SharpProofEffect effect, IOperation operation, ISymbol? symbol, string reason)
             => Add(effect, SharpProofCapability.None, operation, symbol, reason);
         internal void Add(SharpProofEffect effect, SyntaxNode syntax, ISymbol? symbol, string reason) {
