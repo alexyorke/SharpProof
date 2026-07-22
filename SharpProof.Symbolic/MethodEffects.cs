@@ -495,6 +495,14 @@ internal sealed class MethodEffectAnalysisSession(
                         "array_foreach_read");
                     break;
                 }
+                if (foreachCollection.Type?.SpecialType == SpecialType.System_String) {
+                    builder.Add(
+                        GetInstanceReadEffect(foreachCollection, builder),
+                        loop,
+                        foreachCollection.Type,
+                        "string_foreach_read");
+                    break;
+                }
                 var info = semanticModel.GetForEachStatementInfo(syntax);
                 AnalyzeCall(info.GetEnumeratorMethod, loop, builder, loop.Collection);
                 var enumeratorType = info.GetEnumeratorMethod?.ReturnType;

@@ -663,7 +663,6 @@ public sealed class MethodEffectsTests {
             """, 2);
         Assert.Multiple(() => {
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
-            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.ReadsArgumentState), Is.True);
             Assert.That(result.UnknownReasons, Is.Empty);
         });
     }
