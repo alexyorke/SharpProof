@@ -206,6 +206,9 @@ internal sealed class MethodEffectAnalysisSession(
                 if (assignment.Target is IPropertyReferenceOperation { Property.SetMethod: not null } propertyTarget)
                     AnalyzeCall(propertyTarget.Property.SetMethod, assignment, builder, propertyTarget.Instance);
                 break;
+            case IDeconstructionAssignmentOperation deconstruction:
+                AnalyzeDeconstructionTarget(deconstruction.Target, builder);
+                break;
             case ICompoundAssignmentOperation compound:
                 AddWrite(compound.Target, builder);
                 if (compound.Target is IPropertyReferenceOperation compoundProperty) {
@@ -347,6 +350,16 @@ internal sealed class MethodEffectAnalysisSession(
                 builder.AddUnknown(operation, "dynamic_dispatch");
                 break;
         }
+    }
+    private void AnalyzeDeconstructionTarget(IOperation target, Builder builder) {
+        while (target is IConversionOperation conversion) target = conversion.Operand;
+        if (target is ITupleOperation tuple) {
+            foreach (var element in tuple.Elements) AnalyzeDeconstructionTarget(element, builder);
+            return;
+        }
+        AddWrite(target, builder);
+        if (target is IPropertyReferenceOperation { Property.SetMethod: not null } property)
+            AnalyzeCall(property.Property.SetMethod, property, builder, property.Instance);
     }
     private bool AnalyzeCall(
         IMethodSymbol? method,
