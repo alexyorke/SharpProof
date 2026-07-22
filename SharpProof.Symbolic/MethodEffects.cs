@@ -2003,8 +2003,19 @@ internal sealed class MethodEffectAnalysisSession(
         return expressions.Aggregate(
             SharpProofEffect.None,
             (effects, expression) => effects |
-                                     GetInvocationReturnedExpressionEffect(
-                                         expression, targetMethod, invocation, builder, write));
+                                     (builder.TryGetMappedInvocationReturnedValues(
+                                          expression,
+                                          targetMethod,
+                                          invocation,
+                                          out var mappedValues)
+                                         ? mappedValues.Aggregate(
+                                             SharpProofEffect.None,
+                                             (mappedEffects, mapped) => mappedEffects |
+                                                 (write
+                                                     ? GetInstanceWriteEffect(mapped, builder)
+                                                     : GetInstanceReadEffect(mapped, builder)))
+                                         : GetInvocationReturnedExpressionEffect(
+                                             expression, targetMethod, invocation, builder, write)));
     }
     private static SharpProofEffect GetInvocationReturnedExpressionEffect(
         ExpressionSyntax expression,
@@ -4890,6 +4901,50 @@ internal sealed class MethodEffectAnalysisSession(
                 if (current is IAnonymousFunctionOperation or ILocalFunctionOperation) return false;
             }
             return false;
+        }
+        internal bool TryGetMappedInvocationReturnedValues(
+            ExpressionSyntax expression,
+            IMethodSymbol targetMethod,
+            IInvocationOperation invocation,
+            out ImmutableArray<IOperation> values) {
+            values = [];
+            if (invocation.SemanticModel?.Compilation is not { } compilation)
+                return false;
+            var model = compilation.GetSemanticModel(expression.SyntaxTree);
+            if (model.GetOperation(expression) is not { } returnedValue ||
+                !TryCollectStableInitializerValues(
+                    returnedValue,
+                    compilation,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                    out var returnedValues))
+                return false;
+            var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
+            var visitedMethods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+            foreach (var returned in returnedValues) {
+                if (!TryMapConstructorAssignedValue(
+                        returned,
+                        targetMethod,
+                        invocation,
+                        compilation,
+                        visitedMethods,
+                        out var mapped))
+                    return false;
+                foreach (var candidate in mapped) {
+                    if (candidate.DescendantsAndSelf().Any(operation =>
+                            operation is IParameterReferenceOperation parameter &&
+                            SymbolEqualityComparer.Default.Equals(
+                                parameter.Parameter.ContainingSymbol.OriginalDefinition,
+                                targetMethod) ||
+                            operation is IInstanceReferenceOperation instance &&
+                            SymbolEqualityComparer.Default.Equals(
+                                instance.Type?.OriginalDefinition,
+                                targetMethod.ContainingType.OriginalDefinition)))
+                        return false;
+                    mappedValues.Add(candidate);
+                }
+            }
+            values = mappedValues.ToImmutable();
+            return !values.IsDefaultOrEmpty;
         }
         internal void AssignLocal(ILocalSymbol local, IOperation value) {
             local = (ILocalSymbol)local.OriginalDefinition;
