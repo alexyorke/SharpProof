@@ -856,6 +856,31 @@ internal sealed class MethodEffectAnalysisSession(
             }
             return false;
         }
+        private bool IsCaught(SyntaxNode syntax, string exceptionType) {
+            var exceptionSymbol = session.Compilation.GetTypeByMetadataName(exceptionType) as INamedTypeSymbol;
+            for (var current = syntax.Parent; current != null; current = current.Parent) {
+                if (current is not TryStatementSyntax tryStatement || !tryStatement.Block.Span.Contains(syntax.Span)) continue;
+                foreach (var clause in tryStatement.Catches) {
+                    if (clause.Filter != null && semanticModel.GetConstantValue(clause.Filter.FilterExpression,
+                            session.CancellationToken) is not { HasValue: true, Value: true })
+                        continue;
+                    if (clause.Declaration == null) return true;
+                    var caughtType = semanticModel.GetTypeInfo(clause.Declaration.Type, session.CancellationToken).Type;
+                    if (caughtType?.ToDisplayString() == "System.Exception" ||
+                        caughtType?.ToDisplayString() == exceptionType || caughtType?.Name == exceptionType)
+                        return true;
+                    for (var candidate = exceptionSymbol; candidate != null; candidate = candidate.BaseType)
+                        if (SymbolEqualityComparer.Default.Equals(candidate, caughtType)) return true;
+                }
+            }
+            return false;
+        }
+        private MethodEffects ApplyCatches(MethodEffects summary, IOperation site) => summary with {
+            ExceptionFacts = [.. summary.ExceptionFacts.Select(fact =>
+                fact.Escape != SharpProofVerdict.Disproven && IsCaught(site.Syntax, fact.ExceptionType)
+                    ? fact with { Escape = SharpProofVerdict.Disproven }
+                    : fact)]
+        };
         private bool IsCompileTimeSkipped(IOperation operation) {
             var key = (operation.Kind, operation.Syntax.Span);
             if (operation.IsImplicit && operation is IObjectCreationOperation { Type.Name: "SwitchExpressionException" } &&
@@ -1454,6 +1479,7 @@ internal sealed class MethodEffectAnalysisSession(
             IReadOnlyList<EffectFlowValue> arguments,
             IOperation site,
             IMethodSymbol target) {
+            summary = ApplyCatches(summary, site);
             const SharpProofEffect relative = SharpProofEffect.ReadsReceiverState | SharpProofEffect.WritesReceiverState |
                                                 SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState;
             var mapped = summary.Effects & ~relative;
