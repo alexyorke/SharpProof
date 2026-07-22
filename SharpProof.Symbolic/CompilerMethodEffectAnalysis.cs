@@ -909,6 +909,7 @@ internal sealed class MethodEffectAnalysisSession(
         private EffectFlowValue EvaluateField(IFieldReferenceOperation field, ref EffectFlowState state) {
             if (field.Field.IsConst) return EffectFlowValue.None;
             if (field.Field.IsStatic) {
+                AddExplicitTypeInitializerEffects(field.Field.ContainingType, field);
                 effects.Add(SharpProofEffect.ReadsStaticState, field.Syntax, field.Field, "static_field_read");
                 return EffectFlowValue.FromRoot(new(EffectValueRootKind.Static, Key: MemberKey(field.Field)), field.Type);
             }
@@ -1112,7 +1113,8 @@ internal sealed class MethodEffectAnalysisSession(
                 : returnedValue;
         }
         private void AddExplicitTypeInitializerEffects(ITypeSymbol? type, IOperation site) {
-            if (type is not INamedTypeSymbol named ||
+            if (type is not INamedTypeSymbol named || method.MethodKind == MethodKind.StaticConstructor &&
+                SymbolEqualityComparer.Default.Equals(method.ContainingType, named) ||
                 named.GetMembers().OfType<IMethodSymbol>().FirstOrDefault(static candidate =>
                     candidate.MethodKind == MethodKind.StaticConstructor && !candidate.IsImplicitlyDeclared) is not { } initializer)
                 return;
