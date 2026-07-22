@@ -4293,9 +4293,16 @@ internal sealed class MethodEffectAnalysisSession(
                 element = elements[index];
                 return true;
             }
-            if (collection.Elements.Length != 1 ||
-                collection.Elements[0] is not ISpreadOperation spread)
+            if (collection.Elements.Length == 0 ||
+                collection.Elements[collection.Elements.Length - 1] is not ISpreadOperation spread)
                 return false;
+            for (var prefixIndex = 0; prefixIndex < collection.Elements.Length - 1; prefixIndex++) {
+                if (collection.Elements[prefixIndex] is ISpreadOperation) return false;
+                if (prefixIndex == index) {
+                    element = collection.Elements[prefixIndex];
+                    return true;
+                }
+            }
             element = spread.Operand;
             return true;
         }
