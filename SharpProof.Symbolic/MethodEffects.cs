@@ -484,6 +484,17 @@ internal sealed class MethodEffectAnalysisSession(
                         builder);
                 break;
             case IForEachLoopOperation { Syntax: CommonForEachStatementSyntax syntax } loop:
+                var foreachCollection = loop.Collection;
+                while (foreachCollection is IConversionOperation collectionConversion)
+                    foreachCollection = collectionConversion.Operand;
+                if (foreachCollection.Type is IArrayTypeSymbol arrayType) {
+                    builder.Add(
+                        GetInstanceReadEffect(foreachCollection, builder),
+                        loop,
+                        arrayType,
+                        "array_foreach_read");
+                    break;
+                }
                 var info = semanticModel.GetForEachStatementInfo(syntax);
                 AnalyzeCall(info.GetEnumeratorMethod, loop, builder, loop.Collection);
                 var enumeratorType = info.GetEnumeratorMethod?.ReturnType;
