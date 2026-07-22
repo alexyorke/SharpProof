@@ -3695,6 +3695,30 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ForeachDoesNotTreatUserDefinedConversionResultAsFresh() {
+        var result = Analyze("""
+            sealed class Enumerator {
+                public int State;
+                public int Current => 0;
+                public bool MoveNext() { State++; return false; }
+            }
+            static class Globals { public static Enumerator Shared = new(); }
+            sealed class Source {
+                public static implicit operator Enumerator(Source source) => Globals.Shared;
+            }
+            sealed class Values {
+                public Enumerator GetEnumerator() => (Enumerator)new Source();
+            }
+            class C { static void M() { foreach (var _ in new Values()) { } } }
+            """, 13);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.False);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ReturnedLambdaPreservesCapturedPrimaryConstructorMemberOrigin() {
         var result = Analyze("""
             sealed class Box { public int State; }
