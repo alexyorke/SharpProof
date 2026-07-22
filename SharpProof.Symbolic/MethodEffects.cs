@@ -4026,6 +4026,11 @@ internal sealed class MethodEffectAnalysisSession(
                 }
                 return switchExpression.Arms.Length != 0;
             }
+            if (value is IFieldReferenceOperation { Field.IsStatic: true }) {
+                readEffect = GetInstanceReadEffect(value, this);
+                writeEffect = GetInstanceWriteEffect(value, this);
+                return true;
+            }
             if (value is IInvocationOperation nestedInvocation)
                 return TryGetCapturedCallResultEffects(
                     nestedInvocation.TargetMethod,
