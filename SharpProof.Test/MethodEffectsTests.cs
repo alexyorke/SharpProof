@@ -1329,6 +1329,35 @@ public sealed class MethodEffectsTests {
             string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
     }
     [Test]
+    public void AsyncLocalFunctionStateMachineAllocationIsVisible() {
+        const string source = """
+            class C {
+                static System.Threading.Tasks.Task M() {
+                    return Local();
+                    static async System.Threading.Tasks.Task Local() {
+                        await System.Threading.Tasks.Task.Yield();
+                    }
+                }
+            }
+            """;
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+        var compilation = CSharpCompilation.Create(
+            "AsyncLocalAllocation",
+            [tree],
+            SymbolicSourceCompilation.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var declaration = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>().Single();
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
+        var effects = new MethodEffectAnalysisSession(compilation, default).Analyze(method, declaration, model);
+        Assert.Multiple(() => {
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Allocates), Is.True);
+            Assert.That(effects.Sites,
+                Has.Some.Property(nameof(MethodEffectSite.Reason)).EqualTo("state_machine_allocation"));
+        });
+    }
+    [Test]
     public void WithExpressionIncludesCopyConstructorEffects() {
         var result = Analyze("""
             sealed record R {
