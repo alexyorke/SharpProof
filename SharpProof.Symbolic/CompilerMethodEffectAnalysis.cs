@@ -1162,7 +1162,8 @@ internal sealed class MethodEffectAnalysisSession(
                 effects.Read(receiver, property.Syntax, property.Property, "property_read");
             var key = MemberKey(property) ?? MemberKey(property.Property);
             if (property.Property.GetMethod == null) return receiver.Member(key);
-            if (!property.Property.GetMethod.IsVirtual && (property.Property.GetMethod.IsImplicitlyDeclared ||
+            if (!property.Property.GetMethod.IsVirtual && !property.Property.GetMethod.IsOverride &&
+                (property.Property.GetMethod.IsImplicitlyDeclared ||
                 property.Property is { IsAbstract: false, ContainingType.TypeKind: not TypeKind.Interface } &&
                 property.Property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(session.CancellationToken) is
                     PropertyDeclarationSyntax { AccessorList.Accessors: var accessors } &&
