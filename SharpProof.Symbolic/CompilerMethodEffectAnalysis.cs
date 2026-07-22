@@ -1220,7 +1220,11 @@ internal sealed class MethodEffectAnalysisSession(
                     var bound = BindCallable(local, null, ref state).Callables.FirstOrDefault();
                     if (bound != null) {
                         var localSummary = GetSummary(bound.Method, bound.Captures);
-                        effects.AddTransitive(localSummary.Effects, site.Syntax, bound.Method, "source_call");
+                        if (bound.Captures.Count == 0)
+                            AddSummary(localSummary.Effects, bound.Receiver, values, site, bound.Method,
+                                localSummary.WrittenArgumentOrdinals, localSummary.ReadArgumentOrdinals);
+                        else
+                            effects.AddTransitive(localSummary.Effects, site.Syntax, bound.Method, "source_call");
                         return localSummary.ReturnValue.Instantiate(bound.Receiver, values, bound.Captures);
                     }
                 }
