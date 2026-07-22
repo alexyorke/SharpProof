@@ -3669,6 +3669,27 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void PrimaryConstructorInitializerIncludesUserDefinedConversionEffects() {
+        var result = Analyze("""
+            sealed class Box { }
+            static class Globals { public static int Count; }
+            sealed class Source {
+                public static implicit operator Box(Source source) {
+                    Globals.Count++;
+                    return new Box();
+                }
+            }
+            sealed class Holder(Source source) { readonly Box Value = (Box)source; }
+            class C { static void M(Source input) { _ = new Holder(input); } }
+            """, 10);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ConvertedInvocationArgumentDoesNotEscapeUnrelatedOperand() {
         var result = Analyze("""
             sealed class Box { }
