@@ -1640,6 +1640,7 @@ internal sealed class MethodEffectAnalysisSession(
                 GetInstanceWriteEffect(conditional.WhenFalse, builder),
             IConditionalAccessInstanceOperation conditionalAccess =>
                 GetInstanceWriteEffect(FindConditionalAccessReceiver(conditionalAccess), builder),
+            IInvocationOperation invocation => GetInvocationResultEffect(invocation, builder, write: true),
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceWriteEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IParenthesizedOperation parenthesized => GetInstanceWriteEffect(parenthesized.Operand, builder),
@@ -1684,6 +1685,7 @@ internal sealed class MethodEffectAnalysisSession(
                 GetInstanceReadEffect(conditional.WhenFalse, builder),
             IConditionalAccessInstanceOperation conditionalAccess =>
                 GetInstanceReadEffect(FindConditionalAccessReceiver(conditionalAccess), builder),
+            IInvocationOperation invocation => GetInvocationResultEffect(invocation, builder, write: false),
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceReadEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IParenthesizedOperation parenthesized => GetInstanceReadEffect(parenthesized.Operand, builder),
@@ -1691,6 +1693,77 @@ internal sealed class MethodEffectAnalysisSession(
             ILocalReferenceOperation => SharpProofEffect.ReadsCapturedState,
             _ => SharpProofEffect.Unknown
         };
+    }
+    private static SharpProofEffect GetInvocationResultEffect(
+        IInvocationOperation invocation,
+        Builder builder,
+        bool write) {
+        var targetMethod = invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod;
+        targetMethod = (targetMethod.PartialImplementationPart ?? targetMethod).OriginalDefinition;
+        var declaration = targetMethod.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+        var expression = GetDirectReturnExpression(declaration);
+        if (expression == null) return SharpProofEffect.Unknown;
+        expression = UnwrapReturnExpression(expression);
+        if (expression is IdentifierNameSyntax identifier) {
+            var parameter = targetMethod.Parameters.FirstOrDefault(candidate =>
+                string.Equals(candidate.Name, identifier.Identifier.ValueText, StringComparison.Ordinal));
+            if (parameter != null) {
+                IOperation? source = invocation.Arguments.FirstOrDefault(argument =>
+                    string.Equals(argument.Parameter?.Name, parameter.Name, StringComparison.Ordinal))?.Value;
+                if (source == null && parameter.Ordinal == 0 && invocation.TargetMethod.ReducedFrom != null)
+                    source = invocation.Instance;
+                return write
+                    ? GetInstanceWriteEffect(source, builder)
+                    : GetInstanceReadEffect(source, builder);
+            }
+        }
+        if (expression is ThisExpressionSyntax)
+            return write
+                ? GetInstanceWriteEffect(invocation.Instance, builder)
+                : GetInstanceReadEffect(invocation.Instance, builder);
+        if (expression is ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax or
+            ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax or
+            AnonymousObjectCreationExpressionSyntax or CollectionExpressionSyntax)
+            return write ? SharpProofEffect.WritesFreshOwnedState : SharpProofEffect.None;
+        return SharpProofEffect.Unknown;
+    }
+    private static ExpressionSyntax? GetDirectReturnExpression(SyntaxNode? declaration) {
+        ExpressionSyntax? expression = declaration switch {
+            MethodDeclarationSyntax method => method.ExpressionBody?.Expression,
+            LocalFunctionStatementSyntax localFunction => localFunction.ExpressionBody?.Expression,
+            OperatorDeclarationSyntax @operator => @operator.ExpressionBody?.Expression,
+            ConversionOperatorDeclarationSyntax conversion => conversion.ExpressionBody?.Expression,
+            _ => null
+        };
+        if (expression != null) return expression;
+        var statements = declaration switch {
+            MethodDeclarationSyntax method => method.Body?.Statements,
+            LocalFunctionStatementSyntax localFunction => localFunction.Body?.Statements,
+            OperatorDeclarationSyntax @operator => @operator.Body?.Statements,
+            ConversionOperatorDeclarationSyntax conversion => conversion.Body?.Statements,
+            _ => null
+        };
+        if (statements == null) return null;
+        var returns = statements.Value.OfType<ReturnStatementSyntax>().ToArray();
+        return returns.Length == 1 ? returns[0].Expression : null;
+    }
+    private static ExpressionSyntax UnwrapReturnExpression(ExpressionSyntax expression) {
+        while (true) {
+            switch (expression) {
+                case ParenthesizedExpressionSyntax parenthesized:
+                    expression = parenthesized.Expression;
+                    continue;
+                case CastExpressionSyntax cast:
+                    expression = cast.Expression;
+                    continue;
+                case PostfixUnaryExpressionSyntax suppressed
+                    when suppressed.IsKind(SyntaxKind.SuppressNullableWarningExpression):
+                    expression = suppressed.Operand;
+                    continue;
+                default:
+                    return expression;
+            }
+        }
     }
     private static IOperation? FindConditionalAccessReceiver(IOperation operation) {
         for (var parent = operation.Parent; parent != null; parent = parent.Parent)
