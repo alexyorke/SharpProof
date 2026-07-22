@@ -1078,6 +1078,23 @@ public sealed class MethodEffectsTests {
             Has.Some.Property(nameof(MethodExceptionFact.Escape)).EqualTo(SharpProofVerdict.Disproven));
     }
     [Test]
+    public void FalseCatchFilterDoesNotCatchExplicitThrow() {
+        var result = Analyze("""
+            sealed class E : System.Exception { }
+            class C {
+                static void M() {
+                    try { throw new E(); }
+                    catch (E) when (false) { }
+                }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.ExceptionFacts, Has.Some.Matches<MethodExceptionFact>(fact =>
+                fact.ExceptionType == "E" && fact.Escape == SharpProofVerdict.Proven));
+        });
+    }
+    [Test]
     public void CaughtCalleeExceptionDoesNotEscape() {
         var result = Analyze("""
             sealed class E : System.Exception { }
