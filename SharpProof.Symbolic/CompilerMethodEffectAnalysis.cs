@@ -1361,9 +1361,13 @@ internal sealed class MethodEffectAnalysisSession(
                     ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax or CollectionExpressionSyntax or
                     StackAllocArrayCreationExpressionSyntax))
                 return false;
-            return CSharpSyntaxFacts.DescendantNodesInExecution(declaration).OfType<IdentifierNameSyntax>().Count(identifier =>
-                SymbolEqualityComparer.Default.Equals(
-                    model.GetSymbolInfo(identifier, session.CancellationToken).Symbol, local)) == 1;
+            return CSharpSyntaxFacts.DescendantNodesInExecution(declaration).OfType<IdentifierNameSyntax>()
+                .Where(identifier => SymbolEqualityComparer.Default.Equals(
+                    model.GetSymbolInfo(identifier, session.CancellationToken).Symbol, local))
+                .All(identifier => identifier.Parent is MemberAccessExpressionSyntax access &&
+                                   ReferenceEquals(access.Expression, identifier) &&
+                                   model.GetSymbolInfo(access, session.CancellationToken).Symbol is
+                                       IFieldSymbol or IPropertySymbol);
         }
         private EffectFlowValue InvokeCoreOrValue(
             IMethodSymbol? target,
