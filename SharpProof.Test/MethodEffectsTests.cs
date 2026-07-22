@@ -549,6 +549,28 @@ public sealed class MethodEffectsTests {
             string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
     }
     [Test]
+    public void ForeachMapsGetEnumeratorReceiverEffects() {
+        var result = Analyze("""
+            sealed class Enumerable {
+                private readonly Enumerator enumerator = new();
+                public Enumerator GetEnumerator() => enumerator;
+            }
+            sealed class Enumerator {
+                public bool MoveNext() => false;
+                public int Current => 0;
+            }
+            class C {
+                static void M(Enumerable values) {
+                    foreach (var value in values) { }
+                }
+            }
+            """, 10);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.ReadsArgumentState), Is.True);
+        });
+    }
+    [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {
