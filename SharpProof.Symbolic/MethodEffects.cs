@@ -293,7 +293,9 @@ internal sealed class MethodEffectAnalysisSession(
                             builder,
                             target.Receiver,
                             target.ReceiverReadEffect,
-                            target.ReceiverWriteEffect);
+                            target.ReceiverWriteEffect,
+                            target.CapturedReadEffect,
+                            target.CapturedWriteEffect);
                 }
                 else
                     preservesFreshArguments = AnalyzeCall(invocation.TargetMethod, invocation, builder, invocation.Instance);
@@ -353,7 +355,9 @@ internal sealed class MethodEffectAnalysisSession(
         Builder builder,
         IOperation? receiver = null,
         SharpProofEffect? receiverReadEffect = null,
-        SharpProofEffect? receiverWriteEffect = null) {
+        SharpProofEffect? receiverWriteEffect = null,
+        SharpProofEffect? capturedReadEffect = null,
+        SharpProofEffect? capturedWriteEffect = null) {
         if (method == null) {
             builder.AddUnknown(site, "unresolved_call");
             return false;
@@ -386,7 +390,7 @@ internal sealed class MethodEffectAnalysisSession(
             builder.Add(SharpProofEffect.UsesNativeCode, SharpProofCapability.NativeInterop, site, method, "native_call");
             if (hasContract && IsCompleteContract(contracted))
                 AddCallEffects(contracted, site, method, "complete_native_effect_contract", receiver, builder,
-                    receiverReadEffect, receiverWriteEffect);
+                    receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
             else
                 builder.AddUnknown(site, "native_exception_boundary", method);
             return false;
@@ -397,33 +401,33 @@ internal sealed class MethodEffectAnalysisSession(
             if (TryGetKnownFrameworkSummary(method, out var frameworkSummary)) {
                 var remappedFramework = AddCallEffects(
                     frameworkSummary, site, method, "framework_method_model", receiver, builder,
-                    receiverReadEffect, receiverWriteEffect);
+                    receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
                 return CanPreserveFreshArguments(
                     remappedFramework, site, receiver, builder, receiverWriteEffect);
             }
             var metadata = _metadata.Analyze(method);
             if (hasContract && metadata.Effects == SharpProofEffect.Unknown)
                 AddCallEffects(contracted, site, method, "complete_effect_contract", receiver, builder,
-                    receiverReadEffect, receiverWriteEffect);
+                    receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
             else {
                 AddCallEffects(metadata, site, method, "metadata_call", receiver, builder,
-                    receiverReadEffect, receiverWriteEffect);
+                    receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
                 if (hasContract)
                     AddCallEffects(contracted, site, method, "effect_contract", receiver, builder,
-                        receiverReadEffect, receiverWriteEffect);
+                        receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
             }
             return false;
         }
         var model = compilation.GetSemanticModel(syntax.SyntaxTree);
         var remappedSource = AddCallEffects(
             Analyze(method, syntax, model), site, method, "source_call", receiver, builder,
-            receiverReadEffect, receiverWriteEffect);
+            receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
         var preservesFresh = CanPreserveFreshArguments(
             remappedSource, site, receiver, builder, receiverWriteEffect);
         if (hasContract) {
             var remappedContract = AddCallEffects(
                 contracted, site, method, "effect_contract", receiver, builder,
-                receiverReadEffect, receiverWriteEffect);
+                receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
             preservesFresh &= CanPreserveFreshArguments(
                 remappedContract, site, receiver, builder, receiverWriteEffect);
         }
@@ -437,7 +441,9 @@ internal sealed class MethodEffectAnalysisSession(
         IOperation? receiver,
         Builder builder,
         SharpProofEffect? receiverReadEffect = null,
-        SharpProofEffect? receiverWriteEffect = null) {
+        SharpProofEffect? receiverWriteEffect = null,
+        SharpProofEffect? capturedReadEffect = null,
+        SharpProofEffect? capturedWriteEffect = null) {
         const SharpProofEffect callRelativeEffects =
             SharpProofEffect.ReadsReceiverState |
             SharpProofEffect.WritesReceiverState |
@@ -465,6 +471,14 @@ internal sealed class MethodEffectAnalysisSession(
         }
         if ((effects.Effects & SharpProofEffect.WritesArgumentState) != 0) {
             remapped |= GetArgumentEffect(site, builder, write: true);
+        }
+        if (capturedReadEffect.HasValue && (effects.Effects & SharpProofEffect.ReadsCapturedState) != 0) {
+            remapped &= ~SharpProofEffect.ReadsCapturedState;
+            remapped |= capturedReadEffect.Value;
+        }
+        if (capturedWriteEffect.HasValue && (effects.Effects & SharpProofEffect.WritesCapturedState) != 0) {
+            remapped &= ~SharpProofEffect.WritesCapturedState;
+            remapped |= capturedWriteEffect.Value;
         }
         var remappedEffects = effects with { Effects = remapped };
         builder.AddTransitive(remappedEffects, site, method, reason);
@@ -1045,7 +1059,9 @@ internal sealed class MethodEffectAnalysisSession(
             IMethodSymbol Method,
             IOperation? Receiver,
             SharpProofEffect? ReceiverReadEffect,
-            SharpProofEffect? ReceiverWriteEffect);
+            SharpProofEffect? ReceiverWriteEffect,
+            SharpProofEffect? CapturedReadEffect,
+            SharpProofEffect? CapturedWriteEffect);
         private readonly ImmutableArray<MethodExceptionFact>.Builder _exceptions =
             ImmutableArray.CreateBuilder<MethodExceptionFact>();
         private readonly ImmutableArray<MethodEffectSite>.Builder _sites =
@@ -1084,22 +1100,53 @@ internal sealed class MethodEffectAnalysisSession(
         internal INamedTypeSymbol? GetExactType(ILocalSymbol local) =>
             _exactTypes.TryGetValue(local, out var type) ? type : null;
         internal void MarkDelegateTargets(ILocalSymbol local, IOperation value) {
-            var targets = value.DescendantsAndSelf()
-                .OfType<IMethodReferenceOperation>()
-                .Select(reference => new DelegateTarget(
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is IDelegateCreationOperation creation) value = creation.Target;
+            var target = value switch {
+                IMethodReferenceOperation reference => new DelegateTarget(
                     reference.Method.OriginalDefinition,
                     reference.Instance,
                     reference.Instance == null ? null : GetInstanceReadEffect(reference.Instance, this),
-                    reference.Instance == null ? null : GetInstanceWriteEffect(reference.Instance, this)))
-                .Concat(value.DescendantsAndSelf()
-                    .OfType<IAnonymousFunctionOperation>()
-                    .Select(static function => new DelegateTarget(
-                        function.Symbol.OriginalDefinition,
-                        null,
-                        null,
-                        null)))
-                .ToImmutableArray();
-            if (!targets.IsDefaultOrEmpty) _delegateTargets[local] = targets;
+                    reference.Instance == null ? null : GetInstanceWriteEffect(reference.Instance, this),
+                    null,
+                    null),
+                IAnonymousFunctionOperation function => CreateAnonymousFunctionTarget(function),
+                _ => null
+            };
+            if (target != null) _delegateTargets[local] = [target];
+        }
+        private DelegateTarget CreateAnonymousFunctionTarget(IAnonymousFunctionOperation function) {
+            var capturedReadEffect = SharpProofEffect.None;
+            var capturedWriteEffect = SharpProofEffect.None;
+            var hasCapture = false;
+            foreach (var operation in function.Body.DescendantsAndSelf()) {
+                if (!BelongsDirectlyTo(function, operation)) continue;
+                IOperation? captured = operation switch {
+                    ILocalReferenceOperation local when
+                        !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, function.Symbol) => local,
+                    IParameterReferenceOperation parameter when
+                        !SymbolEqualityComparer.Default.Equals(parameter.Parameter.ContainingSymbol, function.Symbol) => parameter,
+                    IInstanceReferenceOperation instance => instance,
+                    _ => null
+                };
+                if (captured == null) continue;
+                hasCapture = true;
+                capturedReadEffect |= GetInstanceReadEffect(captured, this);
+                capturedWriteEffect |= GetInstanceWriteEffect(captured, this);
+            }
+            return new DelegateTarget(
+                function.Symbol.OriginalDefinition,
+                null,
+                null,
+                null,
+                hasCapture ? capturedReadEffect : null,
+                hasCapture ? capturedWriteEffect : null);
+        }
+        private static bool BelongsDirectlyTo(IAnonymousFunctionOperation function, IOperation operation) {
+            for (var current = operation.Parent; current != null; current = current.Parent)
+                if (current is IAnonymousFunctionOperation ancestor)
+                    return ReferenceEquals(ancestor, function);
+            return false;
         }
         internal void AssignLocal(ILocalSymbol local, IOperation value) {
             local = (ILocalSymbol)local.OriginalDefinition;
