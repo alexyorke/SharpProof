@@ -953,6 +953,13 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private bool IsCompileTimeSkipped(IOperation operation) {
             var key = (operation.Kind, operation.Syntax.Span);
+            foreach (var statement in operation.Syntax.Ancestors().OfType<IfStatementSyntax>()) {
+                var constant = semanticModel.GetConstantValue(statement.Condition, session.CancellationToken);
+                if (constant is not { HasValue: true, Value: bool condition }) continue;
+                if (!condition && statement.Statement.Span.Contains(operation.Syntax.Span) ||
+                    condition && statement.Else?.Statement.Span.Contains(operation.Syntax.Span) == true)
+                    return true;
+            }
             if (operation.IsImplicit && operation is IObjectCreationOperation { Type.Name: "SwitchExpressionException" } &&
                 operation.Syntax is SwitchExpressionSyntax expression && (TrySelectArm(expression, out _) || IsExhaustive(expression)))
                 return true;
