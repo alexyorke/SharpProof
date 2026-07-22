@@ -3185,37 +3185,121 @@ internal sealed class MethodEffectAnalysisSession(
                     creation, primaryType, memberPath, compilation, out values)) {
                 return true;
             }
-            var candidates = declaration == null
-                ? []
-                : GetConstructorMemberAssignments(declaration, memberPath, compilation);
-            if (candidates.Length == 0 ||
-                candidates.Length > 1 && !AreExhaustiveAlternativeAssignments(candidates))
+            if (creation.Constructor == null || declaration == null) return false;
+            return TryGetConstructorDeclarationMemberOrigins(
+                creation.Constructor,
+                creation,
+                declaration,
+                memberPath,
+                compilation,
+                new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
+                out values);
+        }
+        private static bool TryGetConstructorDeclarationMemberOrigins(
+            IMethodSymbol constructor,
+            IOperation constructorCallSite,
+            SyntaxNode declaration,
+            string memberPath,
+            Compilation compilation,
+            HashSet<IMethodSymbol> visitedConstructors,
+            out ImmutableArray<IOperation> values) {
+            values = [];
+            constructor = constructor.OriginalDefinition;
+            if (!visitedConstructors.Add(constructor)) return false;
+            try {
+                var candidates = GetConstructorMemberAssignments(
+                    declaration, memberPath, compilation);
+                if (candidates.Length == 0)
+                    return TryGetChainedConstructorMemberOrigins(
+                        constructor,
+                        constructorCallSite,
+                        declaration,
+                        memberPath,
+                        compilation,
+                        visitedConstructors,
+                        out values);
+                if (candidates.Length > 1 && !AreExhaustiveAlternativeAssignments(candidates))
+                    return false;
+                var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
+                foreach (var candidate in candidates) {
+                    IOperation assignedValue = candidate.Value;
+                    while (assignedValue is IConversionOperation conversion)
+                        assignedValue = conversion.Operand;
+                    var visited = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
+                    ImmutableArray<IOperation> assignedValues;
+                    if (assignedValue is ILocalReferenceOperation local) {
+                        if (!TryGetStableLocalInitializers(
+                                local.Local, compilation, visited, out assignedValues))
+                            return false;
+                    }
+                    else if (!TryCollectStableInitializerValues(
+                                 assignedValue, compilation, visited, out assignedValues))
+                        return false;
+                    foreach (var assigned in assignedValues) {
+                        if (!TryMapConstructorAssignedValue(
+                                assigned,
+                                constructor,
+                                constructorCallSite,
+                                compilation,
+                                new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
+                                out var mapped))
+                            return false;
+                        mappedValues.AddRange(mapped);
+                    }
+                }
+                values = mappedValues.ToImmutable();
+                return !values.IsDefaultOrEmpty;
+            }
+            finally {
+                visitedConstructors.Remove(constructor);
+            }
+        }
+        private static bool TryGetChainedConstructorMemberOrigins(
+            IMethodSymbol constructor,
+            IOperation constructorCallSite,
+            SyntaxNode declaration,
+            string memberPath,
+            Compilation compilation,
+            HashSet<IMethodSymbol> visitedConstructors,
+            out ImmutableArray<IOperation> values) {
+            values = [];
+            var model = compilation.GetSemanticModel(declaration.SyntaxTree);
+            if (model.GetOperation(declaration) is not IConstructorBodyOperation body)
+                return false;
+            var initializer = body.Initializer switch {
+                IInvocationOperation invocation => invocation,
+                IExpressionStatementOperation { Operation: IInvocationOperation invocation } => invocation,
+                _ => null
+            };
+            if (initializer == null ||
+                !SymbolEqualityComparer.Default.Equals(
+                    initializer.TargetMethod.ContainingType,
+                    constructor.ContainingType))
+                return false;
+            var targetConstructor = initializer.TargetMethod.OriginalDefinition;
+            var targetDeclaration = targetConstructor.DeclaringSyntaxReferences
+                .FirstOrDefault()?.GetSyntax();
+            if (targetDeclaration == null ||
+                !TryGetConstructorDeclarationMemberOrigins(
+                    targetConstructor,
+                    initializer,
+                    targetDeclaration,
+                    memberPath,
+                    compilation,
+                    visitedConstructors,
+                    out var chainedValues))
                 return false;
             var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
-            foreach (var candidate in candidates) {
-                IOperation assignedValue = candidate.Value;
-                while (assignedValue is IConversionOperation conversion)
-                    assignedValue = conversion.Operand;
-                var visited = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
-                ImmutableArray<IOperation> assignedValues;
-                if (assignedValue is ILocalReferenceOperation local) {
-                    if (!TryGetStableLocalInitializers(
-                            local.Local, compilation, visited, out assignedValues))
-                        return false;
-                }
-                else if (!TryCollectStableInitializerValues(
-                             assignedValue, compilation, visited, out assignedValues))
+            foreach (var chainedValue in chainedValues) {
+                if (!TryMapConstructorAssignedValue(
+                        chainedValue,
+                        constructor,
+                        constructorCallSite,
+                        compilation,
+                        new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
+                        out var mapped))
                     return false;
-                foreach (var assigned in assignedValues) {
-                    if (!TryMapConstructorAssignedValue(
-                            assigned,
-                            creation,
-                            compilation,
-                            new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
-                            out var mapped))
-                        return false;
-                    mappedValues.AddRange(mapped);
-                }
+                mappedValues.AddRange(mapped);
             }
             values = mappedValues.ToImmutable();
             return !values.IsDefaultOrEmpty;
@@ -3245,35 +3329,38 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private static bool TryMapConstructorAssignedValue(
             IOperation value,
-            IObjectCreationOperation creation,
+            IMethodSymbol constructor,
+            IOperation constructorCallSite,
             Compilation compilation,
             HashSet<IMethodSymbol> visitedMethods,
             out ImmutableArray<IOperation> values) {
             values = [];
             while (value is IConversionOperation conversion) value = conversion.Operand;
             if (value is IParameterReferenceOperation parameter &&
-                creation.Constructor is { } constructor &&
                 SymbolEqualityComparer.Default.Equals(
                     parameter.Parameter.ContainingSymbol.OriginalDefinition,
                     constructor.OriginalDefinition)) {
-                var argument = creation.Arguments.FirstOrDefault(candidate =>
-                    string.Equals(
-                        candidate.Parameter?.Name,
-                        parameter.Parameter.Name,
-                        StringComparison.Ordinal))?.Value;
+                var argument = GetConstructorCallArgument(
+                    constructorCallSite, parameter.Parameter.Name);
                 if (argument == null) return false;
                 values = [argument];
                 return true;
             }
             if (value is IInvocationOperation invocation)
                 return TryGetConstructorHelperOrigins(
-                    invocation, creation, compilation, visitedMethods, out values);
+                    invocation,
+                    constructor,
+                    constructorCallSite,
+                    compilation,
+                    visitedMethods,
+                    out values);
             values = [value];
             return true;
         }
         private static bool TryGetConstructorHelperOrigins(
             IInvocationOperation invocation,
-            IObjectCreationOperation creation,
+            IMethodSymbol constructor,
+            IOperation constructorCallSite,
             Compilation compilation,
             HashSet<IMethodSymbol> visitedMethods,
             out ImmutableArray<IOperation> values) {
@@ -3316,7 +3403,8 @@ internal sealed class MethodEffectAnalysisSession(
                         }
                         if (!TryMapConstructorAssignedValue(
                                 mapped,
-                                creation,
+                                constructor,
+                                constructorCallSite,
                                 compilation,
                                 visitedMethods,
                                 out var origins))
@@ -3331,6 +3419,21 @@ internal sealed class MethodEffectAnalysisSession(
                 visitedMethods.Remove(method);
             }
         }
+        private static IOperation? GetConstructorCallArgument(
+            IOperation callSite,
+            string parameterName) => callSite switch {
+                IObjectCreationOperation creation => creation.Arguments.FirstOrDefault(argument =>
+                    string.Equals(
+                        argument.Parameter?.Name,
+                        parameterName,
+                        StringComparison.Ordinal))?.Value,
+                IInvocationOperation invocation => invocation.Arguments.FirstOrDefault(argument =>
+                    string.Equals(
+                        argument.Parameter?.Name,
+                        parameterName,
+                        StringComparison.Ordinal))?.Value,
+                _ => null
+            };
         private static ISimpleAssignmentOperation[] GetConstructorMemberAssignments(
             SyntaxNode declaration,
             string memberPath,
