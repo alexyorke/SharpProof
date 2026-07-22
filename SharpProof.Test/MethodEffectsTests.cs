@@ -1268,6 +1268,26 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
         });
     }
+    [Test]
+    public void CollectionSpreadIncludesExplicitInterfaceEnumerationEffects() {
+        var result = Analyze("""
+            sealed class Source : System.Collections.Generic.IEnumerable<int> {
+                private static int state;
+                System.Collections.Generic.IEnumerator<int> System.Collections.Generic.IEnumerable<int>.GetEnumerator() {
+                    state++;
+                    yield break;
+                }
+                System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() =>
+                    ((System.Collections.Generic.IEnumerable<int>)this).GetEnumerator();
+            }
+            class C { static int[] M(Source source) => [.. source]; }
+            """, 10);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
     [TestCase("unsafe static int M() { int* value = stackalloc int[1]; value[0] = 1; return value[0]; }")]
     [TestCase("static R M(R value) => value with { X = 2 }; readonly record struct R(int X);")]
     public void StackOnlyOperationsDoNotCreateManagedAllocationSites(string method) {
