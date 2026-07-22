@@ -615,6 +615,29 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ForeachMapsCachedReferenceEnumeratorWrites() {
+        var result = Analyze("""
+            sealed class Enumerable {
+                private readonly Enumerator enumerator = new();
+                public Enumerator GetEnumerator() => enumerator;
+            }
+            sealed class Enumerator {
+                private int index;
+                public bool MoveNext() => index++ < 0;
+                public int Current => 0;
+            }
+            class C {
+                static void M(Enumerable values) {
+                    foreach (var value in values) { }
+                }
+            }
+            """, 11);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+        });
+    }
+    [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {
