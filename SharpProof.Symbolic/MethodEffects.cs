@@ -3588,6 +3588,12 @@ internal sealed class MethodEffectAnalysisSession(
                         argument.Parameter?.Name,
                         parameterName,
                         StringComparison.Ordinal))?.Value,
+                IConversionOperation { OperatorMethod: { } conversionMethod } conversion
+                    when conversionMethod.Parameters.Length == 1 &&
+                         string.Equals(
+                             conversionMethod.Parameters[0].Name,
+                             parameterName,
+                             StringComparison.Ordinal) => conversion.Operand,
                 _ => null
             };
         private static IOperation? GetConstructorCallInstance(IOperation callSite) => callSite switch {
@@ -3636,7 +3642,8 @@ internal sealed class MethodEffectAnalysisSession(
             HashSet<ILocalSymbol> visited,
             ImmutableArray<ConstructorValueCallSite> callSites,
             List<ConstructorMemberAssignment> assignments) {
-            while (value is IConversionOperation conversion) value = conversion.Operand;
+            while (value is IConversionOperation { OperatorMethod: null } conversion)
+                value = conversion.Operand;
             if (value is IConditionalAccessOperation conditionalAccess) {
                 AddDeconstructionMemberAssignments(
                     target,
@@ -3673,6 +3680,19 @@ internal sealed class MethodEffectAnalysisSession(
                     compilation,
                     visited,
                     callSites.RemoveAt(0),
+                    assignments);
+                return;
+            }
+            if (value is IConversionOperation { OperatorMethod: { } operatorMethod } userConversion) {
+                AddDeconstructionCallResultAssignments(
+                    target,
+                    userConversion,
+                    operatorMethod,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites,
                     assignments);
                 return;
             }
