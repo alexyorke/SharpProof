@@ -3278,7 +3278,7 @@ internal sealed class MethodEffectAnalysisSession(
             }
         }
         private static bool IsPotentiallyConditionalAssignment(
-            ISimpleAssignmentOperation assignment,
+            ConstructorMemberAssignment assignment,
             SyntaxNode declaration) => assignment.Syntax.Ancestors()
             .TakeWhile(ancestor => !ReferenceEquals(ancestor, declaration))
             .Any(ancestor => ancestor is IfStatementSyntax or SwitchStatementSyntax or
@@ -3444,8 +3444,11 @@ internal sealed class MethodEffectAnalysisSession(
             values = mappedValues.ToImmutable();
             return !values.IsDefaultOrEmpty;
         }
+        private readonly record struct ConstructorMemberAssignment(
+            SyntaxNode Syntax,
+            IOperation Value);
         private static bool AreExhaustiveAlternativeAssignments(
-            IReadOnlyList<ISimpleAssignmentOperation> assignments) {
+            IReadOnlyList<ConstructorMemberAssignment> assignments) {
             if (assignments.Count != 2) return false;
             var first = assignments[0].Syntax;
             var second = assignments[1].Syntax;
@@ -3574,31 +3577,67 @@ internal sealed class MethodEffectAnalysisSession(
                         StringComparison.Ordinal))?.Value,
                 _ => null
             };
-        private static ISimpleAssignmentOperation[] GetConstructorMemberAssignments(
+        private static ConstructorMemberAssignment[] GetConstructorMemberAssignments(
             SyntaxNode declaration,
             string memberPath,
             Compilation compilation) {
             var model = compilation.GetSemanticModel(declaration.SyntaxTree);
-            return [.. declaration.DescendantNodes()
+            var assignments = new List<ConstructorMemberAssignment>();
+            foreach (var syntax in declaration.DescendantNodes()
                 .OfType<AssignmentExpressionSyntax>()
                 .Where(node => !node.Ancestors()
                     .TakeWhile(ancestor => !ReferenceEquals(ancestor, declaration))
                     .Any(ancestor => ancestor is AnonymousFunctionExpressionSyntax or
-                        LocalFunctionStatementSyntax))
-                .Select(node => model.GetOperation(node))
-                .OfType<ISimpleAssignmentOperation>()
-                .Where(assignment => {
-                    var member = assignment.Target switch {
-                        IFieldReferenceOperation field => (ISymbol)field.Field.OriginalDefinition,
-                        IPropertyReferenceOperation property => property.Property.OriginalDefinition,
-                        _ => null
-                    };
-                    return member != null &&
-                           string.Equals(
-                               GetMemberPathPart(member),
-                               memberPath,
-                               StringComparison.Ordinal);
-                })];
+                        LocalFunctionStatementSyntax))) {
+                switch (model.GetOperation(syntax)) {
+                    case ISimpleAssignmentOperation assignment
+                        when ConstructorTargetMatches(assignment.Target, memberPath):
+                        assignments.Add(new ConstructorMemberAssignment(syntax, assignment.Value));
+                        break;
+                    case IDeconstructionAssignmentOperation deconstruction:
+                        AddDeconstructionMemberAssignments(
+                            deconstruction.Target,
+                            deconstruction.Value,
+                            syntax,
+                            memberPath,
+                            assignments);
+                        break;
+                }
+            }
+            return [.. assignments];
+        }
+        private static void AddDeconstructionMemberAssignments(
+            IOperation target,
+            IOperation value,
+            SyntaxNode syntax,
+            string memberPath,
+            List<ConstructorMemberAssignment> assignments) {
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (target is ITupleOperation targetTuple && value is ITupleOperation valueTuple &&
+                targetTuple.Elements.Length == valueTuple.Elements.Length) {
+                for (var index = 0; index < targetTuple.Elements.Length; index++)
+                    AddDeconstructionMemberAssignments(
+                        targetTuple.Elements[index],
+                        valueTuple.Elements[index],
+                        syntax,
+                        memberPath,
+                        assignments);
+                return;
+            }
+            if (ConstructorTargetMatches(target, memberPath))
+                assignments.Add(new ConstructorMemberAssignment(syntax, value));
+        }
+        private static bool ConstructorTargetMatches(IOperation target, string memberPath) {
+            var member = target switch {
+                IFieldReferenceOperation field => (ISymbol)field.Field.OriginalDefinition,
+                IPropertyReferenceOperation property => property.Property.OriginalDefinition,
+                _ => null
+            };
+            return member != null &&
+                   string.Equals(
+                       GetMemberPathPart(member),
+                       memberPath,
+                       StringComparison.Ordinal);
         }
         private static bool TryGetPrimaryConstructorMemberInitializer(
             IObjectCreationOperation creation,
