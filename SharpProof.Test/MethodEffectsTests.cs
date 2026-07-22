@@ -495,6 +495,24 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
         });
     }
+    [Test]
+    public void CoalesceAssignmentPreservesNonNullResult() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static string Mutate() { state++; return "unused"; }
+                static string M(string? value) {
+                    value ??= "fallback";
+                    value ??= Mutate();
+                    return value;
+                }
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
+        });
+    }
     [TestCase("true || Mutate()")]
     [TestCase("false && Mutate()")]
     public void ConstantBooleanShortCircuitSkipsRightOperand(string expression) {
