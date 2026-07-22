@@ -757,6 +757,30 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ExtensionForeachWritesArgumentStatePrecisely() {
+        var result = Analyze("""
+            sealed class Source { public int State; }
+            static class Extensions {
+                public static Enumerator GetEnumerator(this Source source) {
+                    source.State++;
+                    return default;
+                }
+            }
+            struct Enumerator {
+                public bool MoveNext() => false;
+                public int Current => 0;
+            }
+            class C {
+                static void M(Source source) { foreach (var value in source) { } }
+            }
+            """, 13);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {
