@@ -590,8 +590,7 @@ internal sealed class MethodEffectAnalysisSession(
                         }
                         else {
                             elementValue = Evaluate(collection.Elements[index], ref state);
-                            var add = collection.Type?.GetMembers("Add").OfType<IMethodSymbol>()
-                                .FirstOrDefault(static method => !method.IsStatic && method.Parameters.Length == 1);
+                            var add = FindProtocolMethod(collection.Type, "Add", 1);
                             if (add != null) InvokeCore(add, collectionValue, [elementValue], [], collection.Elements[index], ref state);
                             collectionValue = collectionValue.WithMember("#" + outputIndex++, elementValue);
                         }
