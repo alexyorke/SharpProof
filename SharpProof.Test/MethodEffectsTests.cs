@@ -5555,6 +5555,24 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void RemovedDelegateTargetDoesNotRetainItsEffects() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static void Impure() { state++; }
+                static void M() {
+                    System.Action? action = Impure;
+                    action -= Impure;
+                    action!();
+                }
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
+        });
+    }
+    [Test]
     public void LoopBackEdgesDoNotReusePreAssignmentFreshness() {
         var result = Analyze("""
             class Box { public int Value; }
