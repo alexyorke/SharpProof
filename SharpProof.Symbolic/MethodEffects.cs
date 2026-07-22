@@ -931,12 +931,15 @@ internal sealed class MethodEffectAnalysisSession(
         }
         method = method.ReducedFrom ?? method;
         method = (method.PartialImplementationPart ?? method).OriginalDefinition;
-        var knownExactReceiverType = receiver is ILocalReferenceOperation localReceiver
+        var dispatchReceiver = receiver is IConditionalAccessInstanceOperation conditionalAccess
+            ? FindConditionalAccessReceiver(conditionalAccess) ?? receiver
+            : receiver;
+        var knownExactReceiverType = dispatchReceiver is ILocalReferenceOperation localReceiver
             ? builder.GetExactType(localReceiver.Local)
             : null;
         var exactDispatchTarget = SymbolicDispatchFacts.ResolveExactDispatchTarget(
             method,
-            receiver,
+            dispatchReceiver,
             knownExactReceiverType);
         method = exactDispatchTarget ?? method;
         builder.Add(SharpProofEffect.DirectCall, site, method, "direct_call");
