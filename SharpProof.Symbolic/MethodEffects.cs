@@ -4236,7 +4236,8 @@ internal sealed class MethodEffectAnalysisSession(
             out SharpProofEffect writeEffect) {
             readEffect = SharpProofEffect.None;
             writeEffect = SharpProofEffect.None;
-            while (value is IConversionOperation conversion) value = conversion.Operand;
+            while (value is IConversionOperation { OperatorMethod: null } conversion)
+                value = conversion.Operand;
             if (value is IParenthesizedOperation parenthesized)
                 return TryGetCapturedValueEffects(
                     parenthesized.Operand,
@@ -4311,6 +4312,16 @@ internal sealed class MethodEffectAnalysisSession(
                 }
                 return switchExpression.Arms.Length != 0;
             }
+            if (value is IConversionOperation { OperatorMethod: { } operatorMethod } userConversion)
+                return TryGetCapturedCallResultEffects(
+                    operatorMethod,
+                    userConversion,
+                    [],
+                    callSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
             if (value is IInvocationOperation returnedInvocation)
                 return TryGetCapturedCallResultEffects(
                     returnedInvocation.TargetMethod,
@@ -4401,7 +4412,8 @@ internal sealed class MethodEffectAnalysisSession(
             out SharpProofEffect writeEffect) {
             readEffect = SharpProofEffect.None;
             writeEffect = SharpProofEffect.None;
-            while (value is IConversionOperation conversion) value = conversion.Operand;
+            while (value is IConversionOperation { OperatorMethod: null } conversion)
+                value = conversion.Operand;
             if (value is IParenthesizedOperation parenthesized)
                 return TryGetNestedReturnedValueEffects(
                     parenthesized.Operand,
@@ -4439,6 +4451,12 @@ internal sealed class MethodEffectAnalysisSession(
                                 argument.Parameter?.Name,
                                 parameter.Parameter.Name,
                                 StringComparison.Ordinal))?.Value,
+                    IConversionOperation { OperatorMethod: { } conversionMethod } conversion
+                        when conversionMethod.Parameters.Length == 1 &&
+                             string.Equals(
+                                 conversionMethod.Parameters[0].Name,
+                                 parameter.Parameter.Name,
+                                 StringComparison.Ordinal) => conversion.Operand,
                     _ => null
                 };
             }
@@ -4503,6 +4521,16 @@ internal sealed class MethodEffectAnalysisSession(
                 }
                 return switchExpression.Arms.Length != 0;
             }
+            if (value is IConversionOperation { OperatorMethod: { } operatorMethod } userConversion)
+                return TryGetCapturedCallResultEffects(
+                    operatorMethod,
+                    userConversion,
+                    nestedCallSites,
+                    outerCallSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
             if (value is IFieldReferenceOperation { Field.IsStatic: true }) {
                 readEffect = GetInstanceReadEffect(value, this);
                 writeEffect = GetInstanceWriteEffect(value, this);
@@ -4613,6 +4641,7 @@ internal sealed class MethodEffectAnalysisSession(
         private static IMethodSymbol? GetNestedCallSiteMethod(IOperation site) => site switch {
             IInvocationOperation invocation => invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod,
             IPropertyReferenceOperation property => property.Property.GetMethod,
+            IConversionOperation conversion => conversion.OperatorMethod,
             _ => null
         };
         private bool TryGetCompositeCapturedValueEffects(
