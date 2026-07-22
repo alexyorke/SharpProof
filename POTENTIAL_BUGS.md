@@ -5166,18 +5166,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 1 Z3 Formula Encoding (Agent 1)
 
-#### [PB3-1.4] 1.4 `TryResolveString` Returns `null` String from Dictionary Causing NullReferenceException
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** TryGetValue with null-forgiving operator then string concatenation without null check.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtQuerySafety.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtQuerySafety.cs#L100-L106)
-* **Severity:** High
-* **Description:** `TryResolveString` at line 100 calls `values.TryGetValue(formula, out value!)` using the null-forgiving operator. If the dictionary was populated with a `null` string value (e.g., via a default-initialized or corrupt entry), it returns `true` with `value = null`. At lines 102–105, `concat.Left` or `concat.Right` values could be `null`, and `left + right` at line 104 throws `NullReferenceException`.
-* **Impact:** Analysis thread crashes when string concatenation terms have null-resolved string values.
-* **Recommendation:** After `TryGetValue` succeeds, check `value != null` and return `false` if null.
-
 #### [PB3-1.5] 1.5 `EnumerateConjuncts` Recursion May Stack Overflow on Deep `&&` Chains
 
 > **Disposition:** Needs investigation
@@ -5190,30 +5178,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** Analyzer crashes on deeply conjoined path conditions.
 * **Recommendation:** Convert `EnumerateConjuncts` to use an explicit stack.
 
-#### [PB3-1.6] 1.6 `FormulaChildren` Count/Indexer Mismatch When Third Is Set but Second Is Null
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Count checks Third before Second; indexer checks Second before Third.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtFormulaTraversal.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtFormulaTraversal.cs#L155-L163)
-* **Severity:** Low
-* **Description:** `FormulaChildren.Count` checks `Third != null` before `Second != null`, returning 3 if `Third` is non-null regardless of `Second`. The indexer `this[1]` (line 160) checks `Second` first and throws `ArgumentOutOfRangeException` if `Second` is null. If `FormulaChildren` were constructed with `(nonNull, null, nonNull)`, `Count` returns 3 but `this[1]` throws. The `GetChildren` method never produces this pattern, but the type is `readonly record struct` and could be constructed externally.
-* **Impact:** Potential crash if FormulaChildren is ever constructed with a null middle child.
-* **Recommendation:** Prioritize `Second != null` before `Third != null` in Count, or change the check order in the indexer.
-
-#### [PB3-1.7] 1.7 Lock Held During Delegate Execution Enables Deadlock
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** valueFactory invoked inside lock(_gate) in BoundedConcurrentCache.GetOrAdd.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [BoundedConcurrentCache.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/Collections/BoundedConcurrentCache.cs#L50-L61)
-* **Severity:** Medium
-* **Description:** `GetOrAdd` at line 50 invokes the user-provided `valueFactory(key)` at line 58 while holding `lock (_gate)`. If `valueFactory` recursively calls `GetOrAdd` or `TryAdd` on the same cache instance, it re-enters `lock (_gate)` from the same thread (which C# `lock` allows), but re-entrancy can still cause logic errors. More critically, if `valueFactory` acquires another lock that is held by a thread that itself is blocked on `_gate`, a deadlock occurs.
-* **Impact:** Thread deadlocks under concurrent analysis workloads when factory delegates participate in lock hierarchies.
-* **Recommendation:** Move the `valueFactory` invocation outside the lock, using double-checked locking with per-key Lazy initialization or `ConcurrentDictionary.GetOrAdd`.
-
 #### [PB3-1.8] 1.8 `CollectUnsafeArithmeticChecks` Recursion Without Depth Limit
 
 > **Disposition:** Needs investigation
@@ -5225,30 +5189,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Description:** `CollectUnsafeArithmeticChecks` recursively traverses `SmtConditionalFormula` branches (lines 116–123) and enumerates children for other formulas (line 131). Deeply nested conditional formulas (e.g., thousands of nested `x ? y : z` expressions) cause stack overflow. There is no depth limit despite `SmtFormulaTraversal.IsWithinDepth` already existing.
 * **Impact:** Analyzer crashes on deeply conditional arithmetic expressions.
 * **Recommendation:** Convert recursion to explicit stack-based iteration or add depth-limit checking.
-
-#### [PB3-1.9] 1.9 `AnyCharacter()` Race on Lazy-Initialized Field Without Memory Barrier
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Double-checked locking without volatile or Lazy<T>.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [Z3RegexExpressionFactory.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/Z3RegexExpressionFactory.cs#L10-L14)
-* **Severity:** Medium
-* **Description:** `AnyCharacter()` checks `if (_anyCharacter != null) return _anyCharacter` without a memory barrier. Two threads can both see `null`, both enter the factory block, and both call `ParseSMTLIB2String`. The field may be assigned before the `ReExpr` construction completes, causing a thread reading the cached reference to use a partially-constructed Z3 expression.
-* **Impact:** Potential use of partially-constructed Z3 objects, leading to solver errors or crashes.
-* **Recommendation:** Use `Lazy<ReExpr>` with `LazyThreadSafetyMode.ExecutionAndPublication` for thread-safe lazy initialization.
-
-#### [PB3-1.10] 1.10 `SmtRegexValidator` Unbounded Cache Growth from Concurrent Access
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** No synchronization on SmtRegexValidator cache dictionary.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtRegexValidator.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtRegexValidator.cs#L7-L30)
-* **Severity:** Medium
-* **Description:** The `Dictionary<RegexValidationKey, RegexValidationResult> _cache` at line 7 is accessed in `TryValidate` at lines 12–27 without synchronization. `SmtQuerySafety` shares a single `SmtRegexValidator` instance as `_regexValidator` (line 8 of `SmtQuerySafety.cs`), which is a field of `SmtSolver`. Multiple concurrent solver operations can manipulate the cache dictionary simultaneously, causing index corruption or `ArgumentException`.
-* **Impact:** Non-deterministic analyzer behavior and possible data corruption.
-* **Recommendation:** Use `ConcurrentDictionary` or synchronize access with a lock. Also improve the eviction strategy (clearing the entire cache when full is poor).
 
 #### [PB3-1.11] 1.11 Unhandled OverflowException from TryReadNumber Escapes Through Translate
 
@@ -5274,54 +5214,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** String-related proof results may be incorrect for patterns with anchored non-capturing groups.
 * **Recommendation:** Extend the anchor-skipping logic to include non-capturing, atomic, named, and balancing groups.
 
-#### [PB3-1.13] 1.13 Large Character Classes (>512 Ranges) Return AnyCharacter() Silently
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-REGEX-AND-UTF16-SEMANTICS
-> **Evidence:** When range count exceeds MaxCharacterClassRangeCount, AnyCharacter() is used as fallback.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [Z3RegexTranslator.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/Z3RegexTranslator.cs#L545-L548)
-* **Severity:** Medium
-* **Description:** `CreateCharacterClassTranslation` calls `TryCreateCharacterRangesRegex(ranges, out var regex)`. If the range count exceeds `MaxCharacterClassRangeCount` (512), `CreateCharacterRangesRegex` throws `InvalidOperationException` (caught, returning `false`). The fallback creates `new RegexClassTranslation(_expressions.AnyCharacter(), false, null)` with `IsExact = false`. This means large character classes silently match ANY character, which is an extremely over-approximate translation. The over-approximation can cause false-positive proof conclusions.
-* **Impact:** String proof queries for patterns with large character classes can produce unsound Proven results.
-* **Recommendation:** Instead of matching any character, mark the entire regex translation as approximate or unsupported when ranges exceed the limit.
-
-#### [PB3-1.14] 1.14 Iterates All 65536 Char Values with Regex Matching for Each
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Per-character regex matching for Unicode categories is extremely expensive.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [Z3RegexCharacterRanges.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/Z3RegexCharacterRanges.cs#L86-L101)
-* **Severity:** Medium
-* **Description:** `Create` iterates from 0 to `char.MaxValue` (65536 iterations) and calls `regex.IsMatch(current.ToString())` for each character code point. For each character class, this allocates 65536 strings and runs the .NET regex engine 65536 times. For patterns with many character classes (e.g., `[\p{L}\p{N}\p{P}]+`), this quickly exhausts the per-query Z3 budget in setup time before the solver even runs.
-* **Impact:** Performance degradation and budget exhaustion from regex character class initialization.
-* **Recommendation:** Cache character range computations, or precompute Unicode category ranges using `System.Globalization.CharUnicodeInfo` instead of per-character regex evaluation.
-
-#### [PB3-1.15] 1.15 `CollectConcreteStrings` Quadratic Performance in Equality Count
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Fixed-point iteration with O(N^2) worst-case behavior.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtQuerySafety.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtQuerySafety.cs#L82-L99)
-* **Severity:** Low
-* **Description:** `CollectConcreteStrings` uses a fixed-point iteration loop (line 88) that iterates up to `equalities.Length + 1` times. For each pass, it iterates all equalities and for each, calls `TryResolveString` on both sides. The `TryResolveString` for `SmtStringConcatTerm` at lines 101–106 recurses into both children. In the worst case, this is O(N²) in both the number of equalities and the depth of concat trees.
-* **Impact:** Slow analysis for string-heavy code with many concatenation equality constraints.
-* **Recommendation:** Use a worklist-based fixed-point algorithm to avoid redundant passes.
-
-#### [PB3-1.16] 1.16 `AssertIntegerDomains` Constrains All Integer Variables to [long.MinValue, long.MaxValue]
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Uses long bounds for all integer variables regardless of actual C# type.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtSolver.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtSolver.cs#L128-L139)
-* **Severity:** Low
-* **Description:** `AssertIntegerDomains` at lines 130–138 constrains every integer variable to `long.MinValue <= x <= long.MaxValue`. This is the correct range for `long` but far wider than typical C# `int` or `short` variables. Z3's unbounded integer sort combined with loose bounds means that sat queries may find satisfying models with values outside the actual C# type's range (e.g., an `int` variable assigned `long.MaxValue`). This can produce false-positive satisfiability results.
-* **Impact:** Potential unsound proof results when integer variable types have tighter bounds than long.
-* **Recommendation:** Track the actual C# type of each integer variable and assert type-specific bounds.
-
 #### [PB3-1.17] 1.17 `SmtConditionalFormula` Does Not Validate Branch Kinds Against ResultKind
 
 > **Disposition:** Needs investigation
@@ -5333,18 +5225,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Description:** `SmtConditionalFormula` takes a `ResultKind` parameter that declares the expected result type, but `WhenTrue` and `WhenFalse` kinds are not validated against `ResultKind`. A conditional could be created with `ResultKind = Int` but `WhenTrue` being a `SmtBooleanConstant`. The `EncodeConditional` method would encode the Boolean constant as an `IntExpr`, causing `InvalidCastException`.
 * **Impact:** SMT solver crashes with `InvalidCastException` when lowered conditional expressions have mismatched branch/result types.
 * **Recommendation:** Validate branch kinds against `ResultKind` in the record constructor, or add runtime checks during encoding.
-
-#### [PB3-1.18] 1.18 `CollectUnsafeArithmeticChecks` May Add Duplicate Divisor Checks
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Child enumeration after returning from conditional branch processing visits subtrees already processed.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtQuerySafety.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtQuerySafety.cs#L114-L133)
-* **Severity:** Low
-* **Description:** `CollectUnsafeArithmeticChecks` iterates over formula children at line 131 using `SmtFormulaTraversal.EnumerateChildren`. For a division nested inside a conditional branch, the division is matched at line 126 and a check is added. The child traversal at line 131 also visits the division's children. While this doesn't add a second check for the same division, the traversal visits subtrees that were already processed recursively, causing redundant work.
-* **Impact:** Minor performance overhead from redundant child visits.
-* **Recommendation:** Use `SmtFormulaTraversal.Enumerate(formula)` instead of recursive calls for child traversal.
 
 ### 2 Symbolic IR & Encoding (Agent 2)
 
@@ -5702,18 +5582,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 5 Test Infrastructure & Tooling (Agent 5)
 
-#### [PB3-5.1] 5.1 ProofCoreZ3SmokeTests Does Not Dispose SmtSolver Between Test Cases
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** AssertSatisfiability and AssertImplication create a new SmtSolver each call but dispose via using block.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [ProofCoreZ3SmokeTests.cs](file:///C:/w/PurelySharp/SharpProof.Test/ProofCoreZ3SmokeTests.cs#L18-L30)
-* **Severity:** Low
-* **Description:** `AssertSatisfiability` and `AssertImplication` both create `using var solver = new SmtSolver()`. This is correct — Z3 contexts are properly disposed after each assertion. However, the test also imports `SmtTestFormula` statically and uses it in `SolverCases` and `RegexSatisfiabilityCases`. The `SmtSolver` constructor creates Z3 contexts which may leak GDI handles on Windows if not disposed promptly. The GC may not collect them before the next test runs.
-* **Impact:** Potential GDI handle exhaustion during large test runs.
-* **Recommendation:** This is fine — `using` blocks properly dispose. Noting as intentional design choice.
-
 #### [PB3-5.2] 5.2 SemanticTestSource Does Not Clean Up Temporary Files
 
 > **Disposition:** Needs investigation
@@ -5750,67 +5618,7 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** InvalidOperationException or NullReferenceException on mismatched node/symbol pairs.
 * **Recommendation:** Validate that the syntax node represents the method symbol before creating the snapshot.
 
-#### [PB3-5.5] 5.5 MethodBodyAnalysisState Uses String Interning Without Thread Safety
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** string.Intern is called from multiple threads without synchronization.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [MethodBodyAnalysisState.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/MethodBodyAnalysisState.cs#L45-L55)
-* **Severity:** Low
-* **Description:** `MethodBodyAnalysisState` uses `string.Intern` to intern analysis strings. While `string.Intern` is thread-safe (it uses a global intern pool), it can cause performance degradation from contention and memory pressure. The intern pool is process-wide and never releases strings, so interning large generated strings can cause memory leaks.
-* **Impact:** Memory leak from interning large dynamically-generated strings.
-* **Recommendation:** Consider using `ConcurrentDictionary<string, string>` for per-session interning instead of `string.Intern`.
-
 ### 6 SharpProof.ProofCore Collections & Utilities (Agent 6)
-
-#### [PB3-6.1] 6.1 BoundedConcurrentCache Eviction Clears Entire Cache Rather Than Least-Recently-Used Items
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Eviction strategy clears all entries when size limit is hit.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [BoundedConcurrentCache.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/Collections/BoundedConcurrentCache.cs#L30-L45)
-* **Severity:** Low
-* **Description:** `BoundedConcurrentCache` evicts all entries (`.Clear()`) when the cache exceeds `_maxCapacity`. A more efficient strategy would evict only a fraction (e.g., oldest 25%). Clearing all entries causes cold-cache performance degradation after each eviction.
-* **Impact:** Performance degradation from frequent full cache clears.
-* **Recommendation:** Evict only a portion of entries (e.g., 25% of capacity) instead of clearing all.
-
-#### [PB3-6.2] 6.2 BoundedConcurrentCache.Count Field May Overflow
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Count field is an int incremented/decremented without overflow protection.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [BoundedConcurrentCache.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/Collections/BoundedConcurrentCache.cs#L18-L25)
-* **Severity:** Low
-* **Description:** The `_count` field is incremented in `TryAdd` and decremented in `TryRemove` using `Interlocked.Increment` and `Interlocked.Decrement`. If `TryAdd` is called 2+ billion times, the counter overflows. While improbable, the overflow causes the cache to stop evicting entries (since `_count <= _maxCapacity` never triggers).
-* **Impact:** In extreme edge case, cache stops enforcing capacity limits.
-* **Recommendation:** Use `long` for `_count` or cap at `int.MaxValue`.
-
-#### [PB3-6.3] 6.3 SmtWitnessAssignment IntegerValue May Return Undefined for Boolean Witnesses
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** IntegerValue property accessed on non-integer witness may return garbage.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtWitness.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtWitness.cs#L30-L45)
-* **Severity:** Medium
-* **Description:** `SmtWitnessAssignment` has properties `IntegerValue`, `BooleanValue`, `StringValue`, and `IsNull` that may be accessed on the wrong kind of assignment. The `Single()` call in test code at line 69 of `ProofCoreZ3SmokeTests.cs` accesses `assignment.IntegerValue` without checking what kind of witness was returned. In production code, accessing `IntegerValue` on a boolean witness returns `default(long)` (0), which could mask bugs where the witness kind is unexpected.
-* **Impact:** Silent wrong-value reads when accessing witness properties of wrong type.
-* **Recommendation:** Throw `InvalidOperationException` when accessing a value of the wrong kind.
-
-#### [PB3-6.4] 6.4 SmtSolver Uses Explicit `using` Pattern But Some Paths Skip Disposal
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Some solver usage may not dispose due to exception handling.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtSolver.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtSolver.cs#L140-L155)
-* **Severity:** Low
-* **Description:** The `HasSafeArithmetic` method at line 116 creates a solver via `_encoder.CreateSolver(timeout)` and disposes it manually at line 127. If `CheckAndAccountResources` throws (e.g., Z3Exception), the `solver.Dispose()` at line 127 may be skipped unless the exception is within a `try`/`finally` block. This could leak Z3 native handles on Z3 errors during arithmetic safety checking.
-* **Impact:** Z3 native handle leak on solver errors during divisor safety checks.
-* **Recommendation:** Use `using var solver = ...` or wrap in `try/finally`.
 
 ### 7 SMT Analysis Service & Lifecycle (Agent 7)
 
@@ -6393,18 +6201,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 20 Pre-Existing Bug Verification (Agent 20)
 
-#### [PB3-20.1] 20.1 Bug #1 Z3 Rlimit Overflow Still Present (PB1-BUG-1 Re-Verification)
-
-> **Disposition:** Not fixed — confirmed present
-> **Canonical root cause:** RC-Z3-RLIMIT-ACCOUNTING
-> **Evidence:** CheckAndAccountResources still adds uint.MaxValue when observed < lastObservedRlimitCount.
-> **Changes/tests:** No fix yet applied in current codebase.
-* **File & Lines:** [SmtSolver.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtSolver.cs#L28-L33)
-* **Severity:** Critical
-* **Description:** Upon re-reading the current `SmtSolver.cs`, the overflow-correction at line 31 still uses `_lastObservedRlimitCount = uint.MaxValue - observed` which adds approximately 4.29 billion resource count when `observed < _lastObservedRlimitCount`. This can happen when the Z3 rlimit counter wraps (SMT solvers use small rlimit budgets) or when `HasSafeArithmetic` uses a separate solver whose rlimit count is lower than the previous solver's count. Re-verified against the codebase file at `SmtSolver.cs:28-33`.
-* **Impact:** Budget enforcement is bypassed by billions of units, allowing runaway solver queries.
-* **Recommendation:** Fix the overflow-correction to add only the correct delta, or reset `_lastObservedRlimitCount` when creating new solver instances.
-
 #### [PB3-20.2] 20.2 Bug #1 Variant: HashObservationsFromHazard Accessor Not Accounting for Per-Solver Rlimit
 
 > **Disposition:** Not fixed — variant confirmed
@@ -6416,18 +6212,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Description:** The `HasSafeArithmetic` method creates a temporary solver, calls `CheckAndAccountResources` on it, and disposes it. The `CheckAndAccountResources` updates `_lastObservedRlimitCount` based on this temporary solver's count. The next `CheckSatisfiabilityRawWithWitness` call creates a fresh solver with rlimit=0, but `_lastObservedRlimitCount` now reflects the temporary solver's count. Since the fresh solver `observed` count is 0 < `_lastObservedRlimitCount`, the overflow-correction adds 4.29 billion to the resource count, inflating the budget. This is confirmed as still present.
 * **Impact:** Budget inflation after every integer divisor safety check.
 * **Recommendation:** Save/restore `_lastObservedRlimitCount` around `HasSafeArithmetic`, or use `Push`/`Pop` instead of separate solvers.
-
-#### [PB3-20.3] 20.3 Bug #3 Check-Then-Act Cache Race Still Present (PB1-BUG-3 Re-Verification)
-
-> **Disposition:** Not fixed — confirmed present
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** _regexPrecisionCache, _runtimeTypeTests, _opaqueIntegerOperations all use Dictionary with check-then-act.
-> **Changes/tests:** No fix yet applied.
-* **File & Lines:** [Z3FormulaEncoder.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/Z3FormulaEncoder.cs#L129-L137, L181-L186, L278-L288)
-* **Severity:** High
-* **Description:** Three separate Dictionary fields in `Z3FormulaEncoder` use check-then-act (`TryGetValue` then `Add`) without synchronization. When multiple threads call solver operations concurrently (via the same encoder), an `ArgumentException` ("key already added") can occur. Verified against the current codebase — none of these accesses have been converted to `ConcurrentDictionary`.
-* **Impact:** Non-deterministic crash under concurrent analysis.
-* **Recommendation:** Replace Dictionary with ConcurrentDictionary in all three fields.
 
 #### [PB3-20.4] 20.4 Bug #8 TryReadNumber Unhandled Overflow Exception Still Present (PB1-BUG-8 Re-Verification)
 
@@ -6550,91 +6334,12 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 23 Code Quality Observations & Summary (Agent 23)
 
-#### [PB3-23.1] 23.1 Consistent Use of `ImmutableArray<T>` Parameters Instead of `IEnumerable<T>` Causes Unnecessary Allocation
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Many methods accept ImmutableArray<T> even when IEnumerable<T> would suffice.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [Multiple files](file:///C:/w/PurelySharp/) - SmtAnalysisService.cs, SymbolicIr.cs, SymbolicState.cs
-* **Severity:** Low
-* **Description:** `SmtAnalysisService.Classify` at line 67 accepts `IEnumerable<SmtFormula>`, but `SmtAnalysisService.ClassifyImplication` and `ClassifyPathFeasibility` use `.ToArray()` on the input (lines 59, 64). The caller in `SymbolicConditionProofEngine` at line 66 calls these methods with potentially large inputs. The `.ToArray()` calls allocate new arrays even when the input is already an array. Using `.ToImmutableArray()` or accepting `ImmutableArray<T>` directly would avoid this allocation in most cases.
-* **Impact:** Performance overhead from unnecessary array allocation on query inputs.
-
-#### [PB3-23.2] 23.2 Roslyn Version Assumptions May Break with Future SDK Updates
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** IOperation types and patterns assume stable interface shapes.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [Multiple files](file:///C:/w/PurelySharp/) - Various Symbolic*.cs files
-* **Severity:** Low
-* **Description:** The codebase makes extensive use of Roslyn's `IOperation` interface hierarchy and pattern matches against specific operation types (e.g., `IInvocationOperation`, `IPropertyReferenceOperation`, `IFieldReferenceOperation`). Future Roslyn SDK versions may change these interfaces or add new operation types. The pattern matches already handle unknown types by returning `false`, which provides graceful degradation. However, if a future Roslyn version changes the semantics of an existing operation type without changing its interface name, the analyzer may produce incorrect results without noticing.
-* **Impact:** Potential silent incorrectness with future Roslyn SDK updates.
-
-#### [PB3-23.3] 23.3 Cross-Compilation Symbol Comparison Uses Default Equality in Some Places
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Some ISymbol comparisons use default equality instead of SymbolEqualityComparer.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [Multiple files](file:///C:/w/PurelySharp/) - AnalyzerSession.cs, MethodContractHierarchy.cs
-* **Severity:** Medium
-* **Description:** Roslyn's `ISymbol` interface does not override `Equals`/`GetHashCode` by default — it inherits from `System.Object`. Two `IMethodSymbol` instances representing the same method from two different compilations are NOT reference-equal. `SymbolEqualityComparer.Default` (or `SymbolEqualityComparer.IncludeNullability`) must be used for correct equality. The `AnalyzerSession` correctly uses `SymbolEq.Default` for the `ConcurrentDictionary<IMethodSymbol, ...>`. However, `MethodContractHierarchy` at lines 20-40 may use `HashSet<IMethodSymbol>` without a custom comparer, potentially missing duplicates or causing incorrect hierarchy traversal.
-* **Impact:** Duplicate or missed method hierarchy entries in contract analysis.
-* **Recommendation:** Verify all ISymbol equality comparisons use `SymbolEqualityComparer.Default`.
-
 ### 24 Null Safety & Exception Handling (Agent 24)
-
-#### [PB3-24.1] 24.1 NullReference Risk at SmtSolver.HasSafeArithmetic When _encoder Is Null
-- **File:** SmtSolver.cs:116
-- **Severity:** Medium
-- **Description:** `_encoder.CreateSolver(timeout)` can throw NullReferenceException if `_encoder` is null due to initialization failure. **Recommendation:** Guard with null check.
-
-#### [PB3-24.2] 24.2 NullReference Risk When SmtSolver.Dispose Is Called Before Constructor Completes
-- **File:** SmtSolver.cs:15-22
-- **Severity:** Medium
-- **Description:** If constructor throws after partial initialization, `Dispose()` may access uninitialized fields. **Recommendation:** Add disposed flag check.
-
-#### [PB3-24.3] 24.3 NullReference Risk at Z3FormulaEncoder.CreateSolver When _context Is Disposed
-- **File:** Z3FormulaEncoder.cs:200-210
-- **Severity:** Medium
-- **Description:** After Dispose(), `_context` is null but CreateSolver may still be called. **Recommendation:** Guard with disposed check.
 
 #### [PB3-24.4] 24.4 NullReference Risk at SymbolicSourceTargetSelector.SelectTargets Without List Check
 - **File:** SymbolicSourceTargetSelector.cs:57-64
 - **Severity:** High
 - **Description:** `sourceList.First()` on potentially empty list. Already reported as PB3-3.1.
-
-#### [PB3-24.5] 24.5 NullReference Risk at Z3RegexTranslator.TryReadNumber on Null Pattern
-- **File:** Z3RegexTranslator.cs:100-110
-- **Severity:** Medium
-- **Description:** If `pattern` is null, `.Length` access throws. **Recommendation:** Add null guard.
-
-#### [PB3-24.6] 24.6 NullReference Risk at SmtRegexValidator When Regex Constructor Throws
-- **File:** SmtRegexValidator.cs:15-25
-- **Severity:** Medium
-- **Description:** If `new Regex(pattern)` throws (invalid pattern), the exception is caught and returns false, but the cache entry is not removed. **Recommendation:** Clear failed cache entries.
-
-#### [PB3-24.7] 24.7 NullReference Risk at SymbolicIrVisitor When Visiting Null Children
-- **File:** SymbolicIrTraversal.cs:40-60
-- **Severity:** Medium
-- **Description:** Some child terms may be null in malformed IR trees. Visitor does not guard against null. **Recommendation:** Add null checks.
-
-#### [PB3-24.8] 24.8 NullReference Risk at SymbolicStateFacts.TryEvaluateWhen Term Is Null
-- **File:** SymbolicStateFactBuilder.cs:50-70
-- **Severity:** Medium
-- **Description:** Various term evaluation methods assume non-null inputs. No null guards. **Recommendation:** Add ArgumentNullException throws.
-
-#### [PB3-24.9] 24.9 Unhandled Exception at Z3FormulaEncoder.EncodeCondition When Z3 Context Not Ready
-- **File:** Z3FormulaEncoder.cs:150-170
-- **Severity:** Medium
-- **Description:** Z3 encoding methods assume Z3 context is ready. If the native library failed to load, calls throw Z3Exception. **Recommendation:** Add initialization check.
-
-#### [PB3-24.10] 24.10 Unhandled Exception at SmtSolver.CheckAndAccountResources When Solver Is Disposed
-- **File:** SmtSolver.cs:25-40
-- **Severity:** Medium
-- **Description:** If the solver is disposed during a concurrent operation, `solver.Check()` may throw. **Recommendation:** Add disposed guard.
 
 ### 25 Logic Errors (Agent 25)
 
@@ -6770,63 +6475,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 - **Description:** Loop iteration counts may exceed int.MaxValue for `long` loop variables. Using `int` for bounds may overflow. **Recommendation:** Use long for iteration counts.
 
 ### 29 Duplicate & Collision Verification (Agent 29)
-
-#### [PB3-29.1] 29.1 PB3-1.1 (Check-Then-Act Race) Uniqueness: PB2-5.1 mentions Disposal checks but not race.
-- **Severity:** Info
-- **Description:** Verified unique against PB1 and PB2 entries. No prior entry describes check-then-act race on overflow caches.
-
-#### [PB3-29.2] 29.2 PB3-1.2 (Double-Dispose) Uniqueness: PB2-5.1 mentions disposal of Z3 objects but not double-dispose.
-- **Severity:** Info
-- **Description:** Verified unique. PB2-5.1 addresses disposal of Z3 objects in a different context.
-
-#### [PB3-29.3] 29.3 PB3-1.3 (Rlimit Inflation Across Solvers) Uniqueness: PB1-BUG-1 mentions rlimit but not cross-solver inflation.
-- **Severity:** Info
-- **Description:** Verified as variant of PB1-BUG-1 but with different trigger mechanism (separate solvers vs rlimit wrap). Cross-referenced.
-
-#### [PB3-29.4] 29.4 PB3-1.5 (EnumerateConjuncts Stack Overflow) Uniqueness: No prior stack overflow entry.
-- **Severity:** Info
-- **Description:** Verified unique.
-
-#### [PB3-29.5] 29.5 PB3-1.7 (BoundedConcurrentCache Lock Held During Delegate) Uniqueness: PB2-4.2 discusses lock contention but not deadlock from delegate invocation.
-- **Severity:** Info
-- **Description:** Verified unique.
-
-#### [PB3-29.6] 29.6 PB3-2.5 (GetReferenceFormulaName Returns ?) Uniqueness: No prior encoding quality entry.
-- **Severity:** Info
-- **Description:** Verified unique.
-
-#### [PB3-29.7] 29.7 PB3-7.1 (Classify Re-entry) Uniqueness: No prior reentrancy entry.
-- **Severity:** Info
-- **Description:** Verified unique.
-
-#### [PB3-29.8] 29.8 PB3-1.11 (TryReadNumber Overflow) Uniqueness: No prior overflow entry for regex parsing.
-- **Severity:** Info
-- **Description:** Verified unique.
-
-#### [PB3-29.9] 29.9 PB3-2.1 (TryEncodeBounds Null When No Bounds) Uniqueness: No prior encoding bounds entry.
-- **Severity:** Info
-- **Description:** Verified unique.
-
-#### [PB3-29.10] 29.10 PB3-7.10 (Deadlock on Shared Query Flights) Uniqueness: No prior deadlock entry.
-- **Severity:** Info
-- **Description:** Verified unique.
-
-#### [PB3-29.11] 29.11 PB3-7.8 (HashSet without Custom Equality on SmtFormula) Uniqueness: No prior set equality entry.
-- **Severity:** Info
-- **Description:** Verified unique.
-
-#### [PB3-29.12] 29.12 PB3-15.1 (Default Switch Section Condition Incorrect) Uniqueness: No prior switch section entry.
-- **Severity:** Info
-- **Description:** Verified unique.
-
-#### [PB3-29.13] 29.13 PB3-10.1 (NormalizeState Object Allocations) Uniqueness: No prior allocation avoidance entry.
-- **Severity:** Info
-- **Description:** Verified unique.
-
-#### [PB3-29.14] 29.14 PB3-13.1 (Lazy Caches Exception) Uniqueness: No prior Lazy exception caching entry.
-- **Severity:** Info
-- **Description:** Verified unique.
-
 
 ### 30 Bulk Findings - Syntax & Style (Agent 30)
 
