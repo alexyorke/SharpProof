@@ -2937,7 +2937,8 @@ internal sealed class MethodEffectAnalysisSession(
             Compilation compilation,
             HashSet<ILocalSymbol> visited,
             out ImmutableArray<IOperation> initializers) {
-            while (value is IConversionOperation conversion) value = conversion.Operand;
+            while (value is IConversionOperation { OperatorMethod: null } conversion)
+                value = conversion.Operand;
             if (value is IParenthesizedOperation parenthesized)
                 return TryCollectStableInitializerValues(
                     parenthesized.Operand, compilation, visited, out initializers);
@@ -3239,7 +3240,7 @@ internal sealed class MethodEffectAnalysisSession(
                 var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
                 foreach (var candidate in candidates) {
                     IOperation assignedValue = candidate.Value;
-                    while (assignedValue is IConversionOperation conversion)
+                    while (assignedValue is IConversionOperation { OperatorMethod: null } conversion)
                         assignedValue = conversion.Operand;
                     var visited = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
                     ImmutableArray<IOperation> assignedValues;
@@ -3486,7 +3487,8 @@ internal sealed class MethodEffectAnalysisSession(
             HashSet<IMethodSymbol> visitedMethods,
             out ImmutableArray<IOperation> values) {
             values = [];
-            while (value is IConversionOperation conversion) value = conversion.Operand;
+            while (value is IConversionOperation { OperatorMethod: null } conversion)
+                value = conversion.Operand;
             if (value is IParameterReferenceOperation parameter &&
                 SymbolEqualityComparer.Default.Equals(
                     parameter.Parameter.ContainingSymbol.OriginalDefinition,
@@ -3500,6 +3502,16 @@ internal sealed class MethodEffectAnalysisSession(
             if (value is IInvocationOperation invocation)
                 return TryGetConstructorHelperOrigins(
                     invocation,
+                    invocation.TargetMethod,
+                    constructor,
+                    constructorCallSite,
+                    compilation,
+                    visitedMethods,
+                    out values);
+            if (value is IConversionOperation { OperatorMethod: { } operatorMethod } userConversion)
+                return TryGetConstructorHelperOrigins(
+                    userConversion,
+                    operatorMethod,
                     constructor,
                     constructorCallSite,
                     compilation,
@@ -3509,14 +3521,15 @@ internal sealed class MethodEffectAnalysisSession(
             return true;
         }
         private static bool TryGetConstructorHelperOrigins(
-            IInvocationOperation invocation,
+            IOperation helperCall,
+            IMethodSymbol targetMethod,
             IMethodSymbol constructor,
             IOperation constructorCallSite,
             Compilation compilation,
             HashSet<IMethodSymbol> visitedMethods,
             out ImmutableArray<IOperation> values) {
             values = [];
-            var method = invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod;
+            var method = targetMethod.ReducedFrom ?? targetMethod;
             method = (method.PartialImplementationPart ?? method).OriginalDefinition;
             if (!visitedMethods.Add(method)) return false;
             try {
@@ -3541,15 +3554,12 @@ internal sealed class MethodEffectAnalysisSession(
                             SymbolEqualityComparer.Default.Equals(
                                 parameter.Parameter.ContainingSymbol.OriginalDefinition,
                                 method)) {
-                            mapped = invocation.Arguments.FirstOrDefault(argument =>
-                                string.Equals(
-                                    argument.Parameter?.Name,
-                                    parameter.Parameter.Name,
-                                    StringComparison.Ordinal))?.Value!;
+                            mapped = GetConstructorCallArgument(
+                                helperCall, parameter.Parameter.Name)!;
                             if (mapped == null) return false;
                         }
                         else if (mapped is IInstanceReferenceOperation) {
-                            mapped = invocation.Instance!;
+                            mapped = GetConstructorCallInstance(helperCall)!;
                             if (mapped == null) return false;
                         }
                         if (!TryMapConstructorAssignedValue(
