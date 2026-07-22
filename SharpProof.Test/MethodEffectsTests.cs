@@ -424,6 +424,23 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void RefReassignmentDoesNotWriteThroughPreviousAlias() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            class C {
+                static void M(Box input) {
+                    var fresh = new Box();
+                    ref int alias = ref input.Value;
+                    alias = ref fresh.Value;
+                }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+        });
+    }
+    [Test]
     public void NestedFreshObjectGraphWritesRemainFreshOwned() {
         var result = Analyze("""
             sealed class Box { public int Value; }
