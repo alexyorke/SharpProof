@@ -1634,6 +1634,22 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void PolymorphicWithExpressionKeepsCloneDispatchUncertainty() {
+        var result = Analyze("""
+            record Base { public int X { get; init; } }
+            record Derived : Base {
+                static int state;
+                protected Derived(Derived other) : base(other) { state++; }
+            }
+            class C { static Base M(Base value) => value with { X = 1 }; }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.Not.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.True);
+        });
+    }
+    [Test]
     public void AwaitIncludesGetAwaiterEffects() {
         var result = Analyze("""
             sealed class Awaitable {
