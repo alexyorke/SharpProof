@@ -237,6 +237,7 @@ internal sealed class MethodEffectAnalysisSession(
         var thrownType = node?.AncestorsAndSelf().OfType<ThrowStatementSyntax>().FirstOrDefault()?.Expression is { } expression
             ? model.GetTypeInfo(expression).Type as INamedTypeSymbol
             : null;
+        var hazardType = thrownType ?? model.Compilation.GetTypeByMetadataName(exceptionType);
         for (var current = node; current != null; current = current.Parent) {
             if (current is not TryStatementSyntax statement) continue;
             var inTry = statement.Block.Span.Contains(position);
@@ -253,7 +254,7 @@ internal sealed class MethodEffectAnalysisSession(
                 if (clause.Declaration == null) return true;
                 var caught = model.GetTypeInfo(clause.Declaration.Type).Type;
                 if (caught != null && (caught.ToDisplayString() == exceptionType || caught.Name == exceptionType)) return true;
-                for (var candidate = thrownType; candidate != null; candidate = candidate.BaseType)
+                for (var candidate = hazardType; candidate != null; candidate = candidate.BaseType)
                     if (SymbolEqualityComparer.Default.Equals(candidate, caught)) return true;
             }
         }
