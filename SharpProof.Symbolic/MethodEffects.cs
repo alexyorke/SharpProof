@@ -3741,6 +3741,32 @@ internal sealed class MethodEffectAnalysisSession(
                 assignments.AddRange(resolved);
                 return;
             }
+            if (value is ICoalesceOperation coalesce) {
+                var resolved = new List<ConstructorMemberAssignment>();
+                AddDeconstructionMemberAssignments(
+                    target,
+                    coalesce.Value,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites,
+                    resolved);
+                if (resolved.Count == 0) return;
+                var valueCount = resolved.Count;
+                AddDeconstructionMemberAssignments(
+                    target,
+                    coalesce.WhenNull,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites,
+                    resolved);
+                if (resolved.Count == valueCount) return;
+                assignments.AddRange(resolved);
+                return;
+            }
             if (value is IInvocationOperation invocation) {
                 AddDeconstructionCallResultAssignments(
                     target,
