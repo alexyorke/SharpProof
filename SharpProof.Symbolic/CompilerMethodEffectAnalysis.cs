@@ -354,6 +354,8 @@ internal sealed class MethodEffectAnalysisSession(
         ImmutableDictionary<string, EffectFlowValue>? boundCaptures) : IControlFlowDomain<EffectFlowState> {
         private readonly HashSet<(OperationKind Kind, TextSpan Span)> _unreachableOperations = [];
         private readonly HashSet<(OperationKind Kind, TextSpan Span)> _reachableOperations = [];
+        private readonly HashSet<(OperationKind Kind, TextSpan Span)> _flowFactUnreachableOperations = [];
+        private AnalyzerUtilitiesFlowFacts? _flowFacts;
         internal EffectFlowValue ReturnValue { get; private set; } = EffectFlowValue.None;
         private EffectFlowValue LastValue { get; set; } = EffectFlowValue.None;
         public EffectFlowState Transfer(EffectFlowState state, IOperation operation) {
@@ -366,6 +368,9 @@ internal sealed class MethodEffectAnalysisSession(
             bool conditionalSuccessor) {
             if (condition is not IIsNullOperation isNull) return state;
             var value = ResolveConditionValue(isNull.Operand, state);
+            var testedSymbol = semanticModel.GetSymbolInfo(isNull.Operand.Syntax, session.CancellationToken).Symbol;
+            if (_flowFacts != null && CanUseFlowNullFact(testedSymbol))
+                value = _flowFacts.RefineNullState(isNull.Operand, testedSymbol, value);
             var branchWhenTrue = kind switch {
                 ControlFlowConditionKind.WhenTrue => conditionalSuccessor,
                 ControlFlowConditionKind.WhenFalse => !conditionalSuccessor,
@@ -416,13 +421,41 @@ internal sealed class MethodEffectAnalysisSession(
             };
         }
         internal void SetControlFlowGraph(ControlFlowGraph graph) {
-            foreach (var block in graph.Blocks)
+            if (graph.Blocks.Any(block => block.BranchValue is IIsNullOperation isNull &&
+                    CanUseFlowNullFact(semanticModel.GetSymbolInfo(isNull.Operand.Syntax,
+                        session.CancellationToken).Symbol)))
+                _flowFacts = AnalyzerUtilitiesFlowFacts.TryCreate(graph, method, session.Compilation);
+            foreach (var block in graph.Blocks) {
                 foreach (var operation in block.Operations.Append(block.BranchValue).Where(static value => value != null)
                              .SelectMany(static value => value!.DescendantsAndSelf())) {
                     var span = operation.Syntax.Span;
                     (block.IsReachable ? _reachableOperations : _unreachableOperations).Add((operation.Kind, span));
                 }
+                if (_flowFacts != null && block.BranchValue is IIsNullOperation isNull &&
+                    semanticModel.GetSymbolInfo(isNull.Operand.Syntax, session.CancellationToken).Symbol is { } testedSymbol &&
+                    CanUseFlowNullFact(testedSymbol)) {
+                    var value = _flowFacts.RefineNullState(isNull.Operand, testedSymbol, EffectFlowValue.Unknown);
+                    var skippedConditionValue = value.IsDefinitelyNonNull ? true : value.IsDefinitelyNull ? false : (bool?)null;
+                    if (skippedConditionValue is { } conditionValue &&
+                        block.ConditionKind is ControlFlowConditionKind.WhenTrue or ControlFlowConditionKind.WhenFalse) {
+                        var conditionalValue = block.ConditionKind == ControlFlowConditionKind.WhenTrue;
+                        var skippedBranch = conditionalValue == conditionValue
+                            ? block.ConditionalSuccessor
+                            : block.FallThroughSuccessor;
+                        if (skippedBranch?.Destination is { Predecessors.Length: 1 } destination)
+                            foreach (var operation in destination.Operations.Append(destination.BranchValue)
+                                         .Where(static candidate => candidate != null)
+                                         .SelectMany(static candidate => candidate!.DescendantsAndSelf()))
+                                _flowFactUnreachableOperations.Add((operation.Kind, operation.Syntax.Span));
+                    }
+                }
+            }
         }
+        private static bool CanUseFlowNullFact(ISymbol? symbol) => symbol switch {
+            ILocalSymbol local => local.Type.NullableAnnotation == NullableAnnotation.Annotated,
+            IParameterSymbol parameter => parameter.Type.NullableAnnotation == NullableAnnotation.Annotated,
+            _ => false
+        };
         internal EffectFlowState AnalyzeSemanticAdapters(IOperation root, EffectFlowState state) {
             foreach (var operation in root.DescendantsAndSelf())
                 if (BelongsToCurrentMethod(operation) &&
@@ -1037,6 +1070,7 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private bool IsCompileTimeSkipped(IOperation operation) {
             var key = (operation.Kind, operation.Syntax.Span);
+            if (_flowFactUnreachableOperations.Contains(key)) return true;
             foreach (var statement in operation.Syntax.Ancestors().OfType<IfStatementSyntax>()) {
                 var constant = semanticModel.GetConstantValue(statement.Condition, session.CancellationToken);
                 if (constant is not { HasValue: true, Value: bool condition }) continue;
