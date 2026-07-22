@@ -361,6 +361,21 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
         });
     }
+    [Test]
+    public void PurePositionalPatternRemainsPure() {
+        var result = Analyze("""
+            sealed class D {
+                public void Deconstruct(out int value) { value = 0; }
+            }
+            class C {
+                static bool M(D value) => value is D(var item);
+            }
+            """, 5);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+        });
+    }
     [TestCase("static int M(int[] values) => values.Length;", SharpProofVerdict.Proven)]
     [TestCase("static int[] M(int x) => [1, x, 3];", SharpProofVerdict.Disproven)]
     public void ArrayIntrinsicsHaveStructuralEffects(string method, SharpProofVerdict expectedAllocationFree) {

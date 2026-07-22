@@ -403,6 +403,15 @@ internal sealed class MethodEffectAnalysisSession(
             case IConversionOperation { Conversion.IsUserDefined: true } userConversion:
                 AnalyzeCall(userConversion.Conversion.MethodSymbol, userConversion, builder);
                 break;
+            case IRecursivePatternOperation { DeconstructSymbol: IMethodSymbol deconstruct } recursivePattern:
+                AnalyzeCall(
+                    deconstruct,
+                    recursivePattern,
+                    builder,
+                    FindPatternInput(recursivePattern),
+                    argumentReadEffect: SharpProofEffect.None,
+                    argumentWriteEffect: SharpProofEffect.WritesFreshOwnedState);
+                break;
             case IAwaitOperation { Syntax: AwaitExpressionSyntax syntax } awaited:
                 var awaitInfo = semanticModel.GetAwaitExpressionInfo(syntax);
                 AnalyzeCall(awaitInfo.GetAwaiterMethod, awaited, builder, awaited.Operation);
@@ -472,6 +481,15 @@ internal sealed class MethodEffectAnalysisSession(
             collection.Syntax.SpanStart,
             invocation,
             SpeculativeBindingOption.BindAsExpression).Symbol as IMethodSymbol;
+    }
+    private static IOperation? FindPatternInput(IRecursivePatternOperation pattern) {
+        for (var parent = pattern.Parent; parent != null; parent = parent.Parent) {
+            if (parent is IRecursivePatternOperation) return null;
+            if (parent is IIsPatternOperation isPattern) return isPattern.Value;
+            if (parent is ISwitchOperation switchOperation) return switchOperation.Value;
+            if (parent is ISwitchExpressionOperation switchExpression) return switchExpression.Value;
+        }
+        return null;
     }
     private void AnalyzeCollectionSpread(
         ISpreadOperation spread,
@@ -607,7 +625,9 @@ internal sealed class MethodEffectAnalysisSession(
         SharpProofEffect? receiverReadEffect = null,
         SharpProofEffect? receiverWriteEffect = null,
         SharpProofEffect? capturedReadEffect = null,
-        SharpProofEffect? capturedWriteEffect = null) {
+        SharpProofEffect? capturedWriteEffect = null,
+        SharpProofEffect? argumentReadEffect = null,
+        SharpProofEffect? argumentWriteEffect = null) {
         if (method == null) {
             builder.AddUnknown(site, "unresolved_call");
             return false;
@@ -641,7 +661,8 @@ internal sealed class MethodEffectAnalysisSession(
             builder.Add(SharpProofEffect.UsesNativeCode, SharpProofCapability.NativeInterop, site, method, "native_call");
             if (hasContract && IsCompleteContract(contracted))
                 AddCallEffects(contracted, site, method, "complete_native_effect_contract", receiver, builder,
-                    receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
+                    receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect,
+                    argumentReadEffect, argumentWriteEffect);
             else
                 builder.AddUnknown(site, "native_exception_boundary", method);
             return false;
@@ -652,20 +673,24 @@ internal sealed class MethodEffectAnalysisSession(
             if (TryGetKnownFrameworkSummary(method, out var frameworkSummary)) {
                 var remappedFramework = AddCallEffects(
                     frameworkSummary, site, method, "framework_method_model", receiver, builder,
-                    receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
+                    receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect,
+                    argumentReadEffect, argumentWriteEffect);
                 return CanPreserveFreshArguments(
                     remappedFramework, site, receiver, builder, receiverWriteEffect);
             }
             var metadata = _metadata.Analyze(method);
             if (hasContract && metadata.Effects == SharpProofEffect.Unknown)
                 AddCallEffects(contracted, site, method, "complete_effect_contract", receiver, builder,
-                    receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
+                    receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect,
+                    argumentReadEffect, argumentWriteEffect);
             else {
                 AddCallEffects(metadata, site, method, "metadata_call", receiver, builder,
-                    receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
+                    receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect,
+                    argumentReadEffect, argumentWriteEffect);
                 if (hasContract)
                     AddCallEffects(contracted, site, method, "effect_contract", receiver, builder,
-                        receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
+                        receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect,
+                        argumentReadEffect, argumentWriteEffect);
             }
             return false;
         }
@@ -684,13 +709,15 @@ internal sealed class MethodEffectAnalysisSession(
         }
         var remappedSource = AddCallEffects(
             Analyze(method, syntax, model), site, method, "source_call", receiver, builder,
-            receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
+            receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect,
+            argumentReadEffect, argumentWriteEffect);
         var preservesFresh = CanPreserveFreshArguments(
             remappedSource, site, receiver, builder, receiverWriteEffect);
         if (hasContract) {
             var remappedContract = AddCallEffects(
                 contracted, site, method, "effect_contract", receiver, builder,
-                receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect);
+                receiverReadEffect, receiverWriteEffect, capturedReadEffect, capturedWriteEffect,
+                argumentReadEffect, argumentWriteEffect);
             preservesFresh &= CanPreserveFreshArguments(
                 remappedContract, site, receiver, builder, receiverWriteEffect);
         }
@@ -706,7 +733,9 @@ internal sealed class MethodEffectAnalysisSession(
         SharpProofEffect? receiverReadEffect = null,
         SharpProofEffect? receiverWriteEffect = null,
         SharpProofEffect? capturedReadEffect = null,
-        SharpProofEffect? capturedWriteEffect = null) {
+        SharpProofEffect? capturedWriteEffect = null,
+        SharpProofEffect? argumentReadEffect = null,
+        SharpProofEffect? argumentWriteEffect = null) {
         const SharpProofEffect callRelativeEffects =
             SharpProofEffect.ReadsReceiverState |
             SharpProofEffect.WritesReceiverState |
@@ -730,10 +759,10 @@ internal sealed class MethodEffectAnalysisSession(
                                 : SharpProofEffect.Unknown);
         }
         if ((effects.Effects & SharpProofEffect.ReadsArgumentState) != 0) {
-            remapped |= GetArgumentEffect(site, builder, write: false);
+            remapped |= argumentReadEffect ?? GetArgumentEffect(site, builder, write: false);
         }
         if ((effects.Effects & SharpProofEffect.WritesArgumentState) != 0) {
-            remapped |= GetArgumentEffect(site, builder, write: true);
+            remapped |= argumentWriteEffect ?? GetArgumentEffect(site, builder, write: true);
         }
         if (capturedReadEffect.HasValue && (effects.Effects & SharpProofEffect.ReadsCapturedState) != 0) {
             remapped &= ~SharpProofEffect.ReadsCapturedState;
