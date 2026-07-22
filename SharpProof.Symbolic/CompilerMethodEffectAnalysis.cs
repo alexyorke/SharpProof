@@ -820,15 +820,19 @@ internal sealed class MethodEffectAnalysisSession(
                         InvokeCoreOrValue(length.GetMethod, patternValue, listPattern, ref state);
                     if (listPattern.Patterns.Length != 0 && listPattern.IndexerSymbol is IPropertySymbol indexer)
                         InvokeCoreOrValue(indexer.GetMethod, patternValue, listPattern, ref state);
+                    foreach (var slice in listPattern.Patterns.OfType<ISlicePatternOperation>())
+                        Evaluate(slice, ref state);
                     return EffectFlowValue.None;
                 case ISlicePatternOperation slicePattern:
                     var sliceValue = FindPatternInput(slicePattern, ref state);
-                    InvokeCoreOrValue(slicePattern.SliceSymbol switch {
+                    var sliced = InvokeCoreOrValue(slicePattern.SliceSymbol switch {
                         IPropertySymbol property => property.GetMethod,
                         IMethodSymbol sliceMethod => sliceMethod,
                         _ => null
                     }, sliceValue, slicePattern, ref state);
-                    return EffectFlowValue.None;
+                    if (slicePattern.Pattern is IDeclarationPatternOperation { DeclaredSymbol: ILocalSymbol declared })
+                        state = state with { Locals = state.Locals.SetItem(declared, sliced) };
+                    return sliced;
                 case IDelegateCreationOperation delegateCreation:
                     effects.Add(SharpProofEffect.Allocates, delegateCreation.Syntax, delegateCreation.Type, "delegate_allocation");
                     return BindCallable(delegateCreation.Target, delegateCreation.Type, ref state);
