@@ -1214,10 +1214,13 @@ internal sealed class MethodEffectAnalysisSession(
             if (getEnumerator == null) return;
             var enumerator = InvokeCore(getEnumerator, collection, [], [], site, ref state);
             if (enumerator.Roots.Count == 0) return;
-            InvokeCoreOrValue(FindProtocolMethod(getEnumerator.ReturnType, "MoveNext", 0), enumerator, site, ref state);
-            InvokeCoreOrValue(getEnumerator.ReturnType.GetMembers("Current").OfType<IPropertySymbol>().FirstOrDefault()?.GetMethod,
+            InvokeCoreOrValue(ResolveProtocolImplementation(
+                FindProtocolMethod(getEnumerator.ReturnType, "MoveNext", 0), enumerator), enumerator, site, ref state);
+            InvokeCoreOrValue(ResolveProtocolImplementation(
+                FindProtocolProperty(getEnumerator.ReturnType, "Current")?.GetMethod, enumerator),
                 enumerator, site, ref state);
-            InvokeCoreOrValue(FindProtocolMethod(getEnumerator.ReturnType, "Dispose", 0), enumerator, site, ref state);
+            InvokeCoreOrValue(ResolveProtocolImplementation(
+                FindProtocolMethod(getEnumerator.ReturnType, "Dispose", 0), enumerator), enumerator, site, ref state);
         }
         private void AnalyzeDisposal(
             ITypeSymbol? type,
@@ -1271,7 +1274,36 @@ internal sealed class MethodEffectAnalysisSession(
                     .FirstOrDefault(candidate => !candidate.IsStatic && candidate.Parameters.Length == parameterCount);
                 if (method != null) return method;
             }
+            if (named.TypeKind != TypeKind.Interface) return null;
+            foreach (var interfaceType in named.AllInterfaces) {
+                var method = interfaceType.GetMembers(name).OfType<IMethodSymbol>()
+                    .FirstOrDefault(candidate => !candidate.IsStatic && candidate.Parameters.Length == parameterCount);
+                if (method != null) return method;
+            }
             return null;
+        }
+        private static IPropertySymbol? FindProtocolProperty(ITypeSymbol? type, string name) {
+            if (type is not INamedTypeSymbol named) return null;
+            for (var current = named; current != null; current = current.BaseType) {
+                var property = current.GetMembers(name).OfType<IPropertySymbol>()
+                    .FirstOrDefault(static candidate => !candidate.IsStatic && candidate.Parameters.Length == 0);
+                if (property != null) return property;
+            }
+            if (named.TypeKind != TypeKind.Interface) return null;
+            foreach (var interfaceType in named.AllInterfaces) {
+                var property = interfaceType.GetMembers(name).OfType<IPropertySymbol>()
+                    .FirstOrDefault(static candidate => !candidate.IsStatic && candidate.Parameters.Length == 0);
+                if (property != null) return property;
+            }
+            return null;
+        }
+        private static IMethodSymbol? ResolveProtocolImplementation(
+            IMethodSymbol? member,
+            EffectFlowValue receiver) {
+            if (member == null || member.ContainingType.TypeKind != TypeKind.Interface ||
+                receiver.ExactType is not { } exactType)
+                return member;
+            return exactType.FindImplementationForInterfaceMember(member) as IMethodSymbol ?? member;
         }
         private static IMethodSymbol? FindImplementedProtocolMethod(
             ITypeSymbol? type,
