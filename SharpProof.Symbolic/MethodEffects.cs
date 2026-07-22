@@ -2177,6 +2177,9 @@ internal sealed class MethodEffectAnalysisSession(
         internal ImmutableArray<DelegateTarget> GetDelegateTargets(IOperation? value) {
             if (value == null) return [];
             while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is IConditionalAccessInstanceOperation conditionalAccess &&
+                FindConditionalAccessReceiver(conditionalAccess) is { } conditionalReceiver)
+                value = conditionalReceiver;
             if (value is ILocalReferenceOperation local &&
                 _delegateTargets.TryGetValue(local.Local, out var localTargets))
                 return localTargets;
