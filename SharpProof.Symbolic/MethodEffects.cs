@@ -3740,6 +3740,18 @@ internal sealed class MethodEffectAnalysisSession(
                     assignments);
                 return;
             }
+            if (value is IInlineArrayAccessOperation inlineArrayElement) {
+                AddDeconstructionMemberAssignments(
+                    target,
+                    inlineArrayElement.Instance,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites,
+                    assignments);
+                return;
+            }
             if (value is IConditionalOperation { WhenFalse: { } whenFalse } conditional) {
                 var resolved = new List<ConstructorMemberAssignment>();
                 AddDeconstructionMemberAssignments(
