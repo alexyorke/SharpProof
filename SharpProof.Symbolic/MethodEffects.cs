@@ -2712,8 +2712,94 @@ internal sealed class MethodEffectAnalysisSession(
                     return false;
                 readEffect |= localReadEffect;
                 writeEffect |= localWriteEffect;
+                foreach (var reference in function.Body.DescendantsAndSelf()
+                             .OfType<ILocalReferenceOperation>()
+                             .Where(reference => BelongsDirectlyTo(function, reference) &&
+                                                 SymbolEqualityComparer.Default.Equals(
+                                                     reference.Local,
+                                                     local))) {
+                    if (!TryGetCapturedMemberInitializer(
+                            local,
+                            reference,
+                            compilation,
+                            out var memberInitializer))
+                        continue;
+                    if (!TryGetCapturedValueEffects(
+                            memberInitializer,
+                            callSite,
+                            compilation,
+                            visited,
+                            out var memberReadEffect,
+                            out var memberWriteEffect))
+                        return false;
+                    readEffect |= memberReadEffect;
+                    writeEffect |= memberWriteEffect;
+                }
             }
             return true;
+        }
+        private static bool TryGetCapturedMemberInitializer(
+            ILocalSymbol local,
+            ILocalReferenceOperation reference,
+            Compilation compilation,
+            out IOperation initializer) {
+            initializer = null!;
+            var path = new List<string>();
+            IOperation current = reference;
+            while (true) {
+                switch (current.Parent) {
+                    case IFieldReferenceOperation { Instance: { } instance } field
+                        when ReferenceEquals(instance, current):
+                        path.Add(GetMemberPathPart(field.Field.OriginalDefinition));
+                        current = field;
+                        continue;
+                    case IPropertyReferenceOperation { Instance: { } instance } property
+                        when ReferenceEquals(instance, current):
+                        path.Add(GetMemberPathPart(property.Property.OriginalDefinition));
+                        current = property;
+                        continue;
+                }
+                break;
+            }
+            var isInvocationReceiver = current.Parent is IInvocationOperation invocation &&
+                                       ReferenceEquals(invocation.Instance, current);
+            if (!isInvocationReceiver && path.Count != 0) path.RemoveAt(path.Count - 1);
+            if (path.Count == 0 || local.DeclaringSyntaxReferences.Length != 1) return false;
+            var syntax = local.DeclaringSyntaxReferences[0].GetSyntax();
+            var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+            if (model.GetOperation(syntax) is not IVariableDeclaratorOperation declarator ||
+                declarator.Initializer?.Value is not { } value)
+                return false;
+            return TryGetObjectInitializerMember(value, path, 0, out initializer);
+        }
+        private static bool TryGetObjectInitializerMember(
+            IOperation value,
+            IReadOnlyList<string> path,
+            int index,
+            out IOperation initializer) {
+            initializer = null!;
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is not IObjectCreationOperation { Initializer: { } objectInitializer }) return false;
+            foreach (var assignment in objectInitializer.Initializers.OfType<ISimpleAssignmentOperation>()) {
+                var member = assignment.Target switch {
+                    IFieldReferenceOperation field => (ISymbol)field.Field.OriginalDefinition,
+                    IPropertyReferenceOperation property => property.Property.OriginalDefinition,
+                    _ => null
+                };
+                if (member == null ||
+                    !string.Equals(GetMemberPathPart(member), path[index], StringComparison.Ordinal))
+                    continue;
+                if (index == path.Count - 1) {
+                    initializer = assignment.Value;
+                    return true;
+                }
+                return TryGetObjectInitializerMember(
+                    assignment.Value,
+                    path,
+                    index + 1,
+                    out initializer);
+            }
+            return false;
         }
         private bool TryGetReturnedLambdaCapturedEffects(
             IAnonymousFunctionOperation function,
