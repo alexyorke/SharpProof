@@ -428,9 +428,21 @@ internal sealed class MethodEffectAnalysisSession(
                             string.Equals(method.Name, nameof(string.Split), StringComparison.Ordinal);
         var isStringTrim = containingType?.SpecialType == SpecialType.System_String &&
                            method.Name is nameof(string.Trim) or nameof(string.TrimStart) or nameof(string.TrimEnd);
+        var isStringNullPredicate = method.IsStatic &&
+                                    containingType?.SpecialType == SpecialType.System_String &&
+                                    method.Name is nameof(string.IsNullOrEmpty) or nameof(string.IsNullOrWhiteSpace);
         var typeDefinition = containingType?.OriginalDefinition.ToDisplayString();
         var isSpanToArray = string.Equals(method.Name, "ToArray", StringComparison.Ordinal) &&
                             typeDefinition is "System.Span<T>" or "System.ReadOnlySpan<T>";
+        if (isStringNullPredicate) {
+            effects = new MethodEffects(
+                SharpProofEffect.None,
+                SharpProofCapability.None,
+                [],
+                [],
+                []);
+            return true;
+        }
         if (isNumericToString || isStringSplit || isStringTrim || isSpanToArray) {
             effects = new MethodEffects(
                 SharpProofEffect.Allocates,
