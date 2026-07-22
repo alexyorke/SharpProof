@@ -200,6 +200,15 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
         });
     }
+    [Test]
+    public void StringRangeSliceRemainsPure() {
+        var result = Analyze("class C {\nstatic int M(string text) => text[1..^1].Length;\n}");
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+                string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+        });
+    }
     [TestCase("static string M(string a, string b) => a + b;")]
     [TestCase("static string M(int value) => $\"{value}\";")]
     [TestCase("static object M(int value) => value;")]
