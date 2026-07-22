@@ -2109,6 +2109,22 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void StaticMethodAnalysisWrapsTypeInitializerExceptions() {
+        var result = Analyze("""
+            sealed class D {
+                static D() { throw new System.InvalidOperationException(); }
+                public static void M() { }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.ExceptionFacts, Has.Some.Matches<MethodExceptionFact>(fact =>
+                fact.ExceptionType == "System.TypeInitializationException" && fact.Escape == SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.ExceptionFacts, Has.None.Matches<MethodExceptionFact>(fact =>
+                fact.ExceptionType == "System.InvalidOperationException" && fact.Escape == SharpProofVerdict.Proven));
+        });
+    }
+    [Test]
     public void StaticDelegateInvocationIncludesTypeInitializerEffects() {
         var result = Analyze("""
             static class Globals { public static int Count; }
