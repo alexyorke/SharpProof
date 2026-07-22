@@ -5190,18 +5190,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** Analyzer crashes on deeply conditional arithmetic expressions.
 * **Recommendation:** Convert recursion to explicit stack-based iteration or add depth-limit checking.
 
-#### [PB3-1.11] 1.11 Unhandled OverflowException from TryReadNumber Escapes Through Translate
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-REGEX-AND-UTF16-SEMANTICS
-> **Evidence:** checked(value * 10 + digit) in TryReadNumber not caught in TryParseBoundedRepeat.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [Z3RegexTranslator.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/Z3RegexTranslator.cs#L635-L645)
-* **Severity:** High
-* **Description:** `TryReadNumber` at line 640 uses `checked(value * 10 + digit)` to parse regex repetition counts. If the number exceeds `int.MaxValue`, `checked` throws `OverflowException`. `TryReadNumber` is called from `TryParseBoundedRepeat` at line 237, which does not catch `OverflowException`. The exception propagates through `TryParseRepeat` → `TryParseConcat` → `TryParseExpression` → `Translate`. The `Translate` method only returns `Failed()` when `TryParseExpression` returns `false`, not when it throws. This crashes the entire SMT encoding.
-* **Impact:** Malformed regex patterns with extremely large repetition counts crash analysis threads.
-* **Recommendation:** Remove `checked` from `TryReadNumber` and check for overflow explicitly after each digit.
-
 #### [PB3-1.12] 1.12 `TryFindLeadingStartAnchor` Does Not Skip Non-Capturing Groups
 
 > **Disposition:** Needs investigation
@@ -6212,18 +6200,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Description:** The `HasSafeArithmetic` method creates a temporary solver, calls `CheckAndAccountResources` on it, and disposes it. The `CheckAndAccountResources` updates `_lastObservedRlimitCount` based on this temporary solver's count. The next `CheckSatisfiabilityRawWithWitness` call creates a fresh solver with rlimit=0, but `_lastObservedRlimitCount` now reflects the temporary solver's count. Since the fresh solver `observed` count is 0 < `_lastObservedRlimitCount`, the overflow-correction adds 4.29 billion to the resource count, inflating the budget. This is confirmed as still present.
 * **Impact:** Budget inflation after every integer divisor safety check.
 * **Recommendation:** Save/restore `_lastObservedRlimitCount` around `HasSafeArithmetic`, or use `Push`/`Pop` instead of separate solvers.
-
-#### [PB3-20.4] 20.4 Bug #8 TryReadNumber Unhandled Overflow Exception Still Present (PB1-BUG-8 Re-Verification)
-
-> **Disposition:** Not fixed — confirmed present
-> **Canonical root cause:** RC-REGEX-AND-UTF16-SEMANTICS
-> **Evidence:** checked(value * 10 + digit) at line 640 still may throw OverflowException.
-> **Changes/tests:** No fix yet applied.
-* **File & Lines:** [Z3RegexTranslator.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/Z3RegexTranslator.cs#L635-L645)
-* **Severity:** High
-* **Description:** `TryReadNumber` at line 640 uses `checked()` context for `value * 10 + digit`. When parsing a regex repetition count larger than `int.MaxValue / 10`, the multiplication throws `OverflowException`. The exception propagates through `TryParseBoundedRepeat` → `TryParseRepeat` → `TryParseConcat` → `TryParseExpression` → `Translate`. The `Translate` method at line 237 does not catch `OverflowException`. Verified against current codebase.
-* **Impact:** Analysis crash on regex with very large repetition counts.
-* **Recommendation:** Remove `checked` from `TryReadNumber` and explicitly check for overflow after each digit.
 
 ### 21 Fuzz Testing & Tooling (Agent 21)
 
