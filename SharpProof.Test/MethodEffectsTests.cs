@@ -1117,6 +1117,25 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void FinallyThrowReplacesPendingException() {
+        var result = Analyze("""
+            sealed class FirstException : System.Exception { }
+            sealed class FinallyException : System.Exception { }
+            class C {
+                static void M() {
+                    try { throw new FirstException(); }
+                    finally { throw new FinallyException(); }
+                }
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.ExceptionFacts, Has.Some.Matches<MethodExceptionFact>(fact =>
+                fact.ExceptionType == "FinallyException" && fact.Escape == SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.ExceptionFacts, Has.None.Matches<MethodExceptionFact>(fact =>
+                fact.ExceptionType == "FirstException" && fact.Escape == SharpProofVerdict.Proven));
+        });
+    }
+    [Test]
     public void CaughtCalleeExceptionDoesNotEscape() {
         var result = Analyze("""
             sealed class E : System.Exception { }
