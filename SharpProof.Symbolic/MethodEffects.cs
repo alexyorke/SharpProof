@@ -3662,6 +3662,20 @@ internal sealed class MethodEffectAnalysisSession(
                     assignments);
                 return;
             }
+            if (value is IInstanceReferenceOperation && !callSites.IsDefaultOrEmpty) {
+                var receiver = GetConstructorCallInstance(callSites[0].Operation);
+                if (receiver == null) return;
+                AddDeconstructionMemberAssignments(
+                    target,
+                    receiver,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites.RemoveAt(0),
+                    assignments);
+                return;
+            }
             if (value is IParameterReferenceOperation parameter) {
                 for (var index = 0; index < callSites.Length; index++) {
                     var callSite = callSites[index];
