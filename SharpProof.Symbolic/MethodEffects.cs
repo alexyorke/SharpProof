@@ -3139,16 +3139,16 @@ internal sealed class MethodEffectAnalysisSession(
             if (path[index].StartsWith(indexerPrefix, StringComparison.Ordinal)) {
                 const string intIndexPrefix = "#indexer:System.Int32:";
                 if (value is ICollectionExpressionOperation collection &&
-                    TryGetStaticCollectionElements(collection, out var collectionElements) &&
                     path[index].StartsWith(intIndexPrefix, StringComparison.Ordinal) &&
                     int.TryParse(
                         path[index].Substring(intIndexPrefix.Length),
                         NumberStyles.None,
                         CultureInfo.InvariantCulture,
                     out var collectionIndex) &&
-                    collectionIndex >= 0 &&
-                    collectionIndex < collectionElements.Length) {
-                    var collectionElement = collectionElements[collectionIndex];
+                    TryGetStaticCollectionElement(
+                        collection,
+                        collectionIndex,
+                        out var collectionElement)) {
                     if (index == path.Count - 1) {
                         initializers = [collectionElement];
                         return true;
@@ -3221,23 +3221,13 @@ internal sealed class MethodEffectAnalysisSession(
             }
             const string arrayPrefix = "#array:";
             if (path[index].StartsWith(arrayPrefix, StringComparison.Ordinal)) {
-                ImmutableArray<IOperation> elements = value switch {
-                    IArrayCreationOperation { Initializer: { } arrayInitializer } =>
-                        arrayInitializer.ElementValues,
-                    ICollectionExpressionOperation collection
-                        when TryGetStaticCollectionElements(collection, out var collectionElements) =>
-                        collectionElements,
-                    _ => []
-                };
                 if (!int.TryParse(
                         path[index].Substring(arrayPrefix.Length),
                         NumberStyles.None,
                         CultureInfo.InvariantCulture,
                         out var elementIndex) ||
-                    elementIndex < 0 ||
-                    elementIndex >= elements.Length)
+                    !TryGetStaticCollectionElement(value, elementIndex, out var element))
                     return false;
-                var element = elements[elementIndex];
                 if (index == path.Count - 1) {
                     initializers = [element];
                     return true;
@@ -4256,6 +4246,29 @@ internal sealed class MethodEffectAnalysisSession(
                     return false;
             }
             elements = builder.ToImmutable();
+            return true;
+        }
+        private static bool TryGetStaticCollectionElement(
+            IOperation value,
+            int index,
+            out IOperation element) {
+            element = null!;
+            if (index < 0) return false;
+            if (value is IArrayCreationOperation { Initializer: { } arrayInitializer }) {
+                if (index >= arrayInitializer.ElementValues.Length) return false;
+                element = arrayInitializer.ElementValues[index];
+                return true;
+            }
+            if (value is not ICollectionExpressionOperation collection) return false;
+            if (TryGetStaticCollectionElements(collection, out var elements)) {
+                if (index >= elements.Length) return false;
+                element = elements[index];
+                return true;
+            }
+            if (collection.Elements.Length != 1 ||
+                collection.Elements[0] is not ISpreadOperation spread)
+                return false;
+            element = spread.Operand;
             return true;
         }
         private static bool TryAppendStaticCollectionValue(
