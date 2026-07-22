@@ -8,6 +8,31 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class FuzzRunnerBehaviorTests {
     [Test]
+    public async Task ProvenInterpolatedStringHandlerCallHasMatchingEnforcePureDiagnostic() {
+        var outputDirectory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "fuzz-handler-projection-" + Guid.NewGuid().ToString("N"));
+        try {
+            var summary = await FuzzRunner.RunAsync(new FuzzOptions {
+                Iterations = 29,
+                Seed = 20260722,
+                OutputDirectory = outputDirectory,
+                CheckpointEvery = 0,
+                Parallelism = 1,
+                RepeatAnalyzer = false
+            });
+
+            Assert.That(
+                summary.Findings
+                    .Where(static finding => finding.Family == "InterpolatedStringHandler")
+                    .Select(static finding => finding.Category),
+                Does.Not.Contain("enforce_pure_projection_mismatch"));
+        }
+        finally {
+            if (Directory.Exists(outputDirectory)) Directory.Delete(outputDirectory, recursive: true);
+        }
+    }
+    [Test]
     public async Task ProvenDelegateCallHasMatchingEnforcePureDiagnosticAfterEarlierCases() {
         var outputDirectory = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
