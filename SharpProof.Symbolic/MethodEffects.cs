@@ -2967,6 +2967,15 @@ internal sealed class MethodEffectAnalysisSession(
                     visited,
                     out readEffect,
                     out writeEffect);
+            if (value is ILocalReferenceOperation local)
+                return TryGetNestedCapturedLocalEffects(
+                    local.Local,
+                    nestedCallSites,
+                    outerCallSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
             IOperation? mapped = null;
             var nestedCallSite = nestedCallSites[0];
             if (value is IParameterReferenceOperation parameter) {
@@ -3077,6 +3086,44 @@ internal sealed class MethodEffectAnalysisSession(
             readEffect = GetInstanceReadEffect(value, this);
             writeEffect = GetInstanceWriteEffect(value, this);
             return true;
+        }
+        private bool TryGetNestedCapturedLocalEffects(
+            ILocalSymbol local,
+            ImmutableArray<IOperation> nestedCallSites,
+            IOperation outerCallSite,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
+            out SharpProofEffect readEffect,
+            out SharpProofEffect writeEffect) {
+            readEffect = SharpProofEffect.None;
+            writeEffect = SharpProofEffect.None;
+            if (!visited.Add(local)) return false;
+            try {
+                if (local.DeclaringSyntaxReferences.Length != 1) return false;
+                var syntax = local.DeclaringSyntaxReferences[0].GetSyntax();
+                var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+                if (model.GetOperation(syntax) is not IVariableDeclaratorOperation declarator ||
+                    declarator.Initializer?.Value is not { } value)
+                    return false;
+                var root = (IOperation)declarator;
+                while (root.Parent != null) root = root.Parent;
+                if (root.DescendantsAndSelf()
+                    .OfType<ILocalReferenceOperation>()
+                    .Any(reference => SymbolEqualityComparer.Default.Equals(reference.Local, local) &&
+                                      IsDirectLocalWrite(reference)))
+                    return false;
+                return TryGetNestedReturnedValueEffects(
+                    value,
+                    nestedCallSites,
+                    outerCallSite,
+                    compilation,
+                    visited,
+                    out readEffect,
+                    out writeEffect);
+            }
+            finally {
+                visited.Remove(local);
+            }
         }
         private bool TryGetNestedCompositeReturnedValueEffects(
             IOperation left,
