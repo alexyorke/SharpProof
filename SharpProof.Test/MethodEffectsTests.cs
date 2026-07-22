@@ -210,6 +210,21 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
         });
     }
+    [Test]
+    public void StringNullOrWhiteSpaceGuardWithThrowRemainsPure() {
+        var result = Analyze("""
+            class C {
+                sealed class E : System.Exception { }
+                static int M(string text) => string.IsNullOrWhiteSpace(text) ? throw new E() : text.Length;
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+                string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                    site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+            Assert.That(result.MethodEffects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
+        });
+    }
     [TestCase("static string M(string a, string b) => a + b;")]
     [TestCase("static string M(int value) => $\"{value}\";")]
     [TestCase("static object M(int value) => value;")]
