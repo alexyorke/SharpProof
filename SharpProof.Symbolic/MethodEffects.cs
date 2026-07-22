@@ -2615,20 +2615,18 @@ internal sealed class MethodEffectAnalysisSession(
                     out var receiverWriteEffect))
                 target = target with {
                     ReceiverReadEffect = receiverReadEffect,
-                    ReceiverWriteEffect = receiverWriteEffect,
-                    CapturedReadEffect = receiverReadEffect,
-                    CapturedWriteEffect = receiverWriteEffect
+                    ReceiverWriteEffect = receiverWriteEffect
                 };
             if (target != null &&
-                value is IAnonymousFunctionOperation localFunction &&
-                TryGetReturnedLambdaLocalEffects(
-                    localFunction,
+                value is IAnonymousFunctionOperation capturedFunction &&
+                TryGetReturnedLambdaCapturedEffects(
+                    capturedFunction,
                     callSite,
-                    out var localReadEffect,
-                    out var localWriteEffect))
+                    out var capturedReadEffect,
+                    out var capturedWriteEffect))
                 target = target with {
-                    CapturedReadEffect = localReadEffect,
-                    CapturedWriteEffect = localWriteEffect
+                    CapturedReadEffect = capturedReadEffect,
+                    CapturedWriteEffect = capturedWriteEffect
                 };
             return target == null ? [] : [target];
         }
@@ -2648,18 +2646,7 @@ internal sealed class MethodEffectAnalysisSession(
             var found = false;
             foreach (var operation in function.Body.DescendantsAndSelf()) {
                 if (!BelongsDirectlyTo(function, operation)) continue;
-                switch (operation) {
-                    case IInstanceReferenceOperation:
-                        found = true;
-                        break;
-                    case ILocalReferenceOperation local when
-                        !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, function.Symbol):
-                    case IParameterReferenceOperation parameter when
-                        !SymbolEqualityComparer.Default.Equals(
-                            parameter.Parameter.ContainingSymbol,
-                            function.Symbol):
-                        return false;
-                }
+                if (operation is IInstanceReferenceOperation) found = true;
             }
             if (!found) return false;
             readEffect = GetInstanceReadEffect(receiver, this);
@@ -2713,20 +2700,55 @@ internal sealed class MethodEffectAnalysisSession(
                 .Distinct<ILocalSymbol>(SymbolEqualityComparer.Default)
                 .ToArray();
             if (locals.Length == 0) return false;
-            if (function.Body.DescendantsAndSelf().Any(operation =>
-                    BelongsDirectlyTo(function, operation) &&
-                    (operation is IInstanceReferenceOperation ||
-                     operation is IParameterReferenceOperation parameter &&
-                     !SymbolEqualityComparer.Default.Equals(
-                         parameter.Parameter.ContainingSymbol,
-                         function.Symbol))))
-                return false;
             var visited = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
             foreach (var local in locals) {
                 if (!TryGetCapturedLocalInitializer(local, compilation, visited, out var initializer))
                     return false;
                 readEffect |= GetInstanceReadEffect(initializer, this);
                 writeEffect |= GetInstanceWriteEffect(initializer, this);
+            }
+            return true;
+        }
+        private bool TryGetReturnedLambdaCapturedEffects(
+            IAnonymousFunctionOperation function,
+            IOperation callSite,
+            out SharpProofEffect readEffect,
+            out SharpProofEffect writeEffect) {
+            readEffect = SharpProofEffect.None;
+            writeEffect = SharpProofEffect.None;
+            var operations = function.Body.DescendantsAndSelf()
+                .Where(operation => BelongsDirectlyTo(function, operation))
+                .ToArray();
+            var hasReceiver = operations.Any(operation => operation is IInstanceReferenceOperation);
+            var hasArgument = operations.Any(operation =>
+                operation is IParameterReferenceOperation parameter &&
+                !SymbolEqualityComparer.Default.Equals(
+                    parameter.Parameter.ContainingSymbol,
+                    function.Symbol));
+            var hasLocal = operations.Any(operation =>
+                operation is ILocalReferenceOperation local &&
+                !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, function.Symbol));
+            if (!hasReceiver && !hasArgument && !hasLocal) return false;
+            if (hasReceiver) {
+                if (!TryGetReturnedLambdaReceiverEffects(
+                        function, callSite, out var receiverRead, out var receiverWrite))
+                    return false;
+                readEffect |= receiverRead;
+                writeEffect |= receiverWrite;
+            }
+            if (hasArgument) {
+                if (!TryGetReturnedLambdaArgumentEffects(
+                        function, callSite, out var argumentRead, out var argumentWrite))
+                    return false;
+                readEffect |= argumentRead;
+                writeEffect |= argumentWrite;
+            }
+            if (hasLocal) {
+                if (!TryGetReturnedLambdaLocalEffects(
+                        function, callSite, out var localRead, out var localWrite))
+                    return false;
+                readEffect |= localRead;
+                writeEffect |= localWrite;
             }
             return true;
         }
