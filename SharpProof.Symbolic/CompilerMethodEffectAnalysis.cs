@@ -471,7 +471,7 @@ internal sealed class MethodEffectAnalysisSession(
                 semanticModel.GetOperation(declaration, session.CancellationToken)!, target,
                 summary.WrittenArgumentOrdinals, summary.ReadArgumentOrdinals,
                 summary.BoundArgumentEffects, summary.BoundReceiverEffects);
-            return state with { Receiver = summary.Receiver.Instantiate(state.Receiver, values) };
+            return state with { Receiver = summary.Receiver.Instantiate(state.Receiver, values, sourceMethod: target) };
         }
         internal EffectFlowState AnalyzePrimaryInitializers(TypeDeclarationSyntax declaration, EffectFlowState state) {
             foreach (var parameter in method.Parameters)
@@ -490,7 +490,7 @@ internal sealed class MethodEffectAnalysisSession(
                 AddSummary(summary.Effects, state.Receiver, values, semanticModel.GetOperation(baseType,
                     session.CancellationToken)!, constructor, summary.WrittenArgumentOrdinals,
                     summary.ReadArgumentOrdinals, summary.BoundArgumentEffects, summary.BoundReceiverEffects);
-                state = state with { Receiver = summary.Receiver.Instantiate(state.Receiver, values) };
+                state = state with { Receiver = summary.Receiver.Instantiate(state.Receiver, values, sourceMethod: constructor) };
             }
             return state;
         }
@@ -1137,8 +1137,8 @@ internal sealed class MethodEffectAnalysisSession(
                 AddSummary(summary.Effects, value, arguments, creation, creation.Constructor,
                     summary.WrittenArgumentOrdinals, summary.ReadArgumentOrdinals,
                     summary.BoundArgumentEffects, summary.BoundReceiverEffects);
-                value = summary.Receiver.Instantiate(value, arguments);
-                ApplyRefArguments(summary, creation.Arguments, value, arguments, ref state);
+                value = summary.Receiver.Instantiate(value, arguments, sourceMethod: creation.Constructor);
+                ApplyRefArguments(summary, creation.Constructor, creation.Arguments, value, arguments, ref state);
             }
             if (creation.Constructor?.IsImplicitlyDeclared == true && creation.Type is INamedTypeSymbol {
                 BaseType: { } baseType
@@ -1151,7 +1151,7 @@ internal sealed class MethodEffectAnalysisSession(
                     AddSummary(baseSummary.Effects, value, baseArguments, creation, baseConstructor,
                         baseSummary.WrittenArgumentOrdinals, baseSummary.ReadArgumentOrdinals,
                         baseSummary.BoundArgumentEffects, baseSummary.BoundReceiverEffects);
-                    value = baseSummary.Receiver.Instantiate(value, baseArguments);
+                    value = baseSummary.Receiver.Instantiate(value, baseArguments, sourceMethod: baseConstructor);
                 }
             }
             if (creation.Constructor?.IsImplicitlyDeclared != false)
@@ -1233,7 +1233,7 @@ internal sealed class MethodEffectAnalysisSession(
                                 localSummary.BoundArgumentEffects, localSummary.BoundReceiverEffects);
                         else
                             effects.AddTransitive(localSummary.Effects, site.Syntax, bound.Method, "source_call");
-                        return localSummary.ReturnValue.Instantiate(bound.Receiver, values, bound.Captures);
+                        return localSummary.ReturnValue.Instantiate(bound.Receiver, values, bound.Captures, bound.Method);
                     }
                 }
             }
@@ -1250,7 +1250,8 @@ internal sealed class MethodEffectAnalysisSession(
                         AddSummary(callableSummary.Effects, callable.Receiver, values, site, callable.Method,
                             callableSummary.WrittenArgumentOrdinals, callableSummary.ReadArgumentOrdinals,
                             callableSummary.BoundArgumentEffects, callableSummary.BoundReceiverEffects);
-                    var value = callableSummary.ReturnValue.Instantiate(callable.Receiver, values, callable.Captures);
+                    var value = callableSummary.ReturnValue.Instantiate(
+                        callable.Receiver, values, callable.Captures, callable.Method);
                     returned = ReferenceEquals(returned, EffectFlowValue.None) ? value : returned.Merge(value);
                 }
                 return returned;
@@ -1285,8 +1286,8 @@ internal sealed class MethodEffectAnalysisSession(
                 PublishesArgument(target, receiver.Roots.Count == 0 ||
                     receiver.Roots.Any(static root => root.Kind != EffectValueRootKind.Fresh)))
                 effects.Add(SharpProofEffect.WritesCapturedState, site.Syntax, target, "published_fresh_argument");
-            ApplyRefArguments(summary, arguments, receiver, values, ref state);
-            var returnedValue = summary.ReturnValue.Instantiate(receiver, values);
+            ApplyRefArguments(summary, target, arguments, receiver, values, ref state);
+            var returnedValue = summary.ReturnValue.Instantiate(receiver, values, sourceMethod: target);
             return target.ReturnsByRef && returnedValue.Roots.Any(static root => root.Kind == EffectValueRootKind.Unknown)
                 ? ResolveRefReturn(target, receiver, values)
                 : returnedValue;
@@ -1604,7 +1605,8 @@ internal sealed class MethodEffectAnalysisSession(
                     var receiver = EffectFlowValue.FromRoot(new(EffectValueRootKind.Receiver), target.ContainingType);
                     return inherited with {
                         Receiver = inherited.Receiver.Instantiate(receiver,
-                        baseConstructor.Parameters.Select(static _ => EffectFlowValue.None).ToArray())
+                        baseConstructor.Parameters.Select(static _ => EffectFlowValue.None).ToArray(),
+                        sourceMethod: baseConstructor)
                     };
                 }
                 return EmptySummary(target);
@@ -1673,6 +1675,7 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private void ApplyRefArguments(
             CompilerMethodEffectSummary summary,
+            IMethodSymbol target,
             ImmutableArray<IArgumentOperation> arguments,
             EffectFlowValue receiver,
             IReadOnlyList<EffectFlowValue> values,
@@ -1680,7 +1683,8 @@ internal sealed class MethodEffectAnalysisSession(
             foreach (var argument in arguments) {
                 if (argument.Parameter is not { RefKind: not RefKind.None } parameter || parameter.Ordinal >= summary.Parameters.Length)
                     continue;
-                Assign(argument.Value, summary.Parameters[parameter.Ordinal].Instantiate(receiver, values), false, ref state);
+                Assign(argument.Value, summary.Parameters[parameter.Ordinal].Instantiate(
+                    receiver, values, sourceMethod: target), false, ref state);
             }
         }
         private IReadOnlyList<EffectFlowValue> EvaluateArguments(

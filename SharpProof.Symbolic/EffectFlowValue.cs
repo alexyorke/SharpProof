@@ -57,12 +57,14 @@ internal sealed class EffectFlowValue {
     internal EffectFlowValue Instantiate(
         EffectFlowValue? receiver,
         IReadOnlyList<EffectFlowValue> arguments,
-        IReadOnlyDictionary<string, EffectFlowValue>? captures = null) {
+        IReadOnlyDictionary<string, EffectFlowValue>? captures = null,
+        IMethodSymbol? sourceMethod = null) {
         var result = None;
         foreach (var root in Roots) {
             var mapped = root.Kind switch {
-                EffectValueRootKind.Receiver => receiver ?? Unknown,
-                EffectValueRootKind.Argument when root.Ordinal >= 0 && root.Ordinal < arguments.Count => arguments[root.Ordinal],
+                EffectValueRootKind.Receiver when IsFormalReceiver(root, sourceMethod) => receiver ?? Unknown,
+                EffectValueRootKind.Argument when root.Ordinal >= 0 && root.Ordinal < arguments.Count &&
+                                                   IsFormalArgument(root, sourceMethod) => arguments[root.Ordinal],
                 EffectValueRootKind.Captured when captures != null && captures.TryGetValue(root.Key, out var captured) => captured,
                 _ => FromRoot(root, ExactType)
             };
@@ -70,11 +72,18 @@ internal sealed class EffectFlowValue {
         }
         if (Roots.Count == 0) result = new EffectFlowValue([], ExactType, EmptyMembers, []);
         foreach (var member in Members)
-            result = result.WithMember(member.Key, member.Value.Instantiate(receiver, arguments, captures));
+            result = result.WithMember(member.Key, member.Value.Instantiate(receiver, arguments, captures, sourceMethod));
         if (!Callables.IsDefaultOrEmpty)
-            result = result.WithCallables([.. Callables.Select(callable => callable.Instantiate(receiver, arguments, captures))]);
+            result = result.WithCallables([.. Callables.Select(callable => callable.Instantiate(
+                receiver, arguments, captures, sourceMethod))]);
         return result;
     }
+    private static bool IsFormalReceiver(EffectValueRoot root, IMethodSymbol? sourceMethod) => sourceMethod == null ||
+        string.IsNullOrEmpty(root.Key) ||
+        string.Equals(root.Key, EffectFlowState.SymbolKey(sourceMethod), StringComparison.Ordinal);
+    private static bool IsFormalArgument(EffectValueRoot root, IMethodSymbol? sourceMethod) => sourceMethod == null ||
+        string.IsNullOrEmpty(root.Key) || root.Ordinal < sourceMethod.Parameters.Length &&
+        string.Equals(root.Key, EffectFlowState.SymbolKey(sourceMethod.Parameters[root.Ordinal]), StringComparison.Ordinal);
     private string CreateKey() {
         var roots = string.Join(",", Roots.OrderBy(static root => root.Kind).ThenBy(static root => root.Ordinal)
             .ThenBy(static root => root.Key, StringComparer.Ordinal));
@@ -98,12 +107,13 @@ internal sealed record EffectBoundCallable(
     internal EffectBoundCallable Instantiate(
         EffectFlowValue? receiver,
         IReadOnlyList<EffectFlowValue> arguments,
-        IReadOnlyDictionary<string, EffectFlowValue>? captures) => new(
+        IReadOnlyDictionary<string, EffectFlowValue>? captures,
+        IMethodSymbol? sourceMethod = null) => new(
         Method,
-        Receiver?.Instantiate(receiver, arguments, captures),
+        Receiver?.Instantiate(receiver, arguments, captures, sourceMethod),
         Captures.ToImmutableDictionary(
             static capture => capture.Key,
-            capture => capture.Value.Instantiate(receiver, arguments, captures),
+            capture => capture.Value.Instantiate(receiver, arguments, captures, sourceMethod),
             StringComparer.Ordinal));
 }
 
