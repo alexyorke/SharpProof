@@ -201,7 +201,8 @@ internal sealed class MethodEffectAnalysisSession(
         switch (operation) {
             case ISimpleAssignmentOperation assignment:
                 AddWrite(assignment.Target, builder);
-                if (assignment.Target is ILocalReferenceOperation assignedLocal)
+                if (assignment.Target is ILocalReferenceOperation assignedLocal &&
+                    (assignedLocal.Local.RefKind == RefKind.None || assignment.IsRef))
                     builder.AssignLocal(assignedLocal.Local, assignment.Value);
                 if (assignment.Target is IPropertyReferenceOperation { Property.SetMethod: not null } propertyTarget)
                     AnalyzeCall(propertyTarget.Property.SetMethod, assignment, builder, propertyTarget.Instance);
@@ -259,6 +260,11 @@ internal sealed class MethodEffectAnalysisSession(
                 when field.Parent is not IAssignmentOperation { Target: var target } ||
                      !ReferenceEquals(target, field):
                 builder.Add(GetInstanceReadEffect(field.Instance, builder), field, field.Field, "instance_field_read");
+                break;
+            case ILocalReferenceOperation local when local.Local.RefKind != RefKind.None &&
+                                                     (local.Parent is not IAssignmentOperation { Target: var target } ||
+                                                      !ReferenceEquals(target, local)):
+                builder.Add(GetInstanceReadEffect(local, builder), local, local.Local, "ref_local_read");
                 break;
             case IPropertyReferenceOperation property
                 when property.Parent is not IAssignmentOperation { Target: var target } ||
@@ -871,6 +877,9 @@ internal sealed class MethodEffectAnalysisSession(
             return;
         }
         switch (target) {
+            case ILocalReferenceOperation local when local.Local.RefKind != RefKind.None:
+                builder.Add(GetInstanceWriteEffect(local, builder), local, local.Local, "ref_local_write");
+                break;
             case IFieldReferenceOperation { Field.IsStatic: true } field:
                 builder.Add(SharpProofEffect.WritesStaticState, field, field.Field, "static_field_write");
                 break;
@@ -904,6 +913,7 @@ internal sealed class MethodEffectAnalysisSession(
     private static bool IsPointerIndirection(IOperation operation) =>
         operation.Syntax.IsKind(SyntaxKind.PointerIndirectionExpression);
     private static SharpProofEffect GetInstanceWriteEffect(IOperation? instance, Builder builder) {
+        if (builder.TryGetRefLocalEffects(instance, out _, out var refWriteEffect)) return refWriteEffect;
         if (builder.TryGetFreshRootOrigin(instance, out var origin)) return GetWriteEffect(origin);
         return instance switch {
             IInstanceReferenceOperation => SharpProofEffect.WritesReceiverState,
@@ -924,6 +934,7 @@ internal sealed class MethodEffectAnalysisSession(
         };
     }
     private static SharpProofEffect GetInstanceReadEffect(IOperation? instance, Builder builder) {
+        if (builder.TryGetRefLocalEffects(instance, out var refReadEffect, out _)) return refReadEffect;
         if (builder.TryGetFreshRootOrigin(instance, out var origin)) return GetReadEffect(origin);
         if (instance is { Type.SpecialType: SpecialType.System_String } or { Type.IsValueType: true })
             return SharpProofEffect.None;
@@ -1201,6 +1212,8 @@ internal sealed class MethodEffectAnalysisSession(
         private readonly Dictionary<ILocalSymbol, INamedTypeSymbol> _exactTypes = new(SymbolEqualityComparer.Default);
         private readonly Dictionary<ILocalSymbol, ImmutableArray<DelegateTarget>> _delegateTargets =
             new(SymbolEqualityComparer.Default);
+        private readonly Dictionary<ILocalSymbol, (SharpProofEffect Read, SharpProofEffect Write)> _refLocalEffects =
+            new(SymbolEqualityComparer.Default);
         internal void MarkFresh(ILocalSymbol local) => _freshLocals.Add(local);
         internal bool IsFresh(ILocalSymbol local) => _freshLocals.Contains(local);
         internal bool TryGetFreshRootOrigin(IOperation? operation, out MethodEffectOrigin origin) {
@@ -1315,7 +1328,12 @@ internal sealed class MethodEffectAnalysisSession(
             _memberOrigins.Remove(local);
             _exactTypes.Remove(local);
             _delegateTargets.Remove(local);
+            _refLocalEffects.Remove(local);
             if (_flowUncertainLocals.Contains(local) || IsFlowDependent(value.Syntax)) return;
+            if (local.RefKind != RefKind.None)
+                _refLocalEffects[local] = (
+                    GetInstanceReadEffect(value, this),
+                    GetInstanceWriteEffect(value, this));
             var unwrapped = value;
             while (unwrapped is IConversionOperation conversion) unwrapped = conversion.Operand;
             if (unwrapped is IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
@@ -1350,6 +1368,7 @@ internal sealed class MethodEffectAnalysisSession(
             _memberOrigins.Remove(local);
             _exactTypes.Remove(local);
             _delegateTargets.Remove(local);
+            _refLocalEffects.Remove(local);
         }
         internal void MarkEscapedArguments(
             ImmutableArray<IArgumentOperation> arguments,
@@ -1366,6 +1385,21 @@ internal sealed class MethodEffectAnalysisSession(
                     _delegateTargets.Remove(local.Local);
                 }
             }
+        }
+        internal bool TryGetRefLocalEffects(
+            IOperation? value,
+            out SharpProofEffect readEffect,
+            out SharpProofEffect writeEffect) {
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is ILocalReferenceOperation local &&
+                _refLocalEffects.TryGetValue((ILocalSymbol)local.Local.OriginalDefinition, out var effects)) {
+                readEffect = effects.Read;
+                writeEffect = effects.Write;
+                return true;
+            }
+            readEffect = SharpProofEffect.None;
+            writeEffect = SharpProofEffect.None;
+            return false;
         }
         private void CollectMemberOrigins(
             IOperation value,
