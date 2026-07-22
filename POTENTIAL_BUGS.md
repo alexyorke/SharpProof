@@ -5166,18 +5166,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 1 Z3 Formula Encoding (Agent 1)
 
-#### [PB3-1.3] 1.3 HasSafeArithmetic Inflates `_lastObservedRlimitCount` Across Solver Instances
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-Z3-RLIMIT-ACCOUNTING
-> **Evidence:** HasSafeArithmetic creates a separate solver but updates the shared _lastObservedRlimitCount.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtSolver.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtSolver.cs#L116-L127)
-* **Severity:** High
-* **Description:** `HasSafeArithmetic` at line 116 creates a temporary solver via `_encoder.CreateSolver(timeout)` at line 119, calls `CheckAndAccountResources(solver)` at line 126, and disposes the solver. `CheckAndAccountResources` updates `_lastObservedRlimitCount` (line 32) and `ConsumedResourceCount` (line 29). The next call to `CheckSatisfiabilityRawWithWitness` creates a fresh solver whose rlimit count starts from 0, but `_lastObservedRlimitCount` reflects the prior solver's final count. Since `observed < _lastObservedRlimitCount`, the overflow-correction branch at line 31 adds ~4.29 billion resource units—inflating the budget exactly as Bug #1 did when checks cross solver instances.
-* **Impact:** Cumulative resource budget is inflated by billions of units after every divisor-safety check, delaying or disabling budget enforcement.
-* **Recommendation:** Save and restore `_lastObservedRlimitCount` around `HasSafeArithmetic`, or use Z3 `Push`/`Pop` instead of a separate solver.
-
 #### [PB3-1.4] 1.4 `TryResolveString` Returns `null` String from Dictionary Causing NullReferenceException
 
 > **Disposition:** Needs investigation
