@@ -569,9 +569,9 @@ internal sealed class MethodEffectAnalysisSession(
                         receiverWriteEffect: enumeratorWriteEffect);
                 if (loop.IsAsynchronous) {
                     if (info.MoveNextMethod?.ReturnType is { } moveNextAwaitable)
-                        AnalyzeAwaitableProtocol(moveNextAwaitable, loop, builder);
+                        AnalyzeAwaitableProtocol(moveNextAwaitable, loop, semanticModel, builder);
                     if (info.DisposeMethod?.ReturnType is { } disposeAwaitable)
-                        AnalyzeAwaitableProtocol(disposeAwaitable, loop, builder);
+                        AnalyzeAwaitableProtocol(disposeAwaitable, loop, semanticModel, builder);
                 }
                 break;
             case IUsingOperation usingOperation:
@@ -583,6 +583,7 @@ internal sealed class MethodEffectAnalysisSession(
                             usingOperation,
                             builder,
                             usingOperation.IsAsynchronous,
+                            semanticModel,
                             declarator.Initializer?.Value);
                 }
                 else
@@ -591,6 +592,7 @@ internal sealed class MethodEffectAnalysisSession(
                         usingOperation,
                         builder,
                         usingOperation.IsAsynchronous,
+                        semanticModel,
                         usingOperation.Resources);
                 break;
             case IUsingDeclarationOperation usingDeclaration:
@@ -601,6 +603,7 @@ internal sealed class MethodEffectAnalysisSession(
                         usingDeclaration,
                         builder,
                         usingDeclaration.IsAsynchronous,
+                        semanticModel,
                         declarator.Initializer?.Value);
                 break;
             case IEventAssignmentOperation { EventReference: IEventReferenceOperation eventReference } eventAssignment:
@@ -1198,6 +1201,7 @@ internal sealed class MethodEffectAnalysisSession(
         IOperation site,
         Builder builder,
         bool asynchronous,
+        SemanticModel semanticModel,
         IOperation? receiver) {
         if (type is not INamedTypeSymbol named) return;
         var interfaceName = asynchronous ? "System.IAsyncDisposable" : "System.IDisposable";
@@ -1209,16 +1213,21 @@ internal sealed class MethodEffectAnalysisSession(
             .FirstOrDefault(static method => !method.IsStatic && method.Parameters.Length == 0);
         if (implementation == null) return;
         AnalyzeCall(implementation, site, builder, receiver);
-        if (asynchronous) AnalyzeAwaitableProtocol(implementation.ReturnType, site, builder);
+        if (asynchronous) AnalyzeAwaitableProtocol(implementation.ReturnType, site, semanticModel, builder);
     }
-    private void AnalyzeAwaitableProtocol(ITypeSymbol awaitableType, IOperation site, Builder builder) {
+    private void AnalyzeAwaitableProtocol(
+        ITypeSymbol awaitableType,
+        IOperation site,
+        SemanticModel semanticModel,
+        Builder builder) {
         var awaitableDefinition = awaitableType.OriginalDefinition.ToDisplayString();
         if (awaitableDefinition is "System.Threading.Tasks.Task" or
             "System.Threading.Tasks.Task<TResult>" or
             "System.Threading.Tasks.ValueTask" or
             "System.Threading.Tasks.ValueTask<TResult>")
             return;
-        var getAwaiter = FindProtocolMethod(awaitableType, "GetAwaiter");
+        var getAwaiter = FindProtocolMethod(awaitableType, "GetAwaiter") ??
+                         ResolveExtensionAwaiter(awaitableType, site, semanticModel);
         AnalyzeCall(
             getAwaiter,
             site,
@@ -1245,6 +1254,22 @@ internal sealed class MethodEffectAnalysisSession(
             builder,
             receiverReadEffect: SharpProofEffect.None,
             receiverWriteEffect: SharpProofEffect.WritesFreshOwnedState);
+    }
+    private static IMethodSymbol? ResolveExtensionAwaiter(
+        ITypeSymbol awaitableType,
+        IOperation site,
+        SemanticModel semanticModel) {
+        var receiver = SyntaxFactory.DefaultExpression(SyntaxFactory.ParseTypeName(
+            awaitableType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+        var invocation = SyntaxFactory.InvocationExpression(
+            SyntaxFactory.MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                receiver,
+                SyntaxFactory.IdentifierName("GetAwaiter")));
+        return semanticModel.GetSpeculativeSymbolInfo(
+            site.Syntax.SpanStart,
+            invocation,
+            SpeculativeBindingOption.BindAsExpression).Symbol as IMethodSymbol;
     }
     private static bool TryReadEffectContract(IMethodSymbol method, out MethodEffects effects) {
         var canonicalKey = RoslynStructuralMethodIdentity.GetCanonicalKey(method);
