@@ -279,6 +279,21 @@ public sealed class MethodEffectsTests {
         Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
     }
     [Test]
+    public void DeconstructionAssignmentWritesArgumentState() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            class C {
+                static void M(Box input) {
+                    (input.Value, _) = (1, 2);
+                }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+        });
+    }
+    [Test]
     public void NestedFreshObjectGraphWritesRemainFreshOwned() {
         var result = Analyze("""
             sealed class Box { public int Value; }
