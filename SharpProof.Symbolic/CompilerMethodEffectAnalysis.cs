@@ -1626,10 +1626,11 @@ internal sealed class MethodEffectAnalysisSession(
                     ? candidateArguments
                     : [.. writtenArgumentOrdinals.Where(ordinal => ordinal >= 0 && ordinal < arguments.Count)
                         .Select(ordinal => arguments[ordinal]).Where(static argument => argument.Roots.Count != 0)];
-                mapped |= writtenArguments.Length == 0
-                    ? SharpProofEffect.WritesArgumentState | SharpProofEffect.Unknown
-                    : writtenArguments.Aggregate(SharpProofEffect.None,
+                if (writtenArguments.Length != 0)
+                    mapped |= writtenArguments.Aggregate(SharpProofEffect.None,
                         (current, argument) => current | effects.WriteEffect(argument));
+                else if (writtenArgumentOrdinals.IsDefault)
+                    mapped |= SharpProofEffect.WritesArgumentState | SharpProofEffect.Unknown;
             }
             effects.AddTransitive(summary with { Effects = mapped }, site.Syntax, target, "source_call");
         }
@@ -1681,6 +1682,8 @@ internal sealed class MethodEffectAnalysisSession(
                         state = state with { Locals = state.Locals.SetItem(local.Local, value) };
                     return;
                 case IParameterReferenceOperation parameter:
+                    if (parameter.Parameter.RefKind != RefKind.None)
+                        effects.Write(state.GetParameter(parameter.Parameter), target.Syntax, parameter.Parameter, "ref_parameter_write");
                     state = state.SetParameter(parameter.Parameter, value);
                     return;
                 case IDeclarationExpressionOperation declaration:
