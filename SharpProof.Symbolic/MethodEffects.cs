@@ -494,6 +494,7 @@ internal sealed class MethodEffectAnalysisSession(
                 var foreachCollection = loop.Collection;
                 while (foreachCollection is IConversionOperation collectionConversion)
                     foreachCollection = collectionConversion.Operand;
+                AnalyzeForEachDeconstruction(loop, syntax, semanticModel, builder);
                 if (foreachCollection.Type is IArrayTypeSymbol arrayType) {
                     TrackIntrinsicForEachRefLocal(loop, foreachCollection, builder);
                     builder.Add(
@@ -807,12 +808,38 @@ internal sealed class MethodEffectAnalysisSession(
             deconstruction,
             builder);
     }
+    private void AnalyzeForEachDeconstruction(
+        IForEachLoopOperation loop,
+        CommonForEachStatementSyntax syntax,
+        SemanticModel semanticModel,
+        Builder builder) {
+        if (syntax is not ForEachVariableStatementSyntax variableSyntax) return;
+        var info = semanticModel.GetDeconstructionInfo(variableSyntax);
+        AnalyzeDeconstructionInfo(
+            info,
+            loop.Collection,
+            loop,
+            builder,
+            receiverReadEffect: GetInstanceReadEffect(loop.Collection, builder),
+            receiverWriteEffect: info.Method?.ContainingType.IsValueType == true
+                ? SharpProofEffect.WritesFreshOwnedState
+                : GetInstanceWriteEffect(loop.Collection, builder));
+    }
     private void AnalyzeDeconstructionInfo(
         DeconstructionInfo info,
         IOperation? receiver,
         IOperation site,
-        Builder builder) {
-        if (info.Method != null) AnalyzeCall(info.Method, site, builder, receiver);
+        Builder builder,
+        SharpProofEffect? receiverReadEffect = null,
+        SharpProofEffect? receiverWriteEffect = null) {
+        if (info.Method != null)
+            AnalyzeCall(
+                info.Method,
+                site,
+                builder,
+                receiver,
+                receiverReadEffect,
+                receiverWriteEffect);
         foreach (var nested in info.Nested)
             AnalyzeDeconstructionInfo(nested, null, site, builder);
     }
