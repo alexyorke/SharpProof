@@ -294,6 +294,22 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void CoalesceAssignmentWritesArgumentState() {
+        var result = Analyze("""
+            #nullable enable
+            sealed class Box { public object? Value; }
+            class C {
+                static void M(Box input) {
+                    input.Value ??= new object();
+                }
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+        });
+    }
+    [Test]
     public void NestedFreshObjectGraphWritesRemainFreshOwned() {
         var result = Analyze("""
             sealed class Box { public int Value; }
