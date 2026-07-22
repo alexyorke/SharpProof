@@ -2110,6 +2110,21 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ObjectCreationIncludesBaseTypeInitializerEffects() {
+        var result = Analyze("""
+            static class Globals { public static int Count; }
+            class B {
+                static B() { Globals.Count++; }
+            }
+            sealed class D : B { }
+            class C { static D M() => new D(); }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void StaticFieldReadIncludesTypeInitializerEffects() {
         var result = Analyze("""
             static class Globals { public static int Count; }
