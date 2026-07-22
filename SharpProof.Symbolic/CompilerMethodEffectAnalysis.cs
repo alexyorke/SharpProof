@@ -1205,9 +1205,11 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private void AnalyzeEnumeration(ITypeSymbol? type, EffectFlowValue collection, IOperation site,
             ref EffectFlowState state) {
-            var getEnumerator = FindProtocolMethod(type, "GetEnumerator", 0);
+            var getEnumerator = FindProtocolMethod(type, "GetEnumerator", 0) ??
+                                FindImplementedProtocolMethod(type, "GetEnumerator", 0);
             if (getEnumerator == null) return;
             var enumerator = InvokeCore(getEnumerator, collection, [], [], site, ref state);
+            if (enumerator.Roots.Count == 0) return;
             InvokeCoreOrValue(FindProtocolMethod(getEnumerator.ReturnType, "MoveNext", 0), enumerator, site, ref state);
             InvokeCoreOrValue(getEnumerator.ReturnType.GetMembers("Current").OfType<IPropertySymbol>().FirstOrDefault()?.GetMethod,
                 enumerator, site, ref state);
@@ -1259,6 +1261,20 @@ internal sealed class MethodEffectAnalysisSession(
         private static IMethodSymbol? FindProtocolMethod(ITypeSymbol? type, string name, int parameterCount) =>
             type?.GetMembers(name).OfType<IMethodSymbol>()
                 .FirstOrDefault(method => !method.IsStatic && method.Parameters.Length == parameterCount);
+        private static IMethodSymbol? FindImplementedProtocolMethod(
+            ITypeSymbol? type,
+            string name,
+            int parameterCount) {
+            if (type is not INamedTypeSymbol named) return null;
+            foreach (var interfaceType in named.AllInterfaces.OrderByDescending(static candidate => candidate.IsGenericType)) {
+                foreach (var member in interfaceType.GetMembers(name).OfType<IMethodSymbol>()) {
+                    if (member.IsStatic || member.Parameters.Length != parameterCount) continue;
+                    if (named.FindImplementationForInterfaceMember(member) is IMethodSymbol implementation)
+                        return implementation;
+                }
+            }
+            return null;
+        }
         private static bool IsInlineArray(ITypeSymbol? type) => type?.GetAttributes().Any(static attribute =>
             attribute.AttributeClass?.ToDisplayString() == "System.Runtime.CompilerServices.InlineArrayAttribute") == true;
         private CompilerMethodEffectSummary GetSummary(
