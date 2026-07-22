@@ -2122,6 +2122,21 @@ public sealed class MethodEffectsTests {
         Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
     }
     [Test]
+    public void StaticFieldWriteIncludesTypeInitializerEffects() {
+        var result = Analyze("""
+            static class Globals { public static object? Value; }
+            sealed class D {
+                static D() { Globals.Value = new object(); }
+                public static int Value;
+            }
+            class C { static void M() { D.Value = 1; } }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Allocates), Is.True);
+        });
+    }
+    [Test]
     public void StaticHelperMutationOfFreshArgumentRemainsFreshOwned() {
         var result = Analyze("""
             sealed class Box { public int Value; }
