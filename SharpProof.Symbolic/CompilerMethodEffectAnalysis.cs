@@ -1156,20 +1156,23 @@ internal sealed class MethodEffectAnalysisSession(
         internal EffectFlowValue ApplyDeclaredInitializers(EffectFlowValue value, ITypeSymbol? type,
             ref EffectFlowState state, bool includeBase = true) {
             foreach (var declaration in type?.DeclaringSyntaxReferences ?? []) {
-                if (declaration.SyntaxTree != semanticModel.SyntaxTree || declaration.GetSyntax(session.CancellationToken) is not
-                    TypeDeclarationSyntax typeDeclaration) continue;
+                if (declaration.GetSyntax(session.CancellationToken) is not TypeDeclarationSyntax typeDeclaration) continue;
+                var declarationModel = session.Compilation.GetSemanticModel(declaration.SyntaxTree);
+                var declarationDomain = declaration.SyntaxTree == semanticModel.SyntaxTree
+                    ? this
+                    : new EffectFlowDomain(session, method, declarationModel, effects, boundCaptures);
                 foreach (var member in typeDeclaration.Members) {
                     if (member is BaseFieldDeclarationSyntax field)
                         foreach (var variable in field.Declaration.Variables) {
-                            if (variable.Initializer == null || semanticModel.GetDeclaredSymbol(variable,
+                            if (variable.Initializer == null || declarationModel.GetDeclaredSymbol(variable,
                                     session.CancellationToken) is not { IsStatic: false } symbol) continue;
-                            value = value.WithMember(MemberKey(symbol), Evaluate(semanticModel.GetOperation(
+                            value = value.WithMember(MemberKey(symbol), declarationDomain.Evaluate(declarationModel.GetOperation(
                                 variable.Initializer.Value, session.CancellationToken), ref state));
                         }
                     else if (member is PropertyDeclarationSyntax { Initializer: { } initializer } property &&
-                             semanticModel.GetDeclaredSymbol(property, session.CancellationToken) is
+                             declarationModel.GetDeclaredSymbol(property, session.CancellationToken) is
                                  IPropertySymbol { IsStatic: false } symbol)
-                        value = value.WithMember(MemberKey(symbol), Evaluate(semanticModel.GetOperation(initializer.Value,
+                        value = value.WithMember(MemberKey(symbol), declarationDomain.Evaluate(declarationModel.GetOperation(initializer.Value,
                             session.CancellationToken), ref state));
                 }
             }
