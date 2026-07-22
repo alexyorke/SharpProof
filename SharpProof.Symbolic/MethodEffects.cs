@@ -692,7 +692,8 @@ internal sealed class MethodEffectAnalysisSession(
             initializer.Syntax.SpanStart,
             invocation,
             SpeculativeBindingOption.BindAsExpression).Symbol as IMethodSymbol;
-        AnalyzeCall(getPinnableReference, initializer, builder, initializer);
+        if (getPinnableReference != null)
+            AnalyzeCall(getPinnableReference, initializer, builder, initializer);
     }
     private static IMethodSymbol? FindProtocolMethod(
         ITypeSymbol type,
