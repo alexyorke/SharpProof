@@ -1197,12 +1197,15 @@ internal sealed class MethodEffectAnalysisSession(
                 : InvokeCore(info.GetEnumeratorMethod, collection,
                     info.GetEnumeratorMethod.ReducedFrom != null || info.GetEnumeratorMethod.IsExtensionMethod ? [collection] : [],
                     [], loop, ref state);
-            InvokeCoreOrValue(info.MoveNextMethod, enumerator, loop, ref state);
-            InvokeCoreOrValue(info.CurrentProperty?.GetMethod, enumerator, loop, ref state);
-            InvokeCoreOrValue(info.DisposeMethod, enumerator, loop, ref state);
+            var moveNext = ResolveProtocolImplementation(info.MoveNextMethod, enumerator);
+            var getCurrent = ResolveProtocolImplementation(info.CurrentProperty?.GetMethod, enumerator);
+            var dispose = ResolveProtocolImplementation(info.DisposeMethod, enumerator);
+            InvokeCoreOrValue(moveNext, enumerator, loop, ref state);
+            InvokeCoreOrValue(getCurrent, enumerator, loop, ref state);
+            InvokeCoreOrValue(dispose, enumerator, loop, ref state);
             if (loop.IsAsynchronous) {
-                AnalyzeAwaitable(info.MoveNextMethod?.ReturnType, enumerator, loop, ref state);
-                AnalyzeAwaitable(info.DisposeMethod?.ReturnType, enumerator, loop, ref state);
+                AnalyzeAwaitable(moveNext?.ReturnType, enumerator, loop, ref state);
+                AnalyzeAwaitable(dispose?.ReturnType, enumerator, loop, ref state);
             }
             Evaluate(loop.Body, ref state);
             return collection;
