@@ -1200,12 +1200,12 @@ internal sealed class MethodEffectAnalysisSession(
             var moveNext = ResolveProtocolImplementation(info.MoveNextMethod, enumerator);
             var getCurrent = ResolveProtocolImplementation(info.CurrentProperty?.GetMethod, enumerator);
             var dispose = ResolveProtocolImplementation(info.DisposeMethod, enumerator);
-            InvokeCoreOrValue(moveNext, enumerator, loop, ref state);
+            var moveNextResult = InvokeCoreOrValue(moveNext, enumerator, loop, ref state);
             InvokeCoreOrValue(getCurrent, enumerator, loop, ref state);
-            InvokeCoreOrValue(dispose, enumerator, loop, ref state);
+            var disposeResult = InvokeCoreOrValue(dispose, enumerator, loop, ref state);
             if (loop.IsAsynchronous) {
-                AnalyzeAwaitable(moveNext?.ReturnType, enumerator, loop, ref state);
-                AnalyzeAwaitable(dispose?.ReturnType, enumerator, loop, ref state);
+                AnalyzeAwaitable(moveNext?.ReturnType, moveNextResult, loop, ref state);
+                AnalyzeAwaitable(dispose?.ReturnType, disposeResult, loop, ref state);
             }
             Evaluate(loop.Body, ref state);
             return collection;
