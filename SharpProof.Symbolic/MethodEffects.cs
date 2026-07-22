@@ -444,9 +444,30 @@ internal sealed class MethodEffectAnalysisSession(
             case IForEachLoopOperation { Syntax: CommonForEachStatementSyntax syntax } loop:
                 var info = semanticModel.GetForEachStatementInfo(syntax);
                 AnalyzeCall(info.GetEnumeratorMethod, loop, builder, loop.Collection);
-                AnalyzeCall(info.MoveNextMethod, loop, builder);
-                AnalyzeCall(info.CurrentProperty?.GetMethod, loop, builder);
-                if (info.DisposeMethod != null) AnalyzeCall(info.DisposeMethod, loop, builder);
+                var ownsEnumerator = info.GetEnumeratorMethod?.ReturnType.IsValueType == true;
+                SharpProofEffect? enumeratorReadEffect = ownsEnumerator ? SharpProofEffect.None : null;
+                SharpProofEffect? enumeratorWriteEffect = ownsEnumerator
+                    ? SharpProofEffect.WritesFreshOwnedState
+                    : null;
+                AnalyzeCall(
+                    info.MoveNextMethod,
+                    loop,
+                    builder,
+                    receiverReadEffect: enumeratorReadEffect,
+                    receiverWriteEffect: enumeratorWriteEffect);
+                AnalyzeCall(
+                    info.CurrentProperty?.GetMethod,
+                    loop,
+                    builder,
+                    receiverReadEffect: enumeratorReadEffect,
+                    receiverWriteEffect: enumeratorWriteEffect);
+                if (info.DisposeMethod != null)
+                    AnalyzeCall(
+                        info.DisposeMethod,
+                        loop,
+                        builder,
+                        receiverReadEffect: enumeratorReadEffect,
+                        receiverWriteEffect: enumeratorWriteEffect);
                 if (loop.IsAsynchronous) {
                     if (info.MoveNextMethod?.ReturnType is { } moveNextAwaitable)
                         AnalyzeAwaitableProtocol(moveNextAwaitable, loop, builder);
