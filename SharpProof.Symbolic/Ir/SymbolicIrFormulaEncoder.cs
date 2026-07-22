@@ -92,6 +92,12 @@ internal static class SymbolicIrFormulaEncoder {
                 }
                 break;
             case SymbolicElementTerm element:
+                if (element.Receiver is SymbolicConditionalTerm conditionalElementReceiver &&
+                    TryEncodeConditionalProjection(
+                        conditionalElementReceiver,
+                        receiver => new SymbolicElementTerm(receiver, element.Index, element.Kind),
+                        out formula))
+                    return true;
                 if (TryEncodeTerm(element.Receiver, out var elementReceiver) &&
                     TryEncodeElementIndex(element.Index, out var elementIndexText) &&
                     elementReceiver.Kind == SmtValueKind.Reference &&
@@ -101,6 +107,12 @@ internal static class SymbolicIrFormulaEncoder {
                 }
                 break;
             case SymbolicMultiElementTerm element:
+                if (element.Receiver is SymbolicConditionalTerm conditionalMultiElementReceiver &&
+                    TryEncodeConditionalProjection(
+                        conditionalMultiElementReceiver,
+                        receiver => new SymbolicMultiElementTerm(receiver, element.Indices, element.Kind),
+                        out formula))
+                    return true;
                 if (TryEncodeTerm(element.Receiver, out var multiElementReceiver) &&
                     multiElementReceiver.Kind == SmtValueKind.Reference) {
                     var indexTexts = new List<string>(element.Indices.Length);
