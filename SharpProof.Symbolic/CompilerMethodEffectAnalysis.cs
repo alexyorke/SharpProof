@@ -230,7 +230,14 @@ internal sealed class MethodEffectAnalysisSession(
             ? model.GetTypeInfo(expression).Type as INamedTypeSymbol
             : null;
         for (var current = node; current != null; current = current.Parent) {
-            if (current is not TryStatementSyntax statement || !statement.Block.Span.Contains(position)) continue;
+            if (current is not TryStatementSyntax statement) continue;
+            var inTry = statement.Block.Span.Contains(position);
+            var inCatch = statement.Catches.Any(clause => clause.Block.Span.Contains(position));
+            if (!inTry && !inCatch) continue;
+            if (statement.Finally is { } finallyClause &&
+                model.AnalyzeControlFlow(finallyClause.Block) is { EndPointIsReachable: false })
+                return true;
+            if (!inTry) continue;
             foreach (var clause in statement.Catches) {
                 if (clause.Filter != null && model.GetConstantValue(clause.Filter.FilterExpression) is not
                     { HasValue: true, Value: true })
