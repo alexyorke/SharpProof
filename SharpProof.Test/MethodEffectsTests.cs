@@ -902,6 +902,20 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.True);
         });
     }
+    [Test]
+    public void GenericObjectCreationHasAllocationAndDispatchUncertainty() {
+        var result = Analyze("""
+            class C {
+                static T M<T>() where T : class, new() => new T();
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(result.MethodEffects.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Allocates), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.True);
+        });
+    }
     [TestCase("throw new E();", "E", MethodExceptionSource.ExplicitThrow)]
     [TestCase("var zero = 0; return 10 / zero;", "System.DivideByZeroException", MethodExceptionSource.RuntimeHazard)]
     public void EscapingExceptionsAreCanonicalStructuredFacts(string body, string exceptionType, MethodExceptionSource source) {
