@@ -2091,6 +2091,22 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void PropertyResultRetainsDelegateTarget() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static void Impure() { state++; }
+                static System.Action Action => Impure;
+                static void M() { Action(); }
+            }
+            """, 5);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ConditionalVirtualInvocationRetainsExactDispatch() {
         var result = Analyze("""
             class Base { public virtual void Work() { } }
