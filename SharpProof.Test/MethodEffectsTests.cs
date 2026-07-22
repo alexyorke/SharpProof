@@ -720,6 +720,23 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void UncheckedExpressionBodiedLocalFunctionHasAnalyzableBody() {
+        var result = Analyze("""
+            class C {
+                static int M(int x) {
+                    int Local() => unchecked((x << 1) ^ 17);
+                    return Local();
+                }
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+                string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                    site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ReassignedDelegateUsesTheCurrentTarget() {
         var result = Analyze("""
             class C {
