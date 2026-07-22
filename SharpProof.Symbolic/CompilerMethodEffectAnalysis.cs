@@ -1001,13 +1001,14 @@ internal sealed class MethodEffectAnalysisSession(
             if (statement == null || semanticModel.GetConstantValue(statement.Expression, session.CancellationToken) is not
                 { HasValue: true } value) return false;
             selected = statement.Sections.FirstOrDefault(section => section.Labels.Any(label => label switch {
-                DefaultSwitchLabelSyntax => true,
                 CaseSwitchLabelSyntax constant => Equals(semanticModel.GetConstantValue(constant.Value,
                     session.CancellationToken).Value, value.Value),
                 CasePatternSwitchLabelSyntax pattern => Matches(pattern.Pattern, value.Value) && (pattern.WhenClause == null ||
                     semanticModel.GetConstantValue(pattern.WhenClause.Condition, session.CancellationToken).Value as bool? == true),
                 _ => false
             }));
+            selected ??= statement.Sections.FirstOrDefault(section =>
+                section.Labels.Any(static label => label is DefaultSwitchLabelSyntax));
             return selected != null;
         }
         private bool Matches(PatternSyntax pattern, object? value) => pattern switch {
