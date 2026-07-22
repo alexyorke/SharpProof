@@ -1332,6 +1332,29 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
         });
     }
+    [Test]
+    public void CollectionSpreadIncludesInheritedInterfaceMoveNextEffects() {
+        var result = Analyze("""
+            static class Globals { public static int Count; }
+            sealed class Enumerator : System.Collections.Generic.IEnumerator<int> {
+                int System.Collections.Generic.IEnumerator<int>.Current => 0;
+                object System.Collections.IEnumerator.Current => 0;
+                bool System.Collections.IEnumerator.MoveNext() { Globals.Count++; return false; }
+                void System.Collections.IEnumerator.Reset() { }
+                void System.IDisposable.Dispose() { }
+            }
+            sealed class Source : System.Collections.Generic.IEnumerable<int> {
+                public System.Collections.Generic.IEnumerator<int> GetEnumerator() => new Enumerator();
+                System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+            }
+            class C { static int[] M(Source source) => [.. source]; }
+            """, 13);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
     [TestCase("unsafe static int M() { int* value = stackalloc int[1]; value[0] = 1; return value[0]; }")]
     [TestCase("static R M(R value) => value with { X = 2 }; readonly record struct R(int X);")]
     public void StackOnlyOperationsDoNotCreateManagedAllocationSites(string method) {
