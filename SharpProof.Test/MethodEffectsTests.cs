@@ -795,6 +795,29 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ForeachIncludesExplicitEnumeratorProtocolEffects() {
+        var result = Analyze("""
+            static class Globals { public static int Count; }
+            sealed class Enumerator : System.Collections.Generic.IEnumerator<int> {
+                int System.Collections.Generic.IEnumerator<int>.Current => 0;
+                object System.Collections.IEnumerator.Current => 0;
+                bool System.Collections.IEnumerator.MoveNext() { Globals.Count++; return false; }
+                void System.Collections.IEnumerator.Reset() { }
+                void System.IDisposable.Dispose() { }
+            }
+            sealed class Source : System.Collections.Generic.IEnumerable<int> {
+                public System.Collections.Generic.IEnumerator<int> GetEnumerator() => new Enumerator();
+                System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+            }
+            class C { static void M(Source source) { foreach (var item in source) { } } }
+            """, 13);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {
