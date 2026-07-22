@@ -263,6 +263,13 @@ internal sealed class MethodEffectAnalysisSession(
                     "property_read");
                 AnalyzeCall(property.Property.GetMethod, property, builder, property.Instance);
                 break;
+            case var pointer when IsPointerIndirection(pointer) &&
+                                  pointer.ChildOperations.FirstOrDefault() is { } pointerOperand &&
+                                  (pointer.Parent is not IAssignmentOperation { Target: var target } ||
+                                   !ReferenceEquals(target, pointer)):
+                builder.Add(GetInstanceReadEffect(pointerOperand, builder), pointer, pointer.Type,
+                    "pointer_indirection_read");
+                break;
             case IObjectCreationOperation creation:
                 builder.Add(SharpProofEffect.Allocates, creation, creation.Constructor, "object_allocation");
                 AnalyzeCall(creation.Constructor, creation, builder);
@@ -836,8 +843,15 @@ internal sealed class MethodEffectAnalysisSession(
             case IArrayElementReferenceOperation array:
                 builder.Add(GetInstanceWriteEffect(array.ArrayReference, builder), array, array.Type, "array_element_write");
                 break;
+            case var pointer when IsPointerIndirection(pointer) &&
+                                  pointer.ChildOperations.FirstOrDefault() is { } pointerOperand:
+                builder.Add(GetInstanceWriteEffect(pointerOperand, builder), pointer, pointer.Type,
+                    "pointer_indirection_write");
+                break;
         }
     }
+    private static bool IsPointerIndirection(IOperation operation) =>
+        operation.Syntax.IsKind(SyntaxKind.PointerIndirectionExpression);
     private static SharpProofEffect GetInstanceWriteEffect(IOperation? instance, Builder builder) {
         if (builder.TryGetFreshRootOrigin(instance, out var origin)) return GetWriteEffect(origin);
         return instance switch {
@@ -848,6 +862,8 @@ internal sealed class MethodEffectAnalysisSession(
             IPropertyReferenceOperation { Property.IsStatic: true } => SharpProofEffect.WritesStaticState,
             IPropertyReferenceOperation property => GetInstanceWriteEffect(property.Instance, builder),
             IArrayElementReferenceOperation array => GetInstanceWriteEffect(array.ArrayReference, builder),
+            IOperation pointer when IsPointerIndirection(pointer) =>
+                GetInstanceWriteEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IConversionOperation conversion => GetInstanceWriteEffect(conversion.Operand, builder),
             ILocalReferenceOperation => SharpProofEffect.WritesCapturedState,
             _ => SharpProofEffect.Unknown
@@ -865,6 +881,8 @@ internal sealed class MethodEffectAnalysisSession(
             IPropertyReferenceOperation { Property.IsStatic: true } => SharpProofEffect.ReadsStaticState,
             IPropertyReferenceOperation property => GetInstanceReadEffect(property.Instance, builder),
             IArrayElementReferenceOperation array => GetInstanceReadEffect(array.ArrayReference, builder),
+            IOperation pointer when IsPointerIndirection(pointer) =>
+                GetInstanceReadEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IConversionOperation conversion => GetInstanceReadEffect(conversion.Operand, builder),
             ILocalReferenceOperation => SharpProofEffect.ReadsCapturedState,
             _ => SharpProofEffect.Unknown
