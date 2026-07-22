@@ -284,8 +284,7 @@ internal sealed class MethodEffectAnalysisSession(
             case IInvocationOperation invocation:
                 var preservesFreshArguments = true;
                 if (invocation.TargetMethod.MethodKind == MethodKind.DelegateInvoke &&
-                    invocation.Instance is ILocalReferenceOperation delegateLocal &&
-                    builder.GetDelegateTargets(delegateLocal.Local) is { Length: > 0 } targets) {
+                    builder.GetDelegateTargets(invocation.Instance) is { Length: > 0 } targets) {
                     foreach (var target in targets)
                         preservesFreshArguments &= AnalyzeCall(
                             target.Method,
@@ -1112,7 +1111,15 @@ internal sealed class MethodEffectAnalysisSession(
         internal INamedTypeSymbol? GetExactType(ILocalSymbol local) =>
             _exactTypes.TryGetValue(local, out var type) ? type : null;
         internal void MarkDelegateTargets(ILocalSymbol local, IOperation value) {
+            var targets = GetDelegateTargets(value);
+            if (!targets.IsDefaultOrEmpty) _delegateTargets[local] = targets;
+        }
+        internal ImmutableArray<DelegateTarget> GetDelegateTargets(IOperation? value) {
+            if (value == null) return [];
             while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is ILocalReferenceOperation local &&
+                _delegateTargets.TryGetValue(local.Local, out var localTargets))
+                return localTargets;
             if (value is IDelegateCreationOperation creation) value = creation.Target;
             var target = value switch {
                 IMethodReferenceOperation reference => new DelegateTarget(
@@ -1125,7 +1132,7 @@ internal sealed class MethodEffectAnalysisSession(
                 IAnonymousFunctionOperation function => CreateAnonymousFunctionTarget(function),
                 _ => null
             };
-            if (target != null) _delegateTargets[local] = [target];
+            return target == null ? [] : [target];
         }
         private DelegateTarget CreateAnonymousFunctionTarget(IAnonymousFunctionOperation function) {
             var hasCapture = TryGetCapturedEffects(
@@ -1233,8 +1240,6 @@ internal sealed class MethodEffectAnalysisSession(
                 }
             }
         }
-        internal ImmutableArray<DelegateTarget> GetDelegateTargets(ILocalSymbol local) =>
-            _delegateTargets.TryGetValue(local, out var targets) ? targets : [];
         private void CollectMemberOrigins(
             IOperation value,
             string prefix,
