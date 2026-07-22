@@ -2095,6 +2095,23 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void StaticDelegateInvocationIncludesTypeInitializerEffects() {
+        var result = Analyze("""
+            static class Globals { public static int Count; }
+            sealed class D {
+                static D() { Globals.Count++; }
+                public static void Touch() { }
+            }
+            class C {
+                static void M() { System.Action action = D.Touch; action(); }
+            }
+            """, 7);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void ObjectCreationIncludesTypeInitializerEffects() {
         var result = Analyze("""
             static class Globals { public static int Count; }
