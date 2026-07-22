@@ -1358,6 +1358,19 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void InterfaceGetterDispatchRemainsUnknown() {
+        var result = Analyze("""
+            interface IValue { int Value { get; } }
+            class C {
+                static int M(IValue value) => value.Value;
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.True);
+        });
+    }
+    [Test]
     public void StringRangeSliceRemainsPure() {
         var result = Analyze("class C {\nstatic int M(string text) => text[1..^1].Length;\n}");
         Assert.Multiple(() => {
