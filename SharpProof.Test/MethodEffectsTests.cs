@@ -487,6 +487,19 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void PureAwaitUsingRemainsPure() {
+        var result = Analyze("""
+            sealed class D : System.IAsyncDisposable {
+                public System.Threading.Tasks.ValueTask DisposeAsync() => default;
+            }
+            class C {
+                static async System.Threading.Tasks.Task M() { await using var value = new D(); }
+            }
+            """, 5);
+        Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+            string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
+    }
+    [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {

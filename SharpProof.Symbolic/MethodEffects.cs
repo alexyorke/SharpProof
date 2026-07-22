@@ -1017,7 +1017,44 @@ internal sealed class MethodEffectAnalysisSession(
         var implementation = member == null ? null : named.FindImplementationForInterfaceMember(member) as IMethodSymbol;
         implementation ??= named.GetMembers(methodName).OfType<IMethodSymbol>()
             .FirstOrDefault(static method => !method.IsStatic && method.Parameters.Length == 0);
-        if (implementation != null) AnalyzeCall(implementation, site, builder);
+        if (implementation == null) return;
+        AnalyzeCall(implementation, site, builder);
+        if (asynchronous) AnalyzeAwaitableProtocol(implementation.ReturnType, site, builder);
+    }
+    private void AnalyzeAwaitableProtocol(ITypeSymbol awaitableType, IOperation site, Builder builder) {
+        var awaitableDefinition = awaitableType.OriginalDefinition.ToDisplayString();
+        if (awaitableDefinition is "System.Threading.Tasks.Task" or
+            "System.Threading.Tasks.Task<TResult>" or
+            "System.Threading.Tasks.ValueTask" or
+            "System.Threading.Tasks.ValueTask<TResult>")
+            return;
+        var getAwaiter = FindProtocolMethod(awaitableType, "GetAwaiter");
+        AnalyzeCall(
+            getAwaiter,
+            site,
+            builder,
+            receiverReadEffect: SharpProofEffect.None,
+            receiverWriteEffect: SharpProofEffect.WritesFreshOwnedState);
+        if (getAwaiter?.ReturnType is not { } awaiterType) return;
+        AnalyzeCall(
+            FindProtocolProperty(awaiterType, "IsCompleted")?.GetMethod,
+            site,
+            builder,
+            receiverReadEffect: SharpProofEffect.None,
+            receiverWriteEffect: SharpProofEffect.WritesFreshOwnedState);
+        AnalyzeCall(
+            FindProtocolMethod(awaiterType, "GetResult"),
+            site,
+            builder,
+            receiverReadEffect: SharpProofEffect.None,
+            receiverWriteEffect: SharpProofEffect.WritesFreshOwnedState);
+        AnalyzeCall(
+            FindProtocolMethod(awaiterType, "UnsafeOnCompleted", parameterCount: 1) ??
+            FindProtocolMethod(awaiterType, "OnCompleted", parameterCount: 1),
+            site,
+            builder,
+            receiverReadEffect: SharpProofEffect.None,
+            receiverWriteEffect: SharpProofEffect.WritesFreshOwnedState);
     }
     private static bool TryReadEffectContract(IMethodSymbol method, out MethodEffects effects) {
         var canonicalKey = RoslynStructuralMethodIdentity.GetCanonicalKey(method);
