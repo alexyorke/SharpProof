@@ -2416,6 +2416,27 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ReturnedLambdaPreservesConditionalCapturedFreshMemberOrigin() {
+        var result = Analyze("""
+            sealed class Box { public int State; }
+            sealed class Holder { public Box Value = null!; }
+            class C {
+                static System.Action Bind(Box value, bool first) {
+                    var left = new Holder { Value = value };
+                    var right = new Holder { Value = value };
+                    var alias = first ? left : right;
+                    return () => alias.Value.State++;
+                }
+                static void M(Box value) { Bind(value, true)(); }
+            }
+            """, 10);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void PropertyResultRetainsDelegateTarget() {
         var result = Analyze("""
             class C {
