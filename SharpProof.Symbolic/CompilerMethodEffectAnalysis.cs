@@ -1317,12 +1317,23 @@ internal sealed class MethodEffectAnalysisSession(
                 return arguments[parameter.Ordinal];
             return EffectFlowValue.Unknown;
         }
-        private static bool PublishesArgument(IMethodSymbol target) => target.DeclaringSyntaxReferences.Any(reference =>
-            reference.GetSyntax() is { } declaration && CSharpSyntaxFacts.DescendantNodesInExecution(declaration)
-                .OfType<AssignmentExpressionSyntax>().Any(assignment =>
-                    assignment.Left is IdentifierNameSyntax or MemberAccessExpressionSyntax &&
-                    assignment.Right.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(identifier =>
-                        target.Parameters.Any(parameter => parameter.Name == identifier.Identifier.ValueText))));
+        private bool PublishesArgument(IMethodSymbol target) {
+            foreach (var reference in target.DeclaringSyntaxReferences) {
+                if (reference.GetSyntax(session.CancellationToken) is not { } declaration) continue;
+                var model = session.Compilation.GetSemanticModel(declaration.SyntaxTree);
+                foreach (var assignment in CSharpSyntaxFacts.DescendantNodesInExecution(declaration)
+                             .OfType<AssignmentExpressionSyntax>()) {
+                    if (model.GetSymbolInfo(assignment.Left, session.CancellationToken).Symbol is not
+                        (IFieldSymbol or IPropertySymbol))
+                        continue;
+                    if (assignment.Right.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(identifier =>
+                            model.GetSymbolInfo(identifier, session.CancellationToken).Symbol is IParameterSymbol parameter &&
+                            target.Parameters.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, parameter))))
+                        return true;
+                }
+            }
+            return false;
+        }
         private EffectFlowValue InvokeCoreOrValue(
             IMethodSymbol? target,
             EffectFlowValue receiver,
