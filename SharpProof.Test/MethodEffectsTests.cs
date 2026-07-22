@@ -1321,6 +1321,25 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void FixedIncludesGetPinnableReferenceEffects() {
+        var result = Analyze("""
+            sealed class Pinnable {
+                private int value;
+                private static int state;
+                public ref int GetPinnableReference() { state++; return ref value; }
+            }
+            unsafe class C {
+                static void M(Pinnable value) {
+                    fixed (int* pointer = value) { }
+                }
+            }
+            """, 7);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void NestedFreshObjectGraphWritesRemainFreshOwned() {
         var result = Analyze("""
             sealed class Box { public int Value; }
