@@ -692,6 +692,8 @@ internal sealed class MethodEffectAnalysisSession(
                                     SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
         var isStringSplit = containingType?.SpecialType == SpecialType.System_String &&
                             string.Equals(method.Name, nameof(string.Split), StringComparison.Ordinal);
+        var isStringSubstring = containingType?.SpecialType == SpecialType.System_String &&
+                                string.Equals(method.Name, nameof(string.Substring), StringComparison.Ordinal);
         var isStringTrim = containingType?.SpecialType == SpecialType.System_String &&
                            method.Name is nameof(string.Trim) or nameof(string.TrimStart) or nameof(string.TrimEnd);
         var isStringNullPredicate = method.IsStatic &&
@@ -709,7 +711,7 @@ internal sealed class MethodEffectAnalysisSession(
                 []);
             return true;
         }
-        if (isNumericToString || isStringSplit || isStringTrim || isSpanToArray) {
+        if (isNumericToString || isStringSplit || isStringSubstring || isStringTrim || isSpanToArray) {
             effects = new MethodEffects(
                 SharpProofEffect.Allocates,
                 SharpProofCapability.None,
