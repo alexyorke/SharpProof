@@ -476,14 +476,23 @@ internal sealed class MethodEffectAnalysisSession(
                 }
                 break;
             case IUsingOperation usingOperation:
-                AnalyzeDisposal(
-                    usingOperation.Resources.Type,
-                    usingOperation,
-                    builder,
-                    usingOperation.IsAsynchronous,
-                    usingOperation.Resources is IVariableDeclarationGroupOperation
-                        ? null
-                        : usingOperation.Resources);
+                if (usingOperation.Resources is IVariableDeclarationGroupOperation resourceDeclarations) {
+                    foreach (var declarator in resourceDeclarations.Declarations
+                                 .SelectMany(static declaration => declaration.Declarators))
+                        AnalyzeDisposal(
+                            declarator.Symbol.Type,
+                            usingOperation,
+                            builder,
+                            usingOperation.IsAsynchronous,
+                            declarator.Initializer?.Value);
+                }
+                else
+                    AnalyzeDisposal(
+                        usingOperation.Resources.Type,
+                        usingOperation,
+                        builder,
+                        usingOperation.IsAsynchronous,
+                        usingOperation.Resources);
                 break;
             case IUsingDeclarationOperation usingDeclaration:
                 foreach (var declarator in usingDeclaration.DeclarationGroup.Declarations
