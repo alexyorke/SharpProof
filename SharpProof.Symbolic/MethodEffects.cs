@@ -1017,6 +1017,10 @@ internal sealed class MethodEffectAnalysisSession(
             return false;
         }
         var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        if (method.MethodKind == MethodKind.Constructor &&
+            syntax is TypeDeclarationSyntax { ParameterList: not null } primaryType &&
+            IsEffectFreePrimaryConstructor(primaryType, model))
+            return true;
         if (method.MethodKind == MethodKind.LocalFunction &&
             model.GetOperation(syntax, cancellationToken) is ILocalFunctionOperation localFunction &&
             localFunction.Body is { } localFunctionBody &&
@@ -1044,6 +1048,30 @@ internal sealed class MethodEffectAnalysisSession(
                 remappedContract, site, receiver, builder, receiverWriteEffect);
         }
         return preservesFresh;
+    }
+    private static bool IsEffectFreePrimaryConstructor(
+        TypeDeclarationSyntax declaration,
+        SemanticModel model) {
+        if (declaration.BaseList?.Types.Any(type => type is PrimaryConstructorBaseTypeSyntax) == true)
+            return false;
+        var initializers = declaration.Members
+            .OfType<FieldDeclarationSyntax>()
+            .SelectMany(field => field.Declaration.Variables)
+            .Select(variable => variable.Initializer)
+            .Where(initializer => initializer != null)
+            .Cast<EqualsValueClauseSyntax>()
+            .Concat(declaration.Members
+                .OfType<PropertyDeclarationSyntax>()
+                .Select(property => property.Initializer)
+                .Where(initializer => initializer != null)
+                .Cast<EqualsValueClauseSyntax>());
+        foreach (var initializer in initializers) {
+            IOperation? operation = model.GetOperation(initializer.Value);
+            while (operation is IConversionOperation conversion) operation = conversion.Operand;
+            if (operation is not (IParameterReferenceOperation or ILiteralOperation or IDefaultValueOperation))
+                return false;
+        }
+        return true;
     }
     private static INamedTypeSymbol? GetReturnedExactResultType(
         IMethodSymbol method,
@@ -2854,7 +2882,9 @@ internal sealed class MethodEffectAnalysisSession(
                 return false;
             var members = ImmutableArray.CreateBuilder<IOperation>();
             foreach (var value in values) {
-                if (!TryGetObjectInitializerMember(value, path, 0, out var initializer)) return false;
+                if (!TryGetObjectInitializerMember(
+                        value, path, 0, compilation, out var initializer))
+                    return false;
                 members.Add(initializer);
             }
             initializers = members.ToImmutable();
@@ -2939,6 +2969,7 @@ internal sealed class MethodEffectAnalysisSession(
             IOperation value,
             IReadOnlyList<string> path,
             int index,
+            Compilation compilation,
             out IOperation initializer) {
             initializer = null!;
             while (value is IConversionOperation conversion) value = conversion.Operand;
@@ -2964,6 +2995,7 @@ internal sealed class MethodEffectAnalysisSession(
                         collectionElement,
                         path,
                         index + 1,
+                        compilation,
                         out initializer);
                 }
                 if (value is not IObjectCreationOperation { Initializer: { } collectionInitializer })
@@ -2989,6 +3021,7 @@ internal sealed class MethodEffectAnalysisSession(
                         assignedElement,
                         path,
                         index + 1,
+                        compilation,
                         out initializer);
                 }
                 var additions = collectionInitializer.Initializers
@@ -3021,7 +3054,8 @@ internal sealed class MethodEffectAnalysisSession(
                     initializer = element;
                     return true;
                 }
-                return TryGetObjectInitializerMember(element, path, index + 1, out initializer);
+                return TryGetObjectInitializerMember(
+                    element, path, index + 1, compilation, out initializer);
             }
             const string arrayPrefix = "#array:";
             if (path[index].StartsWith(arrayPrefix, StringComparison.Ordinal)) {
@@ -3046,7 +3080,8 @@ internal sealed class MethodEffectAnalysisSession(
                     initializer = element;
                     return true;
                 }
-                return TryGetObjectInitializerMember(element, path, index + 1, out initializer);
+                return TryGetObjectInitializerMember(
+                    element, path, index + 1, compilation, out initializer);
             }
             if (value is ITupleOperation tuple && value.Type is INamedTypeSymbol tupleType) {
                 for (var elementIndex = 0;
@@ -3068,7 +3103,8 @@ internal sealed class MethodEffectAnalysisSession(
                         initializer = element;
                         return true;
                     }
-                    return TryGetObjectInitializerMember(element, path, index + 1, out initializer);
+                    return TryGetObjectInitializerMember(
+                        element, path, index + 1, compilation, out initializer);
                 }
                 return false;
             }
@@ -3096,10 +3132,12 @@ internal sealed class MethodEffectAnalysisSession(
                     assignment.Value,
                     path,
                     index + 1,
+                    compilation,
                     out initializer);
             }
             if (value is IObjectCreationOperation creation &&
-                TryGetConstructorAssignedMember(creation, path[index], out var constructorValue)) {
+                TryGetConstructorAssignedMember(
+                    creation, path[index], compilation, out var constructorValue)) {
                 if (index == path.Count - 1) {
                     initializer = constructorValue;
                     return true;
@@ -3108,6 +3146,7 @@ internal sealed class MethodEffectAnalysisSession(
                     constructorValue,
                     path,
                     index + 1,
+                    compilation,
                     out initializer);
             }
             return false;
@@ -3115,12 +3154,34 @@ internal sealed class MethodEffectAnalysisSession(
         private static bool TryGetConstructorAssignedMember(
             IObjectCreationOperation creation,
             string memberPath,
+            Compilation compilation,
             out IOperation value) {
             value = null!;
             var declaration = creation.Constructor?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
-            if (declaration == null || creation.SemanticModel?.Compilation is not { } compilation) return false;
+            if (declaration is TypeDeclarationSyntax { ParameterList: not null } primaryType &&
+                TryGetPrimaryConstructorMemberInitializer(
+                    creation, primaryType, memberPath, compilation, out value))
+                return true;
+            var candidates = declaration == null
+                ? []
+                : GetConstructorMemberAssignments(declaration, memberPath, compilation);
+            if (candidates.Length != 1) return false;
+            value = candidates[0].Value;
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is not IParameterReferenceOperation parameter) return true;
+            value = creation.Arguments.FirstOrDefault(argument =>
+                string.Equals(
+                    argument.Parameter?.Name,
+                    parameter.Parameter.Name,
+                    StringComparison.Ordinal))?.Value!;
+            return value != null;
+        }
+        private static ISimpleAssignmentOperation[] GetConstructorMemberAssignments(
+            SyntaxNode declaration,
+            string memberPath,
+            Compilation compilation) {
             var model = compilation.GetSemanticModel(declaration.SyntaxTree);
-            var candidates = declaration.DescendantNodes()
+            return [.. declaration.DescendantNodes()
                 .OfType<AssignmentExpressionSyntax>()
                 .Where(node => !node.Ancestors()
                     .TakeWhile(ancestor => !ReferenceEquals(ancestor, declaration))
@@ -3139,19 +3200,59 @@ internal sealed class MethodEffectAnalysisSession(
                                GetMemberPathPart(member),
                                memberPath,
                                StringComparison.Ordinal);
-                })
-                .ToArray();
-            if (candidates.Length != 1) return false;
-            value = candidates[0].Value;
-            while (value is IConversionOperation conversion) value = conversion.Operand;
-            if (value is not IParameterReferenceOperation parameter) return true;
-            value = creation.Arguments.FirstOrDefault(argument =>
-                string.Equals(
-                    argument.Parameter?.Name,
-                    parameter.Parameter.Name,
-                    StringComparison.Ordinal))?.Value!;
+                })];
+        }
+        private static bool TryGetPrimaryConstructorMemberInitializer(
+            IObjectCreationOperation creation,
+            TypeDeclarationSyntax declaration,
+            string memberPath,
+            Compilation compilation,
+            out IOperation value) {
+            value = null!;
+            var model = compilation.GetSemanticModel(declaration.SyntaxTree);
+            var expressions = new List<ExpressionSyntax>();
+            foreach (var member in declaration.Members) {
+                switch (member) {
+                    case FieldDeclarationSyntax field:
+                        foreach (var variable in field.Declaration.Variables) {
+                            if (variable.Initializer?.Value is not { } expression ||
+                                !MemberNameMatches(
+                                    model.GetDeclaredSymbol(variable),
+                                    variable.Identifier.ValueText,
+                                    memberPath))
+                                continue;
+                            expressions.Add(expression);
+                        }
+                        break;
+                    case PropertyDeclarationSyntax { Initializer.Value: { } expression } property
+                        when MemberNameMatches(
+                            model.GetDeclaredSymbol(property),
+                            property.Identifier.ValueText,
+                            memberPath):
+                        expressions.Add(expression);
+                        break;
+                }
+            }
+            if (expressions.Count != 1) return false;
+            var initializer = expressions[0];
+            if (initializer is IdentifierNameSyntax identifier) {
+                value = creation.Arguments.FirstOrDefault(argument =>
+                    string.Equals(
+                        argument.Parameter?.Name,
+                        identifier.Identifier.ValueText,
+                        StringComparison.Ordinal))?.Value!;
+                if (value != null) return true;
+            }
+            value = model.GetOperation(initializer)!;
             return value != null;
         }
+        private static bool MemberNameMatches(ISymbol? symbol, string name, string memberPath) =>
+            symbol != null &&
+            string.Equals(
+                GetMemberPathPart(symbol.OriginalDefinition),
+                memberPath,
+                StringComparison.Ordinal) ||
+            memberPath.EndsWith("." + name, StringComparison.Ordinal);
         private static bool TryGetConstantPathPart(
             IOperation operation,
             string prefix,
