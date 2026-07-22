@@ -387,6 +387,9 @@ internal sealed class MethodEffectAnalysisSession(
             case IAnonymousObjectCreationOperation anonymousObject:
                 builder.Add(SharpProofEffect.Allocates, anonymousObject, anonymousObject.Type, "anonymous_object_allocation");
                 break;
+            case IWithOperation withOperation:
+                AnalyzeWithClone(withOperation, builder);
+                break;
             case IDelegateCreationOperation delegateCreation:
                 builder.Add(SharpProofEffect.Allocates, delegateCreation, delegateCreation.Type, "delegate_allocation");
                 break;
@@ -699,6 +702,40 @@ internal sealed class MethodEffectAnalysisSession(
             SpeculativeBindingOption.BindAsExpression).Symbol as IMethodSymbol;
         if (getPinnableReference != null)
             AnalyzeCall(getPinnableReference, initializer, builder, initializer);
+    }
+    private void AnalyzeWithClone(IWithOperation operation, Builder builder) {
+        if (operation.CloneMethod is not { } cloneMethod) return;
+        var containingType = cloneMethod.ContainingType;
+        var exactType = operation.Operand switch {
+            IObjectCreationOperation { Type: INamedTypeSymbol createdType } => createdType,
+            ILocalReferenceOperation local => builder.GetExactType(local.Local),
+            _ => null
+        };
+        if (cloneMethod.IsVirtual && !containingType.IsSealed && exactType == null) {
+            builder.Add(
+                SharpProofEffect.DispatchUncertainty,
+                operation,
+                cloneMethod,
+                "with_clone_dispatch_uncertainty");
+            builder.AddUnknown(operation, "unresolved_with_clone_dispatch", cloneMethod);
+            return;
+        }
+        var concreteType = exactType ?? containingType;
+        var copyConstructor = concreteType.InstanceConstructors.FirstOrDefault(constructor =>
+            constructor.Parameters.Length == 1 &&
+            SymbolEqualityComparer.Default.Equals(constructor.Parameters[0].Type, concreteType));
+        if (copyConstructor == null) {
+            builder.AddUnknown(operation, "unresolved_with_copy_constructor", cloneMethod);
+            return;
+        }
+        AnalyzeCall(
+            copyConstructor,
+            operation,
+            builder,
+            receiverReadEffect: SharpProofEffect.None,
+            receiverWriteEffect: SharpProofEffect.WritesFreshOwnedState,
+            argumentReadEffect: GetInstanceReadEffect(operation.Operand, builder),
+            argumentWriteEffect: GetInstanceWriteEffect(operation.Operand, builder));
     }
     private static IMethodSymbol? FindProtocolMethod(
         ITypeSymbol type,
