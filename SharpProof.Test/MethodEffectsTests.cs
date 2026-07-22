@@ -374,6 +374,22 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void RefReturnInvocationAssignmentWritesArgumentState() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            class C {
+                static ref int GetValue(Box box) => ref box.Value;
+                static void M(Box input) {
+                    GetValue(input) = 1;
+                }
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+        });
+    }
+    [Test]
     public void NestedFreshObjectGraphWritesRemainFreshOwned() {
         var result = Analyze("""
             sealed class Box { public int Value; }
