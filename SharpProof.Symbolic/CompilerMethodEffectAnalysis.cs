@@ -499,6 +499,24 @@ internal sealed class MethodEffectAnalysisSession(
                         incrementTarget = EvaluateConversion(refConversion, ref state);
                     effects.Write(incrementTarget, increment.Syntax, null, "increment_assignment");
                     return incrementTarget;
+                case IEventAssignmentOperation {
+                    EventReference: IEventReferenceOperation eventReference
+                } eventAssignment:
+                    var eventReceiver = eventReference.Event.IsStatic
+                        ? EffectFlowValue.FromRoot(new(
+                            EffectValueRootKind.Static,
+                            Key: MemberKey(eventReference.Event)),
+                            eventReference.Type)
+                        : Evaluate(eventReference.Instance, ref state);
+                    var handler = Evaluate(eventAssignment.HandlerValue, ref state);
+                    var accessor = eventAssignment.Adds
+                        ? eventReference.Event.AddMethod
+                        : eventReference.Event.RemoveMethod;
+                    if (accessor?.IsImplicitlyDeclared != false)
+                        effects.Write(eventReceiver, eventAssignment.Syntax, eventReference.Event, "event_assignment");
+                    if (accessor != null)
+                        InvokeCore(accessor, eventReceiver, [handler], [], eventAssignment, ref state);
+                    return eventReceiver;
                 case IFieldReferenceOperation field:
                     return EvaluateField(field, ref state);
                 case IPropertyReferenceOperation property:
