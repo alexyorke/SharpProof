@@ -10,8 +10,6 @@ public static class FuzzRunner {
         CreateCompilationOptions(true);
     private static readonly AnalyzerOptions SharedAnalyzerOptions =
         new([], new FixedAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
-    private static readonly ImmutableArray<DiagnosticAnalyzer> SharedAnalyzers =
-        [new SharpProofAnalyzer()];
     private static readonly CompilationWithAnalyzersOptions SharedCompilationWithAnalyzersOptions =
         new(SharedAnalyzerOptions, null, true, false, false);
     private static readonly Regex GeneratedTypeNameRegex =
@@ -253,7 +251,9 @@ public static class FuzzRunner {
     }
     private static async Task<AnalyzerRunResult> GetAnalyzerDiagnosticsAsync(Compilation compilation, CancellationToken cancellationToken) {
         try {
-            var compilationWithAnalyzers = compilation.WithAnalyzers(SharedAnalyzers, SharedCompilationWithAnalyzersOptions);
+            var compilationWithAnalyzers = compilation.WithAnalyzers(
+                [new SharpProofAnalyzer()],
+                SharedCompilationWithAnalyzersOptions);
             var diagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync(cancellationToken);
             return new AnalyzerRunResult(diagnostics, []);
         }
