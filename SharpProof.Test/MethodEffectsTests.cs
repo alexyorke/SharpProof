@@ -2587,6 +2587,30 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void FreshCapturingLocalFunctionMapsMutatedArgument() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            class C {
+                static void M(Box external) {
+                    var fresh = new Box();
+                    var captured = new Box();
+                    Local(fresh, external);
+                    void Local(Box first, Box second) {
+                        _ = captured.Value;
+                        first.Value = 1;
+                    }
+                }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+                string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                    site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+        });
+    }
+    [Test]
     public void ReassigningByValueParameterDoesNotWriteArgumentState() {
         var result = Analyze("""
             sealed class Box { }
