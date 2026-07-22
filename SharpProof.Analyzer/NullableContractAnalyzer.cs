@@ -121,6 +121,12 @@ internal static class NullableContractAnalyzer {
         // have field-like storage and can use the same assignment proof as fields.
         if (member is IPropertySymbol property &&
             !IsAutoProperty(property, context.CancellationToken)) {
+            context.ReportDiagnostic(Diagnostic.Create(
+                AnalyzerDiagnosticCatalog.Get("NullableContractNotVerifiedRule"),
+                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
+                context.MethodSymbol.Name,
+                targetName,
+                "user-defined property getters are not stable storage"));
             return;
         }
         var target = "this." + EscapeIdentifier(member.Name) + " != null";
@@ -234,12 +240,20 @@ internal static class NullableContractAnalyzer {
         bool counterexampleIsViolation) {
         var proof = MethodCompletionAnalysis.Prove(context, session.ProofService.SmtAnalysis, completion, condition);
         if (proof.TruthValue is SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable) return;
-        if (proof.TruthValue == SymbolicTruthValue.ProvenFalse ||
+        var definiteViolation = proof.TruthValue == SymbolicTruthValue.ProvenFalse ||
             counterexampleIsViolation &&
             proof.CounterexampleWitness.Status == SymbolicWitnessStatus.Exact ||
-            unknownIsViolation) {
+            unknownIsViolation;
+        if (definiteViolation) {
             context.ReportDiagnostic(Diagnostic.Create(violationDescriptor, completion.Location, messageArguments));
+            return;
         }
+        context.ReportDiagnostic(Diagnostic.Create(
+            AnalyzerDiagnosticCatalog.Get("NullableContractNotVerifiedRule"),
+            completion.Location,
+            context.MethodSymbol.Name,
+            condition,
+            ContractDiagnosticSupport.FormatUnknownReason(proof, "nullable contract")));
     }
     private static bool HasVisibleAssignmentToMember(MethodBodyAnalysisContext context, ISymbol member) {
         foreach (var operation in context.Snapshot.VisibleOperations) {

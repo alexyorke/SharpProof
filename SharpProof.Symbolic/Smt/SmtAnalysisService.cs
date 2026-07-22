@@ -3,7 +3,7 @@ internal sealed class SmtAnalysisService : IDisposable {
     private const int PreNormalizationFormulaDepthLimit = 1024;
     private static readonly Func<IAnalysisProofSearchSession> s_defaultProofSearchFactory =
         static () => new AnalysisProofSearch();
-    private readonly SmtAnalysisBudget _budget;
+    private readonly AsyncLocal<MethodBudgetScopeState?> _methodBudgetScope = new();
     private readonly SmtProofResultCache _proofResults = new();
     private readonly SmtProofSearchSessionPool _proofSearchSessions;
     private readonly object _solverLock = new();
@@ -22,7 +22,6 @@ internal sealed class SmtAnalysisService : IDisposable {
     internal SmtAnalysisService(SmtAnalysisOptions options, Func<IAnalysisProofSearchSession> proofSearchFactory) {
         SmtNativeLibraryBootstrap.TryLoadAdjacentLibrary();
         Options = options ?? throw new ArgumentNullException(nameof(options));
-        _budget = new SmtAnalysisBudget(Options.MethodBudget);
         _proofSearchSessions = new SmtProofSearchSessionPool(proofSearchFactory);
         _healthState = (int)SmtAnalysisHealthState.Ready;
     }
@@ -66,6 +65,10 @@ internal sealed class SmtAnalysisService : IDisposable {
             new AnalysisHazard(AnalysisHazardKind.BranchReachability, new SmtUnaryFormula(SmtUnaryOperator.Not, factFormula))));
     }
     internal AnalysisProofResult Classify(AnalysisProofQuery query) {
+        if (_methodBudgetScope.Value == null) {
+            using var scope = BeginMethodBudgetScope();
+            return Classify(query);
+        }
         if (_disposed) return Unknown("smt_disposed");
         if (IsPermanentlyUnavailable) return Unknown("smt_unavailable");
         if (!IsWithinFormulaDepthBudget(query.PathConditions, query.Hazard.TriggerCondition, PreNormalizationFormulaDepthLimit))
@@ -82,16 +85,26 @@ internal sealed class SmtAnalysisService : IDisposable {
             _proofResults.AddLocal(key, sharedResult);
             return sharedResult;
         }
-        if (Options.UseSharedResultCache) return ClassifyWithSharedQueryFlight(normalizedQuery, key);
-        return ClassifyLocally(normalizedQuery, key);
+        var budget = _methodBudgetScope.Value.Budget;
+        if (Options.UseSharedResultCache) return ClassifyWithSharedQueryFlight(normalizedQuery, key, budget);
+        return ClassifyLocally(normalizedQuery, key, budget);
     }
-    private AnalysisProofResult ClassifyWithSharedQueryFlight(AnalysisProofQuery query, string queryKey) {
+    internal IDisposable BeginMethodBudgetScope() {
+        var previous = _methodBudgetScope.Value;
+        if (previous != null) return MethodBudgetScope.Nested;
+        _methodBudgetScope.Value = new MethodBudgetScopeState(new SmtAnalysisBudget(Options.MethodBudget));
+        return new MethodBudgetScope(this);
+    }
+    private AnalysisProofResult ClassifyWithSharedQueryFlight(
+        AnalysisProofQuery query,
+        string queryKey,
+        SmtAnalysisBudget budget) {
         var flight = _proofResults.AcquireSharedFlight(Options, queryKey, () => {
             if (_proofResults.TryGetShared(Options, queryKey, out var racedSharedResult))
                 return racedSharedResult;
-            return _budget.IsExceeded
+            return budget.IsExceeded
                 ? Unknown("smt_method_budget_exceeded")
-                : ClassifyCore(query);
+                : ClassifyCore(query, budget);
         });
         AnalysisProofResult result;
         try {
@@ -109,20 +122,20 @@ internal sealed class SmtAnalysisService : IDisposable {
         }
         return flight.OwnsFlight || SmtProofResultCache.IsShareable(result)
             ? result
-            : ClassifyLocally(query, queryKey);
+            : ClassifyLocally(query, queryKey, budget);
     }
-    private AnalysisProofResult ClassifyLocally(AnalysisProofQuery query, string queryKey) {
+    private AnalysisProofResult ClassifyLocally(AnalysisProofQuery query, string queryKey, SmtAnalysisBudget budget) {
         if (_proofResults.TryGetShared(Options, queryKey, out var sharedResult)) {
             _proofResults.AddLocal(queryKey, sharedResult);
             return sharedResult;
         }
-        if (_budget.IsExceeded) return Unknown("smt_method_budget_exceeded");
-        var result = ClassifyCore(query);
+        if (budget.IsExceeded) return Unknown("smt_method_budget_exceeded");
+        var result = ClassifyCore(query, budget);
         _proofResults.AddLocalIfCacheable(queryKey, result);
         _proofResults.AddSharedIfCacheable(Options, queryKey, result);
         return result;
     }
-    private AnalysisProofResult ClassifyCore(AnalysisProofQuery query) {
+    private AnalysisProofResult ClassifyCore(AnalysisProofQuery query, SmtAnalysisBudget budget) {
         var queryClock = Stopwatch.StartNew();
         try {
             lock (_solverLock) {
@@ -138,7 +151,7 @@ internal sealed class SmtAnalysisService : IDisposable {
                             result = search.Classify(query, Options.QueryTimeout);
                         }
                         finally {
-                            _budget.RecordConsumedResources(search.ConsumedResourceCount - resourcesBefore);
+                            budget.RecordConsumedResources(search.ConsumedResourceCount - resourcesBefore);
                         }
                     }
                     catch (InvalidOperationException) {
@@ -174,7 +187,17 @@ internal sealed class SmtAnalysisService : IDisposable {
         }
         finally {
             queryClock.Stop();
-            _budget.RecordQueryDuration(queryClock.ElapsedTicks);
+            budget.RecordQueryDuration(queryClock.ElapsedTicks);
+        }
+    }
+    private sealed record MethodBudgetScopeState(SmtAnalysisBudget Budget);
+    private sealed class MethodBudgetScope : IDisposable {
+        internal static readonly MethodBudgetScope Nested = new(null);
+        private SmtAnalysisService? _owner;
+        internal MethodBudgetScope(SmtAnalysisService? owner) => _owner = owner;
+        public void Dispose() {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            if (owner != null) owner._methodBudgetScope.Value = null;
         }
     }
     private static AnalysisProofResult Unknown(string reason) => new(

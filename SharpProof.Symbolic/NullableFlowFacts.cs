@@ -193,8 +193,8 @@ internal static class NullableFlowFacts {
                 } ||
                     !CSharpSyntaxFacts.IsThrowOnlyStatement(guardedStatement))
                     break;
-                if (IsNullGuardForParameter(condition, parameter.Name)) return true;
-                if (!method.Parameters.Any(candidate => IsNullGuardForParameter(condition, candidate.Name)))
+                if (IsNullGuardForParameter(condition, parameter)) return true;
+                if (!method.Parameters.Any(candidate => IsNullGuardForParameter(condition, candidate)))
                     break;
             }
         }
@@ -365,7 +365,7 @@ internal static class NullableFlowFacts {
     };
     private static bool HasParameterAttribute(IParameterSymbol parameter, string attributeName) =>
         HasAttribute(GetInputAttributes(parameter), attributeName);
-    private static bool IsNullGuardForParameter(ExpressionSyntax condition, string parameterName) {
+    private static bool IsNullGuardForParameter(ExpressionSyntax condition, IParameterSymbol parameter) {
         condition = CSharpSyntaxFacts.UnwrapParentheses(condition);
         if (condition is IsPatternExpressionSyntax {
             Expression: IdentifierNameSyntax identifier,
@@ -373,16 +373,23 @@ internal static class NullableFlowFacts {
                 Expression.RawKind: (int)SyntaxKind.NullLiteralExpression
             }
         })
-            return identifier.Identifier.ValueText == parameterName;
+            return identifier.Identifier.ValueText == parameter.Name;
         if (condition is not BinaryExpressionSyntax binary ||
-            !binary.IsKind(SyntaxKind.EqualsExpression))
+            !binary.IsKind(SyntaxKind.EqualsExpression) ||
+            HasUserDefinedEqualityOperator(parameter.Type))
             return false;
         return binary.Left is IdentifierNameSyntax left &&
-               left.Identifier.ValueText == parameterName &&
+               left.Identifier.ValueText == parameter.Name &&
                CSharpSyntaxFacts.IsNullLiteral(binary.Right) ||
                binary.Right is IdentifierNameSyntax right &&
-               right.Identifier.ValueText == parameterName &&
+               right.Identifier.ValueText == parameter.Name &&
                CSharpSyntaxFacts.IsNullLiteral(binary.Left);
+    }
+    private static bool HasUserDefinedEqualityOperator(ITypeSymbol type) {
+        for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType)
+            if (current.GetMembers("op_Equality").OfType<IMethodSymbol>().Any())
+                return true;
+        return false;
     }
     private static bool TryGetParameterBooleanAttributeValue(IParameterSymbol parameter, string attributeName, out bool value) =>
         TryGetBooleanAttributeValue(GetAttributes(parameter), attributeName, out value);

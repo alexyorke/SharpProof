@@ -59,6 +59,48 @@ internal static partial class SymbolicOperationLowerer {
             IConversionOperation conversion => TryLowerCheckedConversionOverflow(conversion, context, out hazard),
             _ => NoHazard(out hazard)
         };
+    internal static bool TryLowerDecimalOverflowHazard(
+        IOperation operation,
+        SymbolicLoweringContext _,
+        out SymbolicHazardOperation hazard) {
+        if (operation.ConstantValue.HasValue) return NoHazard(out hazard);
+        var site = operation switch {
+            IBinaryOperation {
+                OperatorKind: BinaryOperatorKind.Add or BinaryOperatorKind.Subtract or BinaryOperatorKind.Multiply or
+                    BinaryOperatorKind.Divide,
+                Type.SpecialType: SpecialType.System_Decimal
+            } binary => binary.Syntax,
+            ICompoundAssignmentOperation {
+                OperatorKind: BinaryOperatorKind.Add or BinaryOperatorKind.Subtract or BinaryOperatorKind.Multiply or
+                    BinaryOperatorKind.Divide,
+                Type.SpecialType: SpecialType.System_Decimal
+            } assignment => assignment.Syntax,
+            IIncrementOrDecrementOperation { Type.SpecialType: SpecialType.System_Decimal } update => update.Syntax,
+            IConversionOperation {
+                Type.SpecialType: SpecialType.System_Decimal,
+                Operand.Type.SpecialType: SpecialType.System_Double or SpecialType.System_Single
+            } conversion => conversion.Syntax,
+            IConversionOperation {
+                Operand.Type.SpecialType: SpecialType.System_Decimal,
+                Type.SpecialType: SpecialType.System_Byte or SpecialType.System_SByte or SpecialType.System_Int16 or
+                    SpecialType.System_UInt16 or SpecialType.System_Int32 or SpecialType.System_UInt32 or
+                    SpecialType.System_Int64 or SpecialType.System_UInt64 or SpecialType.System_Char
+            } conversion => conversion.Syntax,
+            _ => null
+        };
+        if (site == null) return NoHazard(out hazard);
+        const string provenance = "ir.runtime-hazard.decimal-overflow";
+        hazard = CreateHazard(
+            site,
+            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            null,
+            null,
+            ExceptionTypes.OverflowException,
+            ExceptionCategories.DecimalOverflow,
+            provenance);
+        return true;
+    }
     internal static bool TryLowerReferenceNullHazard(
         ExpressionSyntax subjectExpression,
         SymbolicRuntimeHazardKind hazardKind,
@@ -95,12 +137,15 @@ internal static partial class SymbolicOperationLowerer {
         var lowering = SymbolicSemanticPipeline.LowerNullableHasValueTerm(nullableExpression, context);
         SymbolicTerm? subject = null;
         SymbolicCondition? trigger = null;
-        if (lowering is { IsExact: true, Value: SymbolicNullableHasValueTerm hasValue }) {
-            subject = new SymbolicVariableTerm(hasValue.NullableName, SmtValueKind.Reference);
-            trigger = new SymbolicNotCondition(new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicTruthAtom(hasValue),
-                nullableExpression,
-                "ir.runtime-hazard.nullable-value.has-value")));
+        if (lowering is { IsExact: true, Value: { Kind: SmtValueKind.Bool } hasValue }) {
+            if (hasValue is SymbolicNullableHasValueTerm nullableHasValue)
+                subject = new SymbolicVariableTerm(nullableHasValue.NullableName, SmtValueKind.Reference);
+            trigger = hasValue is SymbolicBooleanConstantTerm constant
+                ? new SymbolicConstantCondition(!constant.Value)
+                : new SymbolicNotCondition(new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicTruthAtom(hasValue),
+                    nullableExpression,
+                    "ir.runtime-hazard.nullable-value.has-value")));
         }
         hazard = CreateHazard(
             nullableExpression,
@@ -175,6 +220,12 @@ internal static partial class SymbolicOperationLowerer {
         var category = ExceptionCategories.DefiniteNullDereference;
         switch (site) {
             case MemberAccessExpressionSyntax memberAccess:
+                if (memberAccess.Parent is InvocationExpressionSyntax reducedInvocation &&
+                    context.SemanticModel.GetOperation(reducedInvocation, context.CancellationToken) is
+                        IInvocationOperation { TargetMethod: { } targetMethod } &&
+                    (targetMethod.ReducedFrom != null || targetMethod.IsExtensionMethod ||
+                     targetMethod.MethodKind == MethodKind.ReducedExtension))
+                    return NoHazard(out hazard);
                 receiver = memberAccess.Expression;
                 break;
             case ElementAccessExpressionSyntax elementAccess:

@@ -20,6 +20,7 @@ internal static class SymbolicSourcePredicateLowerer {
         condition = null!;
         var method = invocation.TargetMethod;
         if (!CanInlineSourceBooleanPredicate(method) ||
+            SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(method, invocation) ||
             !TryCreateParameterSubstitutions(method.Parameters, invocation, context, out var substitutions))
             return false;
         var implicitThis = context.ImplicitThis;

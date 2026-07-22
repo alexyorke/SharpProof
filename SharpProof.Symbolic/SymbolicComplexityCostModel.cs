@@ -35,20 +35,34 @@ internal sealed class SymbolicComplexityCostModel(CancellationToken _cancellatio
     }
     internal bool TryGetIntegralConstant(ExpressionSyntax expression, SemanticModel semanticModel, out long value)
         => SymbolicLoweringValueFacts.TryGetIntegralConstant(expression, semanticModel, _cancellationToken, out value);
-    /// <summary>
-    /// A type is sized when it exposes an instance <see cref="int" /> Length or Count,
-    /// which is the shape this model actually depends on. Asking the symbol that
-    /// question covers the spans, lists, dictionaries and immutable arrays a name table
-    /// used to enumerate, and additionally reaches every collection such a table missed
-    /// — HashSet, Queue, Stack, ImmutableList and user-defined collections. Arrays are
-    /// checked separately because their Length is a special member rather than a
-    /// declared one.
-    /// </summary>
     internal static bool IsKnownSizedType(ITypeSymbol? typeSymbol) =>
         typeSymbol is IArrayTypeSymbol ||
         typeSymbol?.SpecialType == SpecialType.System_String ||
-        SymbolicTypeFacts.HasInstanceInt32Member(typeSymbol, "Length") ||
-        SymbolicTypeFacts.HasInstanceInt32Member(typeSymbol, "Count");
+        typeSymbol is INamedTypeSymbol namedType && IsKnownConstantTimeSizedType(namedType);
+    internal static bool IsKnownConstantTimeIndexer(IPropertySymbol property) =>
+        property.IsIndexer && IsKnownSizedType(property.ContainingType) &&
+        property.Parameters.Length == 1 &&
+        property.Parameters[0].Type.SpecialType == SpecialType.System_Int32;
+    internal static bool IsKnownConstantTimeSizeProperty(IPropertySymbol property) =>
+        !property.IsStatic &&
+        property.Type.SpecialType == SpecialType.System_Int32 &&
+        property.Parameters.Length == 0 &&
+        (string.Equals(property.Name, "Length", StringComparison.Ordinal) ||
+         string.Equals(property.Name, "Count", StringComparison.Ordinal)) &&
+        IsKnownSizedType(property.ContainingType);
+    private static bool IsKnownConstantTimeSizedType(INamedTypeSymbol typeSymbol) =>
+        typeSymbol.OriginalDefinition.ToDisplayString() is
+            "System.Span<T>" or
+            "System.ReadOnlySpan<T>" or
+            "System.Memory<T>" or
+            "System.ReadOnlyMemory<T>" or
+            "System.ArraySegment<T>" or
+            "System.Collections.Generic.List<T>" or
+            "System.Collections.Generic.Dictionary<TKey, TValue>" or
+            "System.Collections.Generic.HashSet<T>" or
+            "System.Collections.Generic.Queue<T>" or
+            "System.Collections.Generic.Stack<T>" or
+            "System.Collections.Immutable.ImmutableArray<T>";
     private bool TryCreateScalar(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -82,7 +96,9 @@ internal sealed class SymbolicComplexityCostModel(CancellationToken _cancellatio
         out SymbolicCostExpression cost) {
         if (expression is MemberAccessExpressionSyntax memberAccess &&
             (string.Equals(memberAccess.Name.Identifier.ValueText, "Length", StringComparison.Ordinal) ||
-             string.Equals(memberAccess.Name.Identifier.ValueText, "Count", StringComparison.Ordinal))) {
+             string.Equals(memberAccess.Name.Identifier.ValueText, "Count", StringComparison.Ordinal)) &&
+            semanticModel.GetSymbolInfo(memberAccess, _cancellationToken).Symbol is IPropertySymbol sizeProperty &&
+            IsKnownConstantTimeSizeProperty(sizeProperty)) {
             if (semanticModel.GetSymbolInfo(memberAccess.Expression, _cancellationToken).Symbol is IParameterSymbol
                     parameter &&
                 SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol.OriginalDefinition, currentMethod.OriginalDefinition)) {

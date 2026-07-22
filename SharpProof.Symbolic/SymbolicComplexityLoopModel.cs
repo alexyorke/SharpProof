@@ -126,11 +126,28 @@ internal sealed class SymbolicComplexityLoopModel(SymbolicComplexityCostModel _c
         }
         if (direction == StepDirection.None ||
             boundExpression == null ||
+            !IsStrictProgressCondition(condition, direction, leftSymbol, loopSymbol) ||
             !_costModel.TryCreate(boundExpression, semanticModel, currentMethod, CostProjection.Value, true, out boundCost))
             return false;
         boundDescription = boundExpression.ToString();
         dependentSymbols = GetDependentSymbols(boundExpression, semanticModel);
         return true;
+    }
+    private static bool IsStrictProgressCondition(
+        BinaryExpressionSyntax condition,
+        StepDirection direction,
+        ISymbol? leftSymbol,
+        ISymbol loopSymbol) {
+        var loopIsLeft = SymbolEquals(leftSymbol, loopSymbol);
+        return direction switch {
+            StepDirection.Up => loopIsLeft
+                ? condition.IsKind(SyntaxKind.LessThanExpression)
+                : condition.IsKind(SyntaxKind.GreaterThanExpression),
+            StepDirection.Down => loopIsLeft
+                ? condition.IsKind(SyntaxKind.GreaterThanExpression)
+                : condition.IsKind(SyntaxKind.LessThanExpression),
+            _ => false
+        };
     }
     private bool TryParseForLoopStep(
         ForStatementSyntax forStatement,
@@ -155,13 +172,13 @@ internal sealed class SymbolicComplexityLoopModel(SymbolicComplexityCostModel _c
                 when SymbolEquals(semanticModel.GetSymbolInfo(assignment.Left, _cancellationToken).Symbol, loopSymbol):
                 if (assignment.IsKind(SyntaxKind.AddAssignmentExpression) &&
                     _costModel.TryGetIntegralConstant(assignment.Right, semanticModel, out var addValue) &&
-                    addValue > 0) {
+                    addValue == 1) {
                     direction = StepDirection.Up;
                     return true;
                 }
                 if (assignment.IsKind(SyntaxKind.SubtractAssignmentExpression) &&
                     _costModel.TryGetIntegralConstant(assignment.Right, semanticModel, out var subtractValue) &&
-                    subtractValue > 0) {
+                    subtractValue == 1) {
                     direction = StepDirection.Down;
                     return true;
                 }
@@ -170,13 +187,13 @@ internal sealed class SymbolicComplexityLoopModel(SymbolicComplexityCostModel _c
                     if (binaryExpression.IsKind(SyntaxKind.AddExpression) &&
                         IsReferenceToSymbol(binaryExpression.Left, loopSymbol, semanticModel) &&
                         _costModel.TryGetIntegralConstant(binaryExpression.Right, semanticModel, out var rightAdd) &&
-                        rightAdd > 0) {
+                        rightAdd == 1) {
                         direction = StepDirection.Up;
                         return true;
                     }
                     if (binaryExpression.IsKind(SyntaxKind.AddExpression) &&
                         _costModel.TryGetIntegralConstant(binaryExpression.Left, semanticModel, out var leftAdd) &&
-                        leftAdd > 0 &&
+                        leftAdd == 1 &&
                         IsReferenceToSymbol(binaryExpression.Right, loopSymbol, semanticModel)) {
                         direction = StepDirection.Up;
                         return true;
@@ -184,7 +201,7 @@ internal sealed class SymbolicComplexityLoopModel(SymbolicComplexityCostModel _c
                     if (binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
                         IsReferenceToSymbol(binaryExpression.Left, loopSymbol, semanticModel) &&
                         _costModel.TryGetIntegralConstant(binaryExpression.Right, semanticModel, out var rightSubtract) &&
-                        rightSubtract > 0) {
+                        rightSubtract == 1) {
                         direction = StepDirection.Down;
                         return true;
                     }

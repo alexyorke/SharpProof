@@ -29,6 +29,7 @@ internal static class AnalyzerFeaturePipeline {
     }
     private static void AnalyzeCallable(MethodBodyAnalysisContext context, AnalyzerSession session) {
         using (SymbolicAnalysisLimitContext.Push(session.Configuration.AnalysisLimits, context.Node)) {
+            ContractDiagnosticSupport.ReportInvalidEffectConfigurations(context);
             EnforcePureContractAnalyzer.Analyze(context, session.AttributePolicy);
             MethodAllocationAnalyzer.AnalyzeSymbolForZeroAllocations(context, session.AttributePolicy);
             MethodCapabilityAnalyzer.AnalyzeSymbolForCapabilities(context, session.AttributePolicy);

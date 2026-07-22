@@ -25,7 +25,11 @@ var result = session.Analyze(new SharpProofAnalysisRequest(
     new SharpProofTarget(SharpProofTargetKind.Point, Line: 10, Column: 9),
     SharpProofAnalysisFacet.ProofFacts,
     "left < right"));
-var proofsHold = result.Status == SharpProofQueryStatus.Succeeded;
+var proofsHold = result.Status == SharpProofQueryStatus.Succeeded &&
+                 result.Error == null &&
+                 result.ProofFacts is [{ Status: "ProvenTrue" }] &&
+                 result.UnknownReasons.IsDefaultOrEmpty &&
+                 result.Truncations.IsDefaultOrEmpty;
 var unknownProofCount = result.UnknownReasons.Length;
 var nativeAvailable = proofsHold;
 Console.WriteLine(JsonSerializer.Serialize(new {

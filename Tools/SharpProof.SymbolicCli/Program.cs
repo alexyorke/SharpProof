@@ -75,11 +75,16 @@ try {
             result.MethodEffects.AllocationFree,
             result.MethodEffects.DoesNotThrow
         ];
-    if (flags.Contains("--fail-on-disproven") && verdicts.Contains(SharpProofVerdict.Disproven))
+    var hasDisprovenProof = result.ProofFacts.Any(static fact =>
+        string.Equals(fact.Status, "ProvenFalse", StringComparison.Ordinal));
+    if (flags.Contains("--fail-on-disproven") &&
+        (verdicts.Contains(SharpProofVerdict.Disproven) || hasDisprovenProof))
         return 5;
+    var hasUnknownProof = result.ProofFacts.Any(static fact =>
+        string.Equals(fact.Status, "Unknown", StringComparison.Ordinal));
     if (flags.Contains("--fail-on-unknown") &&
         (result.Status == SharpProofQueryStatus.Unknown || !result.UnknownReasons.IsDefaultOrEmpty ||
-         verdicts.Contains(SharpProofVerdict.Unknown)))
+         !result.Truncations.IsDefaultOrEmpty || verdicts.Contains(SharpProofVerdict.Unknown) || hasUnknownProof))
         return 4;
     return 0;
 }
@@ -113,7 +118,7 @@ bool TryParseTarget(string value, out SharpProofTarget target) {
         return true;
     }
     if (parts.Length == 3 && parts[0] == "span" &&
-        int.TryParse(parts[1], out var start) && int.TryParse(parts[2], out var end) && start >= 0 && end >= start) {
+        int.TryParse(parts[1], out var start) && int.TryParse(parts[2], out var end) && start >= 0 && end > start) {
         target = new SharpProofTarget(SharpProofTargetKind.Span, SpanStart: start, SpanEnd: end);
         return true;
     }

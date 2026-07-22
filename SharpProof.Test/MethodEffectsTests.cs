@@ -83,7 +83,7 @@ public sealed class MethodEffectsTests {
         Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.True);
     }
     [TestCase("throw new E();", "E", MethodExceptionSource.ExplicitThrow)]
-    [TestCase("return 10 / 0;", "System.DivideByZeroException", MethodExceptionSource.RuntimeHazard)]
+    [TestCase("var zero = 0; return 10 / zero;", "System.DivideByZeroException", MethodExceptionSource.RuntimeHazard)]
     public void EscapingExceptionsAreCanonicalStructuredFacts(string body, string exceptionType, MethodExceptionSource source) {
         var result = Analyze($$"""
             sealed class E : System.Exception { }
@@ -160,6 +160,184 @@ public sealed class MethodEffectsTests {
             Assert.That(lockResult.MethodEffects.Capabilities.HasFlag(SharpProofCapability.Synchronization), Is.True);
             Assert.That(nativeResult.MethodEffects!.Effects.HasFlag(SharpProofEffect.UsesNativeCode), Is.True);
             Assert.That(nativeResult.MethodEffects.Capabilities.HasFlag(SharpProofCapability.NativeInterop), Is.True);
+        });
+    }
+    [TestCase("static string M(int value) => value.ToString();")]
+    [TestCase("static string[] M(string value) => value.Split(',');")]
+    [TestCase("static int[] M(System.Span<int> value) => value.ToArray();")]
+    public void ExactFrameworkAllocationModelsDisproveAllocationFreedom(string method) {
+        var result = Analyze("class C {\n" + method + "\n}");
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Allocates), Is.True);
+        });
+    }
+    [Test]
+    public void NumericParseDisprovesDoesNotThrow() {
+        var result = Analyze("class C {\nstatic int M(string value) => int.Parse(value);\n}");
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.ExceptionFacts, Has.Some.Property(nameof(MethodExceptionFact.ExceptionType))
+                .EqualTo("System.FormatException"));
+        });
+    }
+    [TestCase("static string M(string a, string b) => a + b;")]
+    [TestCase("static string M(int value) => $\"{value}\";")]
+    [TestCase("static object M(int value) => value;")]
+    [TestCase("static System.Func<int> M(int value) => () => value;")]
+    [TestCase("static System.Func<int> M() => Helper;\nstatic int Helper() => 1;")]
+    [TestCase("static R M(R value) => value with { X = 2 }; sealed record R(int X);")]
+    [TestCase("static System.Collections.Generic.IEnumerable<int> M() { yield return 1; }")]
+    [TestCase("static async System.Threading.Tasks.Task<int> M() { await System.Threading.Tasks.Task.Yield(); return 1; }")]
+    public void CompilerGeneratedAllocationsAreVisible(string method) {
+        var result = Analyze("class C {\n" + method + "\n}");
+        Assert.That(result.MethodEffects!.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven),
+            string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
+    }
+    [TestCase("unsafe static int M() { int* value = stackalloc int[1]; value[0] = 1; return value[0]; }")]
+    [TestCase("static R M(R value) => value with { X = 2 }; readonly record struct R(int X);")]
+    public void StackOnlyOperationsDoNotCreateManagedAllocationSites(string method) {
+        var result = Analyze("class C {\n" + method + "\n}");
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.Allocates), Is.False);
+            Assert.That(result.MethodEffects.Sites, Has.None.Property(nameof(MethodEffectSite.Effect))
+                .EqualTo(SharpProofEffect.Allocates));
+        });
+    }
+    [TestCase("while (false) { state++; }")]
+    [TestCase("return; state++;")]
+    [TestCase("switch (0) { case 1: state++; break; }")]
+    public void UnreachableWritesDoNotDisprovePurity(string body) {
+        var result = Analyze("class C { static int state;\nstatic void M() { " + body + " }\n}");
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
+        });
+    }
+    [Test]
+    public void OpenVirtualDispatchDoesNotInlineTheBaseImplementation() {
+        var result = Analyze("""
+            class B { public virtual void Work() { } }
+            sealed class D : B { static int state; public override void Work() { state++; } }
+            class C { static void M(B value) => value.Work(); }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.True);
+        });
+    }
+    [Test]
+    public void ReassignedFreshLocalLosesFreshOwnership() {
+        var result = Analyze("""
+            class Box { public int Value; }
+            class C { static void M(Box input) { var box = new Box(); box = input; box.Value++; } }
+            """, 2);
+        Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+    }
+    [Test]
+    public void ReassignedDelegateUsesTheCurrentTarget() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static void Pure() { }
+                static void Impure() { state++; }
+                static void M() { System.Action action = Pure; action = Impure; action(); }
+            }
+            """, 5);
+        Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+    }
+    [Test]
+    public void LoopBackEdgesDoNotReusePreAssignmentFreshness() {
+        var result = Analyze("""
+            class Box { public int Value; }
+            class C {
+                static void M(Box input, bool repeat) {
+                    var box = new Box();
+                    do { box.Value++; box = input; } while (repeat);
+                }
+            }
+            """, 3);
+        Assert.That(result.MethodEffects!.Purity, Is.Not.EqualTo(SharpProofVerdict.Proven));
+    }
+    [Test]
+    public void LoopBackEdgesDoNotReusePreAssignmentDelegateTargets() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static void Pure() { }
+                static void Impure() { state++; }
+                static void M(bool repeat) {
+                    System.Action action = Pure;
+                    do { action(); action = Impure; } while (repeat);
+                }
+            }
+            """, 6);
+        Assert.That(result.MethodEffects!.Purity, Is.Not.EqualTo(SharpProofVerdict.Proven));
+    }
+    [Test]
+    public void CompoundPropertyUpdateIncludesGetterAndSetterBehavior() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static int P { get { state++; return state; } set { } }
+                static void M() { P += 1; }
+            }
+            """, 4);
+        Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+    }
+    [Test]
+    public void NativeBoundaryCannotProveDoesNotThrow() {
+        var result = Analyze("""
+            using System.Runtime.InteropServices;
+            class C {
+                [DllImport("missing")] static extern int Native();
+                static int M() => Native();
+            }
+            """, 4);
+        Assert.That(result.MethodEffects!.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
+    }
+    [Test]
+    public void CompleteNativeContractCanCloseTheExceptionBoundary() {
+        var result = Analyze("""
+            using System.Runtime.InteropServices;
+            using SharpProof.Attributes;
+            class C {
+                [DllImport("missing"), EffectContract(SharpProofEffect.None, Complete = true)]
+                static extern int Native();
+                static int M() => Native();
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.UsesNativeCode), Is.True);
+        });
+    }
+    [Test]
+    public void AmbientWritesDisprovePurity() {
+        var result = Analyze("""
+            using SharpProof.Attributes;
+            class C {
+                [EffectContract(SharpProofEffect.WritesAmbientState, Complete = true)]
+                static extern void M();
+            }
+            """, 4);
+        Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+    }
+    [Test]
+    public void ConflictingCompleteEffectContractsRemainUnknown() {
+        var result = Analyze("""
+            using SharpProof.Attributes;
+            class C {
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                [EffectContract(SharpProofEffect.WritesStaticState, Complete = true)]
+                static extern void Boundary();
+                static void M() => Boundary();
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.Not.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.UnknownReasons, Has.Some.Property(nameof(SharpProofUnknownReason.Message))
+                .EqualTo("conflicting_effect_contracts"));
         });
     }
     private static SharpProofAnalysisResult Analyze(string source, int line = 2) {

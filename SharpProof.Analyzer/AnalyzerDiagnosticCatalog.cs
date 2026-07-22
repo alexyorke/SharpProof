@@ -52,7 +52,16 @@ internal static class AnalyzerDiagnosticCatalog {
             "Reports completions that violate nullable member contracts."),
         new("UnsafeNullForgivingOperatorRule", "SP0044", "Null-forgiving operator is unsafe",
             "Null-forgiving operator can suppress a feasible null value for '{0}'", "Nullability", DiagnosticSeverity.Warning,
-            "Reports null-forgiving operators reached by a proven feasible null value.")
+            "Reports null-forgiving operators reached by a proven feasible null value."),
+        new("ZeroAllocationsNotVerifiedRule", "SP0045", "Zero-allocation contract could not be verified",
+            "Method '{0}' is marked [ZeroAllocations], but allocation freedom could not be verified: {1}", "Allocation",
+            DiagnosticSeverity.Warning, "Reports zero-allocation contracts whose allocation freedom is unknown."),
+        new("ExceptionContractNotVerifiedRule", "SP0046", "Exception contract could not be verified",
+            "Method '{0}' is marked {1}, but its exception behavior could not be verified: {2}", "ExceptionFlow",
+            DiagnosticSeverity.Warning, "Reports exception contracts whose escaping exception behavior is unknown."),
+        new("NullableContractNotVerifiedRule", "SP0047", "Nullable contract could not be verified",
+            "Method '{0}' has a nullable contract for '{1}' that could not be verified: {2}", "Nullability",
+            DiagnosticSeverity.Warning, "Reports nullable contracts that cannot be proven conservatively.")
     ];
     private static readonly ImmutableDictionary<string, DiagnosticDescriptor> DescriptorsByField = Definitions
         .ToImmutableDictionary(static value => value.Field, static value => value.Create(), StringComparer.Ordinal);

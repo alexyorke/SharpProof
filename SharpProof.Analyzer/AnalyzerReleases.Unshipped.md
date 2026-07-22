@@ -11,3 +11,6 @@ SP0041 | Nullability | Warning | Reports nullable return contract violations.
 SP0042 | Nullability | Warning | Reports nullable parameter postcondition violations.
 SP0043 | Nullability | Warning | Reports nullable member contract violations.
 SP0044 | Nullability | Warning | Reports null-forgiving operators that can suppress a feasible null value.
+SP0045 | Allocation | Warning | Reports `[ZeroAllocations]` contracts that could not be verified.
+SP0046 | ExceptionFlow | Warning | Reports exception contracts that could not be verified.
+SP0047 | Nullability | Warning | Reports nullable contracts that could not be verified.

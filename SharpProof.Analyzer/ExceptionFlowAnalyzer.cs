@@ -5,7 +5,6 @@ internal static partial class ExceptionFlowAnalyzer {
         if (contracts.IsDefaultOrEmpty) return;
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         var facts = ProjectEffectFacts(context, effects.ExceptionFacts)
-            .Where(static fact => fact.Escape == SharpProofVerdict.Proven)
             .ToImmutableArray();
         AnalyzeExceptionContracts(context, context.MethodSymbol, contracts, facts);
     }

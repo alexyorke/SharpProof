@@ -61,6 +61,7 @@ internal static class SymbolicRuntimeExceptionFacts {
         internal const string DefiniteModuloByZero = "definite_modulo_by_zero";
         internal const string DefiniteCheckedIntegralOverflow = "definite_checked_integral_overflow";
         internal const string DefiniteCheckedNumericConversionOverflow = "definite_checked_numeric_conversion_overflow";
+        internal const string DecimalOverflow = "decimal_overflow";
         internal const string DefiniteNegativeArrayLength = "definite_negative_array_length";
         internal const string DefiniteNegativeStackAllocLength = "definite_negative_stackalloc_length";
         internal const string DefiniteNullDereference = "definite_null_dereference";

@@ -90,6 +90,16 @@ public sealed class SymbolicComplexityTests {
         yield return Case("NodeTarget_ResolvesIndexerGetter",
             """public sealed class C { public int this[int n] { get { var sum=0; for(var i=0;i<n;i++)sum+=i; return sum; } } }""",
             "this[int n]", SymbolicComplexityKind.Linear);
+        yield return Case("ArrayInitialization_IsLinearInLength",
+            """public static class C { public static int[] Work(int n) => new int[n]; }""",
+            "new int[n]", SymbolicComplexityKind.Linear, "O(n)", driver: "ArrayInitialization");
+        yield return Case("MultidimensionalArrayInitialization_UsesDimensionProduct",
+            """public static class C { public static int[,] Work(int n, int m) => new int[n, m]; }""",
+            "new int[n, m]", SymbolicComplexityKind.Product, "O(n * m)", driver: "ArrayInitialization");
+        yield return Case("ForeachOverCustomCollection_DoesNotTrustCountShape",
+            """using System.Collections; public sealed class Values : IEnumerable { public int Count { get { while (true) { } } } public IEnumerator GetEnumerator() => throw new System.NotImplementedException(); } public static class C { public static int Work(Values values) { var n = 0; foreach (var value in values) n++; return n; } }""",
+            "return n;", SymbolicComplexityKind.Unknown,
+            unknowns: [SymbolicComplexityUnknownReason.UnsupportedLoopShape]);
         yield return Case("UnsupportedForLoop_AggregatesPreLoopEvidenceOnce",
             """public static class C { private static int Seed(int value)=>value; private static bool KeepGoing(int value)=>value>=0; private static int Step(int value)=>value-1; public static int Work(int n){var result=0; for(var i=Seed(n);KeepGoing(i);i=Step(i)){result+=i;} return result;} }""",
             "return result;", SymbolicComplexityKind.Unknown,

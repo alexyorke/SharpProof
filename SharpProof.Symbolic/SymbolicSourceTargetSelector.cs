@@ -12,6 +12,14 @@ internal static class SymbolicSourceTargetSelector {
                ?? token.Parent
                ?? root;
     }
+    internal static SyntaxNode FindNarrowestAtPosition(SyntaxNode root, int position) => root
+            .DescendantNodesAndSelf()
+            .Where(candidate => candidate is StatementSyntax or ExpressionSyntax)
+            .Where(candidate => ContainsPosition(candidate, position))
+            .OrderBy(candidate => candidate.Span.Length)
+            .ThenByDescending(candidate => candidate.SpanStart)
+            .FirstOrDefault()
+        ?? FindAtPosition(root, position);
     internal static IReadOnlyList<SyntaxNode> FindOnLine(SyntaxTree syntaxTree, int line, CancellationToken cancellationToken) {
         var lineSpan = SymbolicSourceLocation.GetLineSpan(syntaxTree, line, cancellationToken);
         return FindInSpan(syntaxTree, lineSpan, cancellationToken);

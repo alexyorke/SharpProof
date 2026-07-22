@@ -200,7 +200,7 @@ internal static class SymbolicProofEncoder {
             }
             builder.Add(formula);
         }
-        if (skippedUnsupported && builder.Count == 0)
+        if (skippedUnsupported)
             return new SymbolicEncodedState(false, [], SymbolicUnknownReason.UnsupportedIrEncoding);
         return new SymbolicEncodedState(true, builder.ToImmutable(), SymbolicUnknownReason.None);
     }

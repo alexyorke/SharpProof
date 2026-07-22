@@ -80,6 +80,8 @@ internal static partial class SymbolicIrLowerer {
                     out condition))
                 return true;
             if (SymbolicOperatorLowerer.TryGetRelationOperator(binaryExpression.Kind(), out var relationOperator) &&
+                context.SemanticModel.GetOperation(binaryExpression, context.CancellationToken) is
+                    Microsoft.CodeAnalysis.Operations.IBinaryOperation { OperatorMethod: null } &&
                 TryLowerTerm(binaryExpression.Left, context, out var left) &&
                 TryLowerTerm(binaryExpression.Right, context, out var right) &&
                 SymbolicOperatorLowerer.CanCompareTerms(left, right, relationOperator)) {

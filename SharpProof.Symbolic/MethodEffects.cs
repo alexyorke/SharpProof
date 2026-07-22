@@ -76,6 +76,7 @@ public sealed record MethodEffects(
     ImmutableArray<SharpProofUnknownReason> UnknownReasons) {
     private const SharpProofEffect ImpureEffects =
         SharpProofEffect.ReadsAmbientState |
+        SharpProofEffect.WritesAmbientState |
         SharpProofEffect.ReadsStaticState |
         SharpProofEffect.WritesReceiverState |
         SharpProofEffect.WritesArgumentState |
@@ -129,18 +130,19 @@ internal sealed class MethodEffectAnalysisSession(
             var root = MethodBodyOperationResolver.GetMethodBodyRootOperation(declaration, semanticModel, cancellationToken, true);
             if (root == null) return Cache(method, AnalyzeMetadata(method, declaration));
             var builder = new Builder(IsCaught);
-            foreach (var operation in root.DescendantsAndSelf())
-                if (operation is IVariableDeclaratorOperation { Symbol: var local, Initializer.Value: var value }) {
-                    if (value is IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
-                        IDelegateCreationOperation) builder.MarkFresh(local);
-                    builder.MarkExactType(local, value.Type);
-                    builder.MarkDelegateTargets(local, value);
-                }
+            var reachableOperations = GetReachableOperationSpans(declaration, semanticModel);
+            MarkFlowUncertainLocals(root, declaration, builder);
             foreach (var operation in root.DescendantsAndSelf()) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!IsVisible(operation, declaration, semanticModel)) continue;
+                if (reachableOperations is { } reachableSpans &&
+                    !reachableSpans.Any(span => span.OverlapsWith(operation.Syntax.Span)))
+                    continue;
+                if (operation is IVariableDeclaratorOperation { Symbol: var local, Initializer.Value: var value })
+                    builder.AssignLocal(local, value);
                 AnalyzeOperation(operation, semanticModel, builder);
             }
+            AddCompilerGeneratedAllocations(declaration, semanticModel, builder, reachableOperations);
             if (smtAnalysis != null)
                 AddRuntimeHazards(root, declaration, semanticModel, smtAnalysis, builder);
             return Cache(method, builder.Build());
@@ -199,16 +201,26 @@ internal sealed class MethodEffectAnalysisSession(
         switch (operation) {
             case ISimpleAssignmentOperation assignment:
                 AddWrite(assignment.Target, builder);
+                if (assignment.Target is ILocalReferenceOperation assignedLocal)
+                    builder.AssignLocal(assignedLocal.Local, assignment.Value);
                 if (assignment.Target is IPropertyReferenceOperation { Property.SetMethod: not null } propertyTarget)
                     AnalyzeCall(propertyTarget.Property.SetMethod, assignment, builder);
                 break;
             case ICompoundAssignmentOperation compound:
                 AddWrite(compound.Target, builder);
-                if (compound.Target is IPropertyReferenceOperation compoundProperty)
+                if (compound.Target is IPropertyReferenceOperation compoundProperty) {
+                    AnalyzeCall(compoundProperty.Property.GetMethod, compound, builder, compoundProperty.Instance);
                     AnalyzeCall(compoundProperty.Property.SetMethod, compound, builder);
+                }
+                if (compound.OperatorMethod != null) AnalyzeCall(compound.OperatorMethod, compound, builder);
                 break;
             case IIncrementOrDecrementOperation increment:
                 AddWrite(increment.Target, builder);
+                if (increment.Target is IPropertyReferenceOperation incrementProperty) {
+                    AnalyzeCall(incrementProperty.Property.GetMethod, increment, builder, incrementProperty.Instance);
+                    AnalyzeCall(incrementProperty.Property.SetMethod, increment, builder, incrementProperty.Instance);
+                }
+                if (increment.OperatorMethod != null) AnalyzeCall(increment.OperatorMethod, increment, builder);
                 break;
             case IFieldReferenceOperation { Field.IsConst: false, Field.IsStatic: true } field
                 when field.Parent is not IAssignmentOperation { Target: var target } ||
@@ -277,6 +289,7 @@ internal sealed class MethodEffectAnalysisSession(
                 }
                 else
                     AnalyzeCall(invocation.TargetMethod, invocation, builder, invocation.Instance);
+                builder.MarkEscapedArguments(invocation.Arguments);
                 break;
             case IBinaryOperation { OperatorMethod: not null } binary:
                 AnalyzeCall(binary.OperatorMethod, binary, builder);
@@ -332,7 +345,13 @@ internal sealed class MethodEffectAnalysisSession(
             return;
         }
         method = (method.ReducedFrom ?? method).OriginalDefinition;
-        var exactDispatchTarget = ResolveExactDispatchTarget(method, receiver, builder);
+        var knownExactReceiverType = receiver is ILocalReferenceOperation localReceiver
+            ? builder.GetExactType(localReceiver.Local)
+            : null;
+        var exactDispatchTarget = SymbolicDispatchFacts.ResolveExactDispatchTarget(
+            method,
+            receiver,
+            knownExactReceiverType);
         method = exactDispatchTarget ?? method;
         builder.Add(SharpProofEffect.DirectCall, site, method, "direct_call");
         if (method.IsImplicitlyDeclared) return;
@@ -342,19 +361,27 @@ internal sealed class MethodEffectAnalysisSession(
             builder.AddUnknown(site, "unresolved_dispatch", method);
             return;
         }
-        if (method.GetDllImportData() != null) {
-            builder.Add(SharpProofEffect.UsesNativeCode, SharpProofCapability.NativeInterop, site, method, "native_call");
-            return;
-        }
         var hasContract = TryReadEffectContract(method, out var contracted);
         var configured = externalContractResolver?.Invoke(method);
         if (configured != null) {
             contracted = hasContract ? UnionContracts(contracted, configured) : configured;
             hasContract = true;
         }
+        if (method.GetDllImportData() != null) {
+            builder.Add(SharpProofEffect.UsesNativeCode, SharpProofCapability.NativeInterop, site, method, "native_call");
+            if (hasContract && IsCompleteContract(contracted))
+                builder.AddTransitive(contracted, site, method, "complete_native_effect_contract");
+            else
+                builder.AddUnknown(site, "native_exception_boundary", method);
+            return;
+        }
         var syntax = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
         if (syntax == null) {
             if (IsStructurallyEffectFreeIntrinsic(method)) return;
+            if (TryGetKnownFrameworkSummary(method, out var frameworkSummary)) {
+                builder.AddTransitive(frameworkSummary, site, method, "framework_method_model");
+                return;
+            }
             var metadata = _metadata.Analyze(method);
             if (hasContract && metadata.Effects == SharpProofEffect.Unknown)
                 builder.AddTransitive(contracted, site, method, "complete_effect_contract");
@@ -378,36 +405,54 @@ internal sealed class MethodEffectAnalysisSession(
                 ContainingType.SpecialType: SpecialType.System_Array
             }
         } ||
-        SymbolicTypeFacts.IsBuiltInIntegralType(method.ContainingType) ||
-        method.ContainingType?.SpecialType is SpecialType.System_String or
-            SpecialType.System_Boolean or
-            SpecialType.System_Single or
-            SpecialType.System_Double or
-            SpecialType.System_Decimal ||
-        method.ContainingType?.OriginalDefinition.ToDisplayString() is
-            "System.Span<T>" or
-            "System.ReadOnlySpan<T>" or
-            "System.Nullable<T>" or
-            "System.Index" or
-            "System.Range";
-    private static IMethodSymbol? ResolveExactDispatchTarget(IMethodSymbol method, IOperation? receiver, Builder builder) {
-        if (!method.IsVirtual && method.ContainingType?.TypeKind != TypeKind.Interface) return method;
-        var exactType = receiver switch {
-            IObjectCreationOperation { Type: INamedTypeSymbol created } => created,
-            IConversionOperation { Operand.Type: INamedTypeSymbol converted } => converted,
-            ILocalReferenceOperation local => builder.GetExactType(local.Local),
-            _ => receiver?.Type as INamedTypeSymbol
+        method is {
+            MethodKind: MethodKind.PropertyGet,
+            Name: "HasValue",
+            ContainingType.SpecialType: SpecialType.System_Nullable_T
         };
-        if (exactType == null || exactType.TypeKind == TypeKind.Interface || exactType.IsAbstract) return null;
-        if (method.ContainingType?.TypeKind == TypeKind.Interface)
-            return exactType.FindImplementationForInterfaceMember(method) as IMethodSymbol;
-        return exactType.GetMembers(method.Name).OfType<IMethodSymbol>()
-            .FirstOrDefault(candidate => Overrides(candidate, method));
-    }
-    private static bool Overrides(IMethodSymbol candidate, IMethodSymbol method) {
-        for (var current = candidate; current != null; current = current.OverriddenMethod)
-            if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, method.OriginalDefinition))
-                return true;
+    private static bool TryGetKnownFrameworkSummary(IMethodSymbol method, out MethodEffects effects) {
+        var containingType = method.ContainingType;
+        var isNumericToString = string.Equals(method.Name, nameof(ToString), StringComparison.Ordinal) &&
+                                method.ReturnType.SpecialType == SpecialType.System_String &&
+                                containingType?.SpecialType is SpecialType.System_Byte or SpecialType.System_SByte or
+                                    SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Int32 or
+                                    SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64 or
+                                    SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
+        var isStringSplit = containingType?.SpecialType == SpecialType.System_String &&
+                            string.Equals(method.Name, nameof(string.Split), StringComparison.Ordinal);
+        var typeDefinition = containingType?.OriginalDefinition.ToDisplayString();
+        var isSpanToArray = string.Equals(method.Name, "ToArray", StringComparison.Ordinal) &&
+                            typeDefinition is "System.Span<T>" or "System.ReadOnlySpan<T>";
+        if (isNumericToString || isStringSplit || isSpanToArray) {
+            effects = new MethodEffects(
+                SharpProofEffect.Allocates,
+                SharpProofCapability.None,
+                [],
+                [],
+                []);
+            return true;
+        }
+        var isNumericParse = method.IsStatic &&
+                             string.Equals(method.Name, "Parse", StringComparison.Ordinal) &&
+                             containingType?.SpecialType is SpecialType.System_Byte or SpecialType.System_SByte or
+                                 SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Int32 or
+                                 SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64 or
+                                 SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
+        if (isNumericParse) {
+            effects = new MethodEffects(
+                SharpProofEffect.Throws,
+                SharpProofCapability.None,
+                [
+                    MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
+                        "framework_parse_model"),
+                    MethodExceptionFact.Boundary("System.OverflowException", MethodExceptionSource.Contract,
+                        "framework_parse_model")
+                ],
+                [],
+                []);
+            return true;
+        }
+        effects = null!;
         return false;
     }
     private void AnalyzeDisposal(ITypeSymbol? type, IOperation site, Builder builder) {
@@ -421,6 +466,7 @@ internal sealed class MethodEffectAnalysisSession(
     }
     private static bool TryReadEffectContract(IMethodSymbol method, out MethodEffects effects) {
         var canonicalKey = RoslynStructuralMethodIdentity.GetCanonicalKey(method);
+        effects = null!;
         foreach (var attribute in method.GetAttributes().Concat(method.ContainingAssembly?.GetAttributes() ?? [])) {
             if (attribute.AttributeClass?.ToDisplayString() != "SharpProof.Attributes.EffectContractAttribute" ||
                 attribute.ConstructorArguments.Length == 0)
@@ -437,6 +483,7 @@ internal sealed class MethodEffectAnalysisSession(
             var deterministic = true;
             var complete = true;
             var exceptions = ImmutableArray.CreateBuilder<string>();
+            var malformed = !HasOnlyDefinedFlags(declared);
             foreach (var pair in attribute.NamedArguments) {
                 if (pair.Key == nameof(EffectContractAttribute.Capabilities) && pair.Value.Value != null)
                     capabilities = (SharpProofCapability)Convert.ToInt32(pair.Value.Value, CultureInfo.InvariantCulture);
@@ -448,24 +495,56 @@ internal sealed class MethodEffectAnalysisSession(
                     complete = completeValue;
                 else if (pair.Key == nameof(EffectContractAttribute.ThrownExceptions))
                     foreach (var item in pair.Value.Values)
-                        if (item.Value is ITypeSymbol type) exceptions.Add(type.ToDisplayString());
+                        if (item.Value is ITypeSymbol type)
+                            exceptions.Add(type.ToDisplayString());
+                        else
+                            malformed = true;
+            }
+            malformed |= !HasOnlyDefinedFlags(capabilities);
+            if (malformed) {
+                var malformedContract = new MethodEffects(
+                    SharpProofEffect.Unknown,
+                    SharpProofCapability.None,
+                    [MethodExceptionFact.Boundary(
+                        "System.Exception",
+                        MethodExceptionSource.Contract,
+                        "malformed_effect_contract",
+                        SharpProofVerdict.Unknown)],
+                    [],
+                    [CreateContractConfigurationReason("malformed_effect_contract")]);
+                effects = effects == null ? malformedContract : UnionContracts(effects, malformedContract);
+                continue;
             }
             if (!deterministic) declared |= SharpProofEffect.UsesNondeterminism;
             if (exceptions.Count != 0) declared |= SharpProofEffect.Throws;
             if (!complete) declared |= SharpProofEffect.Unknown;
-            effects = new MethodEffects(
+            var normalizedExceptions = exceptions
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static type => type, StringComparer.Ordinal)
+                .ToImmutableArray();
+            var candidate = new MethodEffects(
                 declared,
                 capabilities,
-                [.. exceptions.Select(static type
+                [.. normalizedExceptions.Select(static type
                     => MethodExceptionFact.Boundary(type, MethodExceptionSource.Contract, "effect_contract"))],
                 [],
                 complete
                     ? []
                     : [CreateUnknownReason("partial_effect_contract")]);
-            return true;
+            effects = effects == null ? candidate : UnionContracts(effects, candidate);
         }
-        effects = null!;
-        return false;
+        return effects != null;
+    }
+    private static bool IsCompleteContract(MethodEffects effects) =>
+        (effects.Effects & SharpProofEffect.Unknown) == 0 &&
+        effects.UnknownReasons.IsDefaultOrEmpty &&
+        !effects.ExceptionFacts.Any(static fact => fact.Escape == SharpProofVerdict.Unknown);
+    private static bool HasOnlyDefinedFlags<T>(T value) where T : struct, Enum {
+        ulong knownBits = 0;
+        foreach (var defined in Enum.GetValues(typeof(T)))
+            knownBits |= Convert.ToUInt64(defined, CultureInfo.InvariantCulture);
+        var actualBits = Convert.ToUInt64(value, CultureInfo.InvariantCulture);
+        return (actualBits & ~knownBits) == 0;
     }
     private static MethodEffects UnionContracts(MethodEffects left, MethodEffects right) {
         var conflicts = left.Effects != right.Effects || left.Capabilities != right.Capabilities ||
@@ -584,9 +663,126 @@ internal sealed class MethodEffectAnalysisSession(
             else if (current.Parent is ConditionalExpressionSyntax choice &&
                      semanticModel.GetConstantValue(choice.Condition).Value is bool chooseTrue &&
                      ((choice.WhenTrue.Span.Contains(operation.Syntax.Span) && !chooseTrue) ||
-                      (choice.WhenFalse.Span.Contains(operation.Syntax.Span) && chooseTrue)))
+                       (choice.WhenFalse.Span.Contains(operation.Syntax.Span) && chooseTrue)))
+                return false;
+            else if (current.FirstAncestorOrSelf<SwitchSectionSyntax>() is { } section &&
+                     section.Parent is SwitchStatementSyntax switchStatement &&
+                     TryGetSelectedConstantSwitchSection(switchStatement, semanticModel, out var selectedSection) &&
+                     !ReferenceEquals(section, selectedSection))
                 return false;
         return true;
+    }
+    private static bool TryGetSelectedConstantSwitchSection(
+        SwitchStatementSyntax statement,
+        SemanticModel semanticModel,
+        out SwitchSectionSyntax selected) {
+        selected = null!;
+        var governing = semanticModel.GetConstantValue(statement.Expression);
+        if (!governing.HasValue) return false;
+        SwitchSectionSyntax? defaultSection = null;
+        foreach (var section in statement.Sections)
+            foreach (var label in section.Labels) {
+                if (label is DefaultSwitchLabelSyntax) {
+                    defaultSection = section;
+                    continue;
+                }
+                if (label is not CaseSwitchLabelSyntax caseLabel) continue;
+                var caseValue = semanticModel.GetConstantValue(caseLabel.Value);
+                if (caseValue.HasValue && Equals(governing.Value, caseValue.Value)) {
+                    selected = section;
+                    return true;
+                }
+            }
+        selected = defaultSection!;
+        return true;
+    }
+    private static void MarkFlowUncertainLocals(IOperation root, SyntaxNode declaration, Builder builder) {
+        var hasUnstructuredFlow = declaration.DescendantNodes().Any(static node =>
+            node is GotoStatementSyntax or LabeledStatementSyntax);
+        foreach (var operation in root.DescendantsAndSelf()) {
+            ILocalSymbol? assigned = operation switch {
+                IAssignmentOperation { Target: ILocalReferenceOperation local } => local.Local,
+                IIncrementOrDecrementOperation { Target: ILocalReferenceOperation local } => local.Local,
+                _ => null
+            };
+            if (assigned != null && (hasUnstructuredFlow || IsFlowDependent(operation.Syntax)))
+                builder.MarkFlowUncertain(assigned);
+            if (operation is not IArgumentOperation {
+                Parameter.RefKind: RefKind.Ref or RefKind.Out,
+                Value: ILocalReferenceOperation argumentLocal
+            })
+                continue;
+            if (hasUnstructuredFlow || IsFlowDependent(operation.Syntax))
+                builder.MarkFlowUncertain(argumentLocal.Local);
+        }
+    }
+    private static bool IsFlowDependent(SyntaxNode syntax) => syntax.Ancestors().Any(static ancestor =>
+        ancestor is IfStatementSyntax or ConditionalExpressionSyntax or SwitchStatementSyntax or
+            SwitchExpressionSyntax or ForStatementSyntax or ForEachStatementSyntax or
+            ForEachVariableStatementSyntax or WhileStatementSyntax or DoStatementSyntax or
+            TryStatementSyntax or CatchClauseSyntax);
+    private ImmutableArray<TextSpan>? GetReachableOperationSpans(SyntaxNode declaration, SemanticModel semanticModel) {
+        try {
+            var graph = ControlFlowGraph.Create(declaration, semanticModel, cancellationToken);
+            if (graph == null) return null;
+            var reachable = ImmutableArray.CreateBuilder<TextSpan>();
+            foreach (var block in graph.Blocks.Where(static block => block.IsReachable)) {
+                foreach (var operation in block.Operations)
+                    reachable.Add(operation.Syntax.Span);
+                if (block.BranchValue != null)
+                    reachable.Add(block.BranchValue.Syntax.Span);
+            }
+            return reachable.Distinct().ToImmutableArray();
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) {
+            return null;
+        }
+    }
+    private static void AddCompilerGeneratedAllocations(
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        Builder builder,
+        ImmutableArray<TextSpan>? reachableOperations) {
+        var nodes = CSharpSyntaxFacts.DescendantNodesInExecution(declaration).ToArray();
+        if (nodes.OfType<YieldStatementSyntax>().Any())
+            builder.Add(SharpProofEffect.Allocates, declaration, null, "iterator_state_machine_allocation");
+        if (declaration is MethodDeclarationSyntax { Modifiers: var modifiers } &&
+            modifiers.Any(SyntaxKind.AsyncKeyword) &&
+            nodes.OfType<AwaitExpressionSyntax>().Any())
+            builder.Add(SharpProofEffect.Allocates, declaration, null, "async_state_machine_allocation");
+        foreach (var expression in nodes.OfType<ExpressionSyntax>()) {
+            if (reachableOperations is { } reachableSpans &&
+                !reachableSpans.Any(span => span.OverlapsWith(expression.Span)))
+                continue;
+            var typeInfo = semanticModel.GetTypeInfo(expression);
+            if (expression is BinaryExpressionSyntax binary &&
+                binary.IsKind(SyntaxKind.AddExpression) &&
+                typeInfo.ConvertedType?.SpecialType == SpecialType.System_String &&
+                !semanticModel.GetConstantValue(expression).HasValue) {
+                builder.Add(SharpProofEffect.Allocates, expression, typeInfo.ConvertedType, "string_concat_allocation");
+                continue;
+            }
+            if (expression is InterpolatedStringExpressionSyntax &&
+                typeInfo.ConvertedType?.SpecialType == SpecialType.System_String) {
+                builder.Add(SharpProofEffect.Allocates, expression, typeInfo.ConvertedType, "interpolated_string_allocation");
+                continue;
+            }
+            if (expression is WithExpressionSyntax && typeInfo.ConvertedType?.IsReferenceType == true) {
+                builder.Add(SharpProofEffect.Allocates, expression, typeInfo.ConvertedType, "with_clone_allocation");
+                continue;
+            }
+            if (expression is AnonymousFunctionExpressionSyntax && typeInfo.ConvertedType?.TypeKind == TypeKind.Delegate) {
+                builder.Add(SharpProofEffect.Allocates, expression, typeInfo.ConvertedType, "delegate_allocation");
+                continue;
+            }
+            if (typeInfo.ConvertedType?.TypeKind == TypeKind.Delegate &&
+                semanticModel.GetSymbolInfo(expression).Symbol is IMethodSymbol) {
+                builder.Add(SharpProofEffect.Allocates, expression, typeInfo.ConvertedType, "method_group_delegate_allocation");
+                continue;
+            }
+            if (typeInfo.Type?.IsValueType == true && typeInfo.ConvertedType?.IsReferenceType == true)
+                builder.Add(SharpProofEffect.Allocates, expression, typeInfo.ConvertedType, "boxing_allocation");
+        }
     }
     private MethodEffects AnalyzeMetadata(IMethodSymbol method, SyntaxNode site) {
         if (TryReadEffectContract(method, out var contracted)) return contracted;
@@ -620,6 +816,8 @@ internal sealed class MethodEffectAnalysisSession(
             reason)],
         [CreateUnknownReason(reason)]);
     private static SharpProofUnknownReason CreateUnknownReason(string reason) => new("SP-EFFECT-UNKNOWN", "Effects", reason, false, false);
+    private static SharpProofUnknownReason CreateContractConfigurationReason(string reason) =>
+        new("SP-EFFECT-CONTRACT", "Configuration", reason, false, true);
     sealed class Builder(Func<IOperation, string, bool> isCaught) {
         private readonly ImmutableArray<MethodExceptionFact>.Builder _exceptions =
             ImmutableArray.CreateBuilder<MethodExceptionFact>();
@@ -630,6 +828,7 @@ internal sealed class MethodEffectAnalysisSession(
         private SharpProofCapability _capabilities;
         private SharpProofEffect _effects;
         private readonly HashSet<ILocalSymbol> _freshLocals = new(SymbolEqualityComparer.Default);
+        private readonly HashSet<ILocalSymbol> _flowUncertainLocals = new(SymbolEqualityComparer.Default);
         private readonly Dictionary<ILocalSymbol, INamedTypeSymbol> _exactTypes = new(SymbolEqualityComparer.Default);
         private readonly Dictionary<ILocalSymbol, ImmutableArray<IMethodSymbol>> _delegateTargets =
             new(SymbolEqualityComparer.Default);
@@ -651,10 +850,64 @@ internal sealed class MethodEffectAnalysisSession(
                 .ToImmutableArray();
             if (!methods.IsDefaultOrEmpty) _delegateTargets[local] = methods;
         }
+        internal void AssignLocal(ILocalSymbol local, IOperation value) {
+            local = (ILocalSymbol)local.OriginalDefinition;
+            _freshLocals.Remove(local);
+            _exactTypes.Remove(local);
+            _delegateTargets.Remove(local);
+            if (_flowUncertainLocals.Contains(local) || IsFlowDependent(value.Syntax)) return;
+            var unwrapped = value;
+            while (unwrapped is IConversionOperation conversion) unwrapped = conversion.Operand;
+            if (unwrapped is IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
+                IDelegateCreationOperation)
+                _freshLocals.Add(local);
+            else if (unwrapped is ILocalReferenceOperation sourceLocal && IsFresh(sourceLocal.Local))
+                _freshLocals.Add(local);
+            var exactType = unwrapped switch {
+                IObjectCreationOperation { Type: INamedTypeSymbol created } => created,
+                IAnonymousObjectCreationOperation { Type: INamedTypeSymbol created } => created,
+                ILocalReferenceOperation sourceLocal => GetExactType(sourceLocal.Local),
+                _ => unwrapped.Type is INamedTypeSymbol { IsSealed: true } sealedType ? sealedType : null
+            };
+            if (exactType != null) _exactTypes[local] = exactType;
+            MarkDelegateTargets(local, value);
+        }
+        internal void MarkFlowUncertain(ILocalSymbol local) {
+            local = (ILocalSymbol)local.OriginalDefinition;
+            _flowUncertainLocals.Add(local);
+            _freshLocals.Remove(local);
+            _exactTypes.Remove(local);
+            _delegateTargets.Remove(local);
+        }
+        internal void MarkEscapedArguments(ImmutableArray<IArgumentOperation> arguments) {
+            foreach (var argument in arguments) {
+                var value = argument.Value;
+                while (value is IConversionOperation conversion) value = conversion.Operand;
+                if (value is not ILocalReferenceOperation local) continue;
+                _freshLocals.Remove(local.Local);
+                if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out) {
+                    _exactTypes.Remove(local.Local);
+                    _delegateTargets.Remove(local.Local);
+                }
+            }
+        }
         internal ImmutableArray<IMethodSymbol> GetDelegateTargets(ILocalSymbol local) =>
             _delegateTargets.TryGetValue(local, out var methods) ? methods : [];
         internal void Add(SharpProofEffect effect, IOperation operation, ISymbol? symbol, string reason)
             => Add(effect, SharpProofCapability.None, operation, symbol, reason);
+        internal void Add(SharpProofEffect effect, SyntaxNode syntax, ISymbol? symbol, string reason) {
+            _effects |= effect;
+            _sites.Add(new MethodEffectSite(
+                effect,
+                SharpProofCapability.None,
+                syntax.ToString(),
+                symbol?.ToDisplayString() ?? string.Empty,
+                syntax.SpanStart,
+                syntax.Span.Length,
+                false,
+                reason,
+                GetOrigin(effect)));
+        }
         internal void Add(SharpProofEffect effect, SharpProofCapability capabilities, IOperation operation, ISymbol? symbol,
             string reason) {
             _effects |= effect;

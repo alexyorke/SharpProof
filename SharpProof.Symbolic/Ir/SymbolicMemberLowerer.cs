@@ -107,6 +107,10 @@ internal static class SymbolicMemberLowerer {
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(memberAccess.Expression, context), out var receiver) ||
             receiver.Kind != SmtValueKind.Reference)
             return false;
+        if (context.SemanticModel.GetOperation(memberAccess, context.CancellationToken) is
+                IPropertyReferenceOperation propertyOperation &&
+            SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(getter, propertyOperation))
+            return false;
         var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default);
         if (getter.DeclaringSyntaxReferences.Length > 0 &&
             SymbolicSourcePredicateLowerer.TryLowerReturnedBoolean(getter, context, substitutions, receiver, out condition))

@@ -291,7 +291,29 @@ internal sealed class SymbolicComplexityAnalysisSession {
             .Select(size => AnalyzeOperation(size, semanticModel, currentMethod))
             .ToArray();
         var initializerCost = AnalyzeOperation(arrayCreationOperation.Initializer, semanticModel, currentMethod);
-        return SymbolicComplexityAlgebra.CombineSequence(dimensionCosts.Concat(new[] { initializerCost }));
+        var initializationCost = SymbolicCostExpression.Constant();
+        foreach (var dimension in arrayCreationOperation.DimensionSizes) {
+            if (dimension.Syntax is not ExpressionSyntax expression ||
+                !_costModel.TryCreate(
+                    expression,
+                    semanticModel,
+                    currentMethod,
+                    CostProjection.Value,
+                    true,
+                    out var dimensionCost))
+                return ComplexityArtifacts.Unknown(
+                    SymbolicComplexityUnknownReason.UnsupportedOperation,
+                    arrayCreationOperation.Syntax,
+                    dimensionCosts.Concat(new[] { initializerCost }));
+            initializationCost = SymbolicCostExpression.Multiply(initializationCost, dimensionCost);
+        }
+        var initializationArtifacts = ComplexityArtifacts.FromCost(initializationCost).WithDriver(
+            SymbolicComplexityAlgebra.CreateDriver(
+                "ArrayInitialization",
+                "array initialization costs " + initializationCost.ToBigOText(currentMethod),
+                arrayCreationOperation.Syntax));
+        return SymbolicComplexityAlgebra.CombineSequence(
+            dimensionCosts.Concat(new[] { initializerCost, initializationArtifacts }));
     }
     private ComplexityArtifacts AnalyzeSwitchOperation(
         ISwitchOperation switchOperation,

@@ -122,12 +122,18 @@ public sealed class SharpProofAnalysisSession : IDisposable {
     private readonly SmtAnalysisService _ownedSmtAnalysis;
     private readonly SymbolicRuntimeHazardQueryService _runtimeHazardService;
     private readonly SymbolicSourceInput _source;
+    private readonly ImmutableArray<Diagnostic> _sourceCompilationErrors;
+    private readonly ImmutableArray<Diagnostic> _sourceSyntaxErrors;
     private bool _disposed;
     private SharpProofAnalysisSession(
         SymbolicSourceInput source,
         SharpProofAnalysisBudget analysisLimits,
         SmtAnalysisService ownedSmtAnalysis) {
         _source = source;
+        _sourceSyntaxErrors = [.. source.SyntaxTree.GetDiagnostics().Where(static diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error)];
+        _sourceCompilationErrors = [.. source.Compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error)];
         _analysisLimits = analysisLimits;
         _ownedSmtAnalysis = ownedSmtAnalysis;
         _invariantService = new SymbolicInvariantService();
@@ -171,6 +177,10 @@ public sealed class SharpProofAnalysisSession : IDisposable {
     }
     private SharpProofAnalysisResult Execute(SharpProofAnalysisRequest request, CancellationToken cancellationToken) {
         try {
+            ValidateRequest(request);
+            if (TryCreateSourceError(out var sourceError))
+                return Failed(request.Target, sourceError);
+            using var smtBudgetScope = _ownedSmtAnalysis.BeginMethodBudgetScope();
             MethodEffects? effects = null;
             var unknowns = ImmutableArray.CreateBuilder<SharpProofUnknownReason>();
             var proofFacts = ImmutableArray.CreateBuilder<SharpProofProofFact>();
@@ -202,19 +212,101 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         }
         catch (Exception exception) when (!SymbolicErrorClassifier.IsFatal(exception)) {
             var error = SymbolicErrorClassifier.FromException(exception);
-            return new SharpProofAnalysisResult(
-                request.Target,
-                error.Category == SharpProofErrorCategory.Cancellation
-                    ? SharpProofQueryStatus.Canceled
-                    : SharpProofQueryStatus.Failed,
-                null,
-                [],
-                [],
-                null,
-                [],
-                [],
-                error);
+            return Failed(request.Target, error);
         }
+    }
+    private static SharpProofAnalysisResult Failed(SharpProofTarget target, SharpProofError error) => new(
+        target,
+        error.Category == SharpProofErrorCategory.Cancellation
+            ? SharpProofQueryStatus.Canceled
+            : SharpProofQueryStatus.Failed,
+        null,
+        [],
+        [],
+        null,
+        [],
+        [],
+        error);
+    private void ValidateRequest(SharpProofAnalysisRequest request) {
+        var target = request.Target ?? throw new ArgumentException("A query target is required.", nameof(request));
+        if (!Enum.IsDefined(typeof(SharpProofTargetKind), target.Kind))
+            throw new ArgumentException("The target kind is not defined.", nameof(request));
+        if (request.Facets == SharpProofAnalysisFacet.None ||
+            (request.Facets & ~SharpProofAnalysisFacet.All) != 0)
+            throw new ArgumentException("At least one defined analysis facet is required.", nameof(request));
+        var sourceText = _source.SyntaxTree.GetText();
+        switch (target.Kind) {
+            case SharpProofTargetKind.Point:
+                RequirePositive(target.Line, "Point targets require a positive line.");
+                if (target.Column is { } column && column <= 0)
+                    throw new ArgumentOutOfRangeException(nameof(request), "Point target columns must be positive.");
+                ValidateLine(target.Line!.Value, sourceText);
+                var pointLine = sourceText.Lines[target.Line.Value - 1];
+                if ((target.Column ?? 1) > pointLine.Span.Length + 1)
+                    throw new ArgumentOutOfRangeException(nameof(request), "Point target columns must be within the selected line.");
+                break;
+            case SharpProofTargetKind.Line:
+                RequirePositive(target.Line, "Line targets require a positive line.");
+                ValidateLine(target.Line!.Value, sourceText);
+                break;
+            case SharpProofTargetKind.Position:
+                if (target.Position is not { } position || position < 0 || position >= sourceText.Length)
+                    throw new ArgumentOutOfRangeException(nameof(request),
+                        "Position targets require a position within nonempty source text.");
+                break;
+            case SharpProofTargetKind.Span:
+                if (target.SpanStart is not { } spanStart || spanStart < 0 ||
+                    target.SpanEnd is not { } spanEnd || spanEnd <= spanStart || spanEnd > sourceText.Length)
+                    throw new ArgumentOutOfRangeException(nameof(request),
+                        "Span targets require non-negative bounds with span-end greater than span-start.");
+                break;
+            case SharpProofTargetKind.AllLines:
+                if (sourceText.Length == 0)
+                    throw new ArgumentOutOfRangeException(nameof(request), "All-lines targets require nonempty source text.");
+                break;
+        }
+        if (string.IsNullOrWhiteSpace(request.Condition)) return;
+        if ((request.Facets & SharpProofAnalysisFacet.ProofFacts) == 0)
+            throw new ArgumentException("A proof condition requires the proof-facts facet.", nameof(request));
+        if (target.Kind != SharpProofTargetKind.Point)
+            throw new ArgumentException("Condition proof requests require a point target.", nameof(request));
+        var parsedCondition = SyntaxFactory.ParseExpression(request.Condition!);
+        var parseError = parsedCondition.GetDiagnostics().FirstOrDefault(static diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error);
+        if (parseError != null)
+            throw new FormatException("The proof condition is not valid C#: " + parseError.GetMessage());
+        return;
+        static void RequirePositive(int? value, string message) {
+            if (value is not { } actual || actual <= 0)
+                throw new ArgumentOutOfRangeException(nameof(request), message);
+        }
+        static void ValidateLine(int line, SourceText text) {
+            if (line > text.Lines.Count)
+                throw new ArgumentOutOfRangeException(nameof(request), "Target lines must be within the source text.");
+        }
+    }
+    private bool TryCreateSourceError(out SharpProofError error) {
+        var errors = !_sourceSyntaxErrors.IsDefaultOrEmpty
+            ? _sourceSyntaxErrors
+            : _sourceCompilationErrors;
+        if (errors.IsDefaultOrEmpty) {
+            error = null!;
+            return false;
+        }
+        var syntaxFailure = !_sourceSyntaxErrors.IsDefaultOrEmpty;
+        var first = errors[0];
+        var details = ImmutableDictionary<string, string>.Empty
+            .Add("diagnosticCount", errors.Length.ToString(CultureInfo.InvariantCulture))
+            .Add("diagnostics", string.Join(Environment.NewLine, errors.Take(20).Select(static diagnostic =>
+                diagnostic.ToString())));
+        error = new SharpProofError(
+            syntaxFailure ? SymbolicErrorCodes.ParseFailed : SymbolicErrorCodes.CompilationFailed,
+            syntaxFailure ? SharpProofErrorCategory.Parse : SharpProofErrorCategory.Input,
+            (syntaxFailure ? "Source parsing failed: " : "Source compilation failed: ") + first.GetMessage(),
+            SymbolicErrorExitCodes.InvalidData,
+            false,
+            details);
+        return true;
     }
     private MethodEffects AnalyzeMethodEffects(SharpProofTarget target, CancellationToken cancellationToken) {
         if (target.Kind is SharpProofTargetKind.Span or SharpProofTargetKind.AllLines)
@@ -264,6 +356,8 @@ public sealed class SharpProofAnalysisSession : IDisposable {
                 continue;
             effects.Add(session.Analyze(resolved.MethodSymbol, resolved.Declaration, model));
         }
+        if (effects.Count == 0)
+            throw new ArgumentOutOfRangeException(nameof(target), "No analyzable method bodies were found in the requested target.");
         var combinedEffects = SharpProofEffect.None;
         var capabilities = SharpProofCapability.None;
         var exceptions = ImmutableArray.CreateBuilder<MethodExceptionFact>();
@@ -293,6 +387,11 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         if (!string.IsNullOrWhiteSpace(request.Condition)) {
             if (request.Target.Kind != SharpProofTargetKind.Point)
                 throw new ArgumentException("Condition proof requests require a point target.", nameof(request));
+            if (SymbolicSourceTargetSelector.FindOnLine(
+                    _source.SyntaxTree,
+                    request.Target.Line!.Value,
+                    cancellationToken).Count == 0)
+                throw new ArgumentOutOfRangeException(nameof(request), "No program point exists at the requested point.");
             var proof = _conditionProofEngine.ProveAtSyntaxTree(
                 _source.SyntaxTree,
                 _source.Compilation,
@@ -385,16 +484,14 @@ public sealed class SharpProofAnalysisSession : IDisposable {
             case SharpProofTargetKind.Point:
                 var pointPosition = SymbolicSourceLocation.GetPosition(
                     syntaxTree, target.Line!.Value, target.Column ?? 1, cancellationToken);
-                var lineNodes = SymbolicSourceTargetSelector.FindOnLine(syntaxTree, target.Line.Value, cancellationToken);
-                if (lineNodes.Count == 0) throw new ArgumentException("No program points found on --line.", nameof(target));
-                Add(SymbolicSourceTargetSelector.SelectNearest(lineNodes, pointPosition));
+                Add(SymbolicSourceTargetSelector.FindNarrowestAtPosition(root, pointPosition));
                 break;
             case SharpProofTargetKind.Position:
                 var position = target.Position!.Value;
                 var text = syntaxTree.GetText(cancellationToken);
                 if (position < 0 || position > text.Length)
                     throw new ArgumentOutOfRangeException(nameof(target), "--position must be within the source text span.");
-                Add(SymbolicSourceTargetSelector.FindAtPosition(root, position));
+                Add(SymbolicSourceTargetSelector.FindNarrowestAtPosition(root, position));
                 break;
             case SharpProofTargetKind.Line:
                 foreach (var node in SymbolicSourceTargetSelector.FindOnLine(syntaxTree, target.Line!.Value, cancellationToken)) Add(node);
@@ -412,6 +509,8 @@ public sealed class SharpProofAnalysisSession : IDisposable {
             default:
                 throw new NotSupportedException("Target kind is not supported for syntax tree queries.");
         }
+        if (points.Count == 0)
+            throw new ArgumentOutOfRangeException(nameof(target), "No program points were found in the requested target.");
         return points;
     }
     private static SharpProofUnknownReason Convert(SymbolicUnknownReasonInfo reason) => new(

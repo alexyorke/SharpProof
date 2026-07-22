@@ -28,11 +28,14 @@ internal static class SymbolCurrentValueResolver {
                 if (ReferenceEquals(statement, containingStatement)) break;
                 var mutations = SymbolicMutationInventory.Create(statement, semanticModel, cancellationToken);
                 if (statement is LocalDeclarationStatementSyntax localDeclaration) {
+                    var declaredHere = false;
                     foreach (var declarator in localDeclaration.Declaration.Variables)
                         if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol &&
-                            SymbolEqualityComparer.Default.Equals(localSymbol.OriginalDefinition, symbol))
+                            SymbolEqualityComparer.Default.Equals(localSymbol.OriginalDefinition, symbol)) {
                             currentValue = declarator.Initializer?.Value;
-                    if (mutations.MutatesSymbol(symbol))
+                            declaredHere = true;
+                        }
+                    if (!declaredHere && mutations.MutatesSymbol(symbol))
                         currentValue = null;
                     continue;
                 }

@@ -19,3 +19,6 @@ The authoritative diagnostic titles, severities, messages, descriptions, and con
 <a id="sp0042"></a> SP0042 - nullable parameter contract violation.
 <a id="sp0043"></a> SP0043 - nullable member contract violation.
 <a id="sp0044"></a> SP0044 - unsafe null-forgiving operator.
+<a id="sp0045"></a> SP0045 - `[ZeroAllocations]` could not be verified because allocation analysis is incomplete.
+<a id="sp0046"></a> SP0046 - `[DoesNotThrow]` or `[AllowedExceptions]` could not be verified because exception escape analysis is incomplete.
+<a id="sp0047"></a> SP0047 - a nullable flow contract could not be verified because its target or symbolic result is unknown.

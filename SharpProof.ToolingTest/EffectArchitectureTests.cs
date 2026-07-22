@@ -113,7 +113,7 @@ public sealed class EffectArchitectureTests {
             "Implied" + "Conditions"
         };
         var legacyDiagnostic = new System.Text.RegularExpressions.Regex(
-            @"SP(?:000[3-9]|001[0-247]|002[0369]|003[1-9]|004[0567]|00(?:4[89]|5[0-9]|6[0-9]|7[0-6]))",
+            @"SP(?:000[3-9]|001[0-247]|002[0369]|003[1-9]|0040|00(?:4[89]|5[0-9]|6[0-9]|7[0-6]))",
             System.Text.RegularExpressions.RegexOptions.CultureInvariant);
         foreach (var relativeRoot in roots) {
             var path = Path.Combine(root, relativeRoot);

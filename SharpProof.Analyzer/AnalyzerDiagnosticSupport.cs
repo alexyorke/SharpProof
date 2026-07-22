@@ -1,5 +1,17 @@
 namespace SharpProof.Analyzer;
 internal static class ContractDiagnosticSupport {
+    internal static void ReportInvalidEffectConfigurations(MethodBodyAnalysisContext context) {
+        var effects = context.State.GetMethodEffects(context.CancellationToken);
+        foreach (var reason in effects.UnknownReasons
+                     .Where(static reason => reason.IsConfigurationRelated)
+                     .Distinct())
+            context.ReportDiagnostic(Diagnostic.Create(
+                AnalyzerDiagnosticCatalog.Get("InvalidAnalyzerConfigurationRule"),
+                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
+                "sharpproof_effect_contract.*",
+                "<configured contract>",
+                reason.Message));
+    }
     internal static string FormatUnknownReason(SymbolicConditionProofResult proof, string contractAttributeName) {
         if (proof.UnknownReason != SymbolicUnknownReason.None &&
             proof.UnknownReason != SymbolicUnknownReason.Unknown)

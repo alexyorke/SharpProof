@@ -4,6 +4,7 @@ internal static class SymbolicRuntimeHazardCandidateFactory {
     private static readonly TryLowerOperationHazard[] OperationHazardLowerers =
     [
         SymbolicOperationLowerer.TryLowerDivideByZeroHazard,
+        SymbolicOperationLowerer.TryLowerDecimalOverflowHazard,
         SymbolicOperationLowerer.TryLowerCheckedOverflowHazard,
         SymbolicOperationLowerer.TryLowerNullableValueCastHazard,
         SymbolicOperationLowerer.TryLowerUnboxNullCastHazard,
@@ -38,7 +39,10 @@ internal static class SymbolicRuntimeHazardCandidateFactory {
                          !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))) {
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var candidate in EnumerateCandidatesForNode(node, semanticModel, cancellationToken)) {
-                var key = candidate.Kind + ":" + candidate.Site.SpanStart + ":" + candidate.Site.Span.End;
+                var operation = candidate.Operation;
+                var key = candidate.Kind + ":" + operation.PreconditionKind + ":" + operation.ExceptionType + ":" +
+                          operation.Category + ":" + candidate.Site.SpanStart + ":" + candidate.Site.Span.End + ":" +
+                          operation.Origin.Provenance + ":" + SymbolicState.CreateProofConditionKey(operation.Trigger);
                 if (seen.Add(key)) yield return candidate;
             }
         }

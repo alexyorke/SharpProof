@@ -14,14 +14,40 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
         CancellationToken cancellationToken = default,
         SymbolicRuntimeHazardQueryOptions? options = null) {
         var scope = target.Kind switch {
-            SharpProofTargetKind.Line or SharpProofTargetKind.Point => new RuntimeHazardScope(
+            SharpProofTargetKind.Line => new RuntimeHazardScope(
                 SymbolicSourceLocation.GetLineSpan(syntaxTree, target.Line!.Value, cancellationToken)),
+            SharpProofTargetKind.Point => CreatePositionScope(
+                syntaxTree,
+                SymbolicSourceLocation.GetPosition(
+                    syntaxTree,
+                    target.Line!.Value,
+                    target.Column ?? 1,
+                    cancellationToken),
+                cancellationToken),
+            SharpProofTargetKind.Position => CreatePositionScope(
+                syntaxTree,
+                target.Position!.Value,
+                cancellationToken),
             SharpProofTargetKind.Span => new RuntimeHazardScope(
                 SymbolicSourceLocation.GetSourceSpan(syntaxTree, target.SpanStart!.Value, target.SpanEnd!.Value, cancellationToken)),
             SharpProofTargetKind.AllLines => RuntimeHazardScope.All,
             _ => throw new NotSupportedException("Target kind is not supported for runtime hazard queries.")
         };
         return QuerySyntaxTreeRuntimeHazardsCore(syntaxTree, compilation, scope, smtAnalysis, cancellationToken, options);
+    }
+    private static RuntimeHazardScope CreatePositionScope(
+        SyntaxTree syntaxTree,
+        int position,
+        CancellationToken cancellationToken) {
+        var text = syntaxTree.GetText(cancellationToken);
+        if (position < 0 || position > text.Length)
+            throw new ArgumentOutOfRangeException(nameof(position), "--position must be within the source text span.");
+        var root = syntaxTree.GetRoot(cancellationToken);
+        var narrow = SymbolicSourceTargetSelector.FindNarrowestAtPosition(root, position);
+        var container = narrow.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault() ??
+                        narrow.AncestorsAndSelf().OfType<ArrowExpressionClauseSyntax>().FirstOrDefault()?.Expression ??
+                        narrow;
+        return new RuntimeHazardScope(container.Span, position);
     }
     public SymbolicRuntimeHazardQueryResult QueryNodeRuntimeHazards(
         SyntaxNode node,
@@ -74,6 +100,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
         var hazards = SymbolicRuntimeHazardCandidateFactory
             .EnumerateCandidates(root, semanticModel, cancellationToken, includeNestedCallables)
             .Where(candidate => !scope.Span.HasValue || candidate.Site.Span.IntersectsWith(scope.Span.Value))
+            .Where(candidate => !scope.Position.HasValue || candidate.Site.Span.Contains(scope.Position.Value))
             .Where(candidate => options.Includes(candidate.Kind))
             .Select(candidate => ClassifyCandidate(semanticModel, candidate, smtAnalysis, cancellationToken, initialState))
             .Where(hazard => options.IncludeUnprovenCandidates || hazard.Status == SymbolicRuntimeHazardStatus.Proven)
@@ -82,7 +109,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             .ToArray();
         return new SymbolicRuntimeHazardQueryResult(hazards);
     }
-    readonly record struct RuntimeHazardScope(TextSpan? Span) {
+    readonly record struct RuntimeHazardScope(TextSpan? Span, int? Position = null) {
         public static RuntimeHazardScope All { get; } = new(null);
     }
     private SymbolicRuntimeHazard ClassifyCandidate(

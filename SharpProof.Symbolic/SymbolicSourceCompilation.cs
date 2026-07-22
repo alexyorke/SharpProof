@@ -35,10 +35,12 @@ internal static class SymbolicSourceCompilation {
         var syntaxTree = CSharpSyntaxTree.ParseText(sourceText, parseOptions, filePath, cancellationToken: cancellationToken);
         var referenceArray = NormalizeReferences(references);
         if (referenceArray.IsDefaultOrEmpty) referenceArray = GetTrustedPlatformReferences();
+        referenceArray = EnsureReference(referenceArray, typeof(SharpProof.Attributes.EnforcePureAttribute).Assembly.Location);
         var compilationOptions = new CSharpCompilationOptions(
             OutputKind.DynamicallyLinkedLibrary,
             optimizationLevel: OptimizationLevel.Debug,
             platform: Platform.AnyCpu,
+            allowUnsafe: true,
             nullableContextOptions: NullableContextOptions.Disable);
         var compilation = CSharpCompilation.Create(
             assemblyName,
@@ -46,6 +48,16 @@ internal static class SymbolicSourceCompilation {
             referenceArray,
             compilationOptions);
         return (syntaxTree, compilation);
+    }
+    private static ImmutableArray<MetadataReference> EnsureReference(
+        ImmutableArray<MetadataReference> references,
+        string assemblyPath) {
+        if (references.Any(reference => string.Equals(
+                reference.Display,
+                assemblyPath,
+                StringComparison.OrdinalIgnoreCase)))
+            return references;
+        return references.Add(MetadataReference.CreateFromFile(assemblyPath));
     }
     private static ImmutableArray<MetadataReference> NormalizeReferences(IEnumerable<MetadataReference>? references) {
         if (references == null) return [];

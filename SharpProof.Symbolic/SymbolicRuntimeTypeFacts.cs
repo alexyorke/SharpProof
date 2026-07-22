@@ -16,7 +16,7 @@ internal static class SymbolicRuntimeTypeFacts {
                 semanticModel,
                 cancellationToken,
                 out var currentValueExpression))
-            return TryGetExactRuntimeType(currentValueExpression, useNode, semanticModel, cancellationToken, out exactType,
+            return TryGetExactRuntimeType(currentValueExpression, currentValueExpression, semanticModel, cancellationToken, out exactType,
                 inlineDepth + 1);
         var expressionType = GetNaturalExpressionType(expression, semanticModel, cancellationToken);
         if (expressionType != null && IsNonNullableValueType(expressionType)) {

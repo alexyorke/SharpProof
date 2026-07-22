@@ -68,8 +68,21 @@ public static class FuzzRunner {
             var cases = Enumerable.Range(startIndex, batchSize)
                 .Select(createCase)
                 .ToImmutableArray();
-            var analyses =
-                await AnalyzeCasesCoreAsync(cases, options.RepeatAnalyzer, options.Parallelism, cancellationToken);
+            ImmutableArray<FuzzCaseAnalysis> analyses;
+            using (var deadlineCancellation = CreateDeadlineCancellation(deadline, cancellationToken)) {
+                try {
+                    analyses = await AnalyzeCasesCoreAsync(
+                        cases,
+                        options.RepeatAnalyzer,
+                        options.Parallelism,
+                        deadlineCancellation?.Token ?? cancellationToken);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested &&
+                                                         deadline is { } batchEnd &&
+                                                         DateTimeOffset.UtcNow >= batchEnd) {
+                    break;
+                }
+            }
             foreach (var analysis in analyses) {
                 var updatedAnalysis = analysis;
                 if (analysis.Findings.Length > 0) {
@@ -104,6 +117,20 @@ public static class FuzzRunner {
         var summary = builder.Build(DateTimeOffset.UtcNow, stopwatch.Elapsed, options.OutputDirectory, savedInterestingCases);
         await WriteArtifactsAsync(summary, options.OutputDirectory, false, cancellationToken);
         return summary;
+    }
+    internal static CancellationTokenSource? CreateDeadlineCancellation(
+        DateTimeOffset? deadline,
+        CancellationToken userCancellationToken) {
+        if (deadline == null) return null;
+        var remaining = deadline.Value - DateTimeOffset.UtcNow;
+        var source = CancellationTokenSource.CreateLinkedTokenSource(userCancellationToken);
+        if (remaining <= TimeSpan.Zero) {
+            source.Cancel();
+            return source;
+        }
+        var maximumDelay = TimeSpan.FromMilliseconds(int.MaxValue);
+        source.CancelAfter(remaining > maximumDelay ? maximumDelay : remaining);
+        return source;
     }
     internal static async Task<ImmutableArray<FuzzCaseAnalysis>> AnalyzeCasesCoreAsync(
         ImmutableArray<FuzzCase> fuzzCases,
@@ -180,14 +207,6 @@ public static class FuzzRunner {
                     [.. diagnosticSignatures
 , .. secondDiagnosticSignatures, .. firstDiagnostics.Exceptions, .. secondDiagnostics.Exceptions]));
             }
-            foreach (var exception in secondDiagnostics.Exceptions)
-                findings.Add(new FuzzFinding(
-                    fuzzCase.Name,
-                    fuzzCase.Family,
-                    "analyzer_exception",
-                    exception,
-                    null,
-                    []));
         }
         AddMissingExpectedShapeFindings(fuzzCase, operationKinds, syntaxKinds, findings);
         return new FuzzCaseAnalysis(
@@ -253,7 +272,7 @@ public static class FuzzRunner {
         ImmutableArray<Diagnostic> diagnostics,
         ImmutableArray<string> analyzerExceptions) {
         var findings = ImmutableArray.CreateBuilder<FuzzFinding>();
-        foreach (var exception in analyzerExceptions)
+        foreach (var exception in analyzerExceptions.Distinct(StringComparer.Ordinal))
             findings.Add(new FuzzFinding(
                 fuzzCase.Name,
                 fuzzCase.Family,
@@ -262,6 +281,19 @@ public static class FuzzRunner {
                 null,
                 []));
         if (!analyzerExceptions.IsEmpty) return findings;
+        if (effects.Status is SharpProofQueryStatus.Failed or SharpProofQueryStatus.Canceled ||
+            effects.MethodEffects == null) {
+            findings.Add(new FuzzFinding(
+                fuzzCase.Name,
+                fuzzCase.Family,
+                "symbolic_analysis_failure",
+                effects.Error?.Message ?? "Symbolic analysis did not return method effects.",
+                null,
+                effects.Error == null
+                    ? ["status=" + effects.Status]
+                    : ["status=" + effects.Status, "error=" + effects.Error.Code]));
+            return findings;
+        }
         EvaluateEffectExpectation(fuzzCase, effects, diagnostics, findings);
         return findings;
     }

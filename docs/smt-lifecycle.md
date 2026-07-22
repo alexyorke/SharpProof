@@ -1,117 +1,66 @@
-# SMT Lifecycle And Health
+# SMT Lifecycle And Conservative Fallback
 
-SharpProof reuses one Z3-backed proof-search context per managed thread. Reuse
-avoids repeatedly loading native state in analyzer hosts, while the proof-result
-cache remains separate from those contexts. Lifecycle controls make recovery
-and cleanup explicit without discarding valid cached conclusions.
+SharpProof creates a bounded SMT service for each `SharpProofAnalysisSession`.
+The service reuses native solver sessions internally and caches reusable proof
+results, but resource accounting is reset for each top-level analysis request.
+One method or request therefore cannot consume the SMT budget of a later,
+unrelated request.
 
-The NuGet packages bundle native Z3 only for Windows x64 and macOS x64. Linux,
-arm64, and other unsupported package/RID combinations use the permanent
-conservative fallback unless the host supplies a compatible native library.
-See [native SMT packaging and platform support](native-smt-packaging.md).
+The public entry point is `SharpProofAnalysisSession.Analyze`. Solver lifecycle
+types are implementation details and are not a supported public API.
 
-## Default Recovery
+## Availability And Recovery
 
-`SmtSolverLifecycleOptions.Default` uses these settings:
+The NuGet packages bundle native Z3 for the runtime identifiers documented in
+[native SMT packaging and platform support](native-smt-packaging.md). On an
+unsupported platform, or when the native library cannot be loaded, SharpProof
+returns a conservative `Unknown` result with an `smt_unavailable` reason. It
+does not silently treat an unavailable solver as a successful proof.
 
-| Setting | Default | Meaning |
-| --- | ---: | --- |
-| `MaxTransientRetries` | 1 | Retry a logical proof once after a transient Z3 failure. |
-| `RecycleContextOnTransientFailure` | `true` | Dispose the failed current-thread context before retrying. |
-| `DisposeCurrentThreadContextOnServiceDispose` | `true` | Dispose every native proof session owned by the service. |
+Transient solver failures are retried once by default after recycling the
+current native solver session. An exhausted transient failure returns
+`Unknown` with `smt_transient_failure`. Timeouts, incomplete encodings, and
+resource limits similarly return structured Unknown reasons. Proven cache
+entries remain reusable after a solver session is recycled.
 
-A Z3 exception reported by the solver is transient. SharpProof records
-`smt_transient_failure`, recycles the context by default, and retries within the
-configured count. A successful retry returns the proof and records recovery in
-health telemetry. An exhausted transient failure stays unknown and is not put
-in the local or shared result cache, so a later request can recover.
+Disposing `SharpProofAnalysisSession` disposes the SMT service and all native
+solver sessions owned by it. Callers should therefore use `using` or otherwise
+dispose sessions deterministically.
 
-Native library absence, incompatible native binaries, unsupported platforms,
-and context initialization failures are treated as permanent for that
-`SmtAnalysisService`. Further requests return `smt_unavailable` without trying
-to recreate the context. `IsPermanentlyUnavailable` and `Health` expose this
-state directly.
+## Public Result Surface
 
-Timeouts, resource budgets, and formula-encoding failures remain conservative
-query outcomes. They do not mark the solver service permanently unavailable.
+Solver outcomes are exposed through `SharpProofAnalysisResult`:
 
-## Health Snapshot
+- `Status` is `Succeeded`, `Unknown`, `Failed`, or `Canceled`.
+- `ProofFacts` contains the requested proof status and compact evidence.
+- `UnknownReasons` contains stable reason codes such as `smt_unavailable`,
+  `smt_timeout`, and `smt_method_budget_exceeded`.
+- `Truncations` records bounded-analysis limits that were reached.
+- `Error` contains structured input or internal failures.
 
-`SmtAnalysisService.Health` returns an immutable `SmtAnalysisHealth` snapshot:
-
-- `State`: `Disabled`, `Ready`, `Degraded`, `PermanentlyUnavailable`, or
-  `Disposed`
-- `LastFailureCode`
-- consecutive transient failures
-- transient retry and recovered-failure counts
-- context recycle count and global context generation
-- `IsAvailable` and `IsPermanentlyUnavailable` convenience flags
-
-The same snapshot and the active `SmtSolverLifecycleOptions` are included in
-`SharpProofSmtMetadata` and in canonical CLI invariant and runtime-hazard
-JSON. Typed results and CLI JSON therefore expose
-health without requiring direct access to the service instance.
-
-## Explicit Recycling
-
-Use the service methods when a host reaches an intentional maintenance point:
-
-```csharp
-using var smt = new SmtAnalysisService(
-    SmtAnalysisOptions.Default.WithLifecycle(
-        new SmtSolverLifecycleOptions(maxTransientRetries: 2)));
-
-var current = smt.RecycleCurrentThreadSolverContext();
-var global = smt.RequestGlobalSolverContextRecycle();
-```
-
-`RecycleCurrentThreadSolverContext()` immediately disposes a context on the
-calling thread when one exists. `RequestGlobalSolverContextRecycle()` advances
-a process-wide generation and disposes the calling thread's context. Contexts
-on other threads are disposed lazily the next time those threads use the
-solver; a thread-static object cannot safely be synchronously disposed from a
-different thread.
-
-Both methods return `SmtSolverContextRecycleResult`, including the scope,
-whether the current context was disposed, the requested generation, and local
-and shared cache counts. Neither operation clears proof-result caches. Cached
-proven results remain reusable after context recycling.
-
-Service disposal owns and disposes every proof session created by that service
-by default. Disposal is serialized with solver use, so a worker cannot still be
-executing in a session when it is released. The
-`DisposeCurrentThreadContextOnServiceDispose=false` setting is retained only as
-an explicit compatibility opt-out for hosts that manage native-session lifetime
-externally. For process-wide maintenance while services remain active, use the
-generation-based global recycle request.
-
-## Analyzer Configuration
-
-The analyzer accepts compilation-global lifecycle options:
-
-```ini
-is_global = true
-
-sharpproof_smt_transient_retry_count = 2
-sharpproof_smt_recycle_context_on_transient_failure = true
-sharpproof_smt_dispose_thread_context_on_service_dispose = false
-```
-
-The retry count must be non-negative. Invalid values produce `SP0025` and leave
-the documented default active.
+Internal health counters and solver-context recycling methods are not emitted
+by the public API or CLI. Consumers must gate on the requested proof fact, not
+only on the overall query status.
 
 ## CLI
 
-The symbolic CLI exposes matching controls:
+The CLI uses the same session lifecycle and accepts this shape:
 
 ```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --line 42 --check-reachability `
-  --smt-transient-retries 2 `
-  --smt-dispose-context-on-exit `
-  --json
+dotnet run --project Tools/SharpProof.SymbolicCli -- analyze `
+  --file Example.cs `
+  --target line:42 `
+  --facets proofs,hazards `
+  --condition "left < right" `
+  --format json `
+  --fail-on-unknown `
+  --fail-on-disproven
 ```
 
-Use `--smt-keep-context-on-transient-failure` only for diagnostics or a host
-that supplies its own context recovery; the default recycle-before-retry path
-is safer. Text SMT diagnostics print health and lifecycle counters. JSON emits
-nested `smtDiagnostics.health` and `smtDiagnostics.lifecycle` objects.
+Targets are `line:N[:column]`, `position:N`, `span:start:end`, and
+`all-lines`. Facets are `effects`, `proofs`, `hazards`, and `complexity`.
+The only proof gates are `--fail-on-unknown` and `--fail-on-disproven`.
+
+Exit codes are 0 for an accepted result, 2 for CLI usage errors, 3 for analysis
+failures, 4 when the Unknown gate fails, and 5 when a requested proof or effect
+verdict is disproven.

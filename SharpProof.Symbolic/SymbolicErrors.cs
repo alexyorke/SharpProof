@@ -5,6 +5,7 @@ internal static class SymbolicErrorCodes {
     public const string UnsupportedTarget = "SPQ1002";
     public const string SourceNotFound = "SPQ1100";
     public const string ParseFailed = "SPQ1200";
+    public const string CompilationFailed = "SPQ1201";
     public const string NativeSolverUnavailable = "SPQ2000";
     public const string SolverFailed = "SPQ2001";
     public const string TimedOut = "SPQ2100";

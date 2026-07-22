@@ -142,14 +142,11 @@ internal sealed class SymbolicComplexityCallModel(
         cost = SymbolicCostExpression.Unknown(SymbolicComplexityUnknownReason.Unknown);
         if (methodSymbol.MethodKind == MethodKind.PropertyGet &&
             methodSymbol.AssociatedSymbol is IPropertySymbol property) {
-            if (property.IsIndexer &&
-                methodSymbol.Parameters.Length <= 1) {
+            if (SymbolicComplexityCostModel.IsKnownConstantTimeIndexer(property)) {
                 cost = SymbolicCostExpression.Constant();
                 return true;
             }
-            if ((string.Equals(property.Name, "Length", StringComparison.Ordinal) ||
-                 string.Equals(property.Name, "Count", StringComparison.Ordinal)) &&
-                SymbolicComplexityCostModel.IsKnownSizedType(property.ContainingType)) {
+            if (SymbolicComplexityCostModel.IsKnownConstantTimeSizeProperty(property)) {
                 cost = SymbolicCostExpression.Constant();
                 return true;
             }

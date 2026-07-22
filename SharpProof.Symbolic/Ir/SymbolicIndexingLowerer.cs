@@ -131,17 +131,17 @@ internal static class SymbolicIndexingLowerer {
         term = null!;
         if (!TryGetArrayDimensionInvocation(invocation, method, context, out var receiverExpression, out var dimension))
             return false;
-        var receiverType = SymbolicStringLengthLowerer.GetPreferredLengthSemanticType(receiverExpression, context);
-        if (receiverType is not IArrayTypeSymbol) return false;
         if (string.Equals(method.Name, nameof(Array.GetLowerBound), StringComparison.Ordinal)) {
-            if (!TryLowerArrayDimensionLengthTerm(receiverExpression, dimension, context, out _)) return false;
-            term = new SymbolicIntegerConstantTerm(0);
-            return true;
+            return TryLowerArrayDimensionLowerBoundTerm(receiverExpression, dimension, context, out term);
         }
         if (!string.Equals(method.Name, nameof(Array.GetUpperBound), StringComparison.Ordinal) ||
+            !TryLowerArrayDimensionLowerBoundTerm(receiverExpression, dimension, context, out var lowerBound) ||
             !TryLowerArrayDimensionLengthTerm(receiverExpression, dimension, context, out var length))
             return false;
-        term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, length, new SymbolicIntegerConstantTerm(1));
+        term = new SymbolicBinaryTerm(
+            SymbolicBinaryTermOperator.Subtract,
+            new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, lowerBound, length),
+            new SymbolicIntegerConstantTerm(1));
         return true;
     }
     private static bool TryGetArrayDimensionInvocation(
@@ -193,6 +193,32 @@ internal static class SymbolicIndexingLowerer {
             CreateLengthTerm(arrayTerm, out term))
             return true;
         term = new SymbolicArrayDimensionLengthTerm(arrayTerm, dimension);
+        return true;
+    }
+    private static bool TryLowerArrayDimensionLowerBoundTerm(
+        ExpressionSyntax arrayExpression,
+        int dimension,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term) {
+        arrayExpression = UnwrapExpression(arrayExpression);
+        var type = SymbolicStringLengthLowerer.GetPreferredLengthSemanticType(arrayExpression, context);
+        if (type is not IArrayTypeSymbol arrayType || dimension < 0 || dimension >= arrayType.Rank) {
+            term = null!;
+            return false;
+        }
+        if (IsKnownZeroBasedArray(arrayExpression, arrayType)) {
+            term = new SymbolicIntegerConstantTerm(0);
+            return true;
+        }
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(arrayExpression, context), out var arrayTerm) ||
+            arrayTerm.Kind != SmtValueKind.Reference) {
+            term = null!;
+            return false;
+        }
+        term = new SymbolicVariableTerm(
+            SymbolicState.CreateProofTermKey(arrayTerm) + ".GetLowerBound(" +
+            dimension.ToString(CultureInfo.InvariantCulture) + ")",
+            SmtValueKind.Int);
         return true;
     }
     private static bool TryLowerReferenceCastArrayDimensionLengthTerm(
@@ -346,13 +372,29 @@ internal static class SymbolicIndexingLowerer {
         for (var dimension = 0; dimension < typedArray.Rank; dimension++) {
             if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(indexExpressions[dimension], context), out var index) ||
                 index.Kind != SmtValueKind.Int ||
+                !TryLowerArrayDimensionLowerBoundTerm(arrayExpression, dimension, context, out var lowerBound) ||
                 !TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var length))
                 return false;
             subject ??= index;
-            var dimensionInRange = new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicBoundsAtom(index, length, true, true),
-                source,
-                provenance));
+            SymbolicCondition dimensionInRange = IsKnownZeroBasedArray(arrayExpression, typedArray)
+                ? new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicBoundsAtom(index, length, true, true),
+                    source,
+                    provenance))
+                : new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    CreateRelationCondition(
+                        SymbolicRelationOperator.LessThanOrEqual,
+                        lowerBound,
+                        index,
+                        source,
+                        provenance + ".at-or-above-lower-bound"),
+                    CreateRelationCondition(
+                        SymbolicRelationOperator.LessThan,
+                        index,
+                        new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, lowerBound, length),
+                        source,
+                        provenance + ".below-upper-bound"));
             combined = combined == null
                 ? dimensionInRange
                 : new SymbolicBinaryCondition(SymbolicConditionOperator.And, combined, dimensionInRange);
@@ -360,6 +402,11 @@ internal static class SymbolicIndexingLowerer {
         if (combined == null) return false;
         condition = combined;
         return true;
+    }
+    private static bool IsKnownZeroBasedArray(ExpressionSyntax expression, IArrayTypeSymbol arrayType) {
+        if (arrayType.IsSZArray) return true;
+        expression = UnwrapExpression(expression);
+        return expression is ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax;
     }
     internal static bool TryCreateBuiltInElementAccessInRangeCondition(
         ExpressionSyntax receiverExpression,
