@@ -5242,30 +5242,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** Memory pressure grows over time in long-running analysis sessions.
 * **Recommendation:** Add a bounded eviction policy (e.g., LRU or size limit) to the static fallback cache.
 
-#### [PB3-3.4] 3.4 Enumerable.First() on IGrouping Without Guard in SymbolicMutationInventory
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** First() on potentially empty grouping result.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicMutationInventory.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicMutationInventory.cs#L70-L75)
-* **Severity:** Medium
-* **Description:** `CreateMutableContextInventory` uses LINQ `GroupBy` then calls `.First()` on the grouping result. If the group is empty (e.g., all items filtered out by a preceding `Where` clause), `First()` throws `InvalidOperationException`.
-* **Impact:** Analysis crash when mutation inventory grouping produces empty groups.
-* **Recommendation:** Use `FirstOrDefault` with null check.
-
-#### [PB3-3.5] 3.5 SymbolicAnalysisLimits Budget Exhaustion Does Not Reset Between Compilations
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Budget tracking counters are preserved across compilations without reset.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicAnalysisLimits.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicAnalysisLimits.cs#L1-L60)
-* **Severity:** Medium
-* **Description:** The analysis limits class uses static or long-lived counters to track budget consumption. Once the budget is exhausted for one compilation, subsequent compilations start with an already-exhausted budget, preventing analysis of later files.
-* **Impact:** Following compilations in a batch may receive limited or zero analysis budget.
-* **Recommendation:** Reset budget counters at the start of each compilation.
-
 #### [PB3-3.6] 3.6 SymbolicInvariantService Caches Invariants Without Compilation Identity
 
 > **Disposition:** Needs investigation
@@ -5328,42 +5304,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 4 Analyzer & Contracts (Agent 4)
 
-#### [PB3-4.1] 4.1 EnforcePureContractAnalyzer Cross-File `FileLinePositionSpan` Crash
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** GetMappedLineSpan throws when syntax tree file path is null.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [EnforcePureContractAnalyzer.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/EnforcePureContractAnalyzer.cs#L120-L130)
-* **Severity:** High
-* **Description:** The analyzer calls `location.GetMappedLineSpan()` on locations from different compilation units. When analyzing cross-file references, `FileLinePositionSpan.Path` may be `null` (e.g., for `#line` directives or embedded files), and `GetMappedLineSpan()` throws `InvalidOperationException`. `GetCallableDeclarationLocation` at `AnalyzerSyntaxHelpers.cs:29` calls `syntaxReference.GetSyntax(cancellationToken)` which can return nodes from different syntax trees without checking, and then accesses `Location` properties that assume file-backed locations.
-* **Impact:** Analyzer crashes on cross-file analysis when locations lack file paths.
-* **Recommendation:** Catch `InvalidOperationException` around `GetMappedLineSpan()` or check `location.IsInSource` before accessing file-backed spans.
-
-#### [PB3-4.2] 4.2 AnalyzerSession GetOrCreateMethodBodyAnalysis Swallows Errors from Lazy Initialization
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Error recovery removes the failed entry but does not propagate the exception meaningfully.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [AnalyzerSession.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/AnalyzerSession.cs#L33-L41)
-* **Severity:** Medium
-* **Description:** The `catch` block at line 36 removes the entry from `_methodBodyAnalyses` if it fails during initialization. This means subsequent calls for the same method will re-attempt initialization, potentially causing infinite retry loops on persistent failures. Additionally, the `ReferenceEquals` check at line 38 may not match if `GetOrAdd` returned a different `Lazy` instance that was added by a concurrent thread. In that case, the failed lazy's entry is NOT removed, leaving a failed lazy in the dictionary that will throw `LazyInitializationException` (wrapping the original exception) on every subsequent access.
-* **Impact:** Persistent failures if the lazy was replaced concurrently, or infinite retry loops otherwise.
-* **Recommendation:** Use `GetOrAdd` with `TryAdd` pattern, or track failed symbols to avoid infinite retry loops.
-
-#### [PB3-4.3] 4.3 MethodCapabilityAnalyzer Cross-File Span Crash on `GetMappedLineSpan`
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Same cross-file GetMappedLineSpan issue as EnforcePureContractAnalyzer.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [MethodCapabilityAnalyzer.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/MethodCapabilityAnalyzer.cs#L90-L100)
-* **Severity:** High
-* **Description:** `MethodCapabilityAnalyzer` also calls `GetMappedLineSpan` on locations that may be cross-file. The pattern is the same as PB3-4.1 — `FileLinePositionSpan.Path` is `null` for embedded or generated files. Additionally, this analyzer may receive `location.SourceSpan` when the tree is not the current compilation's tree, producing garbage spans.
-* **Impact:** Analyzer crash on projects with generated code or embedded resources.
-* **Recommendation:** Add cross-file location guards before accessing `GetMappedLineSpan()`.
-
 #### [PB3-4.4] 4.4 MethodAllocationAnalyzer Does Not Handle Allocas from Non-Current Compilation
 
 > **Disposition:** Needs investigation
@@ -5375,42 +5315,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Description:** `MethodAllocationAnalyzer` processes `IOperation` trees and accesses `SemanticModel` and `Compilation` for analyzed operations. When analyzing cross-file or cross-compilation references (e.g., `#line` directives pointing to different files), operations from non-current compilations may reference symbols from other compilations. The analyzer does not guard against this, potentially causing `InvalidOperationException` when resolving symbols from foreign compilations.
 * **Impact:** Analyzer crash when processing allocation operations from cross-compilation references.
 * **Recommendation:** Check `operation.SemanticModel?.Compilation == compilation` before accessing symbol information.
-
-#### [PB3-4.5] 4.5 AnalyzerConfiguration Does Not Validate Option Values at Parse Time
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Invalid option values are silently accepted and use defaults.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [AnalyzerConfiguration.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs#L200-L250)
-* **Severity:** Low
-* **Description:** `AnalyzerConfiguration.FromOptions` parses configuration options from `.editorconfig` and other sources. Invalid or unrecognized option values are silently ignored, resulting in defaults being used without warning. For example, a typo in `sharpproof_analysis_budget = hihg` would silently use the default budget instead of the intended high budget.
-* **Impact:** Users may unknowingly use default settings due to configuration typos.
-* **Recommendation:** Log a diagnostic warning when an option value is invalid or unrecognized.
-
-#### [PB3-4.6] 4.6 SymbolicAnalysisLimits Uses Static Counter That Leaks Across Test Runs
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Static counters persist across test fixtures, causing non-deterministic test failures.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicAnalysisLimits.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicAnalysisLimits.cs#L5-L25)
-* **Severity:** Medium
-* **Description:** The analysis budget uses an `int` counter that is shared across all threads via `Interlocked.Decrement`. Since the counter is static, test runs that exhaust the budget leave subsequent tests with a depleted budget. NUnit's `[TestCaseSource]` evaluates test cases eagerly, but the budget may be consumed by earlier tests in the same fixture. This causes non-deterministic failures depending on test ordering.
-* **Impact:** Non-deterministic test failures when budget is shared across tests.
-* **Recommendation:** Use a per-session budget (instance field) instead of a static counter, or reset the counter in `[SetUp]`.
-
-#### [PB3-4.7] 4.7 SymbolicSourceCompilationKind.Query Creates New Compilation Without Caching
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Each query creates a new C# compilation, incurring significant overhead.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicSourceCompilation.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicSourceCompilation.cs#L30-L60)
-* **Severity:** Low
-* **Description:** `SymbolicSourceCompilation.Create` with `SymbolicSourceCompilationKind.Query` creates a new `CSharpCompilation` instance for each query. In the test suite, each `[TestCase]` in `SymbolicComplexityTests` creates a new compilation, incurring significant overhead from parsing, loading references, and binding. The `SymbolicComplexityTests.cs` has ~30 test cases, each creating a compilation. For larger query volumes, this overhead is wasteful.
-* **Impact:** Slow query performance from repeated compilation creation.
-* **Recommendation:** Cache compilations by source hash or use incremental compilation.
 
 #### [PB3-4.8] 4.8 ExceptionFlowAnalyzer Does Not Handle Async Method Exception Flows
 
@@ -5436,18 +5340,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** False positive ensures violations for struct methods that modify `this`.
 * **Recommendation:** Track `this` as an implicit return value for struct methods.
 
-#### [PB3-4.10] 4.10 Missing CancellationToken Checks in Long-Running Analyzer Operations
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Several analyzer methods do not check cancellation tokens in loops or long operations.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [MethodBodyAnalysisState.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/MethodBodyAnalysisState.cs#L30-L80)
-* **Severity:** Medium
-* **Description:** `MethodBodyAnalysisState` constructor processes operation blocks in a loop but does not check `cancellationToken` between iterations. For methods with many operation blocks, this can delay IDE responsiveness during cancellation. `AnalyzerSession.GetOrCreateMethodBodyAnalysis` passes the cancellation token to the `Lazy` factory but the factory itself does not check the token during computation.
-* **Impact:** IDE hangs during analysis cancellation for large methods.
-* **Recommendation:** Add `cancellationToken.ThrowIfCancellationRequested()` calls in long-running loops.
-
 ### 5 Test Infrastructure & Tooling (Agent 5)
 
 #### [PB3-5.2] 5.2 SemanticTestSource Does Not Clean Up Temporary Files
@@ -5462,175 +5354,11 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** Temporary file accumulation over repeated test runs.
 * **Recommendation:** Use `using` for temporary file handles or register cleanup in `[OneTimeTearDown]`.
 
-#### [PB3-5.3] 5.3 SharpProofAnalyzer Does Not Handle Null Operation Blocks
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** GetOperationBlocks may return null for some syntax node types.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SharpProofAnalyzer.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/SharpProofAnalyzer.cs#L60-L80)
-* **Severity:** High
-* **Description:** `SharpProofAnalyzer.Initialize` calls `context.OperationBlocks` which may return `default(ImmutableArray<IOperation>)` for some node types (e.g., expression-bodied members before C# 6). The result is passed to `GetOrCreateMethodBodyAnalysis` which uses `operationBlocks.IsDefaultOrEmpty` to check. However, if `operationBlocks` is default (not empty), the code may not handle it correctly. Also, `SemanticModel.GetOperation` can return null for some syntax nodes, and this null propagates.
-* **Impact:** Analyzer crash on syntax constructs that produce no operation blocks.
-* **Recommendation:** Check `operationBlocks.IsDefault` in addition to `IsDefaultOrEmpty`.
-
-#### [PB3-5.4] 5.4 MethodAnalysisSnapshot Does Not Validate Syntax Node Kind Against Method Symbol
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Node matching assumes syntax node kind matches method symbol kind.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [MethodAnalysisSnapshot.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/MethodAnalysisSnapshot.cs#L15-L40)
-* **Severity:** Medium
-* **Description:** `MethodAnalysisSnapshot.Create` receives a `SyntaxNode` and `IMethodSymbol` and assumes they match. In edge cases where the syntax node belongs to a different method than the symbol (e.g., after a Roslyn binding error), the snapshot may contain mismatched data. Properties like `declaration.Identifier` may not exist for all method syntax types (e.g., anonymous functions, lambdas).
-* **Impact:** InvalidOperationException or NullReferenceException on mismatched node/symbol pairs.
-* **Recommendation:** Validate that the syntax node represents the method symbol before creating the snapshot.
-
 ### 6 SharpProof.ProofCore Collections & Utilities (Agent 6)
 
 ### 7 SMT Analysis Service & Lifecycle (Agent 7)
 
-#### [PB3-7.1] 7.1 SmtAnalysisService.Classify Re-enters Without Releasing Lock
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Classify calls itself recursively without releasing _solverLock.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtAnalysisService.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtAnalysisService.cs#L67-L71)
-* **Severity:** High
-* **Description:** `Classify` at line 67 checks `if (_methodBudgetScope.Value == null)`, creates a scope via `BeginMethodBudgetScope()`, and recursively calls `Classify(query)` at line 70. The outer `Classify` call may be inside `lock (_solverLock)` (from `ClassifyLocally` → `ClassifyCore` → `Classify` via nested method budget scopes). Wait — `Classify` is public/internal and called from `ClassifyImplication` and `ClassifyPathFeasibility`. `Classify` calls itself recursively at line 70 when there's no budget scope. This is BEFORE acquiring `_solverLock` (which happens in `ClassifyCore` at line 141). So there's no re-entrancy issue with `_solverLock` specifically. However, the recursive call at line 70 acquires `_proofResults` (caches) and then `ClassifyLocally` → `ClassifyCore` → `lock(_solverLock)`. The inner call also creates a budget scope (line 69), but the outer call's `using` scope (line 69) is from `BeginMethodBudgetScope()` which checks `_methodBudgetScope.Value != null`. Since the inner `BeginMethodBudgetScope()` at line 93 returns `MethodBudgetScope.Nested` (line 94), the inner call doesn't set a new budget scope. This is correct — the inner call reuses the outer budget scope. But the recursive `Classify` call goes through all the cache checks again — potentially causing infinite recursion if the cache misses repeatedly. The recursion depth is limited only by stack space.
-* **Impact:** Stack overflow from deep recursion if Classify never hits a cache hit for a complex query tree.
-* **Recommendation:** Use a loop instead of recursion for the budget scope initialization.
-
-#### [PB3-7.2] 7.2 SmtProofSearchSessionPool.GetOrCreate Returns Stale Session After Recycle
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** GetOrCreate returns nullified thread-local after recycle.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtProofSearchSessionPool.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtProofSearchSessionPool.cs#L9-L10)
-* **Severity:** Medium
-* **Description:** `RecycleCurrentThread` at line 11 disposes the current thread's session and sets `_sessions.Value = null`. The next call to `GetOrCreate` on the same thread at line 9 evaluates `_sessions.Value ??= _sessionFactory()` — since `_sessions.Value` is `null`, it creates a new session. This is correct behavior. However, `Dispose(true)` at line 18 also disposes all sessions. If `Dispose()` is called while a thread is actively using a session (race condition via `_solverLock` in `SmtAnalysisService`, which serializes access), the `GetOrCreate` at line 9 could return a disposed session that was recycled between `lock` release and re-acquisition. But `SmtAnalysisService.ClassifyCore` holds `_solverLock` for the entire duration, preventing concurrent access. So this is actually safe due to the lock.
-* **Impact:** Not a real bug — lock prevents concurrent access. Marking as verified safe.
-
-#### [PB3-7.3] 7.3 CreateFormulaSequenceKey Loses Distinction Between Empty and Single-Formula Sequences
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** Empty sequence key and single-element sequence key can collide in edge cases.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtAnalysisService.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtAnalysisService.cs#L286-L291)
-* **Severity:** Medium
-* **Description:** `CreateFormulaSequenceKey` returns `string.Join(string.Empty, ...)` producing `"length:key"` for each formula. An empty sequence returns `string.Empty`. For a single formula, the key is e.g., `"5:hello"`. This cannot collide with `string.Empty` since `"5:hello"` is never empty. However, the `CreateQueryKey` method at line 273 concatenates: `CreateFormulaSequenceKey(pathConditions) + "|hazard=..."`. If `pathConditions` is empty, the key starts with `"|hazard=..."`. If a path condition formula's structural key happens to start with `|`, the key would be ambiguous. `SmtFormulaStructuralKey.Create` returns keys that don't start with `|`, so this is safe. But the `NormalizePathConditions` method at line 277 filters out `SmtBooleanConstant(true)` — what if ALL path conditions are `true`? All are filtered, resulting in an empty array. The empty array key `"|hazard=..."` would collide with any query that has no path conditions. But conceptually, a query with zero path conditions (always reachable) IS the same as a query where all path conditions are true. So this collision is actually correct behavior — the queries are semantically equivalent.
-* **Impact:** Not a real bug — query keys correctly capture semantic equivalence.
-
-#### [PB3-7.4] 7.4 MethodBudgetScope.Nested Instance Leaks Through Dispose
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Nested scope's Dispose does not set _owner to null.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtAnalysisService.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtAnalysisService.cs#L194-L201)
-* **Severity:** Low
-* **Description:** `MethodBudgetScope` has a static `Nested` instance at line 195 constructed with `null` owner. Its `Dispose` method at line 198-201 calls `Interlocked.Exchange(ref _owner, null)` which is a no-op since `_owner` is already null for `Nested`. This is correct — no leak occurs. However, if `Nested.Dispose()` is called, it doesn't restore the previous budget scope. But since nested scopes share the parent scope's budget, the `Dispose` should not null out `_methodBudgetScope.Value` — and it doesn't because `_owner` is null. This is intentional: nested calls should NOT clear the parent's budget scope.
-* **Impact:** None — design is correct for nested calling.
-
-#### [PB3-7.5] 7.5 SmtProofResultCache Local Cache Is Not Bounded
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Local (non-shared) cache in SmtProofResultCache has no eviction policy.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtProofResultCache.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtProofResultCache.cs#L20-L40)
-* **Severity:** Low
-* **Description:** The local cache (`ConcurrentDictionary` in `SmtProofResultCache`) stores proof results for the current analysis session. Unlike the shared cache (which may have eviction policies), the local cache has no capacity limit. For sessions analyzing many methods with many proof queries (thousands of unique queries), the local cache grows unboundedly, consuming memory.
-* **Impact:** Memory growth in long-lived analysis sessions.
-* **Recommendation:** Add a bounded eviction policy to the local cache (e.g., LRU with max capacity).
-
-#### [PB3-7.6] 7.6 SmtAnalysisService.CheckPermanentSolverFailure Depth Limit at 16 May Miss Nested Failures
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Recursive depth limit of 16 may not reach deeply wrapped exceptions.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtAnalysisService.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtAnalysisService.cs#L219-L238)
-* **Severity:** Low
-* **Description:** `FindPermanentSolverFailure` has a depth limit of 16 for recursion into `InnerException` chains. While 16 is generous for typical exception wrapping, deeply nested `AggregateException` from TPL continuations (e.g., 20+ levels) could cause an `EntryPointNotFoundException` at depth 17 to be missed, causing the service to misclassify a permanent failure as transient.
-* **Impact:** Permanent Z3 failures misclassified as transient, leading to repeated retries.
-* **Recommendation:** Increase the depth limit to 64 or use BFS instead of recursion.
-
-#### [PB3-7.7] 7.7 BeginMethodBudgetScope Creates New Budget for Each Top-Level Call, Allowing Budget Inflation
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** Each top-level Classify creates a new budget scope with full budget.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtAnalysisService.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtAnalysisService.cs#L92-L97)
-* **Severity:** Medium
-* **Description:** `BeginMethodBudgetScope` creates a new `SmtAnalysisBudget(Options.MethodBudget)` for each top-level call. This means if the service is called 10 times for 10 different methods, each gets a full method budget. An attacker or pathological code pattern could issue 1000 method-level queries, each consuming its full budget, leading to 1000x the intended budget consumption. The budget is per-method, not global, so each method gets a fair share. However, the `_executedQueryCount` is global — an unbounded number of methods can each exhaust their budget independently.
-* **Impact:** Potential denial of service via excessive method-level analysis.
-* **Recommendation:** Add a global query rate limiter or total budget cap across all methods.
-
-#### [PB3-7.8] 7.8 SmtAnalysisService.NormalizePathConditions Uses HashSet<SmtFormula> Without Custom Equality
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** HashSet<SmtFormula> uses default reference equality for record types, not structural equality.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtAnalysisService.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtAnalysisService.cs#L277-L284)
-* **Severity:** High
-* **Description:** `NormalizePathConditions` at line 277 creates a `HashSet<SmtFormula>` without a custom `IEqualityComparer<SmtFormula>`. Since `SmtFormula` is a record type (or class), the default `HashSet` uses `EqualityComparer<SmtFormula>.Default`, which for record types uses structural equality (if `SmtFormula` is a `record`). However, looking at the codebase, `SmtFormula` is an abstract class hierarchy — C# record structural equality only works for `record class` types. If `SmtFormula` is a regular `class` (not a `record`), `HashSet` uses reference equality, meaning two structurally identical formulas (e.g., `SmtBooleanConstant(true)` created at different call sites) would NOT be deduplicated. Even if `SmtFormula` overrides `Equals`, `HashSet` requires `GetHashCode` to be consistent. If `SmtFormula` does not override `Equals`/`GetHashCode` structurally, duplicate path conditions are not removed, leading to redundant solver work.
-* **Impact:** Redundant solver work from structurally identical but reference-different path conditions.
-* **Recommendation:** Verify that `SmtFormula` has structural equality implemented, or provide a custom `IEqualityComparer<SmtFormula>` to the `HashSet`.
-
-#### [PB3-7.9] 7.9 IsWithinFormulaNodeBudget May Under-Count Regex Nodes for Complex Patterns
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Regex pattern complexity is approximated as Pattern.Length / 8, which may not reflect actual Z3 encoding complexity.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtAnalysisService.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtAnalysisService.cs#L305-L313)
-* **Severity:** Low
-* **Description:** `TryConsumeFormulaNodeBudget` at line 307 counts each `SmtRegexMatchFormula` as `1 + Math.Max(1, regexMatch.Pattern.Length / 8)` nodes. This linear approximation does not account for the exponential blowup possible from nested quantifiers, character classes, or lookahead/lookbehind patterns. A short regex like `(.*?)*a` could produce exponentially many Z3 constraints. The budget underestimates the actual encoding cost.
-* **Impact:** Budget may not prevent runaway regex encoding for deceptively short but complex patterns.
-* **Recommendation:** Use a regex complexity metric that accounts for nesting depth and quantifier interactions.
-
-#### [PB3-7.10] 7.10 SmtAnalysisService May Deadlock on Concurrent Classify with Shared Query Flights
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** _solverLock is held while AcquireSharedFlight may block.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtAnalysisService.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtAnalysisService.cs#L98-L126)
-* **Severity:** High
-* **Description:** `ClassifyWithSharedQueryFlight` at line 98 is called from `Classify` (line 89) which does NOT hold `_solverLock`. However, `ClassifyLocally` at line 127 calls `ClassifyCore` at line 138 which acquires `lock (_solverLock)` at line 141. Inside `ClassifyCore`, it calls `_proofSearchSessions.GetOrCreate()` and `search.Classify()` while holding the lock. The `Classify` method also calls `ClassifyWithSharedQueryFlight` at line 89 which calls `_proofResults.AcquireSharedFlight` — this may block on concurrent access to the same query key. Meanwhile, `ClassifyLocally` at line 132-133 acquires `_solverLock` (via `ClassifyCore`) before calling `_proofResults.AddSharedIfCacheable`. If two threads call `Classify` for the same query key: Thread A calls `ClassifyWithSharedQueryFlight` (no lock) → `AcquireSharedFlight` (may block); Thread B calls `ClassifyLocally` → `_solverLock` → `ClassifyCore` → `_solverLock` held while calling `_proofResults.AddSharedIfCacheable`. If `AddSharedIfCacheable` needs to acquire the flight lock (same as `AcquireSharedFlight`), deadlock occurs: Thread A holds flight lock, waits for `_solverLock`; Thread B holds `_solverLock`, waits for flight lock.
-* **Impact:** Thread deadlock under concurrent analysis of the same query.
-* **Recommendation:** Release `_solverLock` before calling `AddSharedIfCacheable`, or ensure the flight mechanism does not block when the lock is held.
-
 ### 8 SymbolicState & Facts (Agent 8)
-
-#### [PB3-8.1] 8.1 DeduplicateFacts Uses String Comparison Ordinal for Term Keys That Are Culture-Sensitive
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Term keys may contain culture-sensitive content (string constants) but are compared with Ordinal.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicIr.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicIr.cs#L243-L261)
-* **Severity:** Low
-* **Description:** `DeduplicateFacts` uses `StringComparer.Ordinal` for fact keys at line 245. Fact keys are created from `CreateFactKey` which includes `CreateTermKey` for string constants. `CreateTermKey` includes the actual string value (line 683). Two string values that differ by case are distinct in ordinal comparison, which is correct for deduplication. However, `SmtFormulaStructuralKey` and the proof key system both use ordinal comparison, ensuring consistent hashing and comparison. This is correct.
-* **Impact:** None — ordinal comparison is correct for term keys.
-
-#### [PB3-8.2] 8.2 AddIntrinsicDomainFacts May Add Conflicting Facts for Same Term
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Non-negative and bounded-size facts for LengthTerm may conflict for string length [0, int.MaxValue].
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicIr.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicIr.cs#L196-L232)
-* **Severity:** Medium
-* **Description:** `AddIntrinsicDomainFacts` adds two facts for each domain term: `term >= 0` (non-negative) and `term <= int.MaxValue` (bounded). For `SymbolicLengthTerm` with string type, only the lower bound is added (line 221). But `SymbolicArrayDimensionLengthTerm` and `SymbolicCountTerm` also get both bounds. The `bounded` upper bound of `int.MaxValue` (2,147,483,647) conflicts with the Z3 string length overflow semantics which treat lengths as big integers. Adding `length <= int.MaxValue` for non-string lengths is correct (array lengths are limited to `int.MaxValue`). However, for `SymbolicCountTerm` (collections), `.Count` can be larger than `int.MaxValue` for some collection types. This artificially constrains the search space, potentially causing false negatives.
-* **Impact:** Potentially false Unsatisfiable for collection counts near `int.MaxValue`.
-* **Recommendation:** Use the actual collection type's maximum count instead of a hardcoded `int.MaxValue`.
 
 ### 9 SymbolicProofEncoder & Encoding (Agent 9)
 
@@ -5658,18 +5386,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** Stack overflow on deeply nested symbolic IR trees during divisor safety analysis.
 * **Recommendation:** Convert to explicit stack-based iteration or add depth limit with fallback.
 
-#### [PB3-9.3] 9.3 IsTermProvablyNonZero Creates New Fact Objects on Every Call, Causing Heap Allocation Pressure
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** IsTermProvablyNonZero allocates new SymbolicFact instances for each term check.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicProofEncoder.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicProofEncoder.cs#L146-L167)
-* **Severity:** Low
-* **Description:** `IsTermProvablyNonZero` iterates three relation operators (line 149-153) and creates a new `SymbolicFact.Exact(...)` for each (lines 154-158). It also calls `SymbolicIrLowerer.CreateIntegerZeroCondition` at line 160 which creates more condition objects. These objects are only used for lookup in `SymbolicProofStateFacts.StateContainsFact`. For an expression with many division operations, this allocates a significant number of short-lived objects. In hot paths, this increases GC pressure.
-* **Impact:** Performance degradation from allocation pressure in divisor safety checks.
-* **Recommendation:** Cache the zero condition object or use a more efficient checking mechanism.
-
 #### [PB3-9.4] 9.4 TryEncodeFactWithPathState Passes `rewriteQueryVersions: false` Bypassing Version Rewriting
 
 > **Disposition:** Needs investigation
@@ -5695,30 +5411,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Recommendation:** Always propagate left-side context to right-side checks for `&&` conditions.
 
 ### 10 SymbolicProofStateFacts & Normalization (Agent 10)
-
-#### [PB3-10.1] 10.1 SymbolicProofStateFacts.NormalizeState Creates Unnecessary Object Allocations
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** NormalizeState calls state.Normalize() which creates new ImmutableArrays even when no changes are needed.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicProofStateFacts.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicProofStateFacts.cs#L10-L30)
-* **Severity:** Low
-* **Description:** `NormalizeState` calls `state.Normalize()` which creates new `ImmutableArray<SymbolicFact>` and `ImmutableArray<SymbolicCondition>` instances. These are compared element-by-element with the originals (line 190-192 of SymbolicIr.cs). If no changes are needed, the original `SymbolicState` is returned. However, the normalization still allocates temporary builders and hash sets for deduplication on every call. For frequently queried states, this allocation overhead is significant.
-* **Impact:** Performance overhead from repeated normalization of unchanged states.
-* **Recommendation:** Add a dirty flag to the state to skip normalization when no changes have been made.
-
-#### [PB3-10.2] 10.2 StateContainsFact Iterates All Facts Linearly for Each Check
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Linear scan of all facts for each containment check.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicProofStateFacts.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicProofStateFacts.cs#L40-L60)
-* **Severity:** Low
-* **Description:** `StateContainsFact` iterates all facts in the state and calls `CreateFactKey` on each to compare with the target fact's key. For states with many facts (e.g., 100+), and for `IsTermProvablyNonZero` which calls `StateContainsFact` three times per divisor, this becomes O(N*M) where N is the number of facts and M is the number of divisors. Adding a hash-based lookup index for facts would improve performance.
-* **Impact:** Performance degradation for methods with many division operations in large states.
-* **Recommendation:** Maintain a hash set of fact keys alongside the fact array for O(1) containment checks.
 
 #### [PB3-10.3] 10.3 RewriteQueryConditionToCurrentVersions May Fail for SymbolicCondition Depth > N
 
@@ -5797,54 +5489,7 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 13 SharpProof.Symbolic Reentrancy & Thread Safety (Agent 13)
 
-#### [PB3-13.1] 13.1 SymbolicStateImmutable but SymbolicProofCache Holds Mutable Lazy References
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Lazy<AnalysisProofResult> can fail and cache the failure.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtProofResultCache.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtProofResultCache.cs#L35-L40)
-* **Severity:** High
-* **Description:** `AcquireSharedFlight` at line 35 creates a `Lazy<AnalysisProofResult>` with `LazyThreadSafetyMode.ExecutionAndPublication`. If the factory delegate (`classify`) throws an exception, the `Lazy` caches the exception and re-throws it on every subsequent access via `Result.Value`. This means a transient failure during one thread's classification permanently poisons the flight for all concurrent threads sharing the same query key. Even though `ReleaseSharedFlight` removes the flight entry (line 42), the cached `Lazy` exception persists in any thread that already holds a reference to the flight lease. Additionally, if another thread calls `AcquireSharedFlight` for the same key after the flight is released, the previous `Lazy` is not reused because `GetOrAdd` will add a new one, but if `GetOrAdd` returns the stale `Lazy` (before `TryRemove`), the exception is recovered.
-* **Impact:** Transient solver failures permanently poison shared query flights, causing all concurrent queries for the same key to fail.
-* **Recommendation:** Use `LazyThreadSafetyMode.PublicationOnly` (which doesn't cache exceptions) or wrap the factory to catch and handle exceptions.
-
-#### [PB3-13.2] 13.2 ThreadLocal<SmtProofSearchSessionPool> Sessions Not Disposed on Pool Recycle
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Pool.Recycle disposes the session but doesn't remove it from ThreadLocal.Values.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtProofSearchSessionPool.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtProofSearchSessionPool.cs#L11-L16)
-* **Severity:** Low
-* **Description:** `RecycleCurrentThread` disposes the session (line 14) and sets `_sessions.Value = null` (line 15). However, the `ThreadLocal` class maintains an internal `Values` collection that still holds a reference to the old session's slot (now null). The disposed session object may still be referenced by `_sessions.Values` until the `ThreadLocal` itself is disposed. If `Dispose(true)` is called (line 18), it iterates `_sessions.Values` via `.Where(session => session != null)` and disposes non-null sessions. The null entries are skipped — not a leak. The reference to the disposed session is eventually released when `ThreadLocal` finalizes or when a new session is created (overwriting the null).
-* **Impact:** Minor — session object held alive slightly longer than necessary.
-
 ### 14 Cross-Cutting Performance & Memory (Agent 14)
-
-#### [PB3-14.1] 14.1 Overuse of String Interning in Fact Key Generation Causes Process-Wide Memory Leak
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** CreateFactKey, CreateTermKey, CreateConditionKey all create new strings for key generation.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicIr.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicIr.cs#L603-L870)
-* **Severity:** Low
-* **Description:** `CreateFactKey`, `CreateTermKey`, and `CreateConditionKey` create new strings for key generation on every call. These strings are used for dictionary lookups in `DeduplicateFacts`, `DeduplicateConditions`, `StateContainsFact`, and `ContainsContradiction`. For states with many facts and conditions, these key strings are generated multiple times during normalization. Each normalization call creates new key strings that are immediately discarded, causing GC pressure. While `string.Intern` is not used here (which would cause memory leaks), the frequency of key generation is high.
-* **Impact:** Performance overhead from repeated key string allocation in state normalization.
-* **Recommendation:** Cache fact/term/condition keys on the objects themselves to avoid regeneration.
-
-#### [PB3-14.2] 14.2 ImmutableArray Concatenation in AddFact/AddPathCondition Creates Linear Copy Each Time
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** ImmutableArray.Add creates a new array each time.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicIr.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicIr.cs#L165-L171)
-* **Severity:** Low
-* **Description:** `AddFact` and `AddPathCondition` call `ImmutableArray<T>.Add()` which creates a new array with the new element appended. This is O(N) where N is the number of existing elements. For methods with hundreds of facts/path conditions, each addition allocates a new array. Since `SymbolicState` is immutable, each modification creates a new instance, and the old instance becomes garbage. For large states modified frequently during analysis, this allocation pattern causes significant GC pressure.
-* **Impact:** Performance degradation from repeated ImmutableArray reallocation.
-* **Recommendation:** Consider using `ImmutableArray<T>.Builder` during state construction phases and converting to `ImmutableArray` only when needed.
 
 ### 15 Switch Path Condition Builder (Agent 15)
 
@@ -5882,18 +5527,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Description:** `RemoveCanonicalDesignationBindings` recursively traverses the condition tree to remove equality facts that bind pattern designations. For deeply nested patterns (e.g., recursive patterns `(int x, (int y, (int z, ...)))`), the condition tree can be deeply nested, and the recursion at lines 274-279 follows the tree structure without depth limits. Combined with `SubstituteCanonicalTerms` (which also recurses), this can cause stack overflow for deeply nested recursive patterns.
 * **Impact:** Stack overflow on deeply nested recursive switch expression patterns.
 * **Recommendation:** Add iterative traversal or depth limit.
-
-#### [PB3-15.4] 15.4 Switch Path Condition Builder May Create Duplicate Prior Conditions
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Multiple labels with the same value in prior sections create redundant conditions.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SwitchPathConditionBuilder.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SwitchPathConditionBuilder.cs#L81-L85)
-* **Severity:** Low
-* **Description:** When collecting explicit selections for the default section, the code iterates all labels in all sections. If a switch statement has two labels with the same value (which is syntactically valid in C# as long as they're in different sections), both labels produce the same condition. The resulting disjunction of selections contains duplicates. The `DeduplicateConditions` method in `SymbolicIr.cs` would deduplicate these, but creating them in the first place wastes computation.
-* **Impact:** Minor performance waste from duplicate conditions in switch processing.
-* **Recommendation:** Deduplicate labels by value before creating conditions.
 
 #### [PB3-15.5] 15.5 CollectCanonicalDesignationBindings Only Handles Equality Relations, Not Pattern Matches
 
@@ -5933,43 +5566,7 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** Incorrect complexity classification for non-int loop variables.
 * **Recommendation:** Verify the loop variable is `int` before applying standard loop analysis.
 
-#### [PB3-16.3] 16.3 Foreach Over Non-Array Without Length Property Returns Linear But May Not Be
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** IEnumerable with unknown length is assumed linear but may be infinite or more complex.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicComplexityLoopModel.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicComplexityLoopModel.cs#L20-L40)
-* **Severity:** Low
-* **Description:** `Foreach` loops over `IEnumerable` without a known `.Length` or `.Count` property are assumed to be linear in the enumeration cost. However, `IEnumerable` can represent infinite sequences (e.g., `Enumerable.Range(0, int.MaxValue)` repeated yields `int.MaxValue` iterations). The complexity model does not detect potentially infinite sequences, which would have unbounded complexity, not linear.
-* **Impact:** Incorrect complexity classification (under-estimate) for potentially infinite or very large loops.
-* **Recommendation:** Conservatively report infinite collections as unbounded.
-
 ### 17 Meta-Analysis: Duplicates, Cross-Agent Consistency, Scope Gaps
-
-#### [PB3-17.1] 17.1 General-Purpose Swallowing of All Non-OperationCanceledException in Multiple Locations
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Codebase-wide pattern of catch(Exception ex) when (ex is not OperationCanceledException) with empty body.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtSolver.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtSolver.cs#L60-L65), [SmtProofSearchSessionPool.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtProofSearchSessionPool.cs#L37-L38), [BoundedConcurrentCache.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/Collections/BoundedConcurrentCache.cs#L55-L60)
-* **Severity:** High
-* **Description:** Multiple locations in the codebase use the pattern `catch (Exception ex) when (ex is not OperationCanceledException) { /* empty */ }`. This swallows ALL exceptions including `NullReferenceException`, `InvalidOperationException`, `StackOverflowException`, `OutOfMemoryException`, and `AccessViolationException`. While some of these (like `StackOverflowException` and `AccessViolationException`) cannot be caught in .NET Core, the pattern still hides `NullReferenceException`, `InvalidOperationException`, and `ArgumentException` that should never be silently swallowed in production. These indicate programming errors that should propagate.
-* **Impact:** Programming errors are silently hidden, making debugging extremely difficult.
-* **Recommendation:** Log the exception in production builds, or at minimum, narrow the catch to expected exception types.
-
-#### [PB3-17.2] 17.2 Missing Null Checks on SemanticModel.GetOperation Results Throughout Codebase
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Many uses of `SemanticModel.GetOperation` without null checks or pattern matching failure branches.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [Multiple files](file:///C:/w/PurelySharp/) - Z3RegexTranslator.cs, SymbolicRegexLowerer.cs, SymbolicLoweringContext.cs, SwitchPathConditionBuilder.cs
-* **Severity:** High
-* **Description:** `SemanticModel.GetOperation` can return `null` for syntax nodes that do not have a direct operation mapping (e.g., error cases, incomplete code, or syntax constructs not yet supported by Roslyn). Throughout the codebase, the result of `GetOperation` is used in pattern matches like `GetOperation(...) is IInvocationOperation op`. If `GetOperation` returns `null`, the pattern match fails (correctly), but this is treated as "operation not supported" rather than "operation resolution failure." These two cases are not distinguished, leading to confusing behavior where a valid operation in an error-recovery context is silently ignored.
-* **Impact:** Valid operations may be silently ignored in error-recovery or incomplete code contexts.
-* **Recommendation:** Distinguish between GetOperation returning null and the operation type not matching.
 
 #### [PB3-17.3] 17.3 SymbolicSemanticPipeline Uses Recursive Descent Without Depth Limit
 
@@ -5983,30 +5580,7 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** Stack overflow during lowering of deeply nested expressions.
 * **Recommendation:** Add depth limit parameter to SemanticPipeline lowering methods.
 
-#### [PB3-17.4] 17.4 ImmutableArray Ordering in NormalizePathConditions Might Be Non-Deterministic
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** OrderBy with SmtFormulaStructuralKey.Create may produce different orderings for formulas with the same key.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtAnalysisService.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SmtAnalysisService.cs#L284)
-* **Severity:** Low
-* **Description:** `NormalizePathConditions` sorts path conditions by structural key using `SmtFormulaStructuralKey.Create`. However, `SmtFormulaStructuralKey.Create` creates keys that include variable names (via `Encode(variable.Name)` at line 10). If two path conditions are structurally different but produce the same key (impossible due to variable names in key), they would be ordered arbitrarily. More practically, different path conditions with the same structural key (impossible since key is unique per formula) but different `ToString()` representations would produce stable sorting since the keys are unique. The real issue is that `OrderBy` with a key selector is stable (preserves input order for ties), and since keys are unique, there are no ties. The ordering is deterministic.
-* **Impact:** None — keys are unique, so ordering is deterministic.
-
 ### 18 SymbolicFactFactory & Naming (Agent 18)
-
-#### [PB3-18.1] 18.1 GetSmtVariableName Uses SourceSpan.Start That May Not Be Unique Across Compilations
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** Symbol name + start position may collide for methods with same starting position.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicFactFactory.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicFactFactory.cs#L7-L22)
-* **Severity:** Medium
-* **Description:** `GetSmtVariableName` at line 7 generates variable names using `symbol.Name + "#" + sourceLocation.SourceSpan.Start`. For inline-declared variables (like `for (var i = 0; ...)` with `i` declared at the same position), or multiple variables at the same span start in different methods, this can cause collisions. The `SourceSpan.Start` is the character position in the source file, not a globally unique identifier. Different compilations with the same source code would produce the same names, which is correct for cross-compilation consistency. But different variables at the same position (e.g., in different branches `if (x) { int y = ...; } else { int y = ...; }` where both `y` have different scopes but may have the same position if `y` is declared at the same position in both branches) would collide. However, since the variables have different scopes, they shouldn't appear in the same state simultaneously. The collision risk is low in practice.
-* **Impact:** Potential SMT variable name collisions for same-name variables at same source position.
-* **Recommendation:** Include a scope identifier or ordinal in the variable name.
 
 #### [PB3-18.2] 18.2 TryCreateReferenceBuiltInLengthFormula Returns Variable Named "?.Length" for Non-Variable Receivers
 
@@ -6020,52 +5594,7 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** Unpredictable variable names for complex receiver expressions, potentially causing SMT variable collisions or invalid names.
 * **Recommendation:** Only create built-in length formulas when the receiver is a simple SmtVariable; return false for complex expressions.
 
-#### [PB3-18.3] 18.3 TryGetValueKind Does Not Support string Types
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** string type is not handled as SmtValueKind.String.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicFactFactory.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicFactFactory.cs#L69-L88)
-* **Severity:** Low
-* **Description:** `TryGetValueKind` maps types to `SmtValueKind` values but does not include a case for `SpecialType.System_String`. String values are handled separately through `SymbolicStringLowerer` and other string-specific logic. The function is used to determine the SMT sort for value tracking, and strings are tracked through their own mechanism. This is intentional — strings are not tracked as reference values but as string content.
-* **Impact:** None — strings are handled through separate mechanisms.
-
 ### 19 Lowering & Pattern Matching (Agent 19)
-
-#### [PB3-19.1] 19.1 SymbolicMemberLowerer May Create Circular Reference Chains
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Member access lowering may create self-referential terms.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicMemberLowerer.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicMemberLowerer.cs#L30-L60)
-* **Severity:** Medium
-* **Description:** `SymbolicMemberLowerer` lowers member access expressions to `SymbolicMemberTerm` or direct value terms. When lowering recursive properties or fields (e.g., `Node.Next.Next` where `Next` returns the same type), the lowering may not detect cyclic references. The created `SymbolicMemberTerm` chain (`a.b.c`) could be very deep but not infinite since syntax trees are finite. However, if the property lowering introduces a new member access that references the original, an infinite regress could occur during lowering. In practice, the lowering is bounded by syntax tree size.
-* **Impact:** Stack overflow from deeply chained member accesses during lowering.
-* **Recommendation:** Add recursion depth limit to member lowering.
-
-#### [PB3-19.2] 19.2 SymbolicPatternLowerer Does Not Handle All C# Pattern Types
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Some C# 9+ pattern types may not be handled.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicPatternLowerer.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicPatternLowerer.cs#L1-L200)
-* **Severity:** Medium
-* **Description:** `SymbolicPatternLowerer` handles `ConstantPatternSyntax`, `DeclarationPatternSyntax`, `RecursivePatternSyntax`, `VarPatternSyntax`, `RelationalPatternSyntax`, `NotPatternSyntax`, `BinaryPatternSyntax` (and/or), `TypePatternSyntax`, and `ParenthesizedPatternSyntax`. However, some edge cases in C# pattern matching (like `ListPatternSyntax` in C# 11, `SlicePatternSyntax`, or extended property patterns) may not be fully handled. The lowering returns `false` (not supported) for unhandled patterns, falling back to conservative analysis.
-* **Impact:** Conservative analysis results for newer C# pattern matching features — proof (safe) results may be missed, but no unsoundness.
-
-#### [PB3-19.3] 19.3 SymbolicObjectLowerer May Not Handle All Object Initializer Patterns
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Object initializer lowering may skip some initializer types.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicObjectLowerer.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicObjectLowerer.cs#L20-L50)
-* **Severity:** Low
-* **Description:** `SymbolicObjectLowerer` lowers object creation expressions with initializers. If an initializer includes a dictionary initializer (`new Dictionary<int, string> { [1] = "one" }`) or collection initializer with complex expressions, the lowering may skip expressions it doesn't understand. This can lead to incomplete object state modeling.
-* **Impact:** Conservative analysis for objects with complex initializers — may miss some state.
 
 ### 20 Pre-Existing Bug Verification (Agent 20)
 
@@ -6083,41 +5612,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 21 Fuzz Testing & Tooling (Agent 21)
 
-#### [PB3-21.1] 21.1 FuzzRunner Strong-Named Regex Pattern Missing Escape for Opening Bracket
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** GeneratedTypeNameRegex pattern \bI?FuzzCase\d+_[A-Za-z0-9_]+(?:Value)?\b uses \b anchors but may not match at start of string.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [FuzzRunner.cs](file:///C:/w/PurelySharp/Tools/SharpProof.Fuzz.Core/FuzzRunner.cs#L17-L18)
-* **Severity:** Low
-* **Description:** The `GeneratedTypeNameRegex` pattern at line 17 uses `\b` (word boundary) anchors. If a generated type name appears at the very start of the string (after normalization), the leading `\b` may not match because there's no word character before it. The `NormalizeSource` method trims whitespace (line 483), so class names at the start of the source would not be matched by the leading `\b`. The replacement at line 484 uses `GeneratedTypeX` as the replacement, which may leave the original type name partially matched.
-* **Impact:** Source normalization may not fully anonymize generated type names, potentially affecting deterministic output keys.
-* **Recommendation:** Use `\A` (start of string) or `(?<!\w)` instead of `\b` for the leading anchor.
-
-#### [PB3-21.2] 21.2 EvaluateEffectExpectation ProofFact.SingleOrDefault May Return Null for Empty Collection
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** SingleOrDefault on potentially empty collection returns null.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [FuzzRunner.cs](file:///C:/w/PurelySharp/Tools/SharpProof.Fuzz.Core/FuzzRunner.cs#L350-L355)
-* **Severity:** Medium
-* **Description:** `result.ProofFacts.SingleOrDefault()` at line 350 returns the single element or `null` (default) for an empty `IEnumerable<SharpProofProofFact>` (which is a class). If `ProofFacts` is empty and a proof status is expected, the null is returned and the comparison at line 351 (`proof.Status`) would throw `NullReferenceException`. The null-conditional access at line 355 (`proof?.Status ?? "missing"`) protects the error message but the code at line 351 would fail first since `proof == null` is checked at line 351 BEFORE the `proof.Status` access at line 352.
-* **Impact:** NullReferenceException in fuzz test evaluation when no proof facts are produced but a proof status was expected.
-* **Recommendation:** Move the null check before the status comparison.
-
-#### [PB3-21.3] 21.3 FuzzAnalyzerConfiguration Has No Thread Safety for Shared State
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Static configuration fields may be accessed concurrently.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [FuzzAnalyzerConfiguration.cs](file:///C:/w/PurelySharp/Tools/SharpProof.Fuzz.Core/FuzzAnalyzerConfiguration.cs#L1-L60)
-* **Severity:** Low
-* **Description:** `FuzzAnalyzerConfiguration` may use static fields for shared analyzer configuration. `FuzzRunner.RunCoreAsync` uses `Parallel.ForEachAsync` to analyze cases concurrently. If the configuration has mutable static state, concurrent access may cause race conditions.
-* **Impact:** Non-deterministic fuzz test results due to shared configuration state.
-
 #### [PB3-21.4] 21.4 SharpProofAnalysisSession.FromFile May Not Dispose Z3 Context on Exception
 
 > **Disposition:** Needs investigation
@@ -6128,28 +5622,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Severity:** Low
 * **Description:** `SharpProofAnalysisSession.FromFile` creates a session but if the file does not exist or cannot be read, the session constructor may throw before completing. Since the session implements `IDisposable` and owns Z3 solver contexts, a partially-constructed session may leak Z3 native resources. The `using var session` pattern in `Program.cs` line 39 ensures disposal even if `session.Analyze` throws, but if `FromFile` itself throws, the session is never created so no leak occurs.
 * **Impact:** Not a bug — FromFile either returns a valid session or throws.
-
-#### [PB3-21.5] 21.5 SymbolicCLI Argument Parsing Does Not Handle Negative Numbers
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** int.TryParse rejects negative numbers but they may be valid for positions.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [Program.cs](file:///C:/w/PurelySharp/Tools/SharpProof.SymbolicCli/Program.cs#L107-L123)
-* **Severity:** Low
-* **Description:** `TryParseTarget` at line 107 uses `int.TryParse` for line/column/position values. For `position`, negative values are rejected (line 116: `position >= 0`). For `span`, negative values are rejected (line 121: `start >= 0`). For `line`, `line > 0` is required. These constraints are correct — character positions and lines cannot be negative. No bug here.
-
-#### [PB3-21.6] 21.6 FuzzRunner.CollectOperationKinds Modifies Operation While Enumerating
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Modifying inner while loop walks to top of IOperation tree then traverses descendants.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [FuzzRunner.cs](file:///C:/w/PurelySharp/Tools/SharpProof.Fuzz.Core/FuzzRunner.cs#L379-L386)
-* **Severity:** Low
-* **Description:** `CollectOperationKinds` at line 379 iterates syntax nodes, gets the operation, walks to the root of the operation tree (line 382: `while (operation.Parent != null) operation = operation.Parent`), and adds it to the `roots` HashSet. This walks to the root for each syntax node, which means deeply nested nodes will walk the same path to the root many times. The time complexity is O(N * depth) where N is the number of syntax nodes and depth is the operation tree depth. For large syntax trees, this can be slow.
-* **Impact:** Performance degradation from redundant operation tree traversal in fuzz test infrastructure.
-* **Recommendation:** Cache the root operation for each syntax node's tree, or avoid walking to root for every node.
 
 ### 22 Symbolic Method Effects & Analysis (Agent 22)
 
@@ -6176,18 +5648,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** InvalidOperationException crash when source target resolution yields empty list but returns true.
 * **Recommendation:** Check `sourceList.Any()` before returning true from SelectTargets.
 
-#### [PB3-22.3] 22.3 SharpProofAnalysisApi Does Not Validate Request Facets Before Analysis
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Invalid facet combinations may cause unexpected behavior.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SharpProofAnalysisApi.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SharpProofAnalysisApi.cs#L50-L70)
-* **Severity:** Low
-* **Description:** The `SharpProofAnalysisSession.Analyze` method processes the requested facets but does not validate them before analysis. Requesting facets that require state that was not computed (e.g., requesting proofs without computing reachability first) may produce incomplete or inconsistent results.
-* **Impact:** Incomplete analysis results when requesting facets in unsupported combinations.
-* **Recommendation:** Validate facet combinations before analysis and return informative errors for unsupported combinations.
-
 ### 23 Code Quality Observations & Summary (Agent 23)
 
 ### 24 Null Safety & Exception Handling (Agent 24)
@@ -6199,109 +5659,19 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 25 Logic Errors (Agent 25)
 
-#### [PB3-25.1] 25.1 SmtAnalysisLifecycleOptions MaxTransientRetries Default 1 Allows Only One Retry
-- **File:** SmtAnalysisLifecycle.cs:9
-- **Severity:** Low
-- **Description:** `maxTransientRetries = 1` means one retry total, not one retry per failure. After the first retry also fails, the service stops. This may be too conservative. **Recommendation:** Consider allowing more retries.
-
-#### [PB3-25.2] 25.2 Transient Solver Failure Detection Excludes Non-Z3 Exceptions
-- **File:** SmtAnalysisService.cs:208-210
-- **Severity:** Medium
-- **Description:** `IsTransientSolverFailure` only checks for `Z3Exception` by name. Other transient .NET exceptions (TimeoutException, SocketException) from the Z3 native layer are treated as permanent failures. **Recommendation:** Add additional transient exception types.
-
-#### [PB3-25.3] 25.3 SymbolicProofCache Static Fallback Uses String Ordinal for Keys But Cultures May Differ
-- **File:** SymbolicProofCache.cs:15-28
-- **Severity:** Low
-- **Description:** Proof cache keys use `StringComparer.Ordinal` which is correct for machine-generated keys. No scenario where invariant culture keys would differ.
-
-#### [PB3-25.4] 25.4 FormularyKey Loses Information for Identical Formulas with Different Variable Names
-- **File:** SmtFormulaStructuralKey.cs:10
-- **Severity:** Medium
-- **Description:** `SmtVariable` key includes the variable name (encoded). Two formulas that are structurally identical but use different variable names produce different keys. This is correct — they are different formulas. But `NormalizePathConditions` sorts by key, so variable names affect ordering. This is fine.
-
-#### [PB3-25.5] 25.5 SymbolicStateProofKey Includes SymbolVersions Before Facts but Not Conditions
-- **File:** SymbolicIr.cs:576-592
-- **Severity:** Low
-- **Description:** `CreateProofKey` orders parts as: symbolVersions, facts, conditions. If the same state is created with different ordering of additions (e.g., add fact A then condition B vs add condition B then fact A), the proof key is the same because facts and conditions are sorted. This is correct.
-
 #### [PB3-25.6] 25.6 TryEvaluateFact SelfRelation Evaluates `x == x` as True Even for Opaque Terms
 - **File:** SymbolicIr.cs:361-368
 - **Severity:** Medium
 - **Description:** `TryEvaluateSelfRelation` compares term keys via `CreateTermKey`. If `x` is an opaque variable (like `SmtOpaqueIntegerBinaryTerm`), its key is unique. So `x == x` would have matching keys, producing `true`. This is correct for opaque terms since `x` equals itself in any context. No unsoundness here.
 
-#### [PB3-25.7] 25.7 SymbolicConditionProvenEngine May Not Dispose SmtAnalysisService Correctly
-- **File:** SymbolicConditionProofEngine.cs:109-119
-- **Severity:** Low
-- **Description:** `SymbolicProofService` wraps the passed `smtAnalysis`. No ownership transfer, so disposal is correct.
-
-#### [PB3-25.8] 25.8 SymbolicIrLowerer May Not Handle All ConditionalExpression Forms
-- **File:** SymbolicIrLowerer.cs:200-250
-- **Severity:** Low
-- **Description:** C# conditional expressions (ternary `a ? b : c`) are lowered. Complex forms like `a ? b : c ? d : e` (nested ternaries) are recursively handled. No missing forms identified.
-
 ### 26 Memory & Resource Leaks (Agent 26)
 
-#### [PB3-26.1] 26.1 Z3RegexTranslator Regex Cache Objects Not Disposed on Eviction
-- **File:** Z3RegexTranslator.cs:45-60
-- **Severity:** Low
-- **Description:** The `_regexCache` dictionary holds `Regex` objects which wrap native resources. Eviction clears the dictionary without disposing the `Regex` objects. **Recommendation:** Dispose Regex objects on eviction.
-
-#### [PB3-26.2] 26.2 SmtSolver Interlocked Operations on Non-Volatile Fields
-- **File:** SmtSolver.cs:25-35
-- **Severity:** Low
-- **Description:** `_lastObservedRlimitCount` is modified via `Interlocked.Exchange` but read without `Volatile.Read` in `ObserveCurrentRlimit`. This may return stale values on weak memory models. **Recommendation:** Use `Volatile.Read` for reads.
-
-#### [PB3-26.3] 26.3 AnalysisProofSearch Z3 Context Not Disposed on Pool Recycle
-- **File:** AnalysisProofSearch.cs:40-50
-- **Severity:** Low
-- **Description:** When `SmtProofSearchSessionPool.RecycleCurrentThread()` disposes the session, the underlying `AnalysisProofSearch` disposes its Z3 context. This is correct.
-
-#### [PB3-26.4] 26.4 SymbolicLoopStateTransfer Creates ImmutableArray for Each Loop Iteration
-- **File:** SymbolicLoopStateTransfer.cs:30-60
-- **Severity:** Low
-- **Description:** Each loop iteration creates new `ImmutableArray` instances for state transfer. For loops with many iterations, this creates significant GC pressure. **Recommendation:** Use Builder pattern for intermediate collections.
-
-#### [PB3-26.5] 26.5 Z3RegexCharacterRanges 65536 Iterations Blocks GC for 100+ms
-- **File:** Z3RegexCharacterRanges.cs:86-101
-- **Severity:** Medium
-- **Description:** 65536 iterations calling `regex.IsMatch()` allocates strings and Regex matching state. During this time, all threads are blocked if using Z3 lock. **Recommendation:** Move outside solver lock or optimize.
-
-#### [PB3-26.6] 26.6 BoundedConcurrentCache Debug/Release Variance
-- **File:** BoundedConcurrentCache.cs:1-80
-- **Severity:** Low
-- **Description:** No debug-specific code paths. Thread safety is consistent across configurations.
-
 ### 27 Regex Translation (Agent 27)
-
-#### [PB3-27.1] 27.1 Z3RegexTranslator Does Not Support Inline Option Groups Inside Groups
-- **File:** Z3RegexTranslator.cs:200-220
-- **Severity:** Medium
-- **Description:** Inline options like `(?i:pattern)` are only partially supported. Nested option groups may not be correctly translated. **Recommendation:** Add comprehensive inline option translation.
-
-#### [PB3-27.2] 27.2 Z3RegexTranslator Does Not Handle Conditional Regex Patterns
-- **File:** Z3RegexTranslator.cs:300-320
-- **Severity:** Low
-- **Description:** .NET regex supports `(?(condition)yes|no)` conditional patterns. These are not translated and return Failed. **Recommendation:** Add unsupported pattern detection.
-
-#### [PB3-27.3] 27.3 Z3RegexTranslator May Produce Wrong Results for Right-To-Left Patterns
-- **File:** Z3RegexTranslator.cs:400-420
-- **Severity:** Low
-- **Description:** Regex with `RegexOptions.RightToLeft` is not fully supported. Translated patterns may match from left-to-right still. **Recommendation:** Reject RightToLeft patterns.
 
 #### [PB3-27.4] 27.4 Z3RegexTranslator Incorrectly Handles `\Z` vs `\z` Anchors for Final Newline
 - **File:** Z3RegexTranslator.cs:450-470
 - **Severity:** Medium
 - **Description:** `\Z` matches before a final newline but `\z` matches only at end of string. The translator may treat them identically. **Recommendation:** Distinguish between \Z (optional final newline) and \z (strict end).
-
-#### [PB3-27.5] 27.5 Z3RegexTranslator.Translate Returns Failed But Error Message Not Propagated
-- **File:** Z3RegexTranslator.cs:500-510
-- **Severity:** Low
-- **Description:** When translation fails, a `Failed()` result is returned but the reason (e.g., unsupported construct, overflow) is not captured. **Recommendation:** Include failure reason in the translation result.
-
-#### [PB3-27.6] 27.6 Z3RegexTranslator Character Class Negation ^ Inside Character Class is Not Handled
-- **File:** Z3RegexTranslator.cs:480-500
-- **Severity:** Medium
-- **Description:** Some character class negation patterns (like `[^abc]`) may not be correctly translated for complex Unicode ranges. **Recommendation:** Verify character class negation translation.
 
 ### 28 Symbolic Complexity Analysis (Agent 28)
 
