@@ -2469,18 +2469,25 @@ internal sealed class MethodEffectAnalysisSession(
                 _delegateTargets.TryGetValue(local.Local, out var localTargets))
                 return localTargets;
             if (value is IInvocationOperation invocation &&
-                GetInvocationDelegateTargets(invocation) is { IsDefaultOrEmpty: false } invocationTargets)
+                GetReturnedDelegateTargets(invocation.TargetMethod, invocation) is {
+                    IsDefaultOrEmpty: false
+                } invocationTargets)
                 return invocationTargets;
+            if (value is IPropertyReferenceOperation { Property.GetMethod: { } getter } property &&
+                GetReturnedDelegateTargets(getter, property) is { IsDefaultOrEmpty: false } propertyTargets)
+                return propertyTargets;
             if (value is IDelegateCreationOperation creation) value = creation.Target;
             var target = CreateDelegateTarget(value);
             return target == null ? [] : [target];
         }
-        private ImmutableArray<DelegateTarget> GetInvocationDelegateTargets(IInvocationOperation invocation) {
-            var targetMethod = invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod;
+        private ImmutableArray<DelegateTarget> GetReturnedDelegateTargets(
+            IMethodSymbol method,
+            IOperation callSite) {
+            var targetMethod = method.ReducedFrom ?? method;
             targetMethod = (targetMethod.PartialImplementationPart ?? targetMethod).OriginalDefinition;
             var declaration = targetMethod.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
             var expressions = GetDirectReturnExpressions(declaration);
-            if (expressions.IsDefaultOrEmpty || invocation.SemanticModel?.Compilation is not { } compilation)
+            if (expressions.IsDefaultOrEmpty || callSite.SemanticModel?.Compilation is not { } compilation)
                 return [];
             var targets = ImmutableArray.CreateBuilder<DelegateTarget>();
             foreach (var expression in expressions) {
