@@ -377,8 +377,9 @@ internal sealed class MethodEffectAnalysisSession(
                     IUsingDeclarationOperation or ICollectionExpressionOperation or IWithOperation or
                     IRecursivePatternOperation or IListPatternOperation or ISlicePatternOperation)
                     Evaluate(operation, ref state);
+            var syntaxNodes = CSharpSyntaxFacts.DescendantNodesInExecution(root.Syntax, includeSelf: false);
             if (method.MethodKind == MethodKind.Constructor)
-                foreach (var assignmentSyntax in root.Syntax.DescendantNodes().OfType<AssignmentExpressionSyntax>()) {
+                foreach (var assignmentSyntax in syntaxNodes.OfType<AssignmentExpressionSyntax>()) {
                     var operation = semanticModel.GetOperation(assignmentSyntax, session.CancellationToken);
                     if (operation is ISimpleAssignmentOperation assignment) {
                         var assigned = Evaluate(assignment.Value, ref state);
@@ -391,7 +392,7 @@ internal sealed class MethodEffectAnalysisSession(
                         Assign(deconstruction.Target, assigned, false, ref state);
                     }
                 }
-            foreach (var fixedSyntax in root.Syntax.DescendantNodes().OfType<FixedStatementSyntax>())
+            foreach (var fixedSyntax in syntaxNodes.OfType<FixedStatementSyntax>())
                 foreach (var variable in fixedSyntax.Declaration.Variables) {
                     var initializer = variable.Initializer?.Value;
                     if (initializer == null) continue;
@@ -400,7 +401,7 @@ internal sealed class MethodEffectAnalysisSession(
                     InvokeCoreOrValue(FindProtocolMethod(initializerOperation?.Type, "GetPinnableReference", 0),
                         fixedReceiver, initializerOperation!, ref state);
                 }
-            foreach (var declarator in root.Syntax.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+            foreach (var declarator in syntaxNodes.OfType<VariableDeclaratorSyntax>())
                 if (semanticModel.GetDeclaredSymbol(declarator, session.CancellationToken) is ILocalSymbol {
                     RefKind: not RefKind.None
                 } refLocal && declarator.Initializer?.Value is { } initializer) {
@@ -414,12 +415,12 @@ internal sealed class MethodEffectAnalysisSession(
                     var value = Evaluate(semanticModel.GetOperation(valueSyntax, session.CancellationToken), ref state);
                     state = state with { Locals = state.Locals.SetItem(local, value) };
                 }
-            foreach (var returned in root.Syntax.DescendantNodes().OfType<ReturnStatementSyntax>())
+            foreach (var returned in syntaxNodes.OfType<ReturnStatementSyntax>())
                 if (returned.Expression is AnonymousFunctionExpressionSyntax) {
                     var value = Evaluate(semanticModel.GetOperation(returned.Expression, session.CancellationToken), ref state);
                     if (!ReferenceEquals(value, EffectFlowValue.None)) ReturnValue = value;
                 }
-            foreach (var assignment in root.Syntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            foreach (var assignment in syntaxNodes.OfType<AssignmentExpressionSyntax>())
                 if (assignment.Left.DescendantNodesAndSelf().OfType<ConditionalExpressionSyntax>().FirstOrDefault() is { } conditional) {
                     var target = Evaluate(semanticModel.GetOperation(conditional, session.CancellationToken), ref state);
                     effects.Write(target, assignment.Left, null, "conditional_ref_write");
@@ -433,7 +434,7 @@ internal sealed class MethodEffectAnalysisSession(
                     var target = Evaluate(semanticModel.GetOperation(assignment.Left, session.CancellationToken), ref state);
                     effects.Write(target, assignment.Left, null, "ref_return_write");
                 }
-            foreach (var filter in root.Syntax.DescendantNodes().OfType<CatchFilterClauseSyntax>()) {
+            foreach (var filter in syntaxNodes.OfType<CatchFilterClauseSyntax>()) {
                 var filterState = state;
                 Evaluate(semanticModel.GetOperation(filter.FilterExpression, session.CancellationToken), ref filterState);
                 state = state.Merge(filterState);
