@@ -480,7 +480,10 @@ internal sealed class MethodEffectAnalysisSession(
                     usingOperation.Resources.Type,
                     usingOperation,
                     builder,
-                    usingOperation.IsAsynchronous);
+                    usingOperation.IsAsynchronous,
+                    usingOperation.Resources is IVariableDeclarationGroupOperation
+                        ? null
+                        : usingOperation.Resources);
                 break;
             case IUsingDeclarationOperation usingDeclaration:
                 foreach (var declarator in usingDeclaration.DeclarationGroup.Declarations
@@ -489,7 +492,8 @@ internal sealed class MethodEffectAnalysisSession(
                         declarator.Symbol.Type,
                         usingDeclaration,
                         builder,
-                        usingDeclaration.IsAsynchronous);
+                        usingDeclaration.IsAsynchronous,
+                        declarator.Initializer?.Value);
                 break;
             case IEventAssignmentOperation { EventReference: IEventReferenceOperation eventReference } eventAssignment:
                 builder.Add(eventReference.Event.IsStatic
@@ -1035,7 +1039,8 @@ internal sealed class MethodEffectAnalysisSession(
         ITypeSymbol? type,
         IOperation site,
         Builder builder,
-        bool asynchronous) {
+        bool asynchronous,
+        IOperation? receiver) {
         if (type is not INamedTypeSymbol named) return;
         var interfaceName = asynchronous ? "System.IAsyncDisposable" : "System.IDisposable";
         var methodName = asynchronous ? "DisposeAsync" : "Dispose";
@@ -1045,7 +1050,7 @@ internal sealed class MethodEffectAnalysisSession(
         implementation ??= named.GetMembers(methodName).OfType<IMethodSymbol>()
             .FirstOrDefault(static method => !method.IsStatic && method.Parameters.Length == 0);
         if (implementation == null) return;
-        AnalyzeCall(implementation, site, builder);
+        AnalyzeCall(implementation, site, builder, receiver);
         if (asynchronous) AnalyzeAwaitableProtocol(implementation.ReturnType, site, builder);
     }
     private void AnalyzeAwaitableProtocol(ITypeSymbol awaitableType, IOperation site, Builder builder) {
