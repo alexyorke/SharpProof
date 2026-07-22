@@ -446,7 +446,7 @@ internal sealed class MethodEffectAnalysisSession(
                 AnalyzeCall(info.GetEnumeratorMethod, loop, builder);
                 AnalyzeCall(info.MoveNextMethod, loop, builder);
                 AnalyzeCall(info.CurrentProperty?.GetMethod, loop, builder);
-                AnalyzeCall(info.DisposeMethod, loop, builder);
+                if (info.DisposeMethod != null) AnalyzeCall(info.DisposeMethod, loop, builder);
                 if (loop.IsAsynchronous) {
                     if (info.MoveNextMethod?.ReturnType is { } moveNextAwaitable)
                         AnalyzeAwaitableProtocol(moveNextAwaitable, loop, builder);
