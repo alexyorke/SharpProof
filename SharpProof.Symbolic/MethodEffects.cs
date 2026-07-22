@@ -3362,11 +3362,7 @@ internal sealed class MethodEffectAnalysisSession(
                 IExpressionStatementOperation { Operation: IInvocationOperation invocation } => invocation,
                 _ => null
             };
-            if (initializer == null ||
-                !SymbolEqualityComparer.Default.Equals(
-                    initializer.TargetMethod.ContainingType,
-                    constructor.ContainingType))
-                return false;
+            if (initializer == null) return false;
             var targetConstructor = initializer.TargetMethod.OriginalDefinition;
             var targetDeclaration = targetConstructor.DeclaringSyntaxReferences
                 .FirstOrDefault()?.GetSyntax();
