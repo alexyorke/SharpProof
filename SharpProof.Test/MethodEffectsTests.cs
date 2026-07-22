@@ -250,6 +250,18 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Allocates), Is.True);
         });
     }
+    [Test]
+    public void FreshCollectionInitializerRemainsPure() {
+        var result = Analyze("""
+            class C {
+                static System.Collections.Generic.List<int> M() => new() { 1, 2, 3 };
+            }
+            """);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
+        });
+    }
     [TestCase("unsafe static int M() { int* value = stackalloc int[1]; value[0] = 1; return value[0]; }")]
     [TestCase("static R M(R value) => value with { X = 2 }; readonly record struct R(int X);")]
     public void StackOnlyOperationsDoNotCreateManagedAllocationSites(string method) {
