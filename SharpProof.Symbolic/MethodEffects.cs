@@ -4082,18 +4082,18 @@ internal sealed class MethodEffectAnalysisSession(
                     out var initializerValues))
                 return false;
             var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
+            if (creation.Constructor is not { } constructor) return false;
+            var visitedMethods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
             foreach (var initializerValue in initializerValues) {
-                var value = initializerValue;
-                while (value is IConversionOperation conversion) value = conversion.Operand;
-                if (value is IParameterReferenceOperation parameter) {
-                    value = creation.Arguments.FirstOrDefault(argument =>
-                        string.Equals(
-                            argument.Parameter?.Name,
-                            parameter.Parameter.Name,
-                            StringComparison.Ordinal))?.Value!;
-                    if (value == null) return false;
-                }
-                mappedValues.Add(value);
+                if (!TryMapConstructorAssignedValue(
+                        initializerValue,
+                        constructor,
+                        creation,
+                        compilation,
+                        visitedMethods,
+                        out var mapped))
+                    return false;
+                mappedValues.AddRange(mapped);
             }
             values = mappedValues.ToImmutable();
             return !values.IsDefaultOrEmpty;
