@@ -622,6 +622,12 @@ internal sealed class MethodEffectAnalysisSession(
                 case IInvocationOperation invocation:
                     if (IsOmittedInvocation(invocation)) return EffectFlowValue.None;
                     return Invoke(invocation.TargetMethod, invocation.Instance, invocation.Arguments, invocation, ref state);
+                case IFunctionPointerInvocationOperation:
+                    foreach (var child in operation.ChildOperations) Evaluate(child, ref state);
+                    effects.Add(SharpProofEffect.DispatchUncertainty, operation.Syntax, null,
+                        "function_pointer_dispatch");
+                    effects.AddUnknown(operation.Syntax, "function_pointer_dispatch");
+                    return EffectFlowValue.Unknown;
                 case IDynamicInvocationOperation or IDynamicObjectCreationOperation or
                     IDynamicIndexerAccessOperation or IDynamicMemberReferenceOperation:
                     foreach (var child in operation.ChildOperations) Evaluate(child, ref state);
