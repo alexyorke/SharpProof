@@ -3187,10 +3187,8 @@ internal sealed class MethodEffectAnalysisSession(
                 return true;
             }
             if (declaration == null) {
-                var typeDeclaration = constructor.ContainingType.DeclaringSyntaxReferences
-                    .FirstOrDefault()?.GetSyntax();
-                return typeDeclaration != null && TryGetDeclaredMemberInitializer(
-                    typeDeclaration, memberPath, compilation, out values);
+                return TryGetImplicitConstructorMemberInitializer(
+                    constructor, memberPath, compilation, out values);
             }
             return TryGetConstructorDeclarationMemberOrigins(
                 constructor,
@@ -3345,6 +3343,29 @@ internal sealed class MethodEffectAnalysisSession(
             values = [initializers[0]];
             return true;
         }
+        private static bool TryGetImplicitConstructorMemberInitializer(
+            IMethodSymbol constructor,
+            string memberPath,
+            Compilation compilation,
+            out ImmutableArray<IOperation> values) {
+            values = [];
+            var current = constructor;
+            while (current.IsImplicitlyDeclared) {
+                var typeDeclaration = current.ContainingType.DeclaringSyntaxReferences
+                    .FirstOrDefault()?.GetSyntax();
+                if (typeDeclaration != null &&
+                    TryGetDeclaredMemberInitializer(
+                        typeDeclaration, memberPath, compilation, out values))
+                    return true;
+                var baseType = current.ContainingType.BaseType;
+                if (baseType == null) return false;
+                var next = baseType.InstanceConstructors.FirstOrDefault(candidate =>
+                    candidate.Parameters.Length == 0);
+                if (next == null || !next.IsImplicitlyDeclared) return false;
+                current = next;
+            }
+            return false;
+        }
         private static bool TryGetChainedConstructorMemberOrigins(
             IMethodSymbol constructor,
             IOperation constructorCallSite,
@@ -3379,11 +3400,8 @@ internal sealed class MethodEffectAnalysisSession(
                     return false;
             }
             else {
-                var targetTypeDeclaration = targetConstructor.ContainingType
-                    .DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
-                if (targetTypeDeclaration == null ||
-                    !TryGetDeclaredMemberInitializer(
-                        targetTypeDeclaration,
+                if (!TryGetImplicitConstructorMemberInitializer(
+                        targetConstructor,
                         memberPath,
                         compilation,
                         out chainedValues))
