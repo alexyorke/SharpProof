@@ -2107,6 +2107,25 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void PropertyDelegateTargetRetainsCallerReceiver() {
+        var result = Analyze("""
+            sealed class Box {
+                public int State;
+                public void Mutate() { State++; }
+                public System.Action Action => Mutate;
+            }
+            class C {
+                static void M(Box input) { input.Action(); }
+            }
+            """, 7);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesReceiverState), Is.False);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ConditionalVirtualInvocationRetainsExactDispatch() {
         var result = Analyze("""
             class Base { public virtual void Work() { } }
