@@ -26,8 +26,8 @@ internal sealed class MethodEffectAnalysisSession(
         var initializerDeclaration = initializer.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) ??
                                      initializer.ContainingType.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
         if (initializerDeclaration == null) return result;
-        var initializerEffects = AnalyzeSummary(initializer, initializerDeclaration,
-            compilation.GetSemanticModel(initializerDeclaration.SyntaxTree), null).Effects;
+        var initializerEffects = WrapTypeInitializerExceptions(AnalyzeSummary(initializer, initializerDeclaration,
+            compilation.GetSemanticModel(initializerDeclaration.SyntaxTree), null).Effects);
         return Union(initializerEffects, result);
     }
     private CompilerMethodEffectSummary AnalyzeSummary(
@@ -279,6 +279,21 @@ internal sealed class MethodEffectAnalysisSession(
         [.. left.ExceptionFacts.AddRange(right.ExceptionFacts).Distinct()],
         [.. left.Sites.AddRange(right.Sites).Distinct()],
         [.. left.UnknownReasons.AddRange(right.UnknownReasons).Distinct()]);
+    private static MethodEffects WrapTypeInitializerExceptions(MethodEffects summary) {
+        var escaping = summary.ExceptionFacts.Where(static fact => fact.Escape != SharpProofVerdict.Disproven).ToArray();
+        if (escaping.Length == 0) return summary;
+        var escape = escaping.Any(static fact => fact.Escape == SharpProofVerdict.Proven)
+            ? SharpProofVerdict.Proven
+            : SharpProofVerdict.Unknown;
+        var inner = summary.ExceptionFacts.Select(static fact => fact.Escape == SharpProofVerdict.Disproven
+            ? fact
+            : fact with { Escape = SharpProofVerdict.Disproven, Reason = "type_initializer_inner_exception" });
+        return summary with {
+            ExceptionFacts = [.. inner.Append(MethodExceptionFact.Boundary(
+                "System.TypeInitializationException", MethodExceptionSource.Callee,
+                "type_initializer_exception", escape))]
+        };
+    }
     private static MethodEffectSite Site(SharpProofEffect effect, SyntaxNode syntax, ISymbol? symbol, string reason) => new(
         effect, SharpProofCapability.None, syntax.ToString(), symbol?.ToDisplayString() ?? string.Empty,
         syntax.SpanStart, syntax.Span.Length, false, reason, Origin(effect));
@@ -1169,7 +1184,8 @@ internal sealed class MethodEffectAnalysisSession(
                     candidate.MethodKind == MethodKind.StaticConstructor) is not { } initializer)
                 return;
             var initializerSummary = GetSummary(initializer, null);
-            AddSummary(initializerSummary.Effects, EffectFlowValue.None, [], site, initializer);
+            AddSummary(MethodEffectAnalysisSession.WrapTypeInitializerExceptions(initializerSummary.Effects),
+                EffectFlowValue.None, [], site, initializer);
         }
         private void AddConstructionTypeInitializerEffects(ITypeSymbol? type, IOperation site) {
             if (type is not INamedTypeSymbol named) return;
