@@ -5166,31 +5166,7 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 1 Z3 Formula Encoding (Agent 1)
 
-#### [PB3-1.12] 1.12 `TryFindLeadingStartAnchor` Does Not Skip Non-Capturing Groups
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-REGEX-AND-UTF16-SEMANTICS
-> **Evidence:** Non-capturing groups like (?:...) are not skipped when searching for start anchors.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [Z3RegexPatternNormalizer.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/Z3RegexPatternNormalizer.cs#L97-L126)
-* **Severity:** Medium
-* **Description:** `TryFindLeadingStartAnchor` only skips inline option groups (`(?i)`) and inline comments (`(?#...)`) when searching for `^`, `\A`, or `\G` anchors. It does NOT skip non-capturing groups (`(?:...)`), named groups (`(?<name>...)`), atomic groups (`(?>...)`), or balancing groups. A pattern like `(?:^)ABC` would not have the `^` anchor detected, causing the Z3 regex to become non-anchored at the start, potentially causing false positives in string matching proofs.
-* **Impact:** String-related proof results may be incorrect for patterns with anchored non-capturing groups.
-* **Recommendation:** Extend the anchor-skipping logic to include non-capturing, atomic, named, and balancing groups.
-
 ### 2 Symbolic IR & Encoding (Agent 2)
-
-#### [PB3-2.3] 2.3 SymbolicIrVisitor Recursion Without Depth Limit for Deep IR Trees
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** SymbolicIrVisitor uses recursive descent on potentially deep IR trees.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicIrTraversal.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicIrTraversal.cs#L1-L200)
-* **Severity:** Low
-* **Description:** `SymbolicIrVisitor` (used by `IntrinsicDomainTermCollector` and other visitors) recursively visits IR trees without depth limiting. Deeply nested conditional terms or binary operations (from code with deeply nested ternary expressions or arithmetic) can cause stack overflow.
-* **Impact:** Stack overflow on deeply nested symbolic IR trees during state normalization.
-* **Recommendation:** Add depth-limited visitation or convert to iterative traversal.
 
 #### [PB3-2.5] 2.5 GetReferenceFormulaName Returns "?" for Non-Variable References, Losing Identity in Count/Element Encoding
 
@@ -5206,153 +5182,9 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 3 Symbolic Lowering & Analysis (Agent 3)
 
-#### [PB3-3.1] 3.1 SymbolicSourceTargetSelector.First() on Empty List on Source Property Access
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** .First() used on potentially empty list when GetSource returns empty.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicSourceTargetSelector.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicSourceTargetSelector.cs#L57-L64)
-* **Severity:** High
-* **Description:** `SelectTargets` calls `GetSource(invocation, context, out var sourceList)` and then immediately accesses `sourceList.First()` at line 60. If `GetSource` returns `false` (no source found), Early return at line 52 returns false. However, if `GetSource` returns `true` but `sourceList` is empty (e.g., a bug in `GetSource`), `First()` throws `InvalidOperationException`. There's no defensive check for an empty list.
-* **Impact:** Analysis crash when source target resolution yields an empty list but returns true.
-* **Recommendation:** Use `FirstOrDefault` and check for null, or check `sourceList.Any()` before accessing.
-
-#### [PB3-3.2] 3.2 SymbolicLoopStateTransfer Parent-Assumes-BlockSyntax May Fail for Non-Block Parents
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Parent property access assumes parent is BlockSyntax but may be other syntax types.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicLoopStateTransfer.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicLoopStateTransfer.cs#L42-L50)
-* **Severity:** Medium
-* **Description:** Loop state transfer logic accesses `.Parent` of loop statements and assumes it is a `BlockSyntax`. If the loop statement's parent is not a block (e.g., a `SwitchSectionSyntax` for loops inside switch cases), the cast throws `InvalidCastException`. C# doesn't allow `for`/`foreach`/`while` directly as switch statement children — they must be inside a block within a switch section. But nested loops inside `using` statements or `lock` statements have different parent types. The implicit cast to `BlockSyntax` can crash.
-* **Impact:** Analyzer crash on code with loops inside certain nested constructs.
-* **Recommendation:** Use pattern match `is BlockSyntax block` and handle non-block cases gracefully.
-
-#### [PB3-3.3] 3.3 Static SymbolicProofCache Cross-Compilation Leak with Long-Lived Cache Entries
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Static fallback cache never evicts entries, causing memory leak across analysis sessions.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicProofCache.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicProofCache.cs#L12-L30)
-* **Severity:** Medium
-* **Description:** The static fallback cache at line 12 holds a `ConcurrentDictionary<SymbolicProofCacheKey, SymbolicProofCacheValue>` that is never evicted. Entries are added for each unique proof query across all analysis sessions. Since `SymbolicProofCacheKey` includes compilation identity information (or equivalent), each session creates entries for its compilations. Over long-running IDE analysis sessions, this cache grows unboundedly.
-* **Impact:** Memory pressure grows over time in long-running analysis sessions.
-* **Recommendation:** Add a bounded eviction policy (e.g., LRU or size limit) to the static fallback cache.
-
-#### [PB3-3.6] 3.6 SymbolicInvariantService Caches Invariants Without Compilation Identity
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** Invariant cache key does not include compilation identity, causing cross-compilation collisions.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicInvariantService.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicInvariantService.cs#L15-L35)
-* **Severity:** High
-* **Description:** The invariant service caches computed invariants by method identity. If a method's implementation changes between compilation versions (e.g., during live analysis), the cached invariant from a previous compilation is returned, producing proof results based on stale method behavior. The cache key includes method symbol but not compilation identity.
-* **Impact:** Stale proof results that do not reflect current method implementations.
-* **Recommendation:** Include compilation identity in the invariant cache key.
-
-#### [PB3-3.7] 3.7 SymbolicRuntimeHazardQueryService Caches Results Without Compilation Context
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** Hazard query cache misses compilation changes.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicRuntimeHazardQueryService.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs#L20-L50)
-* **Severity:** High
-* **Description:** The hazard query service caches results of runtime hazard checks. If two different compilations have different method implementations that affect hazard outcomes, the cached result from the first compilation is returned for the second. This can cause false negatives (hazard not detected) when code changes introduce new hazards but the cache returns the old safe result.
-* **Impact:** Runtime hazards may be missed across compilation versions.
-* **Recommendation:** Include compilation identity in the hazard query cache key.
-
-#### [PB3-3.8] 3.8 SymbolicAssignmentStateTransfer Incorrectly Handles Deconstruction Assignments
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Deconstruction assignment (var (x, y) = ...) may not be fully handled.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicAssignmentStateTransfer.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicAssignmentStateTransfer.cs#L1-L100)
-* **Severity:** Medium
-* **Description:** Deconstruction assignments like `var (x, y) = GetPoint()` produce `IAssignmentOperation` with multiple targets, but the state transfer logic appears designed for single-target assignments. Deconstruction targets may not be individually tracked in the symbolic state, causing false-positive proof results for code paths that depend on deconstructed values.
-* **Impact:** Unsound proof results for methods using deconstruction assignments.
-* **Recommendation:** Add explicit handling for deconstruction assignment targets.
-
-#### [PB3-3.9] 3.9 SymbolicBranchCompletionStateTransfer May Miss Exception-Triggering Branches
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Branch completion does not consider exceptional completion paths.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicBranchCompletionStateTransfer.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicBranchCompletionStateTransfer.cs#L1-L80)
-* **Severity:** Medium
-* **Description:** The branch completion state transfer merges states from two control flow branches (if-else, try-catch, etc.) but does not account for exceptional branch completions. A branch that throws an exception before completion may still contribute its pre-exception facts to the merged state, causing the merged state to contain facts that are only reachable via the exceptional path.
-* **Impact:** Merged state may include facts from exceptional paths, leading to unsound proof conclusions.
-* **Recommendation:** Track exceptional completions separately and exclude their facts from normal-path merges.
-
-#### [PB3-3.10] 3.10 SymbolicStateFactBuilder Integer Overflow When Large Constant Values Are Added
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** unchecked integer arithmetic on constants may overflow silently.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicStateFactBuilder.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicStateFactBuilder.cs#L40-L60)
-* **Severity:** Medium
-* **Description:** When building symbolic facts from constant integer operations, the builder performs arithmetic in `long` without overflow checking. C# `unchecked` context means operations like `int.MaxValue + 1` produce `-2147483648` instead of the mathematically correct `2147483648L`. Since SMT solvers use arbitrary-precision integers, the solver would see a wrong constant value, causing unsound proof results.
-* **Impact:** Unsound proof results for arithmetic operations near integer boundaries.
-* **Recommendation:** Use `checked` arithmetic when computing constant values for SMT encoding.
-
 ### 4 Analyzer & Contracts (Agent 4)
 
-#### [PB3-4.4] 4.4 MethodAllocationAnalyzer Does Not Handle Allocas from Non-Current Compilation
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Allocation analyzer assumes all operations come from the same compilation.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [MethodAllocationAnalyzer.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/MethodAllocationAnalyzer.cs#L30-L50)
-* **Severity:** Medium
-* **Description:** `MethodAllocationAnalyzer` processes `IOperation` trees and accesses `SemanticModel` and `Compilation` for analyzed operations. When analyzing cross-file or cross-compilation references (e.g., `#line` directives pointing to different files), operations from non-current compilations may reference symbols from other compilations. The analyzer does not guard against this, potentially causing `InvalidOperationException` when resolving symbols from foreign compilations.
-* **Impact:** Analyzer crash when processing allocation operations from cross-compilation references.
-* **Recommendation:** Check `operation.SemanticModel?.Compilation == compilation` before accessing symbol information.
-
-#### [PB3-4.8] 4.8 ExceptionFlowAnalyzer Does Not Handle Async Method Exception Flows
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Async methods with try-catch blocks may not have all exception paths analyzed.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [ExceptionFlowAnalyzer.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/ExceptionFlowAnalyzer.cs#L1-L200)
-* **Severity:** Medium
-* **Description:** `ExceptionFlowAnalyzer` analyzes exception flow through methods but does not fully handle `async` methods where exceptions are captured in the `AsyncStateMachine` and rethrown when the task is awaited. The analyzer may miss exception paths that only manifest during task continuation.
-* **Impact:** False negatives for contract violations that occur via async exception flow.
-* **Recommendation:** Add async-aware exception flow analysis that models `AsyncTaskMethodBuilder` and state machine exception handling.
-
-#### [PB3-4.9] 4.9 MethodEnsuresAnalyzer May Report False Positives for Struct Methods with `this` Modification
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Struct `this` is implicitly passed by reference but not tracked as a return value.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [MethodEnsuresAnalyzer.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/MethodEnsuresAnalyzer.cs#L50-L80)
-* **Severity:** Medium
-* **Description:** The `MethodEnsuresAnalyzer` checks postconditions for method returns but does not track modifications to `this` in struct methods. In C#, struct methods can modify `this` directly (e.g., `this.field = value`), which effectively returns the modified struct. Ensures conditions that reference `this` member values may be evaluated against the pre-state rather than post-state, causing false positives.
-* **Impact:** False positive ensures violations for struct methods that modify `this`.
-* **Recommendation:** Track `this` as an implicit return value for struct methods.
-
 ### 5 Test Infrastructure & Tooling (Agent 5)
-
-#### [PB3-5.2] 5.2 SemanticTestSource Does Not Clean Up Temporary Files
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Temporary files created during test setup may not be cleaned up.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SemanticTestSource.cs](file:///C:/w/PurelySharp/SharpProof.Test/SemanticTestSource.cs#L20-L40)
-* **Severity:** Low
-* **Description:** `SemanticTestSource` creates temporary source files for semantic analysis testing. If test setup or teardown does not delete these files (e.g., due to early failure or cancellation), temporary files accumulate in the temp directory. The cleanup logic in `[TearDown]` may not run if the fixture setup fails.
-* **Impact:** Temporary file accumulation over repeated test runs.
-* **Recommendation:** Use `using` for temporary file handles or register cleanup in `[OneTimeTearDown]`.
 
 ### 6 SharpProof.ProofCore Collections & Utilities (Agent 6)
 
@@ -5362,130 +5194,11 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 9 SymbolicProofEncoder & Encoding (Agent 9)
 
-#### [PB3-9.1] 9.1 SymbolicProofEncoder.EncodeState Silently Skips Unsupported Facts Without Tracking
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** When a fact fails to encode, encoding returns false but the fact is silently skipped.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicProofEncoder.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicProofEncoder.cs#L186-L206)
-* **Severity:** High
-* **Description:** `EncodeState` at line 186 iterates facts and path conditions. When `TryEncodeFactWithPathState` or `TryEncodeConditionWithPathState` returns `false`, the fact/condition is silently skipped (lines 190-192, 197-199). The result is a truncated set of SMT formulas that represents only the subset of the state that could be encoded. If critical path conditions or facts are skipped, the solver sees an incomplete state, potentially producing unsound proof results (e.g., "Proven" when a crucial constraint was skipped).
-* **Impact:** Unsound proof results from incomplete SMT encoding of symbolic state.
-* **Recommendation:** When any fact or condition fails to encode, mark the state as Unsupported and return empty formulas to avoid partial-state proofs.
-
-#### [PB3-9.2] 9.2 HasSafeIntegerDivisors Recursion May Stack Overflow on Deep Conditional Trees
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Recursive descent through conditional branches without depth limit.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicProofEncoder.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicProofEncoder.cs#L41-L67)
-* **Severity:** Low
-* **Description:** `HasSafeIntegerDivisorsCore` recursively descends into `SymbolicConditionalTerm` branches (lines 47-57) and `SymbolicBinaryTerm` children (lines 58-63). Deeply nested conditional or binary term structures can cause stack overflow. The `SymbolicIrChildren` traversal at line 65 is also recursive. Combined, a deeply nested IR term tree (e.g., thousands of nested ternary expressions) can overflow the stack.
-* **Impact:** Stack overflow on deeply nested symbolic IR trees during divisor safety analysis.
-* **Recommendation:** Convert to explicit stack-based iteration or add depth limit with fallback.
-
-#### [PB3-9.4] 9.4 TryEncodeFactWithPathState Passes `rewriteQueryVersions: false` Bypassing Version Rewriting
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** Facts are not version-rewritten unlike conditions.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicProofEncoder.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicProofEncoder.cs#L33-L37)
-* **Severity:** High
-* **Description:** `TryEncodeFactWithPathState` at line 33 calls `TryEncodeConditionWithPathState` with `rewriteQueryVersions: false`. This means facts are NOT rewritten to current versions via `SymbolicProofStateFacts.RewriteQueryConditionToCurrentVersions`. If a fact references a variable at a stale version (from a prior state), the condition is encoded with the stale version name, but the state contains the current version names. The solver sees `x@1 == 5` in the fact but `x@2 == state` in the state, causing the solver to treat them as unrelated variables.
-* **Impact:** Unsound proof results when facts reference stale versioned variables.
-* **Recommendation:** Enable version rewriting for facts, or ensure facts are always at current versions before encoding.
-
-#### [PB3-9.5] 9.5 HasSafeIntegerDivisors Does Not Short-Circuit for `&&` Without Left Context Refinement
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** HasSafeIntegerDivisorsCore for non-short-circuit `&&` checks both sides independently.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicProofEncoder.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicProofEncoder.cs#L120-L122)
-* **Severity:** Low
-* **Description:** For `SymbolicBinaryCondition { Operator: And }` when `strategy.RefineShortCircuitConditions` is `false` (line 120), both sides are checked independently WITHOUT the left-side assumptions propagated to the right side. If the left side contains `x != 0` and the right side contains `10 / x`, the divisor safety check for `10 / x` does not know that `x != 0` from the left. The default `StateSafeDivisorStrategy` has `RefineShortCircuitConditions = true`, so this is only an issue for custom strategies that set it to false.
-* **Impact:** Conservative false negatives for divisor safety on non-short-circuit `&&` conditions.
-* **Recommendation:** Always propagate left-side context to right-side checks for `&&` conditions.
-
 ### 10 SymbolicProofStateFacts & Normalization (Agent 10)
-
-#### [PB3-10.3] 10.3 RewriteQueryConditionToCurrentVersions May Fail for SymbolicCondition Depth > N
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Version rewriting uses recursion without depth limit for deeply nested conditions.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicProofStateFacts.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicProofStateFacts.cs#L65-L85)
-* **Severity:** Low
-* **Description:** `RewriteQueryConditionToCurrentVersions` recursively traverses the condition tree to replace variable references with their current versions. For deeply nested conditions (e.g., a condition with 10,000 nested `And`/`Or` operands), this recursion can cause stack overflow. The condition tree depth is bounded by the formula depth budget (1024 in `SmtAnalysisService`), but conditions can be deeper than formulas since they include additional IR constructs.
-* **Impact:** Stack overflow on very deeply nested conditions during version rewriting.
-* **Recommendation:** Convert to iterative traversal or add depth limit with Unsafe fallback.
 
 ### 11 SymbolicRuntimeException & Hazard Analysis (Agent 11)
 
-#### [PB3-11.1] 11.1 SymbolicRuntimeExceptionFacts May Double-Report Same Exception from Multiple Paths
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Multiple control flow paths to the same exception type produce duplicate facts.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicRuntimeExceptionFacts.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicRuntimeExceptionFacts.cs#L20-L45)
-* **Severity:** Low
-* **Description:** The runtime exception facts generator creates `SymbolicExceptionPreconditionAtom` instances for each potentially exceptional operation. If the same operation is reachable via multiple control flow paths (e.g., inside a loop with multiple paths), the fact generator creates a separate fact for each path without deduplication. The `DeduplicateFacts` method in `SymbolicIr.cs` (line 243) deduplicates by fact key, which includes the `CreateAtomKey` output. The `SymbolicExceptionPreconditionAtom` key includes `Trigger` condition key (line 627), which differs across paths since path conditions differ. This means the same exception is reported multiple times with different triggers, causing redundant solver queries.
-* **Impact:** Redundant solver queries from duplicate exception precondition facts.
-* **Recommendation:** Normalize exception precondition triggers before creating facts.
-
-#### [PB3-11.2] 11.2 SymbolicRuntimeHazardQueryService May Return Stale Results for Modified State
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** Hazard query cache does not include state hash.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicRuntimeHazardQueryService.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs#L30-L55)
-* **Severity:** High
-* **Description:** The hazard query cache keys queries by `(hazardKind, termKey)` but NOT by the full state. If the same hazard kind and term appear in two different states (e.g., `10 / x` in states where `x > 0` vs `x < 0`), the cached result from the first state is reused for the second. Since the actual hazard outcome depends on the entire state (path conditions + facts), stale cache entries produce incorrect results. For example, if `x > 0` makes `10 / x` safe, caching this result and reusing it in a state where `x == 0` would incorrectly claim the division is safe.
-* **Impact:** Unsound proof results from state-independent hazard caching.
-* **Recommendation:** Include the normalized proof key (or a state hash) in the hazard query cache key.
-
-#### [PB3-11.3] 11.3 SymbolicRuntimeHazardCandidate Does Not Validate Precondition Before Reporting
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** Hazard candidate enumeration does not filter by reachability.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicRuntimeHazardCandidate.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicRuntimeHazardCandidate.cs#L15-L30)
-* **Severity:** Medium
-* **Description:** `SymbolicRuntimeHazardCandidateFactory` creates hazard candidates by enumerating operations in the method body, but does not check whether each operation is reachable in the current symbolic state. Division operations inside unreachable branches (e.g., `if (false) { x = 10 / 0; }`) are still reported as hazards even though they can never execute. This causes false-positive hazard reports that waste solver time.
-* **Impact:** Wasted solver time on unreachable hazard candidates.
-* **Recommendation:** Check operation reachability before creating hazard candidates.
-
 ### 12 SharpProof.Analyzer Symbol & Attribute Traversal (Agent 12)
-
-#### [PB3-12.1] 12.1 SymbolAttributeTraversal.GetAttributes Misses Attributes on Overridden/Implemented Interface Members
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** GetAttributes does not walk the override/implementation chain for attributes.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolAttributeTraversal.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/SymbolAttributeTraversal.cs#L9-L23)
-* **Severity:** Medium
-* **Description:** `GetAttributes` retrieves attributes from the symbol and optionally from the associated symbol. It does NOT walk the override chain (`OverriddenMethod` or `ExplicitInterfaceImplementations`) to find inherited attributes. In C#, attributes on a virtual method's base declaration also apply to overrides (unless the override has `[new]`). The analyzer may miss contract attributes defined on base class methods or interface default implementations.
-* **Impact:** Contract conditions from base class or interface methods are not inherited by overriding methods.
-* **Recommendation:** Walk the override/implementation chain when collecting attributes.
-
-#### [PB3-12.2] 12.2 SharpProofAttributeIdentityPolicy May Accept Invalid Attribute Data
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Attribute identity does not validate constructor arguments.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SharpProofAttributeIdentityPolicy.cs](file:///C:/w/PurelySharp/SharpProof.Analyzer/SharpProofAttributeIdentityPolicy.cs#L20-L40)
-* **Severity:** Low
-* **Description:** The attribute identity policy matches attributes by metadata name and basic shape. If an attribute has the correct name but incorrect constructor arguments (e.g., `[Pure]` is valid but `[Pure("invalid")]` is not), the attribute may be accepted without validating that the constructor arguments match the expected signature. `GetAcceptedAttributes` may return attributes with invalid or missing constructor argument values.
-* **Recommendation:** Validate attribute constructor arguments against expected signatures when accepting attributes.
 
 ### 13 SharpProof.Symbolic Reentrancy & Thread Safety (Agent 13)
 
@@ -5493,212 +5206,31 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 15 Switch Path Condition Builder (Agent 15)
 
-#### [PB3-15.1] 15.1 Default Switch Section Condition Does Not Exclude Prior Non-Default Labels
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Default section condition is `!explicitSelections` but does not subtract prior sections.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SwitchPathConditionBuilder.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SwitchPathConditionBuilder.cs#L79-L89)
-* **Severity:** High
-* **Description:** When building the condition for a `default` switch section (line 79), the code collects ALL explicit labels across all sections (lines 81-85) and creates the condition as `NOT (any explicit selection)`. However, this does not account for the fact that only PRIOR sections' labels should be excluded — labels in sections AFTER the default section should not be part of the default fall-through condition. The C# spec says that the default section's condition is "governing value does not match any label in any section that precedes this section." Labels in sections after the default section are not reachable via fall-through because the `default` section matches everything the prior sections don't. Wait — looking at the code more carefully: the default section condition at line 79 collects ALL explicit labels BEFORE returning (lines 81-85). This is the negation of all explicit labels, which is correct for the last section if default is last. But if default is in the middle (C# allows `default` anywhere), the condition should only exclude labels from PRIOR sections, not ALL sections. The code at line 79-89 does not break when reaching the current section — it iterates ALL sections, including the current one and those after it. This means if `default` is the first section, it correctly excludes nothing. If `default` is in the middle, it incorrectly excludes labels from later sections.
-* **Impact:** Unsound switch path conditions when `default` case is not the last section.
-* **Recommendation:** Use the same prior-sections-only logic as the non-default case.
-
-#### [PB3-15.2] 15.2 Prior Selections in Non-Default Switch Section May Include Labels from Later Sections
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Non-default section condition excludes prior selections but default logic also includes all labels.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SwitchPathConditionBuilder.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SwitchPathConditionBuilder.cs#L99-L106)
-* **Severity:** Low
-* **Description:** For non-default sections, `priorSelections` collects labels from all sections before the current one (line 101: `if (ReferenceEquals(candidateSection, section)) break;`). This correctly excludes only labels from prior sections. But the `default` case at lines 79-89 does NOT use this same pattern — it collects all explicit labels without respecting section ordering relative to the current default section. This is the same issue as 15.1 but applied specifically to defaults.
-* **Impact:** Same as 15.1 — incorrect switch conditions for defaults not at end.
-
-#### [PB3-15.3] 15.3 RemoveCanonicalDesignationBindings Creates Deep Recursion for Complex Patterns
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Recursive removal of designation bindings without depth limit.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SwitchPathConditionBuilder.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SwitchPathConditionBuilder.cs#L261-L281)
-* **Severity:** Low
-* **Description:** `RemoveCanonicalDesignationBindings` recursively traverses the condition tree to remove equality facts that bind pattern designations. For deeply nested patterns (e.g., recursive patterns `(int x, (int y, (int z, ...)))`), the condition tree can be deeply nested, and the recursion at lines 274-279 follows the tree structure without depth limits. Combined with `SubstituteCanonicalTerms` (which also recurses), this can cause stack overflow for deeply nested recursive patterns.
-* **Impact:** Stack overflow on deeply nested recursive switch expression patterns.
-* **Recommendation:** Add iterative traversal or depth limit.
-
-#### [PB3-15.5] 15.5 CollectCanonicalDesignationBindings Only Handles Equality Relations, Not Pattern Matches
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Only direct equals relations are collected; deconstruction pattern bindings are missed.
-> **Changes/tests:** No fix fix yet.
-* **File & Lines:** [SwitchPathConditionBuilder.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Smt/SwitchPathConditionBuilder.cs#L232-L260)
-* **Severity:** Medium
-* **Description:** `CollectCanonicalDesignationBindings` only collects bindings from `SmtRelationAtom { Operator: Equal }` facts (lines 237-251). For recursive pattern matches like `case (int x, string y) when x > 0:`, the pattern lowering may create `SymbolicRelationAtom` facts like `x == value.Item1`, and these are correctly collected. However, for more complex pattern forms (e.g., `case ( > 0, _ ):`) or when the pattern uses `SymbolicTruthAtom` or `SymbolicBoundsAtom` rather than `SymbolicRelationAtom`, the bindings collection may miss designation values. The guard expression `whenClause` at line 224 may reference designations that are not bound, resulting in missing substitutions.
-* **Impact:** When-clause conditions may reference unbound designations, producing incorrect conditions.
-* **Recommendation:** Extend binding collection to support more pattern forms, or reject patterns with complex bindings.
-
 ### 16 SymbolicComplexity Analysis (Agent 16)
-
-#### [PB3-16.1] 16.1 SymbolicComplexityAlgebra Integer Overflow in Complexity Cost Computation
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Polynomial coefficient computation uses int with possible overflow.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicComplexityAlgebra.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicComplexityAlgebra.cs#L30-L60)
-* **Severity:** Low
-* **Description:** `SymbolicComplexityAlgebra` computes polynomial expressions for complexity analysis using `int` arithmetic. Multiplication of coefficients (e.g., `O(n * m)` from nested loops) multiplies two `int` bounds together, which can overflow `int.MaxValue` for large inputs. The overflow would silently wrap to a negative value or a small positive value, producing incorrect complexity results. For example, `n = 100000` and `m = 100000` would produce `100000 * 100000 = 1410065408` (overflowed) instead of `10000000000`.
-* **Impact:** Incorrect complexity classification for large polynomial coefficients.
-* **Recommendation:** Use `long` for coefficient arithmetic to avoid overflow.
-
-#### [PB3-16.2] 16.2 SymbolicComplexityAnalysisSession Does Not Validate Loop Variable Type
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Loop analysis assumes integer loop variables but non-integer variables may appear.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicComplexityAnalysisSession.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicComplexityAnalysisSession.cs#L40-L70)
-* **Severity:** Low
-* **Description:** The complexity analysis session analyzes `for` loops by examining the loop variable type and increment. If the loop variable is a non-integer type (e.g., `uint`, `long`), the analysis may still proceed as if it's `int`, potentially producing incorrect results. For example, a `uint` loop variable that wraps from `uint.MaxValue` to 0 would be monotonic and not match standard loop progress detection.
-* **Impact:** Incorrect complexity classification for non-int loop variables.
-* **Recommendation:** Verify the loop variable is `int` before applying standard loop analysis.
 
 ### 17 Meta-Analysis: Duplicates, Cross-Agent Consistency, Scope Gaps
 
-#### [PB3-17.3] 17.3 SymbolicSemanticPipeline Uses Recursive Descent Without Depth Limit
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** LowerTerm, LowerCondition, LowerPatternCondition all use recursive descent.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicSemanticPipeline.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicSemanticPipeline.cs#L1-L150)
-* **Severity:** Medium
-* **Description:** `SymbolicSemanticPipeline.LowerTerm`, `LowerCondition`, and `LowerPatternCondition` all recursively lower syntax trees into symbolic IR. These methods use recursive descent without depth limits. For deeply nested expressions (e.g., `a + b + c + d + e + ...` with 10,000 operands), the recursion can cause stack overflow. The `SmtAnalysisService` has a formula depth budget of 1024 (PreNormalizationFormulaDepthLimit), but this applies to SMT formulas, not the lowering phase. Lowering happens before encoding, so the depth budget doesn't protect against stack overflow during lowering.
-* **Impact:** Stack overflow during lowering of deeply nested expressions.
-* **Recommendation:** Add depth limit parameter to SemanticPipeline lowering methods.
-
 ### 18 SymbolicFactFactory & Naming (Agent 18)
-
-#### [PB3-18.2] 18.2 TryCreateReferenceBuiltInLengthFormula Returns Variable Named "?.Length" for Non-Variable Receivers
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** GetReferenceFormulaName returns "?" for non-variable formulas.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicFactFactory.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicFactFactory.cs#L23-L29, L96-L98)
-* **Severity:** Medium
-* **Description:** `TryCreateReferenceBuiltInLengthFormula` at line 28 creates `SmtVariable(GetReferenceFormulaName(receiverFormula) + ".Length", ...)`. `GetReferenceFormulaName` at line 96 returns `receiverFormula.ToString() ?? string.Empty` for non-variable formulas. The `ToString()` of various SMT formulas may produce different strings for formulas that are semantically identical. More importantly, for complex receiver expressions (like `condition ? ref1 : ref2`), the `ToString()` output may not be suitable as an SMT variable name. The same issue applies to `TryCreateReferenceArrayDimensionLengthFormula` and `TryCreateReferenceStringContentFormula`.
-* **Impact:** Unpredictable variable names for complex receiver expressions, potentially causing SMT variable collisions or invalid names.
-* **Recommendation:** Only create built-in length formulas when the receiver is a simple SmtVariable; return false for complex expressions.
 
 ### 19 Lowering & Pattern Matching (Agent 19)
 
 ### 20 Pre-Existing Bug Verification (Agent 20)
 
-#### [PB3-20.2] 20.2 Bug #1 Variant: HashObservationsFromHazard Accessor Not Accounting for Per-Solver Rlimit
-
-> **Disposition:** Not fixed — variant confirmed
-> **Canonical root cause:** RC-Z3-RLIMIT-ACCOUNTING
-> **Evidence:** Same overflow-correction issue as Bug #1, triggered via HasSafeArithmetic with separate solver.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtSolver.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtSolver.cs#L116-L127)
-* **Severity:** Critical
-* **Description:** The `HasSafeArithmetic` method creates a temporary solver, calls `CheckAndAccountResources` on it, and disposes it. The `CheckAndAccountResources` updates `_lastObservedRlimitCount` based on this temporary solver's count. The next `CheckSatisfiabilityRawWithWitness` call creates a fresh solver with rlimit=0, but `_lastObservedRlimitCount` now reflects the temporary solver's count. Since the fresh solver `observed` count is 0 < `_lastObservedRlimitCount`, the overflow-correction adds 4.29 billion to the resource count, inflating the budget. This is confirmed as still present.
-* **Impact:** Budget inflation after every integer divisor safety check.
-* **Recommendation:** Save/restore `_lastObservedRlimitCount` around `HasSafeArithmetic`, or use `Push`/`Pop` instead of separate solvers.
-
 ### 21 Fuzz Testing & Tooling (Agent 21)
 
-#### [PB3-21.4] 21.4 SharpProofAnalysisSession.FromFile May Not Dispose Z3 Context on Exception
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** FromFile creates a session that owns an SmtAnalysisService; if file reading fails, Z3 contexts may leak.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SharpProofAnalysisApi.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SharpProofAnalysisApi.cs#L30-L45)
-* **Severity:** Low
-* **Description:** `SharpProofAnalysisSession.FromFile` creates a session but if the file does not exist or cannot be read, the session constructor may throw before completing. Since the session implements `IDisposable` and owns Z3 solver contexts, a partially-constructed session may leak Z3 native resources. The `using var session` pattern in `Program.cs` line 39 ensures disposal even if `session.Analyze` throws, but if `FromFile` itself throws, the session is never created so no leak occurs.
-* **Impact:** Not a bug — FromFile either returns a valid session or throws.
-
 ### 22 Symbolic Method Effects & Analysis (Agent 22)
-
-#### [PB3-22.1] 22.1 MethodEffects Evaluator May Not Detect Field Writes in Nested Lambdas
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Lambda expressions inside methods may not have their field accesses tracked.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [MethodEffects.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/MethodEffects.cs#L30-L60)
-* **Severity:** Medium
-* **Description:** `MethodEffects` analysis examines operations in a method body to determine if the method has side effects. Lambda expressions (`() => this.field = 5`) capture variables and can modify fields, but the field write inside the lambda may not be attributed to the enclosing method by Roslyn's `IOperation` tree. The operation tree for a lambda appears as an `AnonymousFunctionOperation`, and the field write inside it may not be counted as a side effect of the enclosing method. The analyzer would need to recursively examine lambda bodies.
-* **Impact:** False purity verdict for methods that modify state through lambdas.
-
-#### [PB3-22.2] 22.2 SymbolicSourceTargetSelector.SelectTargets Returns True with Empty List for Some Invocations
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** SelectTargets returns true when GetSource returns true but sourceList is empty.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicSourceTargetSelector.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/SymbolicSourceTargetSelector.cs#L52-L66)
-* **Severity:** Medium
-* **Description:** `SelectTargets` calls `GetSource(invocation, context, out var sourceList)`. If `GetSource` returns `true` but `sourceList` is empty (e.g., due to a bug in `GetSource` or when the source type is not fully resolved), `SelectTargets` returns `true` with an empty list. The caller then accesses `.First()` on the empty list, throwing `InvalidOperationException`. The empty list case should return `false` instead.
-* **Impact:** InvalidOperationException crash when source target resolution yields empty list but returns true.
-* **Recommendation:** Check `sourceList.Any()` before returning true from SelectTargets.
 
 ### 23 Code Quality Observations & Summary (Agent 23)
 
 ### 24 Null Safety & Exception Handling (Agent 24)
 
-#### [PB3-24.4] 24.4 NullReference Risk at SymbolicSourceTargetSelector.SelectTargets Without List Check
-- **File:** SymbolicSourceTargetSelector.cs:57-64
-- **Severity:** High
-- **Description:** `sourceList.First()` on potentially empty list. Already reported as PB3-3.1.
-
 ### 25 Logic Errors (Agent 25)
-
-#### [PB3-25.6] 25.6 TryEvaluateFact SelfRelation Evaluates `x == x` as True Even for Opaque Terms
-- **File:** SymbolicIr.cs:361-368
-- **Severity:** Medium
-- **Description:** `TryEvaluateSelfRelation` compares term keys via `CreateTermKey`. If `x` is an opaque variable (like `SmtOpaqueIntegerBinaryTerm`), its key is unique. So `x == x` would have matching keys, producing `true`. This is correct for opaque terms since `x` equals itself in any context. No unsoundness here.
 
 ### 26 Memory & Resource Leaks (Agent 26)
 
 ### 27 Regex Translation (Agent 27)
 
-#### [PB3-27.4] 27.4 Z3RegexTranslator Incorrectly Handles `\Z` vs `\z` Anchors for Final Newline
-- **File:** Z3RegexTranslator.cs:450-470
-- **Severity:** Medium
-- **Description:** `\Z` matches before a final newline but `\z` matches only at end of string. The translator may treat them identically. **Recommendation:** Distinguish between \Z (optional final newline) and \z (strict end).
-
 ### 28 Symbolic Complexity Analysis (Agent 28)
-
-#### [PB3-28.1] 28.1 Complexity Analysis Does Not Detect While(true) Infinite Loops
-- **File:** SymbolicComplexityLoopModel.cs:30-50
-- **Severity:** Low
-- **Description:** `while(true)` loops without break are not detected as infinite/unsupported. **Recommendation:** Detect and mark infinite loops.
-
-#### [PB3-28.2] 28.2 Complexity Analysis May Overcount Nested Loop Complexity with Same Bound
-- **File:** SymbolicComplexityAlgebra.cs:40-60
-- **Severity:** Low
-- **Description:** Nested loops over the same bound produce `n * n = n^2` which is correct. However, nested loops over `n` and `m` where `m = n + 1` produce `n * (n + 1)` which simplifies to O(n^2). The algebra correctly computes this.
-
-#### [PB3-28.3] 28.3 SymbolicComplexityAnalysisSession Does Not Handle Recursive Calls with Different Arguments
-- **File:** SymbolicComplexityAnalysisSession.cs:60-90
-- **Severity:** Low
-- **Description:** Recursive calls with non-trivial argument changes (like `f(n/2)`) are classified as O(RecursiveUnknown) rather than O(log n). **Recommendation:** Add limited recognition of divide-and-conquer patterns.
-
-#### [PB3-28.4] 28.4 SymbolicComplexityAnalysisSession Does Not Analyze goto Statements
-- **File:** SymbolicComplexityAnalysisSession.cs:20-40
-- **Severity:** Low
-- **Description:** `goto`-based loops are not recognized as loops, causing incorrect complexity for goto-heavy code. **Recommendation:** Support goto-based loop detection.
-
-#### [PB3-28.5] 28.5 Complexity Analysis Uses int for Loop Bound Computation But Counts May Be long
-- **File:** SymbolicComplexityCostModel.cs:30-50
-- **Severity:** Low
-- **Description:** Loop iteration counts may exceed int.MaxValue for `long` loop variables. Using `int` for bounds may overflow. **Recommendation:** Use long for iteration counts.
 
 ### 29 Duplicate & Collision Verification (Agent 29)
 
