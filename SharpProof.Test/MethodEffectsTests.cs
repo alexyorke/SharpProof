@@ -228,6 +228,22 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ConstantPatternSwitchStatementSkipsUnselectedSection() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static int Mutate() { state++; return 1; }
+                static int M() {
+                    switch (5) { case > 0: return 1; default: return Mutate(); }
+                }
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
+        });
+    }
+    [Test]
     public void NullConditionalSkipsGetterForConstantNullReceiver() {
         var result = Analyze("""
             class C {
