@@ -205,6 +205,8 @@ internal sealed class MethodEffectAnalysisSession(
                     builder.AssignLocal(assignedLocal.Local, assignment.Value);
                 if (assignment.Target is IPropertyReferenceOperation { Property.SetMethod: not null } propertyTarget)
                     AnalyzeCall(propertyTarget.Property.SetMethod, assignment, builder, propertyTarget.Instance);
+                if (assignment.Target is IImplicitIndexerReferenceOperation implicitIndexerTarget)
+                    AnalyzeImplicitIndexerAccess(implicitIndexerTarget, assignment, builder, reads: false, writes: true);
                 break;
             case ICoalesceAssignmentOperation coalesceAssignment:
                 AddWrite(coalesceAssignment.Target, builder);
@@ -216,6 +218,8 @@ internal sealed class MethodEffectAnalysisSession(
                     AnalyzeCall(coalescedProperty.Property.SetMethod, coalesceAssignment, builder,
                         coalescedProperty.Instance);
                 }
+                if (coalesceAssignment.Target is IImplicitIndexerReferenceOperation coalescedIndexer)
+                    AnalyzeImplicitIndexerAccess(coalescedIndexer, coalesceAssignment, builder, reads: true, writes: true);
                 break;
             case IDeconstructionAssignmentOperation deconstruction:
                 AnalyzeDeconstructionTarget(deconstruction.Target, builder);
@@ -232,6 +236,8 @@ internal sealed class MethodEffectAnalysisSession(
                     AnalyzeCall(compoundProperty.Property.GetMethod, compound, builder, compoundProperty.Instance);
                     AnalyzeCall(compoundProperty.Property.SetMethod, compound, builder, compoundProperty.Instance);
                 }
+                if (compound.Target is IImplicitIndexerReferenceOperation compoundIndexer)
+                    AnalyzeImplicitIndexerAccess(compoundIndexer, compound, builder, reads: true, writes: true);
                 if (compound.OperatorMethod != null) AnalyzeCall(compound.OperatorMethod, compound, builder);
                 break;
             case IIncrementOrDecrementOperation increment:
@@ -240,6 +246,8 @@ internal sealed class MethodEffectAnalysisSession(
                     AnalyzeCall(incrementProperty.Property.GetMethod, increment, builder, incrementProperty.Instance);
                     AnalyzeCall(incrementProperty.Property.SetMethod, increment, builder, incrementProperty.Instance);
                 }
+                if (increment.Target is IImplicitIndexerReferenceOperation incrementIndexer)
+                    AnalyzeImplicitIndexerAccess(incrementIndexer, increment, builder, reads: true, writes: true);
                 if (increment.OperatorMethod != null) AnalyzeCall(increment.OperatorMethod, increment, builder);
                 break;
             case IFieldReferenceOperation { Field.IsConst: false, Field.IsStatic: true } field
@@ -268,6 +276,13 @@ internal sealed class MethodEffectAnalysisSession(
                      !ReferenceEquals(target, inlineArray):
                 builder.Add(GetInstanceReadEffect(inlineArray.Instance, builder), inlineArray, inlineArray.Type,
                     "inline_array_read");
+                break;
+            case IImplicitIndexerReferenceOperation implicitIndexer
+                when implicitIndexer.Parent is not IAssignmentOperation { Target: var target } ||
+                     !ReferenceEquals(target, implicitIndexer):
+                builder.Add(GetInstanceReadEffect(implicitIndexer.Instance, builder), implicitIndexer,
+                    implicitIndexer.Type, "implicit_indexer_read");
+                AnalyzeImplicitIndexerAccess(implicitIndexer, implicitIndexer, builder, reads: true, writes: false);
                 break;
             case var pointer when IsPointerIndirection(pointer) &&
                                   pointer.ChildOperations.FirstOrDefault() is { } pointerOperand &&
@@ -390,6 +405,26 @@ internal sealed class MethodEffectAnalysisSession(
         AddWrite(target, builder);
         if (target is IPropertyReferenceOperation { Property.SetMethod: not null } property)
             AnalyzeCall(property.Property.SetMethod, property, builder, property.Instance);
+        if (target is IImplicitIndexerReferenceOperation implicitIndexer)
+            AnalyzeImplicitIndexerAccess(implicitIndexer, implicitIndexer, builder, reads: false, writes: true);
+    }
+    private void AnalyzeImplicitIndexerAccess(
+        IImplicitIndexerReferenceOperation indexer,
+        IOperation site,
+        Builder builder,
+        bool reads,
+        bool writes) {
+        if (indexer.LengthSymbol is IPropertySymbol length)
+            AnalyzeCall(length.GetMethod, site, builder, indexer.Instance);
+        switch (indexer.IndexerSymbol) {
+            case IPropertySymbol property:
+                if (reads) AnalyzeCall(property.GetMethod, site, builder, indexer.Instance);
+                if (writes) AnalyzeCall(property.SetMethod, site, builder, indexer.Instance);
+                break;
+            case IMethodSymbol method when reads:
+                AnalyzeCall(method, site, builder, indexer.Instance);
+                break;
+        }
     }
     private bool AnalyzeCall(
         IMethodSymbol? method,
@@ -853,6 +888,10 @@ internal sealed class MethodEffectAnalysisSession(
                 builder.Add(GetInstanceWriteEffect(inlineArray.Instance, builder), inlineArray, inlineArray.Type,
                     "inline_array_write");
                 break;
+            case IImplicitIndexerReferenceOperation implicitIndexer:
+                builder.Add(GetInstanceWriteEffect(implicitIndexer.Instance, builder), implicitIndexer,
+                    implicitIndexer.Type, "implicit_indexer_write");
+                break;
             case var pointer when IsPointerIndirection(pointer) &&
                                   pointer.ChildOperations.FirstOrDefault() is { } pointerOperand:
                 builder.Add(GetInstanceWriteEffect(pointerOperand, builder), pointer, pointer.Type,
@@ -873,6 +912,8 @@ internal sealed class MethodEffectAnalysisSession(
             IPropertyReferenceOperation property => GetInstanceWriteEffect(property.Instance, builder),
             IArrayElementReferenceOperation array => GetInstanceWriteEffect(array.ArrayReference, builder),
             IInlineArrayAccessOperation inlineArray => GetInstanceWriteEffect(inlineArray.Instance, builder),
+            IImplicitIndexerReferenceOperation implicitIndexer =>
+                GetInstanceWriteEffect(implicitIndexer.Instance, builder),
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceWriteEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IConversionOperation conversion => GetInstanceWriteEffect(conversion.Operand, builder),
@@ -893,6 +934,8 @@ internal sealed class MethodEffectAnalysisSession(
             IPropertyReferenceOperation property => GetInstanceReadEffect(property.Instance, builder),
             IArrayElementReferenceOperation array => GetInstanceReadEffect(array.ArrayReference, builder),
             IInlineArrayAccessOperation inlineArray => GetInstanceReadEffect(inlineArray.Instance, builder),
+            IImplicitIndexerReferenceOperation implicitIndexer =>
+                GetInstanceReadEffect(implicitIndexer.Instance, builder),
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceReadEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IConversionOperation conversion => GetInstanceReadEffect(conversion.Operand, builder),
