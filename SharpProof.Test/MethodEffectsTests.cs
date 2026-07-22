@@ -1358,6 +1358,25 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void UnusedIteratorLocalFunctionDoesNotAllocateInOuterMethod() {
+        var result = Analyze("""
+            class C {
+                static void M() {
+                    static System.Collections.Generic.IEnumerable<int> Local() {
+                        yield return 1;
+                    }
+                }
+            }
+            """);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven),
+                string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                    site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+            Assert.That(result.MethodEffects.Sites,
+                Has.None.Property(nameof(MethodEffectSite.Reason)).EqualTo("state_machine_allocation"));
+        });
+    }
+    [Test]
     public void WithExpressionIncludesCopyConstructorEffects() {
         var result = Analyze("""
             sealed record R {
