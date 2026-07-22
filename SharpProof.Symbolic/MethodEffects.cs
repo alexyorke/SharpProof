@@ -200,13 +200,15 @@ internal sealed class MethodEffectAnalysisSession(
     private void AnalyzeOperation(IOperation operation, SemanticModel semanticModel, Builder builder) {
         switch (operation) {
             case ISimpleAssignmentOperation assignment:
-                AddWrite(assignment.Target, builder);
+                if (!assignment.IsRef) AddWrite(assignment.Target, builder);
                 if (assignment.Target is ILocalReferenceOperation assignedLocal &&
                     (assignedLocal.Local.RefKind == RefKind.None || assignment.IsRef))
                     builder.AssignLocal(assignedLocal.Local, assignment.Value);
-                if (assignment.Target is IPropertyReferenceOperation { Property.SetMethod: not null } propertyTarget)
+                if (!assignment.IsRef &&
+                    assignment.Target is IPropertyReferenceOperation { Property.SetMethod: not null } propertyTarget)
                     AnalyzeCall(propertyTarget.Property.SetMethod, assignment, builder, propertyTarget.Instance);
-                if (assignment.Target is IImplicitIndexerReferenceOperation implicitIndexerTarget)
+                if (!assignment.IsRef &&
+                    assignment.Target is IImplicitIndexerReferenceOperation implicitIndexerTarget)
                     AnalyzeImplicitIndexerAccess(implicitIndexerTarget, assignment, builder, reads: false, writes: true);
                 break;
             case ICoalesceAssignmentOperation coalesceAssignment:
