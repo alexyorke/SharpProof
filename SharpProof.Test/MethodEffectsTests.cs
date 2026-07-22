@@ -2218,6 +2218,30 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void EffectFlowStateKeyIncludesRefLocalBindings() {
+        var context = AnalyzerTestHost.CreateSourceContext("""
+            sealed class Box { public int Value; }
+            class C {
+                static void M(Box input) {
+                    ref int alias = ref input.Value;
+                }
+            }
+            """, "RefLocalStateKey");
+        var methodDeclaration = context.Root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var method = (IMethodSymbol)context.SemanticModel.GetDeclaredSymbol(methodDeclaration)!;
+        var aliasDeclaration = methodDeclaration.DescendantNodes().OfType<VariableDeclaratorSyntax>().Single();
+        var alias = (ILocalSymbol)context.SemanticModel.GetDeclaredSymbol(aliasDeclaration)!;
+        var initial = EffectFlowState.Create(method);
+        var argumentState = initial with {
+            RefLocals = initial.RefLocals.SetItem(alias, initial.GetParameter(method.Parameters[0]))
+        };
+        var freshState = initial with {
+            RefLocals = initial.RefLocals.SetItem(alias, EffectFlowValue.Fresh(alias.Type))
+        };
+
+        Assert.That(argumentState.Key, Is.Not.EqualTo(freshState.Key));
+    }
+    [Test]
     public void FixedPointerWriteToFreshObjectRemainsFreshOwned() {
         var result = Analyze("""
             sealed class Box { public int Value; }
