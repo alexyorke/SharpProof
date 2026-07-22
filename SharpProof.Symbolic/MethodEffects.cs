@@ -2790,11 +2790,11 @@ internal sealed class MethodEffectAnalysisSession(
                         when ReferenceEquals(instance, current):
                         if (property.Property.IsIndexer &&
                             property.Arguments.Length == 1 &&
-                            property.Arguments[0].Value.ConstantValue is {
-                                HasValue: true,
-                                Value: int propertyIndex
-                            })
-                            path.Add("#indexer:" + propertyIndex.ToString(CultureInfo.InvariantCulture));
+                            TryGetConstantPathPart(
+                                property.Arguments[0].Value,
+                                "#indexer:",
+                                out var indexerPath))
+                            path.Add(indexerPath);
                         else if (property.Property.IsIndexer)
                             hasUnresolvedPath = true;
                         else
@@ -2916,12 +2916,7 @@ internal sealed class MethodEffectAnalysisSession(
             while (value is IConversionOperation conversion) value = conversion.Operand;
             const string indexerPrefix = "#indexer:";
             if (path[index].StartsWith(indexerPrefix, StringComparison.Ordinal)) {
-                if (value is not IObjectCreationOperation { Initializer: { } collectionInitializer } ||
-                    !int.TryParse(
-                        path[index].Substring(indexerPrefix.Length),
-                        NumberStyles.None,
-                        CultureInfo.InvariantCulture,
-                        out var elementIndex))
+                if (value is not IObjectCreationOperation { Initializer: { } collectionInitializer })
                     return false;
                 var additions = collectionInitializer.Initializers
                     .OfType<IInvocationOperation>()
@@ -2931,14 +2926,21 @@ internal sealed class MethodEffectAnalysisSession(
                 if (additions.Any(invocation => invocation.Arguments.Length >= 2)) {
                     element = additions.FirstOrDefault(invocation =>
                         invocation.Arguments.Length >= 2 &&
-                        invocation.Arguments[0].Value.ConstantValue is {
-                            HasValue: true,
-                            Value: int key
-                        } &&
-                        key == elementIndex)?.Arguments[1].Value;
+                        TryGetConstantPathPart(
+                            invocation.Arguments[0].Value,
+                            indexerPrefix,
+                            out var keyPath) &&
+                        string.Equals(keyPath, path[index], StringComparison.Ordinal))?.Arguments[1].Value;
                 }
                 else {
-                    element = elementIndex >= 0 && elementIndex < additions.Length
+                    const string intIndexPrefix = "#indexer:System.Int32:";
+                    element = path[index].StartsWith(intIndexPrefix, StringComparison.Ordinal) &&
+                              int.TryParse(
+                                  path[index].Substring(intIndexPrefix.Length),
+                                  NumberStyles.None,
+                                  CultureInfo.InvariantCulture,
+                                  out var elementIndex) &&
+                              elementIndex >= 0 && elementIndex < additions.Length
                         ? additions[elementIndex].Arguments[0].Value
                         : null;
                 }
@@ -3025,6 +3027,16 @@ internal sealed class MethodEffectAnalysisSession(
                     out initializer);
             }
             return false;
+        }
+        private static bool TryGetConstantPathPart(
+            IOperation operation,
+            string prefix,
+            out string path) {
+            path = string.Empty;
+            if (operation.ConstantValue is not { HasValue: true, Value: { } value }) return false;
+            path = prefix + value.GetType().FullName + ":" +
+                   Convert.ToString(value, CultureInfo.InvariantCulture);
+            return true;
         }
         private bool TryGetReturnedLambdaCapturedEffects(
             IAnonymousFunctionOperation function,
