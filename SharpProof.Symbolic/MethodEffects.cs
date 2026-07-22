@@ -408,6 +408,12 @@ internal sealed class MethodEffectAnalysisSession(
                 AnalyzeCall(awaitInfo.GetAwaiterMethod, awaited, builder, awaited.Operation);
                 AnalyzeCall(awaitInfo.IsCompletedProperty?.GetMethod, awaited, builder);
                 AnalyzeCall(awaitInfo.GetResultMethod, awaited, builder);
+                if (awaitInfo.GetAwaiterMethod?.ReturnType is { } awaiterType)
+                    AnalyzeCall(
+                        FindProtocolMethod(awaiterType, "UnsafeOnCompleted", parameterCount: 1) ??
+                        FindProtocolMethod(awaiterType, "OnCompleted", parameterCount: 1),
+                        awaited,
+                        builder);
                 break;
             case IForEachLoopOperation { Syntax: CommonForEachStatementSyntax syntax } loop:
                 var info = semanticModel.GetForEachStatementInfo(syntax);
@@ -491,10 +497,13 @@ internal sealed class MethodEffectAnalysisSession(
         AnalyzeCall(FindProtocolProperty(enumeratorType, "Current")?.GetMethod, spread, builder);
         AnalyzeCall(FindProtocolMethod(enumeratorType, "Dispose"), spread, builder);
     }
-    private static IMethodSymbol? FindProtocolMethod(ITypeSymbol type, string name) =>
+    private static IMethodSymbol? FindProtocolMethod(
+        ITypeSymbol type,
+        string name,
+        int parameterCount = 0) =>
         GetProtocolTypes(type)
             .SelectMany(candidate => candidate.GetMembers(name).OfType<IMethodSymbol>())
-            .FirstOrDefault(static method => method.Parameters.Length == 0);
+            .FirstOrDefault(method => method.Parameters.Length == parameterCount);
     private static IPropertySymbol? FindProtocolProperty(ITypeSymbol type, string name) =>
         GetProtocolTypes(type)
             .SelectMany(candidate => candidate.GetMembers(name).OfType<IPropertySymbol>())
