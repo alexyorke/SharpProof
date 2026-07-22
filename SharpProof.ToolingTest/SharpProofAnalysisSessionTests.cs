@@ -82,6 +82,26 @@ public sealed class SharpProofAnalysisSessionTests {
         });
     }
     [Test]
+    public void ConditionProofAtLocalFunctionDeclarationProducesCounterexample() {
+        using var session = SharpProofAnalysisSession.FromText("""
+            class C {
+                static int M(int x) {
+                    int Local() => x + 1;
+                    return Local();
+                }
+            }
+            """);
+        var result = session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Point, Line: 3, Column: 9),
+            SharpProofAnalysisFacet.ProofFacts,
+            "x > 0"));
+        var proof = result.ProofFacts.Single();
+        Assert.Multiple(() => {
+            Assert.That(proof.Status, Is.EqualTo("Unknown"));
+            Assert.That(proof.Counterexample, Does.Contain("x="), proof.Reason);
+        });
+    }
+    [Test]
     public void RequestsAreSafeToReuseConcurrently() {
         using var session = SharpProofAnalysisSession.FromText("""
             class C {
