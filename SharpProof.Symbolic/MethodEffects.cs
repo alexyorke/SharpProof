@@ -602,6 +602,10 @@ internal sealed class MethodEffectAnalysisSession(
                 foreach (var argument in creation.Arguments)
                     AddCandidate(argument.Value, argument.Parameter);
                 break;
+            case IPropertyReferenceOperation property:
+                foreach (var argument in property.Arguments)
+                    AddCandidate(argument.Value, argument.Parameter);
+                break;
             case ISimpleAssignmentOperation {
                 Target: IPropertyReferenceOperation property,
                 Value: var value
@@ -886,6 +890,11 @@ internal sealed class MethodEffectAnalysisSession(
             case IFieldReferenceOperation field:
                 builder.Add(GetInstanceWriteEffect(field.Instance, builder), field, field.Field, "instance_field_write");
                 break;
+            case IPropertyReferenceOperation { Property.GetMethod: { } getter } property
+                when getter.ReturnsByRef || getter.ReturnsByRefReadonly:
+                builder.Add(GetRefReturnWriteEffect(getter, property.Instance, property, builder), property,
+                    property.Property, "ref_return_property_write");
+                break;
             case IPropertyReferenceOperation { Property.IsStatic: true } property:
                 builder.Add(SharpProofEffect.WritesStaticState, property, property.Property, "static_property_write");
                 break;
@@ -905,8 +914,9 @@ internal sealed class MethodEffectAnalysisSession(
                 break;
             case IInvocationOperation invocation when invocation.TargetMethod.ReturnsByRef ||
                                                       invocation.TargetMethod.ReturnsByRefReadonly:
-                builder.Add(GetRefReturnWriteEffect(invocation, builder), invocation, invocation.TargetMethod,
-                    "ref_return_write");
+                builder.Add(GetRefReturnWriteEffect(
+                        invocation.TargetMethod, invocation.Instance, invocation, builder),
+                    invocation, invocation.TargetMethod, "ref_return_write");
                 break;
             case var pointer when IsPointerIndirection(pointer) &&
                                   pointer.ChildOperations.FirstOrDefault() is { } pointerOperand:
@@ -915,8 +925,12 @@ internal sealed class MethodEffectAnalysisSession(
                 break;
         }
     }
-    private SharpProofEffect GetRefReturnWriteEffect(IInvocationOperation invocation, Builder builder) {
-        var method = invocation.TargetMethod.OriginalDefinition;
+    private SharpProofEffect GetRefReturnWriteEffect(
+        IMethodSymbol targetMethod,
+        IOperation? receiver,
+        IOperation site,
+        Builder builder) {
+        var method = targetMethod.OriginalDefinition;
         var syntax = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
         if (syntax != null) {
             var model = compilation.GetSemanticModel(syntax.SyntaxTree);
@@ -936,17 +950,17 @@ internal sealed class MethodEffectAnalysisSession(
                 var remapped = relative & ~(SharpProofEffect.WritesReceiverState |
                                             SharpProofEffect.WritesArgumentState);
                 if ((relative & SharpProofEffect.WritesReceiverState) != 0)
-                    remapped |= invocation.Instance != null
-                        ? GetInstanceWriteEffect(invocation.Instance, builder)
+                    remapped |= receiver != null
+                        ? GetInstanceWriteEffect(receiver, builder)
                         : SharpProofEffect.Unknown;
                 if ((relative & SharpProofEffect.WritesArgumentState) != 0)
-                    remapped |= GetArgumentEffect(invocation, builder, write: true);
+                    remapped |= GetArgumentEffect(site, builder, write: true);
                 return remapped == SharpProofEffect.None ? SharpProofEffect.Unknown : remapped;
             }
         }
         var fallback = SharpProofEffect.Unknown;
-        if (invocation.Instance != null) fallback |= GetInstanceWriteEffect(invocation.Instance, builder);
-        fallback |= GetArgumentEffect(invocation, builder, write: true);
+        if (receiver != null) fallback |= GetInstanceWriteEffect(receiver, builder);
+        fallback |= GetArgumentEffect(site, builder, write: true);
         return fallback;
     }
     private static SharpProofEffect GetRelativeRefWriteEffect(IOperation value) {
