@@ -403,23 +403,51 @@ internal sealed class MethodEffectAnalysisSession(
         string reason,
         IOperation? receiver,
         Builder builder) {
-        var remapped = effects.Effects;
-        if ((remapped & SharpProofEffect.ReadsReceiverState) != 0) {
-            remapped &= ~SharpProofEffect.ReadsReceiverState;
+        const SharpProofEffect callRelativeEffects =
+            SharpProofEffect.ReadsReceiverState |
+            SharpProofEffect.WritesReceiverState |
+            SharpProofEffect.ReadsArgumentState |
+            SharpProofEffect.WritesArgumentState;
+        var remapped = effects.Effects & ~callRelativeEffects;
+        if ((effects.Effects & SharpProofEffect.ReadsReceiverState) != 0) {
             if (receiver != null)
                 remapped |= GetInstanceReadEffect(receiver, builder);
             else if (site is not IObjectCreationOperation)
                 remapped |= SharpProofEffect.Unknown;
         }
-        if ((remapped & SharpProofEffect.WritesReceiverState) != 0) {
-            remapped &= ~SharpProofEffect.WritesReceiverState;
+        if ((effects.Effects & SharpProofEffect.WritesReceiverState) != 0) {
             remapped |= receiver != null
                 ? GetInstanceWriteEffect(receiver, builder)
                 : site is IObjectCreationOperation
                     ? SharpProofEffect.WritesFreshOwnedState
                     : SharpProofEffect.Unknown;
         }
+        if ((effects.Effects & SharpProofEffect.ReadsArgumentState) != 0) {
+            remapped |= GetArgumentEffect(site, builder, write: false);
+        }
+        if ((effects.Effects & SharpProofEffect.WritesArgumentState) != 0) {
+            remapped |= GetArgumentEffect(site, builder, write: true);
+        }
         builder.AddTransitive(effects with { Effects = remapped }, site, method, reason);
+    }
+    private static SharpProofEffect GetArgumentEffect(IOperation site, Builder builder, bool write) {
+        var arguments = site switch {
+            IInvocationOperation invocation => invocation.Arguments,
+            IObjectCreationOperation creation => creation.Arguments,
+            _ => []
+        };
+        var effect = SharpProofEffect.None;
+        var hasCandidate = false;
+        foreach (var argument in arguments) {
+            if (argument.Parameter is not { } parameter ||
+                parameter.Type.IsValueType && parameter.RefKind == RefKind.None)
+                continue;
+            hasCandidate = true;
+            effect |= write
+                ? GetInstanceWriteEffect(argument.Value, builder)
+                : GetInstanceReadEffect(argument.Value, builder);
+        }
+        return hasCandidate ? effect : SharpProofEffect.Unknown;
     }
     private bool IsBodylessAutoPropertyAccessor(IMethodSymbol method) {
         if (method.AssociatedSymbol is not IPropertySymbol) return false;
