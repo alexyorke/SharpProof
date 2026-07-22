@@ -1343,6 +1343,12 @@ internal sealed class MethodEffectAnalysisSession(
                 IsNonNullConstant(coalesce.Value) &&
                 IsWithinOperation(operation, coalesce.WhenNull))
                 return false;
+            if (parent is IBinaryOperation binary &&
+                IsWithinOperation(operation, binary.RightOperand) &&
+                binary.LeftOperand.ConstantValue is { HasValue: true, Value: bool left } &&
+                (binary.OperatorKind == BinaryOperatorKind.ConditionalAnd && !left ||
+                 binary.OperatorKind == BinaryOperatorKind.ConditionalOr && left))
+                return false;
         }
         for (var current = operation.Syntax; current != null && current != declaration; current = current.Parent)
             if (current is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax)
