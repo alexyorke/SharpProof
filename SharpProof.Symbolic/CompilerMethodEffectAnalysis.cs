@@ -1220,8 +1220,7 @@ internal sealed class MethodEffectAnalysisSession(
                     var bound = BindCallable(local, null, ref state).Callables.FirstOrDefault();
                     if (bound != null) {
                         var localSummary = GetSummary(bound.Method, bound.Captures);
-                        if (bound.Captures.Values.All(static capture => capture.Roots.All(static root =>
-                                root.Kind == EffectValueRootKind.Fresh)))
+                        if (CapturesAreFreshOrRootless(bound.Captures))
                             AddSummary(localSummary.Effects, bound.Receiver, values, site, bound.Method,
                                 localSummary.WrittenArgumentOrdinals, localSummary.ReadArgumentOrdinals);
                         else
@@ -1236,7 +1235,8 @@ internal sealed class MethodEffectAnalysisSession(
                     if (callable.Method.IsStatic && callable.Method.MethodKind != MethodKind.StaticConstructor)
                         AddTypeInitializerEffects(callable.Method.ContainingType, site);
                     var callableSummary = GetSummary(callable.Method, callable.Captures);
-                    if (callable.Method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+                    if (callable.Method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction &&
+                        callable.Captures.Count != 0)
                         effects.AddTransitive(callableSummary.Effects, site.Syntax, callable.Method, "source_call");
                     else
                         AddSummary(callableSummary.Effects, callable.Receiver, values, site, callable.Method,
@@ -1281,6 +1281,8 @@ internal sealed class MethodEffectAnalysisSession(
                 ? ResolveRefReturn(target, receiver, values)
                 : returnedValue;
         }
+        private static bool CapturesAreFreshOrRootless(ImmutableDictionary<string, EffectFlowValue> captures) =>
+            captures.Values.All(static capture => capture.Roots.All(static root => root.Kind == EffectValueRootKind.Fresh));
         private void AddTypeInitializerEffects(ITypeSymbol? type, IOperation site) {
             if (type is not INamedTypeSymbol named || method.MethodKind == MethodKind.StaticConstructor &&
                 SymbolEqualityComparer.Default.Equals(method.ContainingType, named) ||
