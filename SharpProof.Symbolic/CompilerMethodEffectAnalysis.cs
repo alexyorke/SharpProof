@@ -848,6 +848,7 @@ internal sealed class MethodEffectAnalysisSession(
             for (var current = thrown.Syntax.Parent; current != null; current = current.Parent) {
                 if (current is not TryStatementSyntax tryStatement || !tryStatement.Block.Span.Contains(thrown.Syntax.Span)) continue;
                 foreach (var clause in tryStatement.Catches) {
+                    if (!IsGuaranteedCatch(clause)) continue;
                     if (clause.Declaration == null) return true;
                     var caughtType = semanticModel.GetTypeInfo(clause.Declaration.Type, session.CancellationToken).Type;
                     for (var candidate = exceptionType as INamedTypeSymbol; candidate != null; candidate = candidate.BaseType)
@@ -861,9 +862,7 @@ internal sealed class MethodEffectAnalysisSession(
             for (var current = syntax.Parent; current != null; current = current.Parent) {
                 if (current is not TryStatementSyntax tryStatement || !tryStatement.Block.Span.Contains(syntax.Span)) continue;
                 foreach (var clause in tryStatement.Catches) {
-                    if (clause.Filter != null && semanticModel.GetConstantValue(clause.Filter.FilterExpression,
-                            session.CancellationToken) is not { HasValue: true, Value: true })
-                        continue;
+                    if (!IsGuaranteedCatch(clause)) continue;
                     if (clause.Declaration == null) return true;
                     var caughtType = semanticModel.GetTypeInfo(clause.Declaration.Type, session.CancellationToken).Type;
                     if (caughtType?.ToDisplayString() == "System.Exception" ||
@@ -874,6 +873,11 @@ internal sealed class MethodEffectAnalysisSession(
                 }
             }
             return false;
+        }
+        private bool IsGuaranteedCatch(CatchClauseSyntax clause) {
+            if (clause.Filter == null) return true;
+            var value = semanticModel.GetConstantValue(clause.Filter.FilterExpression, session.CancellationToken);
+            return value is { HasValue: true, Value: true };
         }
         private MethodEffects ApplyCatches(MethodEffects summary, IOperation site) => summary with {
             ExceptionFacts = [.. summary.ExceptionFacts.Select(fact =>
