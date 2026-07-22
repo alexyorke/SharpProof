@@ -2495,23 +2495,36 @@ internal sealed class MethodEffectAnalysisSession(
                 var value = model.GetOperation(expression);
                 while (value is IConversionOperation conversion) value = conversion.Operand;
                 if (value is IDelegateCreationOperation creation) value = creation.Target;
-                var target = value == null ? null : CreateDelegateTarget(value);
+                var receiverOverride = value is IMethodReferenceOperation {
+                    Instance: IInstanceReferenceOperation
+                }
+                    ? callSite switch {
+                        IInvocationOperation invocation => invocation.Instance,
+                        IPropertyReferenceOperation property => property.Instance,
+                        _ => null
+                    }
+                    : null;
+                var target = value == null ? null : CreateDelegateTarget(value, receiverOverride);
                 if (target == null) return [];
                 targets.Add(target);
             }
             return targets.ToImmutable();
         }
-        private DelegateTarget? CreateDelegateTarget(IOperation value) => value switch {
-            IMethodReferenceOperation reference => new DelegateTarget(
-                reference.Method.OriginalDefinition,
-                reference.Instance,
-                reference.Instance == null ? null : GetInstanceReadEffect(reference.Instance, this),
-                reference.Instance == null ? null : GetInstanceWriteEffect(reference.Instance, this),
-                null,
-                null),
-            IAnonymousFunctionOperation function => CreateAnonymousFunctionTarget(function),
-            _ => null
-        };
+        private DelegateTarget? CreateDelegateTarget(IOperation value, IOperation? receiverOverride = null) {
+            if (value is IMethodReferenceOperation reference) {
+                var receiver = receiverOverride ?? reference.Instance;
+                return new DelegateTarget(
+                    reference.Method.OriginalDefinition,
+                    receiver,
+                    receiver == null ? null : GetInstanceReadEffect(receiver, this),
+                    receiver == null ? null : GetInstanceWriteEffect(receiver, this),
+                    null,
+                    null);
+            }
+            return value is IAnonymousFunctionOperation function
+                ? CreateAnonymousFunctionTarget(function)
+                : null;
+        }
         internal void ApplyDelegateCompoundAssignment(ILocalSymbol local, IOperation value, bool adds) {
             local = (ILocalSymbol)local.OriginalDefinition;
             if (!adds) {
