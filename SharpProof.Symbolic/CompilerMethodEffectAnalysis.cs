@@ -17,8 +17,19 @@ internal sealed class MethodEffectAnalysisSession(
     private readonly MetadataMethodEffectAnalyzer _metadata = new(compilation);
     private Compilation Compilation => compilation;
     private CancellationToken CancellationToken => cancellationToken;
-    internal MethodEffects Analyze(IMethodSymbol method, SyntaxNode declaration, SemanticModel semanticModel) =>
-        AnalyzeSummary(method, declaration, semanticModel, null).Effects;
+    internal MethodEffects Analyze(IMethodSymbol method, SyntaxNode declaration, SemanticModel semanticModel) {
+        var result = AnalyzeSummary(method, declaration, semanticModel, null).Effects;
+        if (!method.IsStatic || method.MethodKind == MethodKind.StaticConstructor ||
+            method.ContainingType.GetMembers().OfType<IMethodSymbol>().FirstOrDefault(static candidate =>
+                candidate.MethodKind == MethodKind.StaticConstructor) is not { } initializer)
+            return result;
+        var initializerDeclaration = initializer.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) ??
+                                     initializer.ContainingType.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+        if (initializerDeclaration == null) return result;
+        var initializerEffects = AnalyzeSummary(initializer, initializerDeclaration,
+            compilation.GetSemanticModel(initializerDeclaration.SyntaxTree), null).Effects;
+        return Union(initializerEffects, result);
+    }
     private CompilerMethodEffectSummary AnalyzeSummary(
         IMethodSymbol method,
         SyntaxNode declaration,
