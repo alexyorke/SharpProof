@@ -3712,7 +3712,7 @@ internal sealed class MethodEffectAnalysisSession(
                         return false;
                     foreach (var returned in returnedValues) {
                         var mapped = returned;
-                        while (mapped is IConversionOperation conversion)
+                        while (mapped is IConversionOperation { OperatorMethod: null } conversion)
                             mapped = conversion.Operand;
                         if (mapped is IParameterReferenceOperation parameter &&
                             SymbolEqualityComparer.Default.Equals(
