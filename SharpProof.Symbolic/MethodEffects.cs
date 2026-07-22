@@ -3637,6 +3637,31 @@ internal sealed class MethodEffectAnalysisSession(
             ImmutableArray<ConstructorValueCallSite> callSites,
             List<ConstructorMemberAssignment> assignments) {
             while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is IConditionalAccessOperation conditionalAccess) {
+                AddDeconstructionMemberAssignments(
+                    target,
+                    conditionalAccess.WhenNotNull,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites,
+                    assignments);
+                return;
+            }
+            if (value is IConditionalAccessInstanceOperation conditionalInstance &&
+                FindConditionalAccessReceiver(conditionalInstance) is { } conditionalReceiver) {
+                AddDeconstructionMemberAssignments(
+                    target,
+                    conditionalReceiver,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites,
+                    assignments);
+                return;
+            }
             if (value is IParameterReferenceOperation parameter) {
                 for (var index = 0; index < callSites.Length; index++) {
                     var callSite = callSites[index];
