@@ -262,7 +262,8 @@ internal sealed class MethodEffectAnalysisSession(
     private static MethodEffects AddCompilerAllocations(MethodEffects effects, SyntaxNode declaration, SemanticModel model) {
         var sites = effects.Sites.ToBuilder();
         var flags = effects.Effects;
-        foreach (var expression in CSharpSyntaxFacts.DescendantNodesInExecution(declaration).OfType<ExpressionSyntax>()) {
+        var executionNodes = CSharpSyntaxFacts.DescendantNodesInExecution(declaration);
+        foreach (var expression in executionNodes.OfType<ExpressionSyntax>()) {
             if (ReferenceEquals(expression, declaration)) continue;
             var type = model.GetTypeInfo(expression).ConvertedType;
             var allocates = expression switch {
@@ -279,8 +280,8 @@ internal sealed class MethodEffectAnalysisSession(
             flags |= SharpProofEffect.Allocates;
             sites.Add(Site(SharpProofEffect.Allocates, expression, type, "compiler_generated_allocation"));
         }
-        if (declaration.DescendantNodes().OfType<YieldStatementSyntax>().Any() ||
-            IsAsyncDeclaration(declaration) && declaration.DescendantNodes().OfType<AwaitExpressionSyntax>().Any()) {
+        if (executionNodes.OfType<YieldStatementSyntax>().Any() ||
+            IsAsyncDeclaration(declaration) && executionNodes.OfType<AwaitExpressionSyntax>().Any()) {
             flags |= SharpProofEffect.Allocates;
             sites.Add(Site(SharpProofEffect.Allocates, declaration, null, "state_machine_allocation"));
         }
