@@ -3188,33 +3188,60 @@ internal sealed class MethodEffectAnalysisSession(
             var candidates = declaration == null
                 ? []
                 : GetConstructorMemberAssignments(declaration, memberPath, compilation);
-            if (candidates.Length != 1) return false;
-            IOperation assignedValue = candidates[0].Value;
-            while (assignedValue is IConversionOperation conversion)
-                assignedValue = conversion.Operand;
-            var visited = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
-            ImmutableArray<IOperation> assignedValues;
-            if (assignedValue is ILocalReferenceOperation local) {
-                if (!TryGetStableLocalInitializers(
-                        local.Local, compilation, visited, out assignedValues))
-                    return false;
-            }
-            else if (!TryCollectStableInitializerValues(
-                         assignedValue, compilation, visited, out assignedValues))
+            if (candidates.Length == 0 ||
+                candidates.Length > 1 && !AreExhaustiveAlternativeAssignments(candidates))
                 return false;
             var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
-            foreach (var assigned in assignedValues) {
-                if (!TryMapConstructorAssignedValue(
-                        assigned,
-                        creation,
-                        compilation,
-                        new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
-                        out var mapped))
+            foreach (var candidate in candidates) {
+                IOperation assignedValue = candidate.Value;
+                while (assignedValue is IConversionOperation conversion)
+                    assignedValue = conversion.Operand;
+                var visited = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
+                ImmutableArray<IOperation> assignedValues;
+                if (assignedValue is ILocalReferenceOperation local) {
+                    if (!TryGetStableLocalInitializers(
+                            local.Local, compilation, visited, out assignedValues))
+                        return false;
+                }
+                else if (!TryCollectStableInitializerValues(
+                             assignedValue, compilation, visited, out assignedValues))
                     return false;
-                mappedValues.AddRange(mapped);
+                foreach (var assigned in assignedValues) {
+                    if (!TryMapConstructorAssignedValue(
+                            assigned,
+                            creation,
+                            compilation,
+                            new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
+                            out var mapped))
+                        return false;
+                    mappedValues.AddRange(mapped);
+                }
             }
             values = mappedValues.ToImmutable();
             return !values.IsDefaultOrEmpty;
+        }
+        private static bool AreExhaustiveAlternativeAssignments(
+            IReadOnlyList<ISimpleAssignmentOperation> assignments) {
+            if (assignments.Count != 2) return false;
+            var first = assignments[0].Syntax;
+            var second = assignments[1].Syntax;
+            foreach (var conditional in first.Ancestors().OfType<IfStatementSyntax>()) {
+                if (conditional.Else == null ||
+                    !second.Ancestors().Contains(conditional))
+                    continue;
+                var firstInThen = IsSoleBranchAssignment(conditional.Statement, first);
+                var firstInElse = IsSoleBranchAssignment(conditional.Else.Statement, first);
+                var secondInThen = IsSoleBranchAssignment(conditional.Statement, second);
+                var secondInElse = IsSoleBranchAssignment(conditional.Else.Statement, second);
+                return firstInThen && secondInElse || firstInElse && secondInThen;
+            }
+            return false;
+        }
+        private static bool IsSoleBranchAssignment(StatementSyntax branch, SyntaxNode assignment) {
+            while (branch is BlockSyntax { Statements.Count: 1 } block)
+                branch = block.Statements[0];
+            return branch is ExpressionStatementSyntax expression &&
+                   ReferenceEquals(expression.Expression, assignment);
         }
         private static bool TryMapConstructorAssignedValue(
             IOperation value,
