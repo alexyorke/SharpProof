@@ -3013,6 +3013,22 @@ internal sealed class MethodEffectAnalysisSession(
                     visited,
                     out readEffect,
                     out writeEffect);
+            if (value is ISwitchExpressionOperation switchExpression) {
+                foreach (var arm in switchExpression.Arms) {
+                    if (!TryGetNestedReturnedValueEffects(
+                            arm.Value,
+                            nestedCallSite,
+                            outerCallSite,
+                            compilation,
+                            visited,
+                            out var armReadEffect,
+                            out var armWriteEffect))
+                        return false;
+                    readEffect |= armReadEffect;
+                    writeEffect |= armWriteEffect;
+                }
+                return switchExpression.Arms.Length != 0;
+            }
             if (value is not (IObjectCreationOperation or IArrayCreationOperation or
                 IAnonymousObjectCreationOperation or IDelegateCreationOperation or
                 ICollectionExpressionOperation))
