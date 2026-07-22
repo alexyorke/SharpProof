@@ -260,6 +260,27 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void AwaitIncludesContinuationEffects() {
+        var result = Analyze("""
+            sealed class Awaitable {
+                public Awaiter GetAwaiter() => default;
+            }
+            struct Awaiter : System.Runtime.CompilerServices.INotifyCompletion {
+                private static int state;
+                public bool IsCompleted => false;
+                public void OnCompleted(System.Action continuation) { state++; }
+                public int GetResult() => 1;
+            }
+            class C {
+                static async System.Threading.Tasks.Task<int> M(Awaitable value) => await value;
+            }
+            """, 11);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void ListCollectionExpressionAllocates() {
         var result = Analyze("""
             class C {
