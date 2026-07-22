@@ -24,12 +24,15 @@ internal sealed class EffectFlowValue {
     internal ImmutableDictionary<string, EffectFlowValue> Members { get; }
     internal ImmutableArray<EffectBoundCallable> Callables { get; }
     internal string Key { get; }
+    internal bool IsDefinitelyNonNull => Roots.Any(static root => root.Kind == EffectValueRootKind.Fresh) ||
+                                         Roots.Count == 0 && ExactType != null;
     internal static EffectFlowValue FromRoot(EffectValueRoot root, ITypeSymbol? type = null) => new(
         [root],
         Exact(type),
         EmptyMembers,
         []);
     internal static EffectFlowValue Fresh(ITypeSymbol? type) => FromRoot(new(EffectValueRootKind.Fresh), type);
+    internal static EffectFlowValue KnownNonNull(ITypeSymbol? type) => new([], Exact(type), EmptyMembers, []);
     internal static EffectFlowValue Callable(EffectBoundCallable callable, ITypeSymbol? type) => new(
         [new EffectValueRoot(EffectValueRootKind.Fresh)], Exact(type), EmptyMembers, [callable]);
     internal EffectFlowValue WithMember(string member, EffectFlowValue value) => new(
@@ -128,7 +131,8 @@ internal sealed record EffectFlowState(
     ImmutableArray<EffectFlowValue> Parameters,
     ImmutableDictionary<ILocalSymbol, EffectFlowValue> Locals,
     ImmutableDictionary<CaptureId, EffectFlowValue> FlowCaptures,
-    ImmutableDictionary<ILocalSymbol, EffectFlowValue> RefLocals) {
+    ImmutableDictionary<ILocalSymbol, EffectFlowValue> RefLocals,
+    bool IsUnreachable = false) {
     internal static EffectFlowState Create(IMethodSymbol method) => new(
         method.IsStatic ? EffectFlowValue.None : EffectFlowValue.FromRoot(
             new(EffectValueRootKind.Receiver, Key: SymbolKey(method)), KnownInputType(method.ContainingType)),
@@ -145,6 +149,8 @@ internal sealed record EffectFlowState(
             ? this with { Parameters = Parameters.SetItem(parameter.Ordinal, value) }
             : this;
     internal EffectFlowState Merge(EffectFlowState other) {
+        if (IsUnreachable) return other;
+        if (other.IsUnreachable) return this;
         var locals = Locals;
         foreach (var local in Locals.Keys.Union(other.Locals.Keys, SymbolEqualityComparer.Default).OfType<ILocalSymbol>())
             locals = locals.SetItem(local, GetLocal(local).Merge(other.GetLocal(local)));
@@ -162,7 +168,7 @@ internal sealed record EffectFlowState(
     internal EffectFlowValue GetLocal(ILocalSymbol local) => Locals.TryGetValue(local, out var value) ? value : EffectFlowValue.Unknown;
     internal EffectFlowValue GetCapture(CaptureId id) => FlowCaptures.TryGetValue(id, out var value) ? value : EffectFlowValue.Unknown;
     internal EffectFlowValue GetRef(ILocalSymbol local) => RefLocals.TryGetValue(local, out var value) ? value : GetLocal(local);
-    internal string Key => Receiver.Key + ";" + string.Join(";", Parameters.Select(static value => value.Key)) + ";" +
+    internal string Key => IsUnreachable + ";" + Receiver.Key + ";" + string.Join(";", Parameters.Select(static value => value.Key)) + ";" +
                            string.Join(";", Locals.OrderBy(static pair => SymbolKey(pair.Key), StringComparer.Ordinal)
                                .Select(static pair => SymbolKey(pair.Key) + "=" + pair.Value.Key)) + ";" +
                            string.Join(";", FlowCaptures.OrderBy(static pair => pair.Key.GetHashCode())

@@ -358,20 +358,40 @@ internal sealed class MethodEffectAnalysisSession(
         private EffectFlowValue LastValue { get; set; } = EffectFlowValue.None;
         public EffectFlowState Transfer(EffectFlowState state, IOperation operation) {
             session.CancellationToken.ThrowIfCancellationRequested();
+            if (state.IsUnreachable) return state;
             LastValue = Evaluate(operation, ref state);
             return state;
         }
         public EffectFlowState Refine(EffectFlowState state, IOperation? condition, ControlFlowConditionKind kind,
-            bool conditionalSuccessor) => state;
+            bool conditionalSuccessor) {
+            if (condition is not IIsNullOperation isNull) return state;
+            var value = ResolveConditionValue(isNull.Operand, state);
+            var branchWhenTrue = kind switch {
+                ControlFlowConditionKind.WhenTrue => conditionalSuccessor,
+                ControlFlowConditionKind.WhenFalse => !conditionalSuccessor,
+                _ => false
+            };
+            return branchWhenTrue && value.IsDefinitelyNonNull
+                ? state with { IsUnreachable = true }
+                : state;
+        }
         public EffectFlowState Merge(EffectFlowState current, EffectFlowState incoming) => current.Merge(incoming);
         public EffectFlowState Widen(EffectFlowState previous, EffectFlowState current, BasicBlock block) => current;
         public EffectFlowState CompleteBlock(EffectFlowState state, BasicBlock block) {
+            if (state.IsUnreachable) return state;
             if (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return ||
                 block.ConditionalSuccessor?.Semantics == ControlFlowBranchSemantics.Return)
                 AddReturn(LastValue);
             return state;
         }
         public bool Equivalent(EffectFlowState left, EffectFlowState right) => string.Equals(left.Key, right.Key, StringComparison.Ordinal);
+        private static EffectFlowValue ResolveConditionValue(IOperation operation, EffectFlowState state) => operation switch {
+            IFlowCaptureReferenceOperation capture => state.GetCapture(capture.Id),
+            ILocalReferenceOperation local => state.GetLocal(local.Local),
+            IParameterReferenceOperation parameter => state.GetParameter(parameter.Parameter),
+            IConversionOperation conversion => ResolveConditionValue(conversion.Operand, state),
+            _ => EffectFlowValue.Unknown
+        };
         internal void SetControlFlowGraph(ControlFlowGraph graph) {
             foreach (var block in graph.Blocks)
                 foreach (var operation in block.Operations.Append(block.BranchValue).Where(static value => value != null)
@@ -562,7 +582,13 @@ internal sealed class MethodEffectAnalysisSession(
                     return Evaluate(parenthesized.Operand, ref state);
                 case IConversionOperation conversion:
                     return EvaluateConversion(conversion, ref state);
-                case ILiteralOperation or IDefaultValueOperation or ITypeOfOperation or INameOfOperation:
+                case ILiteralOperation { ConstantValue: { HasValue: true, Value: not null } } literal:
+                    return EffectFlowValue.KnownNonNull(literal.Type);
+                case ITypeOfOperation typeOf:
+                    return EffectFlowValue.KnownNonNull(typeOf.Type);
+                case INameOfOperation nameOf:
+                    return EffectFlowValue.KnownNonNull(nameOf.Type);
+                case ILiteralOperation or IDefaultValueOperation:
                     return EffectFlowValue.None;
                 case IReturnOperation returned:
                     var returnedValue = Evaluate(returned.ReturnedValue, ref state);
@@ -583,6 +609,7 @@ internal sealed class MethodEffectAnalysisSession(
                     return deconstructed;
                 case ICoalesceAssignmentOperation coalesceAssignment:
                     var current = Evaluate(coalesceAssignment.Target, ref state);
+                    if (current.IsDefinitelyNonNull) return current;
                     var fallback = Evaluate(coalesceAssignment.Value, ref state);
                     var merged = current.Merge(fallback);
                     Assign(coalesceAssignment.Target, merged, false, ref state);
@@ -732,7 +759,10 @@ internal sealed class MethodEffectAnalysisSession(
                     state = trueState.Merge(falseState);
                     return whenTrue.Merge(whenFalse);
                 case ICoalesceOperation coalesce:
-                    return Evaluate(coalesce.Value, ref state).Merge(Evaluate(coalesce.WhenNull, ref state));
+                    var coalesced = Evaluate(coalesce.Value, ref state);
+                    return coalesced.IsDefinitelyNonNull
+                        ? coalesced
+                        : coalesced.Merge(Evaluate(coalesce.WhenNull, ref state));
                 case IBinaryOperation binary:
                     var left = Evaluate(binary.LeftOperand, ref state);
                     var right = Evaluate(binary.RightOperand, ref state);
