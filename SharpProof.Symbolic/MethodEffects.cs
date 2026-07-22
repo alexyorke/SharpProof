@@ -2619,6 +2619,17 @@ internal sealed class MethodEffectAnalysisSession(
                     CapturedReadEffect = receiverReadEffect,
                     CapturedWriteEffect = receiverWriteEffect
                 };
+            if (target != null &&
+                value is IAnonymousFunctionOperation localFunction &&
+                TryGetReturnedLambdaLocalEffects(
+                    localFunction,
+                    callSite,
+                    out var localReadEffect,
+                    out var localWriteEffect))
+                target = target with {
+                    CapturedReadEffect = localReadEffect,
+                    CapturedWriteEffect = localWriteEffect
+                };
             return target == null ? [] : [target];
         }
         private bool TryGetReturnedLambdaReceiverEffects(
@@ -2683,6 +2694,89 @@ internal sealed class MethodEffectAnalysisSession(
                 writeEffect |= GetInstanceWriteEffect(source, this);
             }
             return found;
+        }
+        private bool TryGetReturnedLambdaLocalEffects(
+            IAnonymousFunctionOperation function,
+            IOperation callSite,
+            out SharpProofEffect readEffect,
+            out SharpProofEffect writeEffect) {
+            readEffect = SharpProofEffect.None;
+            writeEffect = SharpProofEffect.None;
+            if (callSite.SemanticModel?.Compilation is not { } compilation) return false;
+            var locals = function.Body.DescendantsAndSelf()
+                .OfType<ILocalReferenceOperation>()
+                .Where(local => BelongsDirectlyTo(function, local) &&
+                                !SymbolEqualityComparer.Default.Equals(
+                                    local.Local.ContainingSymbol,
+                                    function.Symbol))
+                .Select(local => local.Local)
+                .Distinct<ILocalSymbol>(SymbolEqualityComparer.Default)
+                .ToArray();
+            if (locals.Length == 0) return false;
+            if (function.Body.DescendantsAndSelf().Any(operation =>
+                    BelongsDirectlyTo(function, operation) &&
+                    (operation is IInstanceReferenceOperation ||
+                     operation is IParameterReferenceOperation parameter &&
+                     !SymbolEqualityComparer.Default.Equals(
+                         parameter.Parameter.ContainingSymbol,
+                         function.Symbol))))
+                return false;
+            var visited = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
+            foreach (var local in locals) {
+                if (!TryGetCapturedLocalInitializer(local, compilation, visited, out var initializer))
+                    return false;
+                readEffect |= GetInstanceReadEffect(initializer, this);
+                writeEffect |= GetInstanceWriteEffect(initializer, this);
+            }
+            return true;
+        }
+        private static bool TryGetCapturedLocalInitializer(
+            ILocalSymbol local,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
+            out IOperation initializer) {
+            initializer = null!;
+            if (!visited.Add(local)) return false;
+            if (local.DeclaringSyntaxReferences.Length != 1) return false;
+            var syntaxReference = local.DeclaringSyntaxReferences[0];
+            var syntax = syntaxReference.GetSyntax();
+            var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+            if (model.GetOperation(syntax) is not IVariableDeclaratorOperation declarator ||
+                declarator.Initializer?.Value is not { } value)
+                return false;
+            var root = (IOperation)declarator;
+            while (root.Parent != null) root = root.Parent;
+            if (root.DescendantsAndSelf()
+                .OfType<ILocalReferenceOperation>()
+                .Any(reference => SymbolEqualityComparer.Default.Equals(reference.Local, local) &&
+                                  IsDirectLocalWrite(reference)))
+                return false;
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is ILocalReferenceOperation source) {
+                if (!TryGetCapturedLocalInitializer(source.Local, compilation, visited, out initializer))
+                    return false;
+                return true;
+            }
+            if (value is not (IObjectCreationOperation or IArrayCreationOperation or
+                IAnonymousObjectCreationOperation or IDelegateCreationOperation or
+                ICollectionExpressionOperation))
+                return false;
+            initializer = value;
+            return true;
+        }
+        private static bool IsDirectLocalWrite(ILocalReferenceOperation reference) {
+            IOperation current = reference;
+            while (current.Parent is IConversionOperation or IParenthesizedOperation)
+                current = current.Parent;
+            return current.Parent switch {
+                ISimpleAssignmentOperation assignment => ReferenceEquals(assignment.Target, current),
+                ICompoundAssignmentOperation assignment => ReferenceEquals(assignment.Target, current),
+                ICoalesceAssignmentOperation assignment => ReferenceEquals(assignment.Target, current),
+                IIncrementOrDecrementOperation increment => ReferenceEquals(increment.Target, current),
+                IArgumentOperation { Parameter.RefKind: not RefKind.None } argument =>
+                    ReferenceEquals(argument.Value, current),
+                _ => false
+            };
         }
         private DelegateTarget? CreateDelegateTarget(IOperation value, IOperation? receiverOverride = null) {
             if (value is IMethodReferenceOperation reference) {
