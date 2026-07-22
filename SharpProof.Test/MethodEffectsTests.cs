@@ -883,6 +883,19 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void GenericUsingHasDisposalDispatchUncertainty() {
+        var result = Analyze("""
+            class C {
+                static void M<T>(T value) where T : System.IDisposable { using (value) { } }
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.True);
+        });
+    }
+    [Test]
     public void ParenthesizedUsingDeclarationIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {
