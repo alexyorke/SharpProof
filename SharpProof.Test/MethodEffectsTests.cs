@@ -1318,6 +1318,26 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void SwitchExpressionReceiverMapsAllOrigins() {
+        var result = Analyze("""
+            sealed class Box {
+                public int State;
+                public void Mutate() { State++; }
+            }
+            class C {
+                static void M(Box input, bool useInput) {
+                    (useInput switch { true => input, false => new Box() }).Mutate();
+                }
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void PointerIndirectionAssignmentWritesArgumentState() {
         var result = Analyze("""
             unsafe class C {
