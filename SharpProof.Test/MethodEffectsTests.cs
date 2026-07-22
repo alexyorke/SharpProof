@@ -2110,6 +2110,18 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void StaticFieldReadIncludesTypeInitializerEffects() {
+        var result = Analyze("""
+            static class Globals { public static int Count; }
+            sealed class D {
+                static D() { Globals.Count++; }
+                public static int Value;
+            }
+            class C { static int M() => D.Value; }
+            """, 6);
+        Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+    }
+    [Test]
     public void StaticHelperMutationOfFreshArgumentRemainsFreshOwned() {
         var result = Analyze("""
             sealed class Box { public int Value; }
