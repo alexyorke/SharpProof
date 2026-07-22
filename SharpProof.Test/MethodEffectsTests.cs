@@ -3669,6 +3669,32 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ConvertedInvocationArgumentDoesNotEscapeUnrelatedOperand() {
+        var result = Analyze("""
+            sealed class Box { }
+            static class Globals { public static Box Shared = new(); public static Box? Stored; }
+            sealed class Source {
+                public int State;
+                public static implicit operator Box(Source source) => Globals.Shared;
+            }
+            class C {
+                static void Publish(Box box) { Globals.Stored = box; }
+                static void M() {
+                    var fresh = new Source();
+                    Publish((Box)fresh);
+                    fresh.State++;
+                }
+            }
+            """, 9);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesCapturedState), Is.False);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ReturnedLambdaPreservesCapturedPrimaryConstructorMemberOrigin() {
         var result = Analyze("""
             sealed class Box { public int State; }
