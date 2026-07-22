@@ -1159,15 +1159,16 @@ internal sealed class MethodEffectAnalysisSession(
                 if (declaration.SyntaxTree != semanticModel.SyntaxTree || declaration.GetSyntax(session.CancellationToken) is not
                     TypeDeclarationSyntax typeDeclaration) continue;
                 foreach (var member in typeDeclaration.Members) {
-                    if (member is FieldDeclarationSyntax field)
+                    if (member is BaseFieldDeclarationSyntax field)
                         foreach (var variable in field.Declaration.Variables) {
                             if (variable.Initializer == null || semanticModel.GetDeclaredSymbol(variable,
-                                    session.CancellationToken) is not IFieldSymbol symbol) continue;
+                                    session.CancellationToken) is not { IsStatic: false } symbol) continue;
                             value = value.WithMember(MemberKey(symbol), Evaluate(semanticModel.GetOperation(
                                 variable.Initializer.Value, session.CancellationToken), ref state));
                         }
                     else if (member is PropertyDeclarationSyntax { Initializer: { } initializer } property &&
-                             semanticModel.GetDeclaredSymbol(property, session.CancellationToken) is IPropertySymbol symbol)
+                             semanticModel.GetDeclaredSymbol(property, session.CancellationToken) is
+                                 IPropertySymbol { IsStatic: false } symbol)
                         value = value.WithMember(MemberKey(symbol), Evaluate(semanticModel.GetOperation(initializer.Value,
                             session.CancellationToken), ref state));
                 }
