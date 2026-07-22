@@ -1241,9 +1241,12 @@ internal sealed class MethodEffectAnalysisSession(
             : null;
     }
     private static INamedTypeSymbol? GetOperationExactType(IOperation? operation, Builder builder) {
-        while (operation is IConversionOperation conversion) operation = conversion.Operand;
+        while (operation is IConversionOperation { OperatorMethod: null } conversion)
+            operation = conversion.Operand;
         if (operation is IParenthesizedOperation parenthesized) operation = parenthesized.Operand;
         return operation switch {
+            IConversionOperation { OperatorMethod: { } operatorMethod } userConversion =>
+                GetReturnedExactResultType(operatorMethod, userConversion, builder),
             IObjectCreationOperation { Type: INamedTypeSymbol createdType } => createdType,
             ILocalReferenceOperation local => builder.GetExactType(local.Local),
             IInvocationOperation invocation =>
