@@ -1,5 +1,4 @@
 using static SharpProof.Symbolic.SymbolicRuntimeHazardSourceCandidateFactory;
-using static SharpProof.Symbolic.SymbolicRuntimeHazardSyntaxFacts;
 
 namespace SharpProof.Symbolic;
 

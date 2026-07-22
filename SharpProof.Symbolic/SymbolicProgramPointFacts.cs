@@ -1,5 +1,3 @@
-using static SharpProof.Symbolic.SymbolicStateFactBuilder;
-
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicProgramPointFacts {

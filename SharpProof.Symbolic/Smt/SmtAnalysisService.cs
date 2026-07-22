@@ -87,8 +87,6 @@ internal sealed class SmtAnalysisService : IDisposable {
             return Unknown("smt_expression_budget_exceeded");
 
         var pathConditions = NormalizePathConditions(query.PathConditions);
-        if (TryClassifyConcreteFacts(query, pathConditions, out var concreteResult)) return concreteResult;
-
         if (Options.QueryTimeout <= TimeSpan.Zero) return Unknown("smt_timeout");
 
         if (pathConditions.Length > Options.MaxPathConditions) return Unknown("smt_path_condition_budget_exceeded");
@@ -306,49 +304,6 @@ internal sealed class SmtAnalysisService : IDisposable {
             string.Empty,
             keys.Select(static key => key.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + key));
     }
-    private static bool TryClassifyConcreteFacts(
-        AnalysisProofQuery query,
-        ImmutableArray<SmtFormula> pathConditions,
-        out AnalysisProofResult result) {
-        var preprocessor = new SmtConcreteFactPreprocessor();
-        var pathStatus = preprocessor.Prepare([.. pathConditions], out _);
-        if (pathStatus == SmtConcreteFactPreparationStatus.Unsatisfiable) {
-            result = new AnalysisProofResult(
-                AnalysisProofOutcome.Proven,
-                new ProofCheckInfo(true, Feasibility.Unsatisfiable),
-                new ProofCheckInfo(false, Feasibility.Unknown),
-                "path_unsatisfiable");
-            return true;
-        }
-        var pureReason = GetConcreteTriggerPureReason(query.Hazard);
-        if (pureReason.Length != 0) {
-            var combined = new SmtFormula[pathConditions.Length + 1];
-            pathConditions.CopyTo(combined);
-            combined[combined.Length - 1] = query.Hazard.TriggerCondition;
-            if (preprocessor.Prepare(combined, out _) == SmtConcreteFactPreparationStatus.Unsatisfiable) {
-                result = new AnalysisProofResult(
-                    AnalysisProofOutcome.Proven,
-                    new ProofCheckInfo(false, Feasibility.Unknown),
-                    new ProofCheckInfo(true, Feasibility.Unsatisfiable),
-                    pureReason);
-                return true;
-            }
-        }
-        result = Unknown("smt_concrete_fact_no_match");
-        return false;
-    }
-    private static string GetConcreteTriggerPureReason(AnalysisHazard hazard) =>
-        hazard.Visibility == AnalysisEffectVisibility.InternalOnly
-            ? string.Empty
-            : hazard.Kind switch {
-                AnalysisHazardKind.BranchReachability => "branch_unreachable",
-                AnalysisHazardKind.EffectViolationReachability => "impure_call_unreachable",
-                AnalysisHazardKind.CallerVisibleMemoryWrite => "memory_write_unreachable",
-                AnalysisHazardKind.NullDereference => "null_dereference_unreachable",
-                AnalysisHazardKind.DivideByZero => "divide_by_zero_unreachable",
-                _ => string.Empty
-            };
-
     private static bool IsWithinFormulaNodeBudget(IEnumerable<SmtFormula> pathConditions, SmtFormula triggerCondition, int maxNodes) {
         var remaining = maxNodes;
         foreach (var formula in pathConditions)

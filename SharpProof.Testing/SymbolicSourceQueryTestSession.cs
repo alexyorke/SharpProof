@@ -7,7 +7,7 @@ namespace SharpProof.Test;
 
 internal sealed class SymbolicSourceQueryTestSession : IDisposable {
     private readonly Compilation _compilation;
-    private readonly SymbolicQueryExecutor _service = new();
+    private readonly SymbolicConditionProofEngine _proofEngine = new(new SymbolicInvariantService());
     private readonly SmtAnalysisService _smtAnalysis;
     private readonly SyntaxTree _syntaxTree;
 
@@ -27,12 +27,14 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable {
     public string FilePath { get; }
 
     public void Dispose() => _smtAnalysis.Dispose();
-    public SymbolicConditionProofResult ProveAtMarker((int Line, int Column, int Position) marker, string condition) => _service.Prove(
-            new SymbolicQueryContext(
-                SymbolicSourceInput.FromSyntaxTree(_syntaxTree, _compilation),
-                SharpProofTargetFactory.Point(marker.Line, marker.Column),
-                new SymbolicQueryOptions(smtAnalysis: _smtAnalysis)),
-            condition);
+    public SymbolicConditionProofResult ProveAtMarker((int Line, int Column, int Position) marker, string condition) =>
+        _proofEngine.ProveAtSyntaxTree(
+            _syntaxTree,
+            _compilation,
+            marker.Line,
+            marker.Column,
+            condition,
+            _smtAnalysis);
     public int FindLine(string text) {
         var lines = Source.Split('\n');
         for (var index = 0; index < lines.Length; index++)

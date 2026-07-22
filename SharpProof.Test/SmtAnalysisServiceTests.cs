@@ -360,70 +360,7 @@ public class SmtAnalysisServiceTests {
         Assert.That(service.CacheEntryCount, Is.EqualTo(1));
     }
     [Test]
-    public void Classify_SyntacticPathContradiction_BypassesBudgetsAndSolver() {
-        var x = Int("x");
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(SmtAnalysisMode.Bounded, TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromMilliseconds(500), 1, 3));
-
-        var result = service.Classify(CreateQuery(new SmtFormula[] { Equal(x, Integer(0)), NotEqual(x, Integer(0)) }, Boolean(true)));
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.PathCheck.WasAttempted, Is.True);
-        Assert.That(result.HazardCheck.WasAttempted, Is.False);
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
-    }
-    [Test]
-    public void Classify_SyntacticIntegerIntervalContradiction_BypassesBudgetsAndSolver() {
-        var x = Int("interval_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(SmtAnalysisMode.Bounded, TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromMilliseconds(500), 1, 3));
-
-        var result = service.Classify(CreateQuery(new SmtFormula[] { GreaterThanOrEqual(x, Integer(10)), LessThan(x, Integer(10)) },
-            Boolean(true)));
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.PathCheck.WasAttempted, Is.True);
-        Assert.That(result.HazardCheck.WasAttempted, Is.False);
-        Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
-    }
-    [Test]
-    public void Classify_SyntacticDisjunctionOfKnownComparisonComplements_BypassesSolver() {
-        var values = Reference("values_" + Guid.NewGuid().ToString("N"));
-        var index = Int("index_" + Guid.NewGuid().ToString("N"));
-        var length = Int(values.Name + ".Length");
-        var valuesIsNotNull = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, values, new SmtNullConstant());
-        var indexIsNonNegative = GreaterThanOrEqual(index, Integer(0));
-        var indexIsInBounds = LessThan(index, length);
-        var contradiction = new SmtBinaryFormula(
-            SmtBinaryOperator.Or,
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, values, new SmtNullConstant()),
-            new SmtBinaryFormula(SmtBinaryOperator.Or, LessThan(index, Integer(0)), GreaterThanOrEqual(index, length)));
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(SmtAnalysisMode.Bounded, TimeSpan.Zero, TimeSpan.FromMilliseconds(1),
-            4, 64));
-
-        var result = service.ClassifyPathFeasibility(new SmtFormula[] {
-            valuesIsNotNull,
-            indexIsNonNegative,
-            indexIsInBounds,
-            contradiction
-        });
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
-    }
-    [Test]
-    public void Classify_NestedConjunctIntegerContradiction_BypassesSolver() {
+    public void Classify_NestedConjunctIntegerContradiction_UsesSolver() {
         var x = Int("nested_interval_" + Guid.NewGuid().ToString("N"));
         var nestedBounds = new SmtBinaryFormula(SmtBinaryOperator.And, GreaterThan(x, Integer(3)), LessThanOrEqual(x, Integer(3)));
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -433,14 +370,14 @@ public class SmtAnalysisServiceTests {
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        Assert.That(service.ExecutedQueryCount, Is.EqualTo(1));
+        Assert.That(service.CacheEntryCount, Is.EqualTo(1));
     }
-    [TestCase("direct", TestName = "ClassifyImplication_DirectPathFact_BypassesSolver")]
-    [TestCase("interval", TestName = "ClassifyImplication_IntegerIntervalEntailment_BypassesSolver")]
-    [TestCase("length", TestName = "ClassifyImplication_ExactStringLengthEntailment_BypassesSolver")]
-    [TestCase("predicate", TestName = "ClassifyImplication_ExactStringPredicateEntailment_BypassesSolver")]
-    [TestCase("negated", TestName = "ClassifyImplication_ExactStringNegatedPredicateEntailment_BypassesSolver")]
+    [TestCase("direct", TestName = "ClassifyImplication_DirectPathFact_UsesSolver")]
+    [TestCase("interval", TestName = "ClassifyImplication_IntegerIntervalEntailment_UsesSolver")]
+    [TestCase("length", TestName = "ClassifyImplication_ExactStringLengthEntailment_UsesSolver")]
+    [TestCase("predicate", TestName = "ClassifyImplication_ExactStringPredicateEntailment_UsesSolver")]
+    [TestCase("negated", TestName = "ClassifyImplication_ExactStringNegatedPredicateEntailment_UsesSolver")]
     public void SyntacticImplicationMatrix(string kind) {
         SmtFormula path;
         SmtFormula conclusion;
@@ -464,33 +401,16 @@ public class SmtAnalysisServiceTests {
         var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
         var result = service.ClassifyImplication(new[] { path }, conclusion);
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
+        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
         Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
         Assert.That(service.ClassifyImplication(new[] { path }, conclusion).Outcome,
             Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        Assert.That(service.ExecutedQueryCount, Is.EqualTo(1));
+        Assert.That(service.CacheEntryCount, Is.EqualTo(1));
     }
-    [Test]
-    public void ClassifyPathFeasibility_ContradictoryExactStringValues_BypassesSolver() {
-        var text = String("exact_contradiction_" + Guid.NewGuid().ToString("N"));
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(SmtAnalysisMode.Bounded, TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromMilliseconds(500), 1, 3));
-
-        var result = service.ClassifyPathFeasibility(new SmtFormula[] {
-            Equal(text, Text("ABC")),
-            Equal(text, Text("XYZ"))
-        });
-
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
-    }
-    [TestCase(false, TestName = "Classify_DivideByZeroContradictedByGuard_BypassesSolver")]
-    [TestCase(true, TestName = "Classify_DivideByZeroContradictedByPositiveInterval_BypassesSolver")]
+    [TestCase(false, TestName = "Classify_DivideByZeroContradictedByGuard_UsesSolver")]
+    [TestCase(true, TestName = "Classify_DivideByZeroContradictedByPositiveInterval_UsesSolver")]
     public void DivideByZeroContradictionMatrix(bool positiveInterval) {
         var divisor = Int((positiveInterval ? "positive_divisor_" : "divisor_") + Guid.NewGuid().ToString("N"));
         var guard = positiveInterval ? GreaterThan(divisor, Integer(0)) : NotEqual(divisor, Integer(0));
@@ -501,11 +421,11 @@ public class SmtAnalysisServiceTests {
             divisorIsZero)));
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
+        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
         Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("divide_by_zero_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        Assert.That(service.ExecutedQueryCount, Is.EqualTo(1));
+        Assert.That(service.CacheEntryCount, Is.EqualTo(1));
     }
     [Test]
     public void Classify_ReusedSolverContext_DistinguishesSameNamedVariablesByKind() {
@@ -712,7 +632,7 @@ public class SmtAnalysisServiceTests {
         var result = service.ClassifyImplication(pathConditions, fact);
         var expectedOutcome = follows ? AnalysisProofOutcome.Proven : AnalysisProofOutcome.Disproven;
         Assert.That(result.Outcome, Is.EqualTo(expectedOutcome));
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(follows ? Feasibility.Unknown : Feasibility.Satisfiable));
+        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
         Assert.That(result.HazardCheck.Feasibility, Is.EqualTo(follows ? Feasibility.Unsatisfiable : Feasibility.Satisfiable));
         Assert.That(service.ClassifyImplication(pathConditions, fact).Outcome, Is.EqualTo(expectedOutcome));
     }
@@ -819,112 +739,6 @@ public class SmtAnalysisServiceTests {
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
-    private sealed record PreprocessorCase(SmtFormula[] Conditions, SmtFormula? Conclusion = null);
-
-    private static IEnumerable<TestCaseData> PreprocessorCases() {
-        yield return CreatePreprocessorCase("ClassifyImplication_TransitiveBooleanEquivalenceEntailment_BypassesSolver",
-            [Equal(Bool("a"), Bool("b")), Equal(Bool("b"), Bool("c"))], Equal(Bool("a"), Bool("c")));
-        yield return CreatePreprocessorCase("ClassifyImplication_TransitiveBooleanNegationEntailment_BypassesSolver",
-            [NotEqual(Bool("a"), Bool("b")), NotEqual(Bool("b"), Bool("c"))], Equal(Bool("a"), Bool("c")));
-        yield return CreatePreprocessorCase("ClassifyImplication_NegatedBooleanRelationEntailment_BypassesSolver",
-            [Equal(Bool("a"), Not(Bool("b"))), Equal(Bool("b"), Bool("c"))], NotEqual(Bool("a"), Bool("c")));
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_NegatedBooleanRelationParityContradiction_BypassesSolver",
-            [Equal(Bool("a"), Not(Bool("b"))), Equal(Bool("b"), Bool("c")), Equal(Bool("a"), Bool("c"))]);
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_BooleanEquivalenceParityContradiction_BypassesSolver",
-            [Equal(Bool("a"), Bool("b")), NotEqual(Bool("b"), Bool("c")), Equal(Bool("a"), Bool("c"))]);
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_IntegerAliasIntervalContradiction_BypassesSolver",
-            [GreaterThanOrEqual(Int("x"), Integer(10)), Equal(Int("x"), Int("y")), LessThan(Int("y"), Integer(10))]);
-        yield return CreatePreprocessorCase("ClassifyImplication_IntegerAliasIntervalEntailment_BypassesSolver",
-            [Equal(Int("x"), Int("y")), GreaterThanOrEqual(Int("x"), Integer(3))], GreaterThanOrEqual(Int("y"), Integer(3)));
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_AffineOffsetAliasIntervalContradiction_BypassesSolver",
-            [GreaterThanOrEqual(Int("x"), Integer(5)), Equal(Add(Int("x"), Integer(2)), Add(Int("y"), Integer(4))), LessThan(Int("y"),
-                Integer(3))]);
-        yield return CreatePreprocessorCase("ClassifyImplication_AffineOffsetAliasIntervalEntailment_BypassesSolver",
-            [Equal(Add(Int("x"), Integer(2)), Add(Int("y"), Integer(4))), GreaterThanOrEqual(Int("x"), Integer(5))],
-                GreaterThanOrEqual(Int("y"), Integer(3)));
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_SameBaseAffineEqualityContradiction_BypassesSolver",
-            [Equal(Add(Int("x"), Integer(2)), Add(Int("x"), Integer(3)))]);
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_SameBaseAffineOrderingContradiction_BypassesSolver",
-            [LessThan(Add(Int("x"), Integer(3)), Add(Int("x"), Integer(2)))]);
-        yield return CreatePreprocessorCase("ClassifyImplication_SameBaseAffineOrderingTautology_BypassesSolver",
-            [], LessThanOrEqual(Add(Int("x"), Integer(1)), Add(Int("x"), Integer(2))));
-        yield return CreatePreprocessorCase("ClassifyImplication_AffineComparisonAgainstExactTerm_BypassesSolver",
-            [Equal(Int("y"), Integer(10)), LessThanOrEqual(Int("x"), Integer(8))], LessThanOrEqual(Add(Int("x"), Integer(2)), Int("y")));
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_StringAliasContradiction_BypassesSolver",
-            [Equal(String("a"), String("b")), Equal(String("a"), Text("ABC")), NotEqual(String("b"), Text("ABC"))]);
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_ReferenceAliasNullContradiction_BypassesSolver",
-            [Equal(Reference("a"), Reference("b")), Equal(Reference("a"), Null()), NotEqual(Reference("b"), Null())]);
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_DisjunctionReferenceNullContradiction_BypassesSolver",
-            [Or(Equal(Reference("value"), Null()), Bool("guard")), Not(Bool("guard")), NotEqual(Reference("value"), Null())]);
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_NegatedDisjunctionReferenceNullContradiction_BypassesSolver",
-            [Not(Or(Equal(Reference("value"), Null()), Bool("guard"))), Equal(Reference("value"), Null())]);
-        yield return CreatePreprocessorCase("ClassifyImplication_ReferenceAliasNonNullEntailment_BypassesSolver",
-            [Equal(Reference("a"), Reference("b")), NotEqual(Reference("a"), Null())], NotEqual(Reference("b"), Null()));
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_NullConstantInequality_BypassesSolver", [NotEqual(Null(), Null())]);
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_AliasInsideIntegerExpressionIntervalContradiction_BypassesSolver",
-            [Equal(Int("x"), Int("y")), GreaterThanOrEqual(Add(Int("x"), Integer(1)), Integer(5)), LessThan(Add(Int("y"), Integer(1)),
-                Integer(5))]);
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_SubtractionIntervalContradiction_BypassesSolver",
-            [GreaterThanOrEqual(Int("x"), Integer(5)), LessThan(Subtract(Int("x"), Integer(1)), Integer(4))]);
-        yield return CreatePreprocessorCase("ClassifyImplication_PositiveConstantMultiplyIntervalEntailment_BypassesSolver",
-            [GreaterThanOrEqual(Int("x"), Integer(3))], GreaterThanOrEqual(Multiply(Int("x"), Integer(2)), Integer(6)));
-        yield return CreatePreprocessorCase("ClassifyImplication_AliasInsideStringLengthEntailment_BypassesSolver",
-            [Equal(String("a"), String("b")), Equal(Length(String("a")), Integer(3))], Equal(Length(String("b")), Integer(3)));
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_AliasInsideStringConcatContradiction_BypassesSolver",
-            [Equal(String("a"), String("b")), Equal(Concat(String("a"), Text("!")), Text("A!")), NotEqual(Concat(String("b"), Text("!")),
-                Text("A!"))]);
-        yield return CreatePreprocessorCase("ClassifyImplication_StringConcatKnownOperandLengths_BypassesSolver",
-            [Equal(Length(String("a")), Integer(2)), Equal(Length(String("b")), Integer(3))], Equal(Length(Concat(String("a"),
-                String("b"))), Integer(5)));
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_NegativeStringLength_BypassesSolver",
-            [LessThan(Length(String("text")), Integer(0))]);
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_ConditionalIntegerComparisonWithKnownGuard_BypassesSolver",
-            [Bool("g"), GreaterThanOrEqual(Conditional(Bool("g"), Int("a"), Int("b"), SmtValueKind.Int), Integer(10)), LessThan(Int("a"),
-                Integer(10))]);
-        yield return CreatePreprocessorCase("ClassifyImplication_ConditionalReferenceNullFactWithKnownGuard_BypassesSolver",
-            [Not(Bool("g")), NotEqual(Reference("b"), Null())], NotEqual(Conditional(Bool("g"), Reference("a"), Reference("b"),
-                SmtValueKind.Reference), Null()));
-        yield return CreatePreprocessorCase("ClassifyImplication_ConditionalReferenceAliasNullStatePropagatesToSelectedBranch_BypassesSolver",
-            [Bool("g"), Equal(Reference("selected"), Conditional(Bool("g"), Reference("a"), Reference("b"), SmtValueKind.Reference)),
-                Equal(Reference("selected"), Null())], Equal(Reference("a"), Null()));
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_ConditionalBooleanWithKnownGuard_BypassesSolver",
-            [Bool("g"), Conditional(Bool("g"), Bool("a"), Bool("b"), SmtValueKind.Bool), Not(Bool("a"))]);
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_ConditionalWithEqualBranchesCollapsesBeforeSolver",
-            [Equal(Conditional(Bool("g"), Int("x"), Int("x"), SmtValueKind.Int), Integer(7)), NotEqual(Int("x"), Integer(7))]);
-        yield return CreatePreprocessorCase("ClassifyImplication_ConditionalIntegerBranchImplications_BypassesSolver",
-            [Or(Not(Bool("g")), GreaterThanOrEqual(Int("a"), Integer(0))), Or(Bool("g"), GreaterThanOrEqual(Int("b"), Integer(0)))],
-                GreaterThanOrEqual(Conditional(Bool("g"), Int("a"), Int("b"), SmtValueKind.Int), Integer(0)));
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_ConditionalReferenceBranchImplications_BypassesSolver",
-            [Or(Not(Bool("g")), NotEqual(Reference("a"), Null())), Or(Bool("g"), NotEqual(Reference("b"), Null())),
-                Equal(Conditional(Bool("g"), Reference("a"), Reference("b"), SmtValueKind.Reference), Null())]);
-        yield return CreatePreprocessorCase("ClassifyPathFeasibility_ConditionalBooleanBranchImplications_BypassesSolver",
-            [Or(Not(Bool("g")), Bool("a")), Or(Bool("g"), Bool("b")), Not(Conditional(Bool("g"), Bool("a"), Bool("b"),
-                SmtValueKind.Bool))]);
-        yield return CreateConditionalSelectedReferenceCase();
-    }
-    [TestCaseSource(nameof(PreprocessorCases))]
-    public void PreprocessorMatrix(object value) {
-        var testCase = (PreprocessorCase)value;
-        AssertPreprocessed(testCase.Conditions, testCase.Conclusion);
-    }
-    private static TestCaseData CreatePreprocessorCase(string name, SmtFormula[] conditions, SmtFormula? conclusion = null) =>
-        new TestCaseData(new PreprocessorCase(conditions, conclusion)).SetName(name);
-
-    private static TestCaseData CreateConditionalSelectedReferenceCase() {
-        var guard = Bool("g");
-        var first = Reference("a");
-        var second = Reference("b");
-        var result = Reference("result");
-        var resultIsNonNull = NotEqual(result, Null());
-        var firstIsNull = Equal(first, Null());
-        var secondIsNull = Equal(second, Null());
-        var selected = Conditional(guard, first, second, SmtValueKind.Reference);
-        var selectedIsNull = Conditional(guard, firstIsNull, secondIsNull, SmtValueKind.Bool);
-        return CreatePreprocessorCase(
-            "ClassifyImplication_ConditionalSelectedReferenceNullBranchImplication_BypassesSolver",
-            [Equal(result, selected), Equal(Equal(result, Null()), selectedIsNull)],
-            And(Or(Not(guard), Or(resultIsNonNull, firstIsNull)), Or(guard, Or(resultIsNonNull, secondIsNull))));
-    }
     [Test]
     public void ClassifyImplication_RuntimeTypeTestPredicateIsCongruentUnderReferenceEquality() {
         var x = Reference("runtime_x_" + Guid.NewGuid().ToString("N"));
@@ -952,18 +766,6 @@ public class SmtAnalysisServiceTests {
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
-    }
-    private static void AssertPreprocessed(IReadOnlyList<SmtFormula> pathConditions, SmtFormula? conclusion = null) {
-        using var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = conclusion == null
-            ? service.ClassifyPathFeasibility(pathConditions)
-            : service.ClassifyImplication(pathConditions, conclusion);
-        Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
-        Assert.That(conclusion == null ? result.PathCheck.Feasibility : result.HazardCheck.Feasibility,
-            Is.EqualTo(Feasibility.Unsatisfiable));
-        Assert.That(result.Reason, Is.EqualTo(conclusion == null ? "path_unsatisfiable" : "branch_unreachable"));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(0));
     }
     private static void AssertPermanentFailureCode(Exception exception, string expectedCode) {
         var factoryCalls = 0;

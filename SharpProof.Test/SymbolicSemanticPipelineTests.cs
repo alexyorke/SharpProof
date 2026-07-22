@@ -7,8 +7,6 @@ using NUnit.Framework;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
-using SharpProof.Symbolic.Smt;
-using SharpProof.Test.Smt;
 
 namespace SharpProof.Test;
 

@@ -135,8 +135,7 @@ public sealed class SymbolicComplexityTests {
             position)) : SharpProofTargetFactory.AtPosition(position);
         var (tree, compilation) = SymbolicSourceCompilation.Create(source, "SymbolicComplexityTests.cs",
             SymbolicSourceCompilationKind.Query, null, default);
-        return new SymbolicQueryExecutor().QueryComplexity(new SymbolicQueryContext(SymbolicSourceInput.FromSyntaxTree(tree, compilation),
-            target));
+        return QueryComplexity(SymbolicSourceInput.FromSyntaxTree(tree, compilation), target);
     }
     private static int GetLineNumber(string source, int position) =>
         source.Take(position).Count(static character => character == '\n') + 1;
@@ -145,8 +144,16 @@ public sealed class SymbolicComplexityTests {
     public void QueryComplexity_AllLinesTarget_ThrowsNotSupportedException() {
         var (tree, compilation) = SymbolicSourceCompilation.Create(
             "class C { }", "SymbolicComplexityTests.cs", SymbolicSourceCompilationKind.Query, null, default);
-        var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryExecutor().QueryComplexity(
-            new SymbolicQueryContext(SymbolicSourceInput.FromSyntaxTree(tree, compilation), SharpProofTargetFactory.AllLines())));
+        var ex = Assert.Throws<NotSupportedException>(() => QueryComplexity(
+            SymbolicSourceInput.FromSyntaxTree(tree, compilation), SharpProofTargetFactory.AllLines()));
         Assert.That(ex!.Message, Is.EqualTo("Complexity queries support point, position, or line targets only."));
     }
+    private static SymbolicComplexityResult QueryComplexity(SymbolicSourceInput source, SharpProofTarget target) =>
+        SymbolicMethodLikeQueryDispatcher.Execute(
+            source,
+            target,
+            "Complexity queries support point, position, or line targets only.",
+            static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true),
+            static (resolved, compilation, token) => new SymbolicComplexityAnalysisSession(compilation, token).Analyze(resolved),
+            default);
 }

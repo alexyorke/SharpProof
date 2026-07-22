@@ -497,25 +497,6 @@ internal class ProofCoreZ3SmokeTests {
         yield return CreateSolverCase("SmtSolver_SelectedConditionalStringConcatSimplifiesPredicate",
             [Bool("usePrefix"), Not(StartsWith(Concat(Conditional(Bool("usePrefix"), Text("AB"), Text("CD"), SmtValueKind.String),
                 Text("X")), Text("AB")))], Feasibility.Unsatisfiable);
-        yield return CreateSolverCase("SmtSolver_BooleanAliasChainContradiction_IsPreprocessedWithoutZ3",
-            [Equal(Bool("first"), Bool("second")), Bool("first"), Not(Bool("second"))], Feasibility.Unsatisfiable, zeroTimeout: true);
-        yield return CreateSolverCase("SmtSolver_IntegerAliasIntervalContradiction_IsPreprocessedWithoutZ3",
-            [Equal(Int("alias"), Int("source")), GreaterThanOrEqual(Int("source"), Integer(5)), LessThan(Add(Int("alias"), Integer(1)),
-                Integer(5))], Feasibility.Unsatisfiable, zeroTimeout: true);
-        yield return CreateSolverCase("SmtSolver_StringAliasPredicateContradiction_IsPreprocessedWithoutZ3",
-            [Equal(String("copy"), String("text")), Equal(String("text"), Text("ABC")), Not(StartsWith(String("copy"), Text("A")))],
-                Feasibility.Unsatisfiable, zeroTimeout: true);
-        yield return CreateSolverCase("SmtSolver_ReferenceAliasNullContradiction_IsPreprocessedWithoutZ3",
-            [Equal(Reference("target"), Reference("source")), Equal(Reference("source"), Null()), NotEqual(Reference("target"), Null())],
-                Feasibility.Unsatisfiable, zeroTimeout: true);
-        yield return CreateSolverCase("SmtSolver_DistinctNonNullReferencesRemainUnknownWithoutZ3",
-            [NotEqual(Reference("left"), Null()), NotEqual(Reference("right"), Null()), NotEqual(Reference("left"), Reference("right"))],
-                Feasibility.Unknown, zeroTimeout: true);
-        yield return CreateSolverCase("SmtSolver_IdenticalConditionalBranchesSimplifyWithoutZ3",
-            [NotEqual(Conditional(Bool("flag"), Add(Int("value"), Integer(1)), Add(Int("value"), Integer(1)), SmtValueKind.Int),
-                Add(Int("value"), Integer(1)))], Feasibility.Unsatisfiable, zeroTimeout: true);
-        yield return CreateSolverCase("SmtSolver_ConcatLengthNegativeComparison_IsPreprocessedWithoutZ3",
-            [LessThan(Length(Concat(String("left"), String("right"))), Integer(0))], Feasibility.Unsatisfiable, zeroTimeout: true);
         yield return CreateSolverCase("SmtSolver_ReferenceNullAndNonNullConjunction_IsUnsatisfiable",
             [Equal(Reference("reference"), Null()), NotEqual(Reference("reference"), Null())], Feasibility.Unsatisfiable);
     }

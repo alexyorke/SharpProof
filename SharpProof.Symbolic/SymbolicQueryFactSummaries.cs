@@ -1,7 +1,7 @@
 namespace SharpProof.Symbolic;
 
 internal static class SymbolicMergedPathFactMerger {
-    internal static string MergeInvariantText(IEnumerable<SymbolicProgramPointResult> programPoints) {
+    internal static string MergeInvariantText(IEnumerable<SymbolicProgramPointAnalysis> programPoints) {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
 
         var points = programPoints.ToArray();

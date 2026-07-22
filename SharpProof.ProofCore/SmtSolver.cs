@@ -10,7 +10,7 @@ internal enum Feasibility {
 internal sealed class SmtSolver : IDisposable {
     internal const int MaxRegexValidationCacheEntries = SmtRegexValidator.MaxCacheEntries;
     private readonly Z3FormulaEncoder _encoder = new();
-    private readonly SmtConcreteFactPreprocessor _preprocessor = new();
+    private readonly SmtQuerySafety _safety = new();
     private long _lastObservedRlimitCount;
 
     /// <summary>
@@ -20,7 +20,7 @@ internal sealed class SmtSolver : IDisposable {
     /// </summary>
     public long ConsumedResourceCount { get; private set; }
 
-    internal int RegexValidationCacheCount => _preprocessor.RegexValidationCacheCount;
+    internal int RegexValidationCacheCount => _safety.RegexValidationCacheCount;
 
     public void Dispose() => _encoder.Dispose();
     private Status CheckAndAccountResources(Solver solver) {
@@ -43,37 +43,25 @@ internal sealed class SmtSolver : IDisposable {
     public SmtFeasibilityResult CheckSatisfiability(IEnumerable<SmtFormula> pathConditions, TimeSpan timeout)
         => CheckSatisfiability(pathConditions, timeout, true);
     private SmtFeasibilityResult CheckSatisfiability(IEnumerable<SmtFormula> pathConditions, TimeSpan timeout, bool adjustApproximation) {
-        var query = Prepare(pathConditions);
-        if (query.Status != SmtConcreteFactPreparationStatus.Ready)
-            return query.Status == SmtConcreteFactPreparationStatus.Unsatisfiable
-                ? new SmtFeasibilityResult(Feasibility.Unsatisfiable, SmtSatisfyingWitness.None("constraints_unsatisfiable"))
-                : new SmtFeasibilityResult(Feasibility.Unknown, SmtSatisfyingWitness.Unsupported("constraint_preparation_unknown"));
-
         if (timeout <= TimeSpan.Zero)
             return new SmtFeasibilityResult(Feasibility.Unknown, SmtSatisfyingWitness.Unsupported("solver_timeout"));
-
-        if (query.WasChanged && !query.ContainsApproximateRegex)
-            try {
-                return CheckSatisfiabilityRawWithWitness(
-                    query.OriginalConditions,
-                    query.OriginalConditions,
-                    timeout,
-                    false,
-                    adjustApproximation,
-                    false);
-            }
-            catch (Exception ex) when (IsConservativeSolverFailure(ex)) {
-                // Exact concrete facts may still use operations that the encoder cannot represent.
-                // The preparation pass already validated them, so continue with the reduced query.
-            }
+        var original = pathConditions.ToArray();
+        if (!_safety.TryPrepare(original, out var conditions, out var changed))
+            return new SmtFeasibilityResult(Feasibility.Unknown, SmtSatisfyingWitness.Unsupported("constraint_preparation_unknown"));
         try {
+            var clock = Stopwatch.StartNew();
+            if (!HasSafeArithmetic(conditions, timeout))
+                return new SmtFeasibilityResult(Feasibility.Unknown, SmtSatisfyingWitness.Unsupported("constraint_preparation_unknown"));
+            var remaining = timeout - clock.Elapsed;
+            if (remaining <= TimeSpan.Zero)
+                return new SmtFeasibilityResult(Feasibility.Unknown, SmtSatisfyingWitness.Unsupported("solver_timeout"));
             return CheckSatisfiabilityRawWithWitness(
-                query.Conditions,
-                query.OriginalConditions,
-                timeout,
-                query.WasChanged,
+                conditions,
+                original,
+                remaining,
+                changed,
                 adjustApproximation,
-                query.ContainsApproximateRegex);
+                conditions.Any(_encoder.ContainsApproximateRegex));
         }
         catch (Exception ex) when (IsConservativeSolverFailure(ex)) {
             return new SmtFeasibilityResult(Feasibility.Unknown, SmtSatisfyingWitness.Unsupported(GetConservativeSolverFailureReason(ex)));
@@ -109,6 +97,7 @@ internal sealed class SmtSolver : IDisposable {
         var isApproximate = containsApproximateRegex ?? conditions.Any(_encoder.ContainsApproximateRegex);
         using var solver = _encoder.CreateSolver(timeout);
         foreach (var formula in conditions) solver.Assert(_encoder.EncodeCondition(formula));
+        AssertIntegerDomains(solver, conditions);
 
         var feasibility = ToFeasibility(CheckAndAccountResources(solver));
         if (feasibility == Feasibility.Unsatisfiable)
@@ -134,15 +123,30 @@ internal sealed class SmtSolver : IDisposable {
         Status.UNSATISFIABLE => Feasibility.Unsatisfiable,
         _ => Feasibility.Unknown
     };
-    private PreparedSmtQuery Prepare(IEnumerable<SmtFormula> conditions) {
-        var original = conditions.ToArray();
-        var status = _preprocessor.Prepare(original, out var prepared);
-        return new PreparedSmtQuery(
-            status,
-            original,
-            prepared,
-            !ReferenceEquals(original, prepared),
-            original.Any(_encoder.ContainsApproximateRegex));
+    private bool HasSafeArithmetic(IReadOnlyList<SmtFormula> conditions, TimeSpan timeout) {
+        var checks = SmtQuerySafety.CreateUnsafeArithmeticChecks(conditions);
+        if (checks.Count == 0) return true;
+
+        using var solver = _encoder.CreateSolver(timeout);
+        foreach (var condition in conditions)
+            if (!SmtQuerySafety.ContainsUnsafeArithmetic(condition))
+                solver.Assert(_encoder.EncodeCondition(condition));
+        AssertIntegerDomains(solver, conditions);
+        solver.Assert(_encoder.EncodeCondition(checks.Aggregate(
+            static (left, right) => new SmtBinaryFormula(SmtBinaryOperator.Or, left, right))));
+        return CheckAndAccountResources(solver) == Status.UNSATISFIABLE;
+    }
+    private void AssertIntegerDomains(Solver solver, IEnumerable<SmtFormula> conditions) {
+        foreach (var variable in CollectVariables(conditions).Where(static value => value.Kind == SmtValueKind.Int)) {
+            solver.Assert(_encoder.EncodeCondition(new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                variable,
+                new SmtIntegerConstant(long.MinValue))));
+            solver.Assert(_encoder.EncodeCondition(new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                variable,
+                new SmtIntegerConstant(long.MaxValue))));
+        }
     }
     private static Feasibility AdjustForApproximation(Feasibility feasibility, bool containsApproximateRegex)
         => feasibility == Feasibility.Satisfiable && containsApproximateRegex
@@ -168,10 +172,4 @@ internal sealed class SmtSolver : IDisposable {
 
         return variables.ToArray();
     }
-    readonly record struct PreparedSmtQuery(
-        SmtConcreteFactPreparationStatus Status,
-        SmtFormula[] OriginalConditions,
-        SmtFormula[] Conditions,
-        bool WasChanged,
-        bool ContainsApproximateRegex);
 }

@@ -1,10 +1,8 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 

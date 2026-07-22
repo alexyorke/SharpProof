@@ -51,6 +51,8 @@ The first native initialization failure is caught inside `SmtAnalysisService`.
 The service becomes `PermanentlyUnavailable`, disposes any partial thread-local
 solver context, and returns conservative unknown proof results. Later queries
 do not repeatedly attempt the same failed native initialization.
+There is no separate syntactic proof fallback: proof queries return `Unknown`
+whenever the native solver is unavailable or the query timeout is zero.
 
 `SmtAnalysisHealth.LastFailureCode` uses these stable values:
 

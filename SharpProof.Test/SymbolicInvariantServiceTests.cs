@@ -41,17 +41,6 @@ public sealed class SymbolicInvariantServiceTests {
         new TestCaseData(new GuardedProofCase(source, negate, constant, expected)).SetName(name);
 
     [Test]
-    public void ProveImplicationAt_ReturnsUnknownWithoutSmtService() {
-        var (statement, model, condition) = CreateGuardedReturnContext(PositiveGuardSource, "return value;");
-        var line = statement.GetLocation().GetLineSpan().StartLinePosition;
-        var exception = Assert.Throws<ArgumentException>(() => new SymbolicQueryExecutor().Prove(
-            new SymbolicQueryContext(
-                SymbolicSourceInput.FromSyntaxTree(model.SyntaxTree, model.Compilation),
-                SharpProofTargetFactory.Point(line.Line + 1, line.Character + 1)),
-            SymbolicFormulaDisplay.Format(condition)));
-        Assert.That(exception!.Message, Does.Contain("SMT analysis"));
-    }
-    [Test]
     public void ProveImplicationAt_ProvesBooleanLocalAliasInitializer() {
         var context = AnalyzerTestHost.CreateSourceContext(BooleanAliasSource, "SymbolicBooleanAlias");
         var statement = context.Root.DescendantNodes().OfType<ReturnStatementSyntax>()

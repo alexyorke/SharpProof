@@ -2,20 +2,21 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicMethodLikeQueryDispatcher {
     internal static TResult Execute<TResult>(
-        SymbolicQueryContext request,
+        SymbolicSourceInput source,
+        SharpProofTarget target,
         string unsupportedTargetMessage,
         Func<SyntaxNode, bool> isMethodLikeDeclaration,
         Func<ResolvedMethodLikeTarget, Compilation, CancellationToken, TResult> executeAnalysis,
         CancellationToken cancellationToken) {
-        var semanticModel = request.Source.Compilation.GetSemanticModel(request.Source.SyntaxTree);
+        var semanticModel = source.Compilation.GetSemanticModel(source.SyntaxTree);
         var resolvedTarget = SymbolicMethodLikeTargetResolver.Resolve(
-            request.Source.SyntaxTree,
+            source.SyntaxTree,
             semanticModel,
-            request.Target,
+            target,
             unsupportedTargetMessage,
             isMethodLikeDeclaration,
             cancellationToken);
-        return executeAnalysis(resolvedTarget, request.Source.Compilation, cancellationToken);
+        return executeAnalysis(resolvedTarget, source.Compilation, cancellationToken);
     }
 }
 internal static class SymbolicMethodLikeTargetResolver {

@@ -26,6 +26,10 @@ internal static class SmtFormulaTraversal {
 
         return Enumerate(root).Any(predicate);
     }
+    internal static IEnumerable<SmtFormula> EnumerateChildren(SmtFormula formula) {
+        var children = GetChildren(formula);
+        for (var index = 0; index < children.Count; index++) yield return children[index];
+    }
     internal static SmtFormula MapChildren(SmtFormula formula, Func<SmtFormula, SmtFormula> map) {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
         if (map == null) throw new ArgumentNullException(nameof(map));

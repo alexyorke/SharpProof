@@ -158,6 +158,11 @@ internal sealed record SymbolicInvariantFactSummary(IReadOnlyList<string> Facts)
         };
     }
 }
+internal sealed record SymbolicProgramPointQueryContext(
+    SemanticModel SemanticModel,
+    int Position,
+    SyntaxNode Node,
+    SymbolicProgramPointAnalysis Analysis);
 internal sealed record SymbolicProgramPointAnalysis(
     IReadOnlyList<SmtFormula> PathConditions,
     SymbolicState PathState,

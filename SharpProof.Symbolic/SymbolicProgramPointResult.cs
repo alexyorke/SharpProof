@@ -1,21 +1,5 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicProgramPointResult(
-    IReadOnlyList<SmtFormula> pathConditions,
-    SymbolicReachability reachability,
-    string reachabilityReason,
-    SymbolicInputWitness reachabilityWitness,
-    SymbolicAnalysisTruncationInfo analysisTruncation) {
-    internal IReadOnlyList<SmtFormula> PathConditions { get; } = pathConditions;
-
-    public SymbolicReachability Reachability { get; } = reachability;
-
-    public string ReachabilityReason { get; } = reachabilityReason;
-
-    public SymbolicInputWitness ReachabilityWitness { get; } = reachabilityWitness;
-
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; } = analysisTruncation;
-}
 internal sealed record SymbolicConditionProofResult(
     string condition,
     SymbolicTruthValue truthValue,
