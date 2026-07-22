@@ -1222,6 +1222,27 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ExtensionDeconstructionWritesArgumentState() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            static class Extensions {
+                public static void Deconstruct(this Box value, out int left, out int right) {
+                    value.Value++;
+                    left = 1;
+                    right = 2;
+                }
+            }
+            class C {
+                static void M(Box input) { var (left, right) = input; }
+            }
+            """, 10);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void CoalesceAssignmentWritesArgumentState() {
         var result = Analyze("""
             #nullable enable
