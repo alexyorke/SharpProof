@@ -2625,6 +2625,26 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void FreshReceiverDoesNotPublishFreshArgument() {
+        var result = Analyze("""
+            sealed class Box { }
+            sealed class Holder {
+                private static int count;
+                private Box? value;
+                void Touch(Box box) { count++; value = box; }
+                static void M() {
+                    new Holder().Touch(new Box());
+                }
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesCapturedState), Is.False,
+                string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                    site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+        });
+    }
+    [Test]
     public void PropertySetterMutationOfFreshValueRemainsFreshOwned() {
         var result = Analyze("""
             sealed class Box { public int Value; }
