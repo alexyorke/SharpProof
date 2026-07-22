@@ -1,47 +1,57 @@
 namespace SharpProof.Symbolic;
 
 internal enum EffectValueRootKind { Receiver, Argument, Captured, Static, Fresh, Ambient, Unknown }
+internal enum EffectNullState { Unknown, Null, NonNull }
 internal readonly record struct EffectValueRoot(EffectValueRootKind Kind, int Ordinal = -1, string Key = "");
 
 internal sealed class EffectFlowValue {
     private static readonly ImmutableDictionary<string, EffectFlowValue> EmptyMembers =
         ImmutableDictionary.Create<string, EffectFlowValue>(StringComparer.Ordinal);
     internal static EffectFlowValue Unknown { get; } = FromRoot(new(EffectValueRootKind.Unknown));
-    internal static EffectFlowValue None { get; } = new([], null, EmptyMembers, []);
+    internal static EffectFlowValue None { get; } = new([], null, EmptyMembers, [], EffectNullState.Unknown);
     private EffectFlowValue(
         ImmutableHashSet<EffectValueRoot> roots,
         INamedTypeSymbol? exactType,
         ImmutableDictionary<string, EffectFlowValue> members,
-        ImmutableArray<EffectBoundCallable> callables) {
+        ImmutableArray<EffectBoundCallable> callables,
+        EffectNullState nullState) {
         Roots = roots;
         ExactType = exactType;
         Members = members;
         Callables = callables;
+        NullState = nullState;
         Key = CreateKey();
     }
     internal ImmutableHashSet<EffectValueRoot> Roots { get; }
     internal INamedTypeSymbol? ExactType { get; }
     internal ImmutableDictionary<string, EffectFlowValue> Members { get; }
     internal ImmutableArray<EffectBoundCallable> Callables { get; }
+    internal EffectNullState NullState { get; }
     internal string Key { get; }
-    internal bool IsDefinitelyNonNull => Roots.Any(static root => root.Kind == EffectValueRootKind.Fresh) ||
-                                         Roots.Count == 0 && ExactType != null;
+    internal bool IsDefinitelyNonNull => NullState == EffectNullState.NonNull;
+    internal bool IsDefinitelyNull => NullState == EffectNullState.Null;
     internal static EffectFlowValue FromRoot(EffectValueRoot root, ITypeSymbol? type = null) => new(
         [root],
         Exact(type),
         EmptyMembers,
-        []);
+        [],
+        root.Kind == EffectValueRootKind.Fresh ? EffectNullState.NonNull : EffectNullState.Unknown);
     internal static EffectFlowValue Fresh(ITypeSymbol? type) => FromRoot(new(EffectValueRootKind.Fresh), type);
-    internal static EffectFlowValue KnownNonNull(ITypeSymbol? type) => new([], Exact(type), EmptyMembers, []);
+    internal static EffectFlowValue KnownNonNull(ITypeSymbol? type) =>
+        new([], Exact(type), EmptyMembers, [], EffectNullState.NonNull);
+    internal static EffectFlowValue KnownNull { get; } =
+        new([], null, EmptyMembers, [], EffectNullState.Null);
     internal static EffectFlowValue Callable(EffectBoundCallable callable, ITypeSymbol? type) => new(
-        [new EffectValueRoot(EffectValueRootKind.Fresh)], Exact(type), EmptyMembers, [callable]);
+        [new EffectValueRoot(EffectValueRootKind.Fresh)], Exact(type), EmptyMembers, [callable], EffectNullState.NonNull);
     internal EffectFlowValue WithMember(string member, EffectFlowValue value) => new(
-        Roots, ExactType, Members.SetItem(member, value), Callables);
+        Roots, ExactType, Members.SetItem(member, value), Callables, NullState);
     internal EffectFlowValue WithCallables(ImmutableArray<EffectBoundCallable> callables) => new(
-        Roots, ExactType, Members, callables);
+        Roots, ExactType, Members, callables, NullState);
+    internal EffectFlowValue AsDefinitelyNonNull() => new(Roots, ExactType, Members, Callables, EffectNullState.NonNull);
+    internal EffectFlowValue AsDefinitelyNull() => new(Roots, ExactType, Members, Callables, EffectNullState.Null);
     internal EffectFlowValue Member(string member) => Members.TryGetValue(member, out var value)
         ? value
-        : new EffectFlowValue(Roots, null, EmptyMembers, []);
+        : new EffectFlowValue(Roots, null, EmptyMembers, [], EffectNullState.Unknown);
     internal EffectFlowValue Merge(EffectFlowValue other) {
         if (ReferenceEquals(this, other) || string.Equals(Key, other.Key, StringComparison.Ordinal)) return this;
         var roots = Roots.Union(other.Roots);
@@ -55,7 +65,8 @@ internal sealed class EffectFlowValue {
             .GroupBy(static callable => callable.Key, StringComparer.Ordinal)
             .Select(static group => group.First())
             .ToImmutableArray();
-        return new EffectFlowValue(roots, exact, members, callables);
+        var nullState = NullState == other.NullState ? NullState : EffectNullState.Unknown;
+        return new EffectFlowValue(roots, exact, members, callables, nullState);
     }
     internal EffectFlowValue Instantiate(
         EffectFlowValue? receiver,
@@ -73,7 +84,9 @@ internal sealed class EffectFlowValue {
             };
             result = ReferenceEquals(result, None) ? mapped : result.Merge(mapped);
         }
-        if (Roots.Count == 0) result = new EffectFlowValue([], ExactType, EmptyMembers, []);
+        if (Roots.Count == 0) result = new EffectFlowValue([], ExactType, EmptyMembers, [], NullState);
+        else if (NullState == EffectNullState.NonNull) result = result.AsDefinitelyNonNull();
+        else if (NullState == EffectNullState.Null) result = result.AsDefinitelyNull();
         foreach (var member in Members)
             result = result.WithMember(member.Key, member.Value.Instantiate(receiver, arguments, captures, sourceMethod));
         if (!Callables.IsDefaultOrEmpty)
@@ -93,7 +106,8 @@ internal sealed class EffectFlowValue {
         var members = string.Join(",", Members.OrderBy(static member => member.Key, StringComparer.Ordinal)
             .Select(static member => member.Key + "=" + member.Value.Key));
         var callables = string.Join(",", Callables.Select(static callable => callable.Key).OrderBy(static key => key, StringComparer.Ordinal));
-        return roots + "|" + ExactType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + "|" + members + "|" + callables;
+        return roots + "|" + ExactType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + "|" + NullState + "|" +
+               members + "|" + callables;
     }
     private static INamedTypeSymbol? Exact(ITypeSymbol? type) => type is INamedTypeSymbol {
         TypeKind: not (TypeKind.Interface or TypeKind.Dynamic), IsAbstract: false

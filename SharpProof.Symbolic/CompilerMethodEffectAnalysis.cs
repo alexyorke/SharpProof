@@ -371,9 +371,13 @@ internal sealed class MethodEffectAnalysisSession(
                 ControlFlowConditionKind.WhenFalse => !conditionalSuccessor,
                 _ => false
             };
-            return branchWhenTrue && value.IsDefinitelyNonNull
-                ? state with { IsUnreachable = true }
-                : state;
+            if (branchWhenTrue && value.IsDefinitelyNonNull || !branchWhenTrue && value.IsDefinitelyNull)
+                return state with { IsUnreachable = true };
+            var isCoalesceAssignment = isNull.Syntax.Ancestors().OfType<AssignmentExpressionSyntax>()
+                .Any(static assignment => assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression));
+            return branchWhenTrue || !isCoalesceAssignment
+                ? state
+                : RefineConditionValue(isNull.Operand, state, value.AsDefinitelyNonNull());
         }
         public EffectFlowState Merge(EffectFlowState current, EffectFlowState incoming) => current.Merge(incoming);
         public EffectFlowState Widen(EffectFlowState previous, EffectFlowState current, BasicBlock block) => current;
@@ -392,6 +396,25 @@ internal sealed class MethodEffectAnalysisSession(
             IConversionOperation conversion => ResolveConditionValue(conversion.Operand, state),
             _ => EffectFlowValue.Unknown
         };
+        private EffectFlowState RefineConditionValue(
+            IOperation operation,
+            EffectFlowState state,
+            EffectFlowValue value) {
+            while (operation is IConversionOperation conversion) operation = conversion.Operand;
+            state = operation switch {
+                IFlowCaptureReferenceOperation capture => state with {
+                    FlowCaptures = state.FlowCaptures.SetItem(capture.Id, value)
+                },
+                ILocalReferenceOperation local => state with { Locals = state.Locals.SetItem(local.Local, value) },
+                IParameterReferenceOperation parameter => state.SetParameter(parameter.Parameter, value),
+                _ => state
+            };
+            return semanticModel.GetSymbolInfo(operation.Syntax, session.CancellationToken).Symbol switch {
+                ILocalSymbol local => state with { Locals = state.Locals.SetItem(local, value) },
+                IParameterSymbol parameter => state.SetParameter(parameter, value),
+                _ => state
+            };
+        }
         internal void SetControlFlowGraph(ControlFlowGraph graph) {
             foreach (var block in graph.Blocks)
                 foreach (var operation in block.Operations.Append(block.BranchValue).Where(static value => value != null)
@@ -584,6 +607,8 @@ internal sealed class MethodEffectAnalysisSession(
                     return EvaluateConversion(conversion, ref state);
                 case ILiteralOperation { ConstantValue: { HasValue: true, Value: not null } } literal:
                     return EffectFlowValue.KnownNonNull(literal.Type);
+                case ILiteralOperation { ConstantValue: { HasValue: true, Value: null } }:
+                    return EffectFlowValue.KnownNull;
                 case ITypeOfOperation typeOf:
                     return EffectFlowValue.KnownNonNull(typeOf.Type);
                 case INameOfOperation nameOf:
@@ -612,6 +637,7 @@ internal sealed class MethodEffectAnalysisSession(
                     if (current.IsDefinitelyNonNull) return current;
                     var fallback = Evaluate(coalesceAssignment.Value, ref state);
                     var merged = current.Merge(fallback);
+                    if (fallback.IsDefinitelyNonNull) merged = merged.AsDefinitelyNonNull();
                     Assign(coalesceAssignment.Target, merged, false, ref state);
                     return merged;
                 case ICompoundAssignmentOperation compound:
@@ -762,7 +788,7 @@ internal sealed class MethodEffectAnalysisSession(
                     var coalesced = Evaluate(coalesce.Value, ref state);
                     return coalesced.IsDefinitelyNonNull
                         ? coalesced
-                        : coalesced.Merge(Evaluate(coalesce.WhenNull, ref state));
+                        : MergeCoalesce(coalesced, Evaluate(coalesce.WhenNull, ref state));
                 case IBinaryOperation binary:
                     var left = Evaluate(binary.LeftOperand, ref state);
                     var right = Evaluate(binary.RightOperand, ref state);
@@ -923,6 +949,11 @@ internal sealed class MethodEffectAnalysisSession(
                     foreach (var child in operation.ChildOperations) result = Evaluate(child, ref state);
                     return result;
             }
+        }
+        private static EffectFlowValue MergeCoalesce(EffectFlowValue value, EffectFlowValue fallback) {
+            if (value.IsDefinitelyNull) return fallback;
+            var merged = value.Merge(fallback);
+            return fallback.IsDefinitelyNonNull ? merged.AsDefinitelyNonNull() : merged;
         }
         private void AddReturn(EffectFlowValue value) =>
             ReturnValue = ReferenceEquals(ReturnValue, EffectFlowValue.None) ? value : ReturnValue.Merge(value);
@@ -1832,6 +1863,11 @@ internal sealed class MethodEffectAnalysisSession(
             switch (target) {
                 case IFlowCaptureReferenceOperation capture:
                     state = state with { FlowCaptures = state.FlowCaptures.SetItem(capture.Id, value) };
+                    state = semanticModel.GetSymbolInfo(capture.Syntax, session.CancellationToken).Symbol switch {
+                        ILocalSymbol local => state with { Locals = state.Locals.SetItem(local, value) },
+                        IParameterSymbol parameter => state.SetParameter(parameter, value),
+                        _ => state
+                    };
                     return;
                 case ILocalReferenceOperation local:
                     if (local.Local.RefKind != RefKind.None && !isRef)
