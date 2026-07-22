@@ -1359,8 +1359,7 @@ internal sealed class MethodEffectAnalysisSession(
                 effects.Read(collection, loop.Syntax, type, "intrinsic_foreach_read");
                 Evaluate(loop.Body, ref state);
                 if (loop.Syntax is ForEachStatementSyntax refLoop && refLoop.Type.ToString().StartsWith("ref ", StringComparison.Ordinal) &&
-                    refLoop.Statement.DescendantNodesAndSelf().Any(node => node is PostfixUnaryExpressionSyntax or PrefixUnaryExpressionSyntax ||
-                        node is AssignmentExpressionSyntax assignment && assignment.Left.ToString() == refLoop.Identifier.ValueText))
+                    RefIterationVariableIsMutated(refLoop))
                     effects.Write(collection, loop.Syntax, type, "ref_foreach_write");
                 return collection;
             }
@@ -1383,6 +1382,22 @@ internal sealed class MethodEffectAnalysisSession(
             }
             Evaluate(loop.Body, ref state);
             return collection;
+        }
+        private bool RefIterationVariableIsMutated(ForEachStatementSyntax loop) {
+            var iterationVariable = semanticModel.GetDeclaredSymbol(loop, session.CancellationToken);
+            if (iterationVariable == null) return false;
+            bool ReferencesIterationVariable(ExpressionSyntax expression) => SymbolEqualityComparer.Default.Equals(
+                semanticModel.GetSymbolInfo(expression, session.CancellationToken).Symbol, iterationVariable);
+            return CSharpSyntaxFacts.DescendantNodesInExecution(loop.Statement).Any(node => node switch {
+                AssignmentExpressionSyntax assignment => ReferencesIterationVariable(assignment.Left),
+                PrefixUnaryExpressionSyntax prefix when prefix.IsKind(SyntaxKind.PreIncrementExpression) ||
+                                                         prefix.IsKind(SyntaxKind.PreDecrementExpression) =>
+                    ReferencesIterationVariable(prefix.Operand),
+                PostfixUnaryExpressionSyntax postfix when postfix.IsKind(SyntaxKind.PostIncrementExpression) ||
+                                                           postfix.IsKind(SyntaxKind.PostDecrementExpression) =>
+                    ReferencesIterationVariable(postfix.Operand),
+                _ => false
+            });
         }
         private void AnalyzeEnumeration(ITypeSymbol? type, EffectFlowValue collection, IOperation site,
             ref EffectFlowState state) {
