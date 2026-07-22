@@ -443,7 +443,7 @@ internal sealed class MethodEffectAnalysisSession(
                 break;
             case IForEachLoopOperation { Syntax: CommonForEachStatementSyntax syntax } loop:
                 var info = semanticModel.GetForEachStatementInfo(syntax);
-                AnalyzeCall(info.GetEnumeratorMethod, loop, builder);
+                AnalyzeCall(info.GetEnumeratorMethod, loop, builder, loop.Collection);
                 AnalyzeCall(info.MoveNextMethod, loop, builder);
                 AnalyzeCall(info.CurrentProperty?.GetMethod, loop, builder);
                 if (info.DisposeMethod != null) AnalyzeCall(info.DisposeMethod, loop, builder);
