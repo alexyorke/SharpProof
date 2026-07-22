@@ -567,6 +567,39 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void AwaitForeachMapsMoveNextAwaitableReceiverEffects() {
+        var result = Analyze("""
+            static class Globals { public static Awaitable Shared = new(); }
+            sealed class AsyncEnumerable {
+                public Enumerator GetAsyncEnumerator(System.Threading.CancellationToken cancellationToken = default) => new();
+            }
+            sealed class Enumerator {
+                public Awaitable MoveNextAsync() => Globals.Shared;
+                public int Current => 0;
+            }
+            sealed class Awaitable {
+                public int State;
+                public Awaiter GetAwaiter() { State++; return default; }
+            }
+            readonly struct Awaiter : System.Runtime.CompilerServices.INotifyCompletion {
+                public bool IsCompleted => true;
+                public void OnCompleted(System.Action continuation) { }
+                public bool GetResult() => false;
+            }
+            class C {
+                static async System.Threading.Tasks.Task M() {
+                    await foreach (var item in new AsyncEnumerable()) { }
+                }
+            }
+            """, 19);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.False);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ForeachWithoutDisposalRemainsPure() {
         var result = Analyze("""
             sealed class Enumerable {
