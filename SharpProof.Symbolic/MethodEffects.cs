@@ -2883,9 +2883,9 @@ internal sealed class MethodEffectAnalysisSession(
             var members = ImmutableArray.CreateBuilder<IOperation>();
             foreach (var value in values) {
                 if (!TryGetObjectInitializerMember(
-                        value, path, 0, compilation, out var initializer))
+                        value, path, 0, compilation, out var valueInitializers))
                     return false;
-                members.Add(initializer);
+                members.AddRange(valueInitializers);
             }
             initializers = members.ToImmutable();
             return !initializers.IsDefaultOrEmpty;
@@ -2970,8 +2970,8 @@ internal sealed class MethodEffectAnalysisSession(
             IReadOnlyList<string> path,
             int index,
             Compilation compilation,
-            out IOperation initializer) {
-            initializer = null!;
+            out ImmutableArray<IOperation> initializers) {
+            initializers = [];
             while (value is IConversionOperation conversion) value = conversion.Operand;
             const string indexerPrefix = "#indexer:";
             if (path[index].StartsWith(indexerPrefix, StringComparison.Ordinal)) {
@@ -2988,7 +2988,7 @@ internal sealed class MethodEffectAnalysisSession(
                     collectionIndex < collectionElements.Length) {
                     var collectionElement = collectionElements[collectionIndex];
                     if (index == path.Count - 1) {
-                        initializer = collectionElement;
+                        initializers = [collectionElement];
                         return true;
                     }
                     return TryGetObjectInitializerMember(
@@ -2996,7 +2996,7 @@ internal sealed class MethodEffectAnalysisSession(
                         path,
                         index + 1,
                         compilation,
-                        out initializer);
+                        out initializers);
                 }
                 if (value is not IObjectCreationOperation { Initializer: { } collectionInitializer })
                     return false;
@@ -3014,7 +3014,7 @@ internal sealed class MethodEffectAnalysisSession(
                         string.Equals(keyPath, path[index], StringComparison.Ordinal))?.Value;
                 if (assignedElement != null) {
                     if (index == path.Count - 1) {
-                        initializer = assignedElement;
+                        initializers = [assignedElement];
                         return true;
                     }
                     return TryGetObjectInitializerMember(
@@ -3022,7 +3022,7 @@ internal sealed class MethodEffectAnalysisSession(
                         path,
                         index + 1,
                         compilation,
-                        out initializer);
+                        out initializers);
                 }
                 var additions = collectionInitializer.Initializers
                     .OfType<IInvocationOperation>()
@@ -3051,11 +3051,11 @@ internal sealed class MethodEffectAnalysisSession(
                 }
                 if (element == null) return false;
                 if (index == path.Count - 1) {
-                    initializer = element;
+                    initializers = [element];
                     return true;
                 }
                 return TryGetObjectInitializerMember(
-                    element, path, index + 1, compilation, out initializer);
+                    element, path, index + 1, compilation, out initializers);
             }
             const string arrayPrefix = "#array:";
             if (path[index].StartsWith(arrayPrefix, StringComparison.Ordinal)) {
@@ -3077,11 +3077,11 @@ internal sealed class MethodEffectAnalysisSession(
                     return false;
                 var element = elements[elementIndex];
                 if (index == path.Count - 1) {
-                    initializer = element;
+                    initializers = [element];
                     return true;
                 }
                 return TryGetObjectInitializerMember(
-                    element, path, index + 1, compilation, out initializer);
+                    element, path, index + 1, compilation, out initializers);
             }
             if (value is ITupleOperation tuple && value.Type is INamedTypeSymbol tupleType) {
                 for (var elementIndex = 0;
@@ -3100,11 +3100,11 @@ internal sealed class MethodEffectAnalysisSession(
                     if (!matches) continue;
                     var element = tuple.Elements[elementIndex];
                     if (index == path.Count - 1) {
-                        initializer = element;
+                        initializers = [element];
                         return true;
                     }
                     return TryGetObjectInitializerMember(
-                        element, path, index + 1, compilation, out initializer);
+                        element, path, index + 1, compilation, out initializers);
                 }
                 return false;
             }
@@ -3125,7 +3125,7 @@ internal sealed class MethodEffectAnalysisSession(
                     !string.Equals(GetMemberPathPart(member), path[index], StringComparison.Ordinal))
                     continue;
                 if (index == path.Count - 1) {
-                    initializer = assignment.Value;
+                    initializers = [assignment.Value];
                     return true;
                 }
                 return TryGetObjectInitializerMember(
@@ -3133,21 +3133,28 @@ internal sealed class MethodEffectAnalysisSession(
                     path,
                     index + 1,
                     compilation,
-                    out initializer);
+                    out initializers);
             }
             if (value is IObjectCreationOperation creation &&
                 TryGetConstructorAssignedMember(
-                    creation, path[index], compilation, out var constructorValue)) {
+                    creation, path[index], compilation, out var constructorValues)) {
                 if (index == path.Count - 1) {
-                    initializer = constructorValue;
+                    initializers = constructorValues;
                     return true;
                 }
-                return TryGetObjectInitializerMember(
-                    constructorValue,
-                    path,
-                    index + 1,
-                    compilation,
-                    out initializer);
+                var nestedInitializers = ImmutableArray.CreateBuilder<IOperation>();
+                foreach (var constructorValue in constructorValues) {
+                    if (!TryGetObjectInitializerMember(
+                            constructorValue,
+                            path,
+                            index + 1,
+                            compilation,
+                            out var nested))
+                        return false;
+                    nestedInitializers.AddRange(nested);
+                }
+                initializers = nestedInitializers.ToImmutable();
+                return !initializers.IsDefaultOrEmpty;
             }
             return false;
         }
@@ -3155,37 +3162,47 @@ internal sealed class MethodEffectAnalysisSession(
             IObjectCreationOperation creation,
             string memberPath,
             Compilation compilation,
-            out IOperation value) {
-            value = null!;
+            out ImmutableArray<IOperation> values) {
+            values = [];
             var declaration = creation.Constructor?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
             if (declaration is TypeDeclarationSyntax { ParameterList: not null } primaryType &&
                 TryGetPrimaryConstructorMemberInitializer(
-                    creation, primaryType, memberPath, compilation, out value))
+                    creation, primaryType, memberPath, compilation, out var primaryValue)) {
+                values = [primaryValue];
                 return true;
+            }
             var candidates = declaration == null
                 ? []
                 : GetConstructorMemberAssignments(declaration, memberPath, compilation);
             if (candidates.Length != 1) return false;
-            value = candidates[0].Value;
-            while (true) {
-                while (value is IConversionOperation conversion) value = conversion.Operand;
-                if (value is not ILocalReferenceOperation local ||
-                    !TryGetStableLocalInitializers(
-                        local.Local,
-                        compilation,
-                        new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
-                        out var initializers) ||
-                    initializers.Length != 1)
-                    break;
-                value = initializers[0];
+            IOperation assignedValue = candidates[0].Value;
+            while (assignedValue is IConversionOperation conversion)
+                assignedValue = conversion.Operand;
+            var assignedValues = assignedValue is ILocalReferenceOperation local &&
+                                 TryGetStableLocalInitializers(
+                                     local.Local,
+                                     compilation,
+                                     new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                                     out var localInitializers)
+                ? localInitializers
+                : [assignedValue];
+            var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
+            foreach (var assigned in assignedValues) {
+                var value = assigned;
+                while (value is IConversionOperation valueConversion)
+                    value = valueConversion.Operand;
+                if (value is IParameterReferenceOperation parameter) {
+                    value = creation.Arguments.FirstOrDefault(argument =>
+                        string.Equals(
+                            argument.Parameter?.Name,
+                            parameter.Parameter.Name,
+                            StringComparison.Ordinal))?.Value!;
+                    if (value == null) return false;
+                }
+                mappedValues.Add(value);
             }
-            if (value is not IParameterReferenceOperation parameter) return true;
-            value = creation.Arguments.FirstOrDefault(argument =>
-                string.Equals(
-                    argument.Parameter?.Name,
-                    parameter.Parameter.Name,
-                    StringComparison.Ordinal))?.Value!;
-            return value != null;
+            values = mappedValues.ToImmutable();
+            return !values.IsDefaultOrEmpty;
         }
         private static ISimpleAssignmentOperation[] GetConstructorMemberAssignments(
             SyntaxNode declaration,
