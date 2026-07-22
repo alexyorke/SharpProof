@@ -3452,6 +3452,9 @@ internal sealed class MethodEffectAnalysisSession(
         private readonly record struct ConstructorMemberAssignment(
             SyntaxNode Syntax,
             IOperation Value);
+        private readonly record struct ConstructorValueCallSite(
+            IMethodSymbol Method,
+            IInvocationOperation Invocation);
         private static bool AreExhaustiveAlternativeAssignments(
             IReadOnlyList<ConstructorMemberAssignment> assignments) {
             if (assignments.Count != 2) return false;
@@ -3607,6 +3610,7 @@ internal sealed class MethodEffectAnalysisSession(
                             memberPath,
                             compilation,
                             new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                            [],
                             assignments);
                         break;
                 }
@@ -3620,8 +3624,70 @@ internal sealed class MethodEffectAnalysisSession(
             string memberPath,
             Compilation compilation,
             HashSet<ILocalSymbol> visited,
+            ImmutableArray<ConstructorValueCallSite> callSites,
             List<ConstructorMemberAssignment> assignments) {
             while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is IParameterReferenceOperation parameter) {
+                for (var index = 0; index < callSites.Length; index++) {
+                    var callSite = callSites[index];
+                    if (!SymbolEqualityComparer.Default.Equals(
+                            parameter.Parameter.ContainingSymbol.OriginalDefinition,
+                            callSite.Method))
+                        continue;
+                    var mapped = callSite.Invocation.Arguments.FirstOrDefault(argument =>
+                        string.Equals(
+                            argument.Parameter?.Name,
+                            parameter.Parameter.Name,
+                            StringComparison.Ordinal))?.Value;
+                    if (mapped == null) return;
+                    AddDeconstructionMemberAssignments(
+                        target,
+                        mapped,
+                        syntax,
+                        memberPath,
+                        compilation,
+                        visited,
+                        callSites.RemoveAt(index),
+                        assignments);
+                    return;
+                }
+            }
+            if (value is IInvocationOperation invocation) {
+                var method = invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod;
+                method = (method.PartialImplementationPart ?? method).OriginalDefinition;
+                if (callSites.Any(callSite =>
+                        SymbolEqualityComparer.Default.Equals(callSite.Method, method)))
+                    return;
+                var declaration = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                var expressions = GetDirectReturnExpressions(declaration);
+                if (expressions.IsDefaultOrEmpty) return;
+                var resolved = new List<ConstructorMemberAssignment>();
+                foreach (var expression in expressions) {
+                    var model = compilation.GetSemanticModel(expression.SyntaxTree);
+                    if (model.GetOperation(expression) is not { } returnedValue ||
+                        !TryCollectStableInitializerValues(
+                            returnedValue,
+                            compilation,
+                            visited,
+                            out var returnedValues))
+                        return;
+                    foreach (var returned in returnedValues) {
+                        var count = resolved.Count;
+                        AddDeconstructionMemberAssignments(
+                            target,
+                            returned,
+                            syntax,
+                            memberPath,
+                            compilation,
+                            visited,
+                            callSites.Insert(0, new ConstructorValueCallSite(method, invocation)),
+                            resolved);
+                        if (resolved.Count == count) return;
+                    }
+                }
+                assignments.AddRange(resolved);
+                return;
+            }
             if (value is ILocalReferenceOperation local &&
                 TryGetStableLocalInitializers(
                     local.Local, compilation, visited, out var initializers)) {
@@ -3635,6 +3701,7 @@ internal sealed class MethodEffectAnalysisSession(
                         memberPath,
                         compilation,
                         visited,
+                        callSites,
                         resolved);
                     if (resolved.Count == count) return;
                 }
@@ -3651,6 +3718,7 @@ internal sealed class MethodEffectAnalysisSession(
                         memberPath,
                         compilation,
                         visited,
+                        callSites,
                         assignments);
                 return;
             }
