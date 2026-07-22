@@ -3204,21 +3204,105 @@ internal sealed class MethodEffectAnalysisSession(
                 return false;
             var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
             foreach (var assigned in assignedValues) {
-                var value = assigned;
-                while (value is IConversionOperation valueConversion)
-                    value = valueConversion.Operand;
-                if (value is IParameterReferenceOperation parameter) {
-                    value = creation.Arguments.FirstOrDefault(argument =>
-                        string.Equals(
-                            argument.Parameter?.Name,
-                            parameter.Parameter.Name,
-                            StringComparison.Ordinal))?.Value!;
-                    if (value == null) return false;
-                }
-                mappedValues.Add(value);
+                if (!TryMapConstructorAssignedValue(
+                        assigned,
+                        creation,
+                        compilation,
+                        new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
+                        out var mapped))
+                    return false;
+                mappedValues.AddRange(mapped);
             }
             values = mappedValues.ToImmutable();
             return !values.IsDefaultOrEmpty;
+        }
+        private static bool TryMapConstructorAssignedValue(
+            IOperation value,
+            IObjectCreationOperation creation,
+            Compilation compilation,
+            HashSet<IMethodSymbol> visitedMethods,
+            out ImmutableArray<IOperation> values) {
+            values = [];
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is IParameterReferenceOperation parameter &&
+                creation.Constructor is { } constructor &&
+                SymbolEqualityComparer.Default.Equals(
+                    parameter.Parameter.ContainingSymbol.OriginalDefinition,
+                    constructor.OriginalDefinition)) {
+                var argument = creation.Arguments.FirstOrDefault(candidate =>
+                    string.Equals(
+                        candidate.Parameter?.Name,
+                        parameter.Parameter.Name,
+                        StringComparison.Ordinal))?.Value;
+                if (argument == null) return false;
+                values = [argument];
+                return true;
+            }
+            if (value is IInvocationOperation invocation)
+                return TryGetConstructorHelperOrigins(
+                    invocation, creation, compilation, visitedMethods, out values);
+            values = [value];
+            return true;
+        }
+        private static bool TryGetConstructorHelperOrigins(
+            IInvocationOperation invocation,
+            IObjectCreationOperation creation,
+            Compilation compilation,
+            HashSet<IMethodSymbol> visitedMethods,
+            out ImmutableArray<IOperation> values) {
+            values = [];
+            var method = invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod;
+            method = (method.PartialImplementationPart ?? method).OriginalDefinition;
+            if (!visitedMethods.Add(method)) return false;
+            try {
+                var declaration = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                var expressions = GetDirectReturnExpressions(declaration);
+                if (expressions.IsDefaultOrEmpty) return false;
+                var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
+                foreach (var expression in expressions) {
+                    var model = compilation.GetSemanticModel(expression.SyntaxTree);
+                    if (model.GetOperation(expression) is not { } returnedValue ||
+                        !TryCollectStableInitializerValues(
+                            returnedValue,
+                            compilation,
+                            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                            out var returnedValues))
+                        return false;
+                    foreach (var returned in returnedValues) {
+                        var mapped = returned;
+                        while (mapped is IConversionOperation conversion)
+                            mapped = conversion.Operand;
+                        if (mapped is IParameterReferenceOperation parameter &&
+                            SymbolEqualityComparer.Default.Equals(
+                                parameter.Parameter.ContainingSymbol.OriginalDefinition,
+                                method)) {
+                            mapped = invocation.Arguments.FirstOrDefault(argument =>
+                                string.Equals(
+                                    argument.Parameter?.Name,
+                                    parameter.Parameter.Name,
+                                    StringComparison.Ordinal))?.Value!;
+                            if (mapped == null) return false;
+                        }
+                        else if (mapped is IInstanceReferenceOperation) {
+                            mapped = invocation.Instance!;
+                            if (mapped == null) return false;
+                        }
+                        if (!TryMapConstructorAssignedValue(
+                                mapped,
+                                creation,
+                                compilation,
+                                visitedMethods,
+                                out var origins))
+                            return false;
+                        mappedValues.AddRange(origins);
+                    }
+                }
+                values = mappedValues.ToImmutable();
+                return !values.IsDefaultOrEmpty;
+            }
+            finally {
+                visitedMethods.Remove(method);
+            }
         }
         private static ISimpleAssignmentOperation[] GetConstructorMemberAssignments(
             SyntaxNode declaration,
