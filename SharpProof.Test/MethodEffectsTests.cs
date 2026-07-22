@@ -262,6 +262,23 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
         });
     }
+    [Test]
+    public void CollectionExpressionIncludesConstructorEffects() {
+        var result = Analyze("""
+            sealed class Bag : System.Collections.Generic.IEnumerable<int> {
+                private static int state;
+                public Bag() { state++; }
+                public void Add(int value) { }
+                public System.Collections.Generic.IEnumerator<int> GetEnumerator() => throw null!;
+                System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+            }
+            class C { static Bag M() => [1, 2]; }
+            """, 8);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
     [TestCase("unsafe static int M() { int* value = stackalloc int[1]; value[0] = 1; return value[0]; }")]
     [TestCase("static R M(R value) => value with { X = 2 }; readonly record struct R(int X);")]
     public void StackOnlyOperationsDoNotCreateManagedAllocationSites(string method) {
