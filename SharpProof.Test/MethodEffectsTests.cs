@@ -2437,6 +2437,24 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ReturnedLambdaPreservesCapturedFreshArrayElementOrigin() {
+        var result = Analyze("""
+            sealed class Box { public int State; }
+            class C {
+                static System.Action Bind(Box value) {
+                    var values = new[] { value };
+                    return () => values[0].State++;
+                }
+                static void M(Box value) { Bind(value)(); }
+            }
+            """, 7);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void PropertyResultRetainsDelegateTarget() {
         var result = Analyze("""
             class C {
