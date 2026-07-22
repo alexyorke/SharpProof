@@ -1669,8 +1669,7 @@ internal sealed class MethodEffectAnalysisSession(
                         state = state with { Locals = state.Locals.SetItem(local.Local, value) };
                     return;
                 case IParameterReferenceOperation parameter:
-                    if (parameter.Parameter.RefKind != RefKind.None) state = state.SetParameter(parameter.Parameter, value);
-                    else effects.Write(state.GetParameter(parameter.Parameter), target.Syntax, parameter.Parameter, "parameter_write");
+                    state = state.SetParameter(parameter.Parameter, value);
                     return;
                 case IDeclarationExpressionOperation declaration:
                     Assign(declaration.Expression, value, isRef, ref state);
