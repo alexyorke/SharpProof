@@ -3600,6 +3600,8 @@ internal sealed class MethodEffectAnalysisSession(
                             deconstruction.Value,
                             syntax,
                             memberPath,
+                            compilation,
+                            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
                             assignments);
                         break;
                 }
@@ -3611,8 +3613,24 @@ internal sealed class MethodEffectAnalysisSession(
             IOperation value,
             SyntaxNode syntax,
             string memberPath,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
             List<ConstructorMemberAssignment> assignments) {
             while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is ILocalReferenceOperation local &&
+                TryGetStableLocalInitializers(
+                    local.Local, compilation, visited, out var initializers) &&
+                initializers.Length == 1) {
+                AddDeconstructionMemberAssignments(
+                    target,
+                    initializers[0],
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    assignments);
+                return;
+            }
             if (target is ITupleOperation targetTuple && value is ITupleOperation valueTuple &&
                 targetTuple.Elements.Length == valueTuple.Elements.Length) {
                 for (var index = 0; index < targetTuple.Elements.Length; index++)
@@ -3621,6 +3639,8 @@ internal sealed class MethodEffectAnalysisSession(
                         valueTuple.Elements[index],
                         syntax,
                         memberPath,
+                        compilation,
+                        visited,
                         assignments);
                 return;
             }
