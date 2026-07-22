@@ -314,6 +314,36 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ConstantSwitchKeepsNonconstantGuardEffects() {
+        var statement = Analyze("""
+            class C {
+                static int state;
+                static bool Guard() { state++; return false; }
+                static void M() {
+                    switch (1) {
+                        case 1 when Guard(): break;
+                        default: break;
+                    }
+                }
+            }
+            """, 4);
+        var expression = Analyze("""
+            class C {
+                static int state;
+                static bool Guard() { state++; return false; }
+                static int M() => 1 switch { 1 when Guard() => 1, _ => 0 };
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(statement.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven), "statement guard");
+            Assert.That(statement.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True,
+                "statement guard");
+            Assert.That(expression.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven), "expression guard");
+            Assert.That(expression.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True,
+                "expression guard");
+        });
+    }
+    [Test]
     public void NullConditionalSkipsGetterForConstantNullReceiver() {
         var result = Analyze("""
             class C {
