@@ -68,6 +68,22 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void VirtualAutoPropertyGetterKeepsDispatchUncertainty() {
+        var result = Analyze("""
+            class Base { public virtual int Value { get; } }
+            sealed class Derived : Base {
+                static int state;
+                public override int Value { get { state++; return state; } }
+            }
+            class C { static int M(Base value) => value.Value; }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.Not.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.True);
+        });
+    }
+    [Test]
     public void UndefinedConditionalCallHasNoRuntimeEffects() {
         var result = Analyze("""
             class C {
