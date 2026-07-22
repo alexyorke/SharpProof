@@ -1147,6 +1147,25 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void CompileTimeFalseThrowDoesNotEscape() {
+        var result = Analyze("""
+            class C {
+                static int M() {
+                    if (false) {
+                        throw new System.InvalidOperationException();
+                    }
+                    return 1;
+                }
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Throws), Is.False);
+            Assert.That(result.MethodEffects.ExceptionFacts,
+                Has.None.Property(nameof(MethodExceptionFact.Escape)).EqualTo(SharpProofVerdict.Proven));
+        });
+    }
+    [Test]
     public void CatchFilterIncludesEffectsWithoutEscapingItsException() {
         var result = Analyze("""
             static class Globals { public static int Count; }
