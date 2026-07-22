@@ -19,8 +19,16 @@ internal sealed class MethodEffectAnalysisSession(
     private CancellationToken CancellationToken => cancellationToken;
     internal MethodEffects Analyze(IMethodSymbol method, SyntaxNode declaration, SemanticModel semanticModel) {
         var result = AnalyzeSummary(method, declaration, semanticModel, null).Effects;
-        if (!method.IsStatic || method.MethodKind == MethodKind.StaticConstructor ||
-            method.ContainingType.GetMembers().OfType<IMethodSymbol>().FirstOrDefault(static candidate =>
+        if (method.MethodKind == MethodKind.StaticConstructor) return result;
+        if (method.IsStatic) return IncludeTypeInitializerEffects(result, method.ContainingType);
+        if (method.MethodKind != MethodKind.Constructor) return result;
+        var hierarchy = new Stack<INamedTypeSymbol>();
+        for (var current = method.ContainingType; current != null; current = current.BaseType) hierarchy.Push(current);
+        while (hierarchy.Count != 0) result = IncludeTypeInitializerEffects(result, hierarchy.Pop());
+        return result;
+    }
+    private MethodEffects IncludeTypeInitializerEffects(MethodEffects result, INamedTypeSymbol type) {
+        if (type.GetMembers().OfType<IMethodSymbol>().FirstOrDefault(static candidate =>
                 candidate.MethodKind == MethodKind.StaticConstructor) is not { } initializer)
             return result;
         var initializerDeclaration = initializer.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) ??
