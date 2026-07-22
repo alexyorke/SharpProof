@@ -1458,6 +1458,35 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void MultiplePropertyReturnsMapAllOrigins() {
+        var result = Analyze("""
+            sealed class Box {
+                public int State;
+                public void Mutate() { State++; }
+            }
+            sealed class Holder {
+                private static readonly Box global = new();
+                private readonly Box local = new();
+                private readonly bool useGlobal;
+                public Box Value {
+                    get {
+                        if (useGlobal) return global;
+                        return local;
+                    }
+                }
+            }
+            class C {
+                static void M(Holder input) { input.Value.Mutate(); }
+            }
+            """, 17);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void PointerIndirectionAssignmentWritesArgumentState() {
         var result = Analyze("""
             unsafe class C {
