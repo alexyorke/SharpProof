@@ -1610,6 +1610,11 @@ internal sealed class MethodEffectAnalysisSession(
         if (builder.TryGetRefLocalEffects(instance, out _, out var refWriteEffect)) return refWriteEffect;
         if (builder.TryGetFreshRootOrigin(instance, out var origin)) return GetWriteEffect(origin);
         return instance switch {
+            IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
+                IDelegateCreationOperation => SharpProofEffect.WritesFreshOwnedState,
+            ICollectionExpressionOperation collection when collection.Type is IArrayTypeSymbol ||
+                                                           collection.Type?.IsReferenceType == true =>
+                SharpProofEffect.WritesFreshOwnedState,
             IInstanceReferenceOperation => SharpProofEffect.WritesReceiverState,
             IParameterReferenceOperation => SharpProofEffect.WritesArgumentState,
             IFieldReferenceOperation { Field.IsStatic: true } => SharpProofEffect.WritesStaticState,
@@ -1620,6 +1625,9 @@ internal sealed class MethodEffectAnalysisSession(
             IInlineArrayAccessOperation inlineArray => GetInstanceWriteEffect(inlineArray.Instance, builder),
             IImplicitIndexerReferenceOperation implicitIndexer =>
                 GetInstanceWriteEffect(implicitIndexer.Instance, builder),
+            ICoalesceOperation coalesce =>
+                GetInstanceWriteEffect(coalesce.Value, builder) |
+                GetInstanceWriteEffect(coalesce.WhenNull, builder),
             IConditionalOperation conditional =>
                 GetInstanceWriteEffect(conditional.WhenTrue, builder) |
                 GetInstanceWriteEffect(conditional.WhenFalse, builder),
@@ -1638,6 +1646,11 @@ internal sealed class MethodEffectAnalysisSession(
         if (instance is { Type.SpecialType: SpecialType.System_String } or { Type.IsValueType: true })
             return SharpProofEffect.None;
         return instance switch {
+            IObjectCreationOperation or IArrayCreationOperation or IAnonymousObjectCreationOperation or
+                IDelegateCreationOperation => SharpProofEffect.None,
+            ICollectionExpressionOperation collection when collection.Type is IArrayTypeSymbol ||
+                                                           collection.Type?.IsReferenceType == true =>
+                SharpProofEffect.None,
             IInstanceReferenceOperation => SharpProofEffect.ReadsReceiverState,
             IParameterReferenceOperation => SharpProofEffect.ReadsArgumentState,
             IFieldReferenceOperation { Field.IsStatic: true } => SharpProofEffect.ReadsStaticState,
@@ -1648,6 +1661,9 @@ internal sealed class MethodEffectAnalysisSession(
             IInlineArrayAccessOperation inlineArray => GetInstanceReadEffect(inlineArray.Instance, builder),
             IImplicitIndexerReferenceOperation implicitIndexer =>
                 GetInstanceReadEffect(implicitIndexer.Instance, builder),
+            ICoalesceOperation coalesce =>
+                GetInstanceReadEffect(coalesce.Value, builder) |
+                GetInstanceReadEffect(coalesce.WhenNull, builder),
             IConditionalOperation conditional =>
                 GetInstanceReadEffect(conditional.WhenTrue, builder) |
                 GetInstanceReadEffect(conditional.WhenFalse, builder),
