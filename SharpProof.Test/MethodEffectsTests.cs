@@ -200,6 +200,20 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ConstantTypeSwitchSkipsUnselectedArm() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static int Mutate() { state++; return 1; }
+                static int M() => "value" switch { string => 1, _ => Mutate() };
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
+        });
+    }
+    [Test]
     public void NullConditionalSkipsGetterForConstantNullReceiver() {
         var result = Analyze("""
             class C {
