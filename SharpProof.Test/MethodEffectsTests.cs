@@ -1283,6 +1283,23 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ConditionalAccessInvocationWritesArgumentStatePrecisely() {
+        var result = Analyze("""
+            sealed class Box {
+                public int Value;
+                public void Mutate() { Value++; }
+            }
+            class C {
+                static void M(Box input) { input?.Mutate(); }
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void PointerIndirectionAssignmentWritesArgumentState() {
         var result = Analyze("""
             unsafe class C {
