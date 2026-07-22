@@ -1395,6 +1395,25 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void QualifiedInvocationResultUsesReturnedStaticOrigin() {
+        var result = Analyze("""
+            sealed class Box {
+                public int State;
+                public void Mutate() { State++; }
+            }
+            static class Globals { public static readonly Box Value = new(); }
+            class C {
+                static Box GetGlobal() => Globals.Value;
+                static void M() { GetGlobal().Mutate(); }
+            }
+            """, 8);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ConditionalInvocationResultMapsAllReturnedOrigins() {
         var result = Analyze("""
             sealed class Box {
