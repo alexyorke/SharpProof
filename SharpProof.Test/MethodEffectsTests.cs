@@ -1300,6 +1300,24 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void CoalescedUsingReceiverMapsDisposalOrigins() {
+        var result = Analyze("""
+            sealed class D : System.IDisposable {
+                public int State;
+                public void Dispose() { State++; }
+            }
+            class C {
+                static void M(D input) { using (input ?? new D()) { } }
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void PointerIndirectionAssignmentWritesArgumentState() {
         var result = Analyze("""
             unsafe class C {
