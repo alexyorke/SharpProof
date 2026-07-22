@@ -3454,7 +3454,7 @@ internal sealed class MethodEffectAnalysisSession(
             IOperation Value);
         private readonly record struct ConstructorValueCallSite(
             IMethodSymbol Method,
-            IInvocationOperation Invocation);
+            IOperation Operation);
         private static bool AreExhaustiveAlternativeAssignments(
             IReadOnlyList<ConstructorMemberAssignment> assignments) {
             if (assignments.Count != 2) return false;
@@ -3583,6 +3583,11 @@ internal sealed class MethodEffectAnalysisSession(
                         argument.Parameter?.Name,
                         parameterName,
                         StringComparison.Ordinal))?.Value,
+                IPropertyReferenceOperation property => property.Arguments.FirstOrDefault(argument =>
+                    string.Equals(
+                        argument.Parameter?.Name,
+                        parameterName,
+                        StringComparison.Ordinal))?.Value,
                 _ => null
             };
         private static ConstructorMemberAssignment[] GetConstructorMemberAssignments(
@@ -3634,11 +3639,8 @@ internal sealed class MethodEffectAnalysisSession(
                             parameter.Parameter.ContainingSymbol.OriginalDefinition,
                             callSite.Method))
                         continue;
-                    var mapped = callSite.Invocation.Arguments.FirstOrDefault(argument =>
-                        string.Equals(
-                            argument.Parameter?.Name,
-                            parameter.Parameter.Name,
-                            StringComparison.Ordinal))?.Value;
+                    var mapped = GetConstructorCallArgument(
+                        callSite.Operation, parameter.Parameter.Name);
                     if (mapped == null) return;
                     AddDeconstructionMemberAssignments(
                         target,
@@ -3653,39 +3655,29 @@ internal sealed class MethodEffectAnalysisSession(
                 }
             }
             if (value is IInvocationOperation invocation) {
-                var method = invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod;
-                method = (method.PartialImplementationPart ?? method).OriginalDefinition;
-                if (callSites.Any(callSite =>
-                        SymbolEqualityComparer.Default.Equals(callSite.Method, method)))
-                    return;
-                var declaration = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
-                var expressions = GetDirectReturnExpressions(declaration);
-                if (expressions.IsDefaultOrEmpty) return;
-                var resolved = new List<ConstructorMemberAssignment>();
-                foreach (var expression in expressions) {
-                    var model = compilation.GetSemanticModel(expression.SyntaxTree);
-                    if (model.GetOperation(expression) is not { } returnedValue ||
-                        !TryCollectStableInitializerValues(
-                            returnedValue,
-                            compilation,
-                            visited,
-                            out var returnedValues))
-                        return;
-                    foreach (var returned in returnedValues) {
-                        var count = resolved.Count;
-                        AddDeconstructionMemberAssignments(
-                            target,
-                            returned,
-                            syntax,
-                            memberPath,
-                            compilation,
-                            visited,
-                            callSites.Insert(0, new ConstructorValueCallSite(method, invocation)),
-                            resolved);
-                        if (resolved.Count == count) return;
-                    }
-                }
-                assignments.AddRange(resolved);
+                AddDeconstructionCallResultAssignments(
+                    target,
+                    invocation,
+                    invocation.TargetMethod,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites,
+                    assignments);
+                return;
+            }
+            if (value is IPropertyReferenceOperation { Property.GetMethod: { } getter } property) {
+                AddDeconstructionCallResultAssignments(
+                    target,
+                    property,
+                    getter,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites,
+                    assignments);
                 return;
             }
             if (value is ILocalReferenceOperation local &&
@@ -3724,6 +3716,50 @@ internal sealed class MethodEffectAnalysisSession(
             }
             if (ConstructorTargetMatches(target, memberPath))
                 assignments.Add(new ConstructorMemberAssignment(syntax, value));
+        }
+        private static void AddDeconstructionCallResultAssignments(
+            IOperation target,
+            IOperation callSite,
+            IMethodSymbol targetMethod,
+            SyntaxNode syntax,
+            string memberPath,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
+            ImmutableArray<ConstructorValueCallSite> callSites,
+            List<ConstructorMemberAssignment> assignments) {
+            var method = targetMethod.ReducedFrom ?? targetMethod;
+            method = (method.PartialImplementationPart ?? method).OriginalDefinition;
+            if (callSites.Any(candidate =>
+                    SymbolEqualityComparer.Default.Equals(candidate.Method, method)))
+                return;
+            var declaration = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+            var expressions = GetDirectReturnExpressions(declaration);
+            if (expressions.IsDefaultOrEmpty) return;
+            var resolved = new List<ConstructorMemberAssignment>();
+            foreach (var expression in expressions) {
+                var model = compilation.GetSemanticModel(expression.SyntaxTree);
+                if (model.GetOperation(expression) is not { } returnedValue ||
+                    !TryCollectStableInitializerValues(
+                        returnedValue,
+                        compilation,
+                        visited,
+                        out var returnedValues))
+                    return;
+                foreach (var returned in returnedValues) {
+                    var count = resolved.Count;
+                    AddDeconstructionMemberAssignments(
+                        target,
+                        returned,
+                        syntax,
+                        memberPath,
+                        compilation,
+                        visited,
+                        callSites.Insert(0, new ConstructorValueCallSite(method, callSite)),
+                        resolved);
+                    if (resolved.Count == count) return;
+                }
+            }
+            assignments.AddRange(resolved);
         }
         private static bool ConstructorTargetMatches(IOperation target, string memberPath) {
             var member = target switch {
