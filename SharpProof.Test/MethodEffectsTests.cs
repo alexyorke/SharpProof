@@ -606,6 +606,26 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void CopiedDelegateTargetIsIndependentOfSourceReassignment() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static void Pure() { }
+                static void Impure() { state++; }
+                static void M() {
+                    System.Action first = Impure;
+                    System.Action second = first;
+                    first = Pure;
+                    second();
+                }
+            }
+            """, 5);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void ReassignedDelegateUsesTheCurrentTarget() {
         var result = Analyze("""
             class C {

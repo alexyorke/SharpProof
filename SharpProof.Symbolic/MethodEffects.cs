@@ -1129,7 +1129,11 @@ internal sealed class MethodEffectAnalysisSession(
                 _ => unwrapped.Type is INamedTypeSymbol { IsSealed: true } sealedType ? sealedType : null
             };
             if (exactType != null) _exactTypes[local] = exactType;
-            MarkDelegateTargets(local, value);
+            if (unwrapped is ILocalReferenceOperation delegateSource &&
+                _delegateTargets.TryGetValue(delegateSource.Local, out var copiedTargets))
+                _delegateTargets[local] = copiedTargets;
+            else
+                MarkDelegateTargets(local, value);
         }
         internal void MarkFlowUncertain(ILocalSymbol local) {
             local = (ILocalSymbol)local.OriginalDefinition;
