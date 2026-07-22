@@ -1353,6 +1353,11 @@ internal sealed class MethodEffectAnalysisSession(
                      TryGetSelectedConstantSwitchSection(switchStatement, semanticModel, out var selectedSection) &&
                      !ReferenceEquals(section, selectedSection))
                 return false;
+            else if (current.FirstAncestorOrSelf<SwitchExpressionArmSyntax>() is { } arm &&
+                     arm.Parent is SwitchExpressionSyntax switchExpression &&
+                     TryGetSelectedConstantSwitchArm(switchExpression, semanticModel, out var selectedArm) &&
+                     !ReferenceEquals(arm, selectedArm))
+                return false;
         return true;
     }
     private static bool IsOmittedInvocation(
@@ -1384,6 +1389,45 @@ internal sealed class MethodEffectAnalysisSession(
                 defined.Remove(undefine.Name.ValueText);
         }
         return !symbols.Any(symbol => defined.Contains(symbol!));
+    }
+    private static bool TryGetSelectedConstantSwitchArm(
+        SwitchExpressionSyntax expression,
+        SemanticModel semanticModel,
+        out SwitchExpressionArmSyntax selected) {
+        selected = null!;
+        var governing = semanticModel.GetConstantValue(expression.GoverningExpression);
+        if (!governing.HasValue) return false;
+        foreach (var arm in expression.Arms) {
+            if (!TryMatchConstantPattern(arm.Pattern, governing.Value, semanticModel, out var matches))
+                return false;
+            if (!matches) continue;
+            if (arm.WhenClause != null) {
+                var guard = semanticModel.GetConstantValue(arm.WhenClause.Condition);
+                if (!guard.HasValue || guard.Value is not bool enabled) return false;
+                if (!enabled) continue;
+            }
+            selected = arm;
+            return true;
+        }
+        return false;
+    }
+    private static bool TryMatchConstantPattern(
+        PatternSyntax pattern,
+        object? value,
+        SemanticModel semanticModel,
+        out bool matches) {
+        while (pattern is ParenthesizedPatternSyntax parenthesized) pattern = parenthesized.Pattern;
+        if (pattern is DiscardPatternSyntax or VarPatternSyntax) {
+            matches = true;
+            return true;
+        }
+        if (pattern is ConstantPatternSyntax constant) {
+            var patternValue = semanticModel.GetConstantValue(constant.Expression);
+            matches = patternValue.HasValue && Equals(value, patternValue.Value);
+            return patternValue.HasValue;
+        }
+        matches = false;
+        return false;
     }
     private static bool TryGetSelectedConstantSwitchSection(
         SwitchStatementSyntax statement,
