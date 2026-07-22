@@ -2537,31 +2537,60 @@ internal sealed class MethodEffectAnalysisSession(
             foreach (var expression in expressions) {
                 var model = compilation.GetSemanticModel(expression.SyntaxTree);
                 var value = model.GetOperation(expression);
-                while (value is IConversionOperation conversion) value = conversion.Operand;
-                if (value is IDelegateCreationOperation creation) value = creation.Target;
-                IOperation? receiverOverride = value switch {
-                    IMethodReferenceOperation { Instance: IInstanceReferenceOperation } => callSite switch {
-                        IInvocationOperation invocation => invocation.Instance,
-                        IPropertyReferenceOperation property => property.Instance,
-                        _ => null
-                    },
-                    IMethodReferenceOperation { Instance: IParameterReferenceOperation parameter }
-                        when callSite is IInvocationOperation invocation =>
-                        invocation.Arguments.FirstOrDefault(argument =>
-                            string.Equals(
-                                argument.Parameter?.Name,
-                                parameter.Parameter.Name,
-                                StringComparison.Ordinal))?.Value ??
-                        (parameter.Parameter.Ordinal == 0 && invocation.TargetMethod.ReducedFrom != null
-                            ? invocation.Instance
-                            : null),
-                    _ => null
-                };
-                var target = value == null ? null : CreateDelegateTarget(value, receiverOverride);
-                if (target == null) return [];
-                targets.Add(target);
+                var returnedTargets = GetReturnedDelegateOperationTargets(value, callSite);
+                if (returnedTargets.IsDefaultOrEmpty) return [];
+                targets.AddRange(returnedTargets);
             }
             return targets.ToImmutable();
+        }
+        private ImmutableArray<DelegateTarget> GetReturnedDelegateOperationTargets(
+            IOperation? value,
+            IOperation callSite) {
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is IDelegateCreationOperation creation) value = creation.Target;
+            if (value is IConditionalOperation conditional) {
+                var whenTrue = GetReturnedDelegateOperationTargets(conditional.WhenTrue, callSite);
+                var whenFalse = GetReturnedDelegateOperationTargets(conditional.WhenFalse, callSite);
+                return whenTrue.IsDefaultOrEmpty || whenFalse.IsDefaultOrEmpty
+                    ? []
+                    : whenTrue.AddRange(whenFalse);
+            }
+            if (value is ISwitchExpressionOperation switchExpression) {
+                var targets = ImmutableArray.CreateBuilder<DelegateTarget>();
+                foreach (var arm in switchExpression.Arms) {
+                    var armTargets = GetReturnedDelegateOperationTargets(arm.Value, callSite);
+                    if (armTargets.IsDefaultOrEmpty) return [];
+                    targets.AddRange(armTargets);
+                }
+                return targets.ToImmutable();
+            }
+            if (value is ICoalesceOperation coalesce) {
+                var primary = GetReturnedDelegateOperationTargets(coalesce.Value, callSite);
+                var fallback = GetReturnedDelegateOperationTargets(coalesce.WhenNull, callSite);
+                return primary.IsDefaultOrEmpty || fallback.IsDefaultOrEmpty
+                    ? []
+                    : primary.AddRange(fallback);
+            }
+            IOperation? receiverOverride = value switch {
+                IMethodReferenceOperation { Instance: IInstanceReferenceOperation } => callSite switch {
+                    IInvocationOperation invocation => invocation.Instance,
+                    IPropertyReferenceOperation property => property.Instance,
+                    _ => null
+                },
+                IMethodReferenceOperation { Instance: IParameterReferenceOperation parameter }
+                    when callSite is IInvocationOperation invocation =>
+                    invocation.Arguments.FirstOrDefault(argument =>
+                        string.Equals(
+                            argument.Parameter?.Name,
+                            parameter.Parameter.Name,
+                            StringComparison.Ordinal))?.Value ??
+                    (parameter.Parameter.Ordinal == 0 && invocation.TargetMethod.ReducedFrom != null
+                        ? invocation.Instance
+                        : null),
+                _ => null
+            };
+            var target = value == null ? null : CreateDelegateTarget(value, receiverOverride);
+            return target == null ? [] : [target];
         }
         private DelegateTarget? CreateDelegateTarget(IOperation value, IOperation? receiverOverride = null) {
             if (value is IMethodReferenceOperation reference) {
