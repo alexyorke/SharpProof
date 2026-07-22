@@ -934,9 +934,12 @@ internal sealed class MethodEffectAnalysisSession(
         var dispatchReceiver = receiver is IConditionalAccessInstanceOperation conditionalAccess
             ? FindConditionalAccessReceiver(conditionalAccess) ?? receiver
             : receiver;
-        var knownExactReceiverType = dispatchReceiver is ILocalReferenceOperation localReceiver
-            ? builder.GetExactType(localReceiver.Local)
-            : null;
+        var knownExactReceiverType = dispatchReceiver switch {
+            ILocalReferenceOperation localReceiver => builder.GetExactType(localReceiver.Local),
+            IObjectCreationOperation { Type: INamedTypeSymbol createdType } => createdType,
+            IInvocationOperation returnedInvocation => GetInvocationExactResultType(returnedInvocation),
+            _ => null
+        };
         var exactDispatchTarget = SymbolicDispatchFacts.ResolveExactDispatchTarget(
             method,
             dispatchReceiver,
@@ -1022,6 +1025,48 @@ internal sealed class MethodEffectAnalysisSession(
                 remappedContract, site, receiver, builder, receiverWriteEffect);
         }
         return preservesFresh;
+    }
+    private static INamedTypeSymbol? GetInvocationExactResultType(IInvocationOperation invocation) {
+        var targetMethod = invocation.TargetMethod.ReducedFrom ?? invocation.TargetMethod;
+        targetMethod = (targetMethod.PartialImplementationPart ?? targetMethod).OriginalDefinition;
+        var declaration = targetMethod.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+        var expressions = GetDirectReturnExpressions(declaration);
+        if (expressions.IsDefaultOrEmpty || invocation.SemanticModel?.Compilation is not { } compilation)
+            return null;
+        INamedTypeSymbol? exactType = null;
+        foreach (var expression in expressions) {
+            var model = compilation.GetSemanticModel(expression.SyntaxTree);
+            var candidate = GetExactReturnedExpressionType(expression, model);
+            if (candidate == null) return null;
+            if (exactType != null && !SymbolEqualityComparer.Default.Equals(exactType, candidate)) return null;
+            exactType = candidate;
+        }
+        return exactType;
+    }
+    private static INamedTypeSymbol? GetExactReturnedExpressionType(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel) {
+        expression = UnwrapReturnExpression(expression);
+        if (expression is ConditionalExpressionSyntax conditional) {
+            var whenTrue = GetExactReturnedExpressionType(conditional.WhenTrue, semanticModel);
+            var whenFalse = GetExactReturnedExpressionType(conditional.WhenFalse, semanticModel);
+            return whenTrue != null && SymbolEqualityComparer.Default.Equals(whenTrue, whenFalse)
+                ? whenTrue
+                : null;
+        }
+        if (expression is SwitchExpressionSyntax switchExpression) {
+            INamedTypeSymbol? exactType = null;
+            foreach (var arm in switchExpression.Arms) {
+                var candidate = GetExactReturnedExpressionType(arm.Expression, semanticModel);
+                if (candidate == null) return null;
+                if (exactType != null && !SymbolEqualityComparer.Default.Equals(exactType, candidate)) return null;
+                exactType = candidate;
+            }
+            return exactType;
+        }
+        return expression is ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax
+            ? semanticModel.GetTypeInfo(expression).Type as INamedTypeSymbol
+            : null;
     }
     private static MethodEffects AddCallEffects(
         MethodEffects effects,
