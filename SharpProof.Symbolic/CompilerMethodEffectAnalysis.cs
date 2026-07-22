@@ -998,7 +998,9 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private bool TrySelectSection(SwitchStatementSyntax? statement, out SwitchSectionSyntax? selected) {
             selected = null;
-            if (statement == null || semanticModel.GetConstantValue(statement.Expression, session.CancellationToken) is not
+            if (statement == null || statement.DescendantNodes().OfType<GotoStatementSyntax>().Any(static branch =>
+                    branch.IsKind(SyntaxKind.GotoCaseStatement) || branch.IsKind(SyntaxKind.GotoDefaultStatement)) ||
+                semanticModel.GetConstantValue(statement.Expression, session.CancellationToken) is not
                 { HasValue: true } value) return false;
             selected = statement.Sections.FirstOrDefault(section => section.Labels.Any(label => label switch {
                 CaseSwitchLabelSyntax constant => Equals(semanticModel.GetConstantValue(constant.Value,
