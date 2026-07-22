@@ -903,6 +903,19 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void DynamicConversionRemainsUnknown() {
+        var result = Analyze("""
+            class C {
+                static int M(dynamic value) => (int)value;
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.True);
+        });
+    }
+    [Test]
     public void FunctionPointerInvocationRemainsUnknown() {
         var result = Analyze("""
             unsafe class C {
