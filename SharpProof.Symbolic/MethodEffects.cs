@@ -2764,13 +2764,39 @@ internal sealed class MethodEffectAnalysisSession(
             var isInvocationReceiver = current.Parent is IInvocationOperation invocation &&
                                        ReferenceEquals(invocation.Instance, current);
             if (!isInvocationReceiver && path.Count != 0) path.RemoveAt(path.Count - 1);
-            if (path.Count == 0 || local.DeclaringSyntaxReferences.Length != 1) return false;
+            if (path.Count == 0 ||
+                !TryGetStableLocalInitializer(
+                    local,
+                    compilation,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                    out var value))
+                return false;
+            return TryGetObjectInitializerMember(value, path, 0, out initializer);
+        }
+        private static bool TryGetStableLocalInitializer(
+            ILocalSymbol local,
+            Compilation compilation,
+            HashSet<ILocalSymbol> visited,
+            out IOperation initializer) {
+            initializer = null!;
+            if (!visited.Add(local) || local.DeclaringSyntaxReferences.Length != 1) return false;
             var syntax = local.DeclaringSyntaxReferences[0].GetSyntax();
             var model = compilation.GetSemanticModel(syntax.SyntaxTree);
             if (model.GetOperation(syntax) is not IVariableDeclaratorOperation declarator ||
                 declarator.Initializer?.Value is not { } value)
                 return false;
-            return TryGetObjectInitializerMember(value, path, 0, out initializer);
+            var root = (IOperation)declarator;
+            while (root.Parent != null) root = root.Parent;
+            if (root.DescendantsAndSelf()
+                .OfType<ILocalReferenceOperation>()
+                .Any(reference => SymbolEqualityComparer.Default.Equals(reference.Local, local) &&
+                                  IsDirectLocalWrite(reference)))
+                return false;
+            while (value is IConversionOperation conversion) value = conversion.Operand;
+            if (value is ILocalReferenceOperation source)
+                return TryGetStableLocalInitializer(source.Local, compilation, visited, out initializer);
+            initializer = value;
+            return true;
         }
         private static bool TryGetObjectInitializerMember(
             IOperation value,
