@@ -206,6 +206,17 @@ internal sealed class MethodEffectAnalysisSession(
                 if (assignment.Target is IPropertyReferenceOperation { Property.SetMethod: not null } propertyTarget)
                     AnalyzeCall(propertyTarget.Property.SetMethod, assignment, builder, propertyTarget.Instance);
                 break;
+            case ICoalesceAssignmentOperation coalesceAssignment:
+                AddWrite(coalesceAssignment.Target, builder);
+                if (coalesceAssignment.Target is ILocalReferenceOperation coalescedLocal)
+                    builder.AssignLocal(coalescedLocal.Local, coalesceAssignment.Value);
+                if (coalesceAssignment.Target is IPropertyReferenceOperation coalescedProperty) {
+                    AnalyzeCall(coalescedProperty.Property.GetMethod, coalesceAssignment, builder,
+                        coalescedProperty.Instance);
+                    AnalyzeCall(coalescedProperty.Property.SetMethod, coalesceAssignment, builder,
+                        coalescedProperty.Instance);
+                }
+                break;
             case IDeconstructionAssignmentOperation deconstruction:
                 AnalyzeDeconstructionTarget(deconstruction.Target, builder);
                 break;
@@ -532,6 +543,14 @@ internal sealed class MethodEffectAnalysisSession(
                     AddCandidate(argument.Value, argument.Parameter);
                 break;
             case ISimpleAssignmentOperation {
+                Target: IPropertyReferenceOperation property,
+                Value: var value
+            }:
+                foreach (var argument in property.Arguments)
+                    AddCandidate(argument.Value, argument.Parameter);
+                AddCandidate(value, property.Property.SetMethod?.Parameters.LastOrDefault());
+                break;
+            case ICoalesceAssignmentOperation {
                 Target: IPropertyReferenceOperation property,
                 Value: var value
             }:
