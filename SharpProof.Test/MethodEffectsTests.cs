@@ -238,6 +238,18 @@ public sealed class MethodEffectsTests {
         Assert.That(result.MethodEffects!.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven),
             string.Join(" | ", result.UnknownReasons.Select(static reason => reason.Message)));
     }
+    [Test]
+    public void ListCollectionExpressionAllocates() {
+        var result = Analyze("""
+            class C {
+                static System.Collections.Generic.List<int> M() => [1, 2, 3];
+            }
+            """);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Allocates), Is.True);
+        });
+    }
     [TestCase("unsafe static int M() { int* value = stackalloc int[1]; value[0] = 1; return value[0]; }")]
     [TestCase("static R M(R value) => value with { X = 2 }; readonly record struct R(int X);")]
     public void StackOnlyOperationsDoNotCreateManagedAllocationSites(string method) {
