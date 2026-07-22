@@ -1231,14 +1231,15 @@ internal sealed class MethodEffectAnalysisSession(
             IOperation site,
             bool asynchronous,
             ref EffectFlowState state) {
-            if (type is not INamedTypeSymbol named) return;
             var interfaceType = session.Compilation.GetTypeByMetadataName(
                 asynchronous ? "System.IAsyncDisposable" : "System.IDisposable");
             var name = asynchronous ? "DisposeAsync" : "Dispose";
             var member = interfaceType?.GetMembers(name).OfType<IMethodSymbol>().FirstOrDefault();
-            var implementation = member == null ? null : named.FindImplementationForInterfaceMember(member) as IMethodSymbol;
-            implementation ??= named.GetMembers(name).OfType<IMethodSymbol>()
-                .FirstOrDefault(static candidate => !candidate.IsStatic && candidate.Parameters.Length == 0);
+            var implementation = member == null || type is not INamedTypeSymbol named
+                ? null
+                : named.FindImplementationForInterfaceMember(member) as IMethodSymbol;
+            implementation ??= type is ITypeParameterSymbol ? member : null;
+            implementation ??= FindProtocolMethod(type, name, 0);
             if (implementation == null) return;
             var result = InvokeCore(implementation, receiver, [], [], site, ref state);
             if (asynchronous) AnalyzeAwaitable(implementation.ReturnType, result, site, ref state);
