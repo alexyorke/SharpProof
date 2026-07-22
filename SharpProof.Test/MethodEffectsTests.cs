@@ -653,6 +653,21 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void StringForeachUsesIntrinsicEffects() {
+        var result = Analyze("""
+            class C {
+                static void M(string values) {
+                    foreach (var value in values) { }
+                }
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.ReadsArgumentState), Is.True);
+            Assert.That(result.UnknownReasons, Is.Empty);
+        });
+    }
+    [Test]
     public void UsingIncludesDisposeEffects() {
         var result = Analyze("""
             sealed class D : System.IDisposable {
