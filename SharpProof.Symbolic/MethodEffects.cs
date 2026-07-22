@@ -306,8 +306,14 @@ internal sealed class MethodEffectAnalysisSession(
             case IArrayCreationOperation array:
                 builder.Add(SharpProofEffect.Allocates, array, array.Type, "array_allocation");
                 break;
-            case { Kind: OperationKind.CollectionExpression, Type: IArrayTypeSymbol } collection:
-                builder.Add(SharpProofEffect.Allocates, collection, collection.Type, "array_collection_allocation");
+            case ICollectionExpressionOperation collection:
+                if (collection.Type is IArrayTypeSymbol ||
+                    collection.ConstructMethod?.MethodKind == MethodKind.Constructor ||
+                    collection.ConstructMethod == null && collection.Type?.IsReferenceType == true)
+                    builder.Add(SharpProofEffect.Allocates, collection, collection.Type,
+                        "collection_expression_allocation");
+                else if (collection.ConstructMethod is { } builderMethod)
+                    AnalyzeCall(builderMethod, collection, builder);
                 break;
             case IAnonymousObjectCreationOperation anonymousObject:
                 builder.Add(SharpProofEffect.Allocates, anonymousObject, anonymousObject.Type, "anonymous_object_allocation");
