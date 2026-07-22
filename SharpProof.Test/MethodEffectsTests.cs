@@ -3556,6 +3556,31 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ReturnedLambdaDoesNotBypassUserDefinedConversionMemberOrigin() {
+        var result = Analyze("""
+            sealed class Box { public int State; }
+            sealed class Payload { public Box Value = null!; }
+            static class Globals { public static Payload Shared = new() { Value = new() }; }
+            sealed class Source {
+                public static implicit operator Payload(Source source) => Globals.Shared;
+            }
+            class C {
+                static System.Action Bind(Source source) {
+                    var holder = (Payload)source;
+                    return () => holder.Value.State++;
+                }
+                static void M(Source input) { Bind(input)(); }
+            }
+            """, 12);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesCapturedState), Is.False);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ReturnedLambdaPreservesCapturedPrimaryConstructorMemberOrigin() {
         var result = Analyze("""
             sealed class Box { public int State; }
