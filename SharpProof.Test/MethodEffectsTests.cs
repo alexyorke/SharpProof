@@ -310,6 +310,20 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void PointerIndirectionAssignmentWritesArgumentState() {
+        var result = Analyze("""
+            unsafe class C {
+                static void M(int* pointer) {
+                    *pointer = 1;
+                }
+            }
+            """, 2);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+        });
+    }
+    [Test]
     public void NestedFreshObjectGraphWritesRemainFreshOwned() {
         var result = Analyze("""
             sealed class Box { public int Value; }
