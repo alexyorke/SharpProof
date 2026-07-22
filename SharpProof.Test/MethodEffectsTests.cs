@@ -277,6 +277,24 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void EarlierDefaultDoesNotPreemptMatchingConstantCase() {
+        var result = Analyze("""
+            class C {
+                static int state;
+                static void M() {
+                    switch (1) {
+                        default: break;
+                        case 1: state++; break;
+                    }
+                }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void NullConditionalSkipsGetterForConstantNullReceiver() {
         var result = Analyze("""
             class C {
