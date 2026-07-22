@@ -1299,12 +1299,13 @@ internal sealed class MethodEffectAnalysisSession(
                                     method.Name is nameof(string.IsNullOrEmpty) or nameof(string.IsNullOrWhiteSpace);
         var typeDefinition = containingType?.OriginalDefinition.ToDisplayString();
         var isListType = typeDefinition == "System.Collections.Generic.List<T>";
-        var isListIndexerGet = isListType &&
-                               method.MethodKind == MethodKind.PropertyGet &&
-                               method.AssociatedSymbol is IPropertySymbol { IsIndexer: true };
+        var isDictionaryType = typeDefinition == "System.Collections.Generic.Dictionary<TKey, TValue>";
+        var isCollectionIndexerGet = (isListType || isDictionaryType) &&
+                                     method.MethodKind == MethodKind.PropertyGet &&
+                                     method.AssociatedSymbol is IPropertySymbol { IsIndexer: true };
         var isSpanToArray = string.Equals(method.Name, "ToArray", StringComparison.Ordinal) &&
                             typeDefinition is "System.Span<T>" or "System.ReadOnlySpan<T>";
-        if (isListIndexerGet) {
+        if (isCollectionIndexerGet) {
             effects = new MethodEffects(
                 SharpProofEffect.ReadsReceiverState,
                 SharpProofCapability.None,
@@ -1316,6 +1317,19 @@ internal sealed class MethodEffectAnalysisSession(
         if (isListType && (method.MethodKind == MethodKind.Constructor ||
                            string.Equals(method.Name, "Add", StringComparison.Ordinal) &&
                            method.Parameters.Length == 1)) {
+            effects = new MethodEffects(
+                SharpProofEffect.WritesReceiverState |
+                (method.MethodKind == MethodKind.Constructor ? SharpProofEffect.None : SharpProofEffect.Allocates),
+                SharpProofCapability.None,
+                [],
+                [],
+                []);
+            return true;
+        }
+        if (isDictionaryType &&
+            (method.MethodKind == MethodKind.Constructor ||
+             string.Equals(method.Name, "Add", StringComparison.Ordinal) &&
+             method.Parameters.Length == 2)) {
             effects = new MethodEffects(
                 SharpProofEffect.WritesReceiverState |
                 (method.MethodKind == MethodKind.Constructor ? SharpProofEffect.None : SharpProofEffect.Allocates),
@@ -2909,13 +2923,26 @@ internal sealed class MethodEffectAnalysisSession(
                         CultureInfo.InvariantCulture,
                         out var elementIndex))
                     return false;
-                var elements = collectionInitializer.Initializers
+                var additions = collectionInitializer.Initializers
                     .OfType<IInvocationOperation>()
                     .Where(invocation => invocation.Arguments.Length != 0)
-                    .Select(invocation => invocation.Arguments[0].Value)
                     .ToArray();
-                if (elementIndex < 0 || elementIndex >= elements.Length) return false;
-                var element = elements[elementIndex];
+                IOperation? element;
+                if (additions.Any(invocation => invocation.Arguments.Length >= 2)) {
+                    element = additions.FirstOrDefault(invocation =>
+                        invocation.Arguments.Length >= 2 &&
+                        invocation.Arguments[0].Value.ConstantValue is {
+                            HasValue: true,
+                            Value: int key
+                        } &&
+                        key == elementIndex)?.Arguments[1].Value;
+                }
+                else {
+                    element = elementIndex >= 0 && elementIndex < additions.Length
+                        ? additions[elementIndex].Arguments[0].Value
+                        : null;
+                }
+                if (element == null) return false;
                 if (index == path.Count - 1) {
                     initializer = element;
                     return true;
