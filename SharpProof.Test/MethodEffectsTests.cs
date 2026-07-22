@@ -2304,6 +2304,29 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ReturnedLambdaRetainsFreshCapturedSwitchInvocationAlias() {
+        var result = Analyze("""
+            sealed class Box { public int State; }
+            class C {
+                static Box Choose(Box value, int key) => key switch { 0 => value, _ => new Box() };
+                static System.Action Bind(Box value) {
+                    var alias = Choose(value, 0);
+                    return () => alias.State++;
+                }
+                static void M() {
+                    var fresh = new Box();
+                    Bind(fresh)();
+                }
+            }
+            """, 8);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesCapturedState), Is.False);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void PropertyResultRetainsDelegateTarget() {
         var result = Analyze("""
             class C {
