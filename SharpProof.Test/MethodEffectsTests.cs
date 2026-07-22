@@ -3958,6 +3958,32 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ReturnedConvertedParameterRetainsConversionResultDispatch() {
+        var result = Analyze("""
+            class Base { public virtual void Work() { } }
+            sealed class Derived : Base {
+                private static int state;
+                public override void Work() { state++; }
+            }
+            sealed class Source {
+                public static implicit operator Base(Source source) => new Derived();
+            }
+            class C {
+                static Base Identity(Base value) => value;
+                static void M() {
+                    var source = new Source();
+                    Identity((Base)source).Work();
+                }
+            }
+            """, 11);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.False);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void PropertyResultRetainsExactDispatch() {
         var result = Analyze("""
             class Base { public virtual void Work() { } }
