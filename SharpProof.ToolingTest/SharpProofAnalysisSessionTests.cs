@@ -78,19 +78,20 @@ public sealed class SharpProofAnalysisSessionTests {
             "left != left"));
         Assert.Multiple(() => {
             Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("ProvenTrue"));
-            Assert.That(falseResult.ProofFacts.Single().Status, Is.EqualTo("Unknown"));
+            Assert.That(falseResult.ProofFacts.Single().Status, Is.EqualTo("ProvenFalse"));
         });
     }
     [Test]
     public void ConditionProofAtLocalFunctionDeclarationProducesCounterexample() {
-        using var session = SharpProofAnalysisSession.FromText("""
+        const string source = """
             class C {
                 static int M(int x) {
                     int Local() => x + 1;
                     return Local();
                 }
             }
-            """);
+            """;
+        using var session = SharpProofAnalysisSession.FromText(source);
         var result = session.Analyze(new SharpProofAnalysisRequest(
             new SharpProofTarget(SharpProofTargetKind.Point, Line: 3, Column: 9),
             SharpProofAnalysisFacet.ProofFacts,

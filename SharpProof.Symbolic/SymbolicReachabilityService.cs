@@ -59,6 +59,8 @@ internal static class SymbolicReachabilityService {
         CancellationToken cancellationToken,
         SymbolicState? initialState,
         bool includeCurrentStatementCompletionFacts) {
+        if (!includeCurrentStatementCompletionFacts)
+            site = GetNextExecutableSite(site);
         var cfgState = SymbolicCfgProgramPointStateCollector.CollectState(
             site,
             semanticModel,
@@ -68,6 +70,15 @@ internal static class SymbolicReachabilityService {
         if (cfgState is { IsExact: true, Value: { } exactState })
             return exactState;
         return UnsupportedState(cfgState);
+    }
+    private static SyntaxNode GetNextExecutableSite(SyntaxNode site) {
+        while (site is LocalFunctionStatementSyntax localFunction &&
+               localFunction.Parent is BlockSyntax block) {
+            var index = block.Statements.IndexOf(localFunction);
+            if (index < 0 || index + 1 >= block.Statements.Count) break;
+            site = block.Statements[index + 1];
+        }
+        return site;
     }
     private static SymbolicState UnsupportedState(SymbolicLoweringResult<SymbolicState> result) => new(
         support: result.Support,

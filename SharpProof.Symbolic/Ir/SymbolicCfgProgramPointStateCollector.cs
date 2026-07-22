@@ -95,7 +95,12 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         var forInitialEntry = targetKind == CfgProgramPointTargetKind.ForInitialEntry
             ? (ForStatementSyntax)site
             : null;
-        var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(site, ExecutionRootPolicy.Callable);
+        var executionRootSearchNode = site is LocalFunctionStatementSyntax
+            ? site.Parent ?? site
+            : site;
+        var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(
+            executionRootSearchNode,
+            ExecutionRootPolicy.Callable);
         if (executionRoot == null)
             return Unsupported(site, "execution-root");
         var targetIsCompletedRootBlock = includeCurrentStatementCompletionFacts &&
@@ -243,6 +248,17 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                     continue;
                 if (ShouldSkipScopedBlockCompletionOperation(operation, site))
                     continue;
+                if (forInitialEntry == null &&
+                    site is LocalFunctionStatementSyntax &&
+                    operation.Syntax.SpanStart >= site.Span.End) {
+                    var observedState = OrderTargetState(state, currentPath, targetIsInsideBranch);
+                    if (currentPath.GuardFrame == null || targetIsInsideBranch)
+                        targetState = observedState;
+                    else
+                        guardedTargetState = observedState;
+                    foundTarget = true;
+                    break;
+                }
                 if (forInitialEntry == null &&
                     !observedLoopTarget &&
                     IsTargetOperation(operation, site, includeCurrentStatementCompletionFacts, semanticModel, cancellationToken)) {

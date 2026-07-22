@@ -276,6 +276,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
         string assignmentProvenance,
         out ISymbol? invalidatedGuardTarget) {
         invalidatedGuardTarget = null;
+        if (operation is ILocalFunctionOperation) return true;
         if (operation is IVariableDeclarationGroupOperation declarations) {
             foreach (var declarator in declarations.Declarations
                          .SelectMany(static declaration => declaration.Declarators)) {

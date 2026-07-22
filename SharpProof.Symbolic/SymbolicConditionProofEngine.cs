@@ -15,7 +15,11 @@ internal sealed class SymbolicConditionProofEngine(SymbolicInvariantService _inv
         var root = syntaxTree.GetRoot(cancellationToken);
         var position = SymbolicSourceLocation.GetPosition(syntaxTree, line, column, cancellationToken);
         var node = SymbolicSourceTargetSelector.FindAtPosition(root, position);
-        var query = _invariantService.Analyze(semanticModel, position, node, null, cancellationToken);
+        var bindingPosition = node is LocalFunctionStatementSyntax localFunction &&
+                              position <= localFunction.Identifier.Span.End
+            ? Math.Max(0, localFunction.SpanStart - 1)
+            : position;
+        var query = _invariantService.Analyze(semanticModel, bindingPosition, node, null, cancellationToken);
         return ProveAtQuery(query, conditionText, smtAnalysis, cancellationToken);
     }
     internal SymbolicConditionProofResult ProveAtSyntaxNode(
