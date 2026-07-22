@@ -1457,6 +1457,29 @@ internal sealed class MethodEffectAnalysisSession(
             matches = false;
             return false;
         }
+        if (pattern is BinaryPatternSyntax binary) {
+            if (!TryMatchConstantPattern(binary.Left, value, semanticModel, out var left) ||
+                !TryMatchConstantPattern(binary.Right, value, semanticModel, out var right)) {
+                matches = false;
+                return false;
+            }
+            if (binary.IsKind(SyntaxKind.AndPattern)) {
+                matches = left && right;
+                return true;
+            }
+            if (binary.IsKind(SyntaxKind.OrPattern)) {
+                matches = left || right;
+                return true;
+            }
+        }
+        if (pattern is UnaryPatternSyntax unary && unary.IsKind(SyntaxKind.NotPattern)) {
+            if (TryMatchConstantPattern(unary.Pattern, value, semanticModel, out var nested)) {
+                matches = !nested;
+                return true;
+            }
+            matches = false;
+            return false;
+        }
         matches = false;
         return false;
     }
