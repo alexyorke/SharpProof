@@ -1730,6 +1730,15 @@ internal sealed class MethodEffectAnalysisSession(
                 (effects, arm) => effects |
                                   GetInvocationReturnedExpressionEffect(
                                       arm.Expression, targetMethod, invocation, builder, write));
+        if (expression is MemberAccessExpressionSyntax memberAccess)
+            return GetInvocationReturnedExpressionEffect(
+                memberAccess.Expression, targetMethod, invocation, builder, write);
+        if (expression is ElementAccessExpressionSyntax elementAccess)
+            return GetInvocationReturnedExpressionEffect(
+                elementAccess.Expression, targetMethod, invocation, builder, write);
+        if (expression is ConditionalAccessExpressionSyntax conditionalAccess)
+            return GetInvocationReturnedExpressionEffect(
+                conditionalAccess.Expression, targetMethod, invocation, builder, write);
         if (expression is IdentifierNameSyntax identifier) {
             var parameter = targetMethod.Parameters.FirstOrDefault(candidate =>
                 string.Equals(candidate.Name, identifier.Identifier.ValueText, StringComparison.Ordinal));
@@ -1750,6 +1759,11 @@ internal sealed class MethodEffectAnalysisSession(
                 return write
                     ? GetInstanceWriteEffect(invocation.Instance, builder)
                     : GetInstanceReadEffect(invocation.Instance, builder);
+            if (string.Equals(
+                    identifier.Identifier.ValueText,
+                    targetMethod.ContainingType.Name,
+                    StringComparison.Ordinal))
+                return write ? SharpProofEffect.WritesStaticState : SharpProofEffect.ReadsStaticState;
         }
         if (expression is ThisExpressionSyntax)
             return write
@@ -1796,6 +1810,12 @@ internal sealed class MethodEffectAnalysisSession(
                 (effects, arm) => effects |
                                   GetPropertyReturnedExpressionEffect(
                                       arm.Expression, property, builder, write));
+        if (expression is MemberAccessExpressionSyntax memberAccess)
+            return GetPropertyReturnedExpressionEffect(memberAccess.Expression, property, builder, write);
+        if (expression is ElementAccessExpressionSyntax elementAccess)
+            return GetPropertyReturnedExpressionEffect(elementAccess.Expression, property, builder, write);
+        if (expression is ConditionalAccessExpressionSyntax conditionalAccess)
+            return GetPropertyReturnedExpressionEffect(conditionalAccess.Expression, property, builder, write);
         if (expression is IdentifierNameSyntax identifier) {
             var member = property.Property.ContainingType.GetMembers(identifier.Identifier.ValueText)
                 .FirstOrDefault(candidate => candidate is IFieldSymbol or IPropertySymbol);
@@ -1805,6 +1825,11 @@ internal sealed class MethodEffectAnalysisSession(
                 return write
                     ? GetInstanceWriteEffect(property.Instance, builder)
                     : GetInstanceReadEffect(property.Instance, builder);
+            if (string.Equals(
+                    identifier.Identifier.ValueText,
+                    property.Property.ContainingType.Name,
+                    StringComparison.Ordinal))
+                return write ? SharpProofEffect.WritesStaticState : SharpProofEffect.ReadsStaticState;
         }
         if (expression is ThisExpressionSyntax)
             return write
