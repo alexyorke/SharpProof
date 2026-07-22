@@ -3194,6 +3194,23 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
         });
     }
+    [TestCase("choose ? (() => { }) : (() => state++)")]
+    [TestCase("choose ? (() => state++) : (() => { })")]
+    public void ConditionalLambdaInvocationRetainsEveryTarget(string expression) {
+        var result = Analyze($$"""
+            class C {
+                static int state;
+                static void M(bool choose) {
+                    System.Action action = {{expression}};
+                    action();
+                }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
     [Test]
     public void InvocationDelegateTargetRetainsFreshArgumentReceiver() {
         var result = Analyze("""
