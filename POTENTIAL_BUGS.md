@@ -5166,30 +5166,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 1 Z3 Formula Encoding (Agent 1)
 
-#### [PB3-1.5] 1.5 `EnumerateConjuncts` Recursion May Stack Overflow on Deep `&&` Chains
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Recursive descent into And-chain without depth limit.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtFormulaTraversal.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtFormulaTraversal.cs#L6-L15)
-* **Severity:** Low
-* **Description:** `EnumerateConjuncts` recursively descends into left and right branches of `And` formulas without any depth limit. A deeply-nested chain of `And` formulas (e.g., from `a && b && c && d` lowered as `And(And(And(a, b), c), d)`) can cause stack overflow for chains exceeding ~10K formulas. The main `Enumerate` method avoids recursion by using an explicit stack, but `EnumerateConjuncts` does not.
-* **Impact:** Analyzer crashes on deeply conjoined path conditions.
-* **Recommendation:** Convert `EnumerateConjuncts` to use an explicit stack.
-
-#### [PB3-1.8] 1.8 `CollectUnsafeArithmeticChecks` Recursion Without Depth Limit
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** Recursive descent through conditional branches without depth limit.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtQuerySafety.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtQuerySafety.cs#L110-L133)
-* **Severity:** Low
-* **Description:** `CollectUnsafeArithmeticChecks` recursively traverses `SmtConditionalFormula` branches (lines 116–123) and enumerates children for other formulas (line 131). Deeply nested conditional formulas (e.g., thousands of nested `x ? y : z` expressions) cause stack overflow. There is no depth limit despite `SmtFormulaTraversal.IsWithinDepth` already existing.
-* **Impact:** Analyzer crashes on deeply conditional arithmetic expressions.
-* **Recommendation:** Convert recursion to explicit stack-based iteration or add depth-limit checking.
-
 #### [PB3-1.12] 1.12 `TryFindLeadingStartAnchor` Does Not Skip Non-Capturing Groups
 
 > **Disposition:** Needs investigation
@@ -5202,43 +5178,7 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** String-related proof results may be incorrect for patterns with anchored non-capturing groups.
 * **Recommendation:** Extend the anchor-skipping logic to include non-capturing, atomic, named, and balancing groups.
 
-#### [PB3-1.17] 1.17 `SmtConditionalFormula` Does Not Validate Branch Kinds Against ResultKind
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** SmtConditionalFormula can be created with mismatched branch/result kinds.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SmtFormula.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/SmtFormula.cs#L67-L68)
-* **Severity:** Medium
-* **Description:** `SmtConditionalFormula` takes a `ResultKind` parameter that declares the expected result type, but `WhenTrue` and `WhenFalse` kinds are not validated against `ResultKind`. A conditional could be created with `ResultKind = Int` but `WhenTrue` being a `SmtBooleanConstant`. The `EncodeConditional` method would encode the Boolean constant as an `IntExpr`, causing `InvalidCastException`.
-* **Impact:** SMT solver crashes with `InvalidCastException` when lowered conditional expressions have mismatched branch/result types.
-* **Recommendation:** Validate branch kinds against `ResultKind` in the record constructor, or add runtime checks during encoding.
-
 ### 2 Symbolic IR & Encoding (Agent 2)
-
-#### [PB3-2.1] 2.1 SymbolicIrFormulaEncoder.TryEncodeBounds Returns Lower-Only Bound Without Check for Empty Lower/Upper
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** TryEncodeBounds returns lower-only bound when IncludeUpperBound=false but does not validate that Index >= 0 is vacuously true.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicIrFormulaEncoder.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicIrFormulaEncoder.cs#L291-L308)
-* **Severity:** Medium
-* **Description:** `TryEncodeBounds` at line 291 handles `SymbolicBoundsAtom` where `IncludeLowerBound` and `IncludeUpperBound` can each be independently set. Lines 299-307 create only the requested bounds. However, if `IncludeLowerBound=false` and `IncludeUpperBound=false`, both `lower` and `upper` are `null`, and line 307 evaluates `lower ?? upper!` which is `null` — the returned `formula` is `null` and the method returns `true` (line 308). The caller gets `true` with a null formula. Since `TryEncodeBounds` is called from `TryEncode` for atoms (line 50), the null formula propagates to the solver as a null expression.
-* **Impact:** Null formula reaches Z3, causing NullReferenceException or solver crash.
-* **Recommendation:** Return `false` when both bounds are excluded, or assert that at least one bound is included.
-
-#### [PB3-2.2] 2.2 SymbolicConditionalTerm Constructor Does Not Validate Kind Equality
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** WhenTrue.Kind and WhenFalse.Kind are compared in TryEncodeTerm but not enforced at construction.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicIr.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicIr.cs#L85-L86)
-* **Severity:** Medium
-* **Description:** `SymbolicConditionalTerm` at line 85-86 delegates `Kind` to `WhenTrue.Kind` without verifying that `WhenTrue.Kind == WhenFalse.Kind`. `TryEncodeTerm` at lines 206-213 checks `conditional.WhenTrue.Kind == conditional.WhenFalse.Kind` and returns `false` on mismatch, but only at encoding time. The mismatch is not caught at construction time, allowing invalid IR to propagate through multiple lowering passes before failing.
-* **Impact:** Late failures from invalid conditional terms that should have been rejected at construction.
-* **Recommendation:** Add a runtime check in the record constructor to verify kind equality.
 
 #### [PB3-2.3] 2.3 SymbolicIrVisitor Recursion Without Depth Limit for Deep IR Trees
 
@@ -5252,18 +5192,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Impact:** Stack overflow on deeply nested symbolic IR trees during state normalization.
 * **Recommendation:** Add depth-limited visitation or convert to iterative traversal.
 
-#### [PB3-2.4] 2.4 CreateProofKey Contains SymbolVersions But NormalizedProofKey Does Not Update on SymbolVersion Changes
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** NormalizedProofKey is computed once in constructor but does not reflect changes from WithSymbolVersion.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicIr.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicIr.cs#L152-L184)
-* **Severity:** Medium
-* **Description:** The `NormalizedProofKey` is computed at line 152 during construction. `WithSymbolVersion` at lines 173-184 creates a new `SymbolicState` but passes the original `IsContradictory` value (line 180) rather than recomputing it. More critically, `NormalizedProofKey` is computed once in the constructor and never recomputed. Since all methods (`AddFact`, `AddPathCondition`, `WithSymbolVersion`) create new instances, the proof key is always the initial one. This appears intentional for immutability, but `WithSymbolVersion` re-computes `NormalizedProofKey` only if the passed state is used where the constructor calls `CreateProofKey`. Actually, looking more carefully at the constructor — `NormalizedProofKey = CreateProofKey(...)` is only computed once. But since `SymbolicState` is immutable, each mutation creates a new instance through the constructor again, so the proof key IS recomputed for each new state. This bug is actually a false alarm — each new instance goes through the constructor which calls `CreateProofKey`. Marking as false positive.
-* **Impact:** (Determined to be false positive — immutable object model.)
-* **Recommendation:** No action needed.
-
 #### [PB3-2.5] 2.5 GetReferenceFormulaName Returns "?" for Non-Variable References, Losing Identity in Count/Element Encoding
 
 > **Disposition:** Needs investigation
@@ -5275,54 +5203,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 * **Description:** `GetReferenceFormulaName` at line 322 returns `"?"` when the formula is not a `SmtVariable`. This is used for `SymbolicMemberTerm` (line 90), `SymbolicElementTerm` (line 99), `SymbolicMultiElementTerm` (line 115), and `SymbolicCountTerm` (line 190) to construct SMT variable names. When the receiver is a complex expression (e.g., another member access or element access), the resulting variable name is `"?.MemberName"` or `"?[index]"` — all such formulas with different non-variable receivers map to the same SMT variable name. This causes the solver to treat different object graph paths as identical, producing unsound proof results.
 * **Impact:** Unsound proof results when member/element access chains involve non-trivial receivers.
 * **Recommendation:** Extend `GetReferenceFormulaName` to handle nested formula structures, or reject encoding when the receiver cannot be represented as a simple variable name.
-
-#### [PB3-2.6] 2.6 TryEncodeNullTypeTest Returns Hardcoded false for NullTerm Without Checking Polarity
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-SMT-PROOF-SOUNDNESS
-> **Evidence:** TryEvaluateNullTypeTest always returns false, ignoring polarity.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicIr.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicIr.cs#L520-L527)
-* **Severity:** Medium
-* **Description:** `TryEvaluateNullTypeTest` at line 520 checks `if (typeTest.Value is not SymbolicNullTerm)` returning `false`, then returns `false` anyway at line 525. This method always returns `false` with `value = false`, regardless of the type test's actual semantics. A `SymbolicExactRuntimeTypeAtom` with a `null` value means "is this value of a specific runtime type" — for null, the answer is always `false` regardless of polarity. However, a negated type test (polarity = false) would mean "value is NOT of this type" — for null, the answer is `true`. Because `TryEvaluateFact` at line 354 calls `TryEvaluateNullTypeTest` and then applies polarity at line 356, a negated null type test would correctly compute `false` then negate to `true`. So this is actually correct by accident — the method returns `false` for null, and the caller at line 356 applies `fact.Polarity ? value : !value` which gives `true` for negated facts. This is correct but confusing.
-* **Impact:** None — the logic is correct by coincidence. Maintainability concern.
-* **Recommendation:** Document the intentional behavior or rewrite for clarity.
-
-#### [PB3-2.7] 2.7 SymbolicCondition Key with IncludesComplementaryConditionOperands Misses Nested Negation
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** CreateConditionKey only checks direct complementary pairs; missses A && B && !(A && C).
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicIr.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicIr.cs#L872-L883)
-* **Severity:** Low
-* **Description:** `ContainsComplementaryConditionOperands` at line 872 checks for direct complementary pairs (A and !A). However, it does not handle nested negations like `!(A && B)` as complementary to `A`. While `CreateConditionKey` would normalize `!(!A)` to `A` (line 832-833), it won't expand `!(A && B) = !A || !B` via De Morgan. This means key deduplication may miss some logically redundant conditions.
-* **Impact:** Minor: deduplication may leave redundant conditions that could be removed.
-* **Recommendation:** Add De Morgan expansion for better key normalization.
-
-#### [PB3-2.8] 2.8 RemoveAbsorbedConditionOperands Handles Only One Level of Nested Opposite Operators
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-COMPATIBILITY-OR-PRECISION-ENHANCEMENT
-> **Evidence:** Only direct nested opposite operators are checked; deeper nesting is missed.
-> **Changes/tests:** No fix fix yet.
-* **File & Lines:** [SymbolicIr.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicIr.cs#L917-L936)
-* **Severity:** Low
-* **Description:** `RemoveAbsorbedConditionOperands` at line 917 checks each operand condition to see if it is a binary condition with the opposite operator, then checks if any of its operands appear in the top-level operand set. This only handles one level of nesting. For example, `A && (B || (A && C))` — the `A && C` inside the right operand of `||` is not checked because `(B || (A && C))` is not a direct `||` of top-level operands: only `B` and `A && C` are iterated, but `B` is not in the top-level set and `A && C` is not directly a key. The absorption `A || (A && B) = A` for And-over-Or is not checked beyond one level.
-* **Impact:** Minor: IR may contain slightly redundant conditions. No soundness impact.
-* **Recommendation:** Recursively check nested opposite operators.
-
-#### [PB3-2.9] 2.9 SymbolicIrVisitor OnTerm Method Visited Twice for Same Term in Binary/Conditional
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** CollectAssociativeBinaryTerms visits both left/right, and then CreateBinaryTermKey normalizes them, but visitor visits them twice.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [SymbolicIr.cs](file:///C:/w/PurelySharp/SharpProof.Symbolic/Ir/SymbolicIr.cs#L233-L241)
-* **Severity:** Low
-* **Description:** The `IntrinsicDomainTermCollector.OnTerm` is visited for each term in the IR tree. When visiting a `SymbolicBinaryTerm` with `Add` operator that has nested `Add` terms, `CollectAssociativeBinaryTerms` flattens the tree, and the visitor calls `OnTerm` for each leaf. But the parent binary term's `OnTerm` is NOT called (since the visitor recurses into children). This is correct — leaf terms are visited once. However, for `SymbolicConditionalTerm`, both branches may contain the same `SymbolicLengthTerm`, and the visitor will add it to `Terms` (via dictionary key, deduplicated). Actually the `Terms` dictionary is keyed by `CreateTermKey`, so duplicates are silently ignored. This is fine.
-* **Impact:** None — dictionary deduplication prevents actual duplicates. Minor efficiency concern.
-* **Recommendation:** No action needed.
 
 ### 3 Symbolic Lowering & Analysis (Agent 3)
 
