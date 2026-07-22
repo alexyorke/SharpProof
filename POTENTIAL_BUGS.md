@@ -5166,18 +5166,6 @@ This document compiles the potential bugs, soundness gaps, safety issues, resour
 
 ### 1 Z3 Formula Encoding (Agent 1)
 
-#### [PB3-1.2] 1.2 Double-Dispose on Z3 Objects Without Guard
-
-> **Disposition:** Needs investigation
-> **Canonical root cause:** RC-IMPLEMENTATION-CORRECTNESS-AND-ROBUSTNESS
-> **Evidence:** No disposal guard in Z3FormulaEncoder.Dispose.
-> **Changes/tests:** No fix yet.
-* **File & Lines:** [Z3FormulaEncoder.cs](file:///C:/w/PurelySharp/SharpProof.ProofCore/Z3FormulaEncoder.cs#L15-L22)
-* **Severity:** Medium
-* **Description:** `Dispose()` at line 15 iterates `_variables.Values` and calls `.Dispose()` on each Z3 `Expr`, `FuncDecl`, and the `Context` itself. It does not guard against double-calls. If `Dispose()` is called twice (e.g., from an `AnalysisProofSearch` that wraps the solver in a `using` block), the second call disposes already-freed Z3 native handles. The Z3 .NET wrapper may throw `Z3Exception` or exhibit undefined behavior when disposing native handles a second time.
-* **Impact:** Native handle corruption or crash on double-dispose of the encoder.
-* **Recommendation:** Add a `_disposed` flag and return immediately if already disposed.
-
 #### [PB3-1.3] 1.3 HasSafeArithmetic Inflates `_lastObservedRlimitCount` Across Solver Instances
 
 > **Disposition:** Needs investigation
