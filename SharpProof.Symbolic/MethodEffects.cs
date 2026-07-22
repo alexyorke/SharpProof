@@ -1917,7 +1917,7 @@ internal sealed class MethodEffectAnalysisSession(
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceWriteEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IParenthesizedOperation parenthesized => GetInstanceWriteEffect(parenthesized.Operand, builder),
-            IConversionOperation conversion => GetInstanceWriteEffect(conversion.Operand, builder),
+            IConversionOperation conversion => GetConversionResultEffect(conversion, builder, write: true),
             ILocalReferenceOperation => SharpProofEffect.WritesCapturedState,
             _ => SharpProofEffect.Unknown
         };
@@ -1962,8 +1962,32 @@ internal sealed class MethodEffectAnalysisSession(
             IOperation pointer when IsPointerIndirection(pointer) =>
                 GetInstanceReadEffect(pointer.ChildOperations.FirstOrDefault(), builder),
             IParenthesizedOperation parenthesized => GetInstanceReadEffect(parenthesized.Operand, builder),
-            IConversionOperation conversion => GetInstanceReadEffect(conversion.Operand, builder),
+            IConversionOperation conversion => GetConversionResultEffect(conversion, builder, write: false),
             ILocalReferenceOperation => SharpProofEffect.ReadsCapturedState,
+            _ => SharpProofEffect.Unknown
+        };
+    }
+    private static SharpProofEffect GetConversionResultEffect(
+        IConversionOperation conversion,
+        Builder builder,
+        bool write) {
+        if (conversion.OperatorMethod == null)
+            return write
+                ? GetInstanceWriteEffect(conversion.Operand, builder)
+                : GetInstanceReadEffect(conversion.Operand, builder);
+        return (builder.GetTrackedValueOrigin(conversion), write) switch {
+            (MethodEffectOrigin.Ambient, false) => SharpProofEffect.ReadsAmbientState,
+            (MethodEffectOrigin.Ambient, true) => SharpProofEffect.WritesAmbientState,
+            (MethodEffectOrigin.Receiver, false) => SharpProofEffect.ReadsReceiverState,
+            (MethodEffectOrigin.Receiver, true) => SharpProofEffect.WritesReceiverState,
+            (MethodEffectOrigin.Argument, false) => SharpProofEffect.ReadsArgumentState,
+            (MethodEffectOrigin.Argument, true) => SharpProofEffect.WritesArgumentState,
+            (MethodEffectOrigin.Captured, false) => SharpProofEffect.ReadsCapturedState,
+            (MethodEffectOrigin.Captured, true) => SharpProofEffect.WritesCapturedState,
+            (MethodEffectOrigin.Static, false) => SharpProofEffect.ReadsStaticState,
+            (MethodEffectOrigin.Static, true) => SharpProofEffect.WritesStaticState,
+            (MethodEffectOrigin.FreshOwned, false) => SharpProofEffect.None,
+            (MethodEffectOrigin.FreshOwned, true) => SharpProofEffect.WritesFreshOwnedState,
             _ => SharpProofEffect.Unknown
         };
     }
