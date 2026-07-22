@@ -59,6 +59,22 @@ public sealed class SharpProofAnalysisSessionTests {
         });
     }
     [Test]
+    public void ConditionProofInsideLocalFunctionResolvesCapturedParameters() {
+        using var session = SharpProofAnalysisSession.FromText("""
+            class C {
+                static int M(string left, string right) {
+                    int Local() => (left + right).Length;
+                    return Local();
+                }
+            }
+            """);
+        var result = session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Point, Line: 3, Column: 9),
+            SharpProofAnalysisFacet.ProofFacts,
+            "left == left"));
+        Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("ProvenTrue"));
+    }
+    [Test]
     public void RequestsAreSafeToReuseConcurrently() {
         using var session = SharpProofAnalysisSession.FromText("""
             class C {
