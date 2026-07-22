@@ -344,6 +344,35 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ConstantSwitchDoesNotSkipMatchingRecursivePattern() {
+        var statement = Analyze("""
+            class C {
+                static int state;
+                static void M() {
+                    switch ("value") {
+                        case { Length: > 0 }: state++; break;
+                        default: break;
+                    }
+                }
+            }
+            """, 3);
+        var expression = Analyze("""
+            class C {
+                static int state;
+                static int Mutate() { state++; return 1; }
+                static int M() => "value" switch { { Length: > 0 } => Mutate(), _ => 0 };
+            }
+            """, 4);
+        Assert.Multiple(() => {
+            Assert.That(statement.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven), "statement pattern");
+            Assert.That(statement.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True,
+                "statement pattern");
+            Assert.That(expression.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven), "expression pattern");
+            Assert.That(expression.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True,
+                "expression pattern");
+        });
+    }
+    [Test]
     public void NullConditionalSkipsGetterForConstantNullReceiver() {
         var result = Analyze("""
             class C {
