@@ -612,7 +612,8 @@ internal sealed class MethodEffectAnalysisSession(
             builder.AddUnknown(site, "unresolved_call");
             return false;
         }
-        method = (method.ReducedFrom ?? method).OriginalDefinition;
+        method = method.ReducedFrom ?? method;
+        method = (method.PartialImplementationPart ?? method).OriginalDefinition;
         var knownExactReceiverType = receiver is ILocalReferenceOperation localReceiver
             ? builder.GetExactType(localReceiver.Local)
             : null;
