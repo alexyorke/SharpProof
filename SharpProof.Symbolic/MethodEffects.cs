@@ -3590,6 +3590,11 @@ internal sealed class MethodEffectAnalysisSession(
                         StringComparison.Ordinal))?.Value,
                 _ => null
             };
+        private static IOperation? GetConstructorCallInstance(IOperation callSite) => callSite switch {
+            IInvocationOperation invocation => invocation.Instance,
+            IPropertyReferenceOperation property => property.Instance,
+            _ => null
+        };
         private static ConstructorMemberAssignment[] GetConstructorMemberAssignments(
             SyntaxNode declaration,
             string memberPath,
@@ -3653,6 +3658,21 @@ internal sealed class MethodEffectAnalysisSession(
                         assignments);
                     return;
                 }
+            }
+            if (!callSites.IsDefaultOrEmpty &&
+                value is IFieldReferenceOperation { Instance: IInstanceReferenceOperation }) {
+                var receiver = GetConstructorCallInstance(callSites[0].Operation);
+                if (receiver == null) return;
+                AddDeconstructionMemberAssignments(
+                    target,
+                    receiver,
+                    syntax,
+                    memberPath,
+                    compilation,
+                    visited,
+                    callSites.RemoveAt(0),
+                    assignments);
+                return;
             }
             if (value is IInvocationOperation invocation) {
                 AddDeconstructionCallResultAssignments(
