@@ -160,7 +160,9 @@ internal sealed record EffectFlowState(
                            string.Join(";", Locals.OrderBy(static pair => SymbolKey(pair.Key), StringComparer.Ordinal)
                                .Select(static pair => SymbolKey(pair.Key) + "=" + pair.Value.Key)) + ";" +
                            string.Join(";", FlowCaptures.OrderBy(static pair => pair.Key.GetHashCode())
-                               .Select(static pair => pair.Key + "=" + pair.Value.Key));
+                               .Select(static pair => pair.Key + "=" + pair.Value.Key)) + ";" +
+                           string.Join(";", RefLocals.OrderBy(static pair => SymbolKey(pair.Key), StringComparer.Ordinal)
+                               .Select(static pair => SymbolKey(pair.Key) + "=" + pair.Value.Key));
     internal static string SymbolKey(ISymbol symbol) => symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + "@" +
                                                         symbol.Locations.FirstOrDefault()?.SourceSpan.Start;
     private static ITypeSymbol? KnownInputType(ITypeSymbol type) => type.IsValueType || type is INamedTypeSymbol { IsSealed: true }
