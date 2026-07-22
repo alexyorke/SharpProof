@@ -2941,6 +2941,28 @@ internal sealed class MethodEffectAnalysisSession(
             while (value is IConversionOperation conversion) value = conversion.Operand;
             const string indexerPrefix = "#indexer:";
             if (path[index].StartsWith(indexerPrefix, StringComparison.Ordinal)) {
+                const string intIndexPrefix = "#indexer:System.Int32:";
+                if (value is ICollectionExpressionOperation collection &&
+                    collection.Elements.All(element => element is not ISpreadOperation) &&
+                    path[index].StartsWith(intIndexPrefix, StringComparison.Ordinal) &&
+                    int.TryParse(
+                        path[index].Substring(intIndexPrefix.Length),
+                        NumberStyles.None,
+                        CultureInfo.InvariantCulture,
+                        out var collectionIndex) &&
+                    collectionIndex >= 0 &&
+                    collectionIndex < collection.Elements.Length) {
+                    var collectionElement = collection.Elements[collectionIndex];
+                    if (index == path.Count - 1) {
+                        initializer = collectionElement;
+                        return true;
+                    }
+                    return TryGetObjectInitializerMember(
+                        collectionElement,
+                        path,
+                        index + 1,
+                        out initializer);
+                }
                 if (value is not IObjectCreationOperation { Initializer: { } collectionInitializer })
                     return false;
                 var assignedElement = collectionInitializer.Initializers
@@ -2981,7 +3003,6 @@ internal sealed class MethodEffectAnalysisSession(
                         string.Equals(keyPath, path[index], StringComparison.Ordinal))?.Arguments[1].Value;
                 }
                 else {
-                    const string intIndexPrefix = "#indexer:System.Int32:";
                     element = path[index].StartsWith(intIndexPrefix, StringComparison.Ordinal) &&
                               int.TryParse(
                                   path[index].Substring(intIndexPrefix.Length),
