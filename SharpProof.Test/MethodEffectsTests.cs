@@ -2660,6 +2660,25 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void LocalFunctionReturnPreservesCapturedArgumentOrigin() {
+        var result = Analyze("""
+            sealed class Box { public int Value; }
+            class C {
+                static void M(Box external) {
+                    var fresh = new Box();
+                    var returned = Local(fresh);
+                    returned.Value = 1;
+                    Box Local(Box ignored) => external;
+                }
+            }
+            """, 3);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.False);
+        });
+    }
+    [Test]
     public void LambdaMutationMapsOnlyMutatedArgument() {
         var result = Analyze("""
             sealed class Box { public int Value; }
