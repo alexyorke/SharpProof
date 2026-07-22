@@ -497,6 +497,30 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void DelegateMutationOfFreshReceiverRemainsFreshOwned() {
+        var result = Analyze("""
+            sealed class Box {
+                public int Value;
+                public void SetValue() { Value = 1; }
+            }
+            class C {
+                static int M() {
+                    var box = new Box();
+                    System.Action action = box.SetValue;
+                    action();
+                    return box.Value;
+                }
+            }
+            """, 7);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven),
+                string.Join(" | ", result.MethodEffects.Sites.Select(static site =>
+                    site.Symbol + ":" + site.Effect + ":" + site.Reason)));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void ReassignedDelegateUsesTheCurrentTarget() {
         var result = Analyze("""
             class C {
