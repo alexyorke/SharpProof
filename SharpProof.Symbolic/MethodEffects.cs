@@ -3227,10 +3227,15 @@ internal sealed class MethodEffectAnalysisSession(
                         compilation,
                         visitedConstructors,
                         out values);
-                if (candidates.Length > 1 && !AreExhaustiveAlternativeAssignments(candidates))
+                var assignmentSites = candidates
+                    .GroupBy(candidate => candidate.Syntax.Span)
+                    .Select(group => group.First())
+                    .ToArray();
+                if (assignmentSites.Length > 1 &&
+                    !AreExhaustiveAlternativeAssignments(assignmentSites))
                     return false;
-                var needsFallback = candidates.Length == 1 &&
-                                    IsPotentiallyConditionalAssignment(candidates[0], declaration);
+                var needsFallback = assignmentSites.Length == 1 &&
+                                    IsPotentiallyConditionalAssignment(assignmentSites[0], declaration);
                 var mappedValues = ImmutableArray.CreateBuilder<IOperation>();
                 foreach (var candidate in candidates) {
                     IOperation assignedValue = candidate.Value;
@@ -3619,16 +3624,21 @@ internal sealed class MethodEffectAnalysisSession(
             while (value is IConversionOperation conversion) value = conversion.Operand;
             if (value is ILocalReferenceOperation local &&
                 TryGetStableLocalInitializers(
-                    local.Local, compilation, visited, out var initializers) &&
-                initializers.Length == 1) {
-                AddDeconstructionMemberAssignments(
-                    target,
-                    initializers[0],
-                    syntax,
-                    memberPath,
-                    compilation,
-                    visited,
-                    assignments);
+                    local.Local, compilation, visited, out var initializers)) {
+                var resolved = new List<ConstructorMemberAssignment>();
+                foreach (var initializer in initializers) {
+                    var count = resolved.Count;
+                    AddDeconstructionMemberAssignments(
+                        target,
+                        initializer,
+                        syntax,
+                        memberPath,
+                        compilation,
+                        visited,
+                        resolved);
+                    if (resolved.Count == count) return;
+                }
+                assignments.AddRange(resolved);
                 return;
             }
             if (target is ITupleOperation targetTuple && value is ITupleOperation valueTuple &&
