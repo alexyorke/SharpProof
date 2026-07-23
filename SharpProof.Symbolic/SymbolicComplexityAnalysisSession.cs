@@ -224,11 +224,13 @@ internal sealed class SymbolicComplexityAnalysisSession {
         if (variable is not ILocalSymbol and not IParameterSymbol ||
             initializer == null || !IsIntegralConstant(initializer, model) ||
             loop.Condition is not BinaryExpressionSyntax condition ||
-            !TryCondition(condition, variable, model, method, out var direction, out bound, out description) ||
+            !TryCondition(condition, variable, model, method, out var direction, out bound, out description,
+                out var boundDependencies) ||
             loop.Incrementors.Count != 1 ||
             !TryStep(loop.Incrementors[0], variable, model, out var step) || step != direction)
             return false;
-        return !Mutates(variable, loop.Statement, model, ignoreRecognizedStep: false);
+        return !Mutates(variable, loop.Statement, model, ignoreRecognizedStep: false) &&
+               !boundDependencies.Any(symbol => Mutates(symbol, loop.Statement, model, ignoreRecognizedStep: false));
     }
 
     private bool TryWhileBound(
@@ -246,13 +248,15 @@ internal sealed class SymbolicComplexityAnalysisSession {
         var variable = left is ILocalSymbol or IParameterSymbol ? left :
             right is ILocalSymbol or IParameterSymbol ? right : null;
         if (variable == null ||
-            !TryCondition(binary, variable, model, method, out var direction, out bound, out description))
+            !TryCondition(binary, variable, model, method, out var direction, out bound, out description,
+                out var boundDependencies))
             return false;
         var steps = body.DescendantNodes().OfType<ExpressionSyntax>()
             .Select(expression => TryStep(expression, variable, model, out var step) ? step : Direction.None)
             .Where(static step => step != Direction.None).ToArray();
         return steps.Length == 1 && steps[0] == direction &&
-               !Mutates(variable, body, model, ignoreRecognizedStep: true);
+               !Mutates(variable, body, model, ignoreRecognizedStep: true) &&
+               !boundDependencies.Any(symbol => Mutates(symbol, body, model, ignoreRecognizedStep: false));
     }
 
     private bool TryCondition(
@@ -262,10 +266,12 @@ internal sealed class SymbolicComplexityAnalysisSession {
         IMethodSymbol method,
         out Direction direction,
         out Cost bound,
-        out string description) {
+        out string description,
+        out IReadOnlyList<ISymbol> boundDependencies) {
         direction = Direction.None;
         bound = Cost.Constant;
         description = string.Empty;
+        boundDependencies = [];
         var left = Unwrap(condition.Left);
         var right = Unwrap(condition.Right);
         var variableOnLeft = SymbolEqualityComparer.Default.Equals(
@@ -282,6 +288,7 @@ internal sealed class SymbolicComplexityAnalysisSession {
         if (direction == Direction.None || !TryExpressionCost(expression, model, method, false, out bound))
             return false;
         description = expression.ToString();
+        boundDependencies = GetReferencedSymbols(expression, model);
         return true;
     }
 
@@ -383,19 +390,25 @@ internal sealed class SymbolicComplexityAnalysisSession {
         });
 
     private bool Mutates(ISymbol symbol, SyntaxNode body, SemanticModel model, bool ignoreRecognizedStep) {
-        foreach (var expression in body.DescendantNodesAndSelf().OfType<ExpressionSyntax>()) {
-            if (ignoreRecognizedStep && TryStep(expression, symbol, model, out _)) continue;
-            ExpressionSyntax? target = expression switch {
-                AssignmentExpressionSyntax assignment => assignment.Left,
-                PrefixUnaryExpressionSyntax prefix when prefix.IsKind(SyntaxKind.PreIncrementExpression) ||
-                                                        prefix.IsKind(SyntaxKind.PreDecrementExpression) => prefix.Operand,
-                PostfixUnaryExpressionSyntax postfix when postfix.IsKind(SyntaxKind.PostIncrementExpression) ||
-                                                          postfix.IsKind(SyntaxKind.PostDecrementExpression) => postfix.Operand,
-                _ => null
-            };
-            if (target != null && RefersTo(target, symbol, model)) return true;
+        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(body)) {
+            if (ignoreRecognizedStep && node is ExpressionSyntax expression &&
+                TryStep(expression, symbol, model, out _))
+                continue;
+            if (SymbolMutationFacts.TryGetMutationTarget(node, out var target) &&
+                RefersTo(target, symbol, model))
+                return true;
         }
         return false;
+    }
+
+    private IReadOnlyList<ISymbol> GetReferencedSymbols(ExpressionSyntax expression, SemanticModel model) {
+        var symbols = new List<ISymbol>();
+        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(expression).OfType<ExpressionSyntax>()) {
+            var symbol = model.GetSymbolInfo(node, _cancellationToken).Symbol;
+            if (symbol != null && symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
+                symbols.Add(symbol);
+        }
+        return symbols;
     }
 
     private bool RefersTo(ExpressionSyntax expression, ISymbol symbol, SemanticModel model) =>
