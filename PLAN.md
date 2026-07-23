@@ -153,10 +153,10 @@ test before deleting the old setup.
 Only three calls remain, all in
 `SharpProof.Test/SymbolicComplexityTests.cs` near lines 187-200.
 
-- [ ] Replace `LineNumber`, `AtPosition`, and `AllLines` with direct
+- [x] Replace `LineNumber`, `AtPosition`, and `AllLines` with direct
       `SharpProofTarget` construction.
-- [ ] Preserve the existing test inputs, which are already valid.
-- [ ] Delete `SharpProof.Testing/SharpProofTargetFactory.cs`.
+- [x] Preserve the existing test inputs, which are already valid.
+- [x] Delete `SharpProof.Testing/SharpProofTargetFactory.cs`.
 
 Expected net reduction: approximately 24 lines.
 

@@ -184,8 +184,9 @@ public sealed class SymbolicComplexityTests {
     private static SymbolicComplexityResult QueryComplexityAtMarker(string source, string marker, bool useLineTarget = false) {
         var position = source.IndexOf(marker, StringComparison.Ordinal);
         if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
-        var target = useLineTarget ? SharpProofTargetFactory.LineNumber(GetLineNumber(source,
-            position)) : SharpProofTargetFactory.AtPosition(position);
+        var target = useLineTarget
+            ? new SharpProofTarget(SharpProofTargetKind.Line, Line: GetLineNumber(source, position))
+            : new SharpProofTarget(SharpProofTargetKind.Position, Position: position);
         var (tree, compilation) = SymbolicSourceCompilation.Create(source, "SymbolicComplexityTests.cs",
             SymbolicSourceCompilationKind.Query, null, default);
         return QueryComplexity(SymbolicSourceInput.FromSyntaxTree(tree, compilation), target);
@@ -197,7 +198,7 @@ public sealed class SymbolicComplexityTests {
         var (tree, compilation) = SymbolicSourceCompilation.Create(
             "class C { }", "SymbolicComplexityTests.cs", SymbolicSourceCompilationKind.Query, null, default);
         var ex = Assert.Throws<NotSupportedException>(() => QueryComplexity(
-            SymbolicSourceInput.FromSyntaxTree(tree, compilation), SharpProofTargetFactory.AllLines()));
+            SymbolicSourceInput.FromSyntaxTree(tree, compilation), new SharpProofTarget(SharpProofTargetKind.AllLines)));
         Assert.That(ex!.Message, Is.EqualTo("Complexity queries support point, position, or line targets only."));
     }
     private static SymbolicComplexityResult QueryComplexity(SymbolicSourceInput source, SharpProofTarget target) =>
