@@ -2,6 +2,26 @@ using NUnit.Framework;
 namespace SharpProof.Test;
 [TestFixture]
 public sealed class UnknownContractDiagnosticTests {
+    [TestCase("""
+        using SharpProof.Attributes;
+        public static class C {
+            [ExpectedComplexity(ComplexityKind.Linear)]
+            public static void M(int n) {
+                for (var i = 0; i < n; i++)
+                    for (var j = 0; j < n; j++) { }
+            }
+        }
+        """, "SP0021", TestName = "ExpectedComplexityExceededReportsSP0021")]
+    [TestCase("""
+        using SharpProof.Attributes;
+        public static class C {
+            [ExpectedComplexity(ComplexityKind.Linear)]
+            public static void M() => _ = System.Environment.GetEnvironmentVariable("PATH");
+        }
+        """, "SP0022", TestName = "ExpectedComplexityUnknownReportsSP0022")]
+    public async Task ExpectedComplexityDiagnostics(string source, string diagnosticId) =>
+        Assert.That((await AnalyzerTestHost.GetDiagnosticsAsync(source)).Select(static value => value.Id),
+            Does.Contain(diagnosticId));
     [Test]
     public async Task ZeroAllocationsUnknownReportsSP0045() {
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""

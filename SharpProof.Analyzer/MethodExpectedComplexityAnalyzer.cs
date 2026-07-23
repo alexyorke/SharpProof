@@ -2,7 +2,6 @@ namespace SharpProof.Analyzer;
 internal static class MethodExpectedComplexityAnalyzer {
     internal static void AnalyzeSymbolForExpectedComplexity(MethodBodyAnalysisContext context) {
         var methodSymbol = context.MethodSymbol;
-        Action<Diagnostic> report = context.ReportDiagnostic;
         if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
         if (!TryGetExpectedComplexity(
                 methodSymbol,
@@ -18,7 +17,7 @@ internal static class MethodExpectedComplexityAnalyzer {
                 invalidContract.Reason,
                 attributeLocation ??
                 AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken));
-            report(diagnostic);
+            context.ReportDiagnostic(diagnostic);
             return;
         }
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
@@ -26,44 +25,47 @@ internal static class MethodExpectedComplexityAnalyzer {
         if (!outcome.IsSuccess) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var error = outcome.Error!;
-            var diagnostic = CreateUnknownDiagnostic(
+            var diagnostic = CreateDiagnostic(
+                "ComplexityCouldNotBeVerifiedRule",
                 methodSymbol,
-                declaredComplexity,
+                declaredComplexity.Text,
                 attributeLocation,
                 "complexity query failed: " + error.Message,
                 context.CancellationToken);
-            report(diagnostic);
+            context.ReportDiagnostic(diagnostic);
             return;
         }
         var result = outcome.Value!;
         var classification = Classify(result, declaredComplexity);
-        switch (classification.Kind) {
-            case ComplexityVerificationKind.Verified:
+        switch (classification.Comparison) {
+            case SymbolicComplexityComparison.Within:
                 return;
-            case ComplexityVerificationKind.Exceeded:
-                var exceededDiagnostic = CreateExceededDiagnostic(
+            case SymbolicComplexityComparison.Exceeds:
+                var exceededDiagnostic = CreateDiagnostic(
+                    "ComplexityExceededRule",
                     methodSymbol,
-                    declaredComplexity,
-                    result,
+                    declaredComplexity.Text,
                     attributeLocation,
+                    result.Complexity.Text,
                     context.CancellationToken);
-                report(exceededDiagnostic);
+                context.ReportDiagnostic(exceededDiagnostic);
                 return;
             default:
-                var unknownDiagnostic = CreateUnknownDiagnostic(
+                var unknownDiagnostic = CreateDiagnostic(
+                    "ComplexityCouldNotBeVerifiedRule",
                     methodSymbol,
-                    declaredComplexity,
+                    declaredComplexity.Text,
                     attributeLocation,
                     classification.Reason,
                     context.CancellationToken);
-                report(unknownDiagnostic);
+                context.ReportDiagnostic(unknownDiagnostic);
                 return;
         }
     }
     private static bool TryGetExpectedComplexity(
         IMethodSymbol methodSymbol,
         CancellationToken cancellationToken,
-        out DeclaredComplexity declaredComplexity,
+        out (int Kind, string Text) declaredComplexity,
         out Location? attributeLocation,
         out InvalidContractArgument? invalidContract) {
         declaredComplexity = default;
@@ -76,87 +78,58 @@ internal static class MethodExpectedComplexityAnalyzer {
                 attributeLocation = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
                 if (attribute.ConstructorArguments.Length != 1 ||
                     attribute.ConstructorArguments[0].Value is not int intValue) {
-                    declaredComplexity = new DeclaredComplexity(default, "invalid");
+                    declaredComplexity = (default, "invalid");
                     invalidContract = new InvalidContractArgument(
                         AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken),
                         "expected a ComplexityKind enum value");
                     return true;
                 }
                 if (!SymbolicComplexityFacts.IsDefinedBound(intValue)) {
-                    declaredComplexity = new DeclaredComplexity(intValue, intValue.ToString());
+                    declaredComplexity = (intValue, intValue.ToString(CultureInfo.InvariantCulture));
                     invalidContract = new InvalidContractArgument(
                         intValue.ToString(CultureInfo.InvariantCulture),
                         "undefined ComplexityKind value");
                     return true;
                 }
-                declaredComplexity = new DeclaredComplexity(intValue);
+                declaredComplexity = (intValue, SymbolicComplexityFacts.GetBoundText(intValue));
                 return true;
             }
         return false;
     }
-    private static ComplexityVerificationClassification Classify(SymbolicComplexityResult result, DeclaredComplexity declaredComplexity) {
+    private static (SymbolicComplexityComparison Comparison, string Reason) Classify(
+        SymbolicComplexityResult result,
+        (int Kind, string Text) declaredComplexity) {
         if (result.Complexity.IsUnknown || result.Complexity.IsRecursiveUnknown) {
             var reason = result.UnknownReasons.Count > 0
                 ? result.UnknownReasons[0].ToString()
                 : "complexity unknown";
-            return ComplexityVerificationClassification.Unknown(reason);
+            return (SymbolicComplexityComparison.Incomparable, reason);
         }
         if (result.Complexity.IsConservative)
-            return ComplexityVerificationClassification.Unknown(
+            return (SymbolicComplexityComparison.Incomparable,
                 "inferred complexity '" + result.Complexity.Text + "' contains conservative alternatives");
-        return SymbolicComplexityFacts.Compare(result.Complexity.Kind, declaredComplexity.Kind) switch {
-            SymbolicComplexityComparison.Within => ComplexityVerificationClassification.Verified,
-            SymbolicComplexityComparison.Exceeds => ComplexityVerificationClassification.Exceeded,
-            _ => ComplexityVerificationClassification.Unknown(
+        var comparison = SymbolicComplexityFacts.Compare(result.Complexity.Kind, declaredComplexity.Kind);
+        return (comparison, comparison == SymbolicComplexityComparison.Incomparable
+            ?
                 "inferred complexity '" + result.Complexity.Text + "' is not directly comparable to declared bound '" +
-                declaredComplexity.Text + "'")
-        };
+                declaredComplexity.Text + "'"
+            : string.Empty);
     }
-    private static Diagnostic CreateExceededDiagnostic(
+    private static Diagnostic CreateDiagnostic(
+        string rule,
         IMethodSymbol methodSymbol,
-        DeclaredComplexity declaredComplexity,
-        SymbolicComplexityResult result,
+        string declaredComplexity,
         Location? attributeLocation,
+        string detail,
         CancellationToken cancellationToken) {
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
         return Diagnostic.Create(
-            AnalyzerDiagnosticCatalog.Get("ComplexityExceededRule"),
+            AnalyzerDiagnosticCatalog.Get(rule),
             location,
             attributeLocation == null ? null : [attributeLocation],
             methodSymbol.Name,
-            declaredComplexity.Text,
-            result.Complexity.Text);
-    }
-    private static Diagnostic CreateUnknownDiagnostic(
-        IMethodSymbol methodSymbol,
-        DeclaredComplexity declaredComplexity,
-        Location? attributeLocation,
-        string reason,
-        CancellationToken cancellationToken) {
-        var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
-        return Diagnostic.Create(
-            AnalyzerDiagnosticCatalog.Get("ComplexityCouldNotBeVerifiedRule"),
-            location,
-            attributeLocation == null ? null : [attributeLocation],
-            methodSymbol.Name,
-            declaredComplexity.Text,
-            reason);
-    }
-    readonly record struct DeclaredComplexity(int Kind, string? TextOverride = null) {
-        public string Text => TextOverride ?? SymbolicComplexityFacts.GetBoundText(Kind);
-    }
-    readonly record struct ComplexityVerificationClassification(ComplexityVerificationKind Kind, string Reason) {
-        public static readonly ComplexityVerificationClassification Verified =
-            new(ComplexityVerificationKind.Verified, string.Empty);
-        public static readonly ComplexityVerificationClassification Exceeded =
-            new(ComplexityVerificationKind.Exceeded, string.Empty);
-        public static ComplexityVerificationClassification Unknown(string reason) =>
-            new(ComplexityVerificationKind.Unknown, reason);
-    }
-    enum ComplexityVerificationKind {
-        Verified,
-        Exceeded,
-        Unknown
+            declaredComplexity,
+            detail);
     }
     sealed record InvalidContractArgument(string Argument, string Reason);
 }

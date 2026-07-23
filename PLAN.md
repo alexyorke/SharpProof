@@ -467,12 +467,12 @@ non-invalidated `ProvenTrue` path also reports nothing.
 
 Target: 15-22 lines.
 
-- [ ] Merge the nearly identical diagnostic factories.
-- [ ] Replace the private classification record and enum with a named tuple
+- [x] Merge the nearly identical diagnostic factories.
+- [x] Replace the private classification record and enum with a named tuple
       plus existing `SymbolicComplexityComparison`.
-- [ ] Remove the `DeclaredComplexity` wrapper.
-- [ ] Remove the redundant reporting delegate.
-- [ ] Add compact SP0021 and SP0022 analyzer cases.
+- [x] Remove the `DeclaredComplexity` wrapper.
+- [x] Remove the redundant reporting delegate.
+- [x] Add compact SP0021 and SP0022 analyzer cases.
 
 ### 6.7 Remove redundant Requires call-site state
 
