@@ -64,6 +64,9 @@ public sealed class SymbolicComplexityTests {
         yield return Case("BranchesUseWorstCaseMaximum",
             """public static class C { public static int Work(bool flag,int n) { var sum=0; if(flag){for(var i=0;i<n;i++){sum+=i;}}else{sum=1;} return sum; } }""",
             "return sum;", SymbolicComplexityKind.Linear, "O(n)");
+        yield return Case("SwitchStatementIncludesWhenGuardComplexity",
+            """public static class C { private static bool Guard(int n){for(var i=0;i<n;i++){}return true;} public static int Work(object value,int n){switch(value){case int _ when Guard(n):return 1;default:return 0;}} }""",
+            "switch(value)", SymbolicComplexityKind.Linear, "O(n)", callee: "Guard");
         yield return Case("ForeachOverString_IsLinearInLength",
             """public static class C { public static int CountLetters(string text) { var count=0; foreach(var ch in text){count+=ch;} return count; } }""",
             "return count;", SymbolicComplexityKind.Linear, "O(text.Length)");
