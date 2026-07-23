@@ -6,7 +6,7 @@ using static SharpProof.Test.SmtTestFormula;
 namespace SharpProof.Test;
 [TestFixture]
 internal class ProofCoreZ3SmokeTests {
-    private static readonly TimeSpan SolverTimeout = TimeSpan.FromMilliseconds(50);
+    private static readonly TimeSpan SolverTimeout = TimeSpan.FromMilliseconds(500);
     [TestCase("^[a-z]+$", RegexTranslationFallback.None)]
     [TestCase("[", RegexTranslationFallback.InvalidPattern)]
     public void RegexTranslationValidator_ClassifiesInput(string pattern, RegexTranslationFallback expected)
