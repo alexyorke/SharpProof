@@ -2519,6 +2519,20 @@ internal sealed class MethodEffectAnalysisSession(
             } &&
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array } &&
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsArrayConstrainedCopy(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "ConstrainedCopy",
+                IsStatic: true,
+                Parameters.Length: 5,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array } &&
+            method.Parameters[3] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[4] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2983,6 +2997,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Array", MethodKind.Ordinary, "CopyTo")
                     when IsArrayCopyTo(method) =>
                     SharpProofEffect.ReadsReceiverState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+                ("System.Array", MethodKind.Ordinary, "ConstrainedCopy")
+                    when IsArrayConstrainedCopy(method) =>
+                    SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -3134,6 +3151,21 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                             "framework_array_copy_to_model")
                     ]
+                : IsArrayConstrainedCopy(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
+                            "framework_array_constrained_copy_model"),
+                        MethodExceptionFact.Boundary("System.RankException", MethodExceptionSource.Contract,
+                            "framework_array_constrained_copy_model"),
+                        MethodExceptionFact.Boundary("System.ArrayTypeMismatchException", MethodExceptionSource.Contract,
+                            "framework_array_constrained_copy_model"),
+                        MethodExceptionFact.Boundary("System.InvalidCastException", MethodExceptionSource.Contract,
+                            "framework_array_constrained_copy_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_array_constrained_copy_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
+                            "framework_array_constrained_copy_model")
+                    ]
                 : effects == SharpProofEffect.Throws
                     ? [
                         MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
@@ -3156,6 +3188,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsArrayResize(method)) return [0];
             if (IsArrayReverse(method)) return [0];
             if (IsArrayCopyTo(method)) return [0];
+            if (IsArrayConstrainedCopy(method)) return [2];
             return (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
                     method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
@@ -3174,7 +3207,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsIndexesArraySetValue(method)) return [1];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
                    IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) || IsArrayResize(method) ||
-                   IsArrayReverse(method) ||
+                   IsArrayReverse(method) || IsArrayConstrainedCopy(method) ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Read")
                 ? [0]

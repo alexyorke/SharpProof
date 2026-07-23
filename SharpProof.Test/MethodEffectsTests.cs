@@ -2091,6 +2091,41 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Disproven,
             required: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Unknown);
+        yield return Effect("ArrayConstrainedCopyTracksSourceAndDestination", """
+            class C {
+                static void M(System.Array source, int sourceIndex, System.Array destination,
+                              int destinationIndex, int length) =>
+                    System.Array.ConstrainedCopy(source, sourceIndex, destination, destinationIndex, length);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("ArrayConstrainedCopyMapsReadToSource", """
+            class C {
+                static void M(System.Array source) {
+                    System.Array destination = new int[1];
+                    System.Array.ConstrainedCopy(source, 0, destination, 0, 1);
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Unknown);
+        yield return Effect("ArrayConstrainedCopyMapsWriteToDestination", """
+            class C {
+                static void M(System.Array destination) {
+                    System.Array source = new[] { 1 };
+                    System.Array.ConstrainedCopy(source, 0, destination, 0, 1);
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
