@@ -318,12 +318,12 @@ Target: 8-12 lines.
 
 Target: 10-15 lines.
 
-- [ ] Extract one directional argument-effect mapping helper from the read and
+- [x] Extract one directional argument-effect mapping helper from the read and
       write blocks in `CompilerMethodEffectAnalysis.AddSummary`.
-- [ ] Replace the parallel accumulator loops with
+- [x] Replace the parallel accumulator loops with
       `RecordAccess(..., bool write)`.
-- [ ] Retain thin `Read` and `Write` entrypoints for call-site clarity.
-- [ ] Reuse the existing `Map(value, write)` direction abstraction.
+- [x] Retain thin `Read` and `Write` entrypoints for call-site clarity.
+- [x] Reuse the existing `Map(value, write)` direction abstraction.
 
 Preserve these invariants:
 

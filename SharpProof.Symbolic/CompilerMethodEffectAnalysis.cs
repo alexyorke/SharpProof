@@ -1882,30 +1882,23 @@ internal sealed class MethodEffectAnalysisSession(
             if ((unboundEffects & SharpProofEffect.WritesReceiverState) != 0)
                 mapped |= effects.WriteEffect(receiver ?? EffectFlowValue.Unknown);
             var candidateArguments = arguments.Where(static argument => argument.Roots.Count != 0).ToArray();
-            if ((summary.Effects & SharpProofEffect.ReadsArgumentState) != 0) {
-                EffectFlowValue[] readArguments = readArgumentOrdinals.IsDefault
-                    ? candidateArguments
-                    : [.. readArgumentOrdinals.Where(ordinal => ordinal >= 0 && ordinal < arguments.Count)
-                        .Select(ordinal => arguments[ordinal]).Where(static argument => argument.Roots.Count != 0)];
-                if (readArguments.Length != 0)
-                    mapped |= readArguments.Aggregate(SharpProofEffect.None,
-                        (current, argument) => current | effects.ReadEffect(argument));
-                else if (readArgumentOrdinals.IsDefault)
-                    mapped |= SharpProofEffect.ReadsArgumentState | SharpProofEffect.Unknown;
-            }
-            if ((summary.Effects & SharpProofEffect.WritesArgumentState) != 0) {
-                EffectFlowValue[] writtenArguments = writtenArgumentOrdinals.IsDefault
-                    ? candidateArguments
-                    : [.. writtenArgumentOrdinals.Where(ordinal => ordinal >= 0 && ordinal < arguments.Count)
-                        .Select(ordinal => arguments[ordinal]).Where(static argument => argument.Roots.Count != 0)];
-                if (writtenArguments.Length != 0)
-                    mapped |= writtenArguments.Aggregate(SharpProofEffect.None,
-                        (current, argument) => current | effects.WriteEffect(argument));
-                else if (writtenArgumentOrdinals.IsDefault)
-                    mapped |= SharpProofEffect.WritesArgumentState | SharpProofEffect.Unknown;
-            }
+            MapArgumentAccess(readArgumentOrdinals, write: false);
+            MapArgumentAccess(writtenArgumentOrdinals, write: true);
             mapped |= boundArgumentEffects | boundReceiverEffects;
             effects.AddTransitive(summary with { Effects = mapped }, site.Syntax, target, "source_call");
+            void MapArgumentAccess(ImmutableArray<int> ordinals, bool write) {
+                var effect = write ? SharpProofEffect.WritesArgumentState : SharpProofEffect.ReadsArgumentState;
+                if ((summary.Effects & effect) == 0) return;
+                EffectFlowValue[] selectedArguments = ordinals.IsDefault
+                    ? candidateArguments
+                    : [.. ordinals.Where(ordinal => ordinal >= 0 && ordinal < arguments.Count)
+                        .Select(ordinal => arguments[ordinal]).Where(static argument => argument.Roots.Count != 0)];
+                if (selectedArguments.Length != 0)
+                    mapped |= selectedArguments.Aggregate(SharpProofEffect.None,
+                        (current, argument) => current | (write ? effects.WriteEffect(argument) : effects.ReadEffect(argument)));
+                else if (ordinals.IsDefault)
+                    mapped |= effect | SharpProofEffect.Unknown;
+            }
         }
         private void ApplyRefArguments(
             CompilerMethodEffectSummary summary,
@@ -2166,25 +2159,22 @@ internal sealed class MethodEffectAnalysisSession(
             _capabilities |= capabilities;
             Add(effect, syntax, symbol, reason);
         }
-        internal void Read(EffectFlowValue value, SyntaxNode syntax, ISymbol? symbol, string reason) {
+        internal void Read(EffectFlowValue value, SyntaxNode syntax, ISymbol? symbol, string reason) =>
+            RecordAccess(value, syntax, symbol, reason, write: false);
+        internal void Write(EffectFlowValue value, SyntaxNode syntax, ISymbol? symbol, string reason) =>
+            RecordAccess(value, syntax, symbol, reason, write: true);
+        private void RecordAccess(EffectFlowValue value, SyntaxNode syntax, ISymbol? symbol, string reason, bool write) {
+            var argumentOrdinals = write ? _writtenArgumentOrdinals : _readArgumentOrdinals;
+            var argumentEffect = write ? SharpProofEffect.WritesArgumentState : SharpProofEffect.ReadsArgumentState;
+            var receiverEffect = write ? SharpProofEffect.WritesReceiverState : SharpProofEffect.ReadsReceiverState;
             foreach (var root in value.Roots)
                 if (root is { Kind: EffectValueRootKind.Argument, Ordinal: >= 0 }) {
-                    if (IsFormalArgumentRoot(root)) _readArgumentOrdinals.Add(root.Ordinal);
-                    else BoundArgumentEffects |= SharpProofEffect.ReadsArgumentState;
+                    if (IsFormalArgumentRoot(root)) argumentOrdinals.Add(root.Ordinal);
+                    else BoundArgumentEffects |= argumentEffect;
                 }
                 else if (root.Kind == EffectValueRootKind.Receiver && !IsFormalReceiverRoot(root))
-                    BoundReceiverEffects |= SharpProofEffect.ReadsReceiverState;
-            Add(ReadEffect(value), syntax, symbol, reason);
-        }
-        internal void Write(EffectFlowValue value, SyntaxNode syntax, ISymbol? symbol, string reason) {
-            foreach (var root in value.Roots)
-                if (root is { Kind: EffectValueRootKind.Argument, Ordinal: >= 0 }) {
-                    if (IsFormalArgumentRoot(root)) _writtenArgumentOrdinals.Add(root.Ordinal);
-                    else BoundArgumentEffects |= SharpProofEffect.WritesArgumentState;
-                }
-                else if (root.Kind == EffectValueRootKind.Receiver && !IsFormalReceiverRoot(root))
-                    BoundReceiverEffects |= SharpProofEffect.WritesReceiverState;
-            Add(WriteEffect(value), syntax, symbol, reason);
+                    BoundReceiverEffects |= receiverEffect;
+            Add(Map(value, write), syntax, symbol, reason);
         }
         private bool IsFormalArgumentRoot(EffectValueRoot root) => root.Ordinal < method.Parameters.Length &&
             string.Equals(root.Key, EffectFlowState.SymbolKey(method.Parameters[root.Ordinal]), StringComparison.Ordinal);
