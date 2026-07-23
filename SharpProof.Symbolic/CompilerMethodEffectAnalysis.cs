@@ -2339,8 +2339,24 @@ internal sealed class MethodEffectAnalysisSession(
             method.Parameters[0].Type.ToDisplayString() == "System.Type" &&
             method.Parameters[1] is { RefKind: RefKind.None, Type: IArrayTypeSymbol lengthsType } &&
             lengthsType.ElementType.SpecialType == SpecialType.System_Int32;
+        private static bool IsLengthsAndBoundsArrayCreateInstance(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "CreateInstance",
+                IsStatic: true,
+                Parameters.Length: 3,
+                ReturnType.SpecialType: SpecialType.System_Array,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0].RefKind == RefKind.None &&
+            method.Parameters[0].Type.ToDisplayString() == "System.Type" &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type: IArrayTypeSymbol lengthsType } &&
+            lengthsType.ElementType.SpecialType == SpecialType.System_Int32 &&
+            method.Parameters[2] is { RefKind: RefKind.None, Type: IArrayTypeSymbol boundsType } &&
+            boundsType.ElementType.SpecialType == SpecialType.System_Int32;
         private static bool IsArrayCreateInstance(IMethodSymbol method) =>
-            IsSingleLengthArrayCreateInstance(method) || IsLengthsArrayCreateInstance(method);
+            IsSingleLengthArrayCreateInstance(method) || IsLengthsArrayCreateInstance(method) ||
+            IsLengthsAndBoundsArrayCreateInstance(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2780,6 +2796,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Array", MethodKind.Ordinary, "CreateInstance")
                     when IsLengthsArrayCreateInstance(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
+                ("System.Array", MethodKind.Ordinary, "CreateInstance")
+                    when IsLengthsAndBoundsArrayCreateInstance(method) =>
+                    SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -2934,6 +2953,7 @@ internal sealed class MethodEffectAnalysisSession(
         private static ImmutableArray<int> FrameworkReadArgumentOrdinals(IMethodSymbol method) {
             if (IsMemoryMarshalTryWrite(method) || IsMemoryMarshalWrite(method)) return [1];
             if (IsLengthsArrayCreateInstance(method)) return [1];
+            if (IsLengthsAndBoundsArrayCreateInstance(method)) return [1, 2];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
                    IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) || IsArrayResize(method) ||
                    IsArrayReverse(method) ||
