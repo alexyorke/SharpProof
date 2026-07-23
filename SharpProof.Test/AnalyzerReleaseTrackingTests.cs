@@ -9,7 +9,7 @@ public sealed class AnalyzerReleaseTrackingTests {
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline);
     [Test]
     public void SupportedDiagnosticsAndReleaseFiles_StayInSync() {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = AnalyzerTestHost.GetRepositoryRoot();
         var analyzerDirectory = Path.Combine(repositoryRoot, "SharpProof.Analyzer");
         var newRuleIds = Directory
             .EnumerateFiles(analyzerDirectory, "AnalyzerReleases.*.md")
@@ -31,7 +31,8 @@ public sealed class AnalyzerReleaseTrackingTests {
     }
     [Test]
     public void AnalyzerProject_DoesNotSuppressReleaseTrackingRules() {
-        var project = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "SharpProof.Analyzer", "SharpProof.Analyzer.csproj"));
+        var project = File.ReadAllText(Path.Combine(
+            AnalyzerTestHost.GetRepositoryRoot(), "SharpProof.Analyzer", "SharpProof.Analyzer.csproj"));
         Assert.That(project, Does.Not.Contain("RS2007"));
         Assert.That(project, Does.Not.Contain("RS2008"));
     }
@@ -48,13 +49,5 @@ public sealed class AnalyzerReleaseTrackingTests {
             var match = ReleaseRuleRow.Match(trimmed);
             if (match.Success) yield return match.Groups[1].Value;
         }
-    }
-    private static string FindRepositoryRoot() {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null) {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException("Could not find repository root.");
     }
 }

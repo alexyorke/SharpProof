@@ -91,7 +91,8 @@ public sealed class UnifiedCliTests {
     [Test]
     public async Task CliHelpAndSmtLifecycleDocumentationStayConsistent() {
         var result = await SymbolicCliTestHost.RunAsync("--help");
-        var documentation = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "docs", "smt-lifecycle.md"));
+        var documentation = File.ReadAllText(Path.Combine(
+            AnalyzerTestHost.GetRepositoryRoot(), "docs", "smt-lifecycle.md"));
         var options = new[] {
             "--file", "--target", "--facets", "--condition", "--format",
             "--fail-on-unknown", "--fail-on-disproven"
@@ -110,13 +111,5 @@ public sealed class UnifiedCliTests {
         var path = Path.Combine(Path.GetTempPath(), "SharpProofCli-" + Guid.NewGuid().ToString("N") + ".cs");
         File.WriteAllText(path, source);
         return path;
-    }
-    private static string FindRepositoryRoot() {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null) {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException("Could not find repository root.");
     }
 }

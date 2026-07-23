@@ -162,12 +162,12 @@ Expected net reduction: approximately 24 lines.
 
 ### 1.5 Reuse the existing repository-root helper
 
-- [ ] Replace the local walker in
+- [x] Replace the local walker in
       `SharpProof.Test/AnalyzerReleaseTrackingTests.cs` near line 52 with
       `AnalyzerTestHost.GetRepositoryRoot`.
-- [ ] Replace the local walker in
+- [x] Replace the local walker in
       `SharpProof.ToolingTest/UnifiedCliTests.cs` near line 114 the same way.
-- [ ] Delete both duplicate walkers.
+- [x] Delete both duplicate walkers.
 
 Expected reduction: 16 lines.
 
