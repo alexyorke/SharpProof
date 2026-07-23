@@ -1315,14 +1315,14 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private EffectFlowValue EvaluateCreation(IObjectCreationOperation creation, ref EffectFlowState state) {
             var arguments = EvaluateArguments(creation.Arguments, ref state);
-            var spanArrayConstructor = IsSpanArrayConstructor(creation.Constructor);
-            var value = spanArrayConstructor && arguments.Count == 1
+            var arrayBackedViewConstructor = IsArrayBackedMemoryViewConstructor(creation.Constructor);
+            var value = arrayBackedViewConstructor && arguments.Count == 1
                 ? arguments[0].WithExactType(creation.Type).AsDefinitelyNonNull()
                 : EffectFlowValue.Fresh(creation.Type);
             if (creation.Type?.IsReferenceType == true)
                 effects.Add(SharpProofEffect.Allocates, creation.Syntax, creation.Type, "object_allocation");
             AddConstructionTypeInitializerEffects(creation.Type, creation);
-            if (creation.Constructor != null && !spanArrayConstructor) {
+            if (creation.Constructor != null && !arrayBackedViewConstructor) {
                 var summary = GetSummary(creation.Constructor, null);
                 AddSummary(summary.Effects, value, arguments, creation, creation.Constructor,
                     summary.WrittenArgumentOrdinals, summary.ReadArgumentOrdinals,
@@ -1829,11 +1829,12 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private static bool IsInlineArray(ITypeSymbol? type) => type?.GetAttributes().Any(static attribute =>
             attribute.AttributeClass?.ToDisplayString() == "System.Runtime.CompilerServices.InlineArrayAttribute") == true;
-        private static bool IsSpanArrayConstructor(IMethodSymbol? method) =>
+        private static bool IsArrayBackedMemoryViewConstructor(IMethodSymbol? method) =>
             method is { MethodKind: MethodKind.Constructor, Parameters.Length: 1 } &&
             method.Parameters[0].Type is IArrayTypeSymbol &&
             method.ContainingType.OriginalDefinition.ToDisplayString() is
-                "System.Span<T>" or "System.ReadOnlySpan<T>";
+                "System.Span<T>" or "System.ReadOnlySpan<T>" or
+                "System.Memory<T>" or "System.ReadOnlyMemory<T>";
         private static bool IsSpanIndexer(IPropertySymbol property) =>
             property.IsIndexer &&
             property.ContainingType.OriginalDefinition.ToDisplayString() is
