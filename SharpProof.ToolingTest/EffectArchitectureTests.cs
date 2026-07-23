@@ -123,20 +123,13 @@ public sealed class EffectArchitectureTests {
                     file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar) ||
                     !extensions.Contains(Path.GetExtension(file))) continue;
                 var text = File.ReadAllText(file);
-                foreach (var value in forbidden)
+                var forbiddenForFile = relativeRoot == "SharpProof.Symbolic" && Path.GetExtension(file) == ".cs"
+                    ? forbidden.Concat(["System.Text.Json.Serialization", "JsonPropertyOrder", "JsonIgnore"])
+                    : forbidden;
+                foreach (var value in forbiddenForFile)
                     Assert.That(text, Does.Not.Contain(value), $"Forbidden legacy surface in {file}: {value}");
                 Assert.That(legacyDiagnostic.IsMatch(text), Is.False, $"Disabled diagnostic returned in {file}");
             }
-        }
-        foreach (var file in Directory.EnumerateFiles(Path.Combine(root, "SharpProof.Symbolic"), "*.cs", SearchOption.AllDirectories)) {
-            if (file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)) continue;
-            var text = File.ReadAllText(file);
-            Assert.That(text, Does.Not.Contain("System.Text.Json.Serialization"),
-                $"Symbolic JSON presentation annotation returned in {file}");
-            Assert.That(text, Does.Not.Contain("JsonPropertyOrder"),
-                $"Symbolic JSON property ordering returned in {file}");
-            Assert.That(text, Does.Not.Contain("JsonIgnore"),
-                $"Symbolic JSON property filtering returned in {file}");
         }
     }
     [Test]
