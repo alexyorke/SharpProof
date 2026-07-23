@@ -33,9 +33,6 @@ internal static class Z3RegexPatternNormalizer {
         bool canUseIgnoreCase,
         out RegexOptionScope nextScope) {
         nextScope = currentScope;
-        var nextIgnorePatternWhitespace = currentScope.IgnorePatternWhitespace;
-        var nextSingleline = currentScope.Singleline;
-        var nextIgnoreCase = currentScope.IgnoreCase;
         var sawOption = false;
         var sawDisableSeparator = false;
         while (position < pattern.Length && pattern[position] != terminator) {
@@ -46,34 +43,19 @@ internal static class Z3RegexPatternNormalizer {
                 position++;
                 continue;
             }
-            if (current == 'n') {
-                sawOption = true;
-                position++;
-                continue;
-            }
-            if (current == 'x') {
-                sawOption = true;
-                nextIgnorePatternWhitespace = !sawDisableSeparator;
-                position++;
-                continue;
-            }
-            if (current == 's') {
-                sawOption = true;
-                nextSingleline = !sawDisableSeparator;
-                position++;
-                continue;
-            }
-            if (current == 'i' && canUseIgnoreCase) {
-                sawOption = true;
-                nextIgnoreCase = !sawDisableSeparator;
-                position++;
-                continue;
-            }
-            return false;
+            if (current is not ('n' or 'x' or 's') && (current != 'i' || !canUseIgnoreCase)) return false;
+            sawOption = true;
+            var enabled = !sawDisableSeparator;
+            nextScope = current switch {
+                'x' => nextScope with { IgnorePatternWhitespace = enabled },
+                's' => nextScope with { Singleline = enabled },
+                'i' => nextScope with { IgnoreCase = enabled },
+                _ => nextScope
+            };
+            position++;
         }
         if (!sawOption || position >= pattern.Length || pattern[position] != terminator) return false;
         position++;
-        nextScope = new RegexOptionScope(nextIgnorePatternWhitespace, nextSingleline, nextIgnoreCase);
         return true;
     }
     internal static void SkipIgnoredTrivia(string pattern, ref int position, bool ignorePatternWhitespace) {

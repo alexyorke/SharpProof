@@ -405,16 +405,16 @@ Target: 50-65 lines, low-medium risk.
 
 Target: 35-45 lines, medium risk.
 
-- [ ] Replace the four repeated option branches in
+- [x] Replace the four repeated option branches in
       `Z3RegexPatternNormalizer` with one switch/update path.
-- [ ] Replace the three translator booleans with one `RegexOptionScope`.
-- [ ] Collapse repeated `*`, `+`, and `?` quantifier handling.
-- [ ] Delegate the string character-range overload to the existing range
+- [x] Replace the three translator booleans with one `RegexOptionScope`.
+- [x] Collapse repeated `*`, `+`, and `?` quantifier handling.
+- [x] Delegate the string character-range overload to the existing range
       overload.
-- [ ] Remove the duplicate range merge after
+- [x] Remove the duplicate range merge after
       `Z3RegexCharacterRanges.Complement`.
-- [ ] Factor repeated parts-to-concat construction.
-- [ ] Add a missing `(?n)` regression case.
+- [x] Factor repeated parts-to-concat construction.
+- [x] Add a missing `(?n)` regression case.
 
 Use the existing regex smoke matrix as the main validation surface.
 

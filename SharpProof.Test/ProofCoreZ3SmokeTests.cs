@@ -189,6 +189,8 @@ internal class ProofCoreZ3SmokeTests {
             @"\A(?i)ab\z", RegexConstraint.Equal, "AB", options: RegexOptions.CultureInvariant);
         yield return CreateRegexCase("SmtSolver_InlineIgnoreCaseDisableMakesFollowingLiteralCaseSensitive", Feasibility.Unsatisfiable,
             @"\A(?i)ab(?-i)c\z", RegexConstraint.Equal, "ABC", options: RegexOptions.CultureInvariant);
+        yield return CreateRegexCase("SmtSolver_InlineExplicitCaptureOptionBeforeAnchorPreservesMatch", Feasibility.Unsatisfiable,
+            @"(?n)\AA\z", RegexConstraint.NotEqual, "A");
         yield return CreateRegexCase("SmtSolver_InlineIgnorePatternWhitespaceOptionSkipsRemainderTrivia", Feasibility.Unsatisfiable,
             "\\A(?x)A B # ignored comment\n C\\z", RegexConstraint.NotEqual, "ABC");
         yield return CreateRegexCase("SmtSolver_InlineSinglelineDisableMakesFollowingDotRejectsNewline", Feasibility.Unsatisfiable,
