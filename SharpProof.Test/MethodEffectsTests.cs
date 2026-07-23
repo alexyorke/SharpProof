@@ -2161,6 +2161,24 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Disproven,
             required: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Unknown);
+        yield return Effect("BufferByteLengthIsReadOnly", """
+            class C {
+                static int M(System.Array values) => System.Buffer.ByteLength(values);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("BufferByteLengthSupportsConcreteArrays", """
+            class C {
+                static int M(int[] values) => System.Buffer.ByteLength(values);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
