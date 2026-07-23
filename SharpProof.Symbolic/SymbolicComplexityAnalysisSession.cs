@@ -82,7 +82,7 @@ internal sealed class SymbolicComplexityAnalysisSession {
         if (constant is { HasValue: true, Value: bool value })
             return Sequence(condition, AnalyzeOperation(
                 value ? operation.WhenTrue : operation.WhenFalse, model, method));
-        return Sequence(condition, Branch(
+        return Sequence(condition, Sequence(
             AnalyzeOperation(operation.WhenTrue, model, method),
             AnalyzeOperation(operation.WhenFalse, model, method)));
     }
@@ -192,18 +192,18 @@ internal sealed class SymbolicComplexityAnalysisSession {
     }
 
     private Summary AnalyzeSwitch(ISwitchOperation operation, SemanticModel model, IMethodSymbol method) =>
-        Sequence(AnalyzeOperation(operation.Value, model, method), Branch(operation.Cases.Select(@case =>
+        Sequence(AnalyzeOperation(operation.Value, model, method), Sequence(operation.Cases.Select(@case =>
             Sequence(@case.Clauses.Select(clause => AnalyzeOperation(clause, model, method))
                 .Concat(@case.Body.Select(item => AnalyzeOperation(item, model, method)))))));
 
     private Summary AnalyzeSwitchExpression(
         ISwitchExpressionOperation operation, SemanticModel model, IMethodSymbol method) =>
-        Sequence(AnalyzeOperation(operation.Value, model, method), Branch(operation.Arms.Select(arm =>
+        Sequence(AnalyzeOperation(operation.Value, model, method), Sequence(operation.Arms.Select(arm =>
             Sequence(AnalyzeOperation(arm.Pattern, model, method),
                 AnalyzeOperation(arm.Guard, model, method), AnalyzeOperation(arm.Value, model, method)))));
 
     private Summary AnalyzeTry(ITryOperation operation, SemanticModel model, IMethodSymbol method) =>
-        Sequence(Branch(operation.Catches.Select(@catch => AnalyzeOperation(@catch.Handler, model, method))
+        Sequence(Sequence(operation.Catches.Select(@catch => AnalyzeOperation(@catch.Handler, model, method))
                 .Prepend(AnalyzeOperation(operation.Body, model, method))),
             AnalyzeOperation(operation.Finally, model, method));
 
@@ -545,16 +545,13 @@ internal sealed class SymbolicComplexityAnalysisSession {
         property.IsIndexer && property.ContainingType.SpecialType == SpecialType.System_String;
 
     private static Summary Sequence(params Summary[] parts) => Sequence(parts.AsEnumerable());
-    private static Summary Sequence(IEnumerable<Summary> parts) => Combine(parts, Cost.Max);
-    private static Summary Branch(params Summary[] parts) => Branch(parts.AsEnumerable());
-    private static Summary Branch(IEnumerable<Summary> parts) => Combine(parts, Cost.Max);
-    private static Summary Combine(IEnumerable<Summary> parts, Func<Cost, Cost, Cost> combine) {
+    private static Summary Sequence(IEnumerable<Summary> parts) {
         var cost = Cost.Constant;
         var drivers = new List<SymbolicComplexityDriverInfo>();
         var reasons = new List<SymbolicComplexityUnknownReason>();
         var callees = new List<SymbolicComplexityCalleeInfo>();
         foreach (var part in parts) {
-            cost = combine(cost, part.Cost);
+            cost = Cost.Max(cost, part.Cost);
             drivers.AddRange(part.Drivers);
             reasons.AddRange(part.Reasons);
             callees.AddRange(part.Callees);

@@ -1102,15 +1102,9 @@ internal sealed class MethodEffectAnalysisSession(
             if (expression == null || semanticModel.GetConstantValue(expression.GoverningExpression, session.CancellationToken) is not
                 { HasValue: true } value) return false;
             foreach (var arm in expression.Arms) {
-                if (!CanEvaluatePattern(arm.Pattern, value.Value)) return false;
-                if (!Matches(arm.Pattern, value.Value)) continue;
-                if (arm.WhenClause == null) {
-                    selected = arm;
-                    return true;
-                }
-                var guard = semanticModel.GetConstantValue(arm.WhenClause.Condition, session.CancellationToken);
-                if (guard is not { HasValue: true, Value: bool condition }) return false;
-                if (!condition) continue;
+                var match = MatchPatternAndGuard(arm.Pattern, arm.WhenClause, value.Value);
+                if (!match.HasValue) return false;
+                if (!match.Value) continue;
                 selected = arm;
                 return true;
             }
@@ -1130,21 +1124,22 @@ internal sealed class MethodEffectAnalysisSession(
                         return true;
                     }
                     if (label is not CasePatternSwitchLabelSyntax pattern) continue;
-                    if (!CanEvaluatePattern(pattern.Pattern, value.Value)) return false;
-                    if (!Matches(pattern.Pattern, value.Value)) continue;
-                    if (pattern.WhenClause == null) {
-                        selected = section;
-                        return true;
-                    }
-                    var guard = semanticModel.GetConstantValue(pattern.WhenClause.Condition, session.CancellationToken);
-                    if (guard is not { HasValue: true, Value: bool condition }) return false;
-                    if (!condition) continue;
+                    var match = MatchPatternAndGuard(pattern.Pattern, pattern.WhenClause, value.Value);
+                    if (!match.HasValue) return false;
+                    if (!match.Value) continue;
                     selected = section;
                     return true;
                 }
             selected ??= statement.Sections.FirstOrDefault(section =>
                 section.Labels.Any(static label => label is DefaultSwitchLabelSyntax));
             return selected != null;
+        }
+        private bool? MatchPatternAndGuard(PatternSyntax pattern, WhenClauseSyntax? whenClause, object? value) {
+            if (!CanEvaluatePattern(pattern, value)) return null;
+            if (!Matches(pattern, value)) return false;
+            return whenClause == null
+                ? true
+                : semanticModel.GetConstantValue(whenClause.Condition, session.CancellationToken) is { HasValue: true, Value: bool condition } ? condition : null;
         }
         private bool CanEvaluatePattern(PatternSyntax pattern, object? value) => pattern switch {
             DiscardPatternSyntax or VarPatternSyntax => true,

@@ -9,17 +9,10 @@ internal sealed record SymbolicAnalysisTruncationEvent(
     string Provenance,
     int? SourceSpanStart) {
     public string Code { get; } = GetCode(Kind);
-    private static string GetCode(SymbolicAnalysisLimitKind value) {
-        var text = value.ToString();
-        var snakeBuilder = new System.Text.StringBuilder(text.Length + 8);
-        for (var index = 0; index < text.Length; index++) {
-            var character = text[index];
-            if (index != 0 && char.IsUpper(character)) snakeBuilder.Append('_');
-            snakeBuilder.Append(char.ToLowerInvariant(character));
-        }
-        var snake = snakeBuilder.ToString();
-        return "analysis_limit." + (Enum.IsDefined(typeof(SymbolicAnalysisLimitKind), value) ? snake : "unknown");
-    }
+    private static string GetCode(SymbolicAnalysisLimitKind value) => value switch {
+        SymbolicAnalysisLimitKind.TryFactMerge => "analysis_limit.try_fact_merge",
+        _ => "analysis_limit.unknown"
+    };
 }
 internal sealed record SymbolicAnalysisTruncationInfo(IReadOnlyList<SymbolicAnalysisTruncationEvent> Events) {
     public static readonly SymbolicAnalysisTruncationInfo None = new(Array.Empty<SymbolicAnalysisTruncationEvent>());

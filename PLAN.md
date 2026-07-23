@@ -366,17 +366,17 @@ visits interfaces only when the receiver itself is an interface.
 
 Target: 24-39 lines in total.
 
-- [ ] Share the rank-dimension multiplication fold between reference arrays and
+- [x] Share the rank-dimension multiplication fold between reference arrays and
       array creation in `SymbolicIndexingLowerer`: 4-7 lines.
-- [ ] Share narrowly typed validation for `System.Range` and `System.Index`
+- [x] Share narrowly typed validation for `System.Range` and `System.Index`
       factory and constructor shapes: 6-10 lines.
-- [ ] Consider replacing the generic PascalCase-to-snake builder in
+- [x] Consider replacing the generic PascalCase-to-snake builder in
       `SymbolicAnalysisLimits` with an exhaustive switch for its single enum
       member: 7-9 lines. Accept only if the compile-time maintenance tradeoff
       is preferred.
-- [ ] Replace identical `Sequence` and `Branch` `Cost.Max` wrappers with one
+- [x] Replace identical `Sequence` and `Branch` `Cost.Max` wrappers with one
       implementation in `SymbolicComplexityAnalysisSession`: 2-5 lines.
-- [ ] Share only pattern-plus-guard evaluation between `TrySelectArm` and
+- [x] Share only pattern-plus-guard evaluation between `TrySelectArm` and
       `TrySelectSection`: 5-8 lines.
 
 Do not attempt a broad switch-selector abstraction. Statement switches retain

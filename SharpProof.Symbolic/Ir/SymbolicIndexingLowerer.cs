@@ -277,19 +277,13 @@ internal static class SymbolicIndexingLowerer {
     internal static bool HasCountBackedIntIndexer(ITypeSymbol? typeSymbol)
         => SymbolicTypeFacts.HasInstanceInt32Member(typeSymbol, "Count") &&
                SymbolicTypeFacts.HasInt32Indexer(typeSymbol);
-    private static bool TryCreateArrayTotalLengthReferenceTerm(SymbolicTerm arrayTerm, IArrayTypeSymbol arrayType, out SymbolicTerm term) {
-        term = null!;
-        if (arrayTerm.Kind != SmtValueKind.Reference ||
-            arrayType.Rank <= 0)
-            return false;
-        SymbolicTerm totalLength = new SymbolicArrayDimensionLengthTerm(arrayTerm, 0);
-        for (var dimension = 1; dimension < arrayType.Rank; dimension++)
-            totalLength = new SymbolicBinaryTerm(
-                SymbolicBinaryTermOperator.Multiply,
-                totalLength,
-                new SymbolicArrayDimensionLengthTerm(arrayTerm, dimension));
-        term = totalLength;
-        return true;
+    private static bool TryCreateArrayTotalLengthReferenceTerm(
+        SymbolicTerm arrayTerm, IArrayTypeSymbol arrayType, out SymbolicTerm term) {
+        term = arrayTerm.Kind == SmtValueKind.Reference
+            ? MultiplyArrayDimensionLengths(
+                arrayType.Rank, dimension => new SymbolicArrayDimensionLengthTerm(arrayTerm, dimension))!
+            : null!;
+        return term != null;
     }
     private static bool CreateLengthTerm(SymbolicTerm value, out SymbolicTerm term) {
         term = new SymbolicLengthTerm(value);
@@ -300,17 +294,19 @@ internal static class SymbolicIndexingLowerer {
         IArrayTypeSymbol arrayType,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
-        term = null!;
-        if (arrayType.Rank <= 0 ||
-            !TryLowerArrayCreationDimensionLengthTerm(arrayExpression, arrayType, 0, context, out var totalLength))
-            return false;
-        for (var dimension = 1; dimension < arrayType.Rank; dimension++) {
-            if (!TryLowerArrayCreationDimensionLengthTerm(arrayExpression, arrayType, dimension, context,
-                out var dimensionLength)) return false;
-            totalLength = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Multiply, totalLength, dimensionLength);
+        term = MultiplyArrayDimensionLengths(arrayType.Rank,
+            dimension => TryLowerArrayCreationDimensionLengthTerm(
+                arrayExpression, arrayType, dimension, context, out var length) ? length : null)!;
+        return term != null;
+    }
+    private static SymbolicTerm? MultiplyArrayDimensionLengths(int rank, Func<int, SymbolicTerm?> getLength) {
+        var term = rank > 0 ? getLength(0) : null;
+        for (var dimension = 1; dimension < rank; dimension++) {
+            var length = getLength(dimension);
+            if (term == null || length == null) return null;
+            term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Multiply, term, length);
         }
-        term = totalLength;
-        return true;
+        return term;
     }
     private static bool TryLowerArrayCreationDimensionLengthTerm(
         ExpressionSyntax arrayExpression,
@@ -1026,11 +1022,7 @@ internal static class SymbolicIndexingLowerer {
         out RangeLengthShape rangeShape) {
         rangeShape = default;
         if (!TryGetInvocationOperation(expression, context, out _, out var invocationOperation) ||
-            invocationOperation.TargetMethod.MethodKind != MethodKind.Ordinary ||
-            invocationOperation.TargetMethod.ReturnType is not { } returnType ||
-            !SymbolicTypeFacts.IsSystemRangeType(returnType, context.SemanticModel.Compilation) ||
-            invocationOperation.TargetMethod.ContainingType is not { } containingType ||
-            !SymbolicTypeFacts.IsSystemRangeType(containingType, context.SemanticModel.Compilation))
+            !IsBuiltInShapeMethod(invocationOperation.TargetMethod, context, SymbolicTypeFacts.IsSystemRangeType, true))
             return false;
         var startsAt = invocationOperation.TargetMethod.Name == "StartAt";
         if (!startsAt && invocationOperation.TargetMethod.Name != "EndAt" ||
@@ -1049,9 +1041,7 @@ internal static class SymbolicIndexingLowerer {
         rangeShape = default;
         if (context.SemanticModel.GetOperation(expression, context.CancellationToken) is not
                 IObjectCreationOperation objectCreationOperation ||
-            objectCreationOperation.Constructor == null ||
-            !SymbolicTypeFacts.IsSystemRangeType(
-                objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
+            !IsBuiltInShapeMethod(objectCreationOperation.Constructor, context, SymbolicTypeFacts.IsSystemRangeType) ||
             !SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var startExpression) ||
             !SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var endExpression) ||
             !TryResolveBuiltInIndexLengthShape(startExpression, context, out var start) ||
@@ -1081,11 +1071,7 @@ internal static class SymbolicIndexingLowerer {
         out IndexLengthShape indexShape) {
         indexShape = default;
         if (!TryGetInvocationOperation(expression, context, out _, out var invocationOperation) ||
-            invocationOperation.TargetMethod.MethodKind != MethodKind.Ordinary ||
-            invocationOperation.TargetMethod.ReturnType is not { } returnType ||
-            !SymbolicTypeFacts.IsSystemIndexType(returnType, context.SemanticModel.Compilation) ||
-            invocationOperation.TargetMethod.ContainingType is not { } containingType ||
-            !SymbolicTypeFacts.IsSystemIndexType(containingType, context.SemanticModel.Compilation) ||
+            !IsBuiltInShapeMethod(invocationOperation.TargetMethod, context, SymbolicTypeFacts.IsSystemIndexType, true) ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var valueExpression))
             return false;
         var fromEnd = invocationOperation.TargetMethod.Name == "FromEnd";
@@ -1100,9 +1086,7 @@ internal static class SymbolicIndexingLowerer {
         indexShape = default;
         if (context.SemanticModel.GetOperation(expression, context.CancellationToken) is not
                 IObjectCreationOperation objectCreationOperation ||
-            objectCreationOperation.Constructor == null ||
-            !SymbolicTypeFacts.IsSystemIndexType(
-                objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
+            !IsBuiltInShapeMethod(objectCreationOperation.Constructor, context, SymbolicTypeFacts.IsSystemIndexType) ||
             !SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var valueExpression))
             return false;
         if (!SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var fromEndExpression)) {
@@ -1113,6 +1097,12 @@ internal static class SymbolicIndexingLowerer {
         indexShape = new IndexLengthShape(valueExpression, fromEnd, true);
         return true;
     }
+    private static bool IsBuiltInShapeMethod(IMethodSymbol? method, SymbolicLoweringContext context,
+        Func<ITypeSymbol?, Compilation, bool> isShapeType,
+        bool validateReturnType = false) => method != null &&
+               isShapeType(method.ContainingType, context.SemanticModel.Compilation) &&
+               (!validateReturnType || method.MethodKind == MethodKind.Ordinary &&
+                isShapeType(method.ReturnType, context.SemanticModel.Compilation));
     private static bool IsSupportedBuiltInElementAccessReceiver(ITypeSymbol? typeSymbol) => typeSymbol is IArrayTypeSymbol { Rank: 1 } ||
                typeSymbol?.SpecialType == SpecialType.System_String ||
                SymbolicTypeFacts.IsBuiltInSpanType(typeSymbol) ||
