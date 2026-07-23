@@ -1409,6 +1409,10 @@ internal sealed class MethodEffectAnalysisSession(
             ImmutableArray<IArgumentOperation> arguments,
             IOperation site,
             ref EffectFlowState state) {
+            if (TryGetArrayAsSpanSource(target, receiver, values, out var spanSource)) {
+                effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+                return spanSource.WithExactType(target.ReturnType).AsDefinitelyNonNull();
+            }
             if (target.MethodKind == MethodKind.LocalFunction) {
                 var declaration = target.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(session.CancellationToken);
                 if (declaration != null && semanticModel.GetOperation(declaration, session.CancellationToken) is ILocalFunctionOperation local) {
@@ -1832,6 +1836,30 @@ internal sealed class MethodEffectAnalysisSession(
             property.IsIndexer &&
             property.ContainingType.OriginalDefinition.ToDisplayString() is
                 "System.Span<T>" or "System.ReadOnlySpan<T>";
+        private static bool TryGetArrayAsSpanSource(
+            IMethodSymbol method,
+            EffectFlowValue receiver,
+            IReadOnlyList<EffectFlowValue> arguments,
+            out EffectFlowValue source) {
+            source = EffectFlowValue.None;
+            var definition = method.ReducedFrom ?? method;
+            if (definition is not {
+                Name: "AsSpan",
+                ContainingType: { } containingType,
+                Parameters.Length: > 0
+            } ||
+                containingType.ToDisplayString() != "System.MemoryExtensions" ||
+                definition.Parameters[0].Type is not IArrayTypeSymbol ||
+                method.ReturnType.OriginalDefinition.ToDisplayString() is not
+                    ("System.Span<T>" or "System.ReadOnlySpan<T>"))
+                return false;
+            source = method.ReducedFrom != null
+                ? receiver
+                : arguments.Count == 0
+                    ? EffectFlowValue.Unknown
+                    : arguments[0];
+            return true;
+        }
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {

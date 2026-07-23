@@ -588,6 +588,31 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.WritesArgumentState,
             forbidden: SharpProofEffect.WritesFreshOwnedState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("ArrayAsSpanMutationWritesArrayArgumentState", """
+            using System;
+            class C {
+                static void M(int[] values) {
+                    var span = values.AsSpan();
+                    span[0] = 1;
+                }
+            }
+            """, 3,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.WritesFreshOwnedState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("StaticArrayAsSpanMutationWritesArrayArgumentState", """
+            class C {
+                static void M(int[] values) {
+                    var span = System.MemoryExtensions.AsSpan(values);
+                    span[0] = 1;
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.WritesFreshOwnedState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
