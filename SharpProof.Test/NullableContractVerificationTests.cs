@@ -92,6 +92,37 @@ public sealed class NullableContractVerificationTests {
             "public static string Select(bool valid)\n{\n    if (valid) return \"value\";\n    return null;\n}", Nullable));
         Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == "SP0041"), Is.EqualTo(1));
     }
+    [Test]
+    public async Task InterfaceNotNullReturnContractAppliesToImplementation() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IValueSource {
+                [return: NotNull]
+                string? GetValue();
+            }
+            public sealed class ValueSource : IValueSource {
+                public string? GetValue() => null;
+            }
+            """);
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Contain("SP0041"));
+    }
+    [Test]
+    public async Task AsyncInterfaceNonNullResultContractAppliesToImplementation() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            public interface IValueSource {
+                System.Threading.Tasks.Task<string> GetValueAsync();
+            }
+            public sealed class ValueSource : IValueSource {
+                public async System.Threading.Tasks.Task<string?> GetValueAsync() {
+                    await System.Threading.Tasks.Task.Yield();
+                    return null;
+                }
+            }
+            """);
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Contain("SP0041"));
+    }
     private static string Class(string members, string directives, bool isStatic = true) =>
         SemanticTestSource.Class(members, directives).Replace(
             "public class TestClass",

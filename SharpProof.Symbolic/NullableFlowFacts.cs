@@ -209,7 +209,11 @@ internal static class NullableFlowFacts {
     }
     internal static NullableFlowFactState GetMethodBodyReturnState(IMethodSymbol method) {
         if (method == null) throw new ArgumentNullException(nameof(method));
-        if (!method.IsAsync) return GetMethodReturnState(method);
+        return GetMethodBodyReturnState(method, method.IsAsync);
+    }
+    internal static NullableFlowFactState GetMethodBodyReturnState(IMethodSymbol method, bool isAsyncBody) {
+        if (method == null) throw new ArgumentNullException(nameof(method));
+        if (!isAsyncBody) return GetMethodReturnState(method);
         if (method.ReturnType is not INamedTypeSymbol {
             TypeArguments.Length: 1,
             TypeArgumentNullableAnnotations.Length: 1

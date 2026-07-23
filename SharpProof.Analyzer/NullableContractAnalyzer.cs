@@ -16,7 +16,10 @@ internal static class NullableContractAnalyzer {
         ImmutableArray<MethodNormalCompletion> completions) {
         var method = context.MethodSymbol;
         if (method.ReturnsVoid || method.ReturnType.SpecialType == SpecialType.System_Void) return;
-        var requiresNonNull = NullableFlowFacts.GetMethodBodyReturnState(method) == NullableFlowFactState.NotNull;
+        var requiresNonNull = MethodContractHierarchy
+            .EnumerateSources(method, context.CancellationToken)
+            .Any(source => NullableFlowFacts.GetMethodBodyReturnState(source, method.IsAsync) ==
+                           NullableFlowFactState.NotNull);
         var conditionalInputNames = NullableFlowFacts.GetNotNullIfNotNullParameterNames(method);
         if (!requiresNonNull && conditionalInputNames.IsEmpty) return;
         foreach (var completion in completions) {
