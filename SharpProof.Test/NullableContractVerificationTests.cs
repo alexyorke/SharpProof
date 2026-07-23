@@ -18,6 +18,11 @@ public sealed class NullableContractVerificationTests {
         yield return Case("NotNullIfNotNull_ConditionalAccess_DoesNotReport",
             Class("[return: NotNullIfNotNull(nameof(value))]\npublic static string? Normalize(string? value) => value?.Trim();",
                 CodeAnalysis), "SP0041", false);
+        yield return Case("NotNullIfNotNull_SecondContractViolation_ReportsViolation",
+            Class("[return: NotNullIfNotNull(nameof(first))]\n[return: NotNullIfNotNull(nameof(second))]\n" +
+                  "public static string? Select(string? first, string? second)\n{\n" +
+                  "    if (first is null) return null;\n    return first;\n}", CodeAnalysis),
+                "SP0041", true);
         yield return Case("MemberNotNull_AssignedNonNull_DoesNotReport",
             Class("private string? _name;\n\n[MemberNotNull(nameof(_name))]\npublic void Initialize()\n{\n    _name = \"default\";\n}",
                 CodeAnalysis, false), "SP0043", false);

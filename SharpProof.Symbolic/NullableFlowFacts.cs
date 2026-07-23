@@ -263,10 +263,13 @@ internal static class NullableFlowFacts {
                 return false;
         }
     }
+    internal static ImmutableArray<string> GetNotNullIfNotNullParameterNames(IMethodSymbol method) =>
+        GetNotNullIfNotNullParameterNames(GetReturnAttributes(method));
     internal static bool TryGetNotNullIfNotNullParameterName(IMethodSymbol method, out string parameterName) =>
-        TryGetNotNullIfNotNullParameterName(GetReturnAttributes(method), out parameterName);
+        TryGetFirstNotNullIfNotNullParameterName(GetNotNullIfNotNullParameterNames(method), out parameterName);
     internal static bool TryGetNotNullIfNotNullParameterName(IPropertySymbol property, out string parameterName) =>
-        TryGetNotNullIfNotNullParameterName(GetReadAttributes(property), out parameterName);
+        TryGetFirstNotNullIfNotNullParameterName(
+            GetNotNullIfNotNullParameterNames(GetReadAttributes(property)), out parameterName);
     private static NullableFlowFactState GetExactExpressionState(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -457,7 +460,8 @@ internal static class NullableFlowFacts {
             ? target
             : null;
     }
-    private static bool TryGetNotNullIfNotNullParameterName(IEnumerable<AttributeData> attributes, out string parameterName) {
+    private static ImmutableArray<string> GetNotNullIfNotNullParameterNames(IEnumerable<AttributeData> attributes) {
+        var parameterNames = ImmutableArray.CreateBuilder<string>();
         foreach (var attribute in attributes) {
             if (!string.Equals(
                     SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
@@ -467,7 +471,15 @@ internal static class NullableFlowFacts {
                 attribute.ConstructorArguments[0].Value is not string candidate ||
                 string.IsNullOrEmpty(candidate))
                 continue;
-            parameterName = candidate;
+            parameterNames.Add(candidate);
+        }
+        return [.. parameterNames.Distinct(StringComparer.Ordinal)];
+    }
+    private static bool TryGetFirstNotNullIfNotNullParameterName(
+        ImmutableArray<string> parameterNames,
+        out string parameterName) {
+        if (!parameterNames.IsEmpty) {
+            parameterName = parameterNames[0];
             return true;
         }
         parameterName = string.Empty;

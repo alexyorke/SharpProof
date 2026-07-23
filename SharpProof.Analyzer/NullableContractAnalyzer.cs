@@ -17,9 +17,8 @@ internal static class NullableContractAnalyzer {
         var method = context.MethodSymbol;
         if (method.ReturnsVoid || method.ReturnType.SpecialType == SpecialType.System_Void) return;
         var requiresNonNull = NullableFlowFacts.GetMethodBodyReturnState(method) == NullableFlowFactState.NotNull;
-        var hasConditionalContract = NullableFlowFacts.TryGetNotNullIfNotNullParameterName(method, out var inputName);
-        if (!requiresNonNull && !hasConditionalContract) return;
-        var conditionalContract = "[NotNullIfNotNull(\"" + inputName + "\")]";
+        var conditionalInputNames = NullableFlowFacts.GetNotNullIfNotNullParameterNames(method);
+        if (!requiresNonNull && conditionalInputNames.IsEmpty) return;
         foreach (var completion in completions) {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (completion.ResultExpression == null) continue;
@@ -33,18 +32,20 @@ internal static class NullableContractAnalyzer {
                     AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule"),
                     method.Name,
                     "non-null return");
-            if (hasConditionalContract &&
-                method.Parameters.FirstOrDefault(parameter => parameter.Name == inputName) is { RefKind: not RefKind.Out }) {
-                var escapedInput = EscapeIdentifier(inputName);
-                Verify(
-                    context,
-                    session,
-                    completion,
-                    "old(" + escapedInput + ") == null || " + resultText + " != null",
-                    AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule"),
-                    [method.Name, conditionalContract],
-                    CSharpSyntaxFacts.IsNullLiteral(completion.ResultExpression),
-                    true);
+            foreach (var inputName in conditionalInputNames) {
+                if (method.Parameters.FirstOrDefault(parameter => parameter.Name == inputName) is { RefKind: not RefKind.Out }) {
+                    var conditionalContract = "[NotNullIfNotNull(\"" + inputName + "\")]";
+                    var escapedInput = EscapeIdentifier(inputName);
+                    Verify(
+                        context,
+                        session,
+                        completion,
+                        "old(" + escapedInput + ") == null || " + resultText + " != null",
+                        AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule"),
+                        [method.Name, conditionalContract],
+                        CSharpSyntaxFacts.IsNullLiteral(completion.ResultExpression),
+                        true);
+                }
             }
         }
     }
