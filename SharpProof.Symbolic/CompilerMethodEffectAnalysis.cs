@@ -2430,9 +2430,20 @@ internal sealed class MethodEffectAnalysisSession(
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
             method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsIndexesArrayGetValue(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "GetValue",
+                IsStatic: false,
+                Parameters.Length: 1,
+                ReturnType.SpecialType: SpecialType.System_Object,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type: IArrayTypeSymbol indexesType } &&
+            indexesType.ElementType.SpecialType == SpecialType.System_Int32;
         private static bool IsArrayGetValue(IMethodSymbol method) =>
             IsOneIndexArrayGetValue(method) || IsTwoIndexArrayGetValue(method) ||
-            IsThreeIndexArrayGetValue(method);
+            IsThreeIndexArrayGetValue(method) || IsIndexesArrayGetValue(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2882,6 +2893,10 @@ internal sealed class MethodEffectAnalysisSession(
                     when IsThreeScalarLengthsArrayCreateInstance(method) =>
                     SharpProofEffect.Allocates | SharpProofEffect.Throws,
                 ("System.Array", MethodKind.Ordinary, "GetValue")
+                    when IsIndexesArrayGetValue(method) =>
+                    SharpProofEffect.ReadsReceiverState | SharpProofEffect.ReadsArgumentState |
+                    SharpProofEffect.Allocates | SharpProofEffect.Throws,
+                ("System.Array", MethodKind.Ordinary, "GetValue")
                     when IsArrayGetValue(method) =>
                     SharpProofEffect.ReadsReceiverState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
@@ -3046,6 +3061,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsMemoryMarshalTryWrite(method) || IsMemoryMarshalWrite(method)) return [1];
             if (IsLengthsArrayCreateInstance(method)) return [1];
             if (IsLengthsAndBoundsArrayCreateInstance(method)) return [1, 2];
+            if (IsIndexesArrayGetValue(method)) return [0];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
                    IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) || IsArrayResize(method) ||
                    IsArrayReverse(method) ||
