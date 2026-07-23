@@ -54,7 +54,7 @@ internal sealed class SymbolicInvariantService {
             cancellationToken,
             initialState,
             includeCurrentStatementCompletionFacts);
-        return new CollectedProgramPoint(site.SpanStart, pathState, EncodePathState(pathState), limitScope.Snapshot());
+        return new CollectedProgramPoint(pathState, EncodePathState(pathState), limitScope.Snapshot());
     }
     private static SymbolicProgramPointAnalysis CreateAnalysis(
         IReadOnlyList<SmtFormula> formulas,
@@ -119,33 +119,9 @@ internal sealed class SymbolicInvariantService {
         _ => SymbolicReachability.NotChecked
     };
     readonly record struct CollectedProgramPoint(
-        int Position,
         SymbolicState PathState,
         IReadOnlyList<SmtFormula> Formulas,
         SymbolicAnalysisTruncationInfo Truncation);
-}
-internal sealed record SymbolicInvariantFactSummary(IReadOnlyList<string> Facts) {
-    public string MergedInvariantText { get; } = FormatMergedInvariantFacts(Facts);
-    internal static SymbolicInvariantFactSummary Merge(IEnumerable<IEnumerable<string>> factSets) {
-        if (factSets == null) throw new ArgumentNullException(nameof(factSets));
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var facts = new List<string>();
-        foreach (var factSet in factSets) {
-            if (factSet == null) continue;
-            foreach (var fact in factSet)
-                if (!string.IsNullOrWhiteSpace(fact) && seen.Add(fact))
-                    facts.Add(fact);
-        }
-        return new SymbolicInvariantFactSummary(facts);
-    }
-    internal static string FormatMergedInvariantFacts(IReadOnlyList<string> facts) {
-        if (facts == null) throw new ArgumentNullException(nameof(facts));
-        return facts.Count switch {
-            0 => "true",
-            1 => facts[0],
-            _ => string.Join(" && ", facts.Select(static fact => "(" + fact + ")"))
-        };
-    }
 }
 internal sealed record SymbolicProgramPointQueryContext(
     SemanticModel SemanticModel,

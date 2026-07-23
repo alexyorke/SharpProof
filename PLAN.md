@@ -255,15 +255,15 @@ Target: approximately 54-71 net lines.
 
 Target: 20-25 lines.
 
-- [ ] Delete the unused `SymbolicInvariantFactSummary` record and its unused
+- [x] Delete the unused `SymbolicInvariantFactSummary` record and its unused
       `Merge` method in `SymbolicInvariantService.cs` near lines 127-149.
-- [ ] Move the small count-based formatter into
+- [x] Move the small count-based formatter into
       `SymbolicMergedPathFactMerger`.
-- [ ] In `SymbolicQueryFactSummaries.cs`, store formatted strings directly
+- [x] In `SymbolicQueryFactSummaries.cs`, store formatted strings directly
       instead of redundant `(Text, Target)` pairs.
-- [ ] Delete the unreachable whitespace fallback for `Target`.
-- [ ] Preserve first-seen order and ordinal duplicate suppression.
-- [ ] Remove `CollectedProgramPoint.Position`, which is never read.
+- [x] Delete the unreachable whitespace fallback for `Target`.
+- [x] Preserve first-seen order and ordinal duplicate suppression.
+- [x] Remove `CollectedProgramPoint.Position`, which is never read.
 
 Do this as one refactor so the formatter is moved only once.
 

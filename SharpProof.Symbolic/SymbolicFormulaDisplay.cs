@@ -12,6 +12,4 @@ internal static class SymbolicFormulaDisplay {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
         return SmtFormulaStructuralKey.Create(formula);
     }
-
-    internal static string GetMergeTarget(SmtFormula formula) => Format(formula);
 }
