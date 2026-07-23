@@ -2255,8 +2255,22 @@ internal sealed class MethodEffectAnalysisSession(
                 ContainingType.SpecialType: SpecialType.System_Array
             } &&
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array };
+        private static bool IsThreeArgumentNonGenericArrayReverse(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "Reverse",
+                IsStatic: true,
+                IsGenericMethod: false,
+                Parameters.Length: 3,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private static bool IsArrayReverse(IMethodSymbol method) =>
-            IsGenericArrayReverse(method) || IsOneArgumentNonGenericArrayReverse(method);
+            IsGenericArrayReverse(method) || IsOneArgumentNonGenericArrayReverse(method) ||
+            IsThreeArgumentNonGenericArrayReverse(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2763,6 +2777,17 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
                             "framework_array_reverse_model"),
                         MethodExceptionFact.Boundary("System.RankException", MethodExceptionSource.Contract,
+                            "framework_array_reverse_model")
+                    ]
+                : IsThreeArgumentNonGenericArrayReverse(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
+                            "framework_array_reverse_model"),
+                        MethodExceptionFact.Boundary("System.RankException", MethodExceptionSource.Contract,
+                            "framework_array_reverse_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_array_reverse_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                             "framework_array_reverse_model")
                     ]
                 : effects == SharpProofEffect.Throws
