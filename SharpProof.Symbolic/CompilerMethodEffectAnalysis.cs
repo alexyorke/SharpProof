@@ -3000,6 +3000,16 @@ internal sealed class MethodEffectAnalysisSession(
             } &&
             method.ContainingType.ToDisplayString() == "System.BitConverter" &&
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_UInt32 };
+        private static bool IsMathBitIncrement(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "BitIncrement",
+                IsStatic: true,
+                Parameters.Length: 1,
+                ReturnType.SpecialType: SpecialType.System_Double
+            } &&
+            method.ContainingType.ToDisplayString() == "System.Math" &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Double };
         private static bool IsBitConverterToStringArray(IMethodSymbol method) =>
             method is {
                 MethodKind: MethodKind.Ordinary,
@@ -4010,6 +4020,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.BitConverter", MethodKind.Ordinary, "TryWriteBytes")
                     when IsBitConverterTryWriteBytesHalf(method) =>
                     SharpProofEffect.WritesArgumentState,
+                ("System.Math", MethodKind.Ordinary, "BitIncrement")
+                    when IsMathBitIncrement(method) =>
+                    SharpProofEffect.None,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
