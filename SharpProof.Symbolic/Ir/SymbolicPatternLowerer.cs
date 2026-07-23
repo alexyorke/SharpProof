@@ -534,21 +534,11 @@ internal static class SymbolicPatternLowerer {
         return true;
     }
     private static bool TryLowerNullPattern(PatternSyntax pattern, SymbolicLoweringContext context, out bool negate) {
-        pattern = UnwrapPattern(pattern);
-        negate = false;
-        if (pattern is ConstantPatternSyntax constantPattern &&
-            context.SemanticModel.GetConstantValue(constantPattern.Expression, context.CancellationToken) is {
-                HasValue: true,
-                Value: null
-            })
-            return true;
-        if (pattern is UnaryPatternSyntax unaryPattern &&
-            unaryPattern.IsKind(SyntaxKind.NotPattern) &&
-            TryLowerNullPattern(unaryPattern.Pattern, context, out var nestedNegate)) {
-            negate = !nestedNegate;
-            return true;
-        }
-        return false;
+        pattern = UnwrapNegations(pattern, out negate);
+        if (pattern is not ConstantPatternSyntax constantPattern) return false;
+        var constant = context.SemanticModel.GetConstantValue(
+            constantPattern.Expression, context.CancellationToken);
+        return constant is { HasValue: true, Value: null };
     }
     internal static bool TryLowerConstantPatternCondition(
         SymbolicTerm value,
@@ -570,17 +560,10 @@ internal static class SymbolicPatternLowerer {
         return true;
     }
     private static bool TryLowerConstantPattern(PatternSyntax pattern, out ExpressionSyntax constantExpression, out bool negate) {
-        pattern = UnwrapPattern(pattern);
-        negate = false;
+        pattern = UnwrapNegations(pattern, out negate);
         if (pattern is ConstantPatternSyntax constantPattern &&
             !constantPattern.Expression.IsKind(SyntaxKind.NullLiteralExpression)) {
             constantExpression = constantPattern.Expression;
-            return true;
-        }
-        if (pattern is UnaryPatternSyntax unaryPattern &&
-            unaryPattern.IsKind(SyntaxKind.NotPattern) &&
-            TryLowerConstantPattern(unaryPattern.Pattern, out constantExpression, out var nestedNegate)) {
-            negate = !nestedNegate;
             return true;
         }
         constantExpression = null!;
@@ -608,17 +591,10 @@ internal static class SymbolicPatternLowerer {
         out SyntaxKind operatorKind,
         out ExpressionSyntax relationalExpression,
         out bool negate) {
-        pattern = UnwrapPattern(pattern);
-        negate = false;
+        pattern = UnwrapNegations(pattern, out negate);
         if (pattern is RelationalPatternSyntax relationalPattern) {
             operatorKind = relationalPattern.OperatorToken.Kind();
             relationalExpression = relationalPattern.Expression;
-            return true;
-        }
-        if (pattern is UnaryPatternSyntax unaryPattern &&
-            unaryPattern.IsKind(SyntaxKind.NotPattern) &&
-            TryLowerRelationalPattern(unaryPattern.Pattern, out operatorKind, out relationalExpression, out var nestedNegate)) {
-            negate = !nestedNegate;
             return true;
         }
         operatorKind = default;
@@ -649,19 +625,10 @@ internal static class SymbolicPatternLowerer {
         return true;
     }
     private static bool TryLowerEmptyRecursivePattern(PatternSyntax pattern, out bool negate) {
-        pattern = UnwrapPattern(pattern);
-        negate = false;
-        if (pattern is RecursivePatternSyntax recursivePattern &&
-            recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 } &&
-            recursivePattern.PositionalPatternClause is not { Subpatterns.Count: > 0 })
-            return true;
-        if (pattern is UnaryPatternSyntax unaryPattern &&
-            unaryPattern.IsKind(SyntaxKind.NotPattern) &&
-            TryLowerEmptyRecursivePattern(unaryPattern.Pattern, out var nestedNegate)) {
-            negate = !nestedNegate;
-            return true;
-        }
-        return false;
+        pattern = UnwrapNegations(pattern, out negate);
+        return pattern is RecursivePatternSyntax recursivePattern &&
+               recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 } &&
+               recursivePattern.PositionalPatternClause is not { Subpatterns.Count: > 0 };
     }
     internal static bool TryLowerTypePatternCondition(
         SymbolicTerm value,
@@ -697,24 +664,24 @@ internal static class SymbolicPatternLowerer {
         return true;
     }
     private static bool TryLowerTypePattern(PatternSyntax pattern, out TypeSyntax type, out bool negate) {
-        pattern = UnwrapPattern(pattern);
+        pattern = UnwrapNegations(pattern, out negate);
+        type = pattern switch {
+            TypePatternSyntax typePattern => typePattern.Type,
+            DeclarationPatternSyntax declarationPattern => declarationPattern.Type,
+            _ => null!
+        };
+        return type != null;
+    }
+    private static PatternSyntax UnwrapNegations(PatternSyntax pattern, out bool negate) {
         negate = false;
-        if (pattern is TypePatternSyntax typePattern) {
-            type = typePattern.Type;
-            return true;
+        while (true) {
+            pattern = UnwrapPattern(pattern);
+            if (pattern is not UnaryPatternSyntax unaryPattern ||
+                !unaryPattern.IsKind(SyntaxKind.NotPattern))
+                return pattern;
+            negate = !negate;
+            pattern = unaryPattern.Pattern;
         }
-        if (pattern is DeclarationPatternSyntax declarationPattern) {
-            type = declarationPattern.Type;
-            return true;
-        }
-        if (pattern is UnaryPatternSyntax unaryPattern &&
-            unaryPattern.IsKind(SyntaxKind.NotPattern) &&
-            TryLowerTypePattern(unaryPattern.Pattern, out type, out var nestedNegate)) {
-            negate = !nestedNegate;
-            return true;
-        }
-        type = null!;
-        return false;
     }
     private static PatternSyntax UnwrapPattern(PatternSyntax pattern) {
         while (pattern is ParenthesizedPatternSyntax parenthesizedPattern) pattern = parenthesizedPattern.Pattern;
