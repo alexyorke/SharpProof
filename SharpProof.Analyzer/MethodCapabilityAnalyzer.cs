@@ -5,6 +5,7 @@ internal static class MethodCapabilityAnalyzer {
         if (!TryGetAllowedCapabilities(context, out var allowed)) return;
         var method = context.MethodSymbol;
         if (method.IsAbstract) return;
+        if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         foreach (var site in effects.Sites) {
             var disallowed = site.Capabilities & ~allowed;
