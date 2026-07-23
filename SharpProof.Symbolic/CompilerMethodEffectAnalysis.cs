@@ -2021,15 +2021,18 @@ internal sealed class MethodEffectAnalysisSession(
             IReadOnlyList<EffectFlowValue> arguments,
             out EffectFlowValue source) {
             source = EffectFlowValue.None;
-            if (method is not { Name: "GetReference", Parameters.Length: 1 } ||
+            if (method is not { Name: "GetReference" or "GetArrayDataReference", Parameters.Length: 1 } ||
                 method.ContainingType.ToDisplayString() != "System.Runtime.InteropServices.MemoryMarshal" ||
                 (!method.ReturnsByRef && !method.ReturnsByRefReadonly) ||
-                method.Parameters[0].Type is not INamedTypeSymbol { TypeArguments.Length: 1 } inputType ||
-                inputType.OriginalDefinition.ToDisplayString() is not
-                    ("System.Span<T>" or "System.ReadOnlySpan<T>") ||
-                !SymbolEqualityComparer.Default.Equals(inputType.TypeArguments[0], method.ReturnType) ||
                 arguments.Count == 0)
                 return false;
+            var inputMatches = method.Name == "GetReference"
+                ? method.Parameters[0].Type is INamedTypeSymbol { TypeArguments.Length: 1 } inputType &&
+                  (inputType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>") &&
+                  SymbolEqualityComparer.Default.Equals(inputType.TypeArguments[0], method.ReturnType)
+                : method.Parameters[0].Type is IArrayTypeSymbol arrayType &&
+                  SymbolEqualityComparer.Default.Equals(arrayType.ElementType, method.ReturnType);
+            if (!inputMatches) return false;
             source = arguments[0].WithExactType(method.ReturnType);
             return true;
         }

@@ -1251,6 +1251,30 @@ public sealed class MethodEffectsTests {
             purity: SharpProofVerdict.Proven,
             allocationFree: SharpProofVerdict.Proven,
             forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("MemoryMarshalGetArrayDataReferencePreservesOwnership", """
+            class C {
+                static void M(int[] values) {
+                    ref var first = ref System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(values);
+                    first = 1;
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("MemoryMarshalGetArrayDataReferenceSupportsReferenceElements", """
+            class C {
+                static void M(string[] values, string replacement) {
+                    ref var first = ref System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(values);
+                    first = replacement;
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
