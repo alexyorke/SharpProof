@@ -2440,6 +2440,16 @@ public sealed class MethodEffectsTests {
             required: SharpProofEffect.Allocates,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                        SharpProofEffect.Throws | SharpProofEffect.Unknown);
+        yield return Effect("BitConverterGetBytesUInt32OnlyAllocates", """
+            class C {
+                static byte[] M(uint value) => System.BitConverter.GetBytes(value);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.Allocates,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                       SharpProofEffect.Throws | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
