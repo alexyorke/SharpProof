@@ -2354,9 +2354,22 @@ internal sealed class MethodEffectAnalysisSession(
             lengthsType.ElementType.SpecialType == SpecialType.System_Int32 &&
             method.Parameters[2] is { RefKind: RefKind.None, Type: IArrayTypeSymbol boundsType } &&
             boundsType.ElementType.SpecialType == SpecialType.System_Int32;
+        private static bool IsTwoScalarLengthsArrayCreateInstance(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "CreateInstance",
+                IsStatic: true,
+                Parameters.Length: 3,
+                ReturnType.SpecialType: SpecialType.System_Array,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0].RefKind == RefKind.None &&
+            method.Parameters[0].Type.ToDisplayString() == "System.Type" &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private static bool IsArrayCreateInstance(IMethodSymbol method) =>
             IsSingleLengthArrayCreateInstance(method) || IsLengthsArrayCreateInstance(method) ||
-            IsLengthsAndBoundsArrayCreateInstance(method);
+            IsLengthsAndBoundsArrayCreateInstance(method) || IsTwoScalarLengthsArrayCreateInstance(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2799,6 +2812,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Array", MethodKind.Ordinary, "CreateInstance")
                     when IsLengthsAndBoundsArrayCreateInstance(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
+                ("System.Array", MethodKind.Ordinary, "CreateInstance")
+                    when IsTwoScalarLengthsArrayCreateInstance(method) =>
+                    SharpProofEffect.Allocates | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
