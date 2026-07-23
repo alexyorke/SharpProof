@@ -2227,6 +2227,23 @@ internal sealed class MethodEffectAnalysisSession(
             } &&
             method.Parameters[0] is { RefKind: RefKind.None, Type: IArrayTypeSymbol arrayType } &&
             SymbolEqualityComparer.Default.Equals(arrayType.ElementType, method.TypeArguments[0]);
+        private static bool IsThreeArgumentGenericArrayReverse(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "Reverse",
+                IsStatic: true,
+                IsGenericMethod: true,
+                TypeArguments.Length: 1,
+                Parameters.Length: 3,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type: IArrayTypeSymbol arrayType } &&
+            SymbolEqualityComparer.Default.Equals(arrayType.ElementType, method.TypeArguments[0]) &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsGenericArrayReverse(IMethodSymbol method) =>
+            IsOneArgumentGenericArrayReverse(method) || IsThreeArgumentGenericArrayReverse(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2640,7 +2657,7 @@ internal sealed class MethodEffectAnalysisSession(
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                     SharpProofEffect.Allocates | SharpProofEffect.Throws,
                 ("System.Array", MethodKind.Ordinary, "Reverse")
-                    when IsOneArgumentGenericArrayReverse(method) =>
+                    when IsGenericArrayReverse(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
@@ -2719,6 +2736,15 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
                             "framework_array_reverse_model")
                     ]
+                : IsThreeArgumentGenericArrayReverse(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
+                            "framework_array_reverse_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_array_reverse_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
+                            "framework_array_reverse_model")
+                    ]
                 : effects == SharpProofEffect.Throws
                     ? [
                         MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
@@ -2739,7 +2765,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsArrayClear(method)) return [0];
             if (IsArrayFill(method)) return [0];
             if (IsArrayResize(method)) return [0];
-            if (IsOneArgumentGenericArrayReverse(method)) return [0];
+            if (IsGenericArrayReverse(method)) return [0];
             return (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
                     method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
@@ -2754,7 +2780,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsMemoryMarshalTryWrite(method) || IsMemoryMarshalWrite(method)) return [1];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
                    IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) || IsArrayResize(method) ||
-                   IsOneArgumentGenericArrayReverse(method) ||
+                   IsGenericArrayReverse(method) ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Read")
                 ? [0]
