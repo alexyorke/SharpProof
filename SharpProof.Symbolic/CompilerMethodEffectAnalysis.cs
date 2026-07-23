@@ -751,6 +751,8 @@ internal sealed class MethodEffectAnalysisSession(
                         InvokeCoreOrValue(lengthProperty.GetMethod, indexerReceiver, implicitIndexer, ref state);
                     if (implicitIndexer.IndexerSymbol is IPropertySymbol indexerProperty)
                         InvokeCoreOrValue(indexerProperty.GetMethod, indexerReceiver, implicitIndexer, ref state);
+                    else if (implicitIndexer.IndexerSymbol is IMethodSymbol sliceMethod)
+                        return InvokeCore(sliceMethod, indexerReceiver, [], [], implicitIndexer, ref state);
                     return indexerReceiver.Member("#?");
                 case IObjectCreationOperation creation:
                     return EvaluateCreation(creation, ref state);
