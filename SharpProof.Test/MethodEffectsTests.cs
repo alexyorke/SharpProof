@@ -2470,6 +2470,29 @@ public sealed class MethodEffectsTests {
             required: SharpProofEffect.Allocates,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                        SharpProofEffect.Throws | SharpProofEffect.Unknown);
+        yield return Effect("BitConverterTryWriteBytesInt32TracksDestinationWrite", """
+            class C {
+                static bool M(System.Span<byte> destination, int value) =>
+                    System.BitConverter.TryWriteBytes(destination, value);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates |
+                       SharpProofEffect.Throws | SharpProofEffect.Unknown);
+        yield return Effect("BitConverterTryWriteBytesInt32KeepsStackWriteOwned", """
+            class C {
+                static bool M(int value) {
+                    System.Span<byte> destination = stackalloc byte[4];
+                    return System.BitConverter.TryWriteBytes(destination, value);
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                       SharpProofEffect.Allocates | SharpProofEffect.Throws | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
