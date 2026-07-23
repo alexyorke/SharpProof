@@ -13,17 +13,33 @@ internal static partial class ExceptionFlowAnalyzer {
         MethodBodyAnalysisContext context,
         ImmutableArray<MethodExceptionFact> facts) => [.. facts
         .Where(static fact => fact.Escape != SharpProofVerdict.Disproven)
-        .Select(fact => new ExceptionFactView(
-            FindSite(context.Node, fact.SpanStart, fact.SpanStart + fact.SpanLength),
+        .Select(fact => ProjectEffectFact(context, fact))];
+    private static ExceptionFactView ProjectEffectFact(
+        MethodBodyAnalysisContext context,
+        MethodExceptionFact fact) {
+        var site = FindSite(context.Node, fact.SpanStart, fact.SpanStart + fact.SpanLength);
+        return new ExceptionFactView(
+            site,
             fact.ExceptionType,
-            ResolveExceptionType(context.SemanticModel.Compilation, fact.ExceptionType),
-            fact.Escape))];
+            ResolveExceptionType(context.SemanticModel, site, fact.ExceptionType),
+            fact.Escape);
+    }
     private static SyntaxNode FindSite(SyntaxNode method, int start, int end) =>
         method.DescendantNodesAndSelf().FirstOrDefault(node => node.SpanStart == start && node.Span.End == end) ??
         method.DescendantNodesAndSelf().Where(node => node.Span.Contains(start))
             .OrderBy(static node => node.Span.Length).FirstOrDefault() ?? method;
-    private static ITypeSymbol? ResolveExceptionType(Compilation compilation, string name) =>
-        compilation.GetTypeByMetadataName(name.Replace("global::", string.Empty));
+    private static ITypeSymbol? ResolveExceptionType(
+        SemanticModel semanticModel,
+        SyntaxNode site,
+        string name) {
+        var operation = semanticModel.GetOperation(site);
+        var operationType = operation switch {
+            IThrowOperation { Exception.Type: { } exceptionType } => exceptionType,
+            _ => operation?.Type
+        };
+        return operationType ??
+               semanticModel.Compilation.GetTypeByMetadataName(name.Replace("global::", string.Empty));
+    }
     private static Location GetExceptionSiteLocation(SyntaxNode node) => node.GetLocation();
     private readonly record struct ExceptionFactView(SyntaxNode Site, string ExceptionType, ITypeSymbol? Type, SharpProofVerdict Escape);
 }

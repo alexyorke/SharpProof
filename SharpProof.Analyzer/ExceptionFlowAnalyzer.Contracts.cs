@@ -166,14 +166,24 @@ internal static partial class ExceptionFlowAnalyzer {
     }
     private static bool IsAllowedByExceptionContract(EffectiveExceptionContract contract, ExceptionFactView exception) {
         if (contract.Kind == ExceptionContractKind.DoesNotThrow) return false;
-        if (exception.Type == null) return false;
-        foreach (var allowedType in contract.AllowedTypes)
-            if (TypeHierarchyEnumeration.IsSameOrDerivedFrom(exception.Type, allowedType, TypeIdentityPolicy.ExactOrOriginalDefinition))
+        foreach (var allowedType in contract.AllowedTypes) {
+            if (exception.Type != null &&
+                TypeHierarchyEnumeration.IsSameOrDerivedFrom(exception.Type, allowedType))
                 return true;
+            if (string.Equals(
+                    NormalizeTypeName(exception.ExceptionType),
+                    NormalizeTypeName(FormatType(allowedType)),
+                    StringComparison.Ordinal))
+                return true;
+        }
         return false;
     }
+    private static string NormalizeTypeName(string typeName) =>
+        typeName.StartsWith("global::", StringComparison.Ordinal)
+            ? typeName.Substring("global::".Length)
+            : typeName;
     private static bool ContainsSymbol(IEnumerable<ITypeSymbol> symbols, ITypeSymbol candidate) => symbols.Any(symbol
-        => SymbolEq.AreEqual(symbol.OriginalDefinition, candidate.OriginalDefinition));
+        => SymbolEq.AreEqual(symbol, candidate));
     private static string FormatType(ITypeSymbol type) {
         var display = type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         return string.IsNullOrWhiteSpace(display)

@@ -132,4 +132,39 @@ public sealed class UnknownContractDiagnosticTests {
             """)).Select(static diagnostic => diagnostic.Id);
         Assert.That(diagnosticIds, Does.Not.Contain("SP0046"));
     }
+    [Test]
+    public async Task AllowedExceptionsAcceptsExactClosedGenericType() {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""
+            #nullable enable
+            using SharpProof.Attributes;
+            public sealed class GenericException<T> : System.Exception { }
+            public static class Worker {
+                [AllowedExceptions(typeof(GenericException<string>))]
+                public static void Work(GenericException<string>? error) {
+                    if (error is null) return;
+                    throw error;
+                }
+            }
+            """);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0030"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public async Task AllowedExceptionsRejectsDifferentClosedGenericType() {
+        var diagnosticIds = (await AnalyzerTestHost.GetDiagnosticsAsync("""
+            #nullable enable
+            using SharpProof.Attributes;
+            public sealed class GenericException<T> : System.Exception { }
+            public static class Worker {
+                [AllowedExceptions(typeof(GenericException<int>))]
+                public static void Work(GenericException<string>? error) {
+                    if (error is null) return;
+                    throw error;
+                }
+            }
+            """)).Select(static diagnostic => diagnostic.Id);
+        Assert.That(diagnosticIds, Does.Contain("SP0030"));
+    }
 }
