@@ -97,7 +97,10 @@ internal static class NullableContractAnalyzer {
                         context.MethodSymbol.Name,
                         parameter.Name,
                         "[NotNull]");
-            if (NullableFlowFacts.TryGetNotNullWhenValue(parameter, out var notNullWhen)) {
+            foreach (var notNullWhen in CollectNotNullWhenValues(
+                         context.MethodSymbol,
+                         parameter.Ordinal,
+                         context.CancellationToken)) {
                 var contract = FormatBooleanAttribute("NotNullWhen", notNullWhen);
                 foreach (var completion in completions)
                     if (completion.ResultExpression != null)
@@ -127,6 +130,22 @@ internal static class NullableContractAnalyzer {
                             contract);
             }
         }
+    }
+    private static ImmutableArray<bool> CollectNotNullWhenValues(
+        IMethodSymbol method,
+        int parameterOrdinal,
+        CancellationToken cancellationToken) {
+        var values = ImmutableArray.CreateBuilder<bool>();
+        var seen = new HashSet<bool>();
+        foreach (var source in MethodContractHierarchy.EnumerateSources(method, cancellationToken)) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (parameterOrdinal >= source.Parameters.Length ||
+                !NullableFlowFacts.TryGetNotNullWhenValue(source.Parameters[parameterOrdinal], out var value) ||
+                !seen.Add(value))
+                continue;
+            values.Add(value);
+        }
+        return values.ToImmutable();
     }
     private static void VerifyMemberContracts(
         MethodBodyAnalysisContext context,
