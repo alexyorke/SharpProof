@@ -2180,6 +2180,9 @@ internal sealed class MethodEffectAnalysisSession(
                     MethodKind.PropertySet or MethodKind.Constructor, _) => SharpProofEffect.WritesReceiverState,
                 ("System.Collections.Generic.List<T>" or "System.Collections.Generic.Dictionary<TKey, TValue>", _, "Add") =>
                     SharpProofEffect.WritesReceiverState | SharpProofEffect.Allocates,
+                ("System.Array", _, "Empty")
+                    when method.IsGenericMethod && method.Parameters.Length == 0 =>
+                    SharpProofEffect.None,
                 (_, _, "IsNullOrEmpty" or "IsNullOrWhiteSpace") when type?.SpecialType == SpecialType.System_String =>
                     SharpProofEffect.None,
                 (_, _, "Contains" or "IndexOf" or "LastIndexOf" or "StartsWith" or "EndsWith")
