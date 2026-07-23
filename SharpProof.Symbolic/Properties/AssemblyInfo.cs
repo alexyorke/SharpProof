@@ -1,5 +1,4 @@
 [assembly: InternalsVisibleTo("SharpProof.SymbolicCli")]
 [assembly: InternalsVisibleTo("SharpProof.Test")]
 [assembly: InternalsVisibleTo("SharpProof.ToolingTest")]
-[assembly: InternalsVisibleTo("SharpProof.Testing")]
 [assembly: InternalsVisibleTo("SharpProof.Analyzer")]

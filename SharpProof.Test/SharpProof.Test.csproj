@@ -11,7 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" />
-    <ProjectReference Include="..\SharpProof.Testing\SharpProof.Testing.csproj" />
   </ItemGroup>
   <ItemGroup>
   </ItemGroup>

@@ -2,6 +2,5 @@
   <Import Project="..\SharpProof.Testing.props" />
   <ItemGroup>
     <ProjectReference Include="..\Tools\SharpProof.Fuzz.Core\SharpProof.Fuzz.Core.csproj" />
-    <ProjectReference Include="..\SharpProof.Testing\SharpProof.Testing.csproj" />
   </ItemGroup>
 </Project>

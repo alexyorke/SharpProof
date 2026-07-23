@@ -189,29 +189,29 @@ Target: another 28-30 net lines, low-medium risk. This phase depends on Phase
 After Phase 1, only the reduced `AnalyzerTestHost` and
 `ReadmeExampleAttribute` should remain useful.
 
-- [ ] Compile the remaining shared support into both test projects through
+- [x] Compile the remaining shared support into both test projects through
       `SharpProof.Testing.props`, using explicit linked `Compile` items or a
       narrow include.
-- [ ] Preserve the `SharpProof.Test` namespace expected by existing tests and
+- [x] Preserve the `SharpProof.Test` namespace expected by existing tests and
       by `scripts/Generate-Readme.ps1`.
-- [ ] Delete `SharpProof.Testing/SharpProof.Testing.csproj` (19 lines).
-- [ ] Delete its three-line `AssemblyInfo.cs`.
-- [ ] Remove the project references from `SharpProof.Test.csproj` and
+- [x] Delete `SharpProof.Testing/SharpProof.Testing.csproj` (19 lines).
+- [x] Delete its three-line `AssemblyInfo.cs`.
+- [x] Remove the project references from `SharpProof.Test.csproj` and
       `SharpProof.ToolingTest.csproj`.
-- [ ] Remove the project stanza and configuration entries from
+- [x] Remove the project stanza and configuration entries from
       `SharpProof.sln`.
-- [ ] Remove now-unneeded `InternalsVisibleTo("SharpProof.Testing")`
+- [x] Remove now-unneeded `InternalsVisibleTo("SharpProof.Testing")`
       declarations from Analyzer, ProofCore, and Symbolic.
-- [ ] Keep direct `InternalsVisibleTo` access for `SharpProof.Test` and
+- [x] Keep direct `InternalsVisibleTo` access for `SharpProof.Test` and
       `SharpProof.ToolingTest`.
 
 Validation:
 
-- [ ] Build `SharpProof.sln`.
-- [ ] Confirm both test assemblies discover the exact baseline cases.
-- [ ] Run README example generation and verify it still finds
+- [x] Build `SharpProof.sln`.
+- [x] Confirm both test assemblies discover the exact baseline cases.
+- [x] Run README example generation and verify it still finds
       `ReadmeExampleAttribute`.
-- [ ] Confirm no assembly or project still references `SharpProof.Testing`.
+- [x] Confirm no assembly or project still references `SharpProof.Testing`.
 
 ## Phase 3: Replace Switch-Specific IR Substitution
 

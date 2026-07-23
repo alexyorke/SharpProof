@@ -21,4 +21,8 @@
     <ProjectReference Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
     <ProjectReference Include="$(MSBuildThisFileDirectory)SharpProof.Symbolic\SharpProof.Symbolic.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)SharpProof.Testing\AnalyzerTestHost.cs" Link="Testing\AnalyzerTestHost.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SharpProof.Testing\ReadmeExampleAttribute.cs" Link="Testing\ReadmeExampleAttribute.cs" />
+  </ItemGroup>
 </Project>
