@@ -266,7 +266,7 @@ internal static class SymbolicNullableLowerer {
         if (invocation.ArgumentList.Arguments.Count == 0) {
             if (!TryCreateDefaultTerm(method.ReturnType, out fallbackTerm)) return false;
         }
-        else if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var fallbackExpression) ||
+        else if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var fallbackExpression) ||
                  !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(fallbackExpression, context),
             out fallbackTerm) ||
                  fallbackTerm.Kind != valueTerm.Kind) {

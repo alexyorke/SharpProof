@@ -11,8 +11,8 @@ internal static class SymbolicObjectLowerer {
         if (!method.IsStatic ||
             invocation.ArgumentList.Arguments.Count != 2 ||
             method.Parameters.Length != 2 ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var leftExpression) ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 1, out var rightExpression) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var leftExpression) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 1, out var rightExpression) ||
             LowerTerm(leftExpression, context) is not { } left ||
             LowerTerm(rightExpression, context) is not { } right ||
             !SymbolicOperatorLowerer.CanCompareTerms(left, right, SymbolicRelationOperator.Equal) ||

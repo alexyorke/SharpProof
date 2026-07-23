@@ -115,7 +115,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
         }
         if (method.IsStatic ||
             invocationOperation.Instance?.Syntax is not ExpressionSyntax instanceExpression ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, 0, out var firstArgument))
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var firstArgument))
             return false;
         if (IsStringSlicingInvocation(method, "Substring")) {
             sourceExpression = instanceExpression;
@@ -177,7 +177,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
             method.Parameters[0].Type.SpecialType != SpecialType.System_Int32 ||
             method.Parameters[1].Type.SpecialType != SpecialType.System_Int32)
             return false;
-        return SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, 1, out secondArgument);
+        return SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1, out secondArgument);
     }
     internal static bool IsStringSlicingInvocation(IMethodSymbol method, string methodName) => method.Name == methodName &&
                method.ContainingType?.SpecialType == SpecialType.System_String &&

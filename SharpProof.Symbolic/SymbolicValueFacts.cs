@@ -6,37 +6,15 @@ internal static class SymbolicValueFacts {
     public static bool TryGetInvocationArgumentExpression(
         IInvocationOperation invocationOperation,
         int parameterIndex,
-        out ExpressionSyntax expression) {
-        expression = null!;
-        if (parameterIndex < 0 ||
-            parameterIndex >= invocationOperation.TargetMethod.Parameters.Length)
-            return false;
-        var parameter = invocationOperation.TargetMethod.Parameters[parameterIndex];
-        foreach (var argument in invocationOperation.Arguments)
-            if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
-                argument.Value.Syntax is ExpressionSyntax argumentExpression) {
-                expression = argumentExpression;
-                return true;
-            }
-        if (parameterIndex < invocationOperation.Arguments.Length &&
-            invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression) {
-            expression = fallbackExpression;
-            return true;
-        }
-        return false;
-    }
-    public static bool TryGetInvocationArgumentExpressionByOrdinal(
-        IInvocationOperation invocationOperation,
+        out ExpressionSyntax expression) =>
+        TryGetArgumentExpression(invocationOperation.Arguments, parameterIndex, out expression);
+    internal static bool TryGetObjectCreationArgumentExpression(
+        IObjectCreationOperation objectCreationOperation,
         int parameterIndex,
         out ExpressionSyntax expression) {
-        foreach (var argument in invocationOperation.Arguments)
-            if (argument.Parameter?.Ordinal == parameterIndex &&
-                argument.Value.Syntax is ExpressionSyntax argumentExpression) {
-                expression = argumentExpression;
-                return true;
-            }
         expression = null!;
-        return false;
+        return objectCreationOperation.Constructor != null &&
+               TryGetArgumentExpression(objectCreationOperation.Arguments, parameterIndex, out expression);
     }
     internal static bool TryGetInvocationArgumentExpressionsByOrdinal(
         IInvocationOperation invocationOperation,
@@ -48,7 +26,7 @@ internal static class SymbolicValueFacts {
         }
         var builder = ImmutableArray.CreateBuilder<ExpressionSyntax>(count);
         for (var ordinal = 0; ordinal < count; ordinal++) {
-            if (!TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, ordinal, out var expression)) {
+            if (!TryGetInvocationArgumentExpression(invocationOperation, ordinal, out var expression)) {
                 expressions = default;
                 return false;
             }
@@ -56,5 +34,18 @@ internal static class SymbolicValueFacts {
         }
         expressions = builder.MoveToImmutable();
         return true;
+    }
+    private static bool TryGetArgumentExpression(
+        ImmutableArray<IArgumentOperation> arguments,
+        int parameterIndex,
+        out ExpressionSyntax expression) {
+        foreach (var argument in arguments)
+            if (argument.Parameter?.Ordinal == parameterIndex &&
+                argument.Value.Syntax is ExpressionSyntax argumentExpression) {
+                expression = argumentExpression;
+                return true;
+            }
+        expression = null!;
+        return false;
     }
 }

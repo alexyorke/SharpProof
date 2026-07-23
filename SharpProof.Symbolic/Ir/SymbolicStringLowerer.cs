@@ -10,7 +10,7 @@ internal static class SymbolicStringLowerer {
         if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
             invocation.ArgumentList.Arguments.Count is not 1 and not 2 ||
             method.Parameters.Length != invocation.ArgumentList.Arguments.Count ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var argumentExpression) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var argumentExpression) ||
             !TryLowerStringTerm(memberAccess.Expression, context, out var receiver) ||
             !TryLowerStringPredicateArgument(
                 argumentExpression,
@@ -27,7 +27,7 @@ internal static class SymbolicStringLowerer {
         if (predicate == null) return false;
         var ignoreCase = false;
         if (invocation.ArgumentList.Arguments.Count == 2 &&
-            (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 1, out var comparisonExpression) ||
+            (!SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 1, out var comparisonExpression) ||
              !TryGetOrdinalStringComparison(comparisonExpression, context, out ignoreCase)))
             return false;
         if (predicate != SymbolicStringPredicateKind.Contains &&
@@ -79,11 +79,11 @@ internal static class SymbolicStringLowerer {
                 invocation.ArgumentList.Arguments.Count is not 1 and not 2 ||
                 method.Parameters.Length != invocation.ArgumentList.Arguments.Count ||
                 method.Parameters[0].Type.SpecialType != SpecialType.System_String ||
-                !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var argumentExpression))
+                !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var argumentExpression))
                 return false;
             var ignoreCase = false;
             if (invocation.ArgumentList.Arguments.Count == 2 &&
-                (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 1, out var instanceComparisonExpression) ||
+                (!SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 1, out var instanceComparisonExpression) ||
                  !TryGetOrdinalStringComparison(instanceComparisonExpression, context, out ignoreCase)))
                 return false;
             if (ignoreCase)
@@ -105,12 +105,12 @@ internal static class SymbolicStringLowerer {
             method.Parameters.Length != invocation.ArgumentList.Arguments.Count ||
             method.Parameters[0].Type.SpecialType != SpecialType.System_String ||
             method.Parameters[1].Type.SpecialType != SpecialType.System_String ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var leftExpression) ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 1, out var rightExpression))
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var leftExpression) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 1, out var rightExpression))
             return false;
         var staticIgnoreCase = false;
         if (invocation.ArgumentList.Arguments.Count == 3 &&
-            (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 2, out var staticComparisonExpression) ||
+            (!SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 2, out var staticComparisonExpression) ||
              !TryGetOrdinalStringComparison(staticComparisonExpression, context, out staticIgnoreCase)))
             return false;
         if (staticIgnoreCase)
@@ -429,7 +429,7 @@ internal static class SymbolicStringLowerer {
             invocation.ArgumentList.Arguments.Count != 1 ||
             method.Parameters.Length != 1 ||
             method.Parameters[0].Type.SpecialType != SpecialType.System_String ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var argumentExpression) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var argumentExpression) ||
             !TryLowerStringValueWithOptionalReference(
                 argumentExpression,
                 context,

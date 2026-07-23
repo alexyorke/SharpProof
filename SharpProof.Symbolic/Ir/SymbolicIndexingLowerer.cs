@@ -159,7 +159,7 @@ internal static class SymbolicIndexingLowerer {
             method.ContainingType?.SpecialType != SpecialType.System_Array ||
             method.Parameters.Length != 1 ||
             method.Parameters[0].Type.SpecialType != SpecialType.System_Int32 ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var dimensionExpression))
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var dimensionExpression))
             return false;
         var dimensionValue = context.SemanticModel.GetConstantValue(
             dimensionExpression,
@@ -714,7 +714,7 @@ internal static class SymbolicIndexingLowerer {
             return true;
         }
         if (remainingArgumentCount == 1) {
-            if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(
+            if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(
                     operation, firstArgumentIndex, out var argument))
                 return false;
             if (allowDirectRangeArgument &&
@@ -727,10 +727,10 @@ internal static class SymbolicIndexingLowerer {
             return true;
         }
         if (remainingArgumentCount != 2 ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, firstArgumentIndex, out var startExpression) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, firstArgumentIndex, out var startExpression) ||
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(startExpression, context), out var translatedStart) ||
             translatedStart.Kind != SmtValueKind.Int ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, firstArgumentIndex + 1, out var lengthExpression) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, firstArgumentIndex + 1, out var lengthExpression) ||
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(lengthExpression, context), out var resultLength) ||
             resultLength.Kind != SmtValueKind.Int)
             return false;
@@ -1052,8 +1052,8 @@ internal static class SymbolicIndexingLowerer {
                 IObjectCreationOperation objectCreationOperation ||
             objectCreationOperation.Constructor == null ||
             !IsSystemRangeType(objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
-            !TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var startExpression) ||
-            !TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var endExpression) ||
+            !SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var startExpression) ||
+            !SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var endExpression) ||
             !TryResolveBuiltInIndexLengthShape(startExpression, context, out var start) ||
             !TryResolveBuiltInIndexLengthShape(endExpression, context, out var end))
             return false;
@@ -1102,9 +1102,9 @@ internal static class SymbolicIndexingLowerer {
                 IObjectCreationOperation objectCreationOperation ||
             objectCreationOperation.Constructor == null ||
             !IsSystemIndexType(objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
-            !TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var valueExpression))
+            !SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var valueExpression))
             return false;
-        if (!TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var fromEndExpression)) {
+        if (!SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var fromEndExpression)) {
             indexShape = new IndexLengthShape(valueExpression, false, true);
             return true;
         }
@@ -1131,25 +1131,6 @@ internal static class SymbolicIndexingLowerer {
         invocationExpression = null!;
         invocationOperation = null!;
         return false;
-    }
-    internal static bool TryGetObjectCreationArgumentExpression(
-        IObjectCreationOperation objectCreationOperation,
-        int parameterIndex,
-        out ExpressionSyntax argumentExpression) {
-        argumentExpression = null!;
-        if (objectCreationOperation.Constructor == null ||
-            parameterIndex < 0 ||
-            parameterIndex >= objectCreationOperation.Constructor.Parameters.Length)
-            return false;
-        var parameter = objectCreationOperation.Constructor.Parameters[parameterIndex];
-        IArgumentOperation? argument = objectCreationOperation.Arguments.FirstOrDefault(candidate =>
-            SymbolEqualityComparer.Default.Equals(candidate.Parameter, parameter));
-        argument ??= parameterIndex < objectCreationOperation.Arguments.Length
-            ? objectCreationOperation.Arguments[parameterIndex]
-            : null;
-        if (argument?.Value.Syntax is not ExpressionSyntax expression) return false;
-        argumentExpression = expression;
-        return true;
     }
     private static bool IsSystemRangeExpression(ExpressionSyntax expression, SymbolicLoweringContext context) {
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);

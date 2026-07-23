@@ -14,25 +14,25 @@ internal static class SymbolicStringLengthLowerer {
         if (constructor.Parameters.Length == 2 &&
             constructor.Parameters[0].Type.SpecialType == SpecialType.System_Char &&
             constructor.Parameters[1].Type.SpecialType == SpecialType.System_Int32 &&
-            SymbolicIndexingLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var countExpression) &&
+            SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var countExpression) &&
             SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(countExpression, context), out term) &&
             term.Kind == SmtValueKind.Int)
             return true;
         if (constructor.Parameters.Length == 1 &&
             SymbolicTypeFacts.IsCharArrayType(constructor.Parameters[0].Type) &&
-            SymbolicIndexingLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var charArrayExpression))
+            SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var charArrayExpression))
             return SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(charArrayExpression, context, out term);
         if (constructor.Parameters.Length == 3 &&
             SymbolicTypeFacts.IsCharArrayType(constructor.Parameters[0].Type) &&
             constructor.Parameters[1].Type.SpecialType == SpecialType.System_Int32 &&
             constructor.Parameters[2].Type.SpecialType == SpecialType.System_Int32 &&
-            SymbolicIndexingLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 2, out var lengthExpression) &&
+            SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 2, out var lengthExpression) &&
             SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(lengthExpression, context), out term) &&
             term.Kind == SmtValueKind.Int)
             return true;
         if (constructor.Parameters.Length == 1 &&
             SymbolicTypeFacts.IsReadOnlySpanOfCharType(constructor.Parameters[0].Type) &&
-            SymbolicIndexingLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var spanExpression))
+            SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var spanExpression))
             return SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(spanExpression, context, out term);
         term = null!;
         return false;
