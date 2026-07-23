@@ -3010,6 +3010,16 @@ internal sealed class MethodEffectAnalysisSession(
             } &&
             method.ContainingType.ToDisplayString() == "System.Math" &&
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Double };
+        private static bool IsMathBitDecrement(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "BitDecrement",
+                IsStatic: true,
+                Parameters.Length: 1,
+                ReturnType.SpecialType: SpecialType.System_Double
+            } &&
+            method.ContainingType.ToDisplayString() == "System.Math" &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Double };
         private static bool IsBitConverterToStringArray(IMethodSymbol method) =>
             method is {
                 MethodKind: MethodKind.Ordinary,
@@ -4022,6 +4032,9 @@ internal sealed class MethodEffectAnalysisSession(
                     SharpProofEffect.WritesArgumentState,
                 ("System.Math", MethodKind.Ordinary, "BitIncrement")
                     when IsMathBitIncrement(method) =>
+                    SharpProofEffect.None,
+                ("System.Math", MethodKind.Ordinary, "BitDecrement")
+                    when IsMathBitDecrement(method) =>
                     SharpProofEffect.None,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,

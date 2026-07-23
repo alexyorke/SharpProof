@@ -2805,6 +2805,15 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                        SharpProofEffect.Allocates | SharpProofEffect.Throws | SharpProofEffect.Unknown);
+        yield return Effect("MathBitDecrementIsPureAndAllocationFree", """
+            class C {
+                static double M(double value) => System.Math.BitDecrement(value);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                       SharpProofEffect.Allocates | SharpProofEffect.Throws | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
