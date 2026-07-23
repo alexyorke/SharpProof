@@ -2301,8 +2301,19 @@ internal sealed class MethodEffectAnalysisSession(
                 ContainingType.SpecialType: SpecialType.System_Array
             } &&
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsArrayGetUpperBound(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "GetUpperBound",
+                IsStatic: false,
+                Parameters.Length: 1,
+                ReturnType.SpecialType: SpecialType.System_Int32,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private static bool IsArrayDimensionQuery(IMethodSymbol method) =>
-            IsArrayGetLength(method) || IsArrayGetLongLength(method) || IsArrayGetLowerBound(method);
+            IsArrayGetLength(method) || IsArrayGetLongLength(method) ||
+            IsArrayGetLowerBound(method) || IsArrayGetUpperBound(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2725,7 +2736,8 @@ internal sealed class MethodEffectAnalysisSession(
                         ReturnType.SpecialType: SpecialType.System_Object
                     } =>
                     SharpProofEffect.ReadsReceiverState | SharpProofEffect.Allocates,
-                ("System.Array", MethodKind.Ordinary, "GetLength" or "GetLongLength" or "GetLowerBound")
+                ("System.Array", MethodKind.Ordinary,
+                    "GetLength" or "GetLongLength" or "GetLowerBound" or "GetUpperBound")
                     when IsArrayDimensionQuery(method) =>
                     SharpProofEffect.ReadsReceiverState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
