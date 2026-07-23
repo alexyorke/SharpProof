@@ -118,6 +118,24 @@ public sealed class ContractConditionConsolidationTests {
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(testCase.Source);
         Assert.That(diagnostics.Select(Format), Is.EqualTo(testCase.ExpectedDiagnostics));
     }
+    [Test]
+    public async Task InterfaceRequiresContractMapsRenamedImplementationParameter() {
+        var diagnosticIds = (await AnalyzerTestHost.GetDiagnosticsAsync("""
+            using SharpProof.Attributes;
+            public interface IWorker {
+                [Requires("input > 0")]
+                void Work(int input);
+            }
+            public sealed class Worker : IWorker {
+                public void Work(int value) { }
+                public void Call() => Work(0);
+            }
+            """)).Select(static diagnostic => diagnostic.Id);
+        Assert.Multiple(() => {
+            Assert.That(diagnosticIds, Does.Contain("SP0027"));
+            Assert.That(diagnosticIds, Does.Not.Contain("SP0028"));
+        });
+    }
     private static TestCaseData Case(string name, string source, params string[] expectedDiagnostics) =>
         new TestCaseData(new ContractCase(name, source, expectedDiagnostics)).SetName(name);
     private static string Format(Microsoft.CodeAnalysis.Diagnostic diagnostic) {

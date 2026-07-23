@@ -38,10 +38,23 @@ internal static class RequiresContractHelpers {
         rewrittenCondition = conditionText;
         if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
         var typeReplacements = CreateTypeParameterReplacements(contractMethod, invokedMethod);
-        var rewriter = new ParameterPlaceholderRewriter(arguments, typeReplacements);
+        var parameterReplacements = CreateParameterReplacements(contractMethod, invokedMethod, arguments);
+        var rewriter = new ParameterPlaceholderRewriter(parameterReplacements, typeReplacements);
         var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
         rewrittenCondition = rewritten.ToFullString();
         return true;
+    }
+    private static IReadOnlyDictionary<string, ExpressionSyntax> CreateParameterReplacements(
+        IMethodSymbol contractMethod,
+        IMethodSymbol invokedMethod,
+        IReadOnlyDictionary<string, ExpressionSyntax> arguments) {
+        var replacements = new Dictionary<string, ExpressionSyntax>(StringComparer.Ordinal);
+        for (var index = 0;
+             index < contractMethod.Parameters.Length && index < invokedMethod.Parameters.Length;
+             index++)
+            if (arguments.TryGetValue(invokedMethod.Parameters[index].Name, out var argument))
+                replacements[contractMethod.Parameters[index].Name] = argument;
+        return replacements;
     }
     private static IReadOnlyDictionary<string, TypeSyntax> CreateTypeParameterReplacements(
         IMethodSymbol contractMethod,
