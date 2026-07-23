@@ -2876,6 +2876,21 @@ internal sealed class MethodEffectAnalysisSession(
                 Type: IArrayTypeSymbol { Rank: 1, ElementType.SpecialType: SpecialType.System_Byte }
             } &&
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsBitConverterToDoubleSpan(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "ToDouble",
+                IsStatic: true,
+                Parameters.Length: 1,
+                ReturnType.SpecialType: SpecialType.System_Double
+            } &&
+            method.ContainingType.ToDisplayString() == "System.BitConverter" &&
+            method.Parameters[0] is {
+                RefKind: RefKind.None,
+                Type: INamedTypeSymbol { TypeArguments.Length: 1 } sourceType
+            } &&
+            sourceType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
+            sourceType.TypeArguments[0].SpecialType == SpecialType.System_Byte;
         private static bool IsBitConverterToStringArray(IMethodSymbol method) =>
             method is {
                 MethodKind: MethodKind.Ordinary,
@@ -3778,6 +3793,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.BitConverter", MethodKind.Ordinary, "ToDouble")
                     when IsBitConverterToDoubleArray(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
+                ("System.BitConverter", MethodKind.Ordinary, "ToDouble")
+                    when IsBitConverterToDoubleSpan(method) =>
+                    SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
                 ("System.BitConverter", MethodKind.Ordinary, "ToString")
                     when IsBitConverterToStringArray(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
@@ -4191,6 +4209,11 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                             "framework_bit_converter_to_double_array_model")
                     ]
+                : IsBitConverterToDoubleSpan(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_bit_converter_to_double_span_model")
+                    ]
                 : IsBitConverterToStringArray(method)
                     ? [
                         MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
@@ -4288,6 +4311,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsBitConverterToBooleanSpan(method)) return [0];
             if (IsBitConverterToCharSpan(method)) return [0];
             if (IsBitConverterToSingleSpan(method)) return [0];
+            if (IsBitConverterToDoubleSpan(method)) return [0];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
                    IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) || IsArrayResize(method) ||
                    IsArrayReverse(method) || IsArrayConstrainedCopy(method) || IsBufferBlockCopy(method) ||
