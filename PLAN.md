@@ -636,9 +636,9 @@ Target: 8-12 lines.
 
 Target: 18-30 lines.
 
-- [ ] Use the existing `SmtTestFormula` constructors consistently.
-- [ ] Combine the two regex-category cases into named test data.
-- [ ] Preserve the existing large regex case matrix.
+- [x] Use the existing `SmtTestFormula` constructors consistently.
+- [x] Combine the two regex-category cases into named test data.
+- [x] Preserve the existing large regex case matrix.
 
 ### 8.6 Unknown contract diagnostics
 

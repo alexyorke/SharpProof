@@ -23,28 +23,27 @@ internal class ProofCoreZ3SmokeTests {
         TimeSpan? timeout = null) {
         using var solver = new SmtSolver();
         Assert.That(
-            solver.CheckSatisfiability(pathConditions.Concat(new[] { new SmtUnaryFormula(SmtUnaryOperator.Not, conclusion) }),
+            solver.CheckSatisfiability(pathConditions.Append(Not(conclusion)),
                 timeout ?? SolverTimeout)
                 .Feasibility,
             Is.EqualTo(expected));
     }
     [Test]
     public void SmtSolver_TrueAndFalseConjunction_IsUnsatisfiable()
-        => AssertSatisfiability(Feasibility.Unsatisfiable, new SmtFormula[] { new SmtBooleanConstant(true),
-        new SmtBooleanConstant(false) });
+        => AssertSatisfiability(Feasibility.Unsatisfiable, [Boolean(true), Boolean(false)]);
     [Test]
     public void SmtSolver_CheckSatisfiability_ExposesTypedExactAssignments() {
         using var solver = new SmtSolver();
-        var count = new SmtVariable("count", SmtValueKind.Int);
-        var enabled = new SmtVariable("enabled", SmtValueKind.Bool);
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var receiver = new SmtVariable("receiver", SmtValueKind.Reference);
+        var count = Int("count");
+        var enabled = Bool("enabled");
+        var text = String("text");
+        var receiver = Reference("receiver");
         var result = solver.CheckSatisfiability(
             new SmtFormula[] {
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, count, new SmtIntegerConstant(3)),
+                Equal(count, Integer(3)),
                 enabled,
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("abc")),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, receiver, new SmtNullConstant())
+                Equal(text, Text("abc")),
+                Equal(receiver, Null())
             },
             TimeSpan.FromMilliseconds(100));
         Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
@@ -59,12 +58,9 @@ internal class ProofCoreZ3SmokeTests {
     [Test]
     public void SmtSolver_CheckSatisfiability_ExposesRangeModel() {
         using var solver = new SmtSolver();
-        var index = new SmtVariable("index", SmtValueKind.Int);
+        var index = Int("index");
         var result = solver.CheckSatisfiability(
-            new SmtFormula[] {
-                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, index, new SmtIntegerConstant(2)),
-                new SmtBinaryFormula(SmtBinaryOperator.LessThan, index, new SmtIntegerConstant(5))
-            },
+            [GreaterThanOrEqual(index, Integer(2)), LessThan(index, Integer(5))],
             TimeSpan.FromMilliseconds(100));
         var assignment = result.Witness.Assignments.Single();
         Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
@@ -73,11 +69,9 @@ internal class ProofCoreZ3SmokeTests {
     [Test]
     public void SmtSolver_CheckSatisfiability_MarksOpaqueReferenceModelApproximate() {
         using var solver = new SmtSolver();
-        var receiver = new SmtVariable("receiver", SmtValueKind.Reference);
+        var receiver = Reference("receiver");
         var result = solver.CheckSatisfiability(
-            new SmtFormula[] {
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, receiver, new SmtNullConstant())
-            },
+            [NotEqual(receiver, Null())],
             TimeSpan.FromMilliseconds(100));
         Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
         Assert.That(result.Witness.Status, Is.EqualTo(SmtWitnessStatus.Approximate));
@@ -98,46 +92,41 @@ internal class ProofCoreZ3SmokeTests {
     }
     [Test]
     public void SmtSolver_NonZeroGuardDoesNotImplyZero_IsSatisfiable() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
-        var xNotZero = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, x, new SmtIntegerConstant(0));
-        var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
-        AssertImplication(Feasibility.Satisfiable, new[] { xNotZero }, xIsZero);
+        var x = Int("x");
+        var xNotZero = NotEqual(x, Integer(0));
+        var xIsZero = Equal(x, Integer(0));
+        AssertImplication(Feasibility.Satisfiable, [xNotZero], xIsZero);
     }
     [Test]
     public void SmtSolver_ZeroGuardImpliesZero_IsUnsatisfiable() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
-        var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
-        AssertImplication(Feasibility.Unsatisfiable, new[] { xIsZero }, xIsZero);
+        var x = Int("x");
+        var xIsZero = Equal(x, Integer(0));
+        AssertImplication(Feasibility.Unsatisfiable, [xIsZero], xIsZero);
     }
     [TestCase(SmtIntegerBinaryOperator.Divide)]
     [TestCase(SmtIntegerBinaryOperator.Remainder)]
     public void SmtSolver_UnresolvedDivisor_ReturnsUnknown(SmtIntegerBinaryOperator op) {
-        var dividend = new SmtVariable("dividend", SmtValueKind.Int);
-        var divisor = new SmtVariable("divisor", SmtValueKind.Int);
+        var dividend = Int("dividend");
+        var divisor = Int("divisor");
         var term = new SmtIntegerBinaryTerm(op, dividend, divisor);
-        var contradiction = new SmtUnaryFormula(SmtUnaryOperator.Not, new SmtBinaryFormula(SmtBinaryOperator.Equal, term, term));
-        AssertSatisfiability(Feasibility.Unknown, new[] { contradiction });
+        var contradiction = Not(Equal(term, term));
+        AssertSatisfiability(Feasibility.Unknown, [contradiction]);
     }
     [TestCase(SmtIntegerBinaryOperator.Divide)]
     [TestCase(SmtIntegerBinaryOperator.Remainder)]
     public void SmtSolver_DivisorRangeIncludingZero_ReturnsUnknown(SmtIntegerBinaryOperator op) {
-        var divisor = new SmtVariable("divisor", SmtValueKind.Int);
-        var term = new SmtIntegerBinaryTerm(op, new SmtIntegerConstant(10), divisor);
+        var divisor = Int("divisor");
+        var term = new SmtIntegerBinaryTerm(op, Integer(10), divisor);
         AssertSatisfiability(
             Feasibility.Unknown,
-            new SmtFormula[] {
-                new SmtBinaryFormula( SmtBinaryOperator.GreaterThanOrEqual, divisor, new SmtIntegerConstant(-3)),
-                new SmtBinaryFormula( SmtBinaryOperator.LessThanOrEqual, divisor, new SmtIntegerConstant(3)),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, term, new SmtIntegerConstant(2))
-            });
+            [GreaterThanOrEqual(divisor, Integer(-3)), LessThanOrEqual(divisor, Integer(3)), Equal(term, Integer(2))]);
     }
     [Test]
     public void SmtSolver_AffineEqualityAndConflictingInequality_IsUnsatisfiable() {
-        var x = new SmtVariable("x", SmtValueKind.Int);
-        var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(1));
-        var affineEquality = new SmtBinaryFormula(SmtBinaryOperator.Equal, xPlusOne, new SmtIntegerConstant(0));
-        var xIsNonNegative = new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(0));
-        AssertSatisfiability(Feasibility.Unsatisfiable, new SmtFormula[] { affineEquality, xIsNonNegative });
+        var x = Int("x");
+        var affineEquality = Equal(Add(x, Integer(1)), Integer(0));
+        var xIsNonNegative = GreaterThanOrEqual(x, Integer(0));
+        AssertSatisfiability(Feasibility.Unsatisfiable, [affineEquality, xIsNonNegative]);
     }
     public enum RegexConstraint { None, Equal, NotEqual, StartsWith, LengthEqual, StartsWithAndLength, NegatedMatchAndLength }
     public enum RegexConclusion { Equal, LengthEqual, LengthAtMost }
@@ -345,54 +334,39 @@ internal class ProofCoreZ3SmokeTests {
             TimeSpan.FromMilliseconds(250)).Feasibility;
         Assert.That(result, Is.Not.EqualTo(Feasibility.Unsatisfiable));
     }
-    [Test]
-    public void SmtSolver_NegatedUnicodeCategoryRegexContradictsPunctuationPrefix() {
-        var text = new SmtVariable("text", SmtValueKind.String);
+    [TestCase(@"\A\P{P}\z", TestName = "SmtSolver_NegatedUnicodeCategoryRegexContradictsPunctuationPrefix")]
+    [TestCase(@"\A[^\p{P}]\z", TestName = "SmtSolver_NegatedUnicodeCategoryClassContradictsPunctuationPrefix")]
+    public void SmtSolver_NegatedUnicodeCategoryContradictsPunctuationPrefix(string pattern) {
+        var text = String("text");
         AssertSatisfiability(
             Feasibility.Unsatisfiable,
-            new SmtFormula[] {
-                new SmtRegexMatchFormula(text, @"\A\P{P}\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("!")),
-                new SmtBinaryFormula( SmtBinaryOperator.Equal, new SmtStringLengthTerm(text), new SmtIntegerConstant(1))
-            },
-            TimeSpan.FromMilliseconds(250));
-    }
-    [Test]
-    public void SmtSolver_NegatedUnicodeCategoryClassContradictsPunctuationPrefix() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        AssertSatisfiability(
-            Feasibility.Unsatisfiable,
-            new SmtFormula[] {
-                new SmtRegexMatchFormula(text, @"\A[^\p{P}]\z"),
-                new SmtStringStartsWithFormula(text, new SmtStringConstant("!")),
-                new SmtBinaryFormula( SmtBinaryOperator.Equal, new SmtStringLengthTerm(text), new SmtIntegerConstant(1))
-            },
+            [new SmtRegexMatchFormula(text, pattern), StartsWith(text, Text("!")), Equal(Length(text), Integer(1))],
             TimeSpan.FromMilliseconds(250));
     }
     [Test]
     public void SmtSolver_LargeUnicodeCategoryConclusionDoesNotBecomeProof() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var lengthIsOne = new SmtBinaryFormula(SmtBinaryOperator.Equal, new SmtStringLengthTerm(text), new SmtIntegerConstant(1));
+        var text = String("text");
+        var lengthIsOne = Equal(Length(text), Integer(1));
         var textIsUppercaseLetter = new SmtRegexMatchFormula(text, @"\A\p{Lu}\z");
-        AssertImplication(Feasibility.Unknown, new[] { lengthIsOne }, textIsUppercaseLetter, TimeSpan.FromMilliseconds(250));
+        AssertImplication(Feasibility.Unknown, [lengthIsOne], textIsUppercaseLetter, TimeSpan.FromMilliseconds(250));
     }
     [Test]
     public void SmtSolver_WordBoundaryRegexPathProvesLengthImplication() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var lengthIsOne = new SmtBinaryFormula(SmtBinaryOperator.Equal, new SmtStringLengthTerm(text), new SmtIntegerConstant(1));
+        var text = String("text");
+        var lengthIsOne = Equal(Length(text), Integer(1));
         AssertImplication(
             Feasibility.Unsatisfiable,
-            new[] {
+            [
                 new SmtRegexMatchFormula(text, @"\A\bA\z")
-            },
+            ],
             lengthIsOne);
     }
     [Test]
     public void SmtSolver_WordBoundaryRegexConclusionRemainsUnknown() {
-        var text = new SmtVariable("text", SmtValueKind.String);
-        var lengthIsOne = new SmtBinaryFormula(SmtBinaryOperator.Equal, new SmtStringLengthTerm(text), new SmtIntegerConstant(1));
+        var text = String("text");
+        var lengthIsOne = Equal(Length(text), Integer(1));
         var textIsBoundaryA = new SmtRegexMatchFormula(text, @"\A\bA\z");
-        AssertImplication(Feasibility.Unknown, new[] { lengthIsOne }, textIsBoundaryA);
+        AssertImplication(Feasibility.Unknown, [lengthIsOne], textIsBoundaryA);
     }
     private sealed record SolverCase(SmtFormula[] Conditions, Feasibility Expected, SmtFormula? Conclusion = null,
         bool ZeroTimeout = false);
@@ -483,10 +457,10 @@ internal class ProofCoreZ3SmokeTests {
     [Test]
     public void AnalysisProof_NonNullGuard_MakesNullDereferenceProven() {
         using var search = new AnalysisProofSearch();
-        var s = new SmtVariable("s", SmtValueKind.Reference);
-        var sIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, s, new SmtNullConstant());
-        var sIsNotNull = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, s, new SmtNullConstant());
-        var result = search.Classify(new AnalysisProofQuery(new[] { sIsNotNull }, new AnalysisHazard(AnalysisHazardKind.NullDereference,
+        var s = Reference("s");
+        var sIsNull = Equal(s, Null());
+        var sIsNotNull = NotEqual(s, Null());
+        var result = search.Classify(new AnalysisProofQuery([sIsNotNull], new AnalysisHazard(AnalysisHazardKind.NullDereference,
             sIsNull)), TimeSpan.FromSeconds(2));
         Assert.That(result.Outcome, Is.EqualTo(AnalysisProofOutcome.Proven));
         Assert.That(result.Reason, Is.EqualTo("null_dereference_unreachable"));
