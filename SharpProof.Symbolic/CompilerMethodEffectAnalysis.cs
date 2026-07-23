@@ -2187,6 +2187,9 @@ internal sealed class MethodEffectAnalysisSession(
                 (_, _, "Split" or "Substring" or "Trim" or "TrimStart" or "TrimEnd" or "Replace" or
                     "ToUpper" or "ToUpperInvariant" or "ToLower" or "ToLowerInvariant")
                     when type?.SpecialType == SpecialType.System_String => SharpProofEffect.Allocates,
+                (_, _, "ToCharArray")
+                    when type?.SpecialType == SpecialType.System_String && method.Parameters.Length == 0 =>
+                    SharpProofEffect.Allocates,
                 ("System.Span<T>" or "System.ReadOnlySpan<T>" or
                     "System.Memory<T>" or "System.ReadOnlyMemory<T>", _, "ToArray") => SharpProofEffect.Allocates,
                 _ => null
