@@ -53,13 +53,16 @@ internal static class SymbolicKnownGuardFacts {
             comparisonValue = new SymbolicIntegerConstantTerm(0);
         }
         var provenance = "ir.known-guard.argument-out-of-range." + guardKey;
-        triggerCondition = CreateRelationCondition(triggerRelation, subject, comparisonValue, invocation, provenance + ".trigger");
-        normalCompletionCondition = CreateRelationCondition(
+        triggerCondition = SymbolicIrLowerer.CreateRelationCondition(
+            triggerRelation, subject, comparisonValue, invocation, provenance + ".trigger",
+            evidenceKey: provenance + ".trigger");
+        normalCompletionCondition = SymbolicIrLowerer.CreateRelationCondition(
             normalRelation,
             subject,
             comparisonValue,
             invocation,
-            provenance + ".normal-completion");
+            provenance + ".normal-completion",
+            evidenceKey: provenance + ".normal-completion");
         return true;
     }
     private static bool TryGetArgumentExpression(IInvocationOperation operation, int parameterOrdinal, out ExpressionSyntax expression) {
@@ -73,16 +76,6 @@ internal static class SymbolicKnownGuardFacts {
         expression = null!;
         return false;
     }
-    private static SymbolicCondition CreateRelationCondition(
-        SymbolicRelationOperator relation,
-        SymbolicTerm left,
-        SymbolicTerm right,
-        SyntaxNode sourceNode,
-        string provenance) => new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(relation, left, right),
-            sourceNode,
-            provenance,
-            evidenceKey: provenance));
     private static bool TryGetGuardRelations(
         string methodName,
         out SymbolicRelationOperator triggerRelation,

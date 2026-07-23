@@ -45,7 +45,7 @@ internal static partial class SymbolicOperationLowerer {
             if (target.Kind == SmtValueKind.Reference &&
                 NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
                     valueExpression, valueContext.SemanticModel, valueContext.CancellationToken))
-                postconditions.Add(ExactRelation(
+                postconditions.Add(SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.NotEqual,
                     target,
                     new SymbolicNullTerm(),
@@ -61,7 +61,7 @@ internal static partial class SymbolicOperationLowerer {
                     IsExact: true, Value: { } valueLength
                 } &&
                 SymbolicStateFactBuilder.CanCompareIrTerms(targetLength, valueLength))
-                postconditions.Add(ExactRelation(
+                postconditions.Add(SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.Equal,
                     targetLength,
                     valueLength,
@@ -127,7 +127,7 @@ internal static partial class SymbolicOperationLowerer {
                 Value: { Kind: SmtValueKind.Reference } subject
             })
             return null;
-        return ExactRelation(
+        return SymbolicIrLowerer.CreateRelationCondition(
             SymbolicRelationOperator.NotEqual,
             subject,
             new SymbolicNullTerm(),
@@ -261,7 +261,7 @@ internal static partial class SymbolicOperationLowerer {
                 InvalidateTarget: false));
         if (includeReferencePostconditions && target.Kind == SmtValueKind.Reference) {
             if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(valueExpression, context.SemanticModel, context.CancellationToken))
-                postconditions.Add(ExactRelation(
+                postconditions.Add(SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.NotEqual,
                     target,
                     new SymbolicNullTerm(),
@@ -285,10 +285,11 @@ internal static partial class SymbolicOperationLowerer {
         SymbolicCondition postcondition;
         if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(rightExpression) is ThrowExpressionSyntax) {
             if (SymbolicNullableLowerer.TryCreateSymbolTerms(targetSymbol, context, out var hasValue, out _))
-                postcondition = ExactTruth(hasValue, rightExpression, provenance + ".throw-completion-has-value", targetSymbol);
+                postcondition = SymbolicIrLowerer.CreateTruthCondition(
+                    hasValue, rightExpression, provenance + ".throw-completion-has-value", targetSymbol);
             else if (TryCreateSymbolTerm(targetSymbol, context, out var reference) &&
                      reference.Kind == SmtValueKind.Reference)
-                postcondition = ExactRelation(
+                postcondition = SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.NotEqual,
                     reference,
                     new SymbolicNullTerm(),
@@ -310,11 +311,14 @@ internal static partial class SymbolicOperationLowerer {
                     : null;
             if (rightHasValue == null) return Unsupported(rightExpression, provenance + ".value");
             postcondition = rightHasValue is SymbolicBooleanConstantTerm { Value: true }
-                ? ExactTruth(targetHasValue, rightExpression, provenance + ".nullable-has-value", targetSymbol)
+                ? SymbolicIrLowerer.CreateTruthCondition(
+                    targetHasValue, rightExpression, provenance + ".nullable-has-value", targetSymbol)
                 : new SymbolicBinaryCondition(
                     SymbolicConditionOperator.Or,
-                    ExactTruth(targetHasValue, rightExpression, provenance + ".target-has-value", targetSymbol),
-                    new SymbolicNotCondition(ExactTruth(rightHasValue, rightExpression, provenance + ".right-has-value")));
+                    SymbolicIrLowerer.CreateTruthCondition(
+                        targetHasValue, rightExpression, provenance + ".target-has-value", targetSymbol),
+                    new SymbolicNotCondition(SymbolicIrLowerer.CreateTruthCondition(
+                        rightHasValue, rightExpression, provenance + ".right-has-value")));
         }
         else if (TryCreateSymbolTerm(targetSymbol, context, out var target) &&
                  target.Kind == SmtValueKind.Reference) {
@@ -322,7 +326,7 @@ internal static partial class SymbolicOperationLowerer {
                 rightExpression,
                 context.SemanticModel,
                 context.CancellationToken);
-            var targetNonNull = ExactRelation(
+            var targetNonNull = SymbolicIrLowerer.CreateRelationCondition(
                 SymbolicRelationOperator.NotEqual,
                 target,
                 new SymbolicNullTerm(),
@@ -335,7 +339,7 @@ internal static partial class SymbolicOperationLowerer {
                 postcondition = new SymbolicBinaryCondition(
                     SymbolicConditionOperator.Or,
                     targetNonNull,
-                    ExactRelation(
+                    SymbolicIrLowerer.CreateRelationCondition(
                         SymbolicRelationOperator.Equal,
                         target,
                         right,
@@ -356,30 +360,6 @@ internal static partial class SymbolicOperationLowerer {
             operation,
             new SymbolicLoweringProvenance("roslyn-to-operation", rightExpression.Span, provenance));
     }
-    private static SymbolicCondition ExactTruth(
-        SymbolicTerm value,
-        SyntaxNode source,
-        string provenance,
-        ISymbol? symbol = null,
-        string? evidenceKey = null) => new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicTruthAtom(value),
-            source,
-            provenance,
-            symbol,
-            evidenceKey));
-    private static SymbolicCondition ExactRelation(
-        SymbolicRelationOperator relation,
-        SymbolicTerm left,
-        SymbolicTerm right,
-        SyntaxNode source,
-        string provenance,
-        ISymbol? symbol = null,
-        string? evidenceKey = null) => new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(relation, left, right),
-            source,
-            provenance,
-            symbol,
-            evidenceKey));
     private static bool TryCreateSymbolTerm(ISymbol symbol, SymbolicLoweringContext context, out SymbolicTerm term) {
         var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
         if (type == null ||

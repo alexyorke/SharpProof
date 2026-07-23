@@ -12,12 +12,6 @@ internal static class SymbolicStateFactBuilder {
     internal static bool CanCompareIrTerms(SymbolicTerm left, SymbolicTerm right) => left.Kind == right.Kind ||
                (left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference) ||
                (right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference);
-    internal static SymbolicCondition CreateReferenceNullCondition(SymbolicTerm reference, SyntaxNode source,
-        bool isNull, string provenance, string? evidenceKey = null) =>
-        new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
-                reference, new SymbolicNullTerm()),
-            source, provenance, evidenceKey: evidenceKey));
     internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind) => SymbolicFactFactory.TryGetValueKind(
             type,
             SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,

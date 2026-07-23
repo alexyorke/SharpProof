@@ -271,17 +271,17 @@ Do this as one refactor so the formatter is moved only once.
 
 Target: 22-30 lines.
 
-- [ ] Extend the existing factory in
+- [x] Extend the existing factory in
       `SymbolicIrLowerer.Conditions.cs` with optional `ISymbol?` and
       `evidenceKey` parameters.
-- [ ] Delete `ExactTruth` and `ExactRelation` from
+- [x] Delete `ExactTruth` and `ExactRelation` from
       `SymbolicOperationLowerer.Assignments.cs`.
-- [ ] Route their callers through the central factory.
-- [ ] Delete the parallel relation factory in
+- [x] Route their callers through the central factory.
+- [x] Delete the parallel relation factory in
       `SymbolicKnownGuardFacts.cs`.
-- [ ] Delete the uncalled
+- [x] Delete the uncalled
       `SymbolicStateFactBuilder.CreateReferenceNullCondition`.
-- [ ] Preserve every current symbol, evidence key, source node, and provenance
+- [x] Preserve every current symbol, evidence key, source node, and provenance
       string exactly.
 
 ### 4.3 Reuse the generic SMT value-kind classifier

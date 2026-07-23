@@ -1,13 +1,18 @@
 namespace SharpProof.Symbolic.Ir;
 internal static partial class SymbolicIrLowerer {
-    internal static SymbolicCondition CreateFactCondition(SymbolicAtom atom, SyntaxNode node, string provenance) =>
-        new SymbolicFactCondition(SymbolicFact.Exact(atom, node, provenance));
+    internal static SymbolicCondition CreateFactCondition(SymbolicAtom atom, SyntaxNode node, string provenance,
+        ISymbol? symbol = null, string? evidenceKey = null) =>
+        new SymbolicFactCondition(SymbolicFact.Exact(atom, node, provenance, symbol, evidenceKey));
     internal static SymbolicCondition CreateRelationCondition(
         SymbolicRelationOperator op,
         SymbolicTerm left,
         SymbolicTerm right,
         SyntaxNode node,
-        string provenance) => CreateFactCondition(new SymbolicRelationAtom(op, left, right), node, provenance);
+        string provenance, ISymbol? symbol = null, string? evidenceKey = null) =>
+        CreateFactCondition(new SymbolicRelationAtom(op, left, right), node, provenance, symbol, evidenceKey);
+    internal static SymbolicCondition CreateTruthCondition(SymbolicTerm value, SyntaxNode node, string provenance,
+        ISymbol? symbol = null, string? evidenceKey = null) =>
+        CreateFactCondition(new SymbolicTruthAtom(value), node, provenance, symbol, evidenceKey);
     internal static SymbolicCondition CreateReferenceIsNullCondition(SymbolicTerm reference, SyntaxNode node) => CreateFactCondition(
             new SymbolicRelationAtom(SymbolicRelationOperator.Equal, reference, new SymbolicNullTerm()),
             node,
