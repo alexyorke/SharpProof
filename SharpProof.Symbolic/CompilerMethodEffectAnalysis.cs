@@ -2186,7 +2186,8 @@ internal sealed class MethodEffectAnalysisSession(
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
                 (_, _, "Split" or "Substring" or "Trim" or "TrimStart" or "TrimEnd")
                     when type?.SpecialType == SpecialType.System_String => SharpProofEffect.Allocates,
-                ("System.Span<T>" or "System.ReadOnlySpan<T>", _, "ToArray") => SharpProofEffect.Allocates,
+                ("System.Span<T>" or "System.ReadOnlySpan<T>" or
+                    "System.Memory<T>" or "System.ReadOnlyMemory<T>", _, "ToArray") => SharpProofEffect.Allocates,
                 _ => null
             };
             var exceptions = effects == SharpProofEffect.Throws
