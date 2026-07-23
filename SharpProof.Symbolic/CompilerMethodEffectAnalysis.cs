@@ -2271,6 +2271,16 @@ internal sealed class MethodEffectAnalysisSession(
         private static bool IsArrayReverse(IMethodSymbol method) =>
             IsGenericArrayReverse(method) || IsOneArgumentNonGenericArrayReverse(method) ||
             IsThreeArgumentNonGenericArrayReverse(method);
+        private static bool IsArrayGetLength(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "GetLength",
+                IsStatic: false,
+                Parameters.Length: 1,
+                ReturnType.SpecialType: SpecialType.System_Int32,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2693,6 +2703,9 @@ internal sealed class MethodEffectAnalysisSession(
                         ReturnType.SpecialType: SpecialType.System_Object
                     } =>
                     SharpProofEffect.ReadsReceiverState | SharpProofEffect.Allocates,
+                ("System.Array", MethodKind.Ordinary, "GetLength")
+                    when IsArrayGetLength(method) =>
+                    SharpProofEffect.ReadsReceiverState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -2796,6 +2809,11 @@ internal sealed class MethodEffectAnalysisSession(
                             "framework_array_reverse_model"),
                         MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                             "framework_array_reverse_model")
+                    ]
+                : IsArrayGetLength(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.IndexOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_array_get_length_model")
                     ]
                 : effects == SharpProofEffect.Throws
                     ? [
