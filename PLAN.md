@@ -675,7 +675,7 @@ Target: 45-65 net lines. Package and property removals are validation-gated.
 
 ### 10.1 PowerShell and package-consumer scripts
 
-- [ ] Delete the write-only `$allExampleIds` state from
+- [x] Delete the write-only `$allExampleIds` state from
       `Generate-Readme.ps1`: approximately 4 lines.
 - [ ] Share the generated-page update/report loops while retaining validation
       before writes: approximately 6 lines.

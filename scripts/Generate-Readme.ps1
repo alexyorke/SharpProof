@@ -169,14 +169,9 @@ function Get-GeneratedPage {
 
 $tests = Get-ReadmeExampleTests -Root $repositoryRoot
 $generatedPages = @()
-$allExampleIds = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::Ordinal)
 
 foreach ($page in $pages) {
     $generated = Get-GeneratedPage -Page $page -Tests $tests -Root $repositoryRoot
-    foreach ($example in $generated.Examples) {
-        [void]$allExampleIds.Add($example.Id)
-    }
-
     $generatedPages += @{
         Page = $page
         Content = $generated.Content
