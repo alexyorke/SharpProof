@@ -270,4 +270,18 @@ public sealed class UnknownContractDiagnosticTests {
             """)).Select(static diagnostic => diagnostic.Id);
         Assert.That(diagnosticIds, Does.Not.Contain("SP0002"));
     }
+    [Test]
+    public async Task ZeroAllocationsAutoPropertyGetterDoesNotReportViolation() {
+        var diagnosticIds = (await AnalyzerTestHost.GetDiagnosticsAsync("""
+            using SharpProof.Attributes;
+            public sealed class Worker {
+                [ZeroAllocations]
+                public int Value { get; } = 1;
+            }
+            """)).Select(static diagnostic => diagnostic.Id);
+        Assert.Multiple(() => {
+            Assert.That(diagnosticIds, Does.Not.Contain("SP0013"));
+            Assert.That(diagnosticIds, Does.Not.Contain("SP0045"));
+        });
+    }
 }

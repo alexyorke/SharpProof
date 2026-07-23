@@ -7,6 +7,7 @@ internal static class MethodAllocationAnalyzer {
                 .Any(source => SharpProofAttributeIdentityPolicy.HasAttribute(source, "ZeroAllocationsAttribute")))
             return;
         if (method.IsAbstract) return;
+        if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         if (effects.AllocationFree == SharpProofVerdict.Unknown) {
             var reason = effects.UnknownReasons.IsDefaultOrEmpty
