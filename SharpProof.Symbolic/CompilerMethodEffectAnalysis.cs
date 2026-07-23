@@ -2214,6 +2214,19 @@ internal sealed class MethodEffectAnalysisSession(
             method.Parameters[0] is { RefKind: RefKind.Ref, Type: IArrayTypeSymbol arrayType } &&
             SymbolEqualityComparer.Default.Equals(arrayType.ElementType, method.TypeArguments[0]) &&
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsOneArgumentGenericArrayReverse(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "Reverse",
+                IsStatic: true,
+                IsGenericMethod: true,
+                TypeArguments.Length: 1,
+                Parameters.Length: 1,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type: IArrayTypeSymbol arrayType } &&
+            SymbolEqualityComparer.Default.Equals(arrayType.ElementType, method.TypeArguments[0]);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2626,6 +2639,9 @@ internal sealed class MethodEffectAnalysisSession(
                     when IsArrayResize(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                     SharpProofEffect.Allocates | SharpProofEffect.Throws,
+                ("System.Array", MethodKind.Ordinary, "Reverse")
+                    when IsOneArgumentGenericArrayReverse(method) =>
+                    SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -2698,6 +2714,11 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
                             "framework_array_resize_model")
                     ]
+                : IsOneArgumentGenericArrayReverse(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
+                            "framework_array_reverse_model")
+                    ]
                 : effects == SharpProofEffect.Throws
                     ? [
                         MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
@@ -2718,6 +2739,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsArrayClear(method)) return [0];
             if (IsArrayFill(method)) return [0];
             if (IsArrayResize(method)) return [0];
+            if (IsOneArgumentGenericArrayReverse(method)) return [0];
             return (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
                     method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
@@ -2732,6 +2754,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsMemoryMarshalTryWrite(method) || IsMemoryMarshalWrite(method)) return [1];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
                    IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) || IsArrayResize(method) ||
+                   IsOneArgumentGenericArrayReverse(method) ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Read")
                 ? [0]
