@@ -138,6 +138,20 @@ public sealed class NullableContractVerificationTests {
             """);
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Contain("SP0041"));
     }
+    [Test]
+    public async Task InterfaceNotNullParameterContractAppliesToImplementation() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IValueSource {
+                void Reset([NotNull] ref string? input);
+            }
+            public sealed class ValueSource : IValueSource {
+                public void Reset(ref string? value) => value = null;
+            }
+            """);
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Contain("SP0042"));
+    }
     private static string Class(string members, string directives, bool isStatic = true) =>
         SemanticTestSource.Class(members, directives).Replace(
             "public class TestClass",

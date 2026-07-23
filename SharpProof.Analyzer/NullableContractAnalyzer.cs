@@ -81,7 +81,12 @@ internal static class NullableContractAnalyzer {
         foreach (var parameter in context.MethodSymbol.Parameters) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var target = EscapeIdentifier(parameter.Name);
-            if (NullableFlowFacts.HasNotNullPostcondition(parameter))
+            var hasNotNullPostcondition = MethodContractHierarchy
+                .EnumerateSources(context.MethodSymbol, context.CancellationToken)
+                .Any(source =>
+                    parameter.Ordinal < source.Parameters.Length &&
+                    NullableFlowFacts.HasNotNullPostcondition(source.Parameters[parameter.Ordinal]));
+            if (hasNotNullPostcondition)
                 foreach (var completion in completions)
                     Verify(
                         context,
