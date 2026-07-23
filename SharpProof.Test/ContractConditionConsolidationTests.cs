@@ -73,6 +73,45 @@ public sealed class ContractConditionConsolidationTests {
             }
             """,
             "SP0027@6[3]: Call to 'C.M(int)' does not prove precondition 'value > 0'");
+        yield return Case(
+            "PropertyGetter",
+            """
+            using SharpProof.Attributes;
+            public static class C {
+                public static int P {
+                    [Requires("false")]
+                    get => 1;
+                }
+                public static int Read() => P;
+            }
+            """,
+            "SP0027@7[4]: Call to 'C.P.get' does not prove precondition 'false'");
+        yield return Case(
+            "PropertySetter",
+            """
+            using SharpProof.Attributes;
+            public static class C {
+                private static int _value;
+                public static int P {
+                    get => _value;
+                    [Requires("value > 0")]
+                    set => _value = value;
+                }
+                public static void Write() => P = 0;
+            }
+            """,
+            "SP0027@9[6]: Call to 'C.P.set' does not prove precondition 'value > 0'");
+        yield return Case(
+            "NamedArguments",
+            """
+            using SharpProof.Attributes;
+            public static class C {
+                [Requires("left > right")]
+                public static void M(int left, int right) { }
+                public static void Call() => M(right: 2, left: 1);
+            }
+            """,
+            "SP0027@5[3]: Call to 'C.M(int, int)' does not prove precondition 'left > right'");
     }
     [TestCaseSource(nameof(Cases))]
     public async Task ContractDiagnosticsRemainStable(ContractCase testCase) {

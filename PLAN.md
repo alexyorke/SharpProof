@@ -478,11 +478,11 @@ Target: 15-22 lines.
 
 Target: 12-16 lines.
 
-- [ ] Delete the per-call-site `seen` set because
+- [x] Delete the per-call-site `seen` set because
       `ContractConditionHelpers.Collect` already deduplicates conditions.
-- [ ] Replace `AddPropertyAccessor` ordinal mapping with
+- [x] Replace `AddPropertyAccessor` ordinal mapping with
       `CreateArgumentMap`.
-- [ ] Retain property getter/setter and named-argument tests.
+- [x] Retain property getter/setter and named-argument tests.
 
 ### 6.8 Rebuild SMT records with record cloning
 

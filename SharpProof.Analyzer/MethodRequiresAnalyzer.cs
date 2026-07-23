@@ -29,10 +29,6 @@ internal static class MethodRequiresAnalyzer {
             var contracts = RequiresContractHelpers.ValidContracts(callSite.Method, context.CancellationToken);
             if (contracts.Length == 0) continue;
             var location = callSite.Syntax.GetLocation();
-            var lineSpan = location.GetLineSpan();
-            var line = lineSpan.StartLinePosition.Line + 1;
-            var column = lineSpan.StartLinePosition.Character + 1;
-            var seen = ImmutableHashSet.CreateBuilder<string>();
             foreach (var contract in contracts) {
                 if (!RequiresContractHelpers.TryRewriteForArguments(
                         contract.Condition,
@@ -54,9 +50,6 @@ internal static class MethodRequiresAnalyzer {
                 if (proof.TruthValue == SymbolicTruthValue.ProvenTrue ||
                     proof.TruthValue == SymbolicTruthValue.Unreachable)
                     continue;
-                var key = callSite.Method.ToDisplayString() + ":" + contract.Condition + ":" + line + ":" + column +
-                          ":" + proof.TruthValue + ":" + proof.Reason;
-                if (!seen.Add(key)) continue;
                 if (proof.TruthValue == SymbolicTruthValue.ProvenFalse) {
                     context.ReportDiagnostic(CreateNotProvenDiagnostic(callSite.Method, contract.Condition, location, contract.Location));
                     continue;
@@ -163,20 +156,13 @@ internal static class MethodRequiresAnalyzer {
         ExpressionSyntax? setterValue,
         SyntaxNode? syntax = null) {
         if (accessor == null) return;
-        var arguments = ImmutableDictionary.CreateBuilder<string, ExpressionSyntax>(StringComparer.Ordinal);
-        foreach (var argument in propertyReference.Arguments) {
-            var ordinal = argument.Parameter?.Ordinal ?? -1;
-            if (ordinal < 0 || ordinal >= accessor.Parameters.Length ||
-                argument.Value.Syntax is not ExpressionSyntax expression)
-                continue;
-            arguments[accessor.Parameters[ordinal].Name] = (ExpressionSyntax)expression.WithoutTrivia();
-        }
+        var arguments = CreateArgumentMap(accessor, propertyReference.Arguments);
         if (setterValue != null && accessor.MethodKind is MethodKind.PropertySet or MethodKind.EventAdd or MethodKind.EventRemove) {
             var valueParameter = accessor.Parameters.LastOrDefault();
             if (valueParameter != null)
-                arguments[valueParameter.Name] = (ExpressionSyntax)setterValue.WithoutTrivia();
+                arguments = arguments.SetItem(valueParameter.Name, (ExpressionSyntax)setterValue.WithoutTrivia());
         }
-        builder.Add(new RequiresCallSite(accessor, arguments.ToImmutable(), syntax ?? propertyReference.Syntax));
+        builder.Add(new RequiresCallSite(accessor, arguments, syntax ?? propertyReference.Syntax));
     }
     private static void AddOperator(
         ImmutableArray<RequiresCallSite>.Builder builder,
