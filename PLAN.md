@@ -621,9 +621,9 @@ Target: 15-25 lines.
 
 Target: 18-22 lines.
 
-- [ ] Convert the first two tests into named cases parameterized by output
+- [x] Convert the first two tests into named cases parameterized by output
       prefix, iteration, and family.
-- [ ] Preserve their current names.
+- [x] Preserve their current names.
 
 ### 8.4 Roslyn shape manifest coverage
 

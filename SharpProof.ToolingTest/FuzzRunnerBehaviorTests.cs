@@ -7,14 +7,20 @@ using SharpProof.Tools.Fuzz;
 namespace SharpProof.Test;
 [TestFixture]
 public sealed class FuzzRunnerBehaviorTests {
-    [Test]
-    public async Task ProvenInterpolatedStringHandlerCallHasMatchingEnforcePureDiagnostic() {
+    [TestCase("fuzz-handler-projection-", 29, "InterpolatedStringHandler",
+        TestName = "ProvenInterpolatedStringHandlerCallHasMatchingEnforcePureDiagnostic")]
+    [TestCase("fuzz-projection-", 136, "DelegateCreation",
+        TestName = "ProvenDelegateCallHasMatchingEnforcePureDiagnosticAfterEarlierCases")]
+    public async Task ProvenCallsHaveMatchingEnforcePureDiagnostics(
+        string outputPrefix,
+        int iterations,
+        string family) {
         var outputDirectory = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
-            "fuzz-handler-projection-" + Guid.NewGuid().ToString("N"));
+            outputPrefix + Guid.NewGuid().ToString("N"));
         try {
             var summary = await FuzzRunner.RunAsync(new FuzzOptions {
-                Iterations = 29,
+                Iterations = iterations,
                 Seed = 20260722,
                 OutputDirectory = outputDirectory,
                 CheckpointEvery = 0,
@@ -24,32 +30,7 @@ public sealed class FuzzRunnerBehaviorTests {
 
             Assert.That(
                 summary.Findings
-                    .Where(static finding => finding.Family == "InterpolatedStringHandler")
-                    .Select(static finding => finding.Category),
-                Does.Not.Contain("enforce_pure_projection_mismatch"));
-        }
-        finally {
-            if (Directory.Exists(outputDirectory)) Directory.Delete(outputDirectory, recursive: true);
-        }
-    }
-    [Test]
-    public async Task ProvenDelegateCallHasMatchingEnforcePureDiagnosticAfterEarlierCases() {
-        var outputDirectory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "fuzz-projection-" + Guid.NewGuid().ToString("N"));
-        try {
-            var summary = await FuzzRunner.RunAsync(new FuzzOptions {
-                Iterations = 136,
-                Seed = 20260722,
-                OutputDirectory = outputDirectory,
-                CheckpointEvery = 0,
-                Parallelism = 1,
-                RepeatAnalyzer = false
-            });
-
-            Assert.That(
-                summary.Findings
-                    .Where(static finding => finding.Family == "DelegateCreation")
+                    .Where(finding => finding.Family == family)
                     .Select(static finding => finding.Category),
                 Does.Not.Contain("enforce_pure_projection_mismatch"));
         }
