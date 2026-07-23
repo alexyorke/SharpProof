@@ -101,4 +101,24 @@ public sealed class UnknownContractDiagnosticTests {
                 diagnostic.Location.GetLineSpan().StartLinePosition.Line == 6),
             string.Join(Environment.NewLine, diagnostics));
     }
+    [Test]
+    public async Task InterfaceAllowedExceptionsContractAppliesToImplementation() {
+        const string source = """
+            using SharpProof.Attributes;
+            public interface IWorker {
+                [AllowedExceptions(typeof(System.InvalidOperationException))]
+                void Work();
+            }
+            public sealed class Worker : IWorker {
+                public void Work() => throw new System.ArgumentException();
+            }
+            """;
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source);
+        var violations = diagnostics.Where(static diagnostic => diagnostic.Id == "SP0030").ToArray();
+        Assert.That(
+            violations,
+            Has.Some.Matches<Microsoft.CodeAnalysis.Diagnostic>(diagnostic =>
+                diagnostic.Location.GetLineSpan().StartLinePosition.Line == 6),
+            string.Join(Environment.NewLine, diagnostics));
+    }
 }

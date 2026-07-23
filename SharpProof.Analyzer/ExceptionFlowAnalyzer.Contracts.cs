@@ -12,37 +12,40 @@ internal static partial class ExceptionFlowAnalyzer {
                 [],
                 "[DoesNotThrow]",
                 GetAttributeLocation(doesNotThrow, context.CancellationToken)));
-        var allAllowedTypes = ImmutableArray.CreateBuilder<ITypeSymbol>();
-        Location? allowedLocation = null;
-        var hasValidAllowedContract = false;
         var exceptionBase = context.SemanticModel.Compilation.GetTypeByMetadataName("System.Exception");
-        foreach (var attribute in SharpProofAttributeIdentityPolicy.GetAcceptedAttributes(
-                     context.MethodSymbol, "AllowedExceptionsAttribute")) {
-            context.CancellationToken.ThrowIfCancellationRequested();
-            var attributeTypes = CollectAllowedExceptionTypes(attribute, exceptionBase, context.CancellationToken,
-                out var invalidArguments);
-            if (!invalidArguments.IsDefaultOrEmpty) {
-                foreach (var invalidArgument in invalidArguments)
-                    context.ReportDiagnostic(InvalidContractArgumentDiagnostics.Create(
-                        "[AllowedExceptions]",
-                        invalidArgument.Argument,
-                        invalidArgument.Reason,
-                        invalidArgument.Location ?? GetAttributeLocation(attribute, context.CancellationToken) ??
-                        AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node)));
-                continue;
+        foreach (var source in MethodContractHierarchy.EnumerateSources(
+                     context.MethodSymbol, context.CancellationToken)) {
+            var allAllowedTypes = ImmutableArray.CreateBuilder<ITypeSymbol>();
+            Location? allowedLocation = null;
+            var hasValidAllowedContract = false;
+            foreach (var attribute in SharpProofAttributeIdentityPolicy.GetAcceptedAttributes(
+                         source, "AllowedExceptionsAttribute")) {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                var attributeTypes = CollectAllowedExceptionTypes(attribute, exceptionBase, context.CancellationToken,
+                    out var invalidArguments);
+                if (!invalidArguments.IsDefaultOrEmpty) {
+                    foreach (var invalidArgument in invalidArguments)
+                        context.ReportDiagnostic(InvalidContractArgumentDiagnostics.Create(
+                            "[AllowedExceptions]",
+                            invalidArgument.Argument,
+                            invalidArgument.Reason,
+                            invalidArgument.Location ?? GetAttributeLocation(attribute, context.CancellationToken) ??
+                            AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node)));
+                    continue;
+                }
+                hasValidAllowedContract = true;
+                allowedLocation ??= GetAttributeLocation(attribute, context.CancellationToken);
+                foreach (var allowedType in attributeTypes)
+                    if (!ContainsSymbol(allAllowedTypes, allowedType))
+                        allAllowedTypes.Add(allowedType);
             }
-            hasValidAllowedContract = true;
-            allowedLocation ??= GetAttributeLocation(attribute, context.CancellationToken);
-            foreach (var allowedType in attributeTypes)
-                if (!ContainsSymbol(allAllowedTypes, allowedType))
-                    allAllowedTypes.Add(allowedType);
+            if (hasValidAllowedContract)
+                builder.Add(new EffectiveExceptionContract(
+                    ExceptionContractKind.AllowedExceptions,
+                    allAllowedTypes.ToImmutable(),
+                    "[AllowedExceptions]",
+                    allowedLocation));
         }
-        if (hasValidAllowedContract)
-            builder.Add(new EffectiveExceptionContract(
-                ExceptionContractKind.AllowedExceptions,
-                allAllowedTypes.ToImmutable(),
-                "[AllowedExceptions]",
-                allowedLocation));
         return builder.ToImmutable();
     }
     private static void AnalyzeExceptionContract(
