@@ -2970,6 +2970,16 @@ internal sealed class MethodEffectAnalysisSession(
             } &&
             method.ContainingType.ToDisplayString() == "System.BitConverter" &&
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Single };
+        private static bool IsBitConverterSingleToUInt32Bits(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "SingleToUInt32Bits",
+                IsStatic: true,
+                Parameters.Length: 1,
+                ReturnType.SpecialType: SpecialType.System_UInt32
+            } &&
+            method.ContainingType.ToDisplayString() == "System.BitConverter" &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Single };
         private static bool IsBitConverterInt32BitsToSingle(IMethodSymbol method) =>
             method is {
                 MethodKind: MethodKind.Ordinary,
@@ -3905,6 +3915,9 @@ internal sealed class MethodEffectAnalysisSession(
                     SharpProofEffect.None,
                 ("System.BitConverter", MethodKind.Ordinary, "SingleToInt32Bits")
                     when IsBitConverterSingleToInt32Bits(method) =>
+                    SharpProofEffect.None,
+                ("System.BitConverter", MethodKind.Ordinary, "SingleToUInt32Bits")
+                    when IsBitConverterSingleToUInt32Bits(method) =>
                     SharpProofEffect.None,
                 ("System.BitConverter", MethodKind.Ordinary, "Int32BitsToSingle")
                     when IsBitConverterInt32BitsToSingle(method) =>
