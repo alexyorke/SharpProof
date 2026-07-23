@@ -2186,6 +2186,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Linq.Enumerable", _, "Empty")
                     when method.IsGenericMethod && method.Parameters.Length == 0 =>
                     SharpProofEffect.None,
+                (_, MethodKind.Ordinary, "GetType")
+                    when type?.SpecialType == SpecialType.System_Object && method.Parameters.Length == 0 =>
+                    SharpProofEffect.None,
                 (_, _, "IsNullOrEmpty" or "IsNullOrWhiteSpace") when type?.SpecialType == SpecialType.System_String =>
                     SharpProofEffect.None,
                 (_, _, "Contains" or "IndexOf" or "LastIndexOf" or "StartsWith" or "EndsWith")
