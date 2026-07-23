@@ -679,6 +679,21 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void ImplicitIndexerArgumentEvaluatesEffects() {
+        var result = Analyze("""
+            static class G { public static int C; }
+            sealed class Bag { public int Length => 0; public int this[int index] => 0; }
+            class C {
+                static int Impure() { G.C++; return 1; }
+                static int M(Bag bag) => bag[^Impure()];
+            }
+            """, 5);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void RangeIndexerExpressionIncludesSliceMethodEffects() {
         var result = Analyze("""
             sealed class D {
