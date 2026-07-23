@@ -3,7 +3,6 @@ internal sealed class SmtRegexValidator {
     internal const int MaxCacheEntries = 256;
     private static readonly TimeSpan ConcreteValidationTimeout = TimeSpan.FromMilliseconds(50);
     private readonly Dictionary<RegexValidationKey, RegexValidationResult> _cache = [];
-    internal int CacheCount => _cache.Count;
     internal bool TryValidate(string input, string pattern, RegexOptions options, out bool isMatch) {
         var key = new RegexValidationKey(input, pattern, options);
         if (_cache.TryGetValue(key, out var cached)) {

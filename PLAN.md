@@ -436,14 +436,14 @@ Target: 30-37 lines, low-medium risk.
 
 Target: 28-35 lines, low risk.
 
-- [ ] Remove explicit recursive polarity cases whose children are already
+- [x] Remove explicit recursive polarity cases whose children are already
       traversed by the default path.
-- [ ] Inline the redundant runtime-reference validation wrapper.
-- [ ] Inline the one-use integer-divide wrapper.
-- [ ] Implement `ContainsApproximateRegex` with
+- [x] Inline the redundant runtime-reference validation wrapper.
+- [x] Inline the one-use integer-divide wrapper.
+- [x] Implement `ContainsApproximateRegex` with
       `SmtFormulaTraversal.Contains`.
-- [ ] Remove the one-line `CanEncodeRegexOptions` forwarder.
-- [ ] Delete the unused regex-validation cache-count exposure chain in
+- [x] Remove the one-line `CanEncodeRegexOptions` forwarder.
+- [x] Delete the unused regex-validation cache-count exposure chain in
       `SmtRegexValidator`, `SmtQuerySafety`, and `SmtSolver`.
 
 Run the existing approximate-regex and regex-polarity tests.

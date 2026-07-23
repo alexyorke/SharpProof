@@ -15,7 +15,6 @@ internal sealed class SmtSolver : IDisposable {
     ///     budgets that do not depend on machine speed or load.
     /// </summary>
     public long ConsumedResourceCount { get; private set; }
-    internal int RegexValidationCacheCount => _safety.RegexValidationCacheCount;
     public void Dispose() => _encoder.Dispose();
     private Status CheckAndAccountResources(Solver solver) {
         var status = solver.Check();

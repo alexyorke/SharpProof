@@ -1,7 +1,6 @@
 namespace SharpProof.ProofCore.Smt;
 internal sealed class SmtQuerySafety {
     private readonly SmtRegexValidator _regexValidator = new();
-    internal int RegexValidationCacheCount => _regexValidator.CacheCount;
     internal bool TryPrepare(IReadOnlyList<SmtFormula> conditions, out SmtFormula[] prepared, out bool changed) {
         var strings = CollectConcreteStrings(conditions);
         changed = false;

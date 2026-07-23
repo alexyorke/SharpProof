@@ -56,14 +56,11 @@ internal sealed class Z3FormulaEncoder : IDisposable {
         }
         return new SmtSatisfyingWitness(status, reason, assignments);
     }
-    public bool ContainsApproximateRegex(SmtFormula formula) {
-        foreach (var candidate in SmtFormulaTraversal.Enumerate(formula))
-            if (candidate is SmtRegexMatchFormula regexMatch &&
-                GetRegexTranslationPrecision(regexMatch.Pattern, regexMatch.Options) ==
-                RegexTranslationPrecision.Approximate)
-                return true;
-        return false;
-    }
+    public bool ContainsApproximateRegex(SmtFormula formula) =>
+        SmtFormulaTraversal.Contains(formula, candidate =>
+            candidate is SmtRegexMatchFormula regexMatch &&
+            GetRegexTranslationPrecision(regexMatch.Pattern, regexMatch.Options) ==
+            RegexTranslationPrecision.Approximate);
     private Expr Encode(SmtFormula formula) => formula switch {
         SmtBooleanConstant booleanConstant => booleanConstant.Value ? _context.MkTrue() : _context.MkFalse(),
         SmtIntegerConstant integerConstant => _context.MkInt(integerConstant.Value),
@@ -122,7 +119,8 @@ internal sealed class Z3FormulaEncoder : IDisposable {
         SmtIntegerBinaryOperator.Add => _context.MkAdd(EncodeInteger(term.Left), EncodeInteger(term.Right)),
         SmtIntegerBinaryOperator.Subtract => _context.MkSub(EncodeInteger(term.Left), EncodeInteger(term.Right)),
         SmtIntegerBinaryOperator.Multiply => _context.MkMul(EncodeInteger(term.Left), EncodeInteger(term.Right)),
-        SmtIntegerBinaryOperator.Divide => EncodeCSharpIntegerDivide(term),
+        SmtIntegerBinaryOperator.Divide =>
+            EncodeCSharpIntegerDivide(EncodeInteger(term.Left), EncodeInteger(term.Right)),
         SmtIntegerBinaryOperator.Remainder => EncodeCSharpIntegerRemainder(term),
         _ => throw new InvalidOperationException("Unsupported SMT integer binary operator.")
     };
@@ -135,11 +133,6 @@ internal sealed class Z3FormulaEncoder : IDisposable {
             _opaqueIntegerOperations.Add(term.Operator, operation);
         }
         return _context.MkApp(operation, EncodeInteger(term.Left), EncodeInteger(term.Right));
-    }
-    private ArithExpr EncodeCSharpIntegerDivide(SmtIntegerBinaryTerm term) {
-        var left = EncodeInteger(term.Left);
-        var right = EncodeInteger(term.Right);
-        return EncodeCSharpIntegerDivide(left, right);
     }
     private ArithExpr EncodeCSharpIntegerRemainder(SmtIntegerBinaryTerm term) {
         var left = EncodeInteger(term.Left);
@@ -168,7 +161,7 @@ internal sealed class Z3FormulaEncoder : IDisposable {
         return (SeqExpr)Encode(formula);
     }
     private BoolExpr EncodeRegexMatch(SmtRegexMatchFormula formula) {
-        if (!CanEncodeRegexOptions(formula.Options))
+        if (!SmtRegexSemantics.CanEncodeOptions(formula.Options))
             throw new InvalidOperationException("Unsupported SMT regex options.");
         var translation = Z3RegexTranslator.Translate(_context, formula.Pattern, formula.Options);
         if (!translation.Success)
@@ -185,42 +178,22 @@ internal sealed class Z3FormulaEncoder : IDisposable {
                 _context.BoolSort);
             _runtimeTypeTests.Add(formula.TypeKey, predicate);
         }
-        return (BoolExpr)_context.MkApp(predicate, EncodeReference(formula.Value));
-    }
-    private Expr EncodeReference(SmtFormula formula) {
-        if (formula.Kind != SmtValueKind.Reference)
-            throw new InvalidOperationException("Only reference SMT formulas can be encoded as reference expressions.");
-        return Encode(formula);
+        return (BoolExpr)_context.MkApp(predicate, Encode(formula.Value));
     }
     private void EnsureSafeRegexPolarity(SmtFormula formula, bool isNegativeContext) {
         switch (formula) {
             case SmtRegexMatchFormula regexMatch:
-                if (!CanEncodeRegexOptions(regexMatch.Options))
+                if (!SmtRegexSemantics.CanEncodeOptions(regexMatch.Options))
                     throw new InvalidOperationException("Unsupported SMT regex options.");
                 if (isNegativeContext && IsApproximateRegexPattern(regexMatch.Pattern, regexMatch.Options))
                     throw new InvalidOperationException("Approximate SMT regex patterns cannot be safely negated.");
                 EnsureSafeRegexInTerm(regexMatch.Value);
-                return;
-            case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                EnsureSafeRegexInTerm(runtimeTypeTest.Value);
                 return;
             case SmtUnaryFormula { Operator: SmtUnaryOperator.Not } unaryFormula:
                 EnsureSafeRegexPolarity(unaryFormula.Operand, !isNegativeContext);
                 return;
             case SmtBinaryFormula binaryFormula:
                 EnsureSafeRegexPolarity(binaryFormula, isNegativeContext);
-                return;
-            case SmtStringContainsFormula stringContainsFormula:
-                EnsureSafeRegexInTerm(stringContainsFormula.Value);
-                EnsureSafeRegexInTerm(stringContainsFormula.Search);
-                return;
-            case SmtStringStartsWithFormula stringStartsWithFormula:
-                EnsureSafeRegexInTerm(stringStartsWithFormula.Value);
-                EnsureSafeRegexInTerm(stringStartsWithFormula.Prefix);
-                return;
-            case SmtStringEndsWithFormula stringEndsWithFormula:
-                EnsureSafeRegexInTerm(stringEndsWithFormula.Value);
-                EnsureSafeRegexInTerm(stringEndsWithFormula.Suffix);
                 return;
             case SmtConditionalFormula { Kind: SmtValueKind.Bool } conditionalFormula:
                 EnsureExactRegexUse(conditionalFormula.Condition);
@@ -267,7 +240,7 @@ internal sealed class Z3FormulaEncoder : IDisposable {
     }
     private void EnsureExactRegexUse(SmtFormula formula) {
         foreach (var regexMatch in SmtFormulaTraversal.Enumerate(formula).OfType<SmtRegexMatchFormula>()) {
-            if (!CanEncodeRegexOptions(regexMatch.Options))
+            if (!SmtRegexSemantics.CanEncodeOptions(regexMatch.Options))
                 throw new InvalidOperationException("Unsupported SMT regex options.");
             if (IsApproximateRegexPattern(regexMatch.Pattern, regexMatch.Options))
                 throw new InvalidOperationException("Approximate SMT regex patterns require positive polarity.");
@@ -287,8 +260,6 @@ internal sealed class Z3FormulaEncoder : IDisposable {
         _regexPrecisionCache.Add(key, precision);
         return precision;
     }
-    private static bool CanEncodeRegexOptions(RegexOptions options) =>
-        SmtRegexSemantics.CanEncodeOptions(options);
     private static bool GetBooleanComparisonOperandPolarity(SmtBinaryOperator op, bool constantValue, bool isNegativeContext) {
         var preservesPolarity =
             (op == SmtBinaryOperator.Equal && constantValue) ||
