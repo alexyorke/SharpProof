@@ -1429,6 +1429,10 @@ internal sealed class MethodEffectAnalysisSession(
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
                 return memoryMarshalSource;
             }
+            if (TryGetMemoryMarshalReferenceSource(target, values, out var memoryMarshalReference)) {
+                effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+                return memoryMarshalReference;
+            }
             if (IsMemoryViewSlice(target)) {
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
                 return receiver.WithExactType(target.ReturnType).AsDefinitelyNonNull();
@@ -2010,6 +2014,23 @@ internal sealed class MethodEffectAnalysisSession(
                 arguments.Count == 0)
                 return false;
             source = arguments[0].WithExactType(method.ReturnType).AsDefinitelyNonNull();
+            return true;
+        }
+        private static bool TryGetMemoryMarshalReferenceSource(
+            IMethodSymbol method,
+            IReadOnlyList<EffectFlowValue> arguments,
+            out EffectFlowValue source) {
+            source = EffectFlowValue.None;
+            if (method is not { Name: "GetReference", Parameters.Length: 1 } ||
+                method.ContainingType.ToDisplayString() != "System.Runtime.InteropServices.MemoryMarshal" ||
+                (!method.ReturnsByRef && !method.ReturnsByRefReadonly) ||
+                method.Parameters[0].Type is not INamedTypeSymbol { TypeArguments.Length: 1 } inputType ||
+                inputType.OriginalDefinition.ToDisplayString() is not
+                    ("System.Span<T>" or "System.ReadOnlySpan<T>") ||
+                !SymbolEqualityComparer.Default.Equals(inputType.TypeArguments[0], method.ReturnType) ||
+                arguments.Count == 0)
+                return false;
+            source = arguments[0].WithExactType(method.ReturnType);
             return true;
         }
         private CompilerMethodEffectSummary GetSummary(
