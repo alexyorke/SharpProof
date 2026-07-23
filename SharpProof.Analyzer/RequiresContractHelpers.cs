@@ -2,21 +2,15 @@ namespace SharpProof.Analyzer;
 internal static class RequiresContractHelpers {
     internal const string AttributeTypeName = "RequiresAttribute";
     internal const string AttributeDisplayName = "[Requires]";
-    internal static ImmutableArray<RequiresContract> CollectContracts(
+    internal static ImmutableArray<ContractAttributeCondition> CollectContracts(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken) => ContractConditionHelpers.Collect(
             methodSymbol,
             attributePolicy,
             AttributeTypeName,
-            static contract => new RequiresContract(
-                contract.Condition,
-                contract.Location,
-                contract.Argument,
-                contract.InvalidReason,
-                contract.SourceMethod),
             cancellationToken);
-    internal static ImmutableArray<RequiresContract> ValidContracts(
+    internal static ImmutableArray<ContractAttributeCondition> ValidContracts(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken)
@@ -26,7 +20,8 @@ internal static class RequiresContractHelpers {
             .DescendantNodesAndSelf()
             .OfType<IdentifierNameSyntax>()
             .Any(static identifier => string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal));
-    internal static string CombineAsImplication(ImmutableArray<RequiresContract> requiresContracts, string consequent) {
+    internal static string CombineAsImplication(
+        ImmutableArray<ContractAttributeCondition> requiresContracts, string consequent) {
         if (requiresContracts.IsDefaultOrEmpty) return consequent;
         var validConditions = requiresContracts
             .Where(static contract => contract.InvalidReason == null)
@@ -104,9 +99,3 @@ internal static class RequiresContractHelpers {
         }
     }
 }
-internal readonly record struct RequiresContract(
-    string Condition,
-    Location? Location,
-    string Argument,
-    string? InvalidReason,
-    IMethodSymbol SourceMethod);

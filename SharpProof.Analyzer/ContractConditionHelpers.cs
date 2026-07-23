@@ -1,12 +1,11 @@
 namespace SharpProof.Analyzer;
 internal static class ContractConditionHelpers {
-    internal static ImmutableArray<TContract> Collect<TContract>(
+    internal static ImmutableArray<ContractAttributeCondition> Collect(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
         string attributeTypeName,
-        Func<ContractAttributeCondition, TContract> createContract,
         CancellationToken cancellationToken) {
-        var builder = ImmutableArray.CreateBuilder<TContract>();
+        var builder = ImmutableArray.CreateBuilder<ContractAttributeCondition>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
             foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, attributeTypeName)) {
@@ -17,15 +16,46 @@ internal static class ContractConditionHelpers {
                 var argument = AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken);
                 var key = condition ?? "<invalid>:" + argument;
                 if (!seen.Add(key)) continue;
-                builder.Add(createContract(new ContractAttributeCondition(
+                builder.Add(new ContractAttributeCondition(
                     condition ?? string.Empty,
                     attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation(),
                     argument,
                     GetInvalidReason(attribute, condition),
-                    source)));
+                    source));
             }
         return builder.ToImmutable();
     }
+    internal static ImmutableArray<ContractAttributeCondition> ReportAndFilterInvalid(
+        ImmutableArray<ContractAttributeCondition> contracts,
+        string attributeDisplayName,
+        MethodBodyAnalysisContext context) {
+        var validContracts = ImmutableArray.CreateBuilder<ContractAttributeCondition>(contracts.Length);
+        foreach (var contract in contracts) {
+            if (contract.InvalidReason == null) {
+                validContracts.Add(contract);
+                continue;
+            }
+            context.ReportDiagnostic(InvalidContractArgumentDiagnostics.Create(
+                attributeDisplayName,
+                contract.Argument,
+                contract.InvalidReason,
+                contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node)));
+        }
+        return validContracts.ToImmutable();
+    }
+    internal static void ReportUnsupported(
+        MethodBodyAnalysisContext context,
+        IMethodSymbol methodSymbol,
+        ContractAttributeCondition contract,
+        string reason,
+        Func<IMethodSymbol, string, Location?, string, IEnumerable<Location>?, Diagnostic> createDiagnostic,
+        Location? location = null,
+        IEnumerable<Location>? additionalLocations = null) => context.ReportDiagnostic(createDiagnostic(
+            methodSymbol,
+            contract.Condition,
+            location ?? contract.Location,
+            reason,
+            additionalLocations));
     internal static bool TryParse(string conditionText, out IfStatementSyntax conditionStatement,
         out ExpressionSyntax conditionExpression) {
         var statement = SyntaxFactory.ParseStatement("if (" + conditionText + ") { }");

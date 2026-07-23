@@ -5,29 +5,24 @@ internal static class MethodEnsuresAnalyzer {
         AnalyzerProofService proofService,
         SharpProofAttributeIdentityPolicy attributePolicy) {
         var methodSymbol = context.MethodSymbol;
-        Action<Diagnostic> report = context.ReportDiagnostic;
         if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
-        var contracts = CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);
+        var contracts = ContractConditionHelpers.Collect(
+            methodSymbol, attributePolicy, "EnsuresAttribute", context.CancellationToken);
         if (contracts.Length == 0) return;
-        contracts = ReportAndFilterInvalidContracts(contracts, context);
+        contracts = ContractConditionHelpers.ReportAndFilterInvalid(contracts, "[Ensures]", context);
         if (contracts.Length == 0) return;
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) {
-            foreach (var contract in contracts) {
-                var diagnostic = CreateUnsupportedDiagnostic(
-                    methodSymbol,
-                    contract.Condition,
-                    contract.Location,
+            foreach (var contract in contracts)
+                ContractConditionHelpers.ReportUnsupported(
+                    context, methodSymbol, contract,
                     "auto-property getter result is not source-visible for [Ensures] verification",
-                    null);
-                report(diagnostic);
-            }
+                    CreateUnsupportedDiagnostic);
             return;
         }
         if (!SupportsEnsuresPostconditions(context.Node, out var unsupportedReason)) {
-            foreach (var contract in contracts) {
-                var diagnostic = CreateUnsupportedDiagnostic(methodSymbol, contract.Condition, contract.Location, unsupportedReason, null);
-                report(diagnostic);
-            }
+            foreach (var contract in contracts)
+                ContractConditionHelpers.ReportUnsupported(
+                    context, methodSymbol, contract, unsupportedReason, CreateUnsupportedDiagnostic);
             return;
         }
         var requiresAssumptions = CollectRequiresAssumptions(methodSymbol, attributePolicy, context.CancellationToken);
@@ -36,13 +31,8 @@ internal static class MethodEnsuresAnalyzer {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var contract in contracts) {
             if (!ContractConditionHelpers.TryParse(contract.Condition, out var conditionStatement, out var conditionExpression)) {
-                var diagnostic = CreateUnsupportedDiagnostic(
-                    methodSymbol,
-                    contract.Condition,
-                    contract.Location,
-                    "condition parse failure",
-                    null);
-                report(diagnostic);
+                ContractConditionHelpers.ReportUnsupported(
+                    context, methodSymbol, contract, "condition parse failure", CreateUnsupportedDiagnostic);
                 continue;
             }
             if (!ContractConditionHelpers.TryCreateSpeculativeModel(
@@ -50,34 +40,22 @@ internal static class MethodEnsuresAnalyzer {
                     completionSites[0].QueryNode.SpanStart,
                     conditionStatement,
                     out var speculativeModel)) {
-                var diagnostic = CreateUnsupportedDiagnostic(
-                    methodSymbol,
-                    contract.Condition,
-                    contract.Location,
-                    "condition binding failure",
-                    null);
-                report(diagnostic);
+                ContractConditionHelpers.ReportUnsupported(
+                    context, methodSymbol, contract, "condition binding failure", CreateUnsupportedDiagnostic);
                 continue;
             }
             if (!completionSites.All(static site => site.ResultExpression != null) &&
                 RequiresContractHelpers.ContainsResultReference(conditionExpression)) {
-                var diagnostic = CreateUnsupportedDiagnostic(
-                    methodSymbol,
-                    contract.Condition,
-                    contract.Location,
+                ContractConditionHelpers.ReportUnsupported(
+                    context, methodSymbol, contract,
                     "result is not available for [Ensures] on void-returning members or constructors",
-                    null);
-                report(diagnostic);
+                    CreateUnsupportedDiagnostic);
                 continue;
             }
             if (ReferencesUserLocalOrUnsupportedParameter(conditionExpression, speculativeModel, methodSymbol, context.CancellationToken)) {
-                var diagnostic = CreateUnsupportedDiagnostic(
-                    methodSymbol,
-                    contract.Condition,
-                    contract.Location,
-                    "local variables are not supported in [Ensures] conditions",
-                    null);
-                report(diagnostic);
+                ContractConditionHelpers.ReportUnsupported(
+                    context, methodSymbol, contract,
+                    "local variables are not supported in [Ensures] conditions", CreateUnsupportedDiagnostic);
                 continue;
             }
             foreach (var completionSite in completionSites) {
@@ -87,13 +65,9 @@ internal static class MethodEnsuresAnalyzer {
                         NullableFlowFacts.GetMethodReturnState(methodSymbol),
                         out var rewrittenCondition,
                         out _)) {
-                    var diagnostic = CreateUnsupportedDiagnostic(
-                        methodSymbol,
-                        contract.Condition,
-                        contract.Location,
-                        "result placeholder rewrite failed",
-                        [completionSite.Location]);
-                    report(diagnostic);
+                    ContractConditionHelpers.ReportUnsupported(
+                        context, methodSymbol, contract, "result placeholder rewrite failed", CreateUnsupportedDiagnostic,
+                        additionalLocations: [completionSite.Location]);
                     continue;
                 }
                 var proofCondition =
@@ -111,54 +85,24 @@ internal static class MethodEnsuresAnalyzer {
                     proof.Reason);
                 if (!seen.Add(key)) continue;
                 if (proof.TruthValue == SymbolicTruthValue.ProvenFalse) {
-                    var diagnostic = CreateNotProvenDiagnostic(methodSymbol, contract.Condition, completionSite, contract.Location);
-                    report(diagnostic);
+                    context.ReportDiagnostic(
+                        CreateNotProvenDiagnostic(methodSymbol, contract.Condition, completionSite, contract.Location));
                     continue;
                 }
-                var unsupportedDiagnostic = CreateUnsupportedDiagnostic(
-                    methodSymbol,
-                    contract.Condition,
-                    completionSite.Location,
-                    ContractDiagnosticSupport.FormatUnknownReason(proof, "Ensures"),
+                ContractConditionHelpers.ReportUnsupported(
+                    context, methodSymbol, contract, ContractDiagnosticSupport.FormatUnknownReason(proof, "Ensures"),
+                    CreateUnsupportedDiagnostic, completionSite.Location,
                     contract.Location == null ? null : [contract.Location]);
-                report(unsupportedDiagnostic);
             }
         }
     }
-    private static ImmutableArray<EnsuresContract> CollectContracts(
-        IMethodSymbol methodSymbol,
-        SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken) => ContractConditionHelpers.Collect(
-            methodSymbol,
-            attributePolicy,
-            "EnsuresAttribute",
-            static contract => new EnsuresContract(contract.Condition, contract.Location, contract.Argument, contract.InvalidReason),
-            cancellationToken);
-    private static ImmutableArray<RequiresContract> CollectRequiresAssumptions(
+    private static ImmutableArray<ContractAttributeCondition> CollectRequiresAssumptions(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken) => [.. RequiresContractHelpers.ValidContracts(methodSymbol, attributePolicy, cancellationToken)
             .Where(contract =>
                 ContractConditionHelpers.TryParse(contract.Condition, out _, out var conditionExpression) &&
                 !RequiresContractHelpers.ContainsResultReference(conditionExpression))];
-    private static ImmutableArray<EnsuresContract> ReportAndFilterInvalidContracts(
-        ImmutableArray<EnsuresContract> contracts,
-        MethodBodyAnalysisContext context) {
-        var validContracts = ImmutableArray.CreateBuilder<EnsuresContract>(contracts.Length);
-        foreach (var contract in contracts) {
-            if (contract.InvalidReason == null) {
-                validContracts.Add(contract);
-                continue;
-            }
-            var diagnostic = InvalidContractArgumentDiagnostics.Create(
-                "[Ensures]",
-                contract.Argument,
-                contract.InvalidReason,
-                contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node));
-            context.ReportDiagnostic(diagnostic);
-        }
-        return validContracts.ToImmutable();
-    }
     private static bool SupportsEnsuresPostconditions(SyntaxNode methodNode, out string reason) {
         if (methodNode is AccessorDeclarationSyntax accessor &&
             (accessor.IsKind(SyntaxKind.SetAccessorDeclaration) ||
@@ -377,5 +321,4 @@ internal static class MethodEnsuresAnalyzer {
         public SymbolicState CreateInitialState() =>
             new(_snapshotFacts);
     }
-    readonly record struct EnsuresContract(string Condition, Location? Location, string Argument, string? InvalidReason);
 }

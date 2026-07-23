@@ -8,32 +8,18 @@ internal static class MethodRequiresAnalyzer {
         if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
         var contracts =
             RequiresContractHelpers.CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);
+        contracts = ContractConditionHelpers.ReportAndFilterInvalid(
+            contracts, RequiresContractHelpers.AttributeDisplayName, context);
         foreach (var contract in contracts) {
-            if (contract.InvalidReason != null) {
-                var invalidDiagnostic = InvalidContractArgumentDiagnostics.Create(
-                    RequiresContractHelpers.AttributeDisplayName,
-                    contract.Argument,
-                    contract.InvalidReason,
-                    contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node));
-                context.ReportDiagnostic(invalidDiagnostic);
-                continue;
-            }
             if (!ContractConditionHelpers.TryParse(contract.Condition, out _, out var conditionExpression)) {
-                context.ReportDiagnostic(CreateUnsupportedDiagnostic(
-                        methodSymbol,
-                        contract.Condition,
-                        contract.Location,
-                        "condition parse failure",
-                        null));
+                ContractConditionHelpers.ReportUnsupported(
+                    context, methodSymbol, contract, "condition parse failure", CreateUnsupportedDiagnostic);
                 continue;
             }
             if (RequiresContractHelpers.ContainsResultReference(conditionExpression))
-                context.ReportDiagnostic(CreateUnsupportedDiagnostic(
-                        methodSymbol,
-                        contract.Condition,
-                        contract.Location,
-                        "result placeholder is not supported in [Requires] conditions",
-                        null));
+                ContractConditionHelpers.ReportUnsupported(
+                    context, methodSymbol, contract,
+                    "result placeholder is not supported in [Requires] conditions", CreateUnsupportedDiagnostic);
         }
         AnalyzeCallSitesForRequires(context, proofService, attributePolicy);
     }
@@ -56,12 +42,9 @@ internal static class MethodRequiresAnalyzer {
                         callSite.Method,
                         callSite.Arguments,
                         out var rewrittenCondition)) {
-                    context.ReportDiagnostic(CreateUnsupportedDiagnostic(
-                            callSite.Method,
-                            contract.Condition,
-                            location,
-                            "condition rewrite failure",
-                            AdditionalLocations(contract.Location)));
+                    ContractConditionHelpers.ReportUnsupported(
+                        context, callSite.Method, contract, "condition rewrite failure", CreateUnsupportedDiagnostic,
+                        location, AdditionalLocations(contract.Location));
                     continue;
                 }
                 var proof = context.State.ProveAtNode(
@@ -80,12 +63,9 @@ internal static class MethodRequiresAnalyzer {
                     context.ReportDiagnostic(CreateNotProvenDiagnostic(callSite.Method, contract.Condition, location, contract.Location));
                     continue;
                 }
-                context.ReportDiagnostic(CreateUnsupportedDiagnostic(
-                        callSite.Method,
-                        contract.Condition,
-                        location,
-                        ContractDiagnosticSupport.FormatUnknownReason(proof, "Requires"),
-                        AdditionalLocations(contract.Location)));
+                ContractConditionHelpers.ReportUnsupported(
+                    context, callSite.Method, contract, ContractDiagnosticSupport.FormatUnknownReason(proof, "Requires"),
+                    CreateUnsupportedDiagnostic, location, AdditionalLocations(contract.Location));
             }
         }
     }

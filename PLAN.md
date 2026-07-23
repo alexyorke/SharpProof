@@ -390,15 +390,15 @@ Target: 228-308 net lines.
 
 Target: 50-65 lines, low-medium risk.
 
-- [ ] Return `ContractAttributeCondition` directly from the common collection
+- [x] Return `ContractAttributeCondition` directly from the common collection
       path.
-- [ ] Delete the projection records duplicated by
+- [x] Delete the projection records duplicated by
       `RequiresContractHelpers` and `MethodEnsuresAnalyzer`.
-- [ ] Share invalid-contract filtering between Ensures and Requires.
-- [ ] Add one compact helper for unsupported-contract reporting.
-- [ ] Preserve diagnostic IDs, primary and additional locations, messages, and
+- [x] Share invalid-contract filtering between Ensures and Requires.
+- [x] Add one compact helper for unsupported-contract reporting.
+- [x] Preserve diagnostic IDs, primary and additional locations, messages, and
       ordering.
-- [ ] Add a table-driven regression covering valid, invalid, unsupported,
+- [x] Add a table-driven regression covering valid, invalid, unsupported,
       property-accessor, inherited, and duplicate contracts.
 
 ### 6.2 Consolidate regex parser and option state
