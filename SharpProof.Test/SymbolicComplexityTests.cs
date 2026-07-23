@@ -36,6 +36,10 @@ public sealed class SymbolicComplexityTests {
             """public sealed class C { private int _index; private void Reset()=>_index=0; public int Work(int count) { for(_index=0;_index<count;_index++){Reset();} return _index; } }""",
             "return _index;", SymbolicComplexityKind.Unknown,
             unknowns: [SymbolicComplexityUnknownReason.UnsupportedLoopShape]);
+        yield return Case("ForLoopWithMutatingBound_IsUnknown",
+            """public static class C { public static int Work(int n) { var sum=0; for(var i=0;i<n;i++){n++;sum+=i;} return sum; } }""",
+            "return sum;", SymbolicComplexityKind.Unknown,
+            unknowns: [SymbolicComplexityUnknownReason.UnsupportedLoopShape]);
         yield return Case("NestedForLoopsOverSameBound_ProduceQuadratic",
             """public static class C { public static int Work(int n) { var sum=0; for(var i=0;i<n;i++){for(var j=0;j<n;j++){sum+=i+j;}} return sum; } }""",
             "return sum;", SymbolicComplexityKind.Quadratic, "O(n^2)");
@@ -56,6 +60,10 @@ public sealed class SymbolicComplexityTests {
             "return i;", SymbolicComplexityKind.Linear, "O(n)", driver: "DoLoop");
         yield return Case("UnsupportedWhileLoop_IsUnknown",
             """public static class C { public static int Step(int value)=>value+1; public static int Work(int n) { var i=0; while(i<n){i=Step(i);} return i; } }""",
+            "return i;", SymbolicComplexityKind.Unknown,
+            unknowns: [SymbolicComplexityUnknownReason.UnsupportedWhileLoop]);
+        yield return Case("WhileLoopWithMutatingBound_IsUnknown",
+            """public static class C { public static int Work(int n) { var i=0; while(i<n){n++;i++;} return i; } }""",
             "return i;", SymbolicComplexityKind.Unknown,
             unknowns: [SymbolicComplexityUnknownReason.UnsupportedWhileLoop]);
         yield return Case("KnownSourceCallee_ComposesIntoSurroundingLoop",
