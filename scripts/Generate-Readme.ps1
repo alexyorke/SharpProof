@@ -186,13 +186,7 @@ foreach ($generatedPage in $generatedPages) {
         -DisplayPath $generatedPage.Page.OutputPath `
         -GeneratorCommand '.\scripts\Generate-Readme.ps1' `
         -Verify:$Verify
+    if (-not $Verify) { Write-Host ("Regenerated {0}." -f $generatedPage.Page.OutputPath) }
 }
 
-if ($Verify) {
-    Write-Host "Generated example pages are up to date."
-    return
-}
-
-foreach ($generatedPage in $generatedPages) {
-    Write-Host ("Regenerated {0}." -f $generatedPage.Page.OutputPath)
-}
+if ($Verify) { Write-Host "Generated example pages are up to date." }

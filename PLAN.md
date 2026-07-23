@@ -677,7 +677,7 @@ Target: 45-65 net lines. Package and property removals are validation-gated.
 
 - [x] Delete the write-only `$allExampleIds` state from
       `Generate-Readme.ps1`: approximately 4 lines.
-- [ ] Share the generated-page update/report loops while retaining validation
+- [x] Share the generated-page update/report loops while retaining validation
       before writes: approximately 6 lines.
 - [ ] In `Invoke-SharpProofDotnet.ps1`, construct its `List` and `HashSet`
       directly from enumerables: approximately 8 lines.
