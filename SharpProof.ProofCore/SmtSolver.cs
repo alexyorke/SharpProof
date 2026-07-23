@@ -115,9 +115,9 @@ internal sealed class SmtSolver : IDisposable {
         var checks = SmtQuerySafety.CreateUnsafeArithmeticChecks(conditions);
         if (checks.Count == 0) return true;
         using var solver = _encoder.CreateSolver(timeout);
-        foreach (var condition in conditions)
-            if (!SmtQuerySafety.ContainsUnsafeArithmetic(condition))
-                solver.Assert(_encoder.EncodeCondition(condition));
+        foreach (var conjunct in conditions.SelectMany(SmtFormulaTraversal.EnumerateConjuncts))
+            if (!SmtQuerySafety.ContainsUnsafeArithmetic(conjunct))
+                solver.Assert(_encoder.EncodeCondition(conjunct));
         AssertIntegerDomains(solver, conditions);
         solver.Assert(_encoder.EncodeCondition(checks.Aggregate(
             static (left, right) => new SmtBinaryFormula(SmtBinaryOperator.Or, left, right))));

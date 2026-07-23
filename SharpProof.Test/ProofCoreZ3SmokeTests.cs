@@ -421,6 +421,12 @@ internal class ProofCoreZ3SmokeTests {
             [Equal(Int("divisor"), Integer(2)), NotEqual(Divide(Integer(10), Int("divisor")), Integer(5))], Feasibility.Unsatisfiable);
         yield return CreateSolverCase("SmtSolver_DivisionWithExplicitNonZeroGuard_RemainsUsable",
             [NotEqual(Int("divisor"), Integer(0)), Equal(Divide(Integer(10), Int("divisor")), Integer(5))], Feasibility.Satisfiable);
+        yield return CreateSolverCase("SmtSolver_DivisionWithConjoinedNonZeroGuard_RemainsUsable",
+            [And(NotEqual(Int("divisor"), Integer(0)), Equal(Divide(Integer(10), Int("divisor")), Integer(5)))],
+            Feasibility.Satisfiable);
+        yield return CreateSolverCase("SmtSolver_RemainderWithConjoinedPositiveGuard_RemainsUsable",
+            [And(GreaterThan(Int("divisor"), Integer(0)), Equal(Remainder(Integer(5), Int("divisor")), Integer(1)))],
+            Feasibility.Satisfiable);
         yield return CreateSolverCase("SmtSolver_StrictBoundBeyondInt64Range_IsUnsatisfiableBeforeDivision",
             [GreaterThan(Int("divisor"), Integer(long.MaxValue)), Equal(Divide(Integer(10), Int("divisor")), Integer(0))],
                 Feasibility.Unsatisfiable);
