@@ -1658,7 +1658,9 @@ internal sealed class MethodEffectAnalysisSession(
             ref EffectFlowState state) {
             var getEnumerator = FindProtocolMethod(type, "GetEnumerator", 0) ??
                                 FindImplementedProtocolMethod(type, "GetEnumerator", 0) ??
-                                FindExtensionProtocolMethod(type, "GetEnumerator", 0, site);
+                                (site.Syntax is SpreadElementSyntax spread
+                                    ? BindProtocolInvocation(spread.Expression, "GetEnumerator")
+                                    : null);
             if (getEnumerator == null) return;
             var enumerator = InvokeCore(getEnumerator, collection,
                 getEnumerator.ReducedFrom != null || getEnumerator.IsExtensionMethod ? [collection] : [], [], site, ref state);
@@ -1670,6 +1672,18 @@ internal sealed class MethodEffectAnalysisSession(
                 enumerator, site, ref state);
             InvokeCoreOrValue(ResolveProtocolImplementation(
                 FindEnumerationDisposeMethod(getEnumerator.ReturnType), enumerator), enumerator, site, ref state);
+        }
+        private IMethodSymbol? BindProtocolInvocation(ExpressionSyntax receiver, string name) {
+            var invocation = SyntaxFactory.InvocationExpression(
+                SyntaxFactory.MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    SyntaxFactory.ParenthesizedExpression(receiver.WithoutTrivia()),
+                    SyntaxFactory.IdentifierName(name)));
+            return semanticModel.GetSpeculativeSymbolInfo(
+                receiver.SpanStart, invocation, SpeculativeBindingOption.BindAsExpression).Symbol is
+                IMethodSymbol { ReducedFrom: not null } reduced
+                ? reduced
+                : null;
         }
         private IMethodSymbol? FindEnumerationDisposeMethod(ITypeSymbol type) {
             var disposable = session.Compilation.GetTypeByMetadataName("System.IDisposable");
