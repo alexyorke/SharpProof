@@ -17,19 +17,13 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'JobObjectHelpers.ps1')
 
-$effectiveDotnetArgs = [System.Collections.Generic.List[string]]::new()
-foreach ($argument in $DotnetArgs)
-{
-    $effectiveDotnetArgs.Add($argument)
-}
+$effectiveDotnetArgs = [System.Collections.Generic.List[string]]::new([string[]]$DotnetArgs)
 
 if ($effectiveDotnetArgs.Count -gt 0)
 {
-    $msbuildBackedCommands = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($commandName in @('build', 'clean', 'msbuild', 'pack', 'publish', 'restore', 'test'))
-    {
-        [void]$msbuildBackedCommands.Add($commandName)
-    }
+    $msbuildBackedCommands = [System.Collections.Generic.HashSet[string]]::new(
+        [string[]]@('build', 'clean', 'msbuild', 'pack', 'publish', 'restore', 'test'),
+        [StringComparer]::OrdinalIgnoreCase)
 
     if ($msbuildBackedCommands.Contains($effectiveDotnetArgs[0]))
     {

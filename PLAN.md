@@ -679,7 +679,7 @@ Target: 45-65 net lines. Package and property removals are validation-gated.
       `Generate-Readme.ps1`: approximately 4 lines.
 - [x] Share the generated-page update/report loops while retaining validation
       before writes: approximately 6 lines.
-- [ ] In `Invoke-SharpProofDotnet.ps1`, construct its `List` and `HashSet`
+- [x] In `Invoke-SharpProofDotnet.ps1`, construct its `List` and `HashSet`
       directly from enumerables: approximately 8 lines.
 - [ ] In `Test-SharpProofPackageConsumers.ps1`, load
       `package-projects.json` and loop pack operations instead of maintaining a
