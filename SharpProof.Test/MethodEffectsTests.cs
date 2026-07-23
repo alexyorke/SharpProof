@@ -1204,6 +1204,30 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.ReadsArgumentState,
             forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("MemoryMarshalAsMemoryPreservesOwnership", """
+            class C {
+                static void M(System.ReadOnlyMemory<int> values) {
+                    var memory = System.Runtime.InteropServices.MemoryMarshal.AsMemory(values);
+                    memory.Span[0] = 1;
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("MemoryMarshalAsMemoryReadPreservesOwnership", """
+            class C {
+                static int M(System.ReadOnlyMemory<int> values) {
+                    var memory = System.Runtime.InteropServices.MemoryMarshal.AsMemory(values);
+                    return memory.Span[0];
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState,
+            forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
