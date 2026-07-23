@@ -685,7 +685,7 @@ Target: 45-65 net lines. Package and property removals are validation-gated.
       `package-projects.json` and loop pack operations instead of maintaining a
       second project list and three pack blocks: 8-12 lines.
 - [x] Share package-consumer scaffolding where it remains clear: 4-6 lines.
-- [ ] In `Aggregate-FuzzRun.ps1`, factor the three identical summary-union
+- [x] In `Aggregate-FuzzRun.ps1`, factor the three identical summary-union
       pipelines: 5-7 lines.
 - [ ] In `scripts/package-consumers/SymbolicConsumer.cs`, simplify the
       required/graceful branch because `nativeAvailable == proofsHold`, and

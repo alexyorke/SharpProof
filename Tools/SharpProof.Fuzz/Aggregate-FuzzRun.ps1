@@ -43,6 +43,12 @@ function Get-SummarySum([string]$PropertyName)
     })
 }
 
+function Get-SummaryUnion([string]$PropertyName) {
+    return $phaseSummaries |
+        ForEach-Object { $_.Summary.PSObject.Properties[$PropertyName].Value } |
+        Where-Object { $_ } | Sort-Object -Unique
+}
+
 $schemaVersions = @($phaseSummaries | ForEach-Object { [string]$_.Summary.SchemaVersion } | Sort-Object -Unique)
 if ($schemaVersions.Count -ne 1)
 {
@@ -60,20 +66,9 @@ $totalAnalyzerExceptions = Get-SummarySum "AnalyzerExceptionCount"
 $interestingCasesSaved = Get-SummarySum "InterestingCasesSaved"
 $throughput = if ($totalElapsedSeconds -gt 0) { [math]::Round($totalCases / $totalElapsedSeconds, 2) } else { 0.0 }
 
-$unobservedOperationKinds = $phaseSummaries |
-    ForEach-Object { $_.Summary.UnobservedOperationKinds } |
-    Where-Object { $_ } |
-    Sort-Object -Unique
-
-$actionableUnobservedOperationKinds = $phaseSummaries |
-    ForEach-Object { $_.Summary.ActionableUnobservedOperationKinds } |
-    Where-Object { $_ } |
-    Sort-Object -Unique
-
-$unobservedGeneratorBackedShapes = $phaseSummaries |
-    ForEach-Object { $_.Summary.UnobservedGeneratorBackedShapes } |
-    Where-Object { $_ } |
-    Sort-Object -Unique
+$unobservedOperationKinds = Get-SummaryUnion "UnobservedOperationKinds"
+$actionableUnobservedOperationKinds = Get-SummaryUnion "ActionableUnobservedOperationKinds"
+$unobservedGeneratorBackedShapes = Get-SummaryUnion "UnobservedGeneratorBackedShapes"
 
 $phaseBreakdown = $phaseSummaries | ForEach-Object {
     [pscustomobject]@{
