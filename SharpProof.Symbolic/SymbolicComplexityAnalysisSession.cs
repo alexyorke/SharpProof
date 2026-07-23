@@ -193,7 +193,8 @@ internal sealed class SymbolicComplexityAnalysisSession {
 
     private Summary AnalyzeSwitch(ISwitchOperation operation, SemanticModel model, IMethodSymbol method) =>
         Sequence(AnalyzeOperation(operation.Value, model, method), Branch(operation.Cases.Select(@case =>
-            Sequence(@case.Body.Select(item => AnalyzeOperation(item, model, method))))));
+            Sequence(@case.Clauses.Select(clause => AnalyzeOperation(clause, model, method))
+                .Concat(@case.Body.Select(item => AnalyzeOperation(item, model, method)))))));
 
     private Summary AnalyzeSwitchExpression(
         ISwitchExpressionOperation operation, SemanticModel model, IMethodSymbol method) =>
