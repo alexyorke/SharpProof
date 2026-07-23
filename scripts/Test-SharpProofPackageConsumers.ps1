@@ -69,6 +69,22 @@ function Expand-ProjectTemplate {
         [System.Text.UTF8Encoding]::new($false))
 }
 
+function New-PackageConsumer {
+    param([string]$Name, [string]$PackageVersion, [string]$SourceFileName)
+
+    $consumer = Join-Path $consumerRoot $Name
+    New-Item -ItemType Directory -Path $consumer | Out-Null
+    Expand-ProjectTemplate (Join-Path $fixtureRoot "$Name.csproj.template") `
+        (Join-Path $consumer "$Name.csproj") $PackageVersion
+    Copy-Item -LiteralPath (Join-Path $fixtureRoot "$Name.cs") `
+        -Destination (Join-Path $consumer $SourceFileName)
+    [void](Invoke-DotnetCommand @(
+        'restore', (Join-Path $consumer "$Name.csproj"),
+        '--configfile', $nugetConfigPath,
+        '--packages', $packageCache) $consumer)
+    return $consumer
+}
+
 function Get-EvaluatedProjectProperty {
     param(
         [Parameter(Mandatory = $true)][string]$ProjectPath,
@@ -141,18 +157,7 @@ try {
         $nugetConfigPath,
         $nugetConfig,
         [System.Text.UTF8Encoding]::new($false))
-    $symbolicConsumer = Join-Path $consumerRoot 'SymbolicConsumer'
-    New-Item -ItemType Directory -Path $symbolicConsumer | Out-Null
-    Expand-ProjectTemplate `
-        (Join-Path $fixtureRoot 'SymbolicConsumer.csproj.template') `
-        (Join-Path $symbolicConsumer 'SymbolicConsumer.csproj') `
-        $symbolicVersion
-    Copy-Item -LiteralPath (Join-Path $fixtureRoot 'SymbolicConsumer.cs') `
-        -Destination (Join-Path $symbolicConsumer 'Program.cs')
-    [void](Invoke-DotnetCommand @(
-        'restore', (Join-Path $symbolicConsumer 'SymbolicConsumer.csproj'),
-        '--configfile', $nugetConfigPath,
-        '--packages', $packageCache) $symbolicConsumer)
+    $symbolicConsumer = New-PackageConsumer 'SymbolicConsumer' $symbolicVersion 'Program.cs'
     [void](Invoke-DotnetCommand @(
         'run',
         '--project', (Join-Path $symbolicConsumer 'SymbolicConsumer.csproj'),
@@ -160,18 +165,7 @@ try {
         '--no-restore',
         '--', $ExpectedSmt) $symbolicConsumer)
 
-    $analyzerConsumer = Join-Path $consumerRoot 'AnalyzerConsumer'
-    New-Item -ItemType Directory -Path $analyzerConsumer | Out-Null
-    Expand-ProjectTemplate `
-        (Join-Path $fixtureRoot 'AnalyzerConsumer.csproj.template') `
-        (Join-Path $analyzerConsumer 'AnalyzerConsumer.csproj') `
-        $analyzerVersion
-    Copy-Item -LiteralPath (Join-Path $fixtureRoot 'AnalyzerConsumer.cs') `
-        -Destination (Join-Path $analyzerConsumer 'AnalyzerConsumer.cs')
-    [void](Invoke-DotnetCommand @(
-        'restore', (Join-Path $analyzerConsumer 'AnalyzerConsumer.csproj'),
-        '--configfile', $nugetConfigPath,
-        '--packages', $packageCache) $analyzerConsumer)
+    $analyzerConsumer = New-PackageConsumer 'AnalyzerConsumer' $analyzerVersion 'AnalyzerConsumer.cs'
     $analyzerDiagnosticLog = Join-Path $analyzerConsumer 'analyzer-diagnostics.sarif'
     [void](Invoke-DotnetCommand @(
         'build', (Join-Path $analyzerConsumer 'AnalyzerConsumer.csproj'),
