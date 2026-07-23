@@ -51,6 +51,13 @@ public sealed class SymbolicComplexityTests {
             """public sealed class Counter { public int Limit; public void Grow() => Limit++; } public static class C { public static int Work(Counter counter) { var sum=0; for(var i=0;i<counter.Limit;i++){counter.Grow();sum+=i;} return sum; } }""",
             "return sum;", SymbolicComplexityKind.Unknown,
             unknowns: [SymbolicComplexityUnknownReason.UnsupportedLoopShape]);
+        yield return Case("ForLoopWithSourceArgumentCallMutatingMemberBound_IsUnknown",
+            """public sealed class Counter { public int Limit; } public static class C { private static void Grow(Counter counter) => counter.Limit++; public static int Work(Counter counter) { var sum=0; for(var i=0;i<counter.Limit;i++){Grow(counter);sum+=i;} return sum; } }""",
+            "return sum;", SymbolicComplexityKind.Unknown,
+            unknowns: [SymbolicComplexityUnknownReason.UnsupportedLoopShape]);
+        yield return Case("ForLoopWithPureSourceCallOnMemberBound_StaysLinear",
+            """public sealed class Counter { public int Limit; public int Observe() => 0; } public static class C { public static int Work(Counter counter) { var sum=0; for(var i=0;i<counter.Limit;i++){sum+=counter.Observe();} return sum; } }""",
+            "return sum;", SymbolicComplexityKind.Linear);
         yield return Case("NestedForLoopsOverSameBound_ProduceQuadratic",
             """public static class C { public static int Work(int n) { var sum=0; for(var i=0;i<n;i++){for(var j=0;j<n;j++){sum+=i+j;}} return sum; } }""",
             "return sum;", SymbolicComplexityKind.Quadratic, "O(n^2)");
