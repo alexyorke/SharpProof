@@ -2468,6 +2468,20 @@ internal sealed class MethodEffectAnalysisSession(
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int64 };
         private static bool IsOneIndexArraySetValue(IMethodSymbol method) =>
             IsOneInt32IndexArraySetValue(method) || IsOneInt64IndexArraySetValue(method);
+        private static bool IsTwoIndexArraySetValue(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "SetValue",
+                IsStatic: false,
+                Parameters.Length: 3,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Object } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsArraySetValue(IMethodSymbol method) =>
+            IsOneIndexArraySetValue(method) || IsTwoIndexArraySetValue(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2924,7 +2938,7 @@ internal sealed class MethodEffectAnalysisSession(
                     when IsArrayGetValue(method) =>
                     SharpProofEffect.ReadsReceiverState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
                 ("System.Array", MethodKind.Ordinary, "SetValue")
-                    when IsOneIndexArraySetValue(method) =>
+                    when IsArraySetValue(method) =>
                     SharpProofEffect.WritesReceiverState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
@@ -3053,7 +3067,7 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                             "framework_array_get_value_model")
                     ]
-                : IsOneIndexArraySetValue(method)
+                : IsArraySetValue(method)
                     ? [
                         MethodExceptionFact.Boundary("System.IndexOutOfRangeException", MethodExceptionSource.Contract,
                             "framework_array_set_value_model"),
