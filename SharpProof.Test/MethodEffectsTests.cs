@@ -1387,6 +1387,26 @@ public sealed class MethodEffectsTests {
             purity: SharpProofVerdict.Proven,
             allocationFree: SharpProofVerdict.Proven,
             forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("RuntimeHelpersGetSubArrayTracksReadAndAllocation", """
+            class C {
+                static int[] M(int[] values) =>
+                    System.Runtime.CompilerServices.RuntimeHelpers.GetSubArray(values, 1..^1);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Unknown);
+        yield return Effect("RuntimeHelpersGetSubArraySupportsReferenceElements", """
+            class C {
+                static string[] M(string[] values) =>
+                    System.Runtime.CompilerServices.RuntimeHelpers.GetSubArray(values, ..);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {

@@ -2110,6 +2110,22 @@ internal sealed class MethodEffectAnalysisSession(
             destinationType.TypeArguments[0].SpecialType == SpecialType.System_Byte &&
             method.Parameters[1].RefKind == RefKind.In &&
             SymbolEqualityComparer.Default.Equals(method.Parameters[1].Type, method.TypeArguments[0]);
+        private static bool IsRuntimeHelpersGetSubArray(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "GetSubArray",
+                IsStatic: true,
+                IsGenericMethod: true,
+                TypeArguments.Length: 1,
+                Parameters.Length: 2,
+                ReturnType: IArrayTypeSymbol returnType
+            } &&
+            method.ContainingType.ToDisplayString() == "System.Runtime.CompilerServices.RuntimeHelpers" &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type: IArrayTypeSymbol sourceType } &&
+            SymbolEqualityComparer.Default.Equals(sourceType.ElementType, method.TypeArguments[0]) &&
+            SymbolEqualityComparer.Default.Equals(returnType.ElementType, method.TypeArguments[0]) &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.Name: "Range", Type.ContainingNamespace: { } rangeNamespace } &&
+            rangeNamespace.ToDisplayString() == "System";
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2506,6 +2522,9 @@ internal sealed class MethodEffectAnalysisSession(
                         ReturnType.SpecialType: SpecialType.System_Boolean
                     } =>
                     SharpProofEffect.None,
+                ("System.Runtime.CompilerServices.RuntimeHelpers", MethodKind.Ordinary, "GetSubArray")
+                    when IsRuntimeHelpersGetSubArray(method) =>
+                    SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -2530,6 +2549,13 @@ internal sealed class MethodEffectAnalysisSession(
                     MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                         memoryMarshalAccessReason)
                 ]
+                : IsRuntimeHelpersGetSubArray(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
+                            "framework_runtime_helpers_get_sub_array_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_runtime_helpers_get_sub_array_model")
+                    ]
                 : effects == SharpProofEffect.Throws
                     ? [
                         MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
@@ -2558,6 +2584,7 @@ internal sealed class MethodEffectAnalysisSession(
         private static ImmutableArray<int> FrameworkReadArgumentOrdinals(IMethodSymbol method) {
             if (IsMemoryMarshalTryWrite(method) || IsMemoryMarshalWrite(method)) return [1];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
+                   IsRuntimeHelpersGetSubArray(method) ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Read")
                 ? [0]
