@@ -1,7 +1,6 @@
 <Project>
   <PropertyGroup>
     <Version>$(SharpProofPackageVersion)</Version>
-    <PackageVersion>$(SharpProofPackageVersion)</PackageVersion>
     <Authors>$(SharpProofPublisher)</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>$(SharpProofProjectUrl)</PackageProjectUrl>

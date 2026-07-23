@@ -701,9 +701,9 @@ Target: 45-65 net lines. Package and property removals are validation-gated.
       `SharpProof.Testing.props`.
 - [x] Verify whether `SharpProofVsixVersion` is consumed by pack or release
       automation.
-- [ ] Verify whether the explicit `PackageVersion` in
+- [x] Verify whether the explicit `PackageVersion` in
       `SharpProof.PackageMetadata.props` is redundant.
-- [ ] Do not count any package/property line until pack and consumer validation
+- [x] Do not count any package/property line until pack and consumer validation
       succeeds.
 
 ## Overlap Ledger
