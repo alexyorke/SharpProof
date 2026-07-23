@@ -2603,6 +2603,28 @@ public sealed class MethodEffectsTests {
             required: SharpProofEffect.WritesArgumentState,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates |
                        SharpProofEffect.Throws | SharpProofEffect.Unknown);
+        yield return Effect("BitConverterToInt32SpanReadsWithoutAllocating", """
+            class C {
+                static int M(System.ReadOnlySpan<byte> values) => System.BitConverter.ToInt32(values);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("BitConverterToInt32KeepsStackReadOwned", """
+            class C {
+                static int M() {
+                    System.Span<byte> values = stackalloc byte[4];
+                    return System.BitConverter.ToInt32(values);
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                       SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
