@@ -2822,6 +2822,19 @@ internal sealed class MethodEffectAnalysisSession(
             } &&
             method.ContainingType.ToDisplayString() == "System.BitConverter" &&
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Boolean };
+        private static bool IsBitConverterGetBytesChar(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "GetBytes",
+                IsStatic: true,
+                Parameters.Length: 1,
+                ReturnType: IArrayTypeSymbol {
+                    Rank: 1,
+                    ElementType.SpecialType: SpecialType.System_Byte
+                }
+            } &&
+            method.ContainingType.ToDisplayString() == "System.BitConverter" &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Char };
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -3351,6 +3364,9 @@ internal sealed class MethodEffectAnalysisSession(
                     SharpProofEffect.Allocates,
                 ("System.BitConverter", MethodKind.Ordinary, "GetBytes")
                     when IsBitConverterGetBytesBoolean(method) =>
+                    SharpProofEffect.Allocates,
+                ("System.BitConverter", MethodKind.Ordinary, "GetBytes")
+                    when IsBitConverterGetBytesChar(method) =>
                     SharpProofEffect.Allocates,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
