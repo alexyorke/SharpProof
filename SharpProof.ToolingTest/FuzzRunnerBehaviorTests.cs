@@ -25,6 +25,25 @@ public sealed class FuzzRunnerBehaviorTests {
             if (Directory.Exists(outputDirectory)) Directory.Delete(outputDirectory, recursive: true);
         }
     }
+    [Test]
+    public void RunAsyncRejectsUnboundedProgrammaticOptions() {
+        var outputDirectory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "fuzz-unbounded-options-" + Guid.NewGuid().ToString("N"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        try {
+            Assert.ThrowsAsync<ArgumentException>(async () =>
+                await FuzzRunner.RunAsync(new FuzzOptions {
+                    Iterations = null,
+                    Duration = null,
+                    OutputDirectory = outputDirectory
+                }, cancellation.Token));
+        }
+        finally {
+            if (Directory.Exists(outputDirectory)) Directory.Delete(outputDirectory, recursive: true);
+        }
+    }
     [TestCase("fuzz-handler-projection-", 29, "InterpolatedStringHandler",
         TestName = "ProvenInterpolatedStringHandlerCallHasMatchingEnforcePureDiagnostic")]
     [TestCase("fuzz-projection-", 136, "DelegateCreation",

@@ -47,8 +47,9 @@ public sealed record FuzzOptions {
             throw new ArgumentException("--max-interesting-per-family must be non-negative.");
         if (CheckpointEvery < 0) throw new ArgumentException("--checkpoint-every must be non-negative.");
         if (Parallelism <= 0) throw new ArgumentException("--parallelism must be positive.");
-        if (Iterations == 0 && Duration is null)
-            throw new ArgumentException("Duration-only runs need --seconds, --minutes, or --hours when --iterations is 0.");
+        if ((Iterations is null or 0) && Duration is null)
+            throw new ArgumentException(
+                "Unbounded runs need --seconds, --minutes, or --hours when the iteration limit is null or zero.");
     }
     private static string ReadValue(string[] args, ref int index, string option) =>
         ++index < args.Length ? args[index] : throw new ArgumentException($"{option} expects a value.");
