@@ -44,6 +44,21 @@ internal static class RequiresContractHelpers {
         rewrittenCondition = rewritten.ToFullString();
         return true;
     }
+    internal static bool TryRewriteForMethod(
+        string conditionText,
+        IMethodSymbol contractMethod,
+        IMethodSymbol targetMethod,
+        out string rewrittenCondition) {
+        var arguments = ImmutableDictionary.CreateBuilder<string, ExpressionSyntax>(StringComparer.Ordinal);
+        foreach (var parameter in targetMethod.Parameters)
+            arguments[parameter.Name] = SyntaxFactory.ParseExpression("@" + parameter.Name);
+        return TryRewriteForArguments(
+            conditionText,
+            contractMethod,
+            targetMethod,
+            arguments.ToImmutable(),
+            out rewrittenCondition);
+    }
     private static IReadOnlyDictionary<string, ExpressionSyntax> CreateParameterReplacements(
         IMethodSymbol contractMethod,
         IMethodSymbol invokedMethod,

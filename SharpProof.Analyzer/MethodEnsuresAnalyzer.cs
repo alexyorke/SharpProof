@@ -29,7 +29,19 @@ internal static class MethodEnsuresAnalyzer {
         if (completionSites.Length == 0) return;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var contract in contracts) {
-            if (!ContractConditionHelpers.TryParse(contract.Condition, out var conditionStatement, out var conditionExpression)) {
+            if (!RequiresContractHelpers.TryRewriteForMethod(
+                    contract.Condition,
+                    contract.SourceMethod,
+                    methodSymbol,
+                    out var implementationCondition)) {
+                ContractConditionHelpers.ReportUnsupported(
+                    context, methodSymbol, contract, "condition rewrite failure", CreateUnsupportedDiagnostic);
+                continue;
+            }
+            if (!ContractConditionHelpers.TryParse(
+                    implementationCondition,
+                    out var conditionStatement,
+                    out var conditionExpression)) {
                 ContractConditionHelpers.ReportUnsupported(
                     context, methodSymbol, contract, "condition parse failure", CreateUnsupportedDiagnostic);
                 continue;
@@ -59,7 +71,7 @@ internal static class MethodEnsuresAnalyzer {
             }
             foreach (var completionSite in completionSites) {
                 if (!TryRewriteConditionForCompletionSite(
-                        contract.Condition,
+                        implementationCondition,
                         completionSite,
                         NullableFlowFacts.GetMethodReturnState(methodSymbol),
                         out var rewrittenCondition,
