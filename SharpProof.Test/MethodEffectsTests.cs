@@ -2220,6 +2220,28 @@ public sealed class MethodEffectsTests {
             required: SharpProofEffect.Allocates | SharpProofEffect.Throws,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                        SharpProofEffect.Unknown);
+        yield return Effect("BufferMemoryCopyTracksPointerEffects", """
+            unsafe class C {
+                static void M(void* source, void* destination, long destinationSize, long bytesToCopy) =>
+                    System.Buffer.MemoryCopy(source, destination, destinationSize, bytesToCopy);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                      SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("BufferMemoryCopySupportsUnsignedSizes", """
+            unsafe class C {
+                static void M(void* source, void* destination, ulong destinationSize, ulong bytesToCopy) =>
+                    System.Buffer.MemoryCopy(source, destination, destinationSize, bytesToCopy);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                      SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {

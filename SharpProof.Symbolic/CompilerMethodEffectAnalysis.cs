@@ -2580,6 +2580,27 @@ internal sealed class MethodEffectAnalysisSession(
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array } &&
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
             method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Byte };
+        private static bool IsBufferMemoryCopy(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "MemoryCopy",
+                IsStatic: true,
+                Parameters.Length: 4,
+                ReturnsVoid: true
+            } &&
+            method.ContainingType.ToDisplayString() == "System.Buffer" &&
+            method.Parameters[0] is {
+                RefKind: RefKind.None,
+                Type: IPointerTypeSymbol { PointedAtType.SpecialType: SpecialType.System_Void }
+            } &&
+            method.Parameters[1] is {
+                RefKind: RefKind.None,
+                Type: IPointerTypeSymbol { PointedAtType.SpecialType: SpecialType.System_Void }
+            } &&
+            method.Parameters[2].RefKind == RefKind.None &&
+            method.Parameters[3].RefKind == RefKind.None &&
+            method.Parameters[2].Type.SpecialType is SpecialType.System_Int64 or SpecialType.System_UInt64 &&
+            method.Parameters[3].Type.SpecialType == method.Parameters[2].Type.SpecialType;
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -3059,6 +3080,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Buffer", MethodKind.Ordinary, "SetByte")
                     when IsBufferSetByte(method) =>
                     SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+                ("System.Buffer", MethodKind.Ordinary, "MemoryCopy")
+                    when IsBufferMemoryCopy(method) =>
+                    SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -3259,6 +3283,11 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
                             "framework_buffer_set_byte_model")
                     ]
+                : IsBufferMemoryCopy(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_buffer_memory_copy_model")
+                    ]
                 : effects == SharpProofEffect.Throws
                     ? [
                         MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
@@ -3284,6 +3313,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsArrayConstrainedCopy(method)) return [2];
             if (IsBufferBlockCopy(method)) return [2];
             if (IsBufferSetByte(method)) return [0];
+            if (IsBufferMemoryCopy(method)) return [1];
             return (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
                     method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
@@ -3300,6 +3330,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsLengthsAndBoundsArrayCreateInstance(method)) return [1, 2];
             if (IsIndexesArrayGetValue(method)) return [0];
             if (IsIndexesArraySetValue(method)) return [1];
+            if (IsBufferMemoryCopy(method)) return [0];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
                    IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) || IsArrayResize(method) ||
                    IsArrayReverse(method) || IsArrayConstrainedCopy(method) || IsBufferBlockCopy(method) ||
