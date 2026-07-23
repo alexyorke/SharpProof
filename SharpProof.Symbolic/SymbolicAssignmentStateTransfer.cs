@@ -6,27 +6,6 @@ internal readonly record struct SymbolicThrowGuardedValue(
     bool GuardBranchWhenTrue,
     bool RequiresNonNullValue);
 internal static class SymbolicAssignmentStateTransfer {
-    internal static bool TryCreateSelfReferentialAssignedValueStateTerm(
-        SymbolicTerm previousValueTerm,
-        ISymbol assignedSymbol,
-        ExpressionSyntax valueExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicTerm updatedValueTerm) {
-        updatedValueTerm = null!;
-        valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression);
-        if (previousValueTerm.Kind != SmtValueKind.Int) return false;
-        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default) {
-            [assignedSymbol.OriginalDefinition] = previousValueTerm
-        };
-        var lowering = SymbolicSemanticPipeline.LowerTerm(
-            valueExpression,
-            new SymbolicLoweringContext(semanticModel, cancellationToken, symbolSubstitutions: substitutions));
-        if (lowering is not { IsExact: true, Value: { Kind: SmtValueKind.Int } updatedValue })
-            return false;
-        updatedValueTerm = updatedValue;
-        return true;
-    }
     internal static SymbolicThrowGuardedValue GetThrowGuardedValue(ExpressionSyntax valueExpression) {
         var originalValueExpression = valueExpression;
         valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(originalValueExpression);

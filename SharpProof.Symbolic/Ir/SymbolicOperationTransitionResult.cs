@@ -1,42 +1,20 @@
 namespace SharpProof.Symbolic.Ir;
+
 internal sealed record SymbolicOperationTransitionResult(
     SymbolicState State,
-    SymbolicLoweringSupport Support,
-    SymbolicUnknownReason UnknownReason,
-    ImmutableArray<SymbolicLoweringProvenance> Provenance,
-    SymbolicAnalysisTruncationInfo Truncation) {
-    internal bool IsExact => Support == SymbolicLoweringSupport.Exact;
-    internal bool IsApproximate => Support == SymbolicLoweringSupport.Approximate;
-    internal bool IsUnsupported => Support == SymbolicLoweringSupport.Unsupported;
+    bool IsExact,
+    ImmutableArray<SymbolicLoweringProvenance> Provenance) {
     internal static SymbolicOperationTransitionResult Exact(
         SymbolicState state,
-        IEnumerable<SymbolicLoweringProvenance> provenance,
-        SymbolicAnalysisTruncationInfo? truncation = null) => Create(
-            state.Normalize(),
-            SymbolicLoweringSupport.Exact,
-            SymbolicUnknownReason.None,
-            provenance,
-            truncation);
+        IEnumerable<SymbolicLoweringProvenance> provenance) =>
+        new(state.Normalize(), true, [.. provenance]);
+
     internal static SymbolicOperationTransitionResult Unsupported(
         SymbolicState unchangedState,
         SymbolicUnknownReason unknownReason,
-        IEnumerable<SymbolicLoweringProvenance> provenance,
-        SymbolicAnalysisTruncationInfo? truncation = null) {
+        IEnumerable<SymbolicLoweringProvenance> provenance) {
         if (unknownReason == SymbolicUnknownReason.None)
             throw new ArgumentException("Unsupported transitions require an unknown reason.", nameof(unknownReason));
-        return Create(unchangedState, SymbolicLoweringSupport.Unsupported, unknownReason, provenance, truncation);
-    }
-    private static SymbolicOperationTransitionResult Create(
-        SymbolicState state,
-        SymbolicLoweringSupport support,
-        SymbolicUnknownReason unknownReason,
-        IEnumerable<SymbolicLoweringProvenance> provenance,
-        SymbolicAnalysisTruncationInfo? truncation) {
-        if (state == null) throw new ArgumentNullException(nameof(state));
-        if (provenance == null) throw new ArgumentNullException(nameof(provenance));
-        var normalizedTruncation = truncation == null || !truncation.IsTruncated
-            ? SymbolicAnalysisTruncationInfo.None
-            : SymbolicAnalysisTruncationInfo.Combine(new[] { truncation });
-        return new SymbolicOperationTransitionResult(state, support, unknownReason, [.. provenance], normalizedTruncation);
+        return new(unchangedState, false, [.. provenance]);
     }
 }
