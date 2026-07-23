@@ -229,4 +229,19 @@ public sealed class UnknownContractDiagnosticTests {
             """)).Select(static diagnostic => diagnostic.Id);
         Assert.That(diagnosticIds, Does.Not.Contain("SP0002"));
     }
+    [Test]
+    public async Task InterfacePurityContractAppliesToImplementation() {
+        var diagnosticIds = (await AnalyzerTestHost.GetDiagnosticsAsync("""
+            using SharpProof.Attributes;
+            public interface IWorker {
+                [EnforcePure]
+                void Work();
+            }
+            public sealed class Worker : IWorker {
+                private static int _state;
+                public void Work() => _state++;
+            }
+            """)).Select(static diagnostic => diagnostic.Id);
+        Assert.That(diagnosticIds, Does.Contain("SP0002"));
+    }
 }
