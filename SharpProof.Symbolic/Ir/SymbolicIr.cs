@@ -431,78 +431,64 @@ internal sealed class SymbolicState {
             SymbolicStringPredicateKind.EndsWith;
     }
     private static bool TryGetConstantEqualityKey(SymbolicTerm term, out string key) {
-        switch (term) {
-            case SymbolicBooleanConstantTerm:
-            case SymbolicNullTerm:
-                key = CreateTermKey(term);
-                return true;
-            default:
-                if (TryEvaluateBooleanTerm(term, out var booleanValue)) {
-                    key = CreateTermKey(new SymbolicBooleanConstantTerm(booleanValue));
-                    return true;
-                }
-                if (TryEvaluateIntegerTerm(term, out var integerValue)) {
-                    key = CreateTermKey(new SymbolicIntegerConstantTerm(integerValue));
-                    return true;
-                }
-                if (TryEvaluateStringTerm(term, out var stringValue)) {
-                    key = CreateTermKey(new SymbolicStringConstantTerm(stringValue));
-                    return true;
-                }
-                key = string.Empty;
-                return false;
+        if (term is SymbolicNullTerm) {
+            key = CreateTermKey(term);
+            return true;
         }
+        if (!TryEvaluateTerm(term, out var value)) {
+            key = string.Empty;
+            return false;
+        }
+        var constant = value switch {
+            bool boolean => (SymbolicTerm)new SymbolicBooleanConstantTerm(boolean),
+            long integer => new SymbolicIntegerConstantTerm(integer),
+            string text => new SymbolicStringConstantTerm(text),
+            _ => null
+        };
+        key = constant == null ? string.Empty : CreateTermKey(constant);
+        return constant != null;
     }
-    private static bool TryEvaluateIntegerTerm(SymbolicTerm term, out long value) {
+    private static bool TryEvaluateTerm(SymbolicTerm term, out object value) {
         switch (term) {
             case SymbolicIntegerConstantTerm integer:
                 value = integer.Value;
                 return true;
-            case SymbolicLengthTerm { Value: var lengthValue }
-                when TryEvaluateStringTerm(lengthValue, out var stringValue):
-                value = stringValue.Length;
-                return true;
-            case SymbolicConditionalTerm conditional
-                when TrySelectConstantConditionalBranch(conditional, out var selected):
-                return TryEvaluateIntegerTerm(selected, out value);
-            default:
-                value = 0;
-                return false;
-        }
-    }
-    private static bool TryEvaluateStringTerm(SymbolicTerm term, out string value) {
-        switch (term) {
-            case SymbolicStringConstantTerm stringConstant:
-                value = stringConstant.Value;
-                return true;
-            case SymbolicStringConcatTerm concat:
-                if (TryEvaluateStringTerm(concat.Left, out var left) &&
-                    TryEvaluateStringTerm(concat.Right, out var right)) {
-                    value = left + right;
-                    return true;
-                }
-                value = string.Empty;
-                return false;
-            case SymbolicConditionalTerm conditional
-                when TrySelectConstantConditionalBranch(conditional, out var selected):
-                return TryEvaluateStringTerm(selected, out value);
-            default:
-                value = string.Empty;
-                return false;
-        }
-    }
-    private static bool TryEvaluateBooleanTerm(SymbolicTerm term, out bool value) {
-        switch (term) {
             case SymbolicBooleanConstantTerm boolean:
                 value = boolean.Value;
                 return true;
+            case SymbolicStringConstantTerm text:
+                value = text.Value;
+                return true;
+            case SymbolicLengthTerm { Value: var lengthValue }
+                when TryEvaluateStringTerm(lengthValue, out var stringValue):
+                value = (long)stringValue.Length;
+                return true;
+            case SymbolicStringConcatTerm concat
+                when TryEvaluateStringTerm(concat.Left, out var left) &&
+                     TryEvaluateStringTerm(concat.Right, out var right):
+                value = left + right;
+                return true;
             case SymbolicConditionalTerm conditional
                 when TrySelectConstantConditionalBranch(conditional, out var selected):
-                return TryEvaluateBooleanTerm(selected, out value);
+                return TryEvaluateTerm(selected, out value);
             default:
-                value = false;
+                value = null!;
                 return false;
         }
+    }
+    private static bool TryEvaluateIntegerTerm(SymbolicTerm term, out long value) =>
+        TryEvaluateTerm(term, out value);
+    private static bool TryEvaluateStringTerm(SymbolicTerm term, out string value) =>
+        TryEvaluateTerm(term, out value);
+    private static bool TryEvaluateBooleanTerm(SymbolicTerm term, out bool value) =>
+        TryEvaluateTerm(term, out value);
+    private static bool TryEvaluateTerm<T>(SymbolicTerm term, out T value) {
+        if (TryEvaluateTerm(term, out object result) && result is T typed) {
+            value = typed;
+            return true;
+        }
+        value = default!;
+        return false;
     }
     private static bool TrySelectConstantConditionalBranch(SymbolicConditionalTerm conditional, out SymbolicTerm selected) {
         var conditionKey = CreateConditionKey(conditional.Condition);
