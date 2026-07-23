@@ -2035,6 +2035,28 @@ public sealed class MethodEffectsTests {
             required: SharpProofEffect.Allocates | SharpProofEffect.Throws,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                        SharpProofEffect.Unknown);
+        yield return Effect("ArraySetValueReadsIndexesArray", """
+            class C {
+                static void M(System.Array values, object replacement, int[] indexes) =>
+                    values.SetValue(replacement, indexes);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("ArraySetValueMapsReadToIndexesArgument", """
+            class C {
+                static void M(int[] indexes) {
+                    System.Array values = new object[1];
+                    values.SetValue(null, indexes);
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
