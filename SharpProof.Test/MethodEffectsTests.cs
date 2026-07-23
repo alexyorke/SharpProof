@@ -1095,6 +1095,27 @@ public sealed class MethodEffectsTests {
             purity: SharpProofVerdict.Proven,
             allocationFree: SharpProofVerdict.Proven,
             forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("ReadOnlySpanOverlapsOffsetWritesOnlyOutArgument", """
+            using System;
+            class C {
+                static bool M(ReadOnlySpan<int> left, ReadOnlySpan<int> right, out int offset) =>
+                    left.Overlaps(right, out offset);
+            }
+            """, 3,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("ReadOnlySpanOverlapsOffsetStaticCallWritesOutArgument", """
+            class C {
+                static bool M(System.ReadOnlySpan<int> left, System.ReadOnlySpan<int> right, out int offset) =>
+                    System.MemoryExtensions.Overlaps(left, right, out offset);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
