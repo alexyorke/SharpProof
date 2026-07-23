@@ -2673,6 +2673,21 @@ internal sealed class MethodEffectAnalysisSession(
                 Type: IArrayTypeSymbol { Rank: 1, ElementType.SpecialType: SpecialType.System_Byte }
             } &&
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsBitConverterToInt16Span(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "ToInt16",
+                IsStatic: true,
+                Parameters.Length: 1,
+                ReturnType.SpecialType: SpecialType.System_Int16
+            } &&
+            method.ContainingType.ToDisplayString() == "System.BitConverter" &&
+            method.Parameters[0] is {
+                RefKind: RefKind.None,
+                Type: INamedTypeSymbol { TypeArguments.Length: 1 } sourceType
+            } &&
+            sourceType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
+            sourceType.TypeArguments[0].SpecialType == SpecialType.System_Byte;
         private static bool IsBitConverterToUInt16Array(IMethodSymbol method) =>
             method is {
                 MethodKind: MethodKind.Ordinary,
@@ -3631,6 +3646,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.BitConverter", MethodKind.Ordinary, "ToInt16")
                     when IsBitConverterToInt16Array(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
+                ("System.BitConverter", MethodKind.Ordinary, "ToInt16")
+                    when IsBitConverterToInt16Span(method) =>
+                    SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
                 ("System.BitConverter", MethodKind.Ordinary, "ToUInt16")
                     when IsBitConverterToUInt16Array(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
@@ -3969,6 +3987,11 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                             "framework_bit_converter_to_int16_array_model")
                     ]
+                : IsBitConverterToInt16Span(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_bit_converter_to_int16_span_model")
+                    ]
                 : IsBitConverterToUInt16Array(method)
                     ? [
                         MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
@@ -4120,6 +4143,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsBitConverterToStringArrayRange(method)) return [0];
             if (IsBitConverterToInt32Span(method)) return [0];
             if (IsBitConverterToInt64Span(method)) return [0];
+            if (IsBitConverterToInt16Span(method)) return [0];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
                    IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) || IsArrayResize(method) ||
                    IsArrayReverse(method) || IsArrayConstrainedCopy(method) || IsBufferBlockCopy(method) ||
