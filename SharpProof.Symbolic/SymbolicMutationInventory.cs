@@ -35,9 +35,6 @@ internal sealed class SymbolicMutationInventory(
         entries.Any(entry => entry.Exposure is { } exposure && References(exposure, symbol));
     internal bool InvalidatesSymbol(ISymbol symbol, bool mutableExposures) =>
         MutatesSymbol(symbol) || ExposesSymbol(symbol, mutableExposures);
-    internal IEnumerable<SyntaxNode> MutationSources(ISymbol symbol) =>
-        entries.Where(entry => entry.Target is { } target && References(target, symbol))
-            .Select(static entry => entry.Source);
     internal bool MutatesBetween(int after, int before, ISymbol symbol) =>
         entries.Any(entry => entry.Target is { } target &&
             !ReferenceEquals(entry.Source, root) && entry.Source.SpanStart > after &&
@@ -58,16 +55,6 @@ internal sealed class SymbolicMutationInventory(
                     steps.Add(new([ForSymbol(symbol)], entry.Source.Span, "operation-transfer.reference-invalidation"));
         }
         return new(steps.ToImmutable(), unsupported);
-    }
-    internal bool TryCollectLocalOrParameterInvalidations(ISet<string> keys, ImmutableArray<SymbolicInvalidationTarget>.Builder targets) {
-        foreach (var entry in entries) {
-            if (entry.Target == null) continue;
-            if (!SymbolMutationFacts.TryGetLocalOrParameterSymbol(entry.Target, semanticModel, cancellationToken, out var symbol))
-                return false;
-            var key = SymbolicFactFactory.GetSmtVariableName(symbol);
-            if (keys.Add(key)) targets.Add(new(key));
-        }
-        return true;
     }
     internal static ImmutableArray<SymbolicInvalidationTarget> LowerTargetInvalidations(
         ExpressionSyntax target, SemanticModel semanticModel, CancellationToken cancellationToken) {

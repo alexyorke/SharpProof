@@ -75,16 +75,6 @@ internal static class NullableFlowFacts {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) => GetExpressionState(expression, semanticModel, cancellationToken) ==
                NullableFlowFactState.NotNull;
-    internal static bool IsDefinitelyNullReferenceValue(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        var constant = semanticModel.GetConstantValue(expression, cancellationToken);
-        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
-        return constant is { HasValue: true, Value: null } &&
-               (typeInfo.ConvertedType ?? typeInfo.Type)?.IsReferenceType == true;
-    }
     internal static bool TryEvaluateNullTest(
         ExpressionSyntax expression,
         SemanticModel semanticModel,

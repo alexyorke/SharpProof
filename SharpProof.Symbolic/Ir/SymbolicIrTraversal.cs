@@ -31,10 +31,6 @@ internal readonly record struct SymbolicIrChildren(
             new(conditional.WhenTrue, conditional.WhenFalse, conditional.Condition),
         _ => default,
     };
-    internal bool AnyTerm(Func<SymbolicTerm, bool> predicate) =>
-        First != null && predicate(First) ||
-        Second != null && predicate(Second) ||
-        !Rest.IsDefaultOrEmpty && Rest.Any(predicate);
 }
 internal abstract class SymbolicIrRewriter {
     internal SymbolicFact Rewrite(SymbolicFact fact) {
