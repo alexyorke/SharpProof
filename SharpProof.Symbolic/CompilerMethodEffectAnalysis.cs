@@ -2244,6 +2244,19 @@ internal sealed class MethodEffectAnalysisSession(
             method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private static bool IsGenericArrayReverse(IMethodSymbol method) =>
             IsOneArgumentGenericArrayReverse(method) || IsThreeArgumentGenericArrayReverse(method);
+        private static bool IsOneArgumentNonGenericArrayReverse(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "Reverse",
+                IsStatic: true,
+                IsGenericMethod: false,
+                Parameters.Length: 1,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array };
+        private static bool IsArrayReverse(IMethodSymbol method) =>
+            IsGenericArrayReverse(method) || IsOneArgumentNonGenericArrayReverse(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2657,7 +2670,7 @@ internal sealed class MethodEffectAnalysisSession(
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                     SharpProofEffect.Allocates | SharpProofEffect.Throws,
                 ("System.Array", MethodKind.Ordinary, "Reverse")
-                    when IsGenericArrayReverse(method) =>
+                    when IsArrayReverse(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
@@ -2745,6 +2758,13 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                             "framework_array_reverse_model")
                     ]
+                : IsOneArgumentNonGenericArrayReverse(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
+                            "framework_array_reverse_model"),
+                        MethodExceptionFact.Boundary("System.RankException", MethodExceptionSource.Contract,
+                            "framework_array_reverse_model")
+                    ]
                 : effects == SharpProofEffect.Throws
                     ? [
                         MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
@@ -2765,7 +2785,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsArrayClear(method)) return [0];
             if (IsArrayFill(method)) return [0];
             if (IsArrayResize(method)) return [0];
-            if (IsGenericArrayReverse(method)) return [0];
+            if (IsArrayReverse(method)) return [0];
             return (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
                     method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
@@ -2780,7 +2800,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsMemoryMarshalTryWrite(method) || IsMemoryMarshalWrite(method)) return [1];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
                    IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) || IsArrayResize(method) ||
-                   IsGenericArrayReverse(method) ||
+                   IsArrayReverse(method) ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Read")
                 ? [0]

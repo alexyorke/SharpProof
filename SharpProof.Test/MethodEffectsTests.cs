@@ -1585,6 +1585,28 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
             forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("NonGenericArrayReverseTracksReadAndWrite", """
+            class C {
+                static void M(System.Array values) => System.Array.Reverse(values);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("NonGenericArrayReverseKeepsLocalMutationOwned", """
+            class C {
+                static void M() {
+                    System.Array values = new int[1];
+                    System.Array.Reverse(values);
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.Allocates | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                       SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
