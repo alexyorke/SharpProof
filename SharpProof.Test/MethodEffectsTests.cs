@@ -776,6 +776,22 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Disproven,
             required: SharpProofEffect.Allocates,
             forbidden: SharpProofEffect.Unknown);
+        yield return Effect("StringContainsCharIsPureAndAllocationFree", """
+            class C {
+                static bool M(string value) => value.Contains('x');
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("StringIndexOfCharIsPureAndAllocationFree", """
+            class C {
+                static int M(string value) => value.IndexOf('x');
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {

@@ -2182,6 +2182,11 @@ internal sealed class MethodEffectAnalysisSession(
                     SharpProofEffect.WritesReceiverState | SharpProofEffect.Allocates,
                 (_, _, "IsNullOrEmpty" or "IsNullOrWhiteSpace") when type?.SpecialType == SpecialType.System_String =>
                     SharpProofEffect.None,
+                (_, _, "Contains" or "IndexOf" or "LastIndexOf" or "StartsWith" or "EndsWith")
+                    when type?.SpecialType == SpecialType.System_String &&
+                         method.Parameters.Length == 1 &&
+                         method.Parameters[0].Type.SpecialType == SpecialType.System_Char =>
+                    SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
                 (_, _, "Split" or "Substring" or "Trim" or "TrimStart" or "TrimEnd" or "Replace" or
