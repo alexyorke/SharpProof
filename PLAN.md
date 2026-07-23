@@ -693,7 +693,7 @@ Target: 45-65 net lines. Package and property removals are validation-gated.
 
 ### 10.2 Validation-gated package and property cleanup
 
-- [ ] Verify whether the three private package references in
+- [x] Verify whether the three private package references in
       `SharpProof.Test.csproj` have any compile, runtime, binding-redirect, or
       test-host role. Remove them only after a clean build/load probe.
 - [ ] Delete the trailing empty `ItemGroup` in that project.

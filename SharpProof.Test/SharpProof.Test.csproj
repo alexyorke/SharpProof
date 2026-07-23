@@ -5,11 +5,6 @@
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="System.CodeDom" Version="10.0.9" PrivateAssets="all" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" PrivateAssets="all" />
-    <PackageReference Include="System.IO.Hashing" Version="8.0.0" PrivateAssets="all" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" />
   </ItemGroup>
   <ItemGroup>
