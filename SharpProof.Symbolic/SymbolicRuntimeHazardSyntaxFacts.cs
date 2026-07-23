@@ -151,7 +151,9 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
         startExpression = null!;
         countExpression = null;
         if (!IsMemoryExtensionsViewInvocation(method)) return false;
-        if (!TryGetMemoryExtensionsViewSourceExpression(invocationOperation, out sourceExpression)) return false;
+        if (!SymbolicStringLengthLowerer.TryGetMemoryExtensionsViewSourceExpression(
+                invocationOperation, out sourceExpression, out _))
+            return false;
         var intArguments = invocationOperation.Arguments
             .Where(static argument => argument.Parameter?.Type.SpecialType == SpecialType.System_Int32)
             .Select(static argument => argument.Value.Syntax)
@@ -161,25 +163,6 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
         startExpression = intArguments[0];
         countExpression = intArguments.Length == 2 ? intArguments[1] : null;
         return true;
-    }
-    internal static bool TryGetMemoryExtensionsViewSourceExpression(
-        IInvocationOperation invocationOperation,
-        out ExpressionSyntax sourceExpression) {
-        if (invocationOperation.Instance?.Syntax is ExpressionSyntax instanceExpression &&
-            IsMemoryExtensionsViewSourceType(invocationOperation.Instance.Type)) {
-            sourceExpression = instanceExpression;
-            return true;
-        }
-        foreach (var argument in invocationOperation.Arguments)
-            if ((argument.Parameter?.Ordinal == 0 ||
-                 IsMemoryExtensionsViewSourceType(argument.Value.Type)) &&
-                argument.Value.Syntax is ExpressionSyntax argumentExpression &&
-                IsMemoryExtensionsViewSourceType(argument.Value.Type)) {
-                sourceExpression = argumentExpression;
-                return true;
-            }
-        sourceExpression = null!;
-        return false;
     }
     internal static bool TryGetOptionalSecondIntArgument(
         IInvocationOperation invocationOperation,

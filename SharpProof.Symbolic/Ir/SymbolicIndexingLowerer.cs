@@ -668,7 +668,7 @@ internal static class SymbolicIndexingLowerer {
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         term = null!;
-        if (!TryGetInvocationOperation(expression, context, out var invocationExpression, out var invocationOperation))
+        if (!TryGetInvocationOperation(expression, context, out _, out var invocationOperation))
             return false;
         var method = invocationOperation.TargetMethod;
         if (method.IsStatic ||
@@ -677,22 +677,22 @@ internal static class SymbolicIndexingLowerer {
             !SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(method.ReturnType) ||
             invocationOperation.Instance?.Syntax is not ExpressionSyntax sourceExpression)
             return false;
-        return TryLowerViewLengthFromInvocationArguments(invocationExpression, sourceExpression, 0, false, context, out term);
+        return TryLowerViewLengthFromInvocationArguments(invocationOperation, sourceExpression, 0, false, context, out term);
     }
     private static bool TryLowerMemoryExtensionsViewResultLengthTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         term = null!;
-        if (!TryGetInvocationOperation(expression, context, out var invocationExpression, out var invocationOperation) ||
+        if (!TryGetInvocationOperation(expression, context, out _, out var invocationOperation) ||
             !SymbolicStringLengthLowerer.IsMemoryExtensionsViewMethod(invocationOperation.TargetMethod) ||
             !SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(invocationOperation.TargetMethod.ReturnType) ||
-            !SymbolicStringLengthLowerer.TryGetMemoryExtensionsViewSourceExpression(invocationExpression, context, out var sourceExpression,
+            !SymbolicStringLengthLowerer.TryGetMemoryExtensionsViewSourceExpression(invocationOperation, out var sourceExpression,
                 out var firstArgumentIndex) ||
             !SymbolicStringLengthLowerer.IsSupportedMemoryExtensionsViewSource(sourceExpression, context))
             return false;
         return TryLowerViewLengthFromInvocationArguments(
-            invocationExpression,
+            invocationOperation,
             sourceExpression,
             firstArgumentIndex,
             true,
@@ -700,7 +700,7 @@ internal static class SymbolicIndexingLowerer {
             out term);
     }
     private static bool TryLowerViewLengthFromInvocationArguments(
-        InvocationExpressionSyntax invocationExpression,
+        IInvocationOperation operation,
         ExpressionSyntax sourceExpression,
         int firstArgumentIndex,
         bool allowDirectRangeArgument,
@@ -708,13 +708,15 @@ internal static class SymbolicIndexingLowerer {
         out SymbolicTerm term) {
         term = null!;
         if (!TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength)) return false;
-        var remainingArgumentCount = invocationExpression.ArgumentList.Arguments.Count - firstArgumentIndex;
+        var remainingArgumentCount = operation.TargetMethod.Parameters.Length - firstArgumentIndex;
         if (remainingArgumentCount == 0) {
             term = sourceLength;
             return true;
         }
         if (remainingArgumentCount == 1) {
-            var argument = invocationExpression.ArgumentList.Arguments[firstArgumentIndex].Expression;
+            if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(
+                    operation, firstArgumentIndex, out var argument))
+                return false;
             if (allowDirectRangeArgument &&
                 TryCreateRangeLengthTerm(argument, sourceExpression, context, out term))
                 return true;
@@ -725,10 +727,11 @@ internal static class SymbolicIndexingLowerer {
             return true;
         }
         if (remainingArgumentCount != 2 ||
-            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocationExpression.ArgumentList.Arguments[firstArgumentIndex].Expression, context), out var translatedStart) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, firstArgumentIndex, out var startExpression) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(startExpression, context), out var translatedStart) ||
             translatedStart.Kind != SmtValueKind.Int ||
-            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocationExpression.ArgumentList.Arguments[firstArgumentIndex +
-                1].Expression, context), out var resultLength) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, firstArgumentIndex + 1, out var lengthExpression) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(lengthExpression, context), out var resultLength) ||
             resultLength.Kind != SmtValueKind.Int)
             return false;
         term = resultLength;

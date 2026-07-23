@@ -213,24 +213,26 @@ internal static class SymbolicStringLengthLowerer {
                definition.ContainingType?.ToDisplayString() == "System.MemoryExtensions";
     }
     internal static bool TryGetMemoryExtensionsViewSourceExpression(
-        InvocationExpressionSyntax invocationExpression,
-        SymbolicLoweringContext context,
+        IInvocationOperation operation,
         out ExpressionSyntax sourceExpression,
         out int firstArgumentIndex) {
-        if (invocationExpression.Expression is MemberAccessExpressionSyntax memberAccess &&
-            context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type != null) {
-            sourceExpression = memberAccess.Expression;
+        if (operation.Instance?.Syntax is ExpressionSyntax instanceExpression &&
+            SymbolicRuntimeHazardSyntaxFacts.IsMemoryExtensionsViewSourceType(operation.Instance.Type)) {
+            sourceExpression = instanceExpression;
             firstArgumentIndex = 0;
             return true;
         }
-        if (invocationExpression.ArgumentList.Arguments.Count == 0) {
-            sourceExpression = null!;
-            firstArgumentIndex = 0;
-            return false;
-        }
-        sourceExpression = invocationExpression.ArgumentList.Arguments[0].Expression;
-        firstArgumentIndex = 1;
-        return true;
+        foreach (var argument in operation.Arguments)
+            if (argument.Parameter?.Ordinal == 0 &&
+                argument.Value.Syntax is ExpressionSyntax argumentExpression &&
+                SymbolicRuntimeHazardSyntaxFacts.IsMemoryExtensionsViewSourceType(argument.Value.Type)) {
+                sourceExpression = argumentExpression;
+                firstArgumentIndex = 1;
+                return true;
+            }
+        sourceExpression = null!;
+        firstArgumentIndex = 0;
+        return false;
     }
     internal static bool IsSupportedMemoryExtensionsViewSource(ExpressionSyntax sourceExpression, SymbolicLoweringContext context) {
         var sourceTypeInfo = context.SemanticModel.GetTypeInfo(sourceExpression, context.CancellationToken);
