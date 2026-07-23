@@ -3055,6 +3055,22 @@ internal sealed class MethodEffectAnalysisSession(
             destinationType.OriginalDefinition.ToDisplayString() == "System.Span<T>" &&
             destinationType.TypeArguments[0].SpecialType == SpecialType.System_Byte &&
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_UInt16 };
+        private static bool IsBitConverterTryWriteBytesUInt32(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "TryWriteBytes",
+                IsStatic: true,
+                Parameters.Length: 2,
+                ReturnType.SpecialType: SpecialType.System_Boolean
+            } &&
+            method.ContainingType.ToDisplayString() == "System.BitConverter" &&
+            method.Parameters[0] is {
+                RefKind: RefKind.None,
+                Type: INamedTypeSymbol { TypeArguments.Length: 1 } destinationType
+            } &&
+            destinationType.OriginalDefinition.ToDisplayString() == "System.Span<T>" &&
+            destinationType.TypeArguments[0].SpecialType == SpecialType.System_Byte &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_UInt32 };
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -3633,6 +3649,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.BitConverter", MethodKind.Ordinary, "TryWriteBytes")
                     when IsBitConverterTryWriteBytesUInt16(method) =>
                     SharpProofEffect.WritesArgumentState,
+                ("System.BitConverter", MethodKind.Ordinary, "TryWriteBytes")
+                    when IsBitConverterTryWriteBytesUInt32(method) =>
+                    SharpProofEffect.WritesArgumentState,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -3981,6 +4000,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsBitConverterTryWriteBytesDouble(method)) return [0];
             if (IsBitConverterTryWriteBytesInt16(method)) return [0];
             if (IsBitConverterTryWriteBytesUInt16(method)) return [0];
+            if (IsBitConverterTryWriteBytesUInt32(method)) return [0];
             return (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
                     method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
