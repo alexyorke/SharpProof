@@ -196,6 +196,12 @@ internal class ProofCoreZ3SmokeTests {
             @"\AA(?# repeat previous atom)*\z", RegexConstraint.Equal, "AA");
         yield return CreateRegexCase("SmtSolver_LeadingInlineRegexCommentBeforeStartAnchorKeepsAnchorStrict", Feasibility.Unsatisfiable,
             @"(?# leading comment)\AAB\z", RegexConstraint.StartsWith, "XAB");
+        yield return CreateRegexCase("SmtSolver_LeadingEmptyGroupBeforeStartAnchorKeepsAnchorStrict", Feasibility.Unsatisfiable,
+            @"(?:)\AAB\z", RegexConstraint.StartsWith, "XAB");
+        yield return CreateRegexCase("SmtSolver_LeadingEmptyCaptureBeforeStartAnchorKeepsAnchorStrict", Feasibility.Unsatisfiable,
+            @"()\AAB\z", RegexConstraint.StartsWith, "XAB");
+        yield return CreateRegexCase("SmtSolver_LeadingEmptyAtomicGroupBeforeStartAnchorKeepsAnchorStrict", Feasibility.Unsatisfiable,
+            @"(?>)\AAB\z", RegexConstraint.StartsWith, "XAB");
         yield return CreateRegexCase("SmtSolver_EscapedRegexClassLiteralContradictsPrefix", Feasibility.Unsatisfiable, @"\A[\.\]]\z",
             RegexConstraint.StartsWith, "A");
         yield return CreateRegexCase("SmtSolver_LeadingBracketRegexClassLiteralContradictsPrefix", Feasibility.Unsatisfiable, @"\A[]]\z",

@@ -184,9 +184,13 @@ internal static class Z3RegexPatternNormalizer {
         var canUseIgnoreCase = (options & RegexOptions.CultureInvariant) != 0;
         while (true) {
             SkipIgnoredTrivia(pattern, ref index, optionScope.IgnorePatternWhitespace);
-            if (!TryReadInlineOptionGroup(pattern, index, optionScope, canUseIgnoreCase, out var nextScope, out var nextIndex)) break;
-            optionScope = nextScope;
-            index = nextIndex;
+            if (TryReadInlineOptionGroup(pattern, index, optionScope, canUseIgnoreCase, out var nextScope, out var nextIndex)) {
+                optionScope = nextScope;
+                index = nextIndex;
+                continue;
+            }
+            if (TrySkipEmptyGroup(pattern, ref index)) continue;
+            break;
         }
         if (index >= pattern.Length) return false;
         if (pattern[index] == '^' && allowCaretAnchor) {
@@ -197,6 +201,23 @@ internal static class Z3RegexPatternNormalizer {
         if (index + 1 < pattern.Length && pattern[index] == '\\' && pattern[index + 1] is 'A' or 'G') {
             anchorStart = index;
             anchorLength = 2;
+            return true;
+        }
+        return false;
+    }
+    private static bool TrySkipEmptyGroup(string pattern, ref int position) {
+        if (position + 1 < pattern.Length &&
+            pattern[position] == '(' &&
+            pattern[position + 1] == ')') {
+            position += 2;
+            return true;
+        }
+        if (position + 3 < pattern.Length &&
+            pattern[position] == '(' &&
+            pattern[position + 1] == '?' &&
+            pattern[position + 2] is ':' or '>' &&
+            pattern[position + 3] == ')') {
+            position += 4;
             return true;
         }
         return false;
