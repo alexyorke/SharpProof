@@ -2055,6 +2055,23 @@ internal sealed class MethodEffectAnalysisSession(
             sourceType.TypeArguments[0].SpecialType == SpecialType.System_Byte &&
             method.Parameters[1].RefKind == RefKind.Out &&
             SymbolEqualityComparer.Default.Equals(method.Parameters[1].Type, method.TypeArguments[0]);
+        private static bool IsMemoryMarshalRead(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "Read",
+                IsStatic: true,
+                IsGenericMethod: true,
+                TypeArguments.Length: 1,
+                Parameters.Length: 1
+            } &&
+            method.ContainingType.ToDisplayString() == "System.Runtime.InteropServices.MemoryMarshal" &&
+            method.Parameters[0] is {
+                RefKind: RefKind.None,
+                Type: INamedTypeSymbol { TypeArguments.Length: 1 } sourceType
+            } &&
+            sourceType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
+            sourceType.TypeArguments[0].SpecialType == SpecialType.System_Byte &&
+            SymbolEqualityComparer.Default.Equals(method.ReturnType, method.TypeArguments[0]);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2432,6 +2449,9 @@ internal sealed class MethodEffectAnalysisSession(
                 (_, MethodKind.Ordinary, "TryRead")
                     when IsMemoryMarshalTryRead(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState,
+                (_, MethodKind.Ordinary, "Read")
+                    when IsMemoryMarshalRead(method) =>
+                    SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -2445,11 +2465,21 @@ internal sealed class MethodEffectAnalysisSession(
                     "System.Memory<T>" or "System.ReadOnlyMemory<T>", _, "ToArray") => SharpProofEffect.Allocates,
                 _ => null
             };
-            var exceptions = effects == SharpProofEffect.Throws
-                ? ImmutableArray.Create(
-                    MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract, "framework_parse_model"),
-                    MethodExceptionFact.Boundary("System.OverflowException", MethodExceptionSource.Contract, "framework_parse_model"))
-                : [];
+            ImmutableArray<MethodExceptionFact> exceptions = IsMemoryMarshalRead(method)
+                ? [
+                    MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
+                        "framework_memory_marshal_read_model"),
+                    MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
+                        "framework_memory_marshal_read_model")
+                ]
+                : effects == SharpProofEffect.Throws
+                    ? [
+                        MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
+                            "framework_parse_model"),
+                        MethodExceptionFact.Boundary("System.OverflowException", MethodExceptionSource.Contract,
+                            "framework_parse_model")
+                    ]
+                    : [];
             summary = effects.HasValue ? new(effects.Value, SharpProofCapability.None, exceptions, [], []) : null!;
             return effects.HasValue;
         }
@@ -2467,7 +2497,7 @@ internal sealed class MethodEffectAnalysisSession(
                 : [];
         }
         private static ImmutableArray<int> FrameworkReadArgumentOrdinals(IMethodSymbol method) =>
-            IsMemoryMarshalTryRead(method) ||
+            IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
             (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read") ||
             (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Read")
                 ? [0]
