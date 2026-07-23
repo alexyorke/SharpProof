@@ -852,7 +852,7 @@ public sealed class MethodEffectsTests {
                     foreach (var value in values) { }
                 }
             }
-            """, 10);
+            """, 11);
         Assert.Multiple(() => {
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.ReadsArgumentState), Is.True);
@@ -919,7 +919,7 @@ public sealed class MethodEffectsTests {
                     foreach (var value in values) { }
                 }
             }
-            """, 11);
+            """, 10);
         Assert.Multiple(() => {
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
@@ -1944,6 +1944,25 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void CollectionSpreadDoesNotCallUnrecognizedDisposePattern() {
+        var result = Analyze("""
+            static class Globals { public static int Count; }
+            sealed class Enumerator {
+                public int Current => 0;
+                public bool MoveNext() => false;
+                public void Dispose() { Globals.Count++; }
+            }
+            sealed class Source {
+                public Enumerator GetEnumerator() => new();
+            }
+            class C { static int[] M(Source source) => [.. source]; }
+            """, 10);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
         });
     }
     [TestCase("unsafe static int M() { int* value = stackalloc int[1]; value[0] = 1; return value[0]; }")]
