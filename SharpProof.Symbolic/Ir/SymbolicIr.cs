@@ -676,269 +676,38 @@ internal sealed class SymbolicState {
         }
         return "relation:" + relationOperator + "(" + left + "," + right + ")";
     }
-    private static string CreateTermKey(SymbolicTerm term) => term switch {
-        SymbolicBooleanConstantTerm boolean => "bool:" + (boolean.Value ? "true" : "false"),
-        SymbolicIntegerConstantTerm integer => "int:" + integer.Value.ToString(CultureInfo.InvariantCulture),
-        SymbolicStringConstantTerm stringConstant => "string:" + stringConstant.Value.Length.ToString(CultureInfo.InvariantCulture) + ":" +
-                               stringConstant.Value,
-        SymbolicNullTerm => "null",
-        SymbolicVariableTerm variable => "var:" + variable.ValueKind + ":" + variable.Name,
-        SymbolicMemberTerm member => "member:" + member.ValueKind + ":" + CreateTermKey(member.Receiver) + "." + member.MemberName,
-        SymbolicElementTerm element => "element:" + element.ValueKind + ":" + CreateTermKey(element.Receiver) + "[" +
-                               CreateTermKey(element.Index) + "]",
-        SymbolicMultiElementTerm element => "multi-element:" + element.ValueKind + ":" + CreateTermKey(element.Receiver) + "[" +
-                               string.Join(",", element.Indices.Select(CreateTermKey)) + "]",
-        SymbolicFromEndIndexTerm fromEnd => "from-end-index:" + CreateTermKey(fromEnd.Value),
-        SymbolicStringContentTerm content => "string-content:" + CreateTermKey(content.Reference),
-        SymbolicStringConcatTerm concat => CreateStringConcatTermKey(concat),
-        SymbolicStringSliceTerm slice => "string-slice:" + CreateTermKey(slice.Value) + "[" +
-                               CreateTermKey(slice.Offset) + "," + CreateTermKey(slice.Length) + "]",
-        SymbolicNullableHasValueTerm nullableHasValue => "nullable-has-value:" + nullableHasValue.NullableName,
-        SymbolicNullableValueTerm nullableValue => "nullable-value:" + nullableValue.NullableName + ":" + nullableValue.Kind,
-        SymbolicLengthTerm length => "length:" + CreateTermKey(length.Value),
-        SymbolicArrayDimensionLengthTerm dimensionLength => "array-dimension-length:" +
-                               dimensionLength.Dimension.ToString(CultureInfo.InvariantCulture) +
-                               ":" +
-                               CreateTermKey(dimensionLength.Value),
-        SymbolicCountTerm count => "count:" + CreateTermKey(count.Value),
-        SymbolicBinaryTerm binary => CreateBinaryTermKey(binary),
-        SymbolicConditionalTerm conditional => CreateConditionalTermKey(conditional),
-        SymbolicNumericConversionTerm conversion => "numeric-conversion:" +
-                               (int)conversion.SourceType + ":" +
-                               (int)conversion.TargetType + ":" +
-                               (conversion.IsChecked ? "checked:" : "unchecked:") +
-                               conversion.OperandIdentity.Length.ToString(CultureInfo.InvariantCulture) + ":" +
-                               conversion.OperandIdentity,
-        _ => throw new NotSupportedException("Unsupported symbolic term type: " + term.GetType().FullName),
-    };
-    private static string CreateConditionalTermKey(SymbolicConditionalTerm conditional) {
-        var conditionKey = CreateConditionKey(conditional.Condition);
-        var whenTrueKey = CreateTermKey(conditional.WhenTrue);
-        var whenFalseKey = CreateTermKey(conditional.WhenFalse);
-        if (string.Equals(whenTrueKey, whenFalseKey, StringComparison.Ordinal)) return whenTrueKey;
-        if (string.Equals(conditionKey, "const:true", StringComparison.Ordinal)) return whenTrueKey;
-        if (string.Equals(conditionKey, "const:false", StringComparison.Ordinal)) return whenFalseKey;
-        return "conditional(" +
-               conditionKey + "," +
-               whenTrueKey + "," +
-               whenFalseKey + ")";
+    private static string CreateTermKey(SymbolicTerm term) {
+        if (term is SymbolicFromEndIndexTerm fromEnd)
+            return "from-end-index:" + CreateTermKey(fromEnd.Value);
+        if (term is SymbolicNumericConversionTerm conversion)
+            return "numeric-conversion:" + (int)conversion.SourceType + ":" + (int)conversion.TargetType + ":" +
+                   (conversion.IsChecked ? "checked:" : "unchecked:") + conversion.OperandIdentity;
+        if (SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula))
+            return SmtFormulaStructuralKey.Create(formula);
+        throw new NotSupportedException("Unsupported symbolic term type: " + term.GetType().FullName);
     }
-    private static string CreateStringConcatTermKey(SymbolicStringConcatTerm concat) {
-        var terms = new List<SymbolicTerm>();
-        CollectStringConcatTerms(concat, terms);
-        var termKeys = CreateNormalizedStringConcatTermKeys(terms);
-        if (termKeys.Count == 1) return termKeys[0];
-        return "string-concat(" + string.Join(",", termKeys) + ")";
-    }
-    private static void CollectStringConcatTerms(SymbolicTerm term, ICollection<SymbolicTerm> terms) {
-        if (term is SymbolicStringConcatTerm concat) {
-            CollectStringConcatTerms(concat.Left, terms);
-            CollectStringConcatTerms(concat.Right, terms);
-            return;
-        }
-        terms.Add(term);
-    }
-    private static List<string> CreateNormalizedStringConcatTermKeys(IEnumerable<SymbolicTerm> terms) {
-        var termKeys = new List<string>();
-        var pendingLiteral = string.Empty;
-        foreach (var term in terms) {
-            if (term is SymbolicStringConstantTerm stringConstant) {
-                pendingLiteral += stringConstant.Value;
-                continue;
-            }
-            AddPendingStringLiteralKey(termKeys, ref pendingLiteral);
-            termKeys.Add(CreateTermKey(term));
-        }
-        AddPendingStringLiteralKey(termKeys, ref pendingLiteral);
-        if (termKeys.Count == 0) termKeys.Add(CreateTermKey(new SymbolicStringConstantTerm(string.Empty)));
-        return termKeys;
-    }
-    private static void AddPendingStringLiteralKey(ICollection<string> termKeys, ref string pendingLiteral) {
-        if (pendingLiteral.Length == 0) return;
-        termKeys.Add(CreateTermKey(new SymbolicStringConstantTerm(pendingLiteral)));
-        pendingLiteral = string.Empty;
-    }
-    private static string CreateBinaryTermKey(SymbolicBinaryTerm binary) {
-        var overflowPrefix = binary.MayOverflow ? "overflow-sensitive:" : string.Empty;
-        if (IsCommutativeBinaryTermOperator(binary.Operator)) {
-            var terms = new List<SymbolicTerm>();
-            CollectAssociativeBinaryTerms(binary, binary.Operator, binary.MayOverflow, terms);
-            var operands = CreateNormalizedAssociativeBinaryTermKeys(binary.Operator, terms);
-            if (operands.Count == 1 && !binary.MayOverflow) return operands[0];
-            operands.Sort(StringComparer.Ordinal);
-            return overflowPrefix + "binary-term:" + binary.Operator + "(" + string.Join(",", operands) + ")";
-        }
-        var left = CreateTermKey(binary.Left);
-        var right = CreateTermKey(binary.Right);
-        if (!binary.MayOverflow && IsRightIdentityBinaryTerm(binary.Operator, binary.Right)) return left;
-        if (IsCommutativeBinaryTermOperator(binary.Operator) &&
-            string.CompareOrdinal(left, right) > 0)
-            (left, right) = (right, left);
-        return overflowPrefix + "binary-term:" + binary.Operator + "(" + left + "," + right + ")";
-    }
-    private static void CollectAssociativeBinaryTerms(
-        SymbolicTerm term,
-        SymbolicBinaryTermOperator binaryOperator,
-        bool mayOverflow,
-        ICollection<SymbolicTerm> terms) {
-        if (term is SymbolicBinaryTerm nested &&
-            nested.Operator == binaryOperator &&
-            nested.MayOverflow == mayOverflow) {
-            CollectAssociativeBinaryTerms(nested.Left, binaryOperator, mayOverflow, terms);
-            CollectAssociativeBinaryTerms(nested.Right, binaryOperator, mayOverflow, terms);
-            return;
-        }
-        terms.Add(term);
-    }
-    private static List<string> CreateNormalizedAssociativeBinaryTermKeys(
-        SymbolicBinaryTermOperator binaryOperator,
-        IEnumerable<SymbolicTerm> terms) {
-        var operands = terms
-            .Where(term => !IsIdentityOperand(binaryOperator, term))
-            .Select(CreateTermKey)
-            .ToList();
-        if (operands.Count == 0)
-            operands.Add(CreateTermKey(new SymbolicIntegerConstantTerm(binaryOperator == SymbolicBinaryTermOperator.Add ? 0 : 1)));
-        return operands;
-    }
-    private static bool IsIdentityOperand(SymbolicBinaryTermOperator binaryOperator, SymbolicTerm term) => binaryOperator switch {
-        SymbolicBinaryTermOperator.Add => IsIntegerConstant(term, 0),
-        SymbolicBinaryTermOperator.Multiply => IsIntegerConstant(term, 1),
-        _ => false
-    };
-    private static bool IsRightIdentityBinaryTerm(SymbolicBinaryTermOperator binaryOperator, SymbolicTerm right) => binaryOperator switch {
-        SymbolicBinaryTermOperator.Subtract => IsIntegerConstant(right, 0),
-        SymbolicBinaryTermOperator.Divide => IsIntegerConstant(right, 1),
-        _ => false
-    };
-    private static bool IsIntegerConstant(SymbolicTerm term, long value) => term is SymbolicIntegerConstantTerm integer &&
-               integer.Value == value;
-    private static bool IsCommutativeBinaryTermOperator(SymbolicBinaryTermOperator binaryOperator) =>
-        binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Multiply;
     private static string CreateConditionKey(SymbolicCondition condition) {
+        if (TryEvaluateCondition(condition, out var value)) return "const:" + (value ? "true" : "false");
+        if (condition is SymbolicFactCondition fact) return "fact-condition:" + CreateFactKey(fact.Fact);
+        if (condition is SymbolicNotCondition { Operand: SymbolicFactCondition factOperand })
+            return "fact-condition:" + CreateFactKey(factOperand.Fact.Negate());
+        if (!SymbolicIrFormulaEncoder.TryEncode(condition, out var formula))
+            throw new NotSupportedException("Unsupported symbolic condition type: " + condition.GetType().FullName);
+        return SmtFormulaStructuralKey.Create(formula);
+    }
+    private static bool TryEvaluateCondition(SymbolicCondition condition, out bool value) {
         switch (condition) {
             case SymbolicConstantCondition constant:
-                return "const:" + (constant.Value ? "true" : "false");
-            case SymbolicFactCondition factCondition:
-                if (TryEvaluateFact(factCondition.Fact, out var factValue))
-                    return "const:" + (factValue ? "true" : "false");
-                return "fact-condition:" + CreateFactKey(factCondition.Fact);
-            case SymbolicNotCondition { Operand: SymbolicConstantCondition constantCondition }:
-                return "const:" + (constantCondition.Value ? "false" : "true");
-            case SymbolicNotCondition { Operand: SymbolicFactCondition factCondition }:
-                if (TryEvaluateFact(factCondition.Fact, out var negatedFactValue))
-                    return "const:" + (negatedFactValue ? "false" : "true");
-                return "fact-condition:" + CreateFactKey(factCondition.Fact.Negate());
-            case SymbolicNotCondition { Operand: SymbolicNotCondition nestedNotCondition }:
-                return CreateConditionKey(nestedNotCondition.Operand);
-            case SymbolicNotCondition { Operand: SymbolicBinaryCondition binaryCondition }:
-                return CreateConditionKey(new SymbolicBinaryCondition(
-                    NegateConditionOperator(binaryCondition.Operator),
-                    new SymbolicNotCondition(binaryCondition.Left),
-                    new SymbolicNotCondition(binaryCondition.Right)));
-            case SymbolicNotCondition notCondition:
-                return "not(" + CreateConditionKey(notCondition.Operand) + ")";
-            case SymbolicBinaryCondition binaryCondition:
-                var operandConditions = new List<SymbolicCondition>();
-                CollectBinaryConditionOperands(binaryCondition, binaryCondition.Operator, operandConditions);
-                var supportsBooleanSimplification =
-                    operandConditions.All(static operand => !ContainsPotentiallyExceptionalArithmetic(operand));
-                var operands = operandConditions
-                    .Select(CreateConditionKey)
-                    .ToList();
-                var identityOperand = binaryCondition.Operator == SymbolicConditionOperator.And
-                    ? "const:true"
-                    : "const:false";
-                var absorbingOperand = binaryCondition.Operator == SymbolicConditionOperator.And
-                    ? "const:false"
-                    : "const:true";
-                if (operands.Any(operand => string.Equals(operand, absorbingOperand, StringComparison.Ordinal)))
-                    return absorbingOperand;
-                if (supportsBooleanSimplification &&
-                    ContainsComplementaryConditionOperands(binaryCondition))
-                    return absorbingOperand;
-                operands.RemoveAll(operand => string.Equals(operand, identityOperand, StringComparison.Ordinal));
-                operands = [.. operands.Distinct(StringComparer.Ordinal)];
-                if (supportsBooleanSimplification)
-                    operands = RemoveAbsorbedConditionOperands(binaryCondition.Operator, operandConditions, operands);
-                if (operands.Count == 0) return identityOperand;
-                if (operands.Count == 1) return operands[0];
-                operands.Sort(StringComparer.Ordinal);
-                return "binary:" + binaryCondition.Operator + "(" + string.Join(",", operands) + ")";
+                value = constant.Value;
+                return true;
+            case SymbolicFactCondition fact:
+                return TryEvaluateFact(fact.Fact, out value);
+            case SymbolicNotCondition operand when TryEvaluateCondition(operand.Operand, out value):
+                value = !value;
+                return true;
             default:
-                throw new NotSupportedException("Unsupported symbolic condition type: " + condition.GetType().FullName);
+                value = false;
+                return false;
         }
     }
-    private static bool ContainsComplementaryConditionOperands(SymbolicBinaryCondition condition) {
-        var operands = new List<SymbolicCondition>();
-        CollectBinaryConditionOperands(condition, condition.Operator, operands);
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var operand in operands) {
-            var key = CreateConditionKey(operand);
-            var negatedKey = CreateConditionKey(new SymbolicNotCondition(operand));
-            if (seen.Contains(negatedKey)) return true;
-            seen.Add(key);
-        }
-        return false;
-    }
-    private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicCondition condition) => condition switch {
-        SymbolicFactCondition factCondition => ContainsPotentiallyExceptionalArithmetic(factCondition.Fact),
-        SymbolicNotCondition notCondition => ContainsPotentiallyExceptionalArithmetic(notCondition.Operand),
-        SymbolicBinaryCondition binaryCondition => ContainsPotentiallyExceptionalArithmetic(binaryCondition.Left) ||
-                               ContainsPotentiallyExceptionalArithmetic(binaryCondition.Right),
-        _ => false,
-    };
-    private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicFact fact) =>
-        ContainsPotentiallyExceptionalArithmetic(fact.Atom);
-    private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicAtom atom) =>
-        ContainsPotentiallyExceptionalArithmetic(SymbolicIrChildren.OfAtom(atom));
-    // A divide or remainder is the hazard itself; every other term only carries
-    // whichever hazards its children do.
-    private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicTerm term) =>
-        term is SymbolicBinaryTerm {
-            Operator: SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder
-        } ||
-        ContainsPotentiallyExceptionalArithmetic(SymbolicIrChildren.OfTerm(term));
-    private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicIrChildren children) =>
-        children.AnyTerm(ContainsPotentiallyExceptionalArithmetic) ||
-        children.Condition != null && ContainsPotentiallyExceptionalArithmetic(children.Condition);
-    private static void CollectBinaryConditionOperands(
-        SymbolicCondition condition,
-        SymbolicConditionOperator binaryOperator,
-        ICollection<SymbolicCondition> operands) {
-        if (condition is SymbolicBinaryCondition nested &&
-            nested.Operator == binaryOperator) {
-            CollectBinaryConditionOperands(nested.Left, binaryOperator, operands);
-            CollectBinaryConditionOperands(nested.Right, binaryOperator, operands);
-            return;
-        }
-        operands.Add(condition);
-    }
-    private static List<string> RemoveAbsorbedConditionOperands(
-        SymbolicConditionOperator conditionOperator,
-        IReadOnlyCollection<SymbolicCondition> operandConditions,
-        List<string> operandKeys) {
-        if (operandKeys.Count < 2) return operandKeys;
-        var keySet = new HashSet<string>(operandKeys, StringComparer.Ordinal);
-        var absorbedKeys = new HashSet<string>(StringComparer.Ordinal);
-        var oppositeOperator = NegateConditionOperator(conditionOperator);
-        foreach (var operandCondition in operandConditions) {
-            if (operandCondition is not SymbolicBinaryCondition nested ||
-                nested.Operator != oppositeOperator)
-                continue;
-            var nestedOperands = new List<SymbolicCondition>();
-            CollectBinaryConditionOperands(nested, oppositeOperator, nestedOperands);
-            if (nestedOperands
-                .Select(CreateConditionKey)
-                .Any(keySet.Contains))
-                absorbedKeys.Add(CreateConditionKey(operandCondition));
-        }
-        return absorbedKeys.Count == 0
-            ? operandKeys
-            : [.. operandKeys.Where(key => !absorbedKeys.Contains(key))];
-    }
-    private static SymbolicConditionOperator NegateConditionOperator(SymbolicConditionOperator conditionOperator)
-        => conditionOperator == SymbolicConditionOperator.And
-            ? SymbolicConditionOperator.Or
-            : SymbolicConditionOperator.And;
 }

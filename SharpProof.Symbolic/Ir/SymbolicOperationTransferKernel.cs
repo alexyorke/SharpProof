@@ -21,10 +21,6 @@ internal static class SymbolicOperationTransferKernel {
                 state = state.AddPathCondition(branch.AssumeTrue ? branch.Condition : new SymbolicNotCondition(branch.Condition));
                 continue;
             }
-            if (operation is SymbolicLoopEdgeOperation loop) {
-                if (loop.Condition != null) state = state.AddPathCondition(loop.Condition);
-                continue;
-            }
             if (operation is SymbolicCompletionOperation) {
                 state = state.MarkContradictory();
                 continue;
@@ -74,16 +70,6 @@ internal static class SymbolicOperationTransferKernel {
                 new SymbolicOperationOrigin(sourceSpan, index, provenance)));
         return Apply(state, new SymbolicOperationSequence(operations.MoveToImmutable()));
     }
-    internal static SymbolicOperationTransitionResult TransitionLoopEdge(
-        SymbolicState state,
-        SymbolicCondition condition,
-        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
-        string provenance) =>
-        Apply(
-            state,
-            SymbolicOperationSequence.Single(new SymbolicLoopEdgeOperation(
-                condition,
-                new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
     internal static SymbolicOperationTransitionResult Complete(SymbolicState state, Microsoft.CodeAnalysis.Text.TextSpan sourceSpan) =>
         Apply(
             state,

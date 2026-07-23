@@ -1,304 +1,579 @@
 namespace SharpProof.Symbolic;
+
 internal sealed class SymbolicComplexityAnalysisSession {
-    private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
-    private readonly SymbolicComplexityCallModel _callModel;
+    private readonly Compilation _compilation;
     private readonly CancellationToken _cancellationToken;
-    private readonly SymbolicComplexityCostModel _costModel;
-    private readonly SymbolicComplexityLoopModel _loopModel;
-    private readonly Dictionary<IMethodSymbol, MethodAnalysisSummary> _summaryCache =
-        new(SymbolEqualityComparer.Default);
+    private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<IMethodSymbol, Summary> _cache = new(SymbolEqualityComparer.Default);
+
     internal SymbolicComplexityAnalysisSession(Compilation compilation, CancellationToken cancellationToken) {
-        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
+        _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         _cancellationToken = cancellationToken;
-        _costModel = new SymbolicComplexityCostModel(cancellationToken);
-        _loopModel = new SymbolicComplexityLoopModel(_costModel, cancellationToken);
-        _callModel = new SymbolicComplexityCallModel(compilation, _costModel, AnalyzeMethod, cancellationToken);
     }
+
     public SymbolicComplexityResult Analyze(ResolvedMethodLikeTarget target) {
-        var summary = AnalyzeMethod(target.MethodSymbol!, target.BodyNode!, target.SemanticModel);
-        var cost = summary.Cost;
+        var method = target.MethodSymbol!;
+        var summary = AnalyzeMethod(method, target.BodyNode!, target.SemanticModel);
         return new SymbolicComplexityResult(
             new SymbolicComplexityInfo(
-                cost.ToBigOText(target.MethodSymbol!),
-                cost.ToPublicKind(),
-                cost.IsConservative,
-                cost.IsUnknown,
-                cost.IsRecursiveUnknown),
+                summary.Cost.Text(method),
+                summary.Cost.Kind,
+                summary.Cost.IsUnknown,
+                summary.Cost.IsUnknown,
+                summary.Cost.IsRecursive),
             summary.Drivers.Distinct().ToArray(),
-            summary.UnknownReasons.Where(static reason => reason != SymbolicComplexityUnknownReason.None)
-                .Distinct().ToArray(),
-            summary.CalleeSummaries.Distinct().ToArray());
+            summary.Reasons.Where(static reason => reason != SymbolicComplexityUnknownReason.None).Distinct().ToArray(),
+            summary.Callees.Distinct().ToArray());
     }
-    private MethodAnalysisSummary AnalyzeMethod(IMethodSymbol methodSymbol, SyntaxNode bodyNode, SemanticModel semanticModel) {
+
+    private Summary AnalyzeMethod(IMethodSymbol method, SyntaxNode body, SemanticModel model) {
         _cancellationToken.ThrowIfCancellationRequested();
-        var canonical = methodSymbol.OriginalDefinition;
-        if (_summaryCache.TryGetValue(canonical, out var cached)) return cached;
-        if (_active.Contains(canonical))
-            return SymbolicComplexityAlgebra.CreateSummary(
-                SymbolicCostExpression.RecursiveUnknown(),
-                Array.Empty<SymbolicComplexityDriverInfo>(),
-                new[] { SymbolicComplexityUnknownReason.RecursiveCycle },
-                new[] {
-                    SymbolicComplexityAlgebra.CreateCalleeInfo(
-                        canonical.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-                        SymbolicCostExpression.RecursiveUnknown(),
-                        canonical)
-                });
-        _active.Add(canonical);
+        var canonical = method.OriginalDefinition;
+        if (_cache.TryGetValue(canonical, out var cached)) return cached;
+        if (!_active.Add(canonical)) {
+            var recursive = Cost.Recursive();
+            return new Summary(recursive, [], [SymbolicComplexityUnknownReason.RecursiveCycle],
+                [Callee(canonical, recursive, SymbolicComplexityUnknownReason.RecursiveCycle)]);
+        }
         try {
-            var operation = semanticModel.GetOperation(bodyNode, _cancellationToken);
-            var bodyCost = operation != null
-                ? AnalyzeOperation(operation, semanticModel, canonical)
-                : _callModel.AnalyzeTopLevelInvocations(bodyNode, semanticModel, canonical);
-            var summary = SymbolicComplexityAlgebra.CreateSummary(
-                bodyCost.Cost,
-                bodyCost.Drivers,
-                bodyCost.UnknownReasons,
-                bodyCost.CalleeSummaries);
-            _summaryCache[canonical] = summary;
-            return summary;
+            var operation = MethodBodyOperationResolver.GetMethodBodyRootOperation(
+                body, model, _cancellationToken) ?? model.GetOperation(body, _cancellationToken);
+            var result = AnalyzeOperation(operation, model, canonical);
+            _cache[canonical] = result;
+            return result;
         }
         finally {
             _active.Remove(canonical);
         }
     }
-    private ComplexityArtifacts AnalyzeOperation(IOperation? operation, SemanticModel semanticModel, IMethodSymbol currentMethod) {
+
+    private Summary AnalyzeOperation(IOperation? operation, SemanticModel model, IMethodSymbol method) {
         _cancellationToken.ThrowIfCancellationRequested();
-        if (operation == null) return ComplexityArtifacts.Constant;
-        switch (operation) {
-            case IConditionalOperation conditionalOperation:
-                return AnalyzeConditionalOperation(conditionalOperation, semanticModel, currentMethod);
-            case IForLoopOperation forLoopOperation:
-                return AnalyzeForLoop(forLoopOperation, semanticModel, currentMethod);
-            case IForEachLoopOperation forEachLoopOperation:
-                return AnalyzeForEachLoop(forEachLoopOperation, semanticModel, currentMethod);
-            case IWhileLoopOperation whileLoopOperation:
-                return AnalyzeWhileLikeLoop(whileLoopOperation, semanticModel, currentMethod);
-            case IInvocationOperation invocationOperation:
-                return AnalyzeInvocation(invocationOperation, semanticModel, currentMethod);
-            case IObjectCreationOperation objectCreationOperation:
-                return AnalyzeObjectCreation(objectCreationOperation, semanticModel, currentMethod);
-            case IPropertyReferenceOperation propertyReferenceOperation:
-                return AnalyzePropertyReference(propertyReferenceOperation, semanticModel, currentMethod);
-            case IArrayCreationOperation arrayCreationOperation:
-                return AnalyzeArrayCreation(arrayCreationOperation, semanticModel, currentMethod);
-            case IDelegateCreationOperation:
-            case IAnonymousFunctionOperation:
-            case ILocalFunctionOperation:
-            case IMethodReferenceOperation:
-                return ComplexityArtifacts.Constant;
-            case ISwitchOperation switchOperation:
-                return AnalyzeSwitchOperation(switchOperation, semanticModel, currentMethod);
-            case ISwitchExpressionOperation switchExpressionOperation:
-                return AnalyzeSwitchExpressionOperation(switchExpressionOperation, semanticModel, currentMethod);
-            case ITryOperation tryOperation:
-                return AnalyzeTryOperation(tryOperation, semanticModel, currentMethod);
-            case IDynamicInvocationOperation:
-            case IDynamicIndexerAccessOperation:
-            case IDynamicObjectCreationOperation:
-                return ComplexityArtifacts.Unknown(SymbolicComplexityUnknownReason.UnsupportedOperation, operation.Syntax);
-            default:
-                return SymbolicComplexityAlgebra.CombineSequence(operation.ChildOperations.Select(child =>
-                    AnalyzeOperation(child, semanticModel, currentMethod)));
-        }
-    }
-    private ComplexityArtifacts AnalyzeConditionalOperation(
-        IConditionalOperation conditionalOperation,
-        SemanticModel semanticModel,
-        IMethodSymbol currentMethod) {
-        var conditionCost = AnalyzeOperation(conditionalOperation.Condition, semanticModel, currentMethod);
-        if (TryGetConstantBoolean(conditionalOperation.Condition.Syntax, semanticModel, out var constantValue))
-            return SymbolicComplexityAlgebra.CombineSequence(
-                conditionCost,
-                constantValue
-                    ? AnalyzeOperation(conditionalOperation.WhenTrue, semanticModel, currentMethod)
-                    : AnalyzeOperation(conditionalOperation.WhenFalse, semanticModel, currentMethod));
-        return SymbolicComplexityAlgebra.CombineSequence(
-            conditionCost,
-            SymbolicComplexityAlgebra.CombineBranch(
-                AnalyzeOperation(conditionalOperation.WhenTrue, semanticModel, currentMethod),
-                AnalyzeOperation(conditionalOperation.WhenFalse, semanticModel, currentMethod)));
-    }
-    private ComplexityArtifacts AnalyzeForLoop(IForLoopOperation forLoopOperation, SemanticModel semanticModel,
-        IMethodSymbol currentMethod) {
-        var beforeCost =
-            SymbolicComplexityAlgebra.CombineSequence(
-                forLoopOperation.Before.Select(op => AnalyzeOperation(op, semanticModel, currentMethod)));
-        var conditionCost = AnalyzeOperation(forLoopOperation.Condition, semanticModel, currentMethod);
-        var bottomCost =
-            SymbolicComplexityAlgebra.CombineSequence(
-                forLoopOperation.AtLoopBottom.Select(op => AnalyzeOperation(op, semanticModel, currentMethod)));
-        var bodyCost = AnalyzeOperation(forLoopOperation.Body, semanticModel, currentMethod);
-        if (forLoopOperation.Syntax is not ForStatementSyntax forStatement ||
-            !_loopModel.TryGetForLoopBound(forStatement, semanticModel, currentMethod, out var bound))
-            return SymbolicComplexityAlgebra.CombineSequence(
-                beforeCost,
-                ComplexityArtifacts.Unknown(
-                    SymbolicComplexityUnknownReason.UnsupportedLoopShape,
-                    forLoopOperation.Syntax,
-                    conditionCost,
-                    bottomCost,
-                    bodyCost));
-        var perIteration = SymbolicComplexityAlgebra.CombineSequence(conditionCost, bottomCost, bodyCost);
-        var multiplied = SymbolicComplexityAlgebra.Multiply(bound.Cost, perIteration);
-        multiplied = multiplied.WithDriver(SymbolicComplexityAlgebra.CreateDriver(
-            "ForLoop",
-            "for-loop bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
-            forStatement));
-        return SymbolicComplexityAlgebra.CombineSequence(beforeCost, multiplied);
-    }
-    private ComplexityArtifacts AnalyzeForEachLoop(
-        IForEachLoopOperation forEachLoopOperation,
-        SemanticModel semanticModel,
-        IMethodSymbol currentMethod) {
-        var collectionCost = AnalyzeOperation(forEachLoopOperation.Collection, semanticModel, currentMethod);
-        var bodyCost = AnalyzeOperation(forEachLoopOperation.Body, semanticModel, currentMethod);
-        if (forEachLoopOperation.Syntax is not CommonForEachStatementSyntax foreachSyntax ||
-            !_loopModel.TryGetForeachBound(forEachLoopOperation.Collection.Syntax, semanticModel, currentMethod, out var bound))
-            return SymbolicComplexityAlgebra.CombineSequence(
-                collectionCost,
-                ComplexityArtifacts.Unknown(SymbolicComplexityUnknownReason.UnsupportedLoopShape, forEachLoopOperation.Syntax, bodyCost));
-        var multiplied = SymbolicComplexityAlgebra.Multiply(bound.Cost, bodyCost);
-        multiplied = multiplied.WithDriver(SymbolicComplexityAlgebra.CreateDriver(
-            "ForeachLoop",
-            "foreach bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
-            foreachSyntax));
-        return SymbolicComplexityAlgebra.CombineSequence(collectionCost, multiplied);
-    }
-    private ComplexityArtifacts AnalyzeWhileLikeLoop(
-        IWhileLoopOperation loopOperation,
-        SemanticModel semanticModel,
-        IMethodSymbol currentMethod) {
-        var conditionCost = AnalyzeOperation(loopOperation.Condition, semanticModel, currentMethod);
-        var bodyCost = AnalyzeOperation(loopOperation.Body, semanticModel, currentMethod);
-        var (condition, body, driverKind, description) = loopOperation.Syntax switch {
-            WhileStatementSyntax statement =>
-                (statement.Condition, statement.Statement, "WhileLoop", "while-loop"),
-            DoStatementSyntax statement =>
-                (statement.Condition, statement.Statement, "DoLoop", "do-loop"),
-            _ => (null, null, string.Empty, string.Empty)
+        if (operation == null) return Summary.Constant;
+        return operation switch {
+            IConditionalOperation conditional => AnalyzeConditional(conditional, model, method),
+            IForLoopOperation loop => AnalyzeFor(loop, model, method),
+            IForEachLoopOperation loop => AnalyzeForEach(loop, model, method),
+            IWhileLoopOperation loop => AnalyzeWhile(loop, model, method),
+            IInvocationOperation call => AnalyzeCall(call, call.Instance, call.Arguments, call.TargetMethod,
+                null, model, method),
+            IObjectCreationOperation creation => AnalyzeCall(creation, null, creation.Arguments,
+                creation.Constructor, creation.Initializer, model, method),
+            IPropertyReferenceOperation property => AnalyzeProperty(property, model, method),
+            IArrayCreationOperation array => AnalyzeArray(array, model, method),
+            ISwitchOperation @switch => AnalyzeSwitch(@switch, model, method),
+            ISwitchExpressionOperation @switch => AnalyzeSwitchExpression(@switch, model, method),
+            ITryOperation @try => AnalyzeTry(@try, model, method),
+            IDynamicInvocationOperation or IDynamicIndexerAccessOperation or IDynamicObjectCreationOperation
+                => Unknown(SymbolicComplexityUnknownReason.UnsupportedOperation, operation.Syntax),
+            IDelegateCreationOperation or IAnonymousFunctionOperation or ILocalFunctionOperation or
+                IMethodReferenceOperation => Summary.Constant,
+            _ => Sequence(operation.ChildOperations.Select(child => AnalyzeOperation(child, model, method)))
         };
-        if (condition == null ||
-            body == null ||
-            !_loopModel.TryGetWhileLikeBound(condition, body, semanticModel, currentMethod, out var bound))
-            return ComplexityArtifacts.Unknown(
-                SymbolicComplexityUnknownReason.UnsupportedWhileLoop,
-                loopOperation.Syntax,
-                conditionCost,
-                bodyCost);
-        var multiplied = SymbolicComplexityAlgebra.Multiply(bound.Cost, SymbolicComplexityAlgebra.CombineSequence(conditionCost, bodyCost));
-        multiplied = multiplied.WithDriver(SymbolicComplexityAlgebra.CreateDriver(
-            driverKind,
-            description + " bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
-            loopOperation.Syntax));
-        return multiplied;
     }
-    private ComplexityArtifacts AnalyzeInvocation(
-        IInvocationOperation invocationOperation,
-        SemanticModel semanticModel,
-        IMethodSymbol currentMethod) => AnalyzeCall(invocationOperation, invocationOperation.Instance,
-            invocationOperation.Arguments, invocationOperation.TargetMethod, null, semanticModel, currentMethod);
-    private ComplexityArtifacts AnalyzeObjectCreation(
-        IObjectCreationOperation objectCreationOperation,
-        SemanticModel semanticModel,
-        IMethodSymbol currentMethod) => AnalyzeCall(objectCreationOperation, null, objectCreationOperation.Arguments,
-            objectCreationOperation.Constructor, objectCreationOperation.Initializer, semanticModel, currentMethod);
-    private ComplexityArtifacts AnalyzePropertyReference(
-        IPropertyReferenceOperation propertyReferenceOperation,
-        SemanticModel semanticModel,
-        IMethodSymbol currentMethod) => AnalyzeCall(propertyReferenceOperation, propertyReferenceOperation.Instance,
-            propertyReferenceOperation.Arguments, propertyReferenceOperation.Property.GetMethod, null, semanticModel, currentMethod);
-    private ComplexityArtifacts AnalyzeCall(
+
+    private Summary AnalyzeConditional(IConditionalOperation operation, SemanticModel model, IMethodSymbol method) {
+        var condition = AnalyzeOperation(operation.Condition, model, method);
+        var constant = model.GetConstantValue(operation.Condition.Syntax, _cancellationToken);
+        if (constant is { HasValue: true, Value: bool value })
+            return Sequence(condition, AnalyzeOperation(
+                value ? operation.WhenTrue : operation.WhenFalse, model, method));
+        return Sequence(condition, Branch(
+            AnalyzeOperation(operation.WhenTrue, model, method),
+            AnalyzeOperation(operation.WhenFalse, model, method)));
+    }
+
+    private Summary AnalyzeFor(IForLoopOperation operation, SemanticModel model, IMethodSymbol method) {
+        var before = Sequence(operation.Before.Select(item => AnalyzeOperation(item, model, method)));
+        if (operation.Syntax is not ForStatementSyntax syntax ||
+            !TryForBound(syntax, model, method, out var bound, out var description))
+            return Sequence(before, Unknown(SymbolicComplexityUnknownReason.UnsupportedLoopShape, operation.Syntax));
+        var iteration = Sequence(operation.AtLoopBottom
+            .Select(item => AnalyzeOperation(item, model, method))
+            .Prepend(AnalyzeOperation(operation.Condition, model, method))
+            .Append(AnalyzeOperation(operation.Body, model, method)));
+        return Sequence(before, Multiply(bound, iteration).WithDriver(
+            Driver("ForLoop", "for-loop bound " + bound.Text(method) + " from " + description, syntax)));
+    }
+
+    private Summary AnalyzeForEach(IForEachLoopOperation operation, SemanticModel model, IMethodSymbol method) {
+        var collection = AnalyzeOperation(operation.Collection, model, method);
+        if (!TryCollectionBound(operation.Collection, model, method, out var bound))
+            return Sequence(collection, Unknown(SymbolicComplexityUnknownReason.UnsupportedLoopShape, operation.Syntax));
+        return Sequence(collection, Multiply(bound, AnalyzeOperation(operation.Body, model, method)).WithDriver(
+            Driver("ForeachLoop", "foreach bound " + bound.Text(method) + " from " +
+                operation.Collection.Syntax, operation.Syntax)));
+    }
+
+    private Summary AnalyzeWhile(IWhileLoopOperation operation, SemanticModel model, IMethodSymbol method) {
+        var parts = Sequence(
+            AnalyzeOperation(operation.Condition, model, method),
+            AnalyzeOperation(operation.Body, model, method));
+        ExpressionSyntax? condition;
+        StatementSyntax? body;
+        string kind;
+        string label;
+        if (operation.Syntax is WhileStatementSyntax @while) {
+            (condition, body, kind, label) = (@while.Condition, @while.Statement, "WhileLoop", "while-loop");
+        }
+        else if (operation.Syntax is DoStatementSyntax @do) {
+            (condition, body, kind, label) = (@do.Condition, @do.Statement, "DoLoop", "do-loop");
+        }
+        else {
+            return Unknown(SymbolicComplexityUnknownReason.UnsupportedWhileLoop, operation.Syntax, parts);
+        }
+        if (!TryWhileBound(condition, body, model, method, out var bound, out var description))
+            return Unknown(SymbolicComplexityUnknownReason.UnsupportedWhileLoop, operation.Syntax, parts);
+        return Multiply(bound, parts).WithDriver(
+            Driver(kind, label + " bound " + bound.Text(method) + " from " + description, operation.Syntax));
+    }
+
+    private Summary AnalyzeProperty(IPropertyReferenceOperation property, SemanticModel model, IMethodSymbol method) {
+        var children = Sequence(property.Instance == null
+            ? property.Arguments.Select(argument => AnalyzeOperation(argument.Value, model, method))
+            : property.Arguments.Select(argument => AnalyzeOperation(argument.Value, model, method))
+                .Prepend(AnalyzeOperation(property.Instance, model, method)));
+        if (IsConstantProperty(property.Property)) return children;
+        return Sequence(children, AnalyzeCall(property, property.Instance, property.Arguments,
+            property.Property.GetMethod, null, model, method));
+    }
+
+    private Summary AnalyzeCall(
         IOperation operation,
         IOperation? receiver,
         ImmutableArray<IArgumentOperation> arguments,
         IMethodSymbol? target,
         IOperation? initializer,
-        SemanticModel semanticModel,
-        IMethodSymbol currentMethod) {
-        var parts = new List<ComplexityArtifacts>();
-        if (receiver != null) parts.Add(AnalyzeOperation(receiver, semanticModel, currentMethod));
-        foreach (var argument in arguments)
-            parts.Add(AnalyzeOperation(argument.Value, semanticModel, currentMethod));
-        if (initializer != null) parts.Add(AnalyzeOperation(initializer, semanticModel, currentMethod));
-        if (target != null)
-            parts.Add(_callModel.AnalyzeMethodCall(
-                target,
-                operation,
-                operation.Syntax,
-                semanticModel,
-                currentMethod,
-                SymbolicComplexityCallModel.GetArgumentSyntaxes(target, arguments),
-                receiver?.Syntax));
-        return SymbolicComplexityAlgebra.CombineSequence(parts);
+        SemanticModel model,
+        IMethodSymbol method) {
+        var children = new List<Summary>();
+        if (receiver != null) children.Add(AnalyzeOperation(receiver, model, method));
+        children.AddRange(arguments.Select(argument => AnalyzeOperation(argument.Value, model, method)));
+        if (initializer != null) children.Add(AnalyzeOperation(initializer, model, method));
+        if (target == null) return Sequence(children);
+        if (SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(target, operation))
+            return Sequence(children.Append(
+                UnknownCallee(target, SymbolicComplexityUnknownReason.DynamicDispatch, operation.Syntax)));
+        if (!SymbolicMethodSourceResolver.IsBackedBySource(target))
+            return Sequence(children.Append(UnknownCallee(target, SymbolicComplexityUnknownReason.ExternalCallee,
+                operation.Syntax, includeUnknownCallee: true)));
+        if (!SymbolicMethodSourceResolver.TryResolve(_compilation, target, static _ => true, false,
+                _cancellationToken, out _, out var body, out var sourceModel) || body == null)
+            return Sequence(children.Append(
+                UnknownCallee(target, SymbolicComplexityUnknownReason.UnknownCallee, operation.Syntax)));
+        var callee = AnalyzeMethod(target, body, sourceModel);
+        var cost = Substitute(callee.Cost, arguments, receiver, model, method);
+        var info = Callee(target, cost, cost.IsRecursive
+            ? SymbolicComplexityUnknownReason.RecursiveCycle
+            : cost.IsUnknown ? SymbolicComplexityUnknownReason.UnknownCallee : SymbolicComplexityUnknownReason.None);
+        var result = new Summary(cost, callee.Drivers, callee.Reasons, [info, .. callee.Callees]);
+        if (!cost.IsConstant)
+            result = result.WithDriver(Driver("Call",
+                "call to " + info.MethodDisplayName + " contributes " + info.ComplexityText, operation.Syntax));
+        return Sequence(children.Append(result));
     }
-    private ComplexityArtifacts AnalyzeArrayCreation(
-        IArrayCreationOperation arrayCreationOperation,
-        SemanticModel semanticModel,
-        IMethodSymbol currentMethod) {
-        var dimensionCosts = arrayCreationOperation.DimensionSizes
-            .Select(size => AnalyzeOperation(size, semanticModel, currentMethod))
-            .ToArray();
-        var initializerCost = AnalyzeOperation(arrayCreationOperation.Initializer, semanticModel, currentMethod);
-        var initializationCost = SymbolicCostExpression.Constant();
-        foreach (var dimension in arrayCreationOperation.DimensionSizes) {
-            if (dimension.Syntax is not ExpressionSyntax expression ||
-                !_costModel.TryCreate(
-                    expression,
-                    semanticModel,
-                    currentMethod,
-                    CostProjection.Value,
-                    true,
-                    out var dimensionCost))
-                return ComplexityArtifacts.Unknown(
-                    SymbolicComplexityUnknownReason.UnsupportedOperation,
-                    arrayCreationOperation.Syntax,
-                    dimensionCosts.Concat(new[] { initializerCost }));
-            initializationCost = SymbolicCostExpression.Multiply(initializationCost, dimensionCost);
+
+    private Summary AnalyzeArray(IArrayCreationOperation operation, SemanticModel model, IMethodSymbol method) {
+        var parts = operation.DimensionSizes.Select(size => AnalyzeOperation(size, model, method))
+            .Append(AnalyzeOperation(operation.Initializer, model, method)).ToArray();
+        var cost = Cost.Constant;
+        foreach (var dimension in operation.DimensionSizes) {
+            if (!TryExpressionCost(dimension.Syntax as ExpressionSyntax, model, method, false, out var factor))
+                return Unknown(SymbolicComplexityUnknownReason.UnsupportedOperation, operation.Syntax, parts);
+            cost = Cost.Multiply(cost, factor);
         }
-        var initializationArtifacts = ComplexityArtifacts.FromCost(initializationCost).WithDriver(
-            SymbolicComplexityAlgebra.CreateDriver(
-                "ArrayInitialization",
-                "array initialization costs " + initializationCost.ToBigOText(currentMethod),
-                arrayCreationOperation.Syntax));
-        return SymbolicComplexityAlgebra.CombineSequence(
-            dimensionCosts.Concat(new[] { initializerCost, initializationArtifacts }));
+        return Sequence(parts.Append(new Summary(cost,
+            [Driver("ArrayInitialization", "array initialization costs " + cost.Text(method), operation.Syntax)],
+            [], [])));
     }
-    private ComplexityArtifacts AnalyzeSwitchOperation(
-        ISwitchOperation switchOperation,
-        SemanticModel semanticModel,
-        IMethodSymbol currentMethod) => AnalyzeBranches(switchOperation.Value,
-            switchOperation.Cases.Select(static @case => @case.Body.Cast<IOperation?>()), semanticModel, currentMethod);
-    private ComplexityArtifacts AnalyzeSwitchExpressionOperation(
-        ISwitchExpressionOperation switchExpressionOperation,
-        SemanticModel semanticModel,
-        IMethodSymbol currentMethod) => AnalyzeBranches(switchExpressionOperation.Value,
-            switchExpressionOperation.Arms.Select(static arm => new[] { arm.Pattern, arm.Guard, arm.Value }),
-            semanticModel, currentMethod);
-    private ComplexityArtifacts AnalyzeBranches(IOperation value, IEnumerable<IEnumerable<IOperation?>> branches,
-        SemanticModel semanticModel, IMethodSymbol currentMethod) {
-        var valueCost = AnalyzeOperation(value, semanticModel, currentMethod);
-        var costs = branches.Select(branch => SymbolicComplexityAlgebra.CombineSequence(
-            branch.Select(operation => AnalyzeOperation(operation, semanticModel, currentMethod)))).ToArray();
-        return costs.Length == 0 ? valueCost : SymbolicComplexityAlgebra.CombineSequence(
-            valueCost, SymbolicComplexityAlgebra.CombineBranch(costs));
+
+    private Summary AnalyzeSwitch(ISwitchOperation operation, SemanticModel model, IMethodSymbol method) =>
+        Sequence(AnalyzeOperation(operation.Value, model, method), Branch(operation.Cases.Select(@case =>
+            Sequence(@case.Body.Select(item => AnalyzeOperation(item, model, method))))));
+
+    private Summary AnalyzeSwitchExpression(
+        ISwitchExpressionOperation operation, SemanticModel model, IMethodSymbol method) =>
+        Sequence(AnalyzeOperation(operation.Value, model, method), Branch(operation.Arms.Select(arm =>
+            Sequence(AnalyzeOperation(arm.Pattern, model, method),
+                AnalyzeOperation(arm.Guard, model, method), AnalyzeOperation(arm.Value, model, method)))));
+
+    private Summary AnalyzeTry(ITryOperation operation, SemanticModel model, IMethodSymbol method) =>
+        Sequence(Branch(operation.Catches.Select(@catch => AnalyzeOperation(@catch.Handler, model, method))
+                .Prepend(AnalyzeOperation(operation.Body, model, method))),
+            AnalyzeOperation(operation.Finally, model, method));
+
+    private bool TryForBound(
+        ForStatementSyntax loop,
+        SemanticModel model,
+        IMethodSymbol method,
+        out Cost bound,
+        out string description) {
+        bound = Cost.Constant;
+        description = string.Empty;
+        ISymbol? variable = null;
+        ExpressionSyntax? initializer = null;
+        if (loop.Declaration is { Variables.Count: 1 } declaration) {
+            variable = model.GetDeclaredSymbol(declaration.Variables[0], _cancellationToken);
+            initializer = declaration.Variables[0].Initializer?.Value;
+        }
+        else if (loop.Initializers.Count == 1 &&
+                 loop.Initializers[0] is AssignmentExpressionSyntax assignment) {
+            variable = model.GetSymbolInfo(assignment.Left, _cancellationToken).Symbol;
+            initializer = assignment.Right;
+        }
+        if (variable is not ILocalSymbol and not IParameterSymbol ||
+            initializer == null || !IsIntegralConstant(initializer, model) ||
+            loop.Condition is not BinaryExpressionSyntax condition ||
+            !TryCondition(condition, variable, model, method, out var direction, out bound, out description) ||
+            loop.Incrementors.Count != 1 ||
+            !TryStep(loop.Incrementors[0], variable, model, out var step) || step != direction)
+            return false;
+        return !Mutates(variable, loop.Statement, model, ignoreRecognizedStep: false);
     }
-    private ComplexityArtifacts AnalyzeTryOperation(ITryOperation tryOperation, SemanticModel semanticModel, IMethodSymbol currentMethod) {
-        var paths = new List<ComplexityArtifacts> {
-            AnalyzeOperation(tryOperation.Body, semanticModel, currentMethod)
+
+    private bool TryWhileBound(
+        ExpressionSyntax condition,
+        StatementSyntax body,
+        SemanticModel model,
+        IMethodSymbol method,
+        out Cost bound,
+        out string description) {
+        bound = Cost.Constant;
+        description = string.Empty;
+        if (condition is not BinaryExpressionSyntax binary) return false;
+        var left = model.GetSymbolInfo(Unwrap(binary.Left), _cancellationToken).Symbol;
+        var right = model.GetSymbolInfo(Unwrap(binary.Right), _cancellationToken).Symbol;
+        var variable = left is ILocalSymbol or IParameterSymbol ? left :
+            right is ILocalSymbol or IParameterSymbol ? right : null;
+        if (variable == null ||
+            !TryCondition(binary, variable, model, method, out var direction, out bound, out description))
+            return false;
+        var steps = body.DescendantNodes().OfType<ExpressionSyntax>()
+            .Select(expression => TryStep(expression, variable, model, out var step) ? step : Direction.None)
+            .Where(static step => step != Direction.None).ToArray();
+        return steps.Length == 1 && steps[0] == direction &&
+               !Mutates(variable, body, model, ignoreRecognizedStep: true);
+    }
+
+    private bool TryCondition(
+        BinaryExpressionSyntax condition,
+        ISymbol variable,
+        SemanticModel model,
+        IMethodSymbol method,
+        out Direction direction,
+        out Cost bound,
+        out string description) {
+        direction = Direction.None;
+        bound = Cost.Constant;
+        description = string.Empty;
+        var left = Unwrap(condition.Left);
+        var right = Unwrap(condition.Right);
+        var variableOnLeft = SymbolEqualityComparer.Default.Equals(
+            model.GetSymbolInfo(left, _cancellationToken).Symbol, variable);
+        var variableOnRight = SymbolEqualityComparer.Default.Equals(
+            model.GetSymbolInfo(right, _cancellationToken).Symbol, variable);
+        if (!variableOnLeft && !variableOnRight) return false;
+        direction = (condition.Kind(), variableOnLeft) switch {
+            (SyntaxKind.LessThanExpression, true) or (SyntaxKind.GreaterThanExpression, false) => Direction.Up,
+            (SyntaxKind.GreaterThanExpression, true) or (SyntaxKind.LessThanExpression, false) => Direction.Down,
+            _ => Direction.None
         };
-        foreach (var @catch in tryOperation.Catches)
-            paths.Add(AnalyzeOperation(@catch.Handler, semanticModel, currentMethod));
-        var finallyCost = AnalyzeOperation(tryOperation.Finally, semanticModel, currentMethod);
-        return SymbolicComplexityAlgebra.CombineSequence(SymbolicComplexityAlgebra.CombineBranch(paths), finallyCost);
+        var expression = variableOnLeft ? right : left;
+        if (direction == Direction.None || !TryExpressionCost(expression, model, method, false, out bound))
+            return false;
+        description = expression.ToString();
+        return true;
     }
-    private bool TryGetConstantBoolean(SyntaxNode syntaxNode, SemanticModel semanticModel, out bool value) {
-        if (syntaxNode is ExpressionSyntax expression &&
-            semanticModel.GetConstantValue(expression, _cancellationToken) is { HasValue: true, Value: bool boolValue }) {
-            value = boolValue;
+
+    private bool TryStep(
+        ExpressionSyntax expression, ISymbol variable, SemanticModel model, out Direction direction) {
+        direction = Direction.None;
+        expression = Unwrap(expression);
+        if (CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(expression, out var operand, out var delta) &&
+            RefersTo(operand, variable, model)) {
+            direction = delta > 0 ? Direction.Up : Direction.Down;
             return true;
         }
-        value = false;
+        if (expression is not AssignmentExpressionSyntax assignment || !RefersTo(assignment.Left, variable, model))
+            return false;
+        if ((assignment.IsKind(SyntaxKind.AddAssignmentExpression) ||
+             assignment.IsKind(SyntaxKind.SubtractAssignmentExpression)) &&
+            IsOne(assignment.Right, model)) {
+            direction = assignment.IsKind(SyntaxKind.AddAssignmentExpression) ? Direction.Up : Direction.Down;
+            return true;
+        }
+        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+            assignment.Right is not BinaryExpressionSyntax binary)
+            return false;
+        if (binary.IsKind(SyntaxKind.AddExpression) &&
+            ((RefersTo(binary.Left, variable, model) && IsOne(binary.Right, model)) ||
+             (IsOne(binary.Left, model) && RefersTo(binary.Right, variable, model)))) {
+            direction = Direction.Up;
+            return true;
+        }
+        if (binary.IsKind(SyntaxKind.SubtractExpression) &&
+            RefersTo(binary.Left, variable, model) && IsOne(binary.Right, model)) {
+            direction = Direction.Down;
+            return true;
+        }
         return false;
+    }
+
+    private bool TryCollectionBound(IOperation collection, SemanticModel model, IMethodSymbol method, out Cost cost) {
+        cost = Cost.Constant;
+        var type = collection.Type;
+        var supported = type?.SpecialType == SpecialType.System_String || type is IArrayTypeSymbol ||
+            type?.AllInterfaces.Any(interfaceType =>
+                interfaceType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T) == true;
+        return supported && TryExpressionCost(collection.Syntax as ExpressionSyntax, model, method, true, out cost);
+    }
+
+    private bool TryExpressionCost(
+        ExpressionSyntax? expression,
+        SemanticModel model,
+        IMethodSymbol method,
+        bool length,
+        out Cost cost) {
+        cost = Cost.Constant;
+        if (expression == null) return false;
+        expression = Unwrap(expression);
+        if (model.GetConstantValue(expression, _cancellationToken).HasValue) return true;
+        var symbol = model.GetSymbolInfo(expression, _cancellationToken).Symbol;
+        if (symbol is IParameterSymbol parameter) {
+            cost = Cost.Variable("$p" + parameter.Ordinal.ToString(CultureInfo.InvariantCulture) +
+                                 (length ? ":length" : ":value"));
+            return true;
+        }
+        if (expression is MemberAccessExpressionSyntax member &&
+            member.Name.Identifier.ValueText is "Length" or "Count")
+            return TryExpressionCost(member.Expression, model, method, true, out cost);
+        if (expression is BinaryExpressionSyntax binary &&
+            TryExpressionCost(binary.Left, model, method, length, out var left) &&
+            TryExpressionCost(binary.Right, model, method, length, out var right)) {
+            cost = Cost.Max(left, right);
+            return true;
+        }
+        if (symbol is ILocalSymbol or IFieldSymbol or IPropertySymbol) {
+            cost = Cost.Variable("name:" + symbol.Name + (length ? ".Length" : string.Empty));
+            return true;
+        }
+        return false;
+    }
+
+    private Cost Substitute(
+        Cost cost,
+        ImmutableArray<IArgumentOperation> arguments,
+        IOperation? receiver,
+        SemanticModel model,
+        IMethodSymbol method) => cost.Substitute(key => {
+            if (key.StartsWith("$p", StringComparison.Ordinal)) {
+                var colon = key.IndexOf(':');
+                if (colon > 2 && int.TryParse(key.Substring(2, colon - 2), out var ordinal) &&
+                    ordinal >= 0 && ordinal < arguments.Length &&
+                    TryExpressionCost(arguments[ordinal].Value.Syntax as ExpressionSyntax, model, method,
+                        key.EndsWith(":length", StringComparison.Ordinal), out var replacement))
+                    return replacement;
+                return Cost.Unknown(SymbolicComplexityUnknownReason.UnknownCallee);
+            }
+            if (key.StartsWith("$this", StringComparison.Ordinal) &&
+                TryExpressionCost(receiver?.Syntax as ExpressionSyntax, model, method,
+                    key.EndsWith(".length", StringComparison.Ordinal), out var receiverCost))
+                return receiverCost;
+            return null;
+        });
+
+    private bool Mutates(ISymbol symbol, SyntaxNode body, SemanticModel model, bool ignoreRecognizedStep) {
+        foreach (var expression in body.DescendantNodesAndSelf().OfType<ExpressionSyntax>()) {
+            if (ignoreRecognizedStep && TryStep(expression, symbol, model, out _)) continue;
+            ExpressionSyntax? target = expression switch {
+                AssignmentExpressionSyntax assignment => assignment.Left,
+                PrefixUnaryExpressionSyntax prefix when prefix.IsKind(SyntaxKind.PreIncrementExpression) ||
+                                                        prefix.IsKind(SyntaxKind.PreDecrementExpression) => prefix.Operand,
+                PostfixUnaryExpressionSyntax postfix when postfix.IsKind(SyntaxKind.PostIncrementExpression) ||
+                                                          postfix.IsKind(SyntaxKind.PostDecrementExpression) => postfix.Operand,
+                _ => null
+            };
+            if (target != null && RefersTo(target, symbol, model)) return true;
+        }
+        return false;
+    }
+
+    private bool RefersTo(ExpressionSyntax expression, ISymbol symbol, SemanticModel model) =>
+        SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(Unwrap(expression), _cancellationToken).Symbol, symbol);
+
+    private bool IsIntegralConstant(ExpressionSyntax expression, SemanticModel model) {
+        var value = model.GetConstantValue(expression, _cancellationToken);
+        return value.HasValue && value.Value is sbyte or byte or short or ushort or int or uint or long or ulong;
+    }
+
+    private bool IsOne(ExpressionSyntax expression, SemanticModel model) {
+        var value = model.GetConstantValue(expression, _cancellationToken);
+        return value.HasValue && Convert.ToDecimal(value.Value, CultureInfo.InvariantCulture) == 1m;
+    }
+
+    private static ExpressionSyntax Unwrap(ExpressionSyntax expression) =>
+        CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+
+    private static bool IsConstantProperty(IPropertySymbol property) =>
+        property.Name is "Length" or "Count" &&
+        (property.ContainingType.SpecialType == SpecialType.System_String ||
+         property.ContainingType is IArrayTypeSymbol ||
+         property.ContainingType.AllInterfaces.Any(interfaceType =>
+             interfaceType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T)) ||
+        property.IsIndexer && property.ContainingType.SpecialType == SpecialType.System_String;
+
+    private static Summary Sequence(params Summary[] parts) => Sequence(parts.AsEnumerable());
+    private static Summary Sequence(IEnumerable<Summary> parts) => Combine(parts, Cost.Max);
+    private static Summary Branch(params Summary[] parts) => Branch(parts.AsEnumerable());
+    private static Summary Branch(IEnumerable<Summary> parts) => Combine(parts, Cost.Max);
+    private static Summary Combine(IEnumerable<Summary> parts, Func<Cost, Cost, Cost> combine) {
+        var cost = Cost.Constant;
+        var drivers = new List<SymbolicComplexityDriverInfo>();
+        var reasons = new List<SymbolicComplexityUnknownReason>();
+        var callees = new List<SymbolicComplexityCalleeInfo>();
+        foreach (var part in parts) {
+            cost = combine(cost, part.Cost);
+            drivers.AddRange(part.Drivers);
+            reasons.AddRange(part.Reasons);
+            callees.AddRange(part.Callees);
+        }
+        return new Summary(cost, drivers, reasons, callees);
+    }
+
+    private static Summary Multiply(Cost factor, Summary value) =>
+        value with { Cost = Cost.Multiply(factor, value.Cost) };
+
+    private static Summary Unknown(
+        SymbolicComplexityUnknownReason reason, SyntaxNode syntax, params Summary[] parts) {
+        var combined = Sequence(parts);
+        return new Summary(Cost.Unknown(reason),
+            [.. combined.Drivers, Driver("Unknown", reason.ToString(), syntax)],
+            [reason, .. combined.Reasons], combined.Callees);
+    }
+
+    private static Summary UnknownCallee(
+        IMethodSymbol method,
+        SymbolicComplexityUnknownReason reason,
+        SyntaxNode syntax,
+        bool includeUnknownCallee = false) =>
+        new(Cost.Unknown(reason), [Driver("Unknown", reason.ToString(), syntax)],
+            includeUnknownCallee ? [reason, SymbolicComplexityUnknownReason.UnknownCallee] : [reason],
+            [Callee(method, Cost.Unknown(reason), reason)]);
+
+    private static SymbolicComplexityDriverInfo Driver(string kind, string description, SyntaxNode syntax) =>
+        new(kind, description, syntax.SpanStart, syntax.Span.Length);
+
+    private static SymbolicComplexityCalleeInfo Callee(
+        IMethodSymbol method, Cost cost, SymbolicComplexityUnknownReason reason) =>
+        new(method.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+            cost.Text(method), cost.Kind, cost.IsUnknown, reason);
+
+    private enum Direction { None, Up, Down }
+
+    private sealed record Summary(
+        Cost Cost,
+        IReadOnlyList<SymbolicComplexityDriverInfo> Drivers,
+        IReadOnlyList<SymbolicComplexityUnknownReason> Reasons,
+        IReadOnlyList<SymbolicComplexityCalleeInfo> Callees) {
+        internal static readonly Summary Constant = new(Cost.Constant, [], [], []);
+        internal Summary WithDriver(SymbolicComplexityDriverInfo driver) =>
+            this with { Drivers = [.. Drivers, driver] };
+    }
+
+    private sealed record Cost(
+        ImmutableSortedDictionary<string, int>? Factors = null,
+        ImmutableArray<Cost> Alternatives = default,
+        SymbolicComplexityUnknownReason UnknownReason = SymbolicComplexityUnknownReason.None,
+        bool IsRecursive = false) {
+        internal static readonly Cost Constant = new(
+            ImmutableSortedDictionary<string, int>.Empty.WithComparers(StringComparer.Ordinal));
+        internal bool IsUnknown => IsRecursive || UnknownReason != SymbolicComplexityUnknownReason.None;
+        internal bool IsConstant => !IsUnknown && Alternatives.IsDefaultOrEmpty && Factors?.Count == 0;
+        internal SymbolicComplexityKind Kind => IsRecursive ? SymbolicComplexityKind.RecursiveUnknown :
+            UnknownReason != SymbolicComplexityUnknownReason.None ? SymbolicComplexityKind.Unknown :
+            !Alternatives.IsDefaultOrEmpty ? SymbolicComplexityKind.Max :
+            Factors?.Count == 0 ? SymbolicComplexityKind.Constant :
+            Factors?.Count == 1 && Factors.Single().Value == 1 ? SymbolicComplexityKind.Linear :
+            Factors?.Count == 1 && Factors.Single().Value == 2 ? SymbolicComplexityKind.Quadratic :
+            SymbolicComplexityKind.Product;
+
+        internal static Cost Variable(string key) => new(
+            ImmutableSortedDictionary<string, int>.Empty.WithComparers(StringComparer.Ordinal).Add(key, 1));
+        internal static Cost Unknown(SymbolicComplexityUnknownReason reason) => new(UnknownReason: reason);
+        internal static Cost Recursive() => new(
+            UnknownReason: SymbolicComplexityUnknownReason.RecursiveCycle, IsRecursive: true);
+
+        internal static Cost Max(Cost left, Cost right) {
+            if (left.IsRecursive || right.IsRecursive) return Recursive();
+            if (left.UnknownReason != SymbolicComplexityUnknownReason.None) return left;
+            if (right.UnknownReason != SymbolicComplexityUnknownReason.None) return right;
+            if (Dominates(left, right)) return left;
+            if (Dominates(right, left)) return right;
+            var alternatives = Expand(left).Concat(Expand(right)).Distinct().ToImmutableArray();
+            return alternatives.Length == 1 ? alternatives[0] : new Cost(Alternatives: alternatives);
+        }
+
+        internal static Cost Multiply(Cost left, Cost right) {
+            if (left.IsRecursive || right.IsRecursive) return Recursive();
+            if (left.UnknownReason != SymbolicComplexityUnknownReason.None) return left;
+            if (right.UnknownReason != SymbolicComplexityUnknownReason.None) return right;
+            if (!left.Alternatives.IsDefaultOrEmpty)
+                return left.Alternatives.Select(item => Multiply(item, right)).Aggregate(Max);
+            if (!right.Alternatives.IsDefaultOrEmpty)
+                return right.Alternatives.Select(item => Multiply(left, item)).Aggregate(Max);
+            var factors = left.Factors ?? Constant.Factors!;
+            foreach (var pair in right.Factors ?? Constant.Factors!)
+                factors = factors.SetItem(pair.Key,
+                    factors.TryGetValue(pair.Key, out var exponent) ? exponent + pair.Value : pair.Value);
+            return new Cost(factors);
+        }
+
+        internal Cost Substitute(Func<string, Cost?> resolve) {
+            if (IsUnknown) return this;
+            if (!Alternatives.IsDefaultOrEmpty)
+                return Alternatives.Select(item => item.Substitute(resolve)).Aggregate(Max);
+            var result = Constant;
+            foreach (var pair in Factors ?? Constant.Factors!) {
+                var factor = resolve(pair.Key) ?? Variable(pair.Key);
+                for (var index = 0; index < pair.Value; index++) result = Multiply(result, factor);
+            }
+            return result;
+        }
+
+        internal string Text(IMethodSymbol? method) => "O(" + Term(method) + ")";
+
+        private string Term(IMethodSymbol? method) {
+            if (IsRecursive) return "RecursiveUnknown";
+            if (UnknownReason != SymbolicComplexityUnknownReason.None) return "Unknown";
+            if (!Alternatives.IsDefaultOrEmpty)
+                return "max(" + string.Join(", ", Alternatives.Select(item => item.Term(method))) + ")";
+            if (Factors?.Count == 0) return "1";
+            return string.Join(" * ", Factors!.Select(pair => Render(pair.Key, method) +
+                (pair.Value == 1 ? string.Empty : "^" + pair.Value.ToString(CultureInfo.InvariantCulture))));
+        }
+
+        private static string Render(string key, IMethodSymbol? method) {
+            if (key.StartsWith("$p", StringComparison.Ordinal)) {
+                var colon = key.IndexOf(':');
+                if (colon > 2 && int.TryParse(key.Substring(2, colon - 2), out var ordinal)) {
+                    var name = method != null && ordinal < method.Parameters.Length
+                        ? method.Parameters[ordinal].Name
+                        : "p" + ordinal.ToString(CultureInfo.InvariantCulture);
+                    return key.EndsWith(":length", StringComparison.Ordinal) ? name + ".Length" : name;
+                }
+            }
+            return key.StartsWith("name:", StringComparison.Ordinal) ? key.Substring(5) : key;
+        }
+
+        private static IEnumerable<Cost> Expand(Cost cost) =>
+            cost.Alternatives.IsDefaultOrEmpty ? [cost] : cost.Alternatives;
+
+        private static bool Dominates(Cost left, Cost right) {
+            if (!left.Alternatives.IsDefaultOrEmpty || !right.Alternatives.IsDefaultOrEmpty) return false;
+            if (left.Factors?.Count == 0) return right.Factors?.Count == 0;
+            if (right.Factors?.Count == 0) return true;
+            return right.Factors!.All(pair =>
+                left.Factors!.TryGetValue(pair.Key, out var exponent) && exponent >= pair.Value);
+        }
     }
 }

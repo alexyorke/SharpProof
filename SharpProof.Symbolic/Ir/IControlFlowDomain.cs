@@ -7,4 +7,6 @@ internal interface IControlFlowDomain<TState> {
     TState Merge(TState current, TState incoming);
     TState CompleteBlock(TState state, BasicBlock block);
     bool Equivalent(TState left, TState right);
+    bool IsUnreachable(TState state);
+    string GetKey(TState state);
 }

@@ -16,25 +16,6 @@ internal static class SymbolMutationFacts {
                 return false;
         }
     }
-    internal static bool TryGetIncrementedOrDecrementedSymbol(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out ISymbol symbol,
-        out int delta) {
-        if (!CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(expression, out var operand, out delta)) {
-            symbol = null!;
-            return false;
-        }
-        var expressionSymbol = semanticModel.GetSymbolInfo(operand, cancellationToken).Symbol;
-        if (expressionSymbol is not ILocalSymbol && expressionSymbol is not IParameterSymbol) {
-            symbol = null!;
-            delta = 0;
-            return false;
-        }
-        symbol = expressionSymbol.OriginalDefinition;
-        return true;
-    }
     internal static IReadOnlyList<ISymbol> GetReferencedLocalAndParameterSymbols(
         SyntaxNode root,
         SemanticModel semanticModel,

@@ -391,6 +391,8 @@ internal sealed class MethodEffectAnalysisSession(
             return state;
         }
         public bool Equivalent(EffectFlowState left, EffectFlowState right) => string.Equals(left.Key, right.Key, StringComparison.Ordinal);
+        public bool IsUnreachable(EffectFlowState state) => state.IsUnreachable;
+        public string GetKey(EffectFlowState state) => state.Key;
         private static EffectFlowValue ResolveConditionValue(IOperation operation, EffectFlowState state) => operation switch {
             IFlowCaptureReferenceOperation capture => state.GetCapture(capture.Id),
             ILocalReferenceOperation local => state.GetLocal(local.Local),

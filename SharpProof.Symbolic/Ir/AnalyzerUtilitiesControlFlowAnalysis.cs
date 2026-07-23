@@ -1,10 +1,10 @@
 namespace SharpProof.Symbolic.Ir;
 
 internal static class AnalyzerUtilitiesControlFlowAnalysis {
-    internal static AnalyzerControlFlowResult Run(
+    internal static AnalyzerControlFlowResult<TState> Run<TState>(
         ControlFlowGraph graph,
-        EffectFlowState initialState,
-        IControlFlowDomain<EffectFlowState> domain,
+        TState initialState,
+        IControlFlowDomain<TState> domain,
         Compilation compilation,
         ISymbol owningSymbol,
         CancellationToken cancellationToken) {
@@ -22,7 +22,7 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             : null;
         domain.SetControlFlowGraph(graph, pointsTo);
         var valueDomain = new EffectAbstractValueDomain();
-        var context = new EffectAnalysisContext(
+        var context = new EffectAnalysisContext<TState>(
             valueDomain,
             graph,
             owningSymbol,
@@ -33,8 +33,8 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             initialState,
             domain,
             cancellationToken);
-        var visitor = new EffectDataFlowOperationVisitor(context);
-        var analysis = new EffectDataFlowAnalysis(new EffectAnalysisDomain(domain), visitor);
+        var visitor = new EffectDataFlowOperationVisitor<TState>(context);
+        var analysis = new EffectDataFlowAnalysis<TState>(new EffectAnalysisDomain<TState>(domain), visitor);
         var result = analysis.Run(context) ?? throw new InvalidOperationException("AnalyzerUtilities data-flow analysis failed.");
         return new(result.ExitBlockOutput.State, context.Truncated);
     }
@@ -63,7 +63,7 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
         }
     }
 
-    internal sealed record AnalyzerControlFlowResult(EffectFlowState ExitState, bool Truncated);
+    internal sealed record AnalyzerControlFlowResult<TState>(TState ExitState, bool Truncated);
 
     private enum EffectAbstractValue { Unknown }
 
@@ -75,34 +75,34 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
         public override int Compare(EffectAbstractValue oldValue, EffectAbstractValue newValue, bool assertMonotonicity) => 0;
     }
 
-    private sealed class EffectAnalysisData(EffectFlowState state) : AbstractAnalysisData {
-        internal EffectFlowState State { get; } = state;
+    private sealed class EffectAnalysisData<TState>(TState state) : AbstractAnalysisData {
+        internal TState State { get; } = state;
     }
 
-    private sealed class EffectAnalysisDomain(IControlFlowDomain<EffectFlowState> domain) :
-        AbstractAnalysisDomain<EffectAnalysisData> {
-        public override EffectAnalysisData Clone(EffectAnalysisData value) => new(value.State);
-        public override EffectAnalysisData Merge(EffectAnalysisData value1, EffectAnalysisData value2) =>
+    private sealed class EffectAnalysisDomain<TState>(IControlFlowDomain<TState> domain) :
+        AbstractAnalysisDomain<EffectAnalysisData<TState>> {
+        public override EffectAnalysisData<TState> Clone(EffectAnalysisData<TState> value) => new(value.State);
+        public override EffectAnalysisData<TState> Merge(EffectAnalysisData<TState> value1, EffectAnalysisData<TState> value2) =>
             new(domain.Merge(value1.State, value2.State));
-        public override int Compare(EffectAnalysisData oldValue, EffectAnalysisData newValue) {
+        public override int Compare(EffectAnalysisData<TState> oldValue, EffectAnalysisData<TState> newValue) {
             if (domain.Equivalent(oldValue.State, newValue.State)) return 0;
             var merged = domain.Merge(oldValue.State, newValue.State);
             if (domain.Equivalent(merged, newValue.State)) return -1;
             return domain.Equivalent(merged, oldValue.State) ? 1 : -1;
         }
-        public override bool Equals(EffectAnalysisData value1, EffectAnalysisData value2) =>
+        public override bool Equals(EffectAnalysisData<TState> value1, EffectAnalysisData<TState> value2) =>
             domain.Equivalent(value1.State, value2.State);
     }
 
-    private sealed class EffectBlockAnalysisResult(BasicBlock block, EffectFlowState state) :
+    private sealed class EffectBlockAnalysisResult<TState>(BasicBlock block, TState state) :
         AbstractBlockAnalysisResult(block) {
-        internal EffectFlowState State { get; } = state;
+        internal TState State { get; } = state;
     }
 
-    private sealed class EffectAnalysisContext : AbstractDataFlowAnalysisContext<
-        EffectAnalysisData,
-        EffectAnalysisContext,
-        DataFlowAnalysisResult<EffectBlockAnalysisResult, EffectAbstractValue>,
+    private sealed class EffectAnalysisContext<TState> : AbstractDataFlowAnalysisContext<
+        EffectAnalysisData<TState>,
+        EffectAnalysisContext<TState>,
+        DataFlowAnalysisResult<EffectBlockAnalysisResult<TState>, EffectAbstractValue>,
         EffectAbstractValue> {
         internal EffectAnalysisContext(
             EffectAbstractValueDomain valueDomain,
@@ -112,8 +112,8 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             InterproceduralAnalysisConfiguration interprocedural,
             Analyzer.Utilities.WellKnownTypeProvider wellKnownTypeProvider,
             PointsToAnalysisResult? pointsTo,
-            EffectFlowState initialState,
-            IControlFlowDomain<EffectFlowState> domain,
+            TState initialState,
+            IControlFlowDomain<TState> domain,
             CancellationToken cancellationToken) : base(
                 valueDomain,
                 wellKnownTypeProvider,
@@ -135,13 +135,13 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             Domain = domain;
             CancellationToken = cancellationToken;
         }
-        internal EffectFlowState InitialState { get; }
-        internal IControlFlowDomain<EffectFlowState> Domain { get; }
+        internal TState InitialState { get; }
+        internal IControlFlowDomain<TState> Domain { get; }
         internal CancellationToken CancellationToken { get; }
         internal bool Truncated { get; private set; }
         private int Transfers { get; set; }
         private const int MaxTransfers = 4096;
-        internal EffectFlowState Transfer(EffectFlowState state, IOperation operation) {
+        internal TState Transfer(TState state, IOperation operation) {
             if (Transfers >= MaxTransfers) {
                 Truncated = true;
                 return state;
@@ -150,61 +150,61 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             if (Transfers >= MaxTransfers) Truncated = true;
             return Domain.Transfer(state, operation);
         }
-        public override EffectAnalysisContext ForkForInterproceduralAnalysis(
+        public override EffectAnalysisContext<TState> ForkForInterproceduralAnalysis(
             IMethodSymbol invokedMethod,
             ControlFlowGraph invokedCfg,
             PointsToAnalysisResult? pointsToAnalysisResult,
             DataFlowAnalysisResult<CopyBlockAnalysisResult, CopyAbstractValue>? copyAnalysisResult,
             DataFlowAnalysisResult<ValueContentBlockAnalysisResult, ValueContentAbstractValue>? valueContentAnalysisResult,
-            InterproceduralAnalysisData<EffectAnalysisData, EffectAnalysisContext, EffectAbstractValue>?
+            InterproceduralAnalysisData<EffectAnalysisData<TState>, EffectAnalysisContext<TState>, EffectAbstractValue>?
                 interproceduralAnalysisData) => new(
-                    // AnalyzerUtilities requests a context for every unvisited local function on method exit.
-                    // The result callback is intentionally null because SharpProof analyzes callable bodies itself.
-                    (EffectAbstractValueDomain)ValueDomain,
-                    invokedCfg,
-                    invokedMethod,
-                    AnalyzerOptions,
-                    InterproceduralAnalysisConfiguration,
-                    WellKnownTypeProvider,
-                    pointsToAnalysisResult,
-                    InitialState,
-                    Domain,
-                    CancellationToken);
+                // AnalyzerUtilities requests a context for every unvisited local function on method exit.
+                // The result callback is intentionally null because SharpProof analyzes callable bodies itself.
+                (EffectAbstractValueDomain)ValueDomain,
+                invokedCfg,
+                invokedMethod,
+                AnalyzerOptions,
+                InterproceduralAnalysisConfiguration,
+                WellKnownTypeProvider,
+                pointsToAnalysisResult,
+                InitialState,
+                Domain,
+                CancellationToken);
         protected override void ComputeHashCodePartsSpecific(ref Analyzer.Utilities.RoslynHashCode hashCode) { }
         protected override bool ComputeEqualsByHashCodeParts(
-            AbstractDataFlowAnalysisContext<EffectAnalysisData, EffectAnalysisContext,
-                DataFlowAnalysisResult<EffectBlockAnalysisResult, EffectAbstractValue>, EffectAbstractValue> other) =>
+            AbstractDataFlowAnalysisContext<EffectAnalysisData<TState>, EffectAnalysisContext<TState>,
+                DataFlowAnalysisResult<EffectBlockAnalysisResult<TState>, EffectAbstractValue>, EffectAbstractValue> other) =>
             ReferenceEquals(this, other);
     }
 
-    private sealed class EffectDataFlowOperationVisitor : DataFlowOperationVisitor<
-        EffectAnalysisData,
-        EffectAnalysisContext,
-        DataFlowAnalysisResult<EffectBlockAnalysisResult, EffectAbstractValue>,
+    private sealed class EffectDataFlowOperationVisitor<TState> : DataFlowOperationVisitor<
+        EffectAnalysisData<TState>,
+        EffectAnalysisContext<TState>,
+        DataFlowAnalysisResult<EffectBlockAnalysisResult<TState>, EffectAbstractValue>,
         EffectAbstractValue> {
-        private readonly EffectAnalysisContext context;
-        private readonly Dictionary<(IOperation Operation, string State), EffectFlowState> flowedOperations = [];
-        private readonly Dictionary<(int Ordinal, string State), EffectFlowState> completedBlocks = [];
+        private readonly EffectAnalysisContext<TState> context;
+        private readonly Dictionary<(IOperation Operation, string State), TState> flowedOperations = [];
+        private readonly Dictionary<(int Ordinal, string State), TState> completedBlocks = [];
 
-        internal EffectDataFlowOperationVisitor(EffectAnalysisContext context) : base(context) =>
+        internal EffectDataFlowOperationVisitor(EffectAnalysisContext<TState> context) : base(context) =>
             this.context = context;
 
-        public override EffectAnalysisData Flow(IOperation statement, BasicBlock block, EffectAnalysisData input) {
+        public override EffectAnalysisData<TState> Flow(IOperation statement, BasicBlock block, EffectAnalysisData<TState> input) {
             context.CancellationToken.ThrowIfCancellationRequested();
-            var cacheKey = (statement, input.State.Key);
+            var cacheKey = (statement, context.Domain.GetKey(input.State));
             if (!flowedOperations.TryGetValue(cacheKey, out var state)) {
                 state = context.Transfer(input.State, statement);
                 flowedOperations.Add(cacheKey, state);
             }
             return new(state);
         }
-        public override (EffectAnalysisData output, bool isFeasibleBranch) FlowBranch(
+        public override (EffectAnalysisData<TState> output, bool isFeasibleBranch) FlowBranch(
             BasicBlock source,
             BranchWithInfo branch,
-            EffectAnalysisData input) {
+            EffectAnalysisData<TState> input) {
             context.CancellationToken.ThrowIfCancellationRequested();
             // FlowBranch is called once per edge, but SharpProof evaluates a block branch value once.
-            var cacheKey = (source.Ordinal, input.State.Key);
+            var cacheKey = (source.Ordinal, context.Domain.GetKey(input.State));
             if (!completedBlocks.TryGetValue(cacheKey, out var state)) {
                 state = input.State;
                 if (branch.BranchValue != null) state = context.Transfer(state, branch.BranchValue);
@@ -214,17 +214,17 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             var conditionalSuccessor = source.ConditionKind != ControlFlowConditionKind.None &&
                                        branch.ControlFlowConditionKind == source.ConditionKind;
             state = context.Domain.Refine(state, branch.BranchValue, source.ConditionKind, conditionalSuccessor);
-            return (new(state), !state.IsUnreachable);
+            return (new(state), !context.Domain.IsUnreachable(state));
         }
         protected override EffectAbstractValue GetAbstractDefaultValue(ITypeSymbol? type) => EffectAbstractValue.Unknown;
-        protected override bool HasAnyAbstractValue(EffectAnalysisData data) => false;
+        protected override bool HasAnyAbstractValue(EffectAnalysisData<TState> data) => false;
         protected override void SetValueForParameterOnEntry(
             IParameterSymbol parameter,
             AnalysisEntity analysisEntity,
             ArgumentInfo<EffectAbstractValue>? argumentInfo) { }
         protected override void EscapeValueForParameterOnExit(IParameterSymbol parameter, AnalysisEntity analysisEntity) { }
         protected override void ResetCurrentAnalysisData() { }
-        protected override void UpdateValuesForAnalysisData(EffectAnalysisData analysisData) { }
+        protected override void UpdateValuesForAnalysisData(EffectAnalysisData<TState> analysisData) { }
         protected override void StopTrackingDataForParameter(IParameterSymbol parameter, AnalysisEntity analysisEntity) { }
         protected override void SetAbstractValueForArrayElementInitializer(
             IArrayCreationOperation arrayCreation,
@@ -243,35 +243,35 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             EffectAbstractValue assignedValue) { }
         protected override void ResetValueTypeInstanceAnalysisData(AnalysisEntity analysisEntity) { }
         protected override void ResetReferenceTypeInstanceAnalysisData(PointsToAbstractValue pointsToValue) { }
-        protected override EffectAnalysisData MergeAnalysisData(EffectAnalysisData value1, EffectAnalysisData value2) =>
+        protected override EffectAnalysisData<TState> MergeAnalysisData(EffectAnalysisData<TState> value1, EffectAnalysisData<TState> value2) =>
             new(context.Domain.Merge(value1.State, value2.State));
-        protected override EffectAnalysisData GetClonedAnalysisData(EffectAnalysisData value) => new(value.State);
-        public override EffectAnalysisData GetEmptyAnalysisData() => new(context.InitialState);
-        protected override EffectAnalysisData GetExitBlockOutputData(
-            DataFlowAnalysisResult<EffectBlockAnalysisResult, EffectAbstractValue> result) =>
+        protected override EffectAnalysisData<TState> GetClonedAnalysisData(EffectAnalysisData<TState> value) => new(value.State);
+        public override EffectAnalysisData<TState> GetEmptyAnalysisData() => new(context.InitialState);
+        protected override EffectAnalysisData<TState> GetExitBlockOutputData(
+            DataFlowAnalysisResult<EffectBlockAnalysisResult<TState>, EffectAbstractValue> result) =>
             new(result.ExitBlockOutput.State);
-        protected override bool Equals(EffectAnalysisData value1, EffectAnalysisData value2) =>
+        protected override bool Equals(EffectAnalysisData<TState> value1, EffectAnalysisData<TState> value2) =>
             context.Domain.Equivalent(value1.State, value2.State);
         protected override void ApplyMissingCurrentAnalysisDataForUnhandledExceptionData(
-            EffectAnalysisData analysisData,
+            EffectAnalysisData<TState> analysisData,
             ThrownExceptionInfo thrownExceptionInfo) { }
     }
 
-    private sealed class EffectDataFlowAnalysis(
-        EffectAnalysisDomain domain,
-        EffectDataFlowOperationVisitor visitor) : ForwardDataFlowAnalysis<
-            EffectAnalysisData,
-            EffectAnalysisContext,
-            DataFlowAnalysisResult<EffectBlockAnalysisResult, EffectAbstractValue>,
-            EffectBlockAnalysisResult,
+    private sealed class EffectDataFlowAnalysis<TState>(
+        EffectAnalysisDomain<TState> domain,
+        EffectDataFlowOperationVisitor<TState> visitor) : ForwardDataFlowAnalysis<
+            EffectAnalysisData<TState>,
+            EffectAnalysisContext<TState>,
+            DataFlowAnalysisResult<EffectBlockAnalysisResult<TState>, EffectAbstractValue>,
+            EffectBlockAnalysisResult<TState>,
             EffectAbstractValue>(domain, visitor) {
-        internal DataFlowAnalysisResult<EffectBlockAnalysisResult, EffectAbstractValue>? Run(EffectAnalysisContext context) =>
+        internal DataFlowAnalysisResult<EffectBlockAnalysisResult<TState>, EffectAbstractValue>? Run(EffectAnalysisContext<TState> context) =>
             TryGetOrComputeResultCore(context, cacheResult: false);
-        protected override DataFlowAnalysisResult<EffectBlockAnalysisResult, EffectAbstractValue> ToResult(
-            EffectAnalysisContext analysisContext,
-            DataFlowAnalysisResult<EffectBlockAnalysisResult, EffectAbstractValue> dataFlowAnalysisResult) =>
+        protected override DataFlowAnalysisResult<EffectBlockAnalysisResult<TState>, EffectAbstractValue> ToResult(
+            EffectAnalysisContext<TState> analysisContext,
+            DataFlowAnalysisResult<EffectBlockAnalysisResult<TState>, EffectAbstractValue> dataFlowAnalysisResult) =>
             dataFlowAnalysisResult;
-        protected override EffectBlockAnalysisResult ToBlockResult(BasicBlock basicBlock, EffectAnalysisData blockAnalysisData) =>
+        protected override EffectBlockAnalysisResult<TState> ToBlockResult(BasicBlock basicBlock, EffectAnalysisData<TState> blockAnalysisData) =>
             new(basicBlock, blockAnalysisData.State);
     }
 }

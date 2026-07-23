@@ -33,7 +33,8 @@ internal static class SymbolicReachabilityService {
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
-        var cfgState = SymbolicCfgProgramPointStateCollector.CollectForInitialEntryState(forStatement, semanticModel, cancellationToken);
+        var cfgState = CompilerProgramPointAnalysis.Collect(
+            forStatement, semanticModel, cancellationToken, forInitialEntry: true);
         return cfgState is { IsExact: true, Value: { } exactState }
             ? exactState
             : UnsupportedState(cfgState);
@@ -46,12 +47,8 @@ internal static class SymbolicReachabilityService {
         bool includeCurrentStatementCompletionFacts) {
         if (!includeCurrentStatementCompletionFacts)
             site = GetNextExecutableSite(site);
-        var cfgState = SymbolicCfgProgramPointStateCollector.CollectState(
-            site,
-            semanticModel,
-            cancellationToken,
-            initialState,
-            includeCurrentStatementCompletionFacts);
+        var cfgState = CompilerProgramPointAnalysis.Collect(
+            site, semanticModel, cancellationToken, initialState, includeCurrentStatementCompletionFacts);
         if (cfgState is { IsExact: true, Value: { } exactState })
             return exactState;
         return UnsupportedState(cfgState);

@@ -16,14 +16,6 @@ internal static class SymbolicFrameworkPostconditionLowerer {
         AddMemberNotNullConditions(after, expression, semanticModel, cancellationToken);
         return Exact(expression, before.ToImmutable(), after.ToImmutable());
     }
-    internal static SymbolicLoweringResult<SymbolicFrameworkPostconditionPlan> LowerMemberNotNull(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        var conditions = ImmutableArray.CreateBuilder<SymbolicCondition>();
-        AddMemberNotNullConditions(conditions, expression, semanticModel, cancellationToken);
-        return Exact(expression, [], conditions.ToImmutable());
-    }
     internal static bool IsCurrentInstanceInvocation(InvocationExpressionSyntax invocation) {
         var invokedExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(invocation.Expression);
         return invokedExpression is IdentifierNameSyntax or
