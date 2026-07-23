@@ -109,10 +109,25 @@ internal static class MethodEnsuresAnalyzer {
     }
     private static ImmutableArray<ContractAttributeCondition> CollectRequiresAssumptions(
         IMethodSymbol methodSymbol,
-        CancellationToken cancellationToken) => [.. RequiresContractHelpers.ValidContracts(methodSymbol, cancellationToken)
-            .Where(contract =>
-                ContractConditionHelpers.TryParse(contract.Condition, out _, out var conditionExpression) &&
-                !RequiresContractHelpers.ContainsResultReference(conditionExpression))];
+        CancellationToken cancellationToken) {
+        var assumptions = ImmutableArray.CreateBuilder<ContractAttributeCondition>();
+        foreach (var contract in RequiresContractHelpers.ValidContracts(methodSymbol, cancellationToken)) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!RequiresContractHelpers.TryRewriteForMethod(
+                    contract.Condition,
+                    contract.SourceMethod,
+                    methodSymbol,
+                    out var implementationCondition) ||
+                !ContractConditionHelpers.TryParse(
+                    implementationCondition,
+                    out _,
+                    out var conditionExpression) ||
+                RequiresContractHelpers.ContainsResultReference(conditionExpression))
+                continue;
+            assumptions.Add(contract with { Condition = implementationCondition });
+        }
+        return assumptions.ToImmutable();
+    }
     private static bool SupportsEnsuresPostconditions(SyntaxNode methodNode, out string reason) {
         if (methodNode is AccessorDeclarationSyntax accessor &&
             (accessor.IsKind(SyntaxKind.SetAccessorDeclaration) ||
