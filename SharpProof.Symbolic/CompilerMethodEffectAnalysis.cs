@@ -2444,6 +2444,17 @@ internal sealed class MethodEffectAnalysisSession(
         private static bool IsArrayGetValue(IMethodSymbol method) =>
             IsOneIndexArrayGetValue(method) || IsTwoIndexArrayGetValue(method) ||
             IsThreeIndexArrayGetValue(method) || IsIndexesArrayGetValue(method);
+        private static bool IsOneIndexArraySetValue(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "SetValue",
+                IsStatic: false,
+                Parameters.Length: 2,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Object } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2899,6 +2910,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Array", MethodKind.Ordinary, "GetValue")
                     when IsArrayGetValue(method) =>
                     SharpProofEffect.ReadsReceiverState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
+                ("System.Array", MethodKind.Ordinary, "SetValue")
+                    when IsOneIndexArraySetValue(method) =>
+                    SharpProofEffect.WritesReceiverState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -3025,6 +3039,15 @@ internal sealed class MethodEffectAnalysisSession(
                             "framework_array_get_value_model"),
                         MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                             "framework_array_get_value_model")
+                    ]
+                : IsOneIndexArraySetValue(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.IndexOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_array_set_value_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
+                            "framework_array_set_value_model"),
+                        MethodExceptionFact.Boundary("System.InvalidCastException", MethodExceptionSource.Contract,
+                            "framework_array_set_value_model")
                     ]
                 : effects == SharpProofEffect.Throws
                     ? [
