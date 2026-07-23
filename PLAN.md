@@ -654,7 +654,7 @@ Target: 35-45 net lines.
 
 - [x] In `FuzzCaseGenerator`, replace `BuildPureStringConcat` with the existing
       generic `CreateExpressionGenerator`: approximately 11 lines.
-- [ ] Delete the custom empty analyzer-config provider in
+- [x] Delete the custom empty analyzer-config provider in
       `FuzzAnalyzerConfiguration`; use `new AnalyzerOptions([])` from
       `FuzzRunner`: approximately 15 lines.
 - [ ] In `SymbolicCliTestHost`, remove `BuildGate` and double-check locking;

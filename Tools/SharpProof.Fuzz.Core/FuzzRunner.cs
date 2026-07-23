@@ -8,8 +8,7 @@ public static class FuzzRunner {
         CreateCompilationOptions(false);
     private static readonly CSharpCompilationOptions UnsafeCompilationOptions =
         CreateCompilationOptions(true);
-    private static readonly AnalyzerOptions SharedAnalyzerOptions =
-        new([], new FixedAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
+    private static readonly AnalyzerOptions SharedAnalyzerOptions = new([]);
     private static readonly CompilationWithAnalyzersOptions SharedCompilationWithAnalyzersOptions =
         new(SharedAnalyzerOptions, null, true, false, false);
     private static readonly Regex GeneratedTypeNameRegex =
