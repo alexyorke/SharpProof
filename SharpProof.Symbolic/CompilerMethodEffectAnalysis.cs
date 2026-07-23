@@ -2385,7 +2385,7 @@ internal sealed class MethodEffectAnalysisSession(
             IsSingleLengthArrayCreateInstance(method) || IsLengthsArrayCreateInstance(method) ||
             IsLengthsAndBoundsArrayCreateInstance(method) || IsTwoScalarLengthsArrayCreateInstance(method) ||
             IsThreeScalarLengthsArrayCreateInstance(method);
-        private static bool IsOneIndexArrayGetValue(IMethodSymbol method) =>
+        private static bool IsOneInt32IndexArrayGetValue(IMethodSymbol method) =>
             method is {
                 MethodKind: MethodKind.Ordinary,
                 Name: "GetValue",
@@ -2395,6 +2395,18 @@ internal sealed class MethodEffectAnalysisSession(
                 ContainingType.SpecialType: SpecialType.System_Array
             } &&
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsOneInt64IndexArrayGetValue(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "GetValue",
+                IsStatic: false,
+                Parameters.Length: 1,
+                ReturnType.SpecialType: SpecialType.System_Object,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int64 };
+        private static bool IsOneIndexArrayGetValue(IMethodSymbol method) =>
+            IsOneInt32IndexArrayGetValue(method) || IsOneInt64IndexArrayGetValue(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
