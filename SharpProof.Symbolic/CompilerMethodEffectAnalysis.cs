@@ -1667,7 +1667,22 @@ internal sealed class MethodEffectAnalysisSession(
                 FindProtocolProperty(getEnumerator.ReturnType, "Current")?.GetMethod, enumerator),
                 enumerator, site, ref state);
             InvokeCoreOrValue(ResolveProtocolImplementation(
-                FindProtocolMethod(getEnumerator.ReturnType, "Dispose", 0), enumerator), enumerator, site, ref state);
+                FindEnumerationDisposeMethod(getEnumerator.ReturnType), enumerator), enumerator, site, ref state);
+        }
+        private IMethodSymbol? FindEnumerationDisposeMethod(ITypeSymbol type) {
+            var disposable = session.Compilation.GetTypeByMetadataName("System.IDisposable");
+            var member = disposable?.GetMembers("Dispose").OfType<IMethodSymbol>().FirstOrDefault();
+            if (member == null) return null;
+            if (type is ITypeParameterSymbol parameter)
+                return parameter.ConstraintTypes.Any(constraint =>
+                    SymbolEqualityComparer.Default.Equals(constraint, disposable) ||
+                    constraint.AllInterfaces.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, disposable)))
+                    ? member
+                    : null;
+            if (type is not INamedTypeSymbol named) return null;
+            if (named.FindImplementationForInterfaceMember(member) is IMethodSymbol implementation) return implementation;
+            if (named.IsRefLikeType) return FindProtocolMethod(type, "Dispose", 0);
+            return type.IsReferenceType && !named.IsSealed ? member : null;
         }
         private void AnalyzeDisposal(
             ITypeSymbol? type,

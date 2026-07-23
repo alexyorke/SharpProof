@@ -852,7 +852,7 @@ public sealed class MethodEffectsTests {
                     foreach (var value in values) { }
                 }
             }
-            """, 11);
+            """, 10);
         Assert.Multiple(() => {
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.ReadsArgumentState), Is.True);
@@ -919,7 +919,7 @@ public sealed class MethodEffectsTests {
                     foreach (var value in values) { }
                 }
             }
-            """, 10);
+            """, 11);
         Assert.Multiple(() => {
             Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
