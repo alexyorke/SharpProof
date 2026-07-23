@@ -173,10 +173,18 @@ internal static class NullableContractAnalyzer {
         ImmutableArray<MethodNormalCompletion> completions) {
         var method = context.MethodSymbol;
         if (method.IsStatic || method.ContainingType == null) return;
-        foreach (var targetName in NullableFlowFacts.GetMemberNotNullTargets(method))
+        var sources = MethodContractHierarchy
+            .EnumerateSources(method, context.CancellationToken)
+            .ToImmutableArray();
+        foreach (var targetName in sources
+                     .SelectMany(source => NullableFlowFacts.GetMemberNotNullTargets(source))
+                     .Distinct(StringComparer.Ordinal))
             VerifyMemberTarget(context, session, completions, targetName, null);
         foreach (var expectedResult in new[] { false, true })
-            foreach (var targetName in NullableFlowFacts.GetMemberNotNullWhenTargets(method, expectedResult))
+            foreach (var targetName in sources
+                         .SelectMany(source =>
+                             NullableFlowFacts.GetMemberNotNullWhenTargets(source, expectedResult))
+                         .Distinct(StringComparer.Ordinal))
                 VerifyMemberTarget(context, session, completions, targetName, expectedResult);
     }
     private static void VerifyMemberTarget(

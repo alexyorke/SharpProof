@@ -243,16 +243,20 @@ internal static class NullableFlowFacts {
         member = null!;
         var memberName = NormalizeMemberTarget(target);
         if (memberName == null) return false;
-        var candidates = containingType.GetMembers(memberName)
-            .Where(candidate =>
-                candidate is IFieldSymbol or IPropertySymbol &&
-                !candidate.IsStatic &&
-                TryGetMemberType(candidate, out var type) &&
-                SymbolicTypeFacts.IsReferenceLikeType(type))
-            .ToArray();
-        if (candidates.Length != 1) return false;
-        member = candidates[0].OriginalDefinition;
-        return true;
+        for (var current = containingType; current != null; current = current.BaseType) {
+            var candidates = current.GetMembers(memberName)
+                .Where(candidate =>
+                    candidate is IFieldSymbol or IPropertySymbol &&
+                    !candidate.IsStatic &&
+                    TryGetMemberType(candidate, out var type) &&
+                    SymbolicTypeFacts.IsReferenceLikeType(type))
+                .ToArray();
+            if (candidates.Length == 0) continue;
+            if (candidates.Length != 1) return false;
+            member = candidates[0].OriginalDefinition;
+            return true;
+        }
+        return false;
     }
     internal static bool TryGetMemberType(ISymbol member, out ITypeSymbol type) {
         switch (member) {

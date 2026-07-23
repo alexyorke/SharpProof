@@ -186,6 +186,22 @@ public sealed class NullableContractVerificationTests {
             """);
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Contain("SP0042"));
     }
+    [Test]
+    public async Task BaseMemberNotNullContractAppliesToOverride() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public abstract class ValueSource {
+                protected string? Value;
+                [MemberNotNull(nameof(Value))]
+                public abstract void Initialize();
+            }
+            public sealed class EmptyValueSource : ValueSource {
+                public override void Initialize() { }
+            }
+            """);
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Contain("SP0043"));
+    }
     private static string Class(string members, string directives, bool isStatic = true) =>
         SemanticTestSource.Class(members, directives).Replace(
             "public class TestClass",
