@@ -1965,6 +1965,28 @@ public sealed class MethodEffectsTests {
             Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
         });
     }
+    [Test]
+    public void CollectionSpreadIncludesExtensionGetEnumeratorEffects() {
+        var result = Analyze("""
+            static class Globals { public static int Count; }
+            sealed class Enumerator {
+                public int Current => 0;
+                public bool MoveNext() => false;
+            }
+            sealed class Source { }
+            static class Extensions {
+                public static Enumerator GetEnumerator(this Source source) {
+                    Globals.Count++;
+                    return new();
+                }
+            }
+            class C { static int[] M(Source source) => [.. source]; }
+            """, 13);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
     [TestCase("unsafe static int M() { int* value = stackalloc int[1]; value[0] = 1; return value[0]; }")]
     [TestCase("static R M(R value) => value with { X = 2 }; readonly record struct R(int X);")]
     public void StackOnlyOperationsDoNotCreateManagedAllocationSites(string method) {
