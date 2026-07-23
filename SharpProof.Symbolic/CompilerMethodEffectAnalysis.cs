@@ -2260,6 +2260,9 @@ internal sealed class MethodEffectAnalysisSession(
                     SharpProofEffect.WritesArgumentState,
                 (_, MethodKind.Ordinary, "Fill") when IsSpanFill(method) =>
                     SharpProofEffect.WritesReceiverState,
+                ("System.Span<T>", MethodKind.Ordinary, "Clear")
+                    when method.Parameters.Length == 0 =>
+                    SharpProofEffect.WritesReceiverState,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
