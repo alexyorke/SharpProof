@@ -1869,6 +1869,14 @@ internal sealed class MethodEffectAnalysisSession(
             method is { Name: "Reverse", Parameters.Length: 1 } &&
             method.ContainingType.ToDisplayString() == "System.MemoryExtensions" &&
             method.Parameters[0].Type.OriginalDefinition.ToDisplayString() == "System.Span<T>";
+        private static bool IsPureSpanOverlaps(IMethodSymbol method) =>
+            method is { Name: "Overlaps", Parameters.Length: 2 } &&
+            method.ContainingType.ToDisplayString() == "System.MemoryExtensions" &&
+            method.Parameters[0].Type is INamedTypeSymbol { TypeArguments.Length: 1 } left &&
+            method.Parameters[1].Type is INamedTypeSymbol { TypeArguments.Length: 1 } right &&
+            left.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
+            right.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
+            SymbolEqualityComparer.Default.Equals(left.TypeArguments[0], right.TypeArguments[0]);
         private static bool IsMemorySpanProperty(IPropertySymbol property) =>
             property.Name == "Span" &&
             property.ContainingType.OriginalDefinition.ToDisplayString() is
@@ -2273,6 +2281,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.MemoryExtensions", MethodKind.Ordinary, "Reverse")
                     when IsSpanReverse(method) =>
                     SharpProofEffect.WritesArgumentState,
+                ("System.MemoryExtensions", MethodKind.Ordinary, "Overlaps")
+                    when IsPureSpanOverlaps(method) =>
+                    SharpProofEffect.None,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
