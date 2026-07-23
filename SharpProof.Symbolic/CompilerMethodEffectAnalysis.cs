@@ -1415,6 +1415,10 @@ internal sealed class MethodEffectAnalysisSession(
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
                 return spanSource.WithExactType(target.ReturnType).AsDefinitelyNonNull();
             }
+            if (IsMemoryViewSlice(target)) {
+                effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+                return receiver.WithExactType(target.ReturnType).AsDefinitelyNonNull();
+            }
             if (target.MethodKind == MethodKind.LocalFunction) {
                 var declaration = target.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(session.CancellationToken);
                 if (declaration != null && semanticModel.GetOperation(declaration, session.CancellationToken) is ILocalFunctionOperation local) {
@@ -1845,6 +1849,14 @@ internal sealed class MethodEffectAnalysisSession(
                 "System.Memory<T>" or "System.ReadOnlyMemory<T>" &&
             property.Type.OriginalDefinition.ToDisplayString() is
                 "System.Span<T>" or "System.ReadOnlySpan<T>";
+        private static bool IsMemoryViewSlice(IMethodSymbol method) =>
+            method is { Name: "Slice", IsStatic: false } &&
+            method.ContainingType.OriginalDefinition.ToDisplayString() is
+                "System.Span<T>" or "System.ReadOnlySpan<T>" or
+                "System.Memory<T>" or "System.ReadOnlyMemory<T>" &&
+            method.ReturnType.OriginalDefinition.ToDisplayString() is
+                "System.Span<T>" or "System.ReadOnlySpan<T>" or
+                "System.Memory<T>" or "System.ReadOnlyMemory<T>";
         private static bool TryGetMemoryViewSource(
             IMethodSymbol method,
             EffectFlowValue receiver,

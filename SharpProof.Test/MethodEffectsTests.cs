@@ -696,6 +696,41 @@ public sealed class MethodEffectsTests {
             purity: SharpProofVerdict.Proven,
             allocationFree: SharpProofVerdict.Proven,
             forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("MemorySliceMutationWritesMemoryArgumentState", """
+            class C {
+                static void M(System.Memory<int> memory) {
+                    var slice = memory.Slice(1);
+                    slice.Span[0] = 1;
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.WritesFreshOwnedState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("SpanSliceMutationWritesSpanArgumentState", """
+            class C {
+                static void M(System.Span<int> values) {
+                    var slice = values.Slice(1);
+                    slice[0] = 1;
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.WritesFreshOwnedState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("ReadOnlyMemorySliceReadIsPureAndAllocationFree", """
+            class C {
+                static int M(System.ReadOnlyMemory<int> values) {
+                    var slice = values.Slice(1);
+                    return slice.Span[0];
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
