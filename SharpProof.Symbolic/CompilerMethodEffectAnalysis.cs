@@ -1850,8 +1850,8 @@ internal sealed class MethodEffectAnalysisSession(
             } span &&
             span.OriginalDefinition.ToDisplayString() == "System.Span<T>" &&
             span.TypeArguments[0].SpecialType == SpecialType.System_Char;
-        private static bool IsSpanCopyTo(IMethodSymbol method) =>
-            method is { Name: "CopyTo", Parameters.Length: 1, ContainingType.TypeArguments.Length: 1 } &&
+        private static bool IsSpanCopy(IMethodSymbol method) =>
+            method is { Name: "CopyTo" or "TryCopyTo", Parameters.Length: 1, ContainingType.TypeArguments.Length: 1 } &&
             method.ContainingType.OriginalDefinition.ToDisplayString() is
                 "System.Span<T>" or "System.ReadOnlySpan<T>" &&
             method.Parameters[0].Type is INamedTypeSymbol { TypeArguments.Length: 1 } destination &&
@@ -2251,7 +2251,7 @@ internal sealed class MethodEffectAnalysisSession(
                 (_, MethodKind.Ordinary, "CopyTo")
                     when type?.SpecialType == SpecialType.System_String && HasSingleCharSpanParameter(method) =>
                     SharpProofEffect.WritesArgumentState,
-                (_, MethodKind.Ordinary, "CopyTo") when IsSpanCopyTo(method) =>
+                (_, MethodKind.Ordinary, "CopyTo" or "TryCopyTo") when IsSpanCopy(method) =>
                     SharpProofEffect.WritesArgumentState,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
@@ -2280,7 +2280,7 @@ internal sealed class MethodEffectAnalysisSession(
             (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
             (method.ContainingType?.SpecialType == SpecialType.System_String &&
              method.Name == "CopyTo" && HasSingleCharSpanParameter(method)) ||
-            IsSpanCopyTo(method)
+            IsSpanCopy(method)
                 ? [0]
                 : [];
         private static ImmutableArray<int> FrameworkReadArgumentOrdinals(IMethodSymbol method) =>
