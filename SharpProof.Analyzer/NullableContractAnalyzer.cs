@@ -176,25 +176,39 @@ internal static class NullableContractAnalyzer {
         var sources = MethodContractHierarchy
             .EnumerateSources(method, context.CancellationToken)
             .ToImmutableArray();
-        foreach (var targetName in sources
-                     .SelectMany(source => NullableFlowFacts.GetMemberNotNullTargets(source))
-                     .Distinct(StringComparer.Ordinal))
-            VerifyMemberTarget(context, session, completions, targetName, null);
-        foreach (var expectedResult in new[] { false, true })
-            foreach (var targetName in sources
-                         .SelectMany(source =>
-                             NullableFlowFacts.GetMemberNotNullWhenTargets(source, expectedResult))
-                         .Distinct(StringComparer.Ordinal))
-                VerifyMemberTarget(context, session, completions, targetName, expectedResult);
+        var seenMembers = new HashSet<ISymbol>(SymbolEq.Default);
+        foreach (var source in sources)
+            foreach (var targetName in NullableFlowFacts.GetMemberNotNullTargets(source))
+                if (source.ContainingType != null &&
+                    NullableFlowFacts.TryResolveInstanceMemberTarget(source.ContainingType, targetName, out var member) &&
+                    seenMembers.Add(member.OriginalDefinition))
+                    VerifyMemberTarget(
+                        context, session, completions, targetName, member, source.ContainingType, null);
+        foreach (var expectedResult in new[] { false, true }) {
+            seenMembers.Clear();
+            foreach (var source in sources)
+                foreach (var targetName in NullableFlowFacts.GetMemberNotNullWhenTargets(source, expectedResult))
+                    if (source.ContainingType != null &&
+                        NullableFlowFacts.TryResolveInstanceMemberTarget(source.ContainingType, targetName, out var member) &&
+                        seenMembers.Add(member.OriginalDefinition))
+                        VerifyMemberTarget(
+                            context,
+                            session,
+                            completions,
+                            targetName,
+                            member,
+                            source.ContainingType,
+                            expectedResult);
+        }
     }
     private static void VerifyMemberTarget(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
         ImmutableArray<MethodNormalCompletion> completions,
         string targetName,
+        ISymbol member,
+        INamedTypeSymbol contractContainingType,
         bool? expectedResult) {
-        if (!NullableFlowFacts.TryResolveInstanceMemberTarget(context.MethodSymbol.ContainingType, targetName, out var member))
-            return;
         // User-defined getters are not necessarily stable or repeatable. Auto-properties
         // have field-like storage and can use the same assignment proof as fields.
         if (member is IPropertySymbol property &&
@@ -207,7 +221,7 @@ internal static class NullableContractAnalyzer {
                 "user-defined property getters are not stable storage"));
             return;
         }
-        var target = "this." + EscapeIdentifier(member.Name) + " != null";
+        var target = FormatMemberTarget(context.MethodSymbol, member, contractContainingType);
         var contract = expectedResult.HasValue
             ? "[MemberNotNullWhen(" + FormatBoolean(expectedResult.Value) + ", \"" +
               targetName + "\")]"
@@ -230,6 +244,15 @@ internal static class NullableContractAnalyzer {
                 !HasVisibleAssignmentToMember(context, member),
                 false);
         }
+    }
+    private static string FormatMemberTarget(
+        IMethodSymbol method,
+        ISymbol member,
+        INamedTypeSymbol contractContainingType) {
+        var receiver = SymbolEq.AreEqual(method.ContainingType, contractContainingType)
+            ? "this"
+            : "((" + contractContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ")this)";
+        return receiver + "." + EscapeIdentifier(member.Name) + " != null";
     }
     private static bool IsAutoProperty(IPropertySymbol property, CancellationToken cancellationToken) {
         foreach (var syntaxReference in property.DeclaringSyntaxReferences) {

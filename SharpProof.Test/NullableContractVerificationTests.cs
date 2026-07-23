@@ -202,6 +202,39 @@ public sealed class NullableContractVerificationTests {
             """);
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Contain("SP0043"));
     }
+    [Test]
+    public async Task HiddenDerivedMemberDoesNotSatisfyBaseMemberNotNullContract() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public abstract class ValueSource {
+                protected string? Value;
+                [MemberNotNull(nameof(Value))]
+                public abstract void Initialize();
+            }
+            public sealed class HiddenValueSource : ValueSource {
+                private new string? Value;
+                public override void Initialize() => Value = "derived";
+            }
+            """);
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Contain("SP0043"));
+    }
+    [Test]
+    public async Task BaseMemberAssignmentSatisfiesInheritedMemberNotNullContract() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public abstract class ValueSource {
+                protected string? Value;
+                [MemberNotNull(nameof(Value))]
+                public abstract void Initialize();
+            }
+            public sealed class InitializedValueSource : ValueSource {
+                public override void Initialize() => base.Value = "base";
+            }
+            """);
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Not.Contain("SP0043"));
+    }
     private static string Class(string members, string directives, bool isStatic = true) =>
         SemanticTestSource.Class(members, directives).Replace(
             "public class TestClass",
