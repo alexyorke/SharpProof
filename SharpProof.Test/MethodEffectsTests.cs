@@ -917,6 +917,17 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.ReadsStaticState | SharpProofEffect.WritesArgumentState,
             forbidden: SharpProofEffect.WritesStaticState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("InterlockedCompareExchangeWritesOnlyRefArgument", """
+            static class Globals { public static int Value; public static int Comparand; }
+            class C {
+                static int M(ref int target) => System.Threading.Interlocked.CompareExchange(
+                    ref target, Globals.Value, Globals.Comparand);
+            }
+            """, 3,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsStaticState | SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.WritesStaticState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
