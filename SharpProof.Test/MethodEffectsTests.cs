@@ -740,6 +740,15 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Disproven,
             required: SharpProofEffect.Allocates,
             forbidden: SharpProofEffect.Unknown);
+        yield return Effect("StringReplaceIsPureKnownAllocation", """
+            class C {
+                static string M(string value) => value.Replace("a", "b");
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.Allocates,
+            forbidden: SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
