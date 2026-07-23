@@ -1421,6 +1421,10 @@ internal sealed class MethodEffectAnalysisSession(
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
                 return refSpanSource;
             }
+            if (TryGetReinterpretedSpanSource(target, values, out var reinterpretedSpanSource)) {
+                effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+                return reinterpretedSpanSource;
+            }
             if (IsMemoryViewSlice(target)) {
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
                 return receiver.WithExactType(target.ReturnType).AsDefinitelyNonNull();
@@ -1953,6 +1957,27 @@ internal sealed class MethodEffectAnalysisSession(
                 returnType.OriginalDefinition.ToDisplayString() is not
                     ("System.Span<T>" or "System.ReadOnlySpan<T>") ||
                 !SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, returnType.TypeArguments[0]) ||
+                arguments.Count == 0)
+                return false;
+            source = arguments[0].WithExactType(method.ReturnType).AsDefinitelyNonNull();
+            return true;
+        }
+        private static bool TryGetReinterpretedSpanSource(
+            IMethodSymbol method,
+            IReadOnlyList<EffectFlowValue> arguments,
+            out EffectFlowValue source) {
+            source = EffectFlowValue.None;
+            if (method is not {
+                Name: "AsBytes",
+                Parameters.Length: 1,
+                ReturnType: INamedTypeSymbol { TypeArguments.Length: 1 } returnType
+            } ||
+                method.ContainingType.ToDisplayString() != "System.Runtime.InteropServices.MemoryMarshal" ||
+                method.Parameters[0].Type is not INamedTypeSymbol { TypeArguments.Length: 1 } inputType ||
+                returnType.TypeArguments[0].SpecialType != SpecialType.System_Byte ||
+                inputType.OriginalDefinition.ToDisplayString() != returnType.OriginalDefinition.ToDisplayString() ||
+                returnType.OriginalDefinition.ToDisplayString() is not
+                    ("System.Span<T>" or "System.ReadOnlySpan<T>") ||
                 arguments.Count == 0)
                 return false;
             source = arguments[0].WithExactType(method.ReturnType).AsDefinitelyNonNull();
