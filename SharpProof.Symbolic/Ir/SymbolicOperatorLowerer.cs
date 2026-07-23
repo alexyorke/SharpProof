@@ -39,33 +39,19 @@ internal static class SymbolicOperatorLowerer {
     internal static bool IsEqualityExpression(BinaryExpressionSyntax binaryExpression)
         => binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
                binaryExpression.IsKind(SyntaxKind.NotEqualsExpression);
-    internal static bool TryGetRelationOperator(SyntaxKind kind, out SymbolicRelationOperator op) {
-        switch (kind) {
-            case SyntaxKind.EqualsExpression:
-                op = SymbolicRelationOperator.Equal;
-                return true;
-            case SyntaxKind.NotEqualsExpression:
-                op = SymbolicRelationOperator.NotEqual;
-                return true;
-            case SyntaxKind.LessThanExpression:
-                op = SymbolicRelationOperator.LessThan;
-                return true;
-            case SyntaxKind.LessThanOrEqualExpression:
-                op = SymbolicRelationOperator.LessThanOrEqual;
-                return true;
-            case SyntaxKind.GreaterThanExpression:
-                op = SymbolicRelationOperator.GreaterThan;
-                return true;
-            case SyntaxKind.GreaterThanOrEqualExpression:
-                op = SymbolicRelationOperator.GreaterThanOrEqual;
-                return true;
-            default:
-                op = default;
-                return false;
-        }
-    }
-    internal static bool TryGetRelationalPatternOperator(SyntaxKind tokenKind, bool negate, out SymbolicRelationOperator op) {
-        op = tokenKind switch {
+    internal static bool TryGetRelationOperator(SyntaxKind kind, out SymbolicRelationOperator op) =>
+        TryMap(kind switch {
+            SyntaxKind.EqualsExpression => SymbolicRelationOperator.Equal,
+            SyntaxKind.NotEqualsExpression => SymbolicRelationOperator.NotEqual,
+            SyntaxKind.LessThanExpression => SymbolicRelationOperator.LessThan,
+            SyntaxKind.LessThanOrEqualExpression => SymbolicRelationOperator.LessThanOrEqual,
+            SyntaxKind.GreaterThanExpression => SymbolicRelationOperator.GreaterThan,
+            SyntaxKind.GreaterThanOrEqualExpression => SymbolicRelationOperator.GreaterThanOrEqual,
+            _ => (SymbolicRelationOperator?)null
+        }, out op);
+    internal static bool TryGetRelationalPatternOperator(
+        SyntaxKind tokenKind, bool negate, out SymbolicRelationOperator op) =>
+        TryMap(tokenKind switch {
             SyntaxKind.GreaterThanToken => negate
                 ? SymbolicRelationOperator.LessThanOrEqual
                 : SymbolicRelationOperator.GreaterThan,
@@ -78,57 +64,27 @@ internal static class SymbolicOperatorLowerer {
             SyntaxKind.LessThanEqualsToken => negate
                 ? SymbolicRelationOperator.GreaterThan
                 : SymbolicRelationOperator.LessThanOrEqual,
-            _ => default
-        };
-        return tokenKind is SyntaxKind.GreaterThanToken or
-            SyntaxKind.GreaterThanEqualsToken or
-            SyntaxKind.LessThanToken or
-            SyntaxKind.LessThanEqualsToken;
-    }
-    internal static bool TryGetBinaryTermOperator(SyntaxKind kind, out SymbolicBinaryTermOperator op) {
-        switch (kind) {
-            case SyntaxKind.AddExpression:
-                op = SymbolicBinaryTermOperator.Add;
-                return true;
-            case SyntaxKind.SubtractExpression:
-                op = SymbolicBinaryTermOperator.Subtract;
-                return true;
-            case SyntaxKind.MultiplyExpression:
-                op = SymbolicBinaryTermOperator.Multiply;
-                return true;
-            case SyntaxKind.DivideExpression:
-                op = SymbolicBinaryTermOperator.Divide;
-                return true;
-            case SyntaxKind.ModuloExpression:
-                op = SymbolicBinaryTermOperator.Remainder;
-                return true;
-            default:
-                op = default;
-                return false;
-        }
-    }
-    internal static bool TryGetBinaryTermOperator(SmtIntegerBinaryOperator smtOperator, out SymbolicBinaryTermOperator op) {
-        switch (smtOperator) {
-            case SmtIntegerBinaryOperator.Add:
-                op = SymbolicBinaryTermOperator.Add;
-                return true;
-            case SmtIntegerBinaryOperator.Subtract:
-                op = SymbolicBinaryTermOperator.Subtract;
-                return true;
-            case SmtIntegerBinaryOperator.Multiply:
-                op = SymbolicBinaryTermOperator.Multiply;
-                return true;
-            case SmtIntegerBinaryOperator.Divide:
-                op = SymbolicBinaryTermOperator.Divide;
-                return true;
-            case SmtIntegerBinaryOperator.Remainder:
-                op = SymbolicBinaryTermOperator.Remainder;
-                return true;
-            default:
-                op = default;
-                return false;
-        }
-    }
+            _ => (SymbolicRelationOperator?)null
+        }, out op);
+    internal static bool TryGetBinaryTermOperator(SyntaxKind kind, out SymbolicBinaryTermOperator op) =>
+        TryMap(kind switch {
+            SyntaxKind.AddExpression => SymbolicBinaryTermOperator.Add,
+            SyntaxKind.SubtractExpression => SymbolicBinaryTermOperator.Subtract,
+            SyntaxKind.MultiplyExpression => SymbolicBinaryTermOperator.Multiply,
+            SyntaxKind.DivideExpression => SymbolicBinaryTermOperator.Divide,
+            SyntaxKind.ModuloExpression => SymbolicBinaryTermOperator.Remainder,
+            _ => (SymbolicBinaryTermOperator?)null
+        }, out op);
+    internal static bool TryGetBinaryTermOperator(
+        SmtIntegerBinaryOperator smtOperator, out SymbolicBinaryTermOperator op) =>
+        TryMap(smtOperator switch {
+            SmtIntegerBinaryOperator.Add => SymbolicBinaryTermOperator.Add,
+            SmtIntegerBinaryOperator.Subtract => SymbolicBinaryTermOperator.Subtract,
+            SmtIntegerBinaryOperator.Multiply => SymbolicBinaryTermOperator.Multiply,
+            SmtIntegerBinaryOperator.Divide => SymbolicBinaryTermOperator.Divide,
+            SmtIntegerBinaryOperator.Remainder => SymbolicBinaryTermOperator.Remainder,
+            _ => (SymbolicBinaryTermOperator?)null
+        }, out op);
     internal static SmtIntegerBinaryOperator GetSmtIntegerBinaryOperator(SymbolicBinaryTermOperator op) => op switch {
         SymbolicBinaryTermOperator.Add => SmtIntegerBinaryOperator.Add,
         SymbolicBinaryTermOperator.Subtract => SmtIntegerBinaryOperator.Subtract,
@@ -137,4 +93,8 @@ internal static class SymbolicOperatorLowerer {
         SymbolicBinaryTermOperator.Remainder => SmtIntegerBinaryOperator.Remainder,
         _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
     };
+    private static bool TryMap<T>(T? candidate, out T value) where T : struct {
+        value = candidate.GetValueOrDefault();
+        return candidate.HasValue;
+    }
 }

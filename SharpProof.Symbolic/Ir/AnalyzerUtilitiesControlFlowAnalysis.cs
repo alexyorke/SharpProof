@@ -150,6 +150,8 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             if (Transfers >= MaxTransfers) Truncated = true;
             return Domain.Transfer(state, operation);
         }
+        // AnalyzerUtilities requests a context for every unvisited local function on method exit.
+        // The result callback is intentionally null because SharpProof analyzes callable bodies itself.
         public override EffectAnalysisContext<TState> ForkForInterproceduralAnalysis(
             IMethodSymbol invokedMethod,
             ControlFlowGraph invokedCfg,
@@ -158,8 +160,6 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             DataFlowAnalysisResult<ValueContentBlockAnalysisResult, ValueContentAbstractValue>? valueContentAnalysisResult,
             InterproceduralAnalysisData<EffectAnalysisData<TState>, EffectAnalysisContext<TState>, EffectAbstractValue>?
                 interproceduralAnalysisData) => new(
-                // AnalyzerUtilities requests a context for every unvisited local function on method exit.
-                // The result callback is intentionally null because SharpProof analyzes callable bodies itself.
                 (EffectAbstractValueDomain)ValueDomain,
                 invokedCfg,
                 invokedMethod,

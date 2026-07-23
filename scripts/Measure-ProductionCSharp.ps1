@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter()][int]$MaximumLines = 27866,
+    [Parameter()][int]$MaximumLines = 20000,
     [Parameter()][switch]$Json
 )
 
