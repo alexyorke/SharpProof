@@ -2868,6 +2868,16 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                        SharpProofEffect.Allocates | SharpProofEffect.Throws | SharpProofEffect.Unknown);
+        yield return Effect("MathFusedMultiplyAddIsPureAndAllocationFree", """
+            class C {
+                static double M(double left, double right, double addend) =>
+                    System.Math.FusedMultiplyAdd(left, right, addend);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                       SharpProofEffect.Allocates | SharpProofEffect.Throws | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
