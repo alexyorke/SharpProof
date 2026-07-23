@@ -25,6 +25,10 @@ internal static class SymbolicStringLowerer {
             _ => (SymbolicStringPredicateKind?)null
         };
         if (predicate == null) return false;
+        if (invocation.ArgumentList.Arguments.Count == 1 &&
+            predicate != SymbolicStringPredicateKind.Contains &&
+            method.Parameters[0].Type.SpecialType != SpecialType.System_Char)
+            return false;
         var ignoreCase = false;
         if (invocation.ArgumentList.Arguments.Count == 2 &&
             (!SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 1, out var comparisonExpression) ||
