@@ -196,4 +196,15 @@ public sealed class UnknownContractDiagnosticTests {
             """)).Select(static diagnostic => diagnostic.Id);
         Assert.That(diagnosticIds, Does.Not.Contain("SP0022"));
     }
+    [Test]
+    public async Task InterfaceZeroAllocationsContractDoesNotVerifyMissingBody() {
+        var diagnosticIds = (await AnalyzerTestHost.GetDiagnosticsAsync("""
+            using SharpProof.Attributes;
+            public interface IWorker {
+                [ZeroAllocations]
+                void Work();
+            }
+            """)).Select(static diagnostic => diagnostic.Id);
+        Assert.That(diagnosticIds, Does.Not.Contain("SP0045"));
+    }
 }

@@ -6,6 +6,7 @@ internal static class MethodAllocationAnalyzer {
         if (!MethodContractHierarchy.EnumerateSources(method, context.CancellationToken)
                 .Any(source => SharpProofAttributeIdentityPolicy.HasAttribute(source, "ZeroAllocationsAttribute")))
             return;
+        if (method.IsAbstract) return;
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         if (effects.AllocationFree == SharpProofVerdict.Unknown) {
             var reason = effects.UnknownReasons.IsDefaultOrEmpty
