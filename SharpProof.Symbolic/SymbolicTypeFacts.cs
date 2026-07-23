@@ -1,22 +1,27 @@
 namespace SharpProof.Symbolic;
 internal static class SymbolicTypeFacts {
-    internal static bool IsBuiltInIntegralType(ITypeSymbol? typeSymbol) => typeSymbol?.SpecialType is
-            SpecialType.System_Char or
-            SpecialType.System_SByte or
-            SpecialType.System_Byte or
-            SpecialType.System_Int16 or
-            SpecialType.System_UInt16 or
-            SpecialType.System_Int32 or
-            SpecialType.System_UInt32 or
-            SpecialType.System_Int64 or
-            SpecialType.System_UInt64;
-    internal static bool IsBuiltInNumericSpecialType(SpecialType type) => type is
-        SpecialType.System_SByte or SpecialType.System_Byte or SpecialType.System_Int16 or
-        SpecialType.System_UInt16 or SpecialType.System_Char or SpecialType.System_Int32 or
-        SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64 or
-        SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
+    internal static bool IsBuiltInIntegralType(ITypeSymbol? typeSymbol) =>
+        TryGetIntegralShape(typeSymbol?.SpecialType ?? SpecialType.None, out _, out _);
+    internal static bool IsBuiltInNumericSpecialType(SpecialType type) =>
+        TryGetIntegralShape(type, out _, out _) ||
+        type is SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
     internal static bool IsBuiltInIntegralOrEnumType(ITypeSymbol? typeSymbol) =>
         IsBuiltInIntegralType(typeSymbol) || typeSymbol?.TypeKind == TypeKind.Enum;
+    internal static bool TryGetIntegralShape(SpecialType specialType, out bool signed, out int bits) {
+        var shape = specialType switch {
+            SpecialType.System_SByte => (true, 8),
+            SpecialType.System_Byte => (false, 8),
+            SpecialType.System_Int16 => (true, 16),
+            SpecialType.System_UInt16 or SpecialType.System_Char => (false, 16),
+            SpecialType.System_Int32 => (true, 32),
+            SpecialType.System_UInt32 => (false, 32),
+            SpecialType.System_Int64 => (true, 64),
+            SpecialType.System_UInt64 => (false, 64),
+            _ => ((bool, int)?)null
+        };
+        (signed, bits) = shape.GetValueOrDefault();
+        return shape.HasValue;
+    }
     public static string? GetFullMetadataName(INamedTypeSymbol? type) {
         if (type == null) return null;
         var namespaceName = type.ContainingNamespace?.IsGlobalNamespace == false
@@ -93,10 +98,9 @@ internal static class SymbolicTypeFacts {
                    Name: "Value",
                    ContainingType.OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
                };
-    public static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol) => typeSymbol?.SpecialType is
-        SpecialType.System_Byte or SpecialType.System_SByte or SpecialType.System_Int16 or
-        SpecialType.System_UInt16 or SpecialType.System_Int32 or SpecialType.System_UInt32 or
-        SpecialType.System_Int64 or SpecialType.System_UInt64 or SpecialType.System_Decimal ||
+    public static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol) =>
+        (IsBuiltInIntegralType(typeSymbol) && typeSymbol?.SpecialType != SpecialType.System_Char) ||
+        typeSymbol?.SpecialType == SpecialType.System_Decimal ||
         IsBigIntegerType(typeSymbol);
     /// <summary>
     /// The single owner of the BigInteger check. Matched on namespace and name rather
@@ -106,20 +110,14 @@ internal static class SymbolicTypeFacts {
         typeSymbol != null &&
         string.Equals(typeSymbol.ContainingNamespace?.ToDisplayString(), "System.Numerics", StringComparison.Ordinal) &&
         string.Equals(typeSymbol.Name, "BigInteger", StringComparison.Ordinal);
-    public static bool TryGetCheckedIntegralRange(ITypeSymbol? typeSymbol, out long minValue, out long maxValue) {
-        if (typeSymbol?.SpecialType is not (SpecialType.System_Int32 or
-            SpecialType.System_UInt32 or
-            SpecialType.System_Int64)) {
-            minValue = default;
-            maxValue = default;
-            return false;
-        }
-        return TryGetCheckedNumericConversionRange(typeSymbol, out minValue, out maxValue);
-    }
+    public static bool TryGetCheckedIntegralRange(ITypeSymbol? typeSymbol, out long minValue, out long maxValue) =>
+        TryGetCheckedNumericConversionRange(typeSymbol, out minValue, out maxValue) &&
+               typeSymbol?.SpecialType is
+                   SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Int64;
     public static bool TryGetBoundedIntegralRange(ITypeSymbol? typeSymbol, out long minValue, out long maxValue)
         => TryGetCheckedNumericConversionRange(typeSymbol, out minValue, out maxValue);
     public static bool TryGetCheckedNumericConversionRange(ITypeSymbol? typeSymbol, out long minValue, out long maxValue) {
-        (minValue, maxValue) = typeSymbol?.SpecialType switch {
+        var range = typeSymbol?.SpecialType switch {
             SpecialType.System_Char => (char.MinValue, char.MaxValue),
             SpecialType.System_SByte => (sbyte.MinValue, sbyte.MaxValue),
             SpecialType.System_Byte => (byte.MinValue, byte.MaxValue),
@@ -128,11 +126,10 @@ internal static class SymbolicTypeFacts {
             SpecialType.System_Int32 => (int.MinValue, int.MaxValue),
             SpecialType.System_UInt32 => (uint.MinValue, uint.MaxValue),
             SpecialType.System_Int64 => (long.MinValue, long.MaxValue),
-            _ => (default, default)
+            _ => ((long, long)?)null
         };
-        return typeSymbol?.SpecialType is SpecialType.System_Char or SpecialType.System_SByte or
-            SpecialType.System_Byte or SpecialType.System_Int16 or SpecialType.System_UInt16 or
-            SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Int64;
+        (minValue, maxValue) = range.GetValueOrDefault();
+        return range.HasValue;
     }
     private static bool IsKnownReferenceTypeParameter(ITypeParameterSymbol typeParameter, HashSet<ITypeParameterSymbol> visited) {
         if (!visited.Add(typeParameter)) return false;

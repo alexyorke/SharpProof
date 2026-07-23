@@ -102,8 +102,8 @@ internal static class SymbolicConversionLowerer {
         if (sourceType == null || resolvedTargetType == null) return false;
         targetType = resolvedTargetType;
         return
-               TryGetIntegralShape(sourceType.SpecialType, out _, out _) &&
-               TryGetIntegralShape(targetType.SpecialType, out _, out _);
+               SymbolicTypeFacts.TryGetIntegralShape(sourceType.SpecialType, out _, out _) &&
+               SymbolicTypeFacts.TryGetIntegralShape(targetType.SpecialType, out _, out _);
     }
     internal static bool TryLowerReferenceAsTerm(
         BinaryExpressionSyntax asExpression,
@@ -261,7 +261,7 @@ internal static class SymbolicConversionLowerer {
         out SymbolicTerm term) {
         term = null!;
         if (!SymbolicTypeFacts.IsBuiltInNumericSpecialType(sourceType.SpecialType) ||
-            !TryGetIntegralShape(targetType.SpecialType, out _, out _))
+            !SymbolicTypeFacts.TryGetIntegralShape(targetType.SpecialType, out _, out _))
             return false;
         string operandIdentity;
         if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var operand)) {
@@ -284,27 +284,12 @@ internal static class SymbolicConversionLowerer {
             sourceType = enumUnderlyingType;
         if (targetType is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } targetUnderlyingType })
             targetType = targetUnderlyingType;
-        if (!TryGetIntegralShape(sourceType.SpecialType, out var sourceSigned, out var sourceBits) ||
-            !TryGetIntegralShape(targetType.SpecialType, out var targetSigned, out var targetBits))
+        if (!SymbolicTypeFacts.TryGetIntegralShape(sourceType.SpecialType, out var sourceSigned, out var sourceBits) ||
+            !SymbolicTypeFacts.TryGetIntegralShape(targetType.SpecialType, out var targetSigned, out var targetBits))
             return false;
         if (sourceSigned) return targetSigned && targetBits >= sourceBits;
         return targetSigned
             ? targetBits > sourceBits
             : targetBits >= sourceBits;
-    }
-    private static bool TryGetIntegralShape(SpecialType specialType, out bool signed, out int bits) {
-        var shape = specialType switch {
-            SpecialType.System_SByte => (true, 8),
-            SpecialType.System_Byte => (false, 8),
-            SpecialType.System_Int16 => (true, 16),
-            SpecialType.System_UInt16 or SpecialType.System_Char => (false, 16),
-            SpecialType.System_Int32 => (true, 32),
-            SpecialType.System_UInt32 => (false, 32),
-            SpecialType.System_Int64 => (true, 64),
-            SpecialType.System_UInt64 => (false, 64),
-            _ => ((bool, int)?)null
-        };
-        (signed, bits) = shape.GetValueOrDefault();
-        return shape.HasValue;
     }
 }

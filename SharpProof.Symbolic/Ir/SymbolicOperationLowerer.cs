@@ -82,10 +82,8 @@ internal static partial class SymbolicOperationLowerer {
             } conversion => conversion.Syntax,
             IConversionOperation {
                 Operand.Type.SpecialType: SpecialType.System_Decimal,
-                Type.SpecialType: SpecialType.System_Byte or SpecialType.System_SByte or SpecialType.System_Int16 or
-                    SpecialType.System_UInt16 or SpecialType.System_Int32 or SpecialType.System_UInt32 or
-                    SpecialType.System_Int64 or SpecialType.System_UInt64 or SpecialType.System_Char
-            } conversion => conversion.Syntax,
+                Type: { } targetType
+            } conversion when SymbolicTypeFacts.IsBuiltInIntegralType(targetType) => conversion.Syntax,
             _ => null
         };
         if (site == null) return NoHazard(out hazard);
@@ -1001,33 +999,10 @@ internal static partial class SymbolicOperationLowerer {
             !TryGetCheckedIntegralRange(expression, context, out var minValue, out var maxValue) ||
             !TryGetOverflowOperator(expression.Kind(), operation.IsChecked, minValue, out var smtOperator))
             return NoHazard(out hazard);
-        if (smtOperator is SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder) {
-            const string provenance = "ir.runtime-hazard.checked-integral.signed-division-overflow";
-            var left = LowerIntegerTerm(expression.Left, context);
-            var right = LowerIntegerTerm(expression.Right, context);
-            var trigger = left != null && right != null
-                ? SymbolicIrLowerer.CreateSignedDivisionOverflowCondition(left, right, minValue, expression, provenance)
-                : null;
-            hazard = CreateCheckedOverflowHazard(expression, left, trigger, provenance,
-                ExceptionCategories.DefiniteCheckedIntegralOverflow);
-            return true;
-        }
-        const string binaryProvenance = "ir.runtime-hazard.checked-integral.binary-overflow";
-        var inRange = SymbolicSemanticPipeline.LowerIntegerBinaryInRangeCondition(
-            expression.Left,
-            expression.Right,
-            smtOperator,
-            minValue,
-            maxValue,
-            expression,
-            context);
-        hazard = CreateCheckedOverflowHazard(
-            expression,
-            null,
-            inRange is { IsExact: true, Value: { } condition } ? new SymbolicNotCondition(condition) : null,
-            binaryProvenance,
-            ExceptionCategories.DefiniteCheckedIntegralOverflow);
-        return true;
+        return TryLowerCheckedBinaryLikeOverflow(
+            expression, expression.Left, expression.Right, smtOperator, minValue, maxValue, null,
+            "ir.runtime-hazard.checked-integral.signed-division-overflow",
+            "ir.runtime-hazard.checked-integral.binary-overflow", context, out hazard);
     }
     private static bool TryLowerCheckedUnaryOverflow(
         IUnaryOperation operation,
@@ -1087,30 +1062,47 @@ internal static partial class SymbolicOperationLowerer {
             !TryGetOverflowOperator(binaryKind, operation.IsChecked, minValue, out var smtOperator))
             return NoHazard(out hazard);
         var left = LowerIntegerTerm(leftExpression, context);
+        return TryLowerCheckedBinaryLikeOverflow(
+            assignment, leftExpression, rightExpression, smtOperator, minValue, maxValue, left,
+            "ir.runtime-hazard.checked-integral.compound-signed-division-overflow",
+            "ir.runtime-hazard.checked-integral.compound-assignment-overflow", context, out hazard);
+    }
+    private static bool TryLowerCheckedBinaryLikeOverflow(
+        SyntaxNode site,
+        ExpressionSyntax leftExpression,
+        ExpressionSyntax rightExpression,
+        SmtIntegerBinaryOperator smtOperator,
+        long minValue,
+        long maxValue,
+        SymbolicTerm? subject,
+        string divisionProvenance,
+        string arithmeticProvenance,
+        SymbolicLoweringContext context,
+        out SymbolicHazardOperation hazard) {
         if (smtOperator is SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder) {
-            const string provenance = "ir.runtime-hazard.checked-integral.compound-signed-division-overflow";
+            var left = subject ?? LowerIntegerTerm(leftExpression, context);
             var right = LowerIntegerTerm(rightExpression, context);
             var trigger = left != null && right != null
-                ? SymbolicIrLowerer.CreateSignedDivisionOverflowCondition(left, right, minValue, assignment, provenance)
+                ? SymbolicIrLowerer.CreateSignedDivisionOverflowCondition(
+                    left, right, minValue, site, divisionProvenance)
                 : null;
-            hazard = CreateCheckedOverflowHazard(assignment, left, trigger, provenance,
+            hazard = CreateCheckedOverflowHazard(site, left, trigger, divisionProvenance,
                 ExceptionCategories.DefiniteCheckedIntegralOverflow);
             return true;
         }
-        const string compoundProvenance = "ir.runtime-hazard.checked-integral.compound-assignment-overflow";
         var inRange = SymbolicSemanticPipeline.LowerIntegerBinaryInRangeCondition(
             leftExpression,
             rightExpression,
             smtOperator,
             minValue,
             maxValue,
-            assignment,
+            site,
             context);
         hazard = CreateCheckedOverflowHazard(
-            assignment,
-            left,
+            site,
+            subject,
             inRange is { IsExact: true, Value: { } condition } ? new SymbolicNotCondition(condition) : null,
-            compoundProvenance,
+            arithmeticProvenance,
             ExceptionCategories.DefiniteCheckedIntegralOverflow);
         return true;
     }
