@@ -121,4 +121,15 @@ public sealed class UnknownContractDiagnosticTests {
                 diagnostic.Location.GetLineSpan().StartLinePosition.Line == 6),
             string.Join(Environment.NewLine, diagnostics));
     }
+    [Test]
+    public async Task InterfaceExceptionContractDoesNotVerifyMissingBody() {
+        var diagnosticIds = (await AnalyzerTestHost.GetDiagnosticsAsync("""
+            using SharpProof.Attributes;
+            public interface IWorker {
+                [DoesNotThrow]
+                void Work();
+            }
+            """)).Select(static diagnostic => diagnostic.Id);
+        Assert.That(diagnosticIds, Does.Not.Contain("SP0046"));
+    }
 }
