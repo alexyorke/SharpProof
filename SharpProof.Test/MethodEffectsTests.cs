@@ -986,6 +986,26 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.ReadsStaticState | SharpProofEffect.WritesArgumentState,
             forbidden: SharpProofEffect.WritesStaticState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("ReadOnlySpanCopyToWritesDestinationWithoutAllocating", """
+            class C {
+                static void M(System.ReadOnlySpan<int> source, System.Span<int> destination) =>
+                    source.CopyTo(destination);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("SpanCopyToWritesDestinationWithoutAllocating", """
+            class C {
+                static void M(System.Span<byte> source, System.Span<byte> destination) =>
+                    source.CopyTo(destination);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
