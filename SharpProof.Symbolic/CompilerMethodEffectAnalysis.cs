@@ -2189,7 +2189,7 @@ internal sealed class MethodEffectAnalysisSession(
                 (_, MethodKind.Ordinary, "GetType")
                     when type?.SpecialType == SpecialType.System_Object && method.Parameters.Length == 0 =>
                     SharpProofEffect.None,
-                ("System.Threading.Interlocked", MethodKind.Ordinary, "Increment")
+                ("System.Threading.Interlocked", MethodKind.Ordinary, "Increment" or "Decrement")
                     when method.Parameters.Length == 1 &&
                          method.Parameters[0].RefKind == RefKind.Ref &&
                          method.Parameters[0].Type.SpecialType is
