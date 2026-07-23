@@ -202,7 +202,8 @@ internal static class SymbolicStringLowerer {
         if (!constantValue.HasValue ||
             constantValue.Value == null ||
             !SymbolicLoweringValueFacts.TryGetIntegralConstant(constantValue.Value, out var comparisonConstant) ||
-            !TryClassifyStringSearchComparison(comparisonKind, comparisonConstant, out var found) ||
+            !SymbolicLoweringValueFacts.TryClassifyThresholdComparison(
+                comparisonKind, comparisonConstant, 0, out var found) ||
             !TryLowerStringSearchPredicate(searchResultExpression, context, out var predicate))
             return false;
         condition = found ? predicate : new SymbolicNotCondition(predicate);
@@ -257,22 +258,6 @@ internal static class SymbolicStringLowerer {
             invocation,
             "ir.string-search.ordinal");
         return true;
-    }
-    private static bool TryClassifyStringSearchComparison(SyntaxKind comparisonKind, long constant, out bool found) {
-        found = false;
-        switch (comparisonKind) {
-            case SyntaxKind.EqualsExpression when constant == -1:
-            case SyntaxKind.LessThanExpression when constant == 0:
-            case SyntaxKind.LessThanOrEqualExpression when constant == -1:
-                return true;
-            case SyntaxKind.NotEqualsExpression when constant == -1:
-            case SyntaxKind.GreaterThanExpression when constant == -1:
-            case SyntaxKind.GreaterThanOrEqualExpression when constant == 0:
-                found = true;
-                return true;
-            default:
-                return false;
-        }
     }
     internal static SyntaxKind ReverseStringComparisonKind(SyntaxKind kind) => kind switch {
         SyntaxKind.LessThanExpression => SyntaxKind.GreaterThanExpression,

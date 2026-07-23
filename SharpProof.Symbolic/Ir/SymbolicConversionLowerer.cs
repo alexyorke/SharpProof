@@ -293,44 +293,18 @@ internal static class SymbolicConversionLowerer {
             : targetBits >= sourceBits;
     }
     private static bool TryGetIntegralShape(SpecialType specialType, out bool signed, out int bits) {
-        switch (specialType) {
-            case SpecialType.System_SByte:
-                signed = true;
-                bits = 8;
-                return true;
-            case SpecialType.System_Byte:
-                signed = false;
-                bits = 8;
-                return true;
-            case SpecialType.System_Int16:
-                signed = true;
-                bits = 16;
-                return true;
-            case SpecialType.System_UInt16:
-            case SpecialType.System_Char:
-                signed = false;
-                bits = 16;
-                return true;
-            case SpecialType.System_Int32:
-                signed = true;
-                bits = 32;
-                return true;
-            case SpecialType.System_UInt32:
-                signed = false;
-                bits = 32;
-                return true;
-            case SpecialType.System_Int64:
-                signed = true;
-                bits = 64;
-                return true;
-            case SpecialType.System_UInt64:
-                signed = false;
-                bits = 64;
-                return true;
-            default:
-                signed = false;
-                bits = 0;
-                return false;
-        }
+        var shape = specialType switch {
+            SpecialType.System_SByte => (true, 8),
+            SpecialType.System_Byte => (false, 8),
+            SpecialType.System_Int16 => (true, 16),
+            SpecialType.System_UInt16 or SpecialType.System_Char => (false, 16),
+            SpecialType.System_Int32 => (true, 32),
+            SpecialType.System_UInt32 => (false, 32),
+            SpecialType.System_Int64 => (true, 64),
+            SpecialType.System_UInt64 => (false, 64),
+            _ => ((bool, int)?)null
+        };
+        (signed, bits) = shape.GetValueOrDefault();
+        return shape.HasValue;
     }
 }

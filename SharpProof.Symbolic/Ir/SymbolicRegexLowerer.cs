@@ -58,27 +58,12 @@ internal static class SymbolicRegexLowerer {
             !constant.HasValue ||
             constant.Value == null ||
             !SymbolicLoweringValueFacts.TryGetIntegralConstant(constant.Value, out var count) ||
-            !TryClassifyRegexMatchCountComparison(comparisonKind, count, out var hasMatch) ||
+            !SymbolicLoweringValueFacts.TryClassifyThresholdComparison(
+                comparisonKind, count, 1, out var hasMatch) ||
             !TryLowerRegexInvocationParts(invocation, context, out var evaluation, out var match))
             return false;
         condition = CombineRegexEvaluationAndValue(evaluation, hasMatch ? match : new SymbolicNotCondition(match));
         return true;
-    }
-    private static bool TryClassifyRegexMatchCountComparison(SyntaxKind comparisonKind, long constant, out bool hasMatch) {
-        hasMatch = false;
-        switch (comparisonKind) {
-            case SyntaxKind.EqualsExpression when constant == 0:
-            case SyntaxKind.LessThanExpression when constant == 1:
-            case SyntaxKind.LessThanOrEqualExpression when constant == 0:
-                return true;
-            case SyntaxKind.NotEqualsExpression when constant == 0:
-            case SyntaxKind.GreaterThanExpression when constant == 0:
-            case SyntaxKind.GreaterThanOrEqualExpression when constant == 1:
-                hasMatch = true;
-                return true;
-            default:
-                return false;
-        }
     }
     internal static bool TryLowerRegexInvocationPredicate(
         InvocationExpressionSyntax invocation,
