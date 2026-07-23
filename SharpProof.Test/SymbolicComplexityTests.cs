@@ -47,6 +47,10 @@ public sealed class SymbolicComplexityTests {
         yield return Case("ForLoopIgnoresBoundMutationInsideUninvokedLocalFunction",
             """public static class C { public static int Work(int n) { var sum=0; for(var i=0;i<n;i++){void MoveBound(){n++;}sum+=i;} return sum; } }""",
             "return sum;", SymbolicComplexityKind.Linear, "O(n)");
+        yield return Case("ForLoopWithSourceCallMutatingMemberBound_IsUnknown",
+            """public sealed class Counter { public int Limit; public void Grow() => Limit++; } public static class C { public static int Work(Counter counter) { var sum=0; for(var i=0;i<counter.Limit;i++){counter.Grow();sum+=i;} return sum; } }""",
+            "return sum;", SymbolicComplexityKind.Unknown,
+            unknowns: [SymbolicComplexityUnknownReason.UnsupportedLoopShape]);
         yield return Case("NestedForLoopsOverSameBound_ProduceQuadratic",
             """public static class C { public static int Work(int n) { var sum=0; for(var i=0;i<n;i++){for(var j=0;j<n;j++){sum+=i+j;}} return sum; } }""",
             "return sum;", SymbolicComplexityKind.Quadratic, "O(n^2)");
