@@ -15,8 +15,8 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
     public void Add(FuzzCaseAnalysis analysis) {
         CasesAnalyzed++;
         _familyCounts.Increment(analysis.Case.Family);
-        AddAll(_operationKinds, analysis.OperationKinds);
-        AddAll(_syntaxKinds, analysis.SyntaxKinds);
+        foreach (var pair in analysis.OperationKinds) _operationKinds.Increment(pair.Key, pair.Value);
+        foreach (var pair in analysis.SyntaxKinds) _syntaxKinds.Increment(pair.Key, pair.Value);
         if (!analysis.Case.PrimaryShapeIds.IsDefaultOrEmpty)
             foreach (var shapeId in analysis.Case.PrimaryShapeIds)
                 _primaryShapeCounts.Increment(shapeId);
@@ -128,9 +128,5 @@ internal sealed class FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset 
         }
         _findingIndices.Add(aggregationKey, _findings.Count);
         _findings.Add(finding);
-    }
-    private static void AddAll(SortedDictionary<string, int> target, IReadOnlyDictionary<string, int> source) {
-        foreach (var pair in source)
-            target[pair.Key] = target.TryGetValue(pair.Key, out var count) ? count + pair.Value : pair.Value;
     }
 }

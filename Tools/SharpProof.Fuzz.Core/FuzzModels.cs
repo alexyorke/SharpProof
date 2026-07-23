@@ -30,8 +30,8 @@ public sealed record FuzzFinding(
                                 string.Join("||", Details.OrderBy(static detail => detail, StringComparer.Ordinal));
 }
 internal static class FuzzDictionaryExtensions {
-    internal static void Increment(this IDictionary<string, int> values, string key) =>
-        values[key] = values.TryGetValue(key, out var count) ? count + 1 : 1;
+    internal static void Increment(this IDictionary<string, int> values, string key, int amount = 1) =>
+        values[key] = values.TryGetValue(key, out var count) ? count + amount : amount;
 }
 public sealed record FuzzRunSummary(
     string SchemaVersion,

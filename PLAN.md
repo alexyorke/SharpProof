@@ -661,7 +661,7 @@ Target: 35-45 net lines.
       `Lazy<Task<string>>` already serializes initialization: 8-9 lines.
 - [x] If still net-negative, share the process runner in
       `SymbolicCliTestHost`: 6-8 lines.
-- [ ] Extend `FuzzRunSummaryBuilder.Increment` with an amount and delete
+- [x] Extend `FuzzRunSummaryBuilder.Increment` with an amount and delete
       `AddAll`: approximately 3 lines.
 - [ ] Fold the second Symbolic file walk in `EffectArchitectureTests` into the
       first walk: 8-10 lines.
