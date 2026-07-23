@@ -1525,6 +1525,28 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("ArrayResizeTracksRefArrayEffects", """
+            class C {
+                static void M(ref int[] values, int newSize) =>
+                    System.Array.Resize(ref values, newSize);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                      SharpProofEffect.Allocates | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.Unknown);
+        yield return Effect("ArrayResizeSupportsReferenceElements", """
+            class C {
+                static void M(ref string[] values, int newSize) =>
+                    System.Array.Resize(ref values, newSize);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                      SharpProofEffect.Allocates | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {

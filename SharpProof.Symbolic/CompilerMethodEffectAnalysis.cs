@@ -2200,6 +2200,20 @@ internal sealed class MethodEffectAnalysisSession(
             method.Parameters[3] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private static bool IsArrayFill(IMethodSymbol method) =>
             IsTwoArgumentArrayFill(method) || IsFourArgumentArrayFill(method);
+        private static bool IsArrayResize(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "Resize",
+                IsStatic: true,
+                IsGenericMethod: true,
+                TypeArguments.Length: 1,
+                Parameters.Length: 2,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.Ref, Type: IArrayTypeSymbol arrayType } &&
+            SymbolEqualityComparer.Default.Equals(arrayType.ElementType, method.TypeArguments[0]) &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2608,6 +2622,10 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Array", MethodKind.Ordinary, "Fill")
                     when IsArrayFill(method) =>
                     SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+                ("System.Array", MethodKind.Ordinary, "Resize")
+                    when IsArrayResize(method) =>
+                    SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                    SharpProofEffect.Allocates | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -2675,6 +2693,11 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                             "framework_array_fill_model")
                     ]
+                : IsArrayResize(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_array_resize_model")
+                    ]
                 : effects == SharpProofEffect.Throws
                     ? [
                         MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
@@ -2694,6 +2717,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsFiveArgumentArrayCopy(method)) return [2];
             if (IsArrayClear(method)) return [0];
             if (IsArrayFill(method)) return [0];
+            if (IsArrayResize(method)) return [0];
             return (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
                     method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
@@ -2707,7 +2731,7 @@ internal sealed class MethodEffectAnalysisSession(
         private static ImmutableArray<int> FrameworkReadArgumentOrdinals(IMethodSymbol method) {
             if (IsMemoryMarshalTryWrite(method) || IsMemoryMarshalWrite(method)) return [1];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
-                   IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) ||
+                   IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) || IsArrayResize(method) ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Read")
                 ? [0]
