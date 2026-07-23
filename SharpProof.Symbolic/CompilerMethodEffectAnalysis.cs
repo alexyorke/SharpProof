@@ -2480,8 +2480,22 @@ internal sealed class MethodEffectAnalysisSession(
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Object } &&
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
             method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsThreeIndexArraySetValue(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "SetValue",
+                IsStatic: false,
+                Parameters.Length: 4,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Object } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[3] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private static bool IsArraySetValue(IMethodSymbol method) =>
-            IsOneIndexArraySetValue(method) || IsTwoIndexArraySetValue(method);
+            IsOneIndexArraySetValue(method) || IsTwoIndexArraySetValue(method) ||
+            IsThreeIndexArraySetValue(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {

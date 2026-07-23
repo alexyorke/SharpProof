@@ -2012,6 +2012,29 @@ public sealed class MethodEffectsTests {
             required: SharpProofEffect.Allocates | SharpProofEffect.Throws,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                        SharpProofEffect.Unknown);
+        yield return Effect("ArraySetValueSupportsThreeIndexes", """
+            class C {
+                static void M(System.Array values, object replacement, int index1, int index2, int index3) =>
+                    values.SetValue(replacement, index1, index2, index3);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("ArraySetValueThreeIndexesKeepsLocalWriteOwned", """
+            class C {
+                static void M(object replacement) {
+                    System.Array values = new object[1, 1, 1];
+                    values.SetValue(replacement, 0, 0, 0);
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.Allocates | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                       SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
