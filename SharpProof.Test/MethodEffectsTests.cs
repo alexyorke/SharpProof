@@ -1315,6 +1315,38 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
             forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("MemoryMarshalTryWriteTracksDestinationAndValue", """
+            class C {
+                static bool M(System.Span<byte> destination, in int value) =>
+                    System.Runtime.InteropServices.MemoryMarshal.TryWrite(destination, in value);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("MemoryMarshalTryWriteSupportsOtherUnmanagedValues", """
+            class C {
+                static bool M(System.Span<byte> destination, in long value) =>
+                    System.Runtime.InteropServices.MemoryMarshal.TryWrite(destination, in value);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("MemoryMarshalTryWriteMapsValueReadToSecondArgument", """
+            class C {
+                static bool M(in int value) {
+                    System.Span<byte> destination = stackalloc byte[sizeof(int)];
+                    return System.Runtime.InteropServices.MemoryMarshal.TryWrite(destination, in value);
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState,
+            forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
