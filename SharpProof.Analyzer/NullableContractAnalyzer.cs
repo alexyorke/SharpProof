@@ -114,8 +114,10 @@ internal static class NullableContractAnalyzer {
                             parameter.Name,
                             contract);
             }
-            if (NullableFlowFacts.TryGetMaybeNullWhenValue(parameter, out var maybeNullWhen) &&
-                parameter.NullableAnnotation == NullableAnnotation.NotAnnotated) {
+            foreach (var maybeNullWhen in CollectMaybeNullWhenValues(
+                         context.MethodSymbol,
+                         parameter.Ordinal,
+                         context.CancellationToken)) {
                 var contract = FormatBooleanAttribute("MaybeNullWhen", maybeNullWhen);
                 foreach (var completion in completions)
                     if (completion.ResultExpression != null)
@@ -141,6 +143,24 @@ internal static class NullableContractAnalyzer {
             cancellationToken.ThrowIfCancellationRequested();
             if (parameterOrdinal >= source.Parameters.Length ||
                 !NullableFlowFacts.TryGetNotNullWhenValue(source.Parameters[parameterOrdinal], out var value) ||
+                !seen.Add(value))
+                continue;
+            values.Add(value);
+        }
+        return values.ToImmutable();
+    }
+    private static ImmutableArray<bool> CollectMaybeNullWhenValues(
+        IMethodSymbol method,
+        int parameterOrdinal,
+        CancellationToken cancellationToken) {
+        var values = ImmutableArray.CreateBuilder<bool>();
+        var seen = new HashSet<bool>();
+        foreach (var source in MethodContractHierarchy.EnumerateSources(method, cancellationToken)) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (parameterOrdinal >= source.Parameters.Length) continue;
+            var sourceParameter = source.Parameters[parameterOrdinal];
+            if (sourceParameter.NullableAnnotation != NullableAnnotation.NotAnnotated ||
+                !NullableFlowFacts.TryGetMaybeNullWhenValue(sourceParameter, out var value) ||
                 !seen.Add(value))
                 continue;
             values.Add(value);
