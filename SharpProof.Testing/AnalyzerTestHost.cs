@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
@@ -23,13 +22,8 @@ internal static class AnalyzerTestHost {
         new(CreateMinimalFrameworkReferences);
     private static readonly Lazy<MetadataReference> EnforcePureAttributeReference =
         new(() => MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location));
-    private static readonly ConcurrentDictionary<string, ConditionContext> ConditionContextCache =
-        new(StringComparer.Ordinal);
-    private static readonly ConcurrentDictionary<string, ConditionImplicationContext> ConditionImplicationContextCache =
-        new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<SourceContextCacheKey, SourceContext> SourceContextCache = new();
-    private static readonly AnalyzerOptions EmptyAnalyzerOptions =
-        new([], new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
+    private static readonly AnalyzerOptions EmptyAnalyzerOptions = new([]);
     public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(string source) {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions, string.Empty);
         var compilation = CreateCompilation(
@@ -41,41 +35,6 @@ internal static class AnalyzerTestHost {
             AnalyzerInstances,
             new CompilationWithAnalyzersOptions(EmptyAnalyzerOptions, null, false, false, false));
         return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
-    }
-    public static AnalyzerOptions CreateAnalyzerOptions(ImmutableDictionary<string, string>? globalOptions = null) {
-        var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
-        if (analyzerGlobalOptions.Count == 0) return EmptyAnalyzerOptions;
-        return new AnalyzerOptions([], new TestAnalyzerConfigOptionsProvider(analyzerGlobalOptions));
-    }
-    public static ConditionContext CreateConditionContext(string parameterList, string conditionExpression)
-        => CreateConditionContext(parameterList, conditionExpression, "");
-    public static ConditionContext CreateConditionContext(string parameterList, string conditionExpression, string extraSource) {
-        var source = $$"""
-            {{extraSource}}
-            public static class ConditionHost
-            {
-                public static bool Evaluate({{parameterList}})
-                {
-                    return {{conditionExpression}};
-                }
-            }
-            """;
-        return ConditionContextCache.GetOrAdd(source, static conditionSource => CreateConditionContextCore(conditionSource));
-    }
-    private static ConditionContext CreateConditionContextCore(string source) {
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions);
-        var compilation = CreateCompilation("ConditionHost", GetMinimalFrameworkReferences(), DefaultCompilationOptions, syntaxTree);
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var returnExpression = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Evaluate")
-            .Body!
-            .Statements
-            .OfType<ReturnStatementSyntax>()
-            .Single()
-            .Expression!;
-        return new ConditionContext(semanticModel, returnExpression);
     }
     public static SourceContext CreateSourceContext(
         string source,
@@ -95,36 +54,6 @@ internal static class AnalyzerTestHost {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions, string.Empty);
         var compilation = CreateCompilation(compilationName, references, DefaultCompilationOptions, syntaxTree);
         return new SourceContext(compilation, compilation.GetSemanticModel(syntaxTree), syntaxTree, syntaxTree.GetRoot());
-    }
-    public static ConditionImplicationContext CreateConditionImplicationContext(
-        string parameterList,
-        string pathCondition,
-        string conclusion) {
-        var source = $$"""
-                       public static class ConditionHost
-                       {
-                           public static bool Evaluate({{parameterList}})
-                           {
-                               var path = {{pathCondition}};
-                               var conclusion = {{conclusion}};
-                               return path && conclusion;
-                           }
-                       }
-                       """;
-        return ConditionImplicationContextCache.GetOrAdd(
-            source,
-            static implicationSource => CreateConditionImplicationContextCore(implicationSource));
-    }
-    private static ConditionImplicationContext CreateConditionImplicationContextCore(string source) {
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions);
-        var compilation = CreateCompilation("ConditionHost", GetMinimalFrameworkReferences(), DefaultCompilationOptions, syntaxTree);
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var variables = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<VariableDeclaratorSyntax>()
-            .Select(variable => variable.Initializer!.Value)
-            .ToArray();
-        return new ConditionImplicationContext(semanticModel, variables[0], variables[1]);
     }
     internal static ImmutableArray<MetadataReference> GetTrustedPlatformReferences() => TrustedPlatformReferences.Value;
     internal static ImmutableArray<MetadataReference> GetMinimalFrameworkReferences() => MinimalFrameworkReferences.Value;
@@ -189,34 +118,10 @@ internal static class AnalyzerTestHost {
             new[] { syntaxTree },
             references,
             options);
-    internal readonly record struct ConditionContext(SemanticModel SemanticModel, ExpressionSyntax Expression);
-    internal readonly record struct ConditionImplicationContext(
-        SemanticModel SemanticModel,
-        ExpressionSyntax PathCondition,
-        ExpressionSyntax Conclusion);
     internal readonly record struct SourceContext(
         CSharpCompilation Compilation,
         SemanticModel SemanticModel,
         SyntaxTree SyntaxTree,
         SyntaxNode Root);
     private readonly record struct SourceContextCacheKey(string Source, string CompilationName);
-    private sealed class TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string,
-        string> globalOptions) : AnalyzerConfigOptionsProvider {
-        private readonly AnalyzerConfigOptions _emptyOptions =
-            new TestAnalyzerConfigOptions(ImmutableDictionary<string, string>.Empty);
-        public override AnalyzerConfigOptions GlobalOptions { get; } = new TestAnalyzerConfigOptions(globalOptions);
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _emptyOptions;
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _emptyOptions;
-    }
-    private sealed class TestAnalyzerConfigOptions(ImmutableDictionary<string, string> values) : AnalyzerConfigOptions {
-        private readonly ImmutableDictionary<string, string> _values = values;
-        public override bool TryGetValue(string key, out string value) {
-            if (_values.TryGetValue(key, out var found)) {
-                value = found;
-                return true;
-            }
-            value = string.Empty;
-            return false;
-        }
-    }
 }

@@ -114,14 +114,14 @@ repository consumers.
 
 In `SharpProof.Testing/AnalyzerTestHost.cs`:
 
-- [ ] Delete the unused condition-context and implication-context caches.
-- [ ] Delete `CreateConditionContext` and its core builder.
-- [ ] Delete `CreateConditionImplicationContext` and its core builder.
-- [ ] Delete their record structs.
-- [ ] Delete unused `CreateAnalyzerOptions`.
-- [ ] Replace the custom empty analyzer-options provider with the direct empty
+- [x] Delete the unused condition-context and implication-context caches.
+- [x] Delete `CreateConditionContext` and its core builder.
+- [x] Delete `CreateConditionImplicationContext` and its core builder.
+- [x] Delete their record structs.
+- [x] Delete unused `CreateAnalyzerOptions`.
+- [x] Replace the custom empty analyzer-options provider with the direct empty
       Roslyn representation if the remaining analyzer host still needs options.
-- [ ] Delete the custom `TestAnalyzerConfigOptionsProvider` and
+- [x] Delete the custom `TestAnalyzerConfigOptionsProvider` and
       `TestAnalyzerConfigOptions` if no callers remain.
 
 Expected reduction: approximately 93 lines.
