@@ -2218,6 +2218,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Threading.Volatile", MethodKind.Ordinary, "Read")
                     when method.Parameters.Length == 1 && method.Parameters[0].RefKind != RefKind.None =>
                     SharpProofEffect.ReadsArgumentState,
+                ("System.Threading.Volatile", MethodKind.Ordinary, "Write")
+                    when method.Parameters.Length == 2 && method.Parameters[0].RefKind != RefKind.None =>
+                    SharpProofEffect.None,
                 (_, _, "IsNullOrEmpty" or "IsNullOrWhiteSpace") when type?.SpecialType == SpecialType.System_String =>
                     SharpProofEffect.None,
                 (_, _, "Contains" or "IndexOf" or "LastIndexOf" or "StartsWith" or "EndsWith")
@@ -2247,8 +2250,9 @@ internal sealed class MethodEffectAnalysisSession(
             return effects.HasValue;
         }
         private static ImmutableArray<int> FrameworkWrittenArgumentOrdinals(IMethodSymbol method) =>
-            method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
-            method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange"
+            (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
+             method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange") ||
+            (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write")
                 ? [0]
                 : [];
         private static ImmutableArray<int> FrameworkReadArgumentOrdinals(IMethodSymbol method) =>

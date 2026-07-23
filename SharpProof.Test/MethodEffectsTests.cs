@@ -946,6 +946,17 @@ public sealed class MethodEffectsTests {
             purity: SharpProofVerdict.Proven,
             allocationFree: SharpProofVerdict.Proven,
             forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("VolatileWriteWritesOnlyRefArgument", """
+            static class Globals { public static int Source; }
+            class C {
+                static void M(ref int target) =>
+                    System.Threading.Volatile.Write(ref target, Globals.Source);
+            }
+            """, 3,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsStaticState | SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.WritesStaticState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
