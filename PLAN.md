@@ -681,7 +681,7 @@ Target: 45-65 net lines. Package and property removals are validation-gated.
       before writes: approximately 6 lines.
 - [x] In `Invoke-SharpProofDotnet.ps1`, construct its `List` and `HashSet`
       directly from enumerables: approximately 8 lines.
-- [ ] In `Test-SharpProofPackageConsumers.ps1`, load
+- [x] In `Test-SharpProofPackageConsumers.ps1`, load
       `package-projects.json` and loop pack operations instead of maintaining a
       second project list and three pack blocks: 8-12 lines.
 - [ ] Share package-consumer scaffolding where it remains clear: 4-6 lines.

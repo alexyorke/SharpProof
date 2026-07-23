@@ -105,9 +105,9 @@ $previousPackageCache = $env:NUGET_PACKAGES
 New-Item -ItemType Directory -Force -Path $packageSource, $consumerRoot, $packageCache | Out-Null
 
 try {
-    $analyzerProject = Join-Path $repoRoot 'SharpProof.Package/SharpProof.Package.csproj'
-    $attributesProject = Join-Path $repoRoot 'SharpProof.Attributes/SharpProof.Attributes.csproj'
-    $symbolicProject = Join-Path $repoRoot 'SharpProof.Symbolic/SharpProof.Symbolic.csproj'
+    $packageProjectManifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'package-projects.json') -Raw | ConvertFrom-Json
+    $packageProjects = @($packageProjectManifest.projects | ForEach-Object { Join-Path $repoRoot $_ })
+    $analyzerProject, $attributesProject, $symbolicProject = $packageProjects
     $analyzerVersion = Get-EvaluatedProjectProperty $analyzerProject 'PackageVersion'
     $attributesVersion = Get-EvaluatedProjectProperty $attributesProject 'Version'
     $symbolicVersion = Get-EvaluatedProjectProperty $symbolicProject 'Version'
@@ -122,21 +122,13 @@ try {
         '--no-restore',
         '/m:1',
         '/warnaserror') $repoRoot)
-    [void](Invoke-DotnetCommand @(
-        'pack', $analyzerProject,
-        '--configuration', $Configuration,
-        '--no-build',
-        '--output', $packageSource) $repoRoot)
-    [void](Invoke-DotnetCommand @(
-        'pack', $attributesProject,
-        '--configuration', $Configuration,
-        '--no-build',
-        '--output', $packageSource) $repoRoot)
-    [void](Invoke-DotnetCommand @(
-        'pack', $symbolicProject,
-        '--configuration', $Configuration,
-        '--no-build',
-        '--output', $packageSource) $repoRoot)
+    foreach ($packageProject in $packageProjects) {
+        [void](Invoke-DotnetCommand @(
+            'pack', $packageProject,
+            '--configuration', $Configuration,
+            '--no-build',
+            '--output', $packageSource) $repoRoot)
+    }
 
     $env:NUGET_PACKAGES = $packageCache
     $nugetConfigPath = Join-Path $runRoot 'NuGet.Config'
