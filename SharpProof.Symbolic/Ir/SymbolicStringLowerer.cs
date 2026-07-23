@@ -1,5 +1,7 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicStringLowerer {
+    private static readonly ConditionalWeakTable<Compilation, ConcurrentDictionary<string, string>>
+        OrdinalIgnoreCaseConstants = new();
     internal static bool TryLowerStringPredicateInvocation(
         InvocationExpressionSyntax invocation,
         IInvocationOperation operation,
@@ -40,19 +42,8 @@ internal static class SymbolicStringLowerer {
             return false;
         if (ignoreCase) {
             if (argument is not SymbolicStringConstantTerm constantArgument) return false;
-            var pattern = predicate.Value switch {
-                SymbolicStringPredicateKind.StartsWith => @"\A" + Regex.Escape(constantArgument.Value),
-                SymbolicStringPredicateKind.EndsWith => Regex.Escape(constantArgument.Value) + @"\z",
-                _ => Regex.Escape(constantArgument.Value)
-            };
-            condition = SymbolicIrLowerer.CreateFactCondition(
-                new SymbolicStringPredicateAtom(
-                    SymbolicStringPredicateKind.RegexMatch,
-                    receiver,
-                    new SymbolicStringConstantTerm(pattern),
-                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
-                invocation,
-                "ir.known-api.string." + method.Name + ".ordinal-ignore-case");
+            condition = CreateOrdinalIgnoreCasePredicateCondition(
+                predicate.Value, receiver, constantArgument.Value, invocation, context);
         }
         else {
             condition = SymbolicIrLowerer.CreateFactCondition(
@@ -169,12 +160,14 @@ internal static class SymbolicStringLowerer {
         }
         if (!TryLowerStringValueWithOptionalReference(subjectExpression, context, out var subject, out var reference))
             return false;
+        var canonicalConstant = GetOrdinalIgnoreCaseConstant(context.Compilation, constant);
         var matches = SymbolicIrLowerer.CreateFactCondition(
-            new SymbolicStringPredicateAtom(
-                SymbolicStringPredicateKind.RegexMatch,
-                subject,
-                new SymbolicStringConstantTerm(@"\A" + Regex.Escape(constant) + @"\z"),
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.Equal,
+                new SymbolicVariableTerm(
+                    "$ordinal-ignore-case:value:" + SymbolicState.CreateProofTermKey(subject),
+                    SmtValueKind.String),
+                new SymbolicStringConstantTerm(canonicalConstant)),
             sourceNode,
             "ir.string.equals.ordinal-ignore-case");
         condition = reference == null
@@ -190,6 +183,25 @@ internal static class SymbolicStringLowerer {
                 matches);
         return true;
     }
+    private static SymbolicCondition CreateOrdinalIgnoreCasePredicateCondition(
+        SymbolicStringPredicateKind predicate,
+        SymbolicTerm value,
+        string argument,
+        SyntaxNode source,
+        SymbolicLoweringContext context) {
+        var canonicalArgument = GetOrdinalIgnoreCaseConstant(context.Compilation, argument);
+        var name = "$ordinal-ignore-case:" + predicate + ":" +
+                   canonicalArgument.Length.ToString(CultureInfo.InvariantCulture) + ":" + canonicalArgument + ":" +
+                   SymbolicState.CreateProofTermKey(value);
+        return SymbolicIrLowerer.CreateFactCondition(
+            new SymbolicTruthAtom(new SymbolicVariableTerm(name, SmtValueKind.Bool)),
+            source,
+            "ir.known-api.string." + predicate + ".ordinal-ignore-case");
+    }
+    private static string GetOrdinalIgnoreCaseConstant(Compilation compilation, string value) =>
+        OrdinalIgnoreCaseConstants
+            .GetValue(compilation, static _ => new(StringComparer.OrdinalIgnoreCase))
+            .GetOrAdd(value, static candidate => candidate);
     internal static bool TryLowerStringSearchComparison(
         BinaryExpressionSyntax comparison,
         SymbolicLoweringContext context,

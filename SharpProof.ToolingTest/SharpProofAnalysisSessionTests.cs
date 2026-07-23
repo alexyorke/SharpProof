@@ -105,7 +105,14 @@ public sealed class SharpProofAnalysisSessionTests {
             new SharpProofTarget(SharpProofTargetKind.Point, Line: 4, Column: 9),
             SharpProofAnalysisFacet.ProofFacts,
             "text.Equals(\"\\u212A\", System.StringComparison.OrdinalIgnoreCase)"));
-        Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("ProvenFalse"));
+        var equivalent = session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Point, Line: 4, Column: 9),
+            SharpProofAnalysisFacet.ProofFacts,
+            "text.Equals(\"K\", System.StringComparison.OrdinalIgnoreCase)"));
+        Assert.Multiple(() => {
+            Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("ProvenFalse"));
+            Assert.That(equivalent.ProofFacts.Single().Status, Is.EqualTo("ProvenTrue"));
+        });
     }
     [Test]
     public void ConditionProofInsideLocalFunctionResolvesCapturedParameters() {
