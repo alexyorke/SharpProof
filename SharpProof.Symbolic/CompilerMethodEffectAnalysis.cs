@@ -2154,6 +2154,18 @@ internal sealed class MethodEffectAnalysisSession(
             method.Parameters[4] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private static bool IsArrayCopy(IMethodSymbol method) =>
             IsThreeArgumentArrayCopy(method) || IsFiveArgumentArrayCopy(method);
+        private static bool IsArrayClear(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "Clear",
+                IsStatic: true,
+                Parameters.Length: 3,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2556,6 +2568,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Array", MethodKind.Ordinary, "Copy")
                     when IsArrayCopy(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+                ("System.Array", MethodKind.Ordinary, "Clear")
+                    when IsArrayClear(method) =>
+                    SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -2602,6 +2617,13 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                             "framework_array_copy_model")
                     ]
+                : IsArrayClear(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
+                            "framework_array_clear_model"),
+                        MethodExceptionFact.Boundary("System.IndexOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_array_clear_model")
+                    ]
                 : effects == SharpProofEffect.Throws
                     ? [
                         MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
@@ -2619,6 +2641,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsMemoryMarshalTryWrite(method) || IsMemoryMarshalWrite(method)) return [0];
             if (IsThreeArgumentArrayCopy(method)) return [1];
             if (IsFiveArgumentArrayCopy(method)) return [2];
+            if (IsArrayClear(method)) return [0];
             return (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
                     method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
