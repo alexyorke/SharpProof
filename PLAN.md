@@ -492,7 +492,7 @@ Target: 10-15 lines.
       `SmtFormulaTraversal.Rebuild` with a common unchanged check and `with`
       expressions.
 - [x] Add a direct table covering all 14 node shapes.
-- [ ] Verify that regex options, conditional result kinds, and other metadata
+- [x] Verify that regex options, conditional result kinds, and other metadata
       survive rebuilding.
 
 ### 6.9 Combine exception-contract grouping
