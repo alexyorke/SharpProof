@@ -114,6 +114,23 @@ public sealed class SharpProofAnalysisSessionTests {
             Assert.That(equivalent.ProofFacts.Single().Status, Is.EqualTo("ProvenTrue"));
         });
     }
+    [TestCase("IndexOf")]
+    [TestCase("LastIndexOf")]
+    public void OrdinalIgnoreCaseSearchDoesNotUseRegexCaseFolding(string method) {
+        using var session = SharpProofAnalysisSession.FromText($$"""
+            class C {
+                static int M(string text) {
+                    if (text.{{method}}("k", System.StringComparison.OrdinalIgnoreCase) < 0) return 0;
+                    return 1;
+                }
+            }
+            """);
+        var result = session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Point, Line: 4, Column: 9),
+            SharpProofAnalysisFacet.ProofFacts,
+            $"text.{method}(\"\\u212A\", System.StringComparison.OrdinalIgnoreCase) >= 0"));
+        Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("Unknown"));
+    }
     [Test]
     public void ConditionProofInsideLocalFunctionResolvesCapturedParameters() {
         using var session = SharpProofAnalysisSession.FromText("""
