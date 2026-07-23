@@ -9,38 +9,18 @@ internal static class SymbolicCliTestHost {
     public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(params string[] arguments) {
         var repositoryRoot = RepositoryRoot.Value;
         var cliAssemblyPath = await CliAssemblyPath.Value.ConfigureAwait(false);
-        var startInfo = new ProcessStartInfo {
-            FileName = "dotnet",
-            WorkingDirectory = repositoryRoot,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        startInfo.ArgumentList.Add(cliAssemblyPath);
-        foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
+        var startInfo = CreateDotnetStartInfo(repositoryRoot, [cliAssemblyPath, .. arguments]);
         return await RunProcessAsync(startInfo, TimeSpan.FromSeconds(90), "Failed to start symbolic CLI.")
             .ConfigureAwait(false);
     }
     private static async Task<string> EnsureCliAssemblyPathAsync(string repositoryRoot) {
         var existingPath = FindExistingCliAssemblyPath(repositoryRoot);
         if (existingPath != null) return existingPath;
-        var buildConfiguration = FindBuildConfiguration();
-        var startInfo = new ProcessStartInfo {
-            FileName = "dotnet",
-            WorkingDirectory = repositoryRoot,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        startInfo.ArgumentList.Add("build");
-        startInfo.ArgumentList.Add(Path.Combine("Tools", "SharpProof.SymbolicCli", "SharpProof.SymbolicCli.csproj"));
-        startInfo.ArgumentList.Add("--configuration");
-        startInfo.ArgumentList.Add(buildConfiguration);
-        startInfo.ArgumentList.Add("--verbosity");
-        startInfo.ArgumentList.Add("minimal");
-        startInfo.ArgumentList.Add("/m:1");
-        startInfo.ArgumentList.Add("/nodeReuse:false");
-        startInfo.ArgumentList.Add("-p:UseSharedCompilation=false");
+        var startInfo = CreateDotnetStartInfo(
+            repositoryRoot,
+            "build", Path.Combine("Tools", "SharpProof.SymbolicCli", "SharpProof.SymbolicCli.csproj"),
+            "--configuration", FindBuildConfiguration(), "--verbosity", "minimal",
+            "/m:1", "/nodeReuse:false", "-p:UseSharedCompilation=false");
         var buildResult = await RunProcessAsync(startInfo, TimeSpan.FromSeconds(420),
             "Failed to start symbolic CLI build.").ConfigureAwait(false);
         if (buildResult.ExitCode != 0)
@@ -91,6 +71,17 @@ internal static class SymbolicCliTestHost {
             throw;
         }
         return (process.ExitCode, await outputTask.ConfigureAwait(false), await errorTask.ConfigureAwait(false));
+    }
+    private static ProcessStartInfo CreateDotnetStartInfo(string workingDirectory, params string[] arguments) {
+        var startInfo = new ProcessStartInfo {
+            FileName = "dotnet",
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
+        return startInfo;
     }
     private static string FindBuildConfiguration() {
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
