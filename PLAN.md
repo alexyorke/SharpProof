@@ -699,7 +699,7 @@ Target: 45-65 net lines. Package and property removals are validation-gated.
 - [x] Delete the trailing empty `ItemGroup` in that project.
 - [x] Verify and remove the unused analyzer-testing NUnit package from
       `SharpProof.Testing.props`.
-- [ ] Verify whether `SharpProofVsixVersion` is consumed by pack or release
+- [x] Verify whether `SharpProofVsixVersion` is consumed by pack or release
       automation.
 - [ ] Verify whether the explicit `PackageVersion` in
       `SharpProof.PackageMetadata.props` is redundant.
