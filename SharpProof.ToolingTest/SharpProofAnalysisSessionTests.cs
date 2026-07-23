@@ -3,6 +3,10 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 [TestFixture]
 public sealed class SharpProofAnalysisSessionTests {
+    public sealed record HazardCase(string Name, string Source, string Marker,
+        string? Kind = null, string? ExceptionType = null, string? Status = null, string? ForbiddenStatus = null,
+        bool Expected = true);
+
     [Test]
     public void CanonicalRequestReturnsRequestedFacets() {
         using var session = SharpProofAnalysisSession.FromText("""
@@ -40,17 +44,13 @@ public sealed class SharpProofAnalysisSessionTests {
     }
     [Test]
     public void ConditionProofExposesCompactCounterexampleWithoutPublicSolverModel() {
-        using var session = SharpProofAnalysisSession.FromText("""
+        var result = AnalyzeProof("""
             class C {
                 static int M(int value) {
                     return value;
                 }
             }
-            """);
-        var result = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Point, Line: 3, Column: 13),
-            SharpProofAnalysisFacet.ProofFacts,
-            "value > 0"));
+            """, 3, 13, "value > 0");
         var proof = result.ProofFacts.Single();
         Assert.Multiple(() => {
             Assert.That(proof.Status, Is.EqualTo("Unknown"));
@@ -60,55 +60,43 @@ public sealed class SharpProofAnalysisSessionTests {
     }
     [Test]
     public void ReorderedNamedStringArgumentsPreservePathFacts() {
-        using var session = SharpProofAnalysisSession.FromText("""
+        var result = AnalyzeProof("""
             class C {
                 static int M(string text) {
                     if (!text.StartsWith(comparisonType: System.StringComparison.Ordinal, value: "pre")) return 0;
                     return 1;
                 }
             }
-            """);
-        var result = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Point, Line: 4, Column: 9),
-            SharpProofAnalysisFacet.ProofFacts,
-            "text.StartsWith(\"pre\", System.StringComparison.Ordinal)"));
+            """, 4, 9, "text.StartsWith(\"pre\", System.StringComparison.Ordinal)");
         Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("ProvenTrue"));
     }
     [TestCase("StartsWith")]
     [TestCase("EndsWith")]
     public void CultureSensitiveStringPredicatesDoNotImplyOrdinalFacts(string method) {
-        using var session = SharpProofAnalysisSession.FromText($$"""
+        var result = AnalyzeProof($$"""
             class C {
                 static int M(string text) {
                     if (!text.{{method}}("\u00AD")) return 0;
                     return 1;
                 }
             }
-            """);
-        var result = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Point, Line: 4, Column: 9),
-            SharpProofAnalysisFacet.ProofFacts,
-            $"text.{method}(\"\\u00AD\", System.StringComparison.Ordinal)"));
+            """, 4, 9, $"text.{method}(\"\\u00AD\", System.StringComparison.Ordinal)");
         Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("Unknown"));
     }
     [Test]
     public void OrdinalIgnoreCaseDoesNotUseRegexCaseFolding() {
-        using var session = SharpProofAnalysisSession.FromText("""
+        const string source = """
             class C {
                 static int M(string text) {
                     if (!text.Equals("k", System.StringComparison.OrdinalIgnoreCase)) return 0;
                     return 1;
                 }
             }
-            """);
-        var result = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Point, Line: 4, Column: 9),
-            SharpProofAnalysisFacet.ProofFacts,
-            "text.Equals(\"\\u212A\", System.StringComparison.OrdinalIgnoreCase)"));
-        var equivalent = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Point, Line: 4, Column: 9),
-            SharpProofAnalysisFacet.ProofFacts,
-            "text.Equals(\"K\", System.StringComparison.OrdinalIgnoreCase)"));
+            """;
+        var result = AnalyzeProof(source, 4, 9,
+            "text.Equals(\"\\u212A\", System.StringComparison.OrdinalIgnoreCase)");
+        var equivalent = AnalyzeProof(source, 4, 9,
+            "text.Equals(\"K\", System.StringComparison.OrdinalIgnoreCase)");
         Assert.Multiple(() => {
             Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("ProvenFalse"));
             Assert.That(equivalent.ProofFacts.Single().Status, Is.EqualTo("ProvenTrue"));
@@ -117,38 +105,28 @@ public sealed class SharpProofAnalysisSessionTests {
     [TestCase("IndexOf")]
     [TestCase("LastIndexOf")]
     public void OrdinalIgnoreCaseSearchDoesNotUseRegexCaseFolding(string method) {
-        using var session = SharpProofAnalysisSession.FromText($$"""
+        var result = AnalyzeProof($$"""
             class C {
                 static int M(string text) {
                     if (text.{{method}}("k", System.StringComparison.OrdinalIgnoreCase) < 0) return 0;
                     return 1;
                 }
             }
-            """);
-        var result = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Point, Line: 4, Column: 9),
-            SharpProofAnalysisFacet.ProofFacts,
-            $"text.{method}(\"\\u212A\", System.StringComparison.OrdinalIgnoreCase) >= 0"));
+            """, 4, 9, $"text.{method}(\"\\u212A\", System.StringComparison.OrdinalIgnoreCase) >= 0");
         Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("Unknown"));
     }
     [Test]
     public void ConditionProofInsideLocalFunctionResolvesCapturedParameters() {
-        using var session = SharpProofAnalysisSession.FromText("""
+        const string source = """
             class C {
                 static int M(string left, string right) {
                     int Local() => (left + right).Length;
                     return Local();
                 }
             }
-            """);
-        var result = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Point, Line: 3, Column: 9),
-            SharpProofAnalysisFacet.ProofFacts,
-            "left == left"));
-        var falseResult = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Point, Line: 3, Column: 9),
-            SharpProofAnalysisFacet.ProofFacts,
-            "left != left"));
+            """;
+        var result = AnalyzeProof(source, 3, 9, "left == left");
+        var falseResult = AnalyzeProof(source, 3, 9, "left != left");
         Assert.Multiple(() => {
             Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("ProvenTrue"));
             Assert.That(falseResult.ProofFacts.Single().Status, Is.EqualTo("ProvenFalse"));
@@ -164,11 +142,7 @@ public sealed class SharpProofAnalysisSessionTests {
                 }
             }
             """;
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = session.Analyze(new SharpProofAnalysisRequest(
-            new SharpProofTarget(SharpProofTargetKind.Point, Line: 3, Column: 9),
-            SharpProofAnalysisFacet.ProofFacts,
-            "x > 0"));
+        var result = AnalyzeProof(source, 3, 9, "x > 0");
         var proof = result.ProofFacts.Single();
         Assert.Multiple(() => {
             Assert.That(proof.Status, Is.EqualTo("Unknown"));
@@ -298,155 +272,90 @@ public sealed class SharpProofAnalysisSessionTests {
                 .EqualTo("System.Exception"));
         });
     }
-    [Test]
-    public void ReducedExtensionReceiverIsNotAnInstanceDereference() {
-        const string source = """
-            static class E { public static int Len(this string? value) => value?.Length ?? 0; }
-            class C { static int M(string? value) => value.Len(); }
-            """;
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = AnalyzeHazardsAt(session, source, "value.Len", 0);
-        Assert.That(result.Hazards.Where(static hazard => hazard.ExceptionType == "System.NullReferenceException"), Is.Empty);
+    public static IEnumerable<TestCaseData> HazardCases() {
+        yield return Hazard("ReducedExtensionReceiverIsNotAnInstanceDereference",
+            "static class E { public static int Len(this string? value) => value?.Length ?? 0; }\n" +
+            "class C { static int M(string? value) => value.Len(); }",
+            "value.Len",
+            exceptionType: "System.NullReferenceException",
+            expected: false);
+        yield return Hazard("NullableConditionalAccessPreservesInnerHasValue",
+            "sealed class B { public int? Get() => null; }\n" +
+            "class C { static int M(B? value) { var x = value?.Get(); return x.Value; } }",
+            "x.Value",
+            exceptionType: "System.InvalidOperationException",
+            status: "Proven");
+        yield return Hazard("DefinitionTimeSnapshotPreservesDefiniteInvalidCast",
+            "class A { }\nclass B { }\n" +
+            "class C { static B M() { object y = new A(); object x = y; y = new B(); return (B)x; } }",
+            "(B)x",
+            exceptionType: "System.InvalidCastException",
+            status: "Proven");
+        yield return Hazard("DefinitionTimeSnapshotPreservesDefiniteArrayTypeMismatch",
+            "class C { static void M() { object[] later = new string[1]; var snapshot = later; " +
+            "later = new object[1]; snapshot[0] = new object(); } }",
+            "snapshot[0]",
+            exceptionType: "System.ArrayTypeMismatchException",
+            status: "Proven");
+        yield return Hazard("OpenVirtualPredicateDoesNotMakeReachableHazardUnreachable",
+            "class B { public virtual bool IsZero() => false; }\n" +
+            "sealed class D : B { public override bool IsZero() => true; }\n" +
+            "class C { static int M(B value) { var zero = 0; " +
+            "if (value.IsZero()) return 10 / zero; return 1; } }",
+            "10 / zero",
+            exceptionType: "System.DivideByZeroException",
+            forbiddenStatus: "Unreachable");
+        yield return Hazard("UserDefinedEqualityDoesNotEstablishANullGuard",
+            "class P { public int Value; public static bool operator ==(P? left, P? right) => false; " +
+            "public static bool operator !=(P? left, P? right) => true; " +
+            "public override bool Equals(object? value) => false; public override int GetHashCode() => 0; }\n" +
+            "class C { static int M(P? value) { if (value == null) throw new System.Exception(); return value.Value; } }",
+            "value.Value",
+            exceptionType: "System.NullReferenceException",
+            forbiddenStatus: "Unreachable");
+        yield return Hazard("NonZeroBasedMultidimensionalArrayBoundsAreNotAssumedToStartAtZero",
+            "class C { static int M(int[,] values, int i, int j) => values[i, j]; }", "values[i",
+            kind: "IndexOutOfRange", forbiddenStatus: "Unreachable");
+        yield return Hazard("PerDimensionLowerAndUpperBoundsCanProveMultidimensionalAccessSafe",
+            "class C { static int M(int[,] values, int i, int j) { " +
+            "if (i < values.GetLowerBound(0) || i > values.GetUpperBound(0) || " +
+            "j < values.GetLowerBound(1) || j > values.GetUpperBound(1)) return 0; return values[i, j]; } }",
+            "values[i",
+            kind: "IndexOutOfRange",
+            status: "Unreachable");
+        yield return Hazard("ReorderedNamedMemoryExtensionArgumentsPreserveViewLength",
+            "class C { static char M(string text) { if (text.Length < 3) return '\\0'; " +
+            "var span = System.MemoryExtensions.AsSpan(start: 2, text: text); return span[text.Length - 3]; } }",
+            "span[text.Length",
+            kind: "IndexOutOfRange",
+            status: "Unreachable");
+        yield return Hazard("SymbolicDecimalArithmeticProducesAConservativeOverflowCandidate",
+            "class C { static decimal M(decimal value) => value * decimal.MaxValue; }", "value *",
+            exceptionType: "System.OverflowException", status: "Unknown");
+        yield return Hazard("ConstantDecimalArithmeticIsClassifiedExactly",
+            "class C { static decimal M() => 1m + 2m; }", "1m +",
+            exceptionType: "System.OverflowException", expected: false);
+        yield return Hazard("DecimalDivisionByZeroIsProven",
+            "class C { static decimal M(decimal value) => value / 0m; }", "value /",
+            exceptionType: "System.DivideByZeroException", status: "Proven");
     }
-    [Test]
-    public void NullableConditionalAccessPreservesInnerHasValue() {
-        const string source = """
-            sealed class B { public int? Get() => null; }
-            class C { static int M(B? value) { var x = value?.Get(); return x.Value; } }
-            """;
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = AnalyzeHazardsAt(session, source, "x.Value", 0);
-        Assert.That(result.Hazards, Has.Some.Matches<SharpProofHazard>(hazard =>
-            hazard.ExceptionType == "System.InvalidOperationException" && hazard.Status == "Proven"));
+    [TestCaseSource(nameof(HazardCases))]
+    public void HazardMatrix(HazardCase test) {
+        using var session = SharpProofAnalysisSession.FromText(test.Source);
+        var result = AnalyzeHazardsAt(session, test.Source, test.Marker, 0);
+        Assert.That(result.Hazards.Any(hazard =>
+            (test.Kind is null || hazard.Kind == test.Kind) &&
+            (test.ExceptionType is null || hazard.ExceptionType == test.ExceptionType) &&
+            (test.Status is null || hazard.Status == test.Status) &&
+            (test.ForbiddenStatus is null || hazard.Status != test.ForbiddenStatus)),
+            Is.EqualTo(test.Expected));
     }
-    [Test]
-    public void DefinitionTimeSnapshotPreservesDefiniteInvalidCast() {
-        const string source = """
-            class A { }
-            class B { }
-            class C { static B M() { object y = new A(); object x = y; y = new B(); return (B)x; } }
-            """;
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = AnalyzeHazardsAt(session, source, "(B)x", 0);
-        Assert.That(result.Hazards, Has.Some.Matches<SharpProofHazard>(hazard =>
-            hazard.ExceptionType == "System.InvalidCastException" && hazard.Status == "Proven"));
-    }
-    [Test]
-    public void DefinitionTimeSnapshotPreservesDefiniteArrayTypeMismatch() {
-        const string source = """
-            class C {
-                static void M() {
-                    object[] later = new string[1];
-                    var snapshot = later;
-                    later = new object[1];
-                    snapshot[0] = new object();
-                }
-            }
-            """;
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = AnalyzeHazardsAt(session, source, "snapshot[0]", 0);
-        Assert.That(result.Hazards, Has.Some.Matches<SharpProofHazard>(hazard =>
-            hazard.ExceptionType == "System.ArrayTypeMismatchException" && hazard.Status == "Proven"));
-    }
-    [Test]
-    public void OpenVirtualPredicateDoesNotMakeReachableHazardUnreachable() {
-        const string source = """
-            class B { public virtual bool IsZero() => false; }
-            sealed class D : B { public override bool IsZero() => true; }
-            class C {
-                static int M(B value) {
-                    var zero = 0;
-                    if (value.IsZero()) return 10 / zero;
-                    return 1;
-                }
-            }
-            """;
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = AnalyzeHazardsAt(session, source, "10 / zero", 0);
-        Assert.That(result.Hazards, Has.Some.Matches<SharpProofHazard>(hazard =>
-            hazard.ExceptionType == "System.DivideByZeroException" && hazard.Status != "Unreachable"));
-    }
-    [Test]
-    public void UserDefinedEqualityDoesNotEstablishANullGuard() {
-        const string source = """
-            class P {
-                public int Value;
-                public static bool operator ==(P? left, P? right) => false;
-                public static bool operator !=(P? left, P? right) => true;
-                public override bool Equals(object? value) => false;
-                public override int GetHashCode() => 0;
-            }
-            class C { static int M(P? value) { if (value == null) throw new System.Exception(); return value.Value; } }
-            """;
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = AnalyzeHazardsAt(session, source, "value.Value", 0);
-        Assert.That(result.Hazards, Has.Some.Matches<SharpProofHazard>(hazard =>
-            hazard.ExceptionType == "System.NullReferenceException" && hazard.Status != "Unreachable"));
-    }
-    [Test]
-    public void NonZeroBasedMultidimensionalArrayBoundsAreNotAssumedToStartAtZero() {
-        const string source = "class C { static int M(int[,] values, int i, int j) => values[i, j]; }";
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = AnalyzeHazardsAt(session, source, "values[i", 0);
-        Assert.That(result.Hazards, Has.Some.Matches<SharpProofHazard>(hazard =>
-            hazard.Kind == "IndexOutOfRange" && hazard.Status != "Unreachable"));
-    }
-    [Test]
-    public void PerDimensionLowerAndUpperBoundsCanProveMultidimensionalAccessSafe() {
-        const string source = """
-            class C {
-                static int M(int[,] values, int i, int j) {
-                    if (i < values.GetLowerBound(0) || i > values.GetUpperBound(0) ||
-                        j < values.GetLowerBound(1) || j > values.GetUpperBound(1)) return 0;
-                    return values[i, j];
-                }
-            }
-            """;
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = AnalyzeHazardsAt(session, source, "values[i", 0);
-        Assert.That(result.Hazards, Has.Some.Matches<SharpProofHazard>(hazard =>
-            hazard.Kind == "IndexOutOfRange" && hazard.Status == "Unreachable"));
-    }
-    [Test]
-    public void ReorderedNamedMemoryExtensionArgumentsPreserveViewLength() {
-        const string source = """
-            class C {
-                static char M(string text) {
-                    if (text.Length < 3) return '\0';
-                    var span = System.MemoryExtensions.AsSpan(start: 2, text: text);
-                    return span[text.Length - 3];
-                }
-            }
-            """;
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = AnalyzeHazardsAt(session, source, "span[text.Length", 0);
-        Assert.That(result.Hazards, Has.Some.Matches<SharpProofHazard>(hazard =>
-            hazard.Kind == "IndexOutOfRange" && hazard.Status == "Unreachable"));
-    }
-    [Test]
-    public void SymbolicDecimalArithmeticProducesAConservativeOverflowCandidate() {
-        const string source = "class C { static decimal M(decimal value) => value * decimal.MaxValue; }";
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = AnalyzeHazardsAt(session, source, "value *", 0);
-        Assert.That(result.Hazards, Has.Some.Matches<SharpProofHazard>(hazard =>
-            hazard.ExceptionType == "System.OverflowException" && hazard.Status == "Unknown"));
-    }
-    [Test]
-    public void ConstantDecimalArithmeticIsClassifiedExactly() {
-        const string source = "class C { static decimal M() => 1m + 2m; }";
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = AnalyzeHazardsAt(session, source, "1m +", 0);
-        Assert.That(result.Hazards, Has.None.Matches<SharpProofHazard>(hazard =>
-            hazard.ExceptionType == "System.OverflowException"));
-    }
-    [Test]
-    public void DecimalDivisionByZeroIsProven() {
-        const string source = "class C { static decimal M(decimal value) => value / 0m; }";
-        using var session = SharpProofAnalysisSession.FromText(source);
-        var result = AnalyzeHazardsAt(session, source, "value /", 0);
-        Assert.That(result.Hazards, Has.Some.Matches<SharpProofHazard>(hazard =>
-            hazard.ExceptionType == "System.DivideByZeroException" && hazard.Status == "Proven"));
-    }
+    private static TestCaseData Hazard(string name, string source, string marker,
+        string? kind = null, string? exceptionType = null, string? status = null, string? forbiddenStatus = null,
+        bool expected = true) =>
+        new(new HazardCase(name, source, marker, kind, exceptionType, status, forbiddenStatus, expected)) {
+            TestName = name
+        };
     private static SharpProofAnalysisResult AnalyzeHazardsAt(
         SharpProofAnalysisSession session,
         string source,
@@ -459,5 +368,16 @@ public sealed class SharpProofAnalysisSessionTests {
         return session.Analyze(new SharpProofAnalysisRequest(
             new SharpProofTarget(SharpProofTargetKind.Position, Position: position),
             SharpProofAnalysisFacet.RuntimeHazards));
+    }
+    private static SharpProofAnalysisResult AnalyzeProof(
+        string source,
+        int line,
+        int column,
+        string condition) {
+        using var session = SharpProofAnalysisSession.FromText(source);
+        return session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Point, Line: line, Column: column),
+            SharpProofAnalysisFacet.ProofFacts,
+            condition));
     }
 }

@@ -603,10 +603,10 @@ Target: 130-200 net lines.
 
 Target: approximately 80-115 lines.
 
-- [ ] Introduce a typed `HazardCase` for repeated
+- [x] Introduce a typed `HazardCase` for repeated
       source/session/query/predicate tests near line 289: 60-90 lines.
-- [ ] Share repeated proof-query setup elsewhere: another 20-25 lines.
-- [ ] Preserve exact hazard kind, exception type, status, operation text, and
+- [x] Share repeated proof-query setup elsewhere: another 20-25 lines.
+- [x] Preserve exact hazard kind, exception type, status, operation text, and
       counterexample assertions.
 
 ### 8.2 Unified CLI tests
