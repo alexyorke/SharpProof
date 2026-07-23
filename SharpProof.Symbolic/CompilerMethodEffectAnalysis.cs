@@ -2920,6 +2920,16 @@ internal sealed class MethodEffectAnalysisSession(
                 Type: IArrayTypeSymbol { Rank: 1, ElementType.SpecialType: SpecialType.System_Byte }
             } &&
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsBitConverterDoubleToInt64Bits(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "DoubleToInt64Bits",
+                IsStatic: true,
+                Parameters.Length: 1,
+                ReturnType.SpecialType: SpecialType.System_Int64
+            } &&
+            method.ContainingType.ToDisplayString() == "System.BitConverter" &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Double };
         private static bool IsBitConverterToStringArray(IMethodSymbol method) =>
             method is {
                 MethodKind: MethodKind.Ordinary,
@@ -3831,6 +3841,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.BitConverter", MethodKind.Ordinary, "ToHalf")
                     when IsBitConverterToHalfArray(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
+                ("System.BitConverter", MethodKind.Ordinary, "DoubleToInt64Bits")
+                    when IsBitConverterDoubleToInt64Bits(method) =>
+                    SharpProofEffect.None,
                 ("System.BitConverter", MethodKind.Ordinary, "ToString")
                     when IsBitConverterToStringArray(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
