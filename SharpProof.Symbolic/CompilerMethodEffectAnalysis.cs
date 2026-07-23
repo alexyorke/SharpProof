@@ -739,6 +739,12 @@ internal sealed class MethodEffectAnalysisSession(
                     var array = Evaluate(element.ArrayReference, ref state);
                     foreach (var index in element.Indices) Evaluate(index, ref state);
                     effects.Read(array, element.Syntax, element.Type as ISymbol, "array_element_read");
+                    if (element.Indices.Length == 1 && element.Indices[0].Type is { } indexType &&
+                        SymbolEqualityComparer.Default.Equals(
+                            indexType, session.Compilation.GetTypeByMetadataName("System.Range"))) {
+                        effects.Add(SharpProofEffect.Allocates, element.Syntax, element.Type, "array_slice_allocation");
+                        return EffectFlowValue.Fresh(element.Type);
+                    }
                     return array.Member(IndexKey(element.Indices));
                 case IInlineArrayAccessOperation inlineArray:
                     var inlineReceiver = Evaluate(inlineArray.Instance, ref state);
