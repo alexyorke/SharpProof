@@ -2496,6 +2496,16 @@ internal sealed class MethodEffectAnalysisSession(
                 (_, MethodKind.Ordinary, "Write")
                     when IsMemoryMarshalWrite(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+                ("System.Runtime.CompilerServices.RuntimeHelpers", MethodKind.Ordinary,
+                    "IsReferenceOrContainsReferences")
+                    when method is {
+                        IsStatic: true,
+                        IsGenericMethod: true,
+                        TypeArguments.Length: 1,
+                        Parameters.Length: 0,
+                        ReturnType.SpecialType: SpecialType.System_Boolean
+                    } =>
+                    SharpProofEffect.None,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,

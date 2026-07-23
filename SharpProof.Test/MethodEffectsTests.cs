@@ -1369,6 +1369,24 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
             forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("RuntimeHelpersReferenceCheckIsPure", """
+            class C {
+                static bool M() =>
+                    System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<int>();
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("RuntimeHelpersReferenceCheckSupportsReferenceTypes", """
+            class C {
+                static bool M() =>
+                    System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<string>();
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
