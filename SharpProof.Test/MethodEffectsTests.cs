@@ -808,6 +808,22 @@ public sealed class MethodEffectsTests {
             purity: SharpProofVerdict.Proven,
             allocationFree: SharpProofVerdict.Proven,
             forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("MathSqrtIsPureAndAllocationFree", """
+            class C {
+                static double M(double value) => System.Math.Sqrt(value);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("MathFSqrtIsPureAndAllocationFree", """
+            class C {
+                static float M(float value) => System.MathF.Sqrt(value);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {

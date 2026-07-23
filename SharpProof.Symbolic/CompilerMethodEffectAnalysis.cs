@@ -2187,7 +2187,7 @@ internal sealed class MethodEffectAnalysisSession(
                          method.Parameters.Length == 1 &&
                          method.Parameters[0].Type.SpecialType == SpecialType.System_Char =>
                     SharpProofEffect.None,
-                ("System.Math" or "System.MathF", _, "Min" or "Max") => SharpProofEffect.None,
+                ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
                 (_, _, "Split" or "Substring" or "Trim" or "TrimStart" or "TrimEnd" or "Replace" or
