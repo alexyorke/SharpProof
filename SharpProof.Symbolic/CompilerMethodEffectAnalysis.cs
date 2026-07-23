@@ -2686,6 +2686,13 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Array", MethodKind.Ordinary, "Reverse")
                     when IsArrayReverse(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+                ("System.Array", MethodKind.Ordinary, "Clone")
+                    when method is {
+                        IsStatic: false,
+                        Parameters.Length: 0,
+                        ReturnType.SpecialType: SpecialType.System_Object
+                    } =>
+                    SharpProofEffect.ReadsReceiverState | SharpProofEffect.Allocates,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
