@@ -81,4 +81,24 @@ public sealed class UnknownContractDiagnosticTests {
             Assert.That(exceptionDiagnostics.Select(static diagnostic => diagnostic.Location.SourceSpan).Distinct().Count(), Is.EqualTo(1));
         });
     }
+    [Test]
+    public async Task InterfaceDoesNotThrowContractAppliesToImplementation() {
+        const string source = """
+            using SharpProof.Attributes;
+            public interface IWorker {
+                [DoesNotThrow]
+                void Work();
+            }
+            public sealed class Worker : IWorker {
+                public void Work() => throw new System.InvalidOperationException();
+            }
+            """;
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source);
+        var violations = diagnostics.Where(static diagnostic => diagnostic.Id == "SP0030").ToArray();
+        Assert.That(
+            violations,
+            Has.Some.Matches<Microsoft.CodeAnalysis.Diagnostic>(diagnostic =>
+                diagnostic.Location.GetLineSpan().StartLinePosition.Line == 6),
+            string.Join(Environment.NewLine, diagnostics));
+    }
 }

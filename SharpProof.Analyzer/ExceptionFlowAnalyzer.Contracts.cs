@@ -2,8 +2,10 @@ namespace SharpProof.Analyzer;
 internal static partial class ExceptionFlowAnalyzer {
     private static ImmutableArray<EffectiveExceptionContract> CollectExceptionContracts(MethodBodyAnalysisContext context) {
         var builder = ImmutableArray.CreateBuilder<EffectiveExceptionContract>(2);
-        var doesNotThrow = SharpProofAttributeIdentityPolicy
-            .GetAcceptedAttributes(context.MethodSymbol, "DoesNotThrowAttribute").FirstOrDefault();
+        var doesNotThrow = MethodContractHierarchy
+            .EnumerateSources(context.MethodSymbol, context.CancellationToken)
+            .SelectMany(source => SharpProofAttributeIdentityPolicy.GetAcceptedAttributes(source, "DoesNotThrowAttribute"))
+            .FirstOrDefault();
         if (doesNotThrow != null)
             builder.Add(new EffectiveExceptionContract(
                 ExceptionContractKind.DoesNotThrow,
