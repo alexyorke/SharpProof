@@ -84,6 +84,10 @@ public sealed class SymbolicComplexityTests {
             """public static class C { public static int Work(int n) { var i=0; while(i<n){n++;i++;} return i; } }""",
             "return i;", SymbolicComplexityKind.Unknown,
             unknowns: [SymbolicComplexityUnknownReason.UnsupportedWhileLoop]);
+        yield return Case("WhileLoopDoesNotUseStepInsideUninvokedLocalFunction",
+            """public static class C { public static int Work(int n) { var i=0; while(i<n){void Step(){i++;}} return i; } }""",
+            "return i;", SymbolicComplexityKind.Unknown,
+            unknowns: [SymbolicComplexityUnknownReason.UnsupportedWhileLoop]);
         yield return Case("KnownSourceCallee_ComposesIntoSurroundingLoop",
             """public static class C { public static void Helper(int m){for(var j=0;j<m;j++) { }} public static void Caller(int n,int m){for(var i=0;i<n;i++){Helper(m);}} }""",
             "Helper(m);", SymbolicComplexityKind.Product, "O(n * m)", callee: "Helper");
