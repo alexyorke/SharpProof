@@ -613,8 +613,8 @@ Target: approximately 80-115 lines.
 
 Target: 15-25 lines.
 
-- [ ] Extract one temporary-source command runner.
-- [ ] Preserve exit code, stdout, stderr, file cleanup, and argument-order
+- [x] Extract one temporary-source command runner.
+- [x] Preserve exit code, stdout, stderr, file cleanup, and argument-order
       checks.
 
 ### 8.3 Fuzz runner behavior tests
