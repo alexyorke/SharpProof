@@ -2,7 +2,6 @@ using System.Diagnostics;
 using NUnit.Framework;
 namespace SharpProof.Test;
 internal static class SymbolicCliTestHost {
-    private static readonly SemaphoreSlim BuildGate = new(1, 1);
     private static readonly Lazy<string> RepositoryRoot = new(AnalyzerTestHost.GetRepositoryRoot);
     private static readonly Lazy<string> BuildConfiguration = new(FindBuildConfiguration);
     private static readonly Lazy<Task<string>> CliAssemblyPath =
@@ -25,40 +24,32 @@ internal static class SymbolicCliTestHost {
     private static async Task<string> EnsureCliAssemblyPathAsync(string repositoryRoot) {
         var existingPath = FindExistingCliAssemblyPath(repositoryRoot);
         if (existingPath != null) return existingPath;
-        await BuildGate.WaitAsync().ConfigureAwait(false);
-        try {
-            existingPath = FindExistingCliAssemblyPath(repositoryRoot);
-            if (existingPath != null) return existingPath;
-            var buildConfiguration = FindBuildConfiguration();
-            var startInfo = new ProcessStartInfo {
-                FileName = "dotnet",
-                WorkingDirectory = repositoryRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            };
-            startInfo.ArgumentList.Add("build");
-            startInfo.ArgumentList.Add(Path.Combine("Tools", "SharpProof.SymbolicCli", "SharpProof.SymbolicCli.csproj"));
-            startInfo.ArgumentList.Add("--configuration");
-            startInfo.ArgumentList.Add(buildConfiguration);
-            startInfo.ArgumentList.Add("--verbosity");
-            startInfo.ArgumentList.Add("minimal");
-            startInfo.ArgumentList.Add("/m:1");
-            startInfo.ArgumentList.Add("/nodeReuse:false");
-            startInfo.ArgumentList.Add("-p:UseSharedCompilation=false");
-            var buildResult = await RunProcessAsync(startInfo, TimeSpan.FromSeconds(420),
-                "Failed to start symbolic CLI build.").ConfigureAwait(false);
-            if (buildResult.ExitCode != 0)
-                throw new InvalidOperationException(
-                    "Building SharpProof.SymbolicCli failed." + Environment.NewLine +
-                    buildResult.StandardOutput + Environment.NewLine +
-                    buildResult.StandardError);
-            existingPath = FindExistingCliAssemblyPath(repositoryRoot);
-            if (existingPath != null) return existingPath;
-        }
-        finally {
-            BuildGate.Release();
-        }
+        var buildConfiguration = FindBuildConfiguration();
+        var startInfo = new ProcessStartInfo {
+            FileName = "dotnet",
+            WorkingDirectory = repositoryRoot,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add("build");
+        startInfo.ArgumentList.Add(Path.Combine("Tools", "SharpProof.SymbolicCli", "SharpProof.SymbolicCli.csproj"));
+        startInfo.ArgumentList.Add("--configuration");
+        startInfo.ArgumentList.Add(buildConfiguration);
+        startInfo.ArgumentList.Add("--verbosity");
+        startInfo.ArgumentList.Add("minimal");
+        startInfo.ArgumentList.Add("/m:1");
+        startInfo.ArgumentList.Add("/nodeReuse:false");
+        startInfo.ArgumentList.Add("-p:UseSharedCompilation=false");
+        var buildResult = await RunProcessAsync(startInfo, TimeSpan.FromSeconds(420),
+            "Failed to start symbolic CLI build.").ConfigureAwait(false);
+        if (buildResult.ExitCode != 0)
+            throw new InvalidOperationException(
+                "Building SharpProof.SymbolicCli failed." + Environment.NewLine +
+                buildResult.StandardOutput + Environment.NewLine +
+                buildResult.StandardError);
+        existingPath = FindExistingCliAssemblyPath(repositoryRoot);
+        if (existingPath != null) return existingPath;
         throw new FileNotFoundException(
             "Could not find built SharpProof.SymbolicCli.dll after building it on demand.",
             Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli"));

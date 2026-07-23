@@ -657,7 +657,7 @@ Target: 35-45 net lines.
 - [x] Delete the custom empty analyzer-config provider in
       `FuzzAnalyzerConfiguration`; use `new AnalyzerOptions([])` from
       `FuzzRunner`: approximately 15 lines.
-- [ ] In `SymbolicCliTestHost`, remove `BuildGate` and double-check locking;
+- [x] In `SymbolicCliTestHost`, remove `BuildGate` and double-check locking;
       `Lazy<Task<string>>` already serializes initialization: 8-9 lines.
 - [ ] If still net-negative, share the process runner in
       `SymbolicCliTestHost`: 6-8 lines.
