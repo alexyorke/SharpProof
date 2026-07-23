@@ -865,6 +865,26 @@ public sealed class MethodEffectsTests {
             purity: SharpProofVerdict.Proven,
             allocationFree: SharpProofVerdict.Proven,
             forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("InterlockedIncrementWritesArgumentWithoutAllocating", """
+            class C {
+                static int M(ref int value) =>
+                    System.Threading.Interlocked.Increment(ref value);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("InterlockedIncrementLongWritesArgumentWithoutAllocating", """
+            class C {
+                static long M(ref long value) =>
+                    System.Threading.Interlocked.Increment(ref value);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
