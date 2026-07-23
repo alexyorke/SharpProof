@@ -1027,21 +1027,15 @@ internal static class SymbolicIndexingLowerer {
             invocationOperation.TargetMethod.ContainingType is not { } containingType ||
             !IsSystemRangeType(containingType, context.SemanticModel.Compilation))
             return false;
-        if (invocationOperation.TargetMethod.Name == "StartAt") {
-            if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var startExpression) ||
-                !TryResolveBuiltInIndexLengthShape(startExpression, context, out var start))
-                return false;
-            rangeShape = new RangeLengthShape(true, start, false, default);
-            return true;
-        }
-        if (invocationOperation.TargetMethod.Name == "EndAt") {
-            if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var endExpression) ||
-                !TryResolveBuiltInIndexLengthShape(endExpression, context, out var end))
-                return false;
-            rangeShape = new RangeLengthShape(false, default, true, end);
-            return true;
-        }
-        return false;
+        var startsAt = invocationOperation.TargetMethod.Name == "StartAt";
+        if (!startsAt && invocationOperation.TargetMethod.Name != "EndAt" ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var endpointExpression) ||
+            !TryResolveBuiltInIndexLengthShape(endpointExpression, context, out var endpoint))
+            return false;
+        rangeShape = startsAt
+            ? new RangeLengthShape(true, endpoint, false, default)
+            : new RangeLengthShape(false, default, true, endpoint);
+        return true;
     }
     private static bool TryCreateRangeObjectCreationShape(
         ExpressionSyntax expression,
@@ -1088,15 +1082,10 @@ internal static class SymbolicIndexingLowerer {
             !IsSystemIndexType(containingType, context.SemanticModel.Compilation) ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var valueExpression))
             return false;
-        if (invocationOperation.TargetMethod.Name == "FromStart") {
-            indexShape = new IndexLengthShape(valueExpression, false, true);
-            return true;
-        }
-        if (invocationOperation.TargetMethod.Name == "FromEnd") {
-            indexShape = new IndexLengthShape(valueExpression, true, true);
-            return true;
-        }
-        return false;
+        var fromEnd = invocationOperation.TargetMethod.Name == "FromEnd";
+        if (!fromEnd && invocationOperation.TargetMethod.Name != "FromStart") return false;
+        indexShape = new IndexLengthShape(valueExpression, fromEnd, true);
+        return true;
     }
     private static bool TryCreateIndexObjectCreationShape(
         ExpressionSyntax expression,
@@ -1147,18 +1136,14 @@ internal static class SymbolicIndexingLowerer {
             parameterIndex >= objectCreationOperation.Constructor.Parameters.Length)
             return false;
         var parameter = objectCreationOperation.Constructor.Parameters[parameterIndex];
-        foreach (var argument in objectCreationOperation.Arguments)
-            if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
-                argument.Value.Syntax is ExpressionSyntax expression) {
-                argumentExpression = expression;
-                return true;
-            }
-        if (parameterIndex < objectCreationOperation.Arguments.Length &&
-            objectCreationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression) {
-            argumentExpression = fallbackExpression;
-            return true;
-        }
-        return false;
+        IArgumentOperation? argument = objectCreationOperation.Arguments.FirstOrDefault(candidate =>
+            SymbolEqualityComparer.Default.Equals(candidate.Parameter, parameter));
+        argument ??= parameterIndex < objectCreationOperation.Arguments.Length
+            ? objectCreationOperation.Arguments[parameterIndex]
+            : null;
+        if (argument?.Value.Syntax is not ExpressionSyntax expression) return false;
+        argumentExpression = expression;
+        return true;
     }
     private static bool IsSystemRangeExpression(ExpressionSyntax expression, SymbolicLoweringContext context) {
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);

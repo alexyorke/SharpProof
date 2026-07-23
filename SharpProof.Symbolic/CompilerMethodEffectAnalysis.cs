@@ -870,16 +870,8 @@ internal sealed class MethodEffectAnalysisSession(
                     var awaitedValue = Evaluate(awaited.Operation, ref state);
                     if (awaited.Syntax is AwaitExpressionSyntax awaitSyntax) {
                         var info = semanticModel.GetAwaitExpressionInfo(awaitSyntax);
-                        var awaiter = InvokeCoreOrValue(info.GetAwaiterMethod, awaitedValue, awaited, ref state);
-                        InvokeCoreOrValue(info.IsCompletedProperty?.GetMethod, awaiter, awaited, ref state);
-                        InvokeCoreOrValue(info.GetResultMethod, awaiter, awaited, ref state);
-                        var continuation = FindProtocolMethod(info.GetAwaiterMethod?.ReturnType, "UnsafeOnCompleted", 1) ??
-                                           FindImplementedProtocolMethod(
-                                               info.GetAwaiterMethod?.ReturnType, "UnsafeOnCompleted", 1) ??
-                                           FindProtocolMethod(info.GetAwaiterMethod?.ReturnType, "OnCompleted", 1) ??
-                                           FindImplementedProtocolMethod(
-                                               info.GetAwaiterMethod?.ReturnType, "OnCompleted", 1);
-                        InvokeCoreOrValue(continuation, awaiter, awaited, ref state);
+                        AnalyzeAwaiter(info.GetAwaiterMethod, info.IsCompletedProperty, info.GetResultMethod,
+                            awaitedValue, awaited, ref state);
                     }
                     return awaitedValue;
                 case IForEachLoopOperation loop:
@@ -1706,13 +1698,20 @@ internal sealed class MethodEffectAnalysisSession(
             var getAwaiter = FindProtocolMethod(type, "GetAwaiter", 0) ?? extensionAwaiters
                 .Select(method => method.ReducedFrom != null ? method : type == null ? null : method.ReduceExtensionMethod(type))
                 .FirstOrDefault(static method => method?.Parameters.Length == 0);
+            AnalyzeAwaiter(getAwaiter, null, FindProtocolMethod(getAwaiter?.ReturnType, "GetResult", 0),
+                receiver, site, ref state);
+        }
+        private void AnalyzeAwaiter(
+            IMethodSymbol? getAwaiter,
+            IPropertySymbol? isCompleted,
+            IMethodSymbol? getResult,
+            EffectFlowValue receiver,
+            IOperation site,
+            ref EffectFlowState state) {
             var awaiter = InvokeCoreOrValue(getAwaiter, receiver, site, ref state);
-            InvokeCoreOrValue(FindProtocolMethod(getAwaiter?.ReturnType, "GetResult", 0), awaiter, site, ref state);
-            var continuation = FindProtocolMethod(getAwaiter?.ReturnType, "UnsafeOnCompleted", 1) ??
-                               FindImplementedProtocolMethod(getAwaiter?.ReturnType, "UnsafeOnCompleted", 1) ??
-                               FindProtocolMethod(getAwaiter?.ReturnType, "OnCompleted", 1) ??
-                               FindImplementedProtocolMethod(getAwaiter?.ReturnType, "OnCompleted", 1);
-            InvokeCoreOrValue(continuation, awaiter, site, ref state);
+            InvokeCoreOrValue(isCompleted?.GetMethod, awaiter, site, ref state);
+            InvokeCoreOrValue(getResult, awaiter, site, ref state);
+            InvokeCoreOrValue(FindContinuation(getAwaiter?.ReturnType), awaiter, site, ref state);
         }
         private EffectFlowValue FindPatternInput(IOperation pattern, ref EffectFlowState state) {
             for (var parent = pattern.Parent; parent != null; parent = parent.Parent) {
@@ -1722,36 +1721,31 @@ internal sealed class MethodEffectAnalysisSession(
             }
             return EffectFlowValue.Unknown;
         }
-        private static IMethodSymbol? FindProtocolMethod(ITypeSymbol? type, string name, int parameterCount) {
+        private static T? FindProtocolMember<T>(ITypeSymbol? type, string name, Func<T, bool> predicate)
+            where T : class, ISymbol {
             if (type is not INamedTypeSymbol named) return null;
             for (var current = named; current != null; current = current.BaseType) {
-                var method = current.GetMembers(name).OfType<IMethodSymbol>()
-                    .FirstOrDefault(candidate => !candidate.IsStatic && candidate.Parameters.Length == parameterCount);
-                if (method != null) return method;
+                var member = current.GetMembers(name).OfType<T>().FirstOrDefault(predicate);
+                if (member != null) return member;
             }
             if (named.TypeKind != TypeKind.Interface) return null;
             foreach (var interfaceType in named.AllInterfaces) {
-                var method = interfaceType.GetMembers(name).OfType<IMethodSymbol>()
-                    .FirstOrDefault(candidate => !candidate.IsStatic && candidate.Parameters.Length == parameterCount);
-                if (method != null) return method;
+                var member = interfaceType.GetMembers(name).OfType<T>().FirstOrDefault(predicate);
+                if (member != null) return member;
             }
             return null;
         }
-        private static IPropertySymbol? FindProtocolProperty(ITypeSymbol? type, string name) {
-            if (type is not INamedTypeSymbol named) return null;
-            for (var current = named; current != null; current = current.BaseType) {
-                var property = current.GetMembers(name).OfType<IPropertySymbol>()
-                    .FirstOrDefault(static candidate => !candidate.IsStatic && candidate.Parameters.Length == 0);
-                if (property != null) return property;
-            }
-            if (named.TypeKind != TypeKind.Interface) return null;
-            foreach (var interfaceType in named.AllInterfaces) {
-                var property = interfaceType.GetMembers(name).OfType<IPropertySymbol>()
-                    .FirstOrDefault(static candidate => !candidate.IsStatic && candidate.Parameters.Length == 0);
-                if (property != null) return property;
-            }
-            return null;
-        }
+        private static IMethodSymbol? FindProtocolMethod(ITypeSymbol? type, string name, int parameterCount) =>
+            FindProtocolMember<IMethodSymbol>(
+                type, name, candidate => !candidate.IsStatic && candidate.Parameters.Length == parameterCount);
+        private static IPropertySymbol? FindProtocolProperty(ITypeSymbol? type, string name) =>
+            FindProtocolMember<IPropertySymbol>(
+                type, name, static candidate => !candidate.IsStatic && candidate.Parameters.Length == 0);
+        private static IMethodSymbol? FindContinuation(ITypeSymbol? type) =>
+            FindProtocolMethod(type, "UnsafeOnCompleted", 1) ??
+            FindImplementedProtocolMethod(type, "UnsafeOnCompleted", 1) ??
+            FindProtocolMethod(type, "OnCompleted", 1) ??
+            FindImplementedProtocolMethod(type, "OnCompleted", 1);
         private static IMethodSymbol? ResolveProtocolImplementation(
             IMethodSymbol? member,
             EffectFlowValue receiver) {
