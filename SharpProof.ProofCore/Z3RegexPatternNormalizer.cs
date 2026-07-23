@@ -2,16 +2,18 @@ namespace SharpProof.ProofCore.Smt;
 internal static class Z3RegexPatternNormalizer {
     internal static bool TryNormalize(string pattern, RegexOptions options, out NormalizedRegexPattern normalized) {
         var multiline = (options & RegexOptions.Multiline) != 0;
+        var effectivePatternLength = FindEffectivePatternLength(pattern, options);
+        var effectivePattern = pattern.Substring(0, effectivePatternLength);
         var startAnchored = TryFindLeadingStartAnchor(pattern, options, !multiline, out var startAnchorStart, out var startAnchorLength);
-        var strictEndAnchored = EndsWithUnescapedAnchor(pattern, @"\z");
-        var finalNewlineEndAnchored = !strictEndAnchored && EndsWithUnescapedAnchor(pattern, @"\Z");
+        var strictEndAnchored = EndsWithUnescapedAnchor(effectivePattern, @"\z");
+        var finalNewlineEndAnchored = !strictEndAnchored && EndsWithUnescapedAnchor(effectivePattern, @"\Z");
         var dollarEndAnchored = !strictEndAnchored &&
                                 !finalNewlineEndAnchored &&
                                 !multiline &&
-                                pattern.EndsWith("$", StringComparison.Ordinal) &&
-                                !IsEscaped(pattern, pattern.Length - 1);
+                                effectivePattern.EndsWith("$", StringComparison.Ordinal) &&
+                                !IsEscaped(effectivePattern, effectivePattern.Length - 1);
         var bodyEndTrim = strictEndAnchored || finalNewlineEndAnchored ? 2 : dollarEndAnchored ? 1 : 0;
-        var bodyEnd = pattern.Length - bodyEndTrim;
+        var bodyEnd = effectivePatternLength - bodyEndTrim;
         if (bodyEnd < 0 || (startAnchored && startAnchorStart + startAnchorLength > bodyEnd)) {
             normalized = default;
             return false;
@@ -20,6 +22,99 @@ internal static class Z3RegexPatternNormalizer {
         if (startAnchored) bodyPattern = bodyPattern.Remove(startAnchorStart, startAnchorLength);
         normalized = new NormalizedRegexPattern(bodyPattern, startAnchored, strictEndAnchored, finalNewlineEndAnchored, dollarEndAnchored);
         return true;
+    }
+    private static int FindEffectivePatternLength(string pattern, RegexOptions options) {
+        var currentScope = CreateInitialOptionScope(options);
+        var scopes = new Stack<RegexOptionScope>();
+        var lastSignificantEnd = 0;
+        var position = 0;
+        while (position < pattern.Length) {
+            if (currentScope.IgnorePatternWhitespace) {
+                if (char.IsWhiteSpace(pattern[position])) {
+                    position++;
+                    continue;
+                }
+                if (pattern[position] == '#') {
+                    position++;
+                    while (position < pattern.Length && pattern[position] is not ('\r' or '\n')) position++;
+                    continue;
+                }
+            }
+            if (pattern[position] == '\\') {
+                position = Math.Min(position + 2, pattern.Length);
+                lastSignificantEnd = position;
+                continue;
+            }
+            if (pattern[position] == '[') {
+                SkipCharacterClass(pattern, ref position);
+                lastSignificantEnd = position;
+                continue;
+            }
+            if (TrySkipInlineComment(pattern, ref position)) continue;
+            if (pattern[position] == '(') {
+                var optionPosition = position + 2;
+                if (position + 2 < pattern.Length &&
+                    pattern[position + 1] == '?' &&
+                    TryReadOptionsUntil(pattern, ref optionPosition, ')', currentScope, true, out var unscopedOptions)) {
+                    currentScope = unscopedOptions;
+                    position = optionPosition;
+                    lastSignificantEnd = position;
+                    continue;
+                }
+                optionPosition = position + 2;
+                if (position + 2 < pattern.Length &&
+                    pattern[position + 1] == '?' &&
+                    TryReadOptionsUntil(pattern, ref optionPosition, ':', currentScope, true, out var scopedOptions)) {
+                    scopes.Push(currentScope);
+                    currentScope = scopedOptions;
+                    position = optionPosition;
+                    lastSignificantEnd = position;
+                    continue;
+                }
+                scopes.Push(currentScope);
+            }
+            else if (pattern[position] == ')' && scopes.Count > 0) {
+                currentScope = scopes.Pop();
+            }
+            position++;
+            lastSignificantEnd = position;
+        }
+        return lastSignificantEnd;
+    }
+    private static void SkipCharacterClass(string pattern, ref int position) {
+        var depth = 1;
+        var firstCharacter = true;
+        position++;
+        while (position < pattern.Length && depth > 0) {
+            if (pattern[position] == '\\') {
+                position = Math.Min(position + 2, pattern.Length);
+                firstCharacter = false;
+                continue;
+            }
+            if (firstCharacter && pattern[position] == '^') {
+                position++;
+                continue;
+            }
+            if (firstCharacter && pattern[position] == ']') {
+                position++;
+                firstCharacter = false;
+                continue;
+            }
+            if (pattern[position] == '[' && position > 0 && pattern[position - 1] == '-') {
+                depth++;
+                position++;
+                firstCharacter = true;
+                continue;
+            }
+            if (pattern[position] == ']') {
+                depth--;
+                position++;
+                firstCharacter = false;
+                continue;
+            }
+            position++;
+            firstCharacter = false;
+        }
     }
     internal static RegexOptionScope CreateInitialOptionScope(RegexOptions options) => new(
         (options & RegexOptions.IgnorePatternWhitespace) != 0,

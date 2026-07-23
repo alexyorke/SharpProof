@@ -162,6 +162,14 @@ internal class ProofCoreZ3SmokeTests {
             @"\A\p{NotARealCategory}\z", RegexConstraint.LengthEqual, length: 1);
         yield return CreateRegexCase("SmtSolver_IgnorePatternWhitespaceBeforeStrictStartAnchorSkipsTrivia", Feasibility.Unsatisfiable,
             "(?x) # leading trivia\n \\A A B \\z", RegexConstraint.NotEqual, "AB");
+        yield return CreateRegexCase("SmtSolver_IgnorePatternWhitespaceAfterStrictEndAnchorSkipsTrivia", Feasibility.Unsatisfiable,
+            "(?x)\\A A B \\z # trailing trivia", RegexConstraint.NotEqual, "AB");
+        yield return CreateRegexCase("SmtSolver_IgnorePatternWhitespaceScopeRestoresBeforeTrailingTrivia", Feasibility.Unsatisfiable,
+            "(?x)\\A(?-x:A B)\\z # trailing trivia", RegexConstraint.NotEqual, "A B");
+        yield return CreateRegexCase("SmtSolver_DisabledIgnorePatternWhitespaceKeepsTrailingSpace", Feasibility.Unknown,
+            @"(?x)\AA(?-x)\z ");
+        yield return CreateRegexCase("SmtSolver_OptionTextInsideLeadingBracketClassDoesNotChangeWhitespaceMode", Feasibility.Unknown,
+            @"[](?x)]\z ");
         yield return CreateRegexCase("SmtSolver_InlineSinglelineBeforeCaretAnchorAllowsNewlineDot", Feasibility.Satisfiable, @"(?s)^.\z",
             RegexConstraint.Equal, "\n");
         yield return CreateRegexCase("SmtSolver_IgnorePatternWhitespaceGroupSkipsWhitespaceAndComments", Feasibility.Unsatisfiable,
@@ -266,6 +274,10 @@ internal class ProofCoreZ3SmokeTests {
             RegexConclusion.LengthEqual, length: 2, options: RegexOptions.CultureInvariant);
         yield return CreateRegexImplicationCase("SmtSolver_InlineOptionBeforeDollarAnchorImpliesBoundedFinalNewlineLength", "(?x)^ A $",
             RegexConclusion.LengthAtMost, length: 2);
+        yield return CreateRegexImplicationCase("SmtSolver_TrailingTriviaAfterFinalNewlineAnchorImpliesBoundedLength",
+            @"\AAB\Z # trailing trivia", RegexConclusion.LengthAtMost, length: 3, options: RegexOptions.IgnorePatternWhitespace);
+        yield return CreateRegexImplicationCase("SmtSolver_TrailingTriviaAfterDollarAnchorImpliesBoundedLength",
+            "(?x)^ A $ # trailing trivia", RegexConclusion.LengthAtMost, length: 2);
     }
     [TestCaseSource(nameof(RegexSatisfiabilityCases))]
     public void SmtSolver_RegexSatisfiabilityMatrix(RegexCase testCase) {
