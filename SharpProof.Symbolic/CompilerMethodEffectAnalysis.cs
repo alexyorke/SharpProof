@@ -747,6 +747,7 @@ internal sealed class MethodEffectAnalysisSession(
                     return inlineReceiver.Member("#?");
                 case IImplicitIndexerReferenceOperation implicitIndexer:
                     var indexerReceiver = Evaluate(implicitIndexer.Instance, ref state);
+                    Evaluate(implicitIndexer.Argument, ref state);
                     if (implicitIndexer.LengthSymbol is IPropertySymbol lengthProperty)
                         InvokeCoreOrValue(lengthProperty.GetMethod, indexerReceiver, implicitIndexer, ref state);
                     if (implicitIndexer.IndexerSymbol is IPropertySymbol indexerProperty)
