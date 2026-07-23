@@ -132,7 +132,7 @@ internal sealed class SymbolicState {
         IEnumerable<SymbolicCondition>? pathConditions = null,
         IEnumerable<KeyValuePair<string, int>>? symbolVersions = null,
         bool isContradictory = false,
-        SymbolicLoweringSupport support = SymbolicLoweringSupport.Exact,
+        bool isExact = true,
         SymbolicUnknownReason unknownReason = SymbolicUnknownReason.None,
         IEnumerable<SymbolicLoweringProvenance>? provenance = null) {
         var normalizedFacts = DeduplicateFacts(facts?.ToImmutableArray() ?? []);
@@ -146,7 +146,7 @@ internal sealed class SymbolicState {
         PathConditions = normalizedConditions;
         IsContradictory = isContradictory ||
                           ContainsContradiction(Facts, PathConditions);
-        Support = support;
+        IsExact = isExact;
         UnknownReason = unknownReason;
         Provenance = provenance?.ToImmutableArray() ?? [];
         NormalizedProofKey = CreateProofKey(Facts, PathConditions, SymbolVersions, IsContradictory);
@@ -155,20 +155,19 @@ internal sealed class SymbolicState {
     public ImmutableArray<SymbolicCondition> PathConditions { get; }
     public ImmutableDictionary<string, int> SymbolVersions { get; }
     public bool IsContradictory { get; }
-    public SymbolicLoweringSupport Support { get; }
     public SymbolicUnknownReason UnknownReason { get; }
     public ImmutableArray<SymbolicLoweringProvenance> Provenance { get; }
-    public bool IsExact => Support == SymbolicLoweringSupport.Exact;
+    public bool IsExact { get; }
     public string NormalizedProofKey { get; }
     public SymbolicState MarkContradictory() =>
-        new(Facts, PathConditions, SymbolVersions, true, Support, UnknownReason, Provenance);
+        new(Facts, PathConditions, SymbolVersions, true, IsExact, UnknownReason, Provenance);
     public SymbolicState AddFact(SymbolicFact fact) {
         if (fact == null) throw new ArgumentNullException(nameof(fact));
-        return new SymbolicState(Facts.Add(fact), PathConditions, SymbolVersions, IsContradictory, Support, UnknownReason, Provenance);
+        return new SymbolicState(Facts.Add(fact), PathConditions, SymbolVersions, IsContradictory, IsExact, UnknownReason, Provenance);
     }
     public SymbolicState AddPathCondition(SymbolicCondition condition) {
         if (condition == null) throw new ArgumentNullException(nameof(condition));
-        return new SymbolicState(Facts, PathConditions.Add(condition), SymbolVersions, IsContradictory, Support, UnknownReason, Provenance);
+        return new SymbolicState(Facts, PathConditions.Add(condition), SymbolVersions, IsContradictory, IsExact, UnknownReason, Provenance);
     }
     public SymbolicState WithSymbolVersion(string symbolKey, int version) {
         if (string.IsNullOrWhiteSpace(symbolKey))
@@ -178,7 +177,7 @@ internal sealed class SymbolicState {
             PathConditions,
             SymbolVersions.SetItem(symbolKey, version),
             IsContradictory,
-            Support,
+            IsExact,
             UnknownReason,
             Provenance);
     }
@@ -191,7 +190,7 @@ internal sealed class SymbolicState {
             normalizedConditions.SequenceEqual(PathConditions) &&
             contradictory == IsContradictory)
             return this;
-        return new SymbolicState(normalizedFacts, normalizedConditions, SymbolVersions, contradictory, Support, UnknownReason, Provenance);
+        return new SymbolicState(normalizedFacts, normalizedConditions, SymbolVersions, contradictory, IsExact, UnknownReason, Provenance);
     }
     private static ImmutableArray<SymbolicFact> AddIntrinsicDomainFacts(
         ImmutableArray<SymbolicFact> facts,

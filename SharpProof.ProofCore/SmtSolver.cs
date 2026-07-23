@@ -6,7 +6,6 @@ internal enum Feasibility {
     Unknown
 }
 internal sealed class SmtSolver : IDisposable {
-    internal const int MaxRegexValidationCacheEntries = SmtRegexValidator.MaxCacheEntries;
     private readonly Z3FormulaEncoder _encoder = new();
     private readonly SmtQuerySafety _safety = new();
     private long _lastObservedRlimitCount;

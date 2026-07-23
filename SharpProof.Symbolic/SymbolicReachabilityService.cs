@@ -63,7 +63,7 @@ internal static class SymbolicReachabilityService {
         return site;
     }
     private static SymbolicState UnsupportedState(SymbolicLoweringResult<SymbolicState> result) => new(
-        support: result.Support,
+        isExact: result.IsExact,
         unknownReason: result.UnknownReason == SymbolicUnknownReason.None
             ? SymbolicUnknownReason.UnsupportedIrEncoding
             : result.UnknownReason,

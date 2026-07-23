@@ -1,30 +1,22 @@
 namespace SharpProof.Symbolic.Ir;
-internal enum SymbolicLoweringSupport {
-    Exact,
-    Approximate,
-    Unsupported
-}
 internal sealed record SymbolicLoweringProvenance(string Stage, TextSpan SourceSpan, string Detail);
 internal sealed class SymbolicLoweringResult<T>(
-    SymbolicLoweringSupport support,
+    bool isExact,
     T? value,
     ImmutableArray<SymbolicLoweringProvenance> provenance,
     SymbolicUnknownReason unknownReason)
     where T : class {
-    internal SymbolicLoweringSupport Support { get; } = support;
     internal T? Value { get; } = value;
     internal ImmutableArray<SymbolicLoweringProvenance> Provenance { get; } = provenance;
     internal SymbolicUnknownReason UnknownReason { get; } = unknownReason;
-    internal bool IsExact => Support == SymbolicLoweringSupport.Exact;
-    internal bool IsApproximate => Support == SymbolicLoweringSupport.Approximate;
-    internal bool IsUnsupported => Support == SymbolicLoweringSupport.Unsupported;
+    internal bool IsExact { get; } = isExact;
     internal static SymbolicLoweringResult<T> Exact(T value, SymbolicLoweringProvenance provenance) => new(
-            SymbolicLoweringSupport.Exact,
+            true,
             value ?? throw new ArgumentNullException(nameof(value)),
             [provenance],
             SymbolicUnknownReason.None);
     internal static SymbolicLoweringResult<T> Unsupported(SymbolicLoweringProvenance provenance) => new(
-            SymbolicLoweringSupport.Unsupported,
+            false,
             null,
             [provenance],
             SymbolicUnknownReason.UnsupportedIrEncoding);
