@@ -254,7 +254,7 @@ internal sealed class SymbolicComplexityAnalysisSession {
             !TryCondition(binary, variable, model, method, out var direction, out bound, out description,
                 out var boundDependencies))
             return false;
-        var steps = body.DescendantNodes().OfType<ExpressionSyntax>()
+        var steps = CSharpSyntaxFacts.DescendantNodesInExecution(body).OfType<ExpressionSyntax>()
             .Select(expression => TryStep(expression, variable, model, out var step) ? step : Direction.None)
             .Where(static step => step != Direction.None).ToArray();
         return steps.Length == 1 && steps[0] == direction &&
