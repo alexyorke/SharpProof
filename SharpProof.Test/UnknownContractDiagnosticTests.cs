@@ -244,4 +244,19 @@ public sealed class UnknownContractDiagnosticTests {
             """)).Select(static diagnostic => diagnostic.Id);
         Assert.That(diagnosticIds, Does.Contain("SP0002"));
     }
+    [Test]
+    public async Task SourceDefinedLookalikeAttributeIsNotAnOfficialContract() {
+        var diagnosticIds = (await AnalyzerTestHost.GetDiagnosticsAsync("""
+            namespace SharpProof.Attributes {
+                [System.AttributeUsage(System.AttributeTargets.Method)]
+                public sealed class EnforcePureAttribute : System.Attribute { }
+            }
+            public static class Worker {
+                private static int _state;
+                [SharpProof.Attributes.EnforcePure]
+                public static void Work() => _state++;
+            }
+            """)).Select(static diagnostic => diagnostic.Id);
+        Assert.That(diagnosticIds, Does.Not.Contain("SP0002"));
+    }
 }
