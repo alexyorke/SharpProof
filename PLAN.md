@@ -173,13 +173,13 @@ Expected reduction: 16 lines.
 
 ### Phase 1 validation
 
-- [ ] Build both test projects through the Job Object wrapper.
-- [ ] Run the tests that use `AnalyzerTestHost`.
-- [ ] Run `MethodEffectsTests.EffectFlowStateKeyIncludesRefLocalBindings`.
-- [ ] Run `SymbolicComplexityTests`.
-- [ ] Run analyzer release-tracking and unified CLI tests.
-- [ ] Confirm NUnit discovery is unchanged.
-- [ ] Confirm the reduction is within 316-319 net lines.
+- [x] Build both test projects through the Job Object wrapper.
+- [x] Run the tests that use `AnalyzerTestHost`.
+- [x] Run `MethodEffectsTests.EffectFlowStateKeyIncludesRefLocalBindings`.
+- [x] Run `SymbolicComplexityTests`.
+- [x] Run analyzer release-tracking and unified CLI tests.
+- [x] Confirm NUnit discovery is unchanged.
+- [x] Confirm the reduction is within 316-319 net lines.
 
 ## Phase 2: Collapse `SharpProof.Testing`
 
