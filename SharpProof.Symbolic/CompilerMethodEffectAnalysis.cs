@@ -2557,6 +2557,17 @@ internal sealed class MethodEffectAnalysisSession(
             } &&
             method.ContainingType.ToDisplayString() == "System.Buffer" &&
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array };
+        private static bool IsBufferGetByte(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "GetByte",
+                IsStatic: true,
+                Parameters.Length: 2,
+                ReturnType.SpecialType: SpecialType.System_Byte
+            } &&
+            method.ContainingType.ToDisplayString() == "System.Buffer" &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -3030,6 +3041,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Buffer", MethodKind.Ordinary, "ByteLength")
                     when IsBufferByteLength(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
+                ("System.Buffer", MethodKind.Ordinary, "GetByte")
+                    when IsBufferGetByte(method) =>
+                    SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -3212,6 +3226,15 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                             "framework_buffer_byte_length_model")
                     ]
+                : IsBufferGetByte(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
+                            "framework_buffer_get_byte_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
+                            "framework_buffer_get_byte_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_buffer_get_byte_model")
+                    ]
                 : effects == SharpProofEffect.Throws
                     ? [
                         MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
@@ -3255,7 +3278,7 @@ internal sealed class MethodEffectAnalysisSession(
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
                    IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) || IsArrayResize(method) ||
                    IsArrayReverse(method) || IsArrayConstrainedCopy(method) || IsBufferBlockCopy(method) ||
-                   IsBufferByteLength(method) ||
+                   IsBufferByteLength(method) || IsBufferGetByte(method) ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Read")
                 ? [0]
