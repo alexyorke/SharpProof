@@ -928,6 +928,24 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.ReadsStaticState | SharpProofEffect.WritesArgumentState,
             forbidden: SharpProofEffect.WritesStaticState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("VolatileReadReadsButDoesNotWriteArgument", """
+            class C {
+                static int M(ref int value) => System.Threading.Volatile.Read(ref value);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState,
+            forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("ReadOnlyRefCallDoesNotWriteArgument", """
+            class C {
+                static int Read(ref int value) => value;
+                static int M(ref int value) => Read(ref value);
+            }
+            """, 3,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {

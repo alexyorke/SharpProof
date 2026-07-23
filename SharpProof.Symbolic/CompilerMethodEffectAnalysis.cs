@@ -1918,7 +1918,8 @@ internal sealed class MethodEffectAnalysisSession(
                 if (TryFrameworkSummary(target, out var framework))
                     return new(framework, FrameworkReturn(target),
                         EffectFlowValue.FromRoot(new(EffectValueRootKind.Receiver), target.ContainingType),
-                        [.. target.Parameters.Select(static _ => EffectFlowValue.None)]);
+                        [.. target.Parameters.Select(static _ => EffectFlowValue.None)],
+                        FrameworkWrittenArgumentOrdinals(target), FrameworkReadArgumentOrdinals(target));
                 return session.MetadataSummary(target);
             }
             return session.AnalyzeSummary(target, syntax, session.Compilation.GetSemanticModel(syntax.SyntaxTree), captures);
@@ -1969,7 +1970,9 @@ internal sealed class MethodEffectAnalysisSession(
             IReadOnlyList<EffectFlowValue> values,
             ref EffectFlowState state) {
             foreach (var argument in arguments) {
-                if (argument.Parameter is not { RefKind: not RefKind.None } parameter || parameter.Ordinal >= summary.Parameters.Length)
+                if (argument.Parameter is not { RefKind: not RefKind.None } parameter ||
+                    parameter.Ordinal >= summary.Parameters.Length ||
+                    !summary.WrittenArgumentOrdinals.Contains(parameter.Ordinal))
                     continue;
                 Assign(argument.Value, summary.Parameters[parameter.Ordinal].Instantiate(
                     receiver, values, sourceMethod: target), false, ref state);
@@ -2162,7 +2165,9 @@ internal sealed class MethodEffectAnalysisSession(
             target.ReturnsVoid ? EffectFlowValue.None : EffectFlowValue.Unknown,
             EffectFlowValue.FromRoot(new(EffectValueRootKind.Receiver), target.ContainingType),
             [.. target.Parameters.Select(parameter => EffectFlowValue.FromRoot(
-                new(EffectValueRootKind.Argument, parameter.Ordinal), parameter.Type))]);
+                new(EffectValueRootKind.Argument, parameter.Ordinal), parameter.Type))],
+            [.. target.Parameters.Where(static parameter => parameter.RefKind is RefKind.Ref or RefKind.Out)
+                .Select(static parameter => parameter.Ordinal)]);
         private static EffectFlowValue FrameworkReturn(IMethodSymbol target) => target.ReturnsVoid
             ? EffectFlowValue.None
             : target.ReturnType.IsReferenceType
@@ -2210,6 +2215,9 @@ internal sealed class MethodEffectAnalysisSession(
                          method.Parameters[1].Type.SpecialType == method.Parameters[0].Type.SpecialType &&
                          method.Parameters[2].Type.SpecialType == method.Parameters[0].Type.SpecialType =>
                     SharpProofEffect.None,
+                ("System.Threading.Volatile", MethodKind.Ordinary, "Read")
+                    when method.Parameters.Length == 1 && method.Parameters[0].RefKind != RefKind.None =>
+                    SharpProofEffect.ReadsArgumentState,
                 (_, _, "IsNullOrEmpty" or "IsNullOrWhiteSpace") when type?.SpecialType == SpecialType.System_String =>
                     SharpProofEffect.None,
                 (_, _, "Contains" or "IndexOf" or "LastIndexOf" or "StartsWith" or "EndsWith")
@@ -2238,6 +2246,15 @@ internal sealed class MethodEffectAnalysisSession(
             summary = effects.HasValue ? new(effects.Value, SharpProofCapability.None, exceptions, [], []) : null!;
             return effects.HasValue;
         }
+        private static ImmutableArray<int> FrameworkWrittenArgumentOrdinals(IMethodSymbol method) =>
+            method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
+            method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange"
+                ? [0]
+                : [];
+        private static ImmutableArray<int> FrameworkReadArgumentOrdinals(IMethodSymbol method) =>
+            method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read"
+                ? [0]
+                : [];
     }
 
     private sealed class EffectAccumulator(IMethodSymbol method) {
