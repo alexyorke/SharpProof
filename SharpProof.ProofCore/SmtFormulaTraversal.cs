@@ -93,51 +93,28 @@ internal static class SmtFormulaTraversal {
         _ => default
     };
     private static SmtFormula Rebuild(SmtFormula formula, IReadOnlyList<SmtFormula> children) {
-        bool Same(int index, SmtFormula child) => ReferenceEquals(children[index], child);
+        var originalChildren = GetChildren(formula);
+        var unchanged = true;
+        for (var index = 0; index < children.Count; index++)
+            unchanged &= ReferenceEquals(children[index], originalChildren[index]);
+        if (unchanged) return formula;
         return formula switch {
-            SmtUnaryFormula value => Same(0, value.Operand)
-                ? formula
-                : new SmtUnaryFormula(value.Operator, children[0]),
-            SmtBinaryFormula value => Same(0, value.Left) && Same(1, value.Right)
-                ? formula
-                : new SmtBinaryFormula(value.Operator, children[0], children[1]),
-            SmtIntegerUnaryTerm value => Same(0, value.Operand)
-                ? formula
-                : new SmtIntegerUnaryTerm(value.Operator, children[0]),
-            SmtIntegerBinaryTerm value => Same(0, value.Left) && Same(1, value.Right)
-                ? formula
-                : new SmtIntegerBinaryTerm(value.Operator, children[0], children[1]),
-            SmtOpaqueIntegerBinaryTerm value => Same(0, value.Left) && Same(1, value.Right)
-                ? formula
-                : new SmtOpaqueIntegerBinaryTerm(value.Operator, children[0], children[1]),
-            SmtStringLengthTerm value => Same(0, value.Value)
-                ? formula
-                : new SmtStringLengthTerm(children[0]),
-            SmtStringConcatTerm value => Same(0, value.Left) && Same(1, value.Right)
-                ? formula
-                : new SmtStringConcatTerm(children[0], children[1]),
-            SmtStringSubstringTerm value => Same(0, value.Value) && Same(1, value.Offset) && Same(2, value.Length)
-                ? formula
-                : new SmtStringSubstringTerm(children[0], children[1], children[2]),
-            SmtStringContainsFormula value => Same(0, value.Value) && Same(1, value.Search)
-                ? formula
-                : new SmtStringContainsFormula(children[0], children[1]),
-            SmtStringStartsWithFormula value => Same(0, value.Value) && Same(1, value.Prefix)
-                ? formula
-                : new SmtStringStartsWithFormula(children[0], children[1]),
-            SmtStringEndsWithFormula value => Same(0, value.Value) && Same(1, value.Suffix)
-                ? formula
-                : new SmtStringEndsWithFormula(children[0], children[1]),
-            SmtRegexMatchFormula value => Same(0, value.Value)
-                ? formula
-                : new SmtRegexMatchFormula(children[0], value.Pattern, value.Options),
-            SmtRuntimeTypeTestFormula value => Same(0, value.Value)
-                ? formula
-                : new SmtRuntimeTypeTestFormula(children[0], value.TypeKey),
+            SmtUnaryFormula value => value with { Operand = children[0] },
+            SmtBinaryFormula value => value with { Left = children[0], Right = children[1] },
+            SmtIntegerUnaryTerm value => value with { Operand = children[0] },
+            SmtIntegerBinaryTerm value => value with { Left = children[0], Right = children[1] },
+            SmtOpaqueIntegerBinaryTerm value => value with { Left = children[0], Right = children[1] },
+            SmtStringLengthTerm value => value with { Value = children[0] },
+            SmtStringConcatTerm value => value with { Left = children[0], Right = children[1] },
+            SmtStringSubstringTerm value =>
+                value with { Value = children[0], Offset = children[1], Length = children[2] },
+            SmtStringContainsFormula value => value with { Value = children[0], Search = children[1] },
+            SmtStringStartsWithFormula value => value with { Value = children[0], Prefix = children[1] },
+            SmtStringEndsWithFormula value => value with { Value = children[0], Suffix = children[1] },
+            SmtRegexMatchFormula value => value with { Value = children[0] },
+            SmtRuntimeTypeTestFormula value => value with { Value = children[0] },
             SmtConditionalFormula value =>
-                Same(0, value.Condition) && Same(1, value.WhenTrue) && Same(2, value.WhenFalse)
-                    ? formula
-                    : new SmtConditionalFormula(children[0], children[1], children[2], value.ResultKind),
+                value with { Condition = children[0], WhenTrue = children[1], WhenFalse = children[2] },
             _ => formula
         };
     }

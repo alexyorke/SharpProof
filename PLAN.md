@@ -488,10 +488,10 @@ Target: 12-16 lines.
 
 Target: 10-15 lines.
 
-- [ ] Replace repeated unchanged-child checks and full constructors in
+- [x] Replace repeated unchanged-child checks and full constructors in
       `SmtFormulaTraversal.Rebuild` with a common unchanged check and `with`
       expressions.
-- [ ] Add a direct table covering all 14 node shapes.
+- [x] Add a direct table covering all 14 node shapes.
 - [ ] Verify that regex options, conditional result kinds, and other metadata
       survive rebuilding.
 
