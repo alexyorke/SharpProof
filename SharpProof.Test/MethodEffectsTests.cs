@@ -749,6 +749,24 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Disproven,
             required: SharpProofEffect.Allocates,
             forbidden: SharpProofEffect.Unknown);
+        yield return Effect("StringToUpperInvariantIsPureKnownAllocation", """
+            class C {
+                static string M(string value) => value.ToUpperInvariant();
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.Allocates,
+            forbidden: SharpProofEffect.Unknown);
+        yield return Effect("StringToLowerInvariantIsPureKnownAllocation", """
+            class C {
+                static string M(string value) => value.ToLowerInvariant();
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.Allocates,
+            forbidden: SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
