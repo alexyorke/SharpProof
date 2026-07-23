@@ -5,8 +5,8 @@ internal static class ContractConditionHelpers {
         string attributeTypeName,
         CancellationToken cancellationToken) {
         var builder = ImmutableArray.CreateBuilder<ContractAttributeCondition>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
+        foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken)) {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var attribute in SharpProofAttributeIdentityPolicy.GetAcceptedAttributes(source, attributeTypeName)) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var condition = attribute.ConstructorArguments.Length == 1
@@ -22,6 +22,7 @@ internal static class ContractConditionHelpers {
                     GetInvalidReason(attribute, condition),
                     source));
             }
+        }
         return builder.ToImmutable();
     }
     internal static ImmutableArray<ContractAttributeCondition> ReportAndFilterInvalid(

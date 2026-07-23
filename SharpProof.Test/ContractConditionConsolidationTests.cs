@@ -175,6 +175,22 @@ public sealed class ContractConditionConsolidationTests {
             Assert.That(diagnosticIds, Does.Not.Contain("SP0019"), message);
         });
     }
+    [Test]
+    public async Task IdenticalRequiresTextPreservesDistinctSourceParameterBindings() {
+        var diagnosticIds = (await AnalyzerTestHost.GetDiagnosticsAsync("""
+            using SharpProof.Attributes;
+            public interface IWorker {
+                [Requires("value > 0")]
+                void Work(int value, int other);
+            }
+            public sealed class Worker : IWorker {
+                [Requires("value > 0")]
+                public void Work(int other, int value) { }
+                public void Call() => Work(0, 1);
+            }
+            """)).Select(static diagnostic => diagnostic.Id);
+        Assert.That(diagnosticIds, Does.Contain("SP0027"));
+    }
     private static TestCaseData Case(string name, string source, params string[] expectedDiagnostics) =>
         new TestCaseData(new ContractCase(name, source, expectedDiagnostics)).SetName(name);
     private static string Format(Microsoft.CodeAnalysis.Diagnostic diagnostic) {

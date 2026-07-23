@@ -29,6 +29,7 @@ internal static class MethodRequiresAnalyzer {
             var contracts = RequiresContractHelpers.ValidContracts(callSite.Method, context.CancellationToken);
             if (contracts.Length == 0) continue;
             var location = callSite.Syntax.GetLocation();
+            var seenConditions = new HashSet<string>(StringComparer.Ordinal);
             foreach (var contract in contracts) {
                 if (!RequiresContractHelpers.TryRewriteForArguments(
                         contract.Condition,
@@ -41,6 +42,7 @@ internal static class MethodRequiresAnalyzer {
                         location, AdditionalLocations(contract.Location));
                     continue;
                 }
+                if (!seenConditions.Add(rewrittenCondition)) continue;
                 var proof = context.State.ProveAtNode(
                     callSite.Syntax,
                     rewrittenCondition,
