@@ -696,7 +696,7 @@ Target: 45-65 net lines. Package and property removals are validation-gated.
 - [x] Verify whether the three private package references in
       `SharpProof.Test.csproj` have any compile, runtime, binding-redirect, or
       test-host role. Remove them only after a clean build/load probe.
-- [ ] Delete the trailing empty `ItemGroup` in that project.
+- [x] Delete the trailing empty `ItemGroup` in that project.
 - [ ] Verify and remove the unused analyzer-testing NUnit package from
       `SharpProof.Testing.props`.
 - [ ] Verify whether `SharpProofVsixVersion` is consumed by pack or release
