@@ -2601,6 +2601,20 @@ internal sealed class MethodEffectAnalysisSession(
             method.Parameters[3].RefKind == RefKind.None &&
             method.Parameters[2].Type.SpecialType is SpecialType.System_Int64 or SpecialType.System_UInt64 &&
             method.Parameters[3].Type.SpecialType == method.Parameters[2].Type.SpecialType;
+        private static bool IsBitConverterToInt32Array(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "ToInt32",
+                IsStatic: true,
+                Parameters.Length: 2,
+                ReturnType.SpecialType: SpecialType.System_Int32
+            } &&
+            method.ContainingType.ToDisplayString() == "System.BitConverter" &&
+            method.Parameters[0] is {
+                RefKind: RefKind.None,
+                Type: IArrayTypeSymbol { Rank: 1, ElementType.SpecialType: SpecialType.System_Byte }
+            } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -3083,6 +3097,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Buffer", MethodKind.Ordinary, "MemoryCopy")
                     when IsBufferMemoryCopy(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+                ("System.BitConverter", MethodKind.Ordinary, "ToInt32")
+                    when IsBitConverterToInt32Array(method) =>
+                    SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -3288,6 +3305,15 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
                             "framework_buffer_memory_copy_model")
                     ]
+                : IsBitConverterToInt32Array(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
+                            "framework_bit_converter_to_int32_array_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_bit_converter_to_int32_array_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
+                            "framework_bit_converter_to_int32_array_model")
+                    ]
                 : effects == SharpProofEffect.Throws
                     ? [
                         MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
@@ -3331,6 +3357,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsIndexesArrayGetValue(method)) return [0];
             if (IsIndexesArraySetValue(method)) return [1];
             if (IsBufferMemoryCopy(method)) return [0];
+            if (IsBitConverterToInt32Array(method)) return [0];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
                    IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) || IsArrayResize(method) ||
                    IsArrayReverse(method) || IsArrayConstrainedCopy(method) || IsBufferBlockCopy(method) ||

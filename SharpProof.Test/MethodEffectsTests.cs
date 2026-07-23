@@ -2242,6 +2242,15 @@ public sealed class MethodEffectsTests {
             required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                       SharpProofEffect.Throws,
             forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("BitConverterToInt32ReadsArrayWithoutAllocating", """
+            class C {
+                static int M(byte[] values, int offset) => System.BitConverter.ToInt32(values, offset);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
