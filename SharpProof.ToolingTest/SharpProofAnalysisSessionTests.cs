@@ -351,6 +351,22 @@ public sealed class SharpProofAnalysisSessionTests {
             hazard.Kind == "IndexOutOfRange" && hazard.Status == "Unreachable"));
     }
     [Test]
+    public void ReorderedNamedMemoryExtensionArgumentsPreserveViewLength() {
+        const string source = """
+            class C {
+                static char M(string text) {
+                    if (text.Length < 3) return '\0';
+                    var span = System.MemoryExtensions.AsSpan(start: 2, text: text);
+                    return span[text.Length - 3];
+                }
+            }
+            """;
+        using var session = SharpProofAnalysisSession.FromText(source);
+        var result = AnalyzeHazardsAt(session, source, "span[text.Length", 0);
+        Assert.That(result.Hazards, Has.Some.Matches<SharpProofHazard>(hazard =>
+            hazard.Kind == "IndexOutOfRange" && hazard.Status == "Unreachable"));
+    }
+    [Test]
     public void SymbolicDecimalArithmeticProducesAConservativeOverflowCandidate() {
         const string source = "class C { static decimal M(decimal value) => value * decimal.MaxValue; }";
         using var session = SharpProofAnalysisSession.FromText(source);
