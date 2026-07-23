@@ -250,9 +250,9 @@ public sealed class SharpProofAnalysisSession : IDisposable {
                 ValidateLine(target.Line!.Value, sourceText);
                 break;
             case SharpProofTargetKind.Position:
-                if (target.Position is not { } position || position < 0 || position >= sourceText.Length)
+                if (target.Position is not { } position || position < 0 || position > sourceText.Length)
                     throw new ArgumentOutOfRangeException(nameof(request),
-                        "Position targets require a position within nonempty source text.");
+                        "Position targets require a position within the source text span.");
                 break;
             case SharpProofTargetKind.Span:
                 if (target.SpanStart is not { } spanStart || spanStart < 0 ||

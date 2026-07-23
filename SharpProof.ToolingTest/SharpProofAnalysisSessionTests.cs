@@ -234,6 +234,18 @@ public sealed class SharpProofAnalysisSessionTests {
         });
     }
     [Test]
+    public void PositionTargetAcceptsEndOfFile() {
+        const string source = "class C { static int M() => 1; }";
+        using var session = SharpProofAnalysisSession.FromText(source);
+        var result = session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Position, Position: source.Length),
+            SharpProofAnalysisFacet.RuntimeHazards));
+        Assert.Multiple(() => {
+            Assert.That(result.Status, Is.EqualTo(SharpProofQueryStatus.Succeeded));
+            Assert.That(result.Error, Is.Null);
+        });
+    }
+    [Test]
     public void PointAndPositionHazardsHonorTheExactColumn() {
         const string source = """
             class C {
