@@ -2545,18 +2545,21 @@ public sealed class MethodEffectsTests {
     }
     [Test]
     public void EffectFlowStateKeyIncludesRefLocalBindings() {
-        var context = AnalyzerTestHost.CreateSourceContext("""
+        const string source = """
             sealed class Box { public int Value; }
             class C {
                 static void M(Box input) {
                     ref int alias = ref input.Value;
                 }
             }
-            """, "RefLocalStateKey");
-        var methodDeclaration = context.Root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var method = (IMethodSymbol)context.SemanticModel.GetDeclaredSymbol(methodDeclaration)!;
+            """;
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+            source, "RefLocalStateKey.cs", SymbolicSourceCompilationKind.Query, null, default);
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var methodDeclaration = syntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var method = (IMethodSymbol)semanticModel.GetDeclaredSymbol(methodDeclaration)!;
         var aliasDeclaration = methodDeclaration.DescendantNodes().OfType<VariableDeclaratorSyntax>().Single();
-        var alias = (ILocalSymbol)context.SemanticModel.GetDeclaredSymbol(aliasDeclaration)!;
+        var alias = (ILocalSymbol)semanticModel.GetDeclaredSymbol(aliasDeclaration)!;
         var initial = EffectFlowState.Create(method);
         var argumentState = initial with {
             RefLocals = initial.RefLocals.SetItem(alias, initial.GetParameter(method.Parameters[0]))

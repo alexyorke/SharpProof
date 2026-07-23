@@ -131,15 +131,15 @@ Expected reduction: approximately 93 lines.
 The sole caller is in
 `SharpProof.Test/MethodEffectsTests.cs` near line 2548.
 
-- [ ] Replace `AnalyzerTestHost.CreateSourceContext` with the existing
+- [x] Replace `AnalyzerTestHost.CreateSourceContext` with the existing
       `SymbolicSourceCompilation.Create`.
-- [ ] Obtain the syntax root, semantic model, method symbol, and local symbol
+- [x] Obtain the syntax root, semantic model, method symbol, and local symbol
       directly from the returned syntax tree and compilation.
-- [ ] Delete `CreateSourceContext`, `CreateSourceContextCore`,
+- [x] Delete `CreateSourceContext`, `CreateSourceContextCore`,
       `SourceContextCache`, `SourceContextCacheKey`, and `SourceContext`.
-- [ ] Delete minimal-framework-reference construction if it becomes unused.
-- [ ] Delete `GetMinimalFrameworkReferences` if it becomes unused.
-- [ ] After deleting `SymbolicSourceQueryTestSession`, delete
+- [x] Delete minimal-framework-reference construction if it becomes unused.
+- [x] Delete `GetMinimalFrameworkReferences` if it becomes unused.
+- [x] After deleting `SymbolicSourceQueryTestSession`, delete
       `GetTrustedPlatformReferences` if it also becomes unused.
 
 Expected net reduction: 52-55 lines after the small caller replacement.
