@@ -906,6 +906,17 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.ReadsStaticState | SharpProofEffect.WritesArgumentState,
             forbidden: SharpProofEffect.WritesStaticState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("InterlockedAddWritesOnlyRefArgument", """
+            static class Globals { public static long Delta; }
+            class C {
+                static long M(ref long target) =>
+                    System.Threading.Interlocked.Add(ref target, Globals.Delta);
+            }
+            """, 3,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsStaticState | SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.WritesStaticState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {

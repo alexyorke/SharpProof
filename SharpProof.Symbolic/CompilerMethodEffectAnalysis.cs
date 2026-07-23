@@ -2195,7 +2195,7 @@ internal sealed class MethodEffectAnalysisSession(
                          method.Parameters[0].Type.SpecialType is
                              SpecialType.System_Int32 or SpecialType.System_Int64 =>
                     SharpProofEffect.WritesArgumentState,
-                ("System.Threading.Interlocked", MethodKind.Ordinary, "Exchange")
+                ("System.Threading.Interlocked", MethodKind.Ordinary, "Exchange" or "Add")
                     when method.Parameters.Length == 2 &&
                          method.Parameters[0].RefKind == RefKind.Ref &&
                          method.Parameters[0].Type.SpecialType is
