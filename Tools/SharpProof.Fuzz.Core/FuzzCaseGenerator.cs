@@ -20,7 +20,7 @@ public sealed class FuzzCaseGenerator(int seed) {
     private static readonly IReadOnlyDictionary<string, Func<int, Random, string, string>> RegistryGenerators =
         new Dictionary<string, Func<int, Random, string, string>>(StringComparer.Ordinal) {
             ["PureArithmetic"] = CreateExpressionGenerator("int x", "x + 1", "(x * 3) - 7", "(x / 2) + 9", "unchecked((x << 1) ^ 17)"),
-            ["PureStringConcat"] = BuildPureStringConcat,
+            ["PureStringConcat"] = CreateExpressionGenerator("string left, string right", "(left + right).Length"),
             ["PureListPattern"] = CreateExpressionGenerator(
                 "int[] values", "values is [1, .., 3] ? 1 : 0", "values is [_, .. var rest] ? rest.Length : 0"),
             ["PureInterpolatedString"] = CreateExpressionGenerator(
@@ -64,18 +64,6 @@ public sealed class FuzzCaseGenerator(int seed) {
             registryEntry.PrimaryShapeIds,
             registryEntry.ExpectedOperationKinds,
             registryEntry.ExpectedSyntaxKinds);
-    }
-    private static string BuildPureStringConcat(int index, Random random, string className) {
-        const string expression = "(left + right).Length";
-        return BuildClass(
-            className,
-            $$"""
-                  [EnforcePure]
-                  public int TestMethod(string left, string right)
-                  {
-              {{Indent(BuildReturnBody(expression, random), 8)}}
-                  }
-              """);
     }
     private Random CreateRandom(int index) =>
         new(StableHash(_seed, index, 0x51ED270B));

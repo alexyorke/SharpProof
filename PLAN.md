@@ -652,7 +652,7 @@ Target: 10-15 lines.
 
 Target: 35-45 net lines.
 
-- [ ] In `FuzzCaseGenerator`, replace `BuildPureStringConcat` with the existing
+- [x] In `FuzzCaseGenerator`, replace `BuildPureStringConcat` with the existing
       generic `CreateExpressionGenerator`: approximately 11 lines.
 - [ ] Delete the custom empty analyzer-config provider in
       `FuzzAnalyzerConfiguration`; use `new AnalyzerOptions([])` from
