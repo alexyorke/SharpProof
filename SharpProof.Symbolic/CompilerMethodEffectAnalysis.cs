@@ -2036,6 +2036,25 @@ internal sealed class MethodEffectAnalysisSession(
             source = arguments[0].WithExactType(method.ReturnType);
             return true;
         }
+        private static bool IsMemoryMarshalTryRead(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "TryRead",
+                IsStatic: true,
+                IsGenericMethod: true,
+                TypeArguments.Length: 1,
+                Parameters.Length: 2,
+                ReturnType.SpecialType: SpecialType.System_Boolean
+            } &&
+            method.ContainingType.ToDisplayString() == "System.Runtime.InteropServices.MemoryMarshal" &&
+            method.Parameters[0] is {
+                RefKind: RefKind.None,
+                Type: INamedTypeSymbol { TypeArguments.Length: 1 } sourceType
+            } &&
+            sourceType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
+            sourceType.TypeArguments[0].SpecialType == SpecialType.System_Byte &&
+            method.Parameters[1].RefKind == RefKind.Out &&
+            SymbolEqualityComparer.Default.Equals(method.Parameters[1].Type, method.TypeArguments[0]);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2410,6 +2429,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.MemoryExtensions", MethodKind.Ordinary, "Overlaps")
                     when IsSpanOverlapsWithOffset(method) =>
                     SharpProofEffect.WritesArgumentState,
+                (_, MethodKind.Ordinary, "TryRead")
+                    when IsMemoryMarshalTryRead(method) =>
+                    SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -2433,6 +2455,7 @@ internal sealed class MethodEffectAnalysisSession(
         }
         private static ImmutableArray<int> FrameworkWrittenArgumentOrdinals(IMethodSymbol method) {
             if (IsSpanOverlapsWithOffset(method)) return [2];
+            if (IsMemoryMarshalTryRead(method)) return [1];
             return (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
                     method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
@@ -2444,6 +2467,7 @@ internal sealed class MethodEffectAnalysisSession(
                 : [];
         }
         private static ImmutableArray<int> FrameworkReadArgumentOrdinals(IMethodSymbol method) =>
+            IsMemoryMarshalTryRead(method) ||
             (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read") ||
             (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Read")
                 ? [0]
