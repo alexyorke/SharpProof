@@ -1261,8 +1261,10 @@ internal sealed class MethodEffectAnalysisSession(
                 ? EffectFlowValue.FromRoot(new(EffectValueRootKind.Static, Key: MemberKey(property.Property)), property.Type)
                 : Evaluate(property.Instance, ref state);
             foreach (var argument in property.Arguments) Evaluate(argument.Value, ref state);
-            if (property.Property.IsStatic)
-                effects.Add(SharpProofEffect.ReadsStaticState, property.Syntax, property.Property, "static_property_read");
+            if (property.Property.IsStatic) {
+                if (!IsStatelessEmptyViewProperty(property.Property))
+                    effects.Add(SharpProofEffect.ReadsStaticState, property.Syntax, property.Property, "static_property_read");
+            }
             else
                 effects.Read(receiver, property.Syntax, property.Property, "property_read");
             var key = MemberKey(property) ?? MemberKey(property.Property);
@@ -1892,6 +1894,11 @@ internal sealed class MethodEffectAnalysisSession(
                 "System.Memory<T>" or "System.ReadOnlyMemory<T>" &&
             property.Type.OriginalDefinition.ToDisplayString() is
                 "System.Span<T>" or "System.ReadOnlySpan<T>";
+        private static bool IsStatelessEmptyViewProperty(IPropertySymbol property) =>
+            property is { Name: "Empty", IsStatic: true } &&
+            property.ContainingType.OriginalDefinition.ToDisplayString() is
+                "System.Span<T>" or "System.ReadOnlySpan<T>" or
+                "System.Memory<T>" or "System.ReadOnlyMemory<T>";
         private static bool IsMemoryViewSlice(IMethodSymbol method) =>
             method is { Name: "Slice", IsStatic: false } &&
             method.ContainingType.OriginalDefinition.ToDisplayString() is
@@ -2234,6 +2241,10 @@ internal sealed class MethodEffectAnalysisSession(
                     SharpProofEffect.None,
                 ("System.Linq.Enumerable", _, "Empty")
                     when method.IsGenericMethod && method.Parameters.Length == 0 =>
+                    SharpProofEffect.None,
+                (_, MethodKind.PropertyGet, _)
+                    when method.AssociatedSymbol is IPropertySymbol property &&
+                         IsStatelessEmptyViewProperty(property) =>
                     SharpProofEffect.None,
                 (_, MethodKind.Ordinary, "GetType")
                     when type?.SpecialType == SpecialType.System_Object && method.Parameters.Length == 0 =>

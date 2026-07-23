@@ -1116,6 +1116,22 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.WritesArgumentState,
             forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("SpanEmptyIsPureAndAllocationFree", """
+            class C {
+                static System.Span<int> M() => System.Span<int>.Empty;
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.ReadsStaticState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("MemoryEmptyIsPureAndAllocationFree", """
+            class C {
+                static System.Memory<int> M() => System.Memory<int>.Empty;
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.ReadsStaticState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
