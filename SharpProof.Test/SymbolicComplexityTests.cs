@@ -67,6 +67,9 @@ public sealed class SymbolicComplexityTests {
         yield return Case("SwitchStatementIncludesWhenGuardComplexity",
             """public static class C { private static bool Guard(int n){for(var i=0;i<n;i++){}return true;} public static int Work(object value,int n){switch(value){case int _ when Guard(n):return 1;default:return 0;}} }""",
             "switch(value)", SymbolicComplexityKind.Linear, "O(n)", callee: "Guard");
+        yield return Case("SourceEnumerableCountGetterIncludesItsComplexity",
+            """using System.Collections; using System.Collections.Generic; public sealed class Values:IEnumerable<int>{private int _count;public int Count{get{for(var i=0;i<_count;i++){}return _count;}}public IEnumerator<int> GetEnumerator()=>throw new System.NotImplementedException();IEnumerator IEnumerable.GetEnumerator()=>GetEnumerator();} public static class C{public static int Work(Values values)=>values.Count;}""",
+            "values.Count", SymbolicComplexityKind.Linear);
         yield return Case("ForeachOverString_IsLinearInLength",
             """public static class C { public static int CountLetters(string text) { var count=0; foreach(var ch in text){count+=ch;} return count; } }""",
             "return count;", SymbolicComplexityKind.Linear, "O(text.Length)");
