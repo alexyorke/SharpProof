@@ -629,8 +629,8 @@ Target: 18-22 lines.
 
 Target: 8-12 lines.
 
-- [ ] Share the operation/syntax surface assertions.
-- [ ] Keep missing/extra shape diagnostics distinct.
+- [x] Share the operation/syntax surface assertions.
+- [x] Keep missing/extra shape diagnostics distinct.
 
 ### 8.5 ProofCore Z3 smoke tests
 

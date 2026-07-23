@@ -42,45 +42,26 @@ public class RoslynShapeManifestCoverageTests {
     }
     [Test]
     public void EveryRegistryEntryReferencesKnownRoslynKinds() {
-        var operationKinds = Enum.GetNames<OperationKind>().ToImmutableHashSet(StringComparer.Ordinal);
-        var syntaxKinds = Enum.GetNames<SyntaxKind>().ToImmutableHashSet(StringComparer.Ordinal);
-        var unknownOperationKinds = FuzzCaseGenerator.RegistryEntries
-            .SelectMany(entry => entry.ExpectedOperationKinds
-                .Where(kind => !operationKinds.Contains(kind))
-                .Select(kind => entry.Id + ":" + kind))
-            .OrderBy(value => value, StringComparer.Ordinal)
-            .ToArray();
-        var unknownSyntaxKinds = FuzzCaseGenerator.RegistryEntries
-            .SelectMany(entry => entry.ExpectedSyntaxKinds
-                .Where(kind => !syntaxKinds.Contains(kind))
-                .Select(kind => entry.Id + ":" + kind))
-            .OrderBy(value => value, StringComparer.Ordinal)
-            .ToArray();
+        var unknownOperationKinds = FindUnknownRoslynKinds(syntax: false);
+        var unknownSyntaxKinds = FindUnknownRoslynKinds(syntax: true);
         Assert.That(unknownOperationKinds, Is.Empty, "Registry entries reference unknown OperationKind values: " + string.Join(", ",
             unknownOperationKinds));
         Assert.That(unknownSyntaxKinds, Is.Empty, "Registry entries reference unknown SyntaxKind values: " + string.Join(", ",
             unknownSyntaxKinds));
     }
-    [Test]
-    public async Task EveryRegistryEntryEmitsDeclaredOperationKinds() {
+    [TestCase(false, TestName = "EveryRegistryEntryEmitsDeclaredOperationKinds")]
+    [TestCase(true, TestName = "EveryRegistryEntryEmitsDeclaredSyntaxKinds")]
+    public async Task EveryRegistryEntryEmitsDeclaredRoslynKinds(bool syntax) {
         var analyses = await AnalyzeRegistryEntriesAsync();
         foreach (var entry in FuzzCaseGenerator.RegistryEntries) {
+            var expected = syntax ? entry.ExpectedSyntaxKinds : entry.ExpectedOperationKinds;
+            if (expected.IsDefaultOrEmpty) continue;
             var analysis = analyses[entry.Id];
             Assert.That(analysis.CompilationErrors, Is.Empty, entry.Id);
-            foreach (var operationKind in entry.ExpectedOperationKinds)
-                Assert.That(analysis.OperationKinds.ContainsKey(operationKind), Is.True,
-                    entry.Id + " missing operation kind " + operationKind);
-        }
-    }
-    [Test]
-    public async Task EveryRegistryEntryEmitsDeclaredSyntaxKinds() {
-        var analyses = await AnalyzeRegistryEntriesAsync();
-        foreach (var entry in FuzzCaseGenerator.RegistryEntries) {
-            if (entry.ExpectedSyntaxKinds.IsDefaultOrEmpty) continue;
-            var analysis = analyses[entry.Id];
-            Assert.That(analysis.CompilationErrors, Is.Empty, entry.Id);
-            foreach (var syntaxKind in entry.ExpectedSyntaxKinds)
-                Assert.That(analysis.SyntaxKinds.ContainsKey(syntaxKind), Is.True, entry.Id + " missing syntax kind " + syntaxKind);
+            var observed = syntax ? analysis.SyntaxKinds : analysis.OperationKinds;
+            foreach (var kind in expected)
+                Assert.That(observed.ContainsKey(kind), Is.True,
+                    entry.Id + " missing " + (syntax ? "syntax" : "operation") + " kind " + kind);
         }
     }
     [Test]
@@ -110,4 +91,14 @@ public class RoslynShapeManifestCoverageTests {
     }
     private static async Task<ImmutableDictionary<string, FuzzCaseAnalysis>> AnalyzeRegistryEntriesAsync()
         => await ToolingFuzzAnalysisCache.GetRegistryEntryAnalysesAsync();
+    private static string[] FindUnknownRoslynKinds(bool syntax) {
+        var known = (syntax ? Enum.GetNames<SyntaxKind>() : Enum.GetNames<OperationKind>())
+            .ToImmutableHashSet(StringComparer.Ordinal);
+        return [
+            .. FuzzCaseGenerator.RegistryEntries
+                .SelectMany(entry => (syntax ? entry.ExpectedSyntaxKinds : entry.ExpectedOperationKinds)
+                    .Where(kind => !known.Contains(kind)).Select(kind => entry.Id + ":" + kind))
+                .OrderBy(value => value, StringComparer.Ordinal)
+        ];
+    }
 }
