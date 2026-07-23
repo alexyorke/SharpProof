@@ -125,7 +125,17 @@ internal sealed class SmtQuerySafety {
         if (formula is SmtIntegerBinaryTerm { Operator: SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder } binary) {
             checks.Add(And(
                 activation,
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, binary.Right, new SmtIntegerConstant(0))));
+                Or(
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, binary.Right, new SmtIntegerConstant(0)),
+                    And(
+                        new SmtBinaryFormula(
+                            SmtBinaryOperator.Equal,
+                            binary.Left,
+                            new SmtIntegerConstant(long.MinValue)),
+                        new SmtBinaryFormula(
+                            SmtBinaryOperator.Equal,
+                            binary.Right,
+                            new SmtIntegerConstant(-1))))));
         }
         foreach (var child in SmtFormulaTraversal.EnumerateChildren(formula))
             CollectUnsafeArithmeticChecks(child, activation, checks);
@@ -134,4 +144,6 @@ internal sealed class SmtQuerySafety {
         left is SmtBooleanConstant { Value: true }
             ? right
             : new SmtBinaryFormula(SmtBinaryOperator.And, left, right);
+    private static SmtFormula Or(SmtFormula left, SmtFormula right) =>
+        new SmtBinaryFormula(SmtBinaryOperator.Or, left, right);
 }

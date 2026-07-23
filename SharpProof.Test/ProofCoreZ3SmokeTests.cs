@@ -417,6 +417,12 @@ internal class ProofCoreZ3SmokeTests {
             [Equal(Divide(Integer(10), Integer(0)), Integer(0))], Feasibility.Unknown);
         yield return CreateSolverCase("SmtSolver_DivideByZeroFromEquality_ReturnsUnknown",
             [Equal(Int("divisor"), Integer(0)), Equal(Divide(Integer(10), Int("divisor")), Integer(0))], Feasibility.Unknown);
+        yield return CreateSolverCase("SmtSolver_SignedDivisionOverflow_ReturnsUnknown",
+            [Equal(Divide(Integer(long.MinValue), Integer(-1)), Integer(long.MinValue))], Feasibility.Unknown);
+        yield return CreateSolverCase("SmtSolver_SignedRemainderOverflow_ReturnsUnknown",
+            [Equal(Remainder(Integer(long.MinValue), Integer(-1)), Integer(0))], Feasibility.Unknown);
+        yield return CreateSolverCase("SmtSolver_SignedMinimumRemainderByNegativeTwo_RemainsUsable",
+            [Equal(Remainder(Integer(long.MinValue), Integer(-2)), Integer(0))], Feasibility.Satisfiable);
         yield return CreateSolverCase("SmtSolver_DivisionWithNonZeroGuard_RemainsUsable",
             [Equal(Int("divisor"), Integer(2)), NotEqual(Divide(Integer(10), Int("divisor")), Integer(5))], Feasibility.Unsatisfiable);
         yield return CreateSolverCase("SmtSolver_DivisionWithExplicitNonZeroGuard_RemainsUsable",
