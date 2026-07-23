@@ -146,15 +146,14 @@ internal static class SymbolicTypeFacts {
         }
         return false;
     }
-    public static bool HasInstanceInt32Member(ITypeSymbol? typeSymbol, string memberName) {
-        if (typeSymbol == null) return false;
+    public static bool HasInstanceInt32Member(ITypeSymbol? typeSymbol, string memberName) => typeSymbol != null &&
+        EnumerateSelfBaseTypesAndInterfaces(typeSymbol).Any(candidate =>
+            HasDeclaredInstanceInt32Member(candidate, memberName));
+    internal static IEnumerable<ITypeSymbol> EnumerateSelfBaseTypesAndInterfaces(ITypeSymbol typeSymbol) {
         for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
-            if (HasDeclaredInstanceInt32Member(current, memberName))
-                return true;
+            yield return current;
         foreach (var interfaceType in typeSymbol.AllInterfaces)
-            if (HasDeclaredInstanceInt32Member(interfaceType, memberName))
-                return true;
-        return false;
+            yield return interfaceType;
     }
     public static bool IsKnownNonNegativeCollectionCountProperty(
         IPropertySymbol propertySymbol,
@@ -210,16 +209,8 @@ internal static class SymbolicTypeFacts {
         typeSymbol.GetMembers(memberName).Any(static member => !member.IsStatic && member is
             IPropertySymbol { Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 } or
             IFieldSymbol { Type.SpecialType: SpecialType.System_Int32 });
-    public static bool HasInt32Indexer(ITypeSymbol? typeSymbol) {
-        if (typeSymbol == null) return false;
-        for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
-            if (HasDeclaredInt32Indexer(current))
-                return true;
-        foreach (var interfaceType in typeSymbol.AllInterfaces)
-            if (HasDeclaredInt32Indexer(interfaceType))
-                return true;
-        return false;
-    }
+    public static bool HasInt32Indexer(ITypeSymbol? typeSymbol) => typeSymbol != null &&
+        EnumerateSelfBaseTypesAndInterfaces(typeSymbol).Any(HasDeclaredInt32Indexer);
     public static bool HasDeclaredInt32Indexer(ITypeSymbol typeSymbol) {
         foreach (var property in typeSymbol.GetMembers().OfType<IPropertySymbol>())
             if (property is { IsIndexer: true, IsStatic: false, Parameters.Length: 1 } &&

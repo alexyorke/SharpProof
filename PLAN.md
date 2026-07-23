@@ -338,13 +338,13 @@ Preserve these invariants:
 
 Target: 7-11 lines.
 
-- [ ] Introduce one ordered enumerator for self, base types, then
+- [x] Introduce one ordered enumerator for self, base types, then
       `AllInterfaces`.
-- [ ] Reuse it from `SymbolicTypeFacts.HasInstanceInt32Member`,
+- [x] Reuse it from `SymbolicTypeFacts.HasInstanceInt32Member`,
       `HasInt32Indexer`, and
       `SymbolicIndexingLowerer.TryGetInt32IndexerElementType`.
-- [ ] Keep the declared-member predicates separate.
-- [ ] Preserve traversal order.
+- [x] Keep the declared-member predicates separate.
+- [x] Preserve traversal order.
 
 Do not reuse `CompilerMethodEffectAnalysis.FindProtocolMember`; it intentionally
 visits interfaces only when the receiver itself is an interface.

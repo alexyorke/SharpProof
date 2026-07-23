@@ -90,11 +90,8 @@ internal static class SymbolicIndexingLowerer {
             elementType = null!;
             return false;
         }
-        for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
-            if (TryGetDeclaredInt32IndexerElementType(current, out elementType))
-                return true;
-        foreach (var interfaceType in typeSymbol.AllInterfaces)
-            if (TryGetDeclaredInt32IndexerElementType(interfaceType, out elementType))
+        foreach (var candidate in SymbolicTypeFacts.EnumerateSelfBaseTypesAndInterfaces(typeSymbol))
+            if (TryGetDeclaredInt32IndexerElementType(candidate, out elementType))
                 return true;
         elementType = null!;
         return false;
