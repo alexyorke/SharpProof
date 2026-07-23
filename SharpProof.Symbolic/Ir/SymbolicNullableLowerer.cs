@@ -56,15 +56,7 @@ internal static class SymbolicNullableLowerer {
         SymbolicLoweringContext context,
         out SymbolicCondition condition) {
         condition = null!;
-        if (!comparison.IsKind(SyntaxKind.EqualsExpression) &&
-            !comparison.IsKind(SyntaxKind.NotEqualsExpression))
-            return false;
-        ExpressionSyntax resultExpression;
-        if (IsNullConstant(comparison.Left, context))
-            resultExpression = comparison.Right;
-        else if (IsNullConstant(comparison.Right, context))
-            resultExpression = comparison.Left;
-        else
+        if (!TryGetNullComparisonOperand(comparison, context, out var resultExpression, out var equals))
             return false;
         if (!TryLowerNotNullIfNotNullResultNonNullTerm(resultExpression, context, false, out var resultNonNull))
             return false;
@@ -72,7 +64,7 @@ internal static class SymbolicNullableLowerer {
             new SymbolicTruthAtom(resultNonNull),
             comparison,
             "ir.not-null-if-not-null.result");
-        if (comparison.IsKind(SyntaxKind.EqualsExpression)) condition = new SymbolicNotCondition(condition);
+        if (equals) condition = new SymbolicNotCondition(condition);
         return true;
     }
     internal static bool TryLowerNotNullIfNotNullResultNonNullTerm(
@@ -127,27 +119,30 @@ internal static class SymbolicNullableLowerer {
         return constant is { HasValue: true, Value: null } ||
                expression.IsKind(SyntaxKind.NullLiteralExpression);
     }
+    private static bool TryGetNullComparisonOperand(
+        BinaryExpressionSyntax comparison,
+        SymbolicLoweringContext context,
+        out ExpressionSyntax operand,
+        out bool equals) {
+        equals = comparison.IsKind(SyntaxKind.EqualsExpression);
+        operand = IsNullConstant(comparison.Left, context) ? comparison.Right
+            : IsNullConstant(comparison.Right, context) ? comparison.Left
+            : null!;
+        return (equals || comparison.IsKind(SyntaxKind.NotEqualsExpression)) && operand != null;
+    }
     internal static bool TryLowerNullableNullComparisonCondition(
         BinaryExpressionSyntax comparison,
         SymbolicLoweringContext context,
         out SymbolicCondition condition) {
         condition = null!;
-        if (!comparison.IsKind(SyntaxKind.EqualsExpression) &&
-            !comparison.IsKind(SyntaxKind.NotEqualsExpression))
-            return false;
-        ExpressionSyntax nullableExpression;
-        if (IsNullConstant(comparison.Left, context))
-            nullableExpression = comparison.Right;
-        else if (IsNullConstant(comparison.Right, context))
-            nullableExpression = comparison.Left;
-        else
+        if (!TryGetNullComparisonOperand(comparison, context, out var nullableExpression, out var equals))
             return false;
         if (!TryLowerNullableHasValueTerm(nullableExpression, context, out var hasValue)) return false;
         condition = SymbolicIrLowerer.CreateFactCondition(
             new SymbolicTruthAtom(hasValue),
             comparison,
             "ir.nullable.null-comparison.has-value");
-        if (comparison.IsKind(SyntaxKind.EqualsExpression)) condition = new SymbolicNotCondition(condition);
+        if (equals) condition = new SymbolicNotCondition(condition);
         return true;
     }
     internal static bool TryLowerNullableValueAccessRelationCondition(

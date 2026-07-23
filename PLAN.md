@@ -351,16 +351,16 @@ visits interfaces only when the receiver itself is an interface.
 
 ### 5.4 Consolidate small symbolic helpers
 
-- [ ] Use one generic cache getter behind
+- [x] Use one generic cache getter behind
       `SymbolicProofCache.TryGetResult` and `TryGetEncodedState`: 4-6 lines.
-- [ ] Share equality-kind and null-side selection between nullable comparison
+- [x] Share equality-kind and null-side selection between nullable comparison
       paths: 4-6 lines.
-- [ ] Preserve the difference between semantic null constants in IR lowering
+- [x] Preserve the difference between semantic null constants in IR lowering
       and syntactic null literals plus non-overloaded equality in flow facts.
-- [ ] Delete the no-op positional property redeclarations for `Status`,
+- [x] Delete the no-op positional property redeclarations for `Status`,
       `UnknownReason`, `CacheHit`, and `Budget` in
       `SymbolicPublicModels.cs`: 4 lines.
-- [ ] Keep the explicit `Reason` property because it normalizes null.
+- [x] Keep the explicit `Reason` property because it normalizes null.
 
 ### 5.5 Lower-priority bounded symbolic work
 

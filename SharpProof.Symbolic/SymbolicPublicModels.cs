@@ -34,13 +34,9 @@ internal sealed record SymbolicProofInfo(
     string Reason,
     bool CacheHit,
     SymbolicBudgetInfo? Budget) {
-    public SymbolicProofStatus Status { get; init; } = Status;
-    public SymbolicUnknownReason UnknownReason { get; init; } = UnknownReason;
     public string Reason { get; init; } = Reason ?? string.Empty;
     public SymbolicUnknownReasonInfo UnknownReasonInfo =>
         SymbolicUnknownReasonTaxonomy.ForProof(UnknownReason, Reason);
-    public bool CacheHit { get; init; } = CacheHit;
-    public SymbolicBudgetInfo? Budget { get; init; } = Budget;
     internal AnalysisProofResult? RawResult { get; init; }
     internal static SymbolicProofInfo Unknown(SymbolicUnknownReason reason, string? detail = null) => new(
         SymbolicProofStatus.Unknown,

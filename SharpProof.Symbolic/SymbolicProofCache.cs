@@ -18,26 +18,20 @@ internal sealed class SymbolicProofCache {
     internal long HitCount => _values.HitCount;
     internal long MissCount => _values.MissCount;
     internal long EvictionCount => _values.EvictionCount;
-    internal bool TryGetResult(string key, out SymbolicProofInfo result) {
-        if (_values.TryGetValue(ResultPrefix + key, out var value) &&
-            value is SymbolicProofInfo cached) {
-            result = cached;
-            return true;
-        }
-        result = null!;
-        return false;
-    }
+    internal bool TryGetResult(string key, out SymbolicProofInfo result) =>
+        TryGet(ResultPrefix, key, out result);
     internal void TryAddResult(string key, SymbolicProofInfo result) => _values.TryAdd(ResultPrefix + key, result);
-    internal bool TryGetEncodedState(string key, out SymbolicEncodedState entry) {
-        if (_values.TryGetValue(EncodedStatePrefix + key, out var value) &&
-            value is SymbolicEncodedState cached) {
+    internal bool TryGetEncodedState(string key, out SymbolicEncodedState entry) =>
+        TryGet(EncodedStatePrefix, key, out entry);
+    internal void TryAddEncodedState(string key, SymbolicEncodedState entry) => _values.TryAdd(EncodedStatePrefix + key, entry);
+    private bool TryGet<T>(string prefix, string key, out T entry) {
+        if (_values.TryGetValue(prefix + key, out var value) && value is T cached) {
             entry = cached;
             return true;
         }
-        entry = default;
+        entry = default!;
         return false;
     }
-    internal void TryAddEncodedState(string key, SymbolicEncodedState entry) => _values.TryAdd(EncodedStatePrefix + key, entry);
 }
 internal readonly record struct SymbolicEncodedState(
     bool Success,
