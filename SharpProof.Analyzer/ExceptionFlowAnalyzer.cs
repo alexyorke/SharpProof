@@ -3,6 +3,7 @@ internal static partial class ExceptionFlowAnalyzer {
     internal static void AnalyzeSymbolForExceptions(MethodBodyAnalysisContext context) {
         var contracts = CollectExceptionContracts(context);
         if (contracts.IsDefaultOrEmpty || context.MethodSymbol.IsAbstract) return;
+        if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         var facts = ProjectEffectFacts(context, effects.ExceptionFacts)
             .ToImmutableArray();
