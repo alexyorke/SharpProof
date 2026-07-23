@@ -541,7 +541,7 @@ found:
 
 ### 7.1 Define the case model
 
-- [ ] Introduce an `EffectCase` containing:
+- [x] Introduce an `EffectCase` containing:
   - Stable test name.
   - Source text or source builder input.
   - Target method or source line.
@@ -552,20 +552,20 @@ found:
   - Expected exception facts, sites, or unknown reasons where applicable.
   - Optional custom verification callback only when the common fields cannot
     express the assertion.
-- [ ] Keep the case type narrow enough that adding one unusual case does not
+- [x] Keep the case type narrow enough that adding one unusual case does not
       make all ordinary cases verbose.
-- [ ] Use `TestCaseData.SetName` to preserve every baseline test name.
+- [x] Use `TestCaseData.SetName` to preserve every baseline test name.
 
 ### 7.2 Convert repeated assertion shapes
 
-- [ ] Convert the largest exact structural groups first.
-- [ ] Compare NUnit discovery after every batch.
-- [ ] Preserve each source snippet and target exactly.
-- [ ] Express required and forbidden effects symbolically as masks rather than
+- [x] Convert the largest exact structural groups first.
+- [x] Compare NUnit discovery after every batch.
+- [x] Preserve each source snippet and target exactly.
+- [x] Express required and forbidden effects symbolically as masks rather than
       repeated `HasFlag` assertions.
-- [ ] Add reusable prelude builders only where they produce a clear net
+- [x] Add reusable prelude builders only where they produce a clear net
       reduction.
-- [ ] Keep marker/prelude helpers separate from the case runner so their
+- [x] Keep marker/prelude helpers separate from the case runner so their
       estimated 80-90-line reduction is not counted twice.
 
 ### 7.3 Keep custom tests standalone
@@ -584,12 +584,12 @@ genuinely smaller reusable representation emerges.
 
 ### 7.4 Matrix validation
 
-- [ ] Compare the complete sorted expanded NUnit name list to the baseline.
-- [ ] Compare the expanded test count.
-- [ ] Run all `MethodEffectsTests`.
-- [ ] Run the full test suite serially if any fixture/order failures appear.
-- [ ] Confirm that every old case maps to one new named case.
-- [ ] Confirm the file is reduced by at least 1,000 net lines.
+- [x] Compare the complete sorted expanded NUnit name list to the baseline.
+- [x] Compare the expanded test count.
+- [x] Run all `MethodEffectsTests`.
+- [x] Run the full test suite serially if any fixture/order failures appear.
+- [x] Confirm that every old case maps to one new named case.
+- [x] Confirm the file is reduced by at least 1,000 net lines.
 
 An assertion-helper-only tranche saving 500-700 lines may be used as an
 intermediate step, but its savings must not be added to the final matrix
