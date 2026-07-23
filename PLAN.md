@@ -422,14 +422,14 @@ Use the existing regex smoke matrix as the main validation surface.
 
 Target: 30-37 lines, low-medium risk.
 
-- [ ] Make `SharpProofAttributeIdentityPolicy` static.
-- [ ] Delete its `AnalyzerSession` field and stop threading the unused session
+- [x] Make `SharpProofAttributeIdentityPolicy` static.
+- [x] Delete its `AnalyzerSession` field and stop threading the unused session
       parameter through analyzers and helpers.
-- [ ] Replace the four-value symbol traversal enum with a boolean or direct
+- [x] Replace the four-value symbol traversal enum with a boolean or direct
       pattern because only `None` and `PropertyForGetter` are produced.
-- [ ] Delete the one-layer `AnalyzerProofService`.
-- [ ] Let `AnalyzerSession` own `SmtAnalysisService` directly.
-- [ ] Update, rather than remove, the architecture assertion in
+- [x] Delete the one-layer `AnalyzerProofService`.
+- [x] Let `AnalyzerSession` own `SmtAnalysisService` directly.
+- [x] Update, rather than remove, the architecture assertion in
       `EffectArchitectureTests`.
 
 ### 6.4 Simplify `Z3FormulaEncoder`

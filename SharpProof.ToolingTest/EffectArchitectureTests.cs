@@ -149,7 +149,8 @@ public sealed class EffectArchitectureTests {
         Assert.That(configuration, Does.Contain("sharpproof_smt_mode"));
         Assert.That(configuration, Does.Not.Contain("disabled"));
         var session = File.ReadAllText(Path.Combine(root, "SharpProof.Analyzer", "AnalyzerSession.cs"));
-        Assert.That(session, Does.Contain("ProofService.SmtAnalysis"));
+        Assert.That(session, Does.Contain("SmtAnalysis = new SmtAnalysisService"));
+        Assert.That(session, Does.Not.Contain("AnalyzerProofService"));
         Assert.That(session, Does.Contain("MethodEffectAnalysisSession"));
         var api = File.ReadAllText(Path.Combine(root, "SharpProof.Symbolic", "SharpProofAnalysisApi.cs"));
         Assert.That(api, Does.Contain("new SmtAnalysisService"));

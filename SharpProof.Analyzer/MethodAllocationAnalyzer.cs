@@ -1,12 +1,10 @@
 using SharpProof.Attributes;
 namespace SharpProof.Analyzer;
 internal static class MethodAllocationAnalyzer {
-    internal static void AnalyzeSymbolForZeroAllocations(
-        MethodBodyAnalysisContext context,
-        SharpProofAttributeIdentityPolicy attributePolicy) {
+    internal static void AnalyzeSymbolForZeroAllocations(MethodBodyAnalysisContext context) {
         var method = context.MethodSymbol;
         if (!MethodContractHierarchy.EnumerateSources(method, context.CancellationToken)
-                .Any(source => attributePolicy.HasAttribute(source, "ZeroAllocationsAttribute")))
+                .Any(source => SharpProofAttributeIdentityPolicy.HasAttribute(source, "ZeroAllocationsAttribute")))
             return;
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         if (effects.AllocationFree == SharpProofVerdict.Unknown) {

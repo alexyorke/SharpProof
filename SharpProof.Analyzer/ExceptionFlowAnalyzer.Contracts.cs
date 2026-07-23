@@ -1,10 +1,9 @@
 namespace SharpProof.Analyzer;
 internal static partial class ExceptionFlowAnalyzer {
-    private static ImmutableArray<EffectiveExceptionContract> CollectExceptionContracts(
-        MethodBodyAnalysisContext context,
-        SharpProofAttributeIdentityPolicy attributePolicy) {
+    private static ImmutableArray<EffectiveExceptionContract> CollectExceptionContracts(MethodBodyAnalysisContext context) {
         var builder = ImmutableArray.CreateBuilder<EffectiveExceptionContract>(2);
-        var doesNotThrow = attributePolicy.GetAcceptedAttributes(context.MethodSymbol, "DoesNotThrowAttribute").FirstOrDefault();
+        var doesNotThrow = SharpProofAttributeIdentityPolicy
+            .GetAcceptedAttributes(context.MethodSymbol, "DoesNotThrowAttribute").FirstOrDefault();
         if (doesNotThrow != null)
             builder.Add(new EffectiveExceptionContract(
                 ExceptionContractKind.DoesNotThrow,
@@ -15,7 +14,8 @@ internal static partial class ExceptionFlowAnalyzer {
         Location? allowedLocation = null;
         var hasValidAllowedContract = false;
         var exceptionBase = context.SemanticModel.Compilation.GetTypeByMetadataName("System.Exception");
-        foreach (var attribute in attributePolicy.GetAcceptedAttributes(context.MethodSymbol, "AllowedExceptionsAttribute")) {
+        foreach (var attribute in SharpProofAttributeIdentityPolicy.GetAcceptedAttributes(
+                     context.MethodSymbol, "AllowedExceptionsAttribute")) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var attributeTypes = CollectAllowedExceptionTypes(attribute, exceptionBase, context.CancellationToken,
                 out var invalidArguments);

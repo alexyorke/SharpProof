@@ -5,18 +5,16 @@ internal sealed class AnalyzerSession : IDisposable {
     private readonly MethodEffectAnalysisSession _effectAnalysis;
     internal AnalyzerSession(Compilation compilation, AnalyzerOptions options, CancellationToken cancellationToken) {
         Configuration = AnalyzerConfiguration.FromOptions(options);
-        AttributePolicy = SharpProofAttributeIdentityPolicy.Create();
-        ProofService = new AnalyzerProofService(Configuration.SmtOptions, Configuration.AnalysisLimits);
+        SmtAnalysis = new SmtAnalysisService(Configuration.SmtOptions);
         var configuredEffects = new ConfiguredEffectContractResolver(options.AnalyzerConfigOptionsProvider.GlobalOptions);
         _effectAnalysis = new MethodEffectAnalysisSession(
             compilation,
             cancellationToken,
             configuredEffects.Resolve,
-            ProofService.SmtAnalysis);
+            SmtAnalysis);
     }
     internal AnalyzerConfiguration Configuration { get; }
-    internal SharpProofAttributeIdentityPolicy AttributePolicy { get; }
-    internal AnalyzerProofService ProofService { get; }
+    internal SmtAnalysisService SmtAnalysis { get; }
     internal MethodBodyAnalysisState GetOrCreateMethodBodyAnalysis(
         IMethodSymbol methodSymbol,
         SyntaxNode declaration,
@@ -41,7 +39,7 @@ internal sealed class AnalyzerSession : IDisposable {
         }
     }
     public void Dispose() {
-        ProofService.Dispose();
+        SmtAnalysis.Dispose();
         _methodBodyAnalyses.Clear();
     }
 }

@@ -2,13 +2,12 @@ namespace SharpProof.Analyzer;
 internal static class ContractConditionHelpers {
     internal static ImmutableArray<ContractAttributeCondition> Collect(
         IMethodSymbol methodSymbol,
-        SharpProofAttributeIdentityPolicy attributePolicy,
         string attributeTypeName,
         CancellationToken cancellationToken) {
         var builder = ImmutableArray.CreateBuilder<ContractAttributeCondition>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
-            foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, attributeTypeName)) {
+            foreach (var attribute in SharpProofAttributeIdentityPolicy.GetAcceptedAttributes(source, attributeTypeName)) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var condition = attribute.ConstructorArguments.Length == 1
                     ? attribute.ConstructorArguments[0].Value as string

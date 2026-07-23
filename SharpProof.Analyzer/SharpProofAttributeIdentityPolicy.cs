@@ -1,14 +1,10 @@
 namespace SharpProof.Analyzer;
-internal sealed class SharpProofAttributeIdentityPolicy {
+internal static class SharpProofAttributeIdentityPolicy {
     private const string OfficialNamespace = "SharpProof.Attributes";
-    private static readonly SharpProofAttributeIdentityPolicy Instance = new();
-    private SharpProofAttributeIdentityPolicy() {
-    }
-    internal static SharpProofAttributeIdentityPolicy Create() => Instance;
-    internal bool HasAttribute(ISymbol symbol, string attributeTypeName) =>
+    internal static bool HasAttribute(ISymbol symbol, string attributeTypeName) =>
         GetAcceptedAttributes(symbol, attributeTypeName).Any();
-    internal IEnumerable<AttributeData> GetAcceptedAttributes(ISymbol symbol, string attributeTypeName) {
-        foreach (var attribute in SymbolAttributeTraversal.GetAttributes(symbol, GetAssociatedAttributePolicy(attributeTypeName)))
+    internal static IEnumerable<AttributeData> GetAcceptedAttributes(ISymbol symbol, string attributeTypeName) {
+        foreach (var attribute in SymbolAttributeTraversal.GetAttributes(symbol, IncludePropertyForGetter(attributeTypeName)))
             if (IsAccepted(attribute.AttributeClass, attributeTypeName))
                 yield return attribute;
     }
@@ -21,7 +17,7 @@ internal sealed class SharpProofAttributeIdentityPolicy {
                    OfficialNamespace,
                    StringComparison.Ordinal);
     }
-    private static AssociatedAttributePolicy GetAssociatedAttributePolicy(string attributeTypeName) =>
+    private static bool IncludePropertyForGetter(string attributeTypeName) =>
         attributeTypeName is
             "AllowedCapabilitiesAttribute" or
             "AllowedExceptionsAttribute" or
@@ -30,7 +26,5 @@ internal sealed class SharpProofAttributeIdentityPolicy {
             "EnforcePureAttribute" or
             "EnsuresAttribute" or
             "ExpectedComplexityAttribute" or
-            "ZeroAllocationsAttribute"
-            ? AssociatedAttributePolicy.PropertyForGetter
-            : AssociatedAttributePolicy.None;
+            "ZeroAllocationsAttribute";
 }

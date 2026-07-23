@@ -186,7 +186,7 @@ internal static class NullableContractAnalyzer {
             var proof = context.State.ProveAtNode(
                 suppression,
                 condition,
-                session.ProofService.SmtAnalysis,
+                session.SmtAnalysis,
                 false,
                 context.CancellationToken);
             if (memberFactInvalidated && proof.TruthValue == SymbolicTruthValue.ProvenTrue) {
@@ -238,7 +238,7 @@ internal static class NullableContractAnalyzer {
         object[] messageArguments,
         bool unknownIsViolation,
         bool counterexampleIsViolation) {
-        var proof = MethodCompletionAnalysis.Prove(context, session.ProofService.SmtAnalysis, completion, condition);
+        var proof = MethodCompletionAnalysis.Prove(context, session.SmtAnalysis, completion, condition);
         if (proof.TruthValue is SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable) return;
         var definiteViolation = proof.TruthValue == SymbolicTruthValue.ProvenFalse ||
             counterexampleIsViolation &&

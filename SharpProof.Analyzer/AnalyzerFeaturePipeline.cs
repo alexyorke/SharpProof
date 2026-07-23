@@ -30,13 +30,13 @@ internal static class AnalyzerFeaturePipeline {
     private static void AnalyzeCallable(MethodBodyAnalysisContext context, AnalyzerSession session) {
         using (SymbolicAnalysisLimitContext.Push(session.Configuration.AnalysisLimits, context.Node)) {
             ContractDiagnosticSupport.ReportInvalidEffectConfigurations(context);
-            EnforcePureContractAnalyzer.Analyze(context, session.AttributePolicy);
-            MethodAllocationAnalyzer.AnalyzeSymbolForZeroAllocations(context, session.AttributePolicy);
-            MethodCapabilityAnalyzer.AnalyzeSymbolForCapabilities(context, session.AttributePolicy);
-            MethodRequiresAnalyzer.AnalyzeSymbolForRequires(context, session.ProofService, session.AttributePolicy);
-            MethodEnsuresAnalyzer.AnalyzeSymbolForEnsures(context, session.ProofService, session.AttributePolicy);
-            MethodExpectedComplexityAnalyzer.AnalyzeSymbolForExpectedComplexity(context, session.AttributePolicy);
-            ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(context, session.AttributePolicy);
+            EnforcePureContractAnalyzer.Analyze(context);
+            MethodAllocationAnalyzer.AnalyzeSymbolForZeroAllocations(context);
+            MethodCapabilityAnalyzer.AnalyzeSymbolForCapabilities(context);
+            MethodRequiresAnalyzer.AnalyzeSymbolForRequires(context, session.SmtAnalysis);
+            MethodEnsuresAnalyzer.AnalyzeSymbolForEnsures(context, session.SmtAnalysis);
+            MethodExpectedComplexityAnalyzer.AnalyzeSymbolForExpectedComplexity(context);
+            ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(context);
             NullableContractAnalyzer.Analyze(context, session);
         }
     }

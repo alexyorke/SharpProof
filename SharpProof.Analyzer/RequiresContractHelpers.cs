@@ -4,17 +4,14 @@ internal static class RequiresContractHelpers {
     internal const string AttributeDisplayName = "[Requires]";
     internal static ImmutableArray<ContractAttributeCondition> CollectContracts(
         IMethodSymbol methodSymbol,
-        SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken) => ContractConditionHelpers.Collect(
             methodSymbol,
-            attributePolicy,
             AttributeTypeName,
             cancellationToken);
     internal static ImmutableArray<ContractAttributeCondition> ValidContracts(
         IMethodSymbol methodSymbol,
-        SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken)
-            => [.. CollectContracts(methodSymbol, attributePolicy, cancellationToken).Where(static contract
+            => [.. CollectContracts(methodSymbol, cancellationToken).Where(static contract
             => contract.InvalidReason == null)];
     internal static bool ContainsResultReference(ExpressionSyntax conditionExpression) => conditionExpression
             .DescendantNodesAndSelf()

@@ -2,12 +2,11 @@ namespace SharpProof.Analyzer;
 internal static class MethodEnsuresAnalyzer {
     internal static void AnalyzeSymbolForEnsures(
         MethodBodyAnalysisContext context,
-        AnalyzerProofService proofService,
-        SharpProofAttributeIdentityPolicy attributePolicy) {
+        SmtAnalysisService smtAnalysis) {
         var methodSymbol = context.MethodSymbol;
         if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
         var contracts = ContractConditionHelpers.Collect(
-            methodSymbol, attributePolicy, "EnsuresAttribute", context.CancellationToken);
+            methodSymbol, "EnsuresAttribute", context.CancellationToken);
         if (contracts.Length == 0) return;
         contracts = ContractConditionHelpers.ReportAndFilterInvalid(contracts, "[Ensures]", context);
         if (contracts.Length == 0) return;
@@ -25,7 +24,7 @@ internal static class MethodEnsuresAnalyzer {
                     context, methodSymbol, contract, unsupportedReason, CreateUnsupportedDiagnostic);
             return;
         }
-        var requiresAssumptions = CollectRequiresAssumptions(methodSymbol, attributePolicy, context.CancellationToken);
+        var requiresAssumptions = CollectRequiresAssumptions(methodSymbol, context.CancellationToken);
         var completionSites = MethodCompletionAnalysis.Collect(context);
         if (completionSites.Length == 0) return;
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -72,7 +71,7 @@ internal static class MethodEnsuresAnalyzer {
                 }
                 var proofCondition =
                     RequiresContractHelpers.CombineAsImplication(requiresAssumptions, rewrittenCondition);
-                var proof = MethodCompletionAnalysis.Prove(context, proofService.SmtAnalysis, completionSite, proofCondition);
+                var proof = MethodCompletionAnalysis.Prove(context, smtAnalysis, completionSite, proofCondition);
                 if (proof.TruthValue == SymbolicTruthValue.ProvenTrue ||
                     proof.TruthValue == SymbolicTruthValue.Unreachable)
                     continue;
@@ -98,8 +97,7 @@ internal static class MethodEnsuresAnalyzer {
     }
     private static ImmutableArray<ContractAttributeCondition> CollectRequiresAssumptions(
         IMethodSymbol methodSymbol,
-        SharpProofAttributeIdentityPolicy attributePolicy,
-        CancellationToken cancellationToken) => [.. RequiresContractHelpers.ValidContracts(methodSymbol, attributePolicy, cancellationToken)
+        CancellationToken cancellationToken) => [.. RequiresContractHelpers.ValidContracts(methodSymbol, cancellationToken)
             .Where(contract =>
                 ContractConditionHelpers.TryParse(contract.Condition, out _, out var conditionExpression) &&
                 !RequiresContractHelpers.ContainsResultReference(conditionExpression))];

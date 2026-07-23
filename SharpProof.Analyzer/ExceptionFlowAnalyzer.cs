@@ -1,7 +1,7 @@
 namespace SharpProof.Analyzer;
 internal static partial class ExceptionFlowAnalyzer {
-    internal static void AnalyzeSymbolForExceptions(MethodBodyAnalysisContext context, SharpProofAttributeIdentityPolicy attributePolicy) {
-        var contracts = CollectExceptionContracts(context, attributePolicy);
+    internal static void AnalyzeSymbolForExceptions(MethodBodyAnalysisContext context) {
+        var contracts = CollectExceptionContracts(context);
         if (contracts.IsDefaultOrEmpty) return;
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         var facts = ProjectEffectFacts(context, effects.ExceptionFacts)

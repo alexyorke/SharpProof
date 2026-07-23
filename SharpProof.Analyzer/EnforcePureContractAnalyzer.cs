@@ -1,8 +1,8 @@
 namespace SharpProof.Analyzer;
 internal static class EnforcePureContractAnalyzer {
-    internal static void Analyze(MethodBodyAnalysisContext context, SharpProofAttributeIdentityPolicy attributePolicy) {
+    internal static void Analyze(MethodBodyAnalysisContext context) {
         var method = context.MethodSymbol;
-        if (!attributePolicy.HasAttribute(method, "EnforcePureAttribute")) return;
+        if (!SharpProofAttributeIdentityPolicy.HasAttribute(method, "EnforcePureAttribute")) return;
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         if (effects.Purity == SharpProofVerdict.Proven) return;
         var firstSite = effects.Sites.FirstOrDefault(site =>

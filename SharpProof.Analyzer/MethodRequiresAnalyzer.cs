@@ -2,12 +2,11 @@ namespace SharpProof.Analyzer;
 internal static class MethodRequiresAnalyzer {
     internal static void AnalyzeSymbolForRequires(
         MethodBodyAnalysisContext context,
-        AnalyzerProofService proofService,
-        SharpProofAttributeIdentityPolicy attributePolicy) {
+        SmtAnalysisService smtAnalysis) {
         var methodSymbol = context.MethodSymbol;
         if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
         var contracts =
-            RequiresContractHelpers.CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);
+            RequiresContractHelpers.CollectContracts(methodSymbol, context.CancellationToken);
         contracts = ContractConditionHelpers.ReportAndFilterInvalid(
             contracts, RequiresContractHelpers.AttributeDisplayName, context);
         foreach (var contract in contracts) {
@@ -21,14 +20,13 @@ internal static class MethodRequiresAnalyzer {
                     context, methodSymbol, contract,
                     "result placeholder is not supported in [Requires] conditions", CreateUnsupportedDiagnostic);
         }
-        AnalyzeCallSitesForRequires(context, proofService, attributePolicy);
+        AnalyzeCallSitesForRequires(context, smtAnalysis);
     }
     private static void AnalyzeCallSitesForRequires(
         MethodBodyAnalysisContext context,
-        AnalyzerProofService proofService,
-        SharpProofAttributeIdentityPolicy attributePolicy) {
+        SmtAnalysisService smtAnalysis) {
         foreach (var callSite in context.Snapshot.VisibleOperations.SelectMany(static operation => CreateCallSites(operation))) {
-            var contracts = RequiresContractHelpers.ValidContracts(callSite.Method, attributePolicy, context.CancellationToken);
+            var contracts = RequiresContractHelpers.ValidContracts(callSite.Method, context.CancellationToken);
             if (contracts.Length == 0) continue;
             var location = callSite.Syntax.GetLocation();
             var lineSpan = location.GetLineSpan();
@@ -50,7 +48,7 @@ internal static class MethodRequiresAnalyzer {
                 var proof = context.State.ProveAtNode(
                     callSite.Syntax,
                     rewrittenCondition,
-                    proofService.SmtAnalysis,
+                    smtAnalysis,
                     includeCurrentStatementCompletionFacts: false,
                     context.CancellationToken);
                 if (proof.TruthValue == SymbolicTruthValue.ProvenTrue ||

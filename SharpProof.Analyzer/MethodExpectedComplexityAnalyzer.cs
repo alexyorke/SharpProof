@@ -1,14 +1,11 @@
 namespace SharpProof.Analyzer;
 internal static class MethodExpectedComplexityAnalyzer {
-    internal static void AnalyzeSymbolForExpectedComplexity(
-        MethodBodyAnalysisContext context,
-        SharpProofAttributeIdentityPolicy attributePolicy) {
+    internal static void AnalyzeSymbolForExpectedComplexity(MethodBodyAnalysisContext context) {
         var methodSymbol = context.MethodSymbol;
         Action<Diagnostic> report = context.ReportDiagnostic;
         if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
         if (!TryGetExpectedComplexity(
                 methodSymbol,
-                attributePolicy,
                 context.CancellationToken,
                 out var declaredComplexity,
                 out var attributeLocation,
@@ -65,7 +62,6 @@ internal static class MethodExpectedComplexityAnalyzer {
     }
     private static bool TryGetExpectedComplexity(
         IMethodSymbol methodSymbol,
-        SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken,
         out DeclaredComplexity declaredComplexity,
         out Location? attributeLocation,
@@ -74,7 +70,8 @@ internal static class MethodExpectedComplexityAnalyzer {
         attributeLocation = null;
         invalidContract = null;
         foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
-            foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, "ExpectedComplexityAttribute")) {
+            foreach (var attribute in SharpProofAttributeIdentityPolicy.GetAcceptedAttributes(
+                         source, "ExpectedComplexityAttribute")) {
                 cancellationToken.ThrowIfCancellationRequested();
                 attributeLocation = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
                 if (attribute.ConstructorArguments.Length != 1 ||

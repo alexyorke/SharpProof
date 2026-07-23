@@ -1,9 +1,8 @@
 using SharpProof.Attributes;
 namespace SharpProof.Analyzer;
 internal static class MethodCapabilityAnalyzer {
-    internal static void AnalyzeSymbolForCapabilities(MethodBodyAnalysisContext context,
-        SharpProofAttributeIdentityPolicy attributePolicy) {
-        if (!TryGetAllowedCapabilities(context, attributePolicy, out var allowed)) return;
+    internal static void AnalyzeSymbolForCapabilities(MethodBodyAnalysisContext context) {
+        if (!TryGetAllowedCapabilities(context, out var allowed)) return;
         var method = context.MethodSymbol;
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         foreach (var site in effects.Sites) {
@@ -28,14 +27,12 @@ internal static class MethodCapabilityAnalyzer {
             method.Name,
             unknown.Message));
     }
-    private static bool TryGetAllowedCapabilities(
-        MethodBodyAnalysisContext context,
-        SharpProofAttributeIdentityPolicy attributePolicy,
-        out SharpProofCapability allowed) {
+    private static bool TryGetAllowedCapabilities(MethodBodyAnalysisContext context, out SharpProofCapability allowed) {
         allowed = SharpProofCapability.None;
         var found = false;
         foreach (var source in MethodContractHierarchy.EnumerateSources(context.MethodSymbol, context.CancellationToken))
-            foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, "AllowedCapabilitiesAttribute")) {
+            foreach (var attribute in SharpProofAttributeIdentityPolicy.GetAcceptedAttributes(
+                         source, "AllowedCapabilitiesAttribute")) {
                 if (attribute.ConstructorArguments.Length != 1 || attribute.ConstructorArguments[0].Value == null)
                     continue;
                 var declared = (SharpProofCapability)Convert.ToInt32(attribute.ConstructorArguments[0].Value, CultureInfo.InvariantCulture);
