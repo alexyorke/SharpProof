@@ -6,7 +6,8 @@ internal static partial class ExceptionFlowAnalyzer {
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         var facts = ProjectEffectFacts(context, effects.ExceptionFacts)
             .ToImmutableArray();
-        AnalyzeExceptionContracts(context, context.MethodSymbol, contracts, facts);
+        foreach (var contract in contracts)
+            AnalyzeExceptionContract(context, context.MethodSymbol, contract, facts);
     }
     private static ImmutableArray<ExceptionFactView> ProjectEffectFacts(
         MethodBodyAnalysisContext context,

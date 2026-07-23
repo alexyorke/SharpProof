@@ -43,14 +43,6 @@ internal static partial class ExceptionFlowAnalyzer {
                 allowedLocation));
         return builder.ToImmutable();
     }
-    private static void AnalyzeExceptionContracts(
-        MethodBodyAnalysisContext context,
-        IMethodSymbol methodSymbol,
-        ImmutableArray<EffectiveExceptionContract> contracts,
-        ImmutableArray<ExceptionFactView> facts) {
-        foreach (var contract in contracts)
-            AnalyzeExceptionContract(context, methodSymbol, contract, facts);
-    }
     private static void AnalyzeExceptionContract(
         MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
@@ -58,35 +50,22 @@ internal static partial class ExceptionFlowAnalyzer {
         ImmutableArray<ExceptionFactView> siteEntries) {
         foreach (var siteGroup in siteEntries.GroupBy(static entry => entry.Site.Span)) {
             var firstEntry = siteGroup.First();
-            var disallowedSites = siteGroup.Where(site =>
+            var provenSites = siteGroup.Where(site =>
                 site.Escape == SharpProofVerdict.Proven && !IsAllowedByExceptionContract(contract, site)).ToArray();
             var unknownSites = siteGroup.Where(site =>
                 site.Escape == SharpProofVerdict.Unknown && !IsAllowedByExceptionContract(contract, site)).ToArray();
-            if (disallowedSites.Length == 0) continue;
             var siteLocation = GetExceptionSiteLocation(firstEntry.Site);
-            var operationDisplay = firstEntry.Site.ToString();
-            var exceptionList = string.Join(", ", disallowedSites
-                .Select(static site => site.ExceptionType)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(static type => type, StringComparer.Ordinal));
-            context.ReportDiagnostic(Diagnostic.Create(
-                AnalyzerDiagnosticCatalog.Get("ExceptionContractViolationRule"),
-                siteLocation,
-                AdditionalLocations(contract.Location),
-                methodSymbol.Name,
-                contract.AttributeDisplay,
-                operationDisplay,
-                exceptionList));
+            if (provenSites.Length != 0)
+                context.ReportDiagnostic(Diagnostic.Create(
+                    AnalyzerDiagnosticCatalog.Get("ExceptionContractViolationRule"),
+                    siteLocation,
+                    AdditionalLocations(contract.Location),
+                    methodSymbol.Name,
+                    contract.AttributeDisplay,
+                    firstEntry.Site.ToString(),
+                    FormatExceptionList(provenSites)));
             if (unknownSites.Length != 0)
                 ReportUnknownExceptionContract(context, methodSymbol, contract, siteLocation, unknownSites);
-        }
-        foreach (var siteGroup in siteEntries.GroupBy(static entry => entry.Site.Span)) {
-            if (siteGroup.Any(site => site.Escape == SharpProofVerdict.Proven && !IsAllowedByExceptionContract(contract, site)))
-                continue;
-            var unknownSites = siteGroup.Where(site =>
-                site.Escape == SharpProofVerdict.Unknown && !IsAllowedByExceptionContract(contract, site)).ToArray();
-            if (unknownSites.Length != 0)
-                ReportUnknownExceptionContract(context, methodSymbol, contract, GetExceptionSiteLocation(siteGroup.First().Site), unknownSites);
         }
     }
     private static void ReportUnknownExceptionContract(
@@ -94,19 +73,17 @@ internal static partial class ExceptionFlowAnalyzer {
         IMethodSymbol methodSymbol,
         EffectiveExceptionContract contract,
         Location location,
-        IReadOnlyCollection<ExceptionFactView> unknownSites) {
-        var exceptionList = string.Join(", ", unknownSites
-            .Select(static site => site.ExceptionType)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static type => type, StringComparer.Ordinal));
-        context.ReportDiagnostic(Diagnostic.Create(
+        IReadOnlyCollection<ExceptionFactView> unknownSites) => context.ReportDiagnostic(Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("ExceptionContractNotVerifiedRule"),
             location,
             AdditionalLocations(contract.Location),
             methodSymbol.Name,
             contract.AttributeDisplay,
-            "unknown escape for " + exceptionList));
-    }
+            "unknown escape for " + FormatExceptionList(unknownSites)));
+    private static string FormatExceptionList(IEnumerable<ExceptionFactView> sites) => string.Join(", ", sites
+        .Select(static site => site.ExceptionType)
+        .Distinct(StringComparer.Ordinal)
+        .OrderBy(static type => type, StringComparer.Ordinal));
     private static ImmutableArray<ITypeSymbol> CollectAllowedExceptionTypes(
         AttributeData attribute,
         INamedTypeSymbol? exceptionBase,

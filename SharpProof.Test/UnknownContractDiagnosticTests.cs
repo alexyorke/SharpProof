@@ -51,6 +51,25 @@ public sealed class UnknownContractDiagnosticTests {
         });
     }
     [Test]
+    public async Task MixedProvenAndUnknownExceptionSiteReportsBothDiagnostics() {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""
+            using SharpProof.Attributes;
+            public static class C {
+                private static void Callee(bool fail, System.Type type) {
+                    if (fail) throw new System.InvalidOperationException();
+                    _ = System.Activator.CreateInstance(type);
+                }
+                [DoesNotThrow]
+                public static void Caller(bool fail, System.Type type) => Callee(fail, type);
+            }
+            """);
+        var exceptionDiagnostics = diagnostics.Where(static diagnostic => diagnostic.Id is "SP0030" or "SP0046").ToArray();
+        Assert.Multiple(() => {
+            Assert.That(exceptionDiagnostics.Select(static diagnostic => diagnostic.Id), Is.EqualTo(["SP0030", "SP0046"]));
+            Assert.That(exceptionDiagnostics.Select(static diagnostic => diagnostic.Location.SourceSpan).Distinct().Count(), Is.EqualTo(1));
+        });
+    }
+    [Test]
     public async Task UserDefinedNullableMemberTargetReportsSP0047() {
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""
             #nullable enable

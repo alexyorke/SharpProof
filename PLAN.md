@@ -499,11 +499,11 @@ Target: 10-15 lines.
 
 Target: 8-14 lines.
 
-- [ ] Group identical site entries once.
-- [ ] Compute proven and unknown arrays within the same loop.
-- [ ] Share exception-list formatting.
-- [ ] Inline the one-call wrapper.
-- [ ] Add a mixed proven/unknown-site regression.
+- [x] Group identical site entries once.
+- [x] Compute proven and unknown arrays within the same loop.
+- [x] Share exception-list formatting.
+- [x] Inline the one-call wrapper.
+- [x] Add a mixed proven/unknown-site regression.
 
 ### 6.10 Small independent Analyzer and ProofCore reductions
 
