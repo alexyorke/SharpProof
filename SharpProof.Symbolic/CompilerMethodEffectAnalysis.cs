@@ -3106,6 +3106,16 @@ internal sealed class MethodEffectAnalysisSession(
             method.ContainingType.ToDisplayString() == "System.MathF" &&
             method.Parameters.All(parameter =>
                 parameter is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Single });
+        private static bool IsMathILogB(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "ILogB",
+                IsStatic: true,
+                Parameters.Length: 1,
+                ReturnType.SpecialType: SpecialType.System_Int32
+            } &&
+            method.ContainingType.ToDisplayString() == "System.Math" &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Double };
         private static bool IsBitConverterToStringArray(IMethodSymbol method) =>
             method is {
                 MethodKind: MethodKind.Ordinary,
@@ -4145,6 +4155,9 @@ internal sealed class MethodEffectAnalysisSession(
                     SharpProofEffect.None,
                 ("System.MathF", MethodKind.Ordinary, "FusedMultiplyAdd")
                     when IsMathFFusedMultiplyAdd(method) =>
+                    SharpProofEffect.None,
+                ("System.Math", MethodKind.Ordinary, "ILogB")
+                    when IsMathILogB(method) =>
                     SharpProofEffect.None,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
