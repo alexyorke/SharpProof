@@ -185,4 +185,15 @@ public sealed class UnknownContractDiagnosticTests {
             """)).Select(static diagnostic => diagnostic.Id);
         Assert.That(diagnosticIds, Does.Contain("SP0021"));
     }
+    [Test]
+    public async Task InterfaceComplexityContractDoesNotVerifyMissingBody() {
+        var diagnosticIds = (await AnalyzerTestHost.GetDiagnosticsAsync("""
+            using SharpProof.Attributes;
+            public interface IWorker {
+                [ExpectedComplexity(ComplexityKind.Linear)]
+                void Work(int count);
+            }
+            """)).Select(static diagnostic => diagnostic.Id);
+        Assert.That(diagnosticIds, Does.Not.Contain("SP0022"));
+    }
 }

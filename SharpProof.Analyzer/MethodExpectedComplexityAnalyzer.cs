@@ -17,7 +17,7 @@ internal static class MethodExpectedComplexityAnalyzer {
             }
         }
         var validContracts = contracts.Where(static contract => contract.InvalidContract == null).ToArray();
-        if (validContracts.Length == 0) return;
+        if (validContracts.Length == 0 || methodSymbol.IsAbstract) return;
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
         var outcome = context.State.GetComplexityOutcome(context.CancellationToken);
         if (!outcome.IsSuccess) {
