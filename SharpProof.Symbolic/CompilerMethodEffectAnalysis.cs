@@ -1409,7 +1409,7 @@ internal sealed class MethodEffectAnalysisSession(
             ImmutableArray<IArgumentOperation> arguments,
             IOperation site,
             ref EffectFlowState state) {
-            if (TryGetArrayAsSpanSource(target, receiver, values, out var spanSource)) {
+            if (TryGetAsSpanSource(target, receiver, values, out var spanSource)) {
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
                 return spanSource.WithExactType(target.ReturnType).AsDefinitelyNonNull();
             }
@@ -1836,20 +1836,21 @@ internal sealed class MethodEffectAnalysisSession(
             property.IsIndexer &&
             property.ContainingType.OriginalDefinition.ToDisplayString() is
                 "System.Span<T>" or "System.ReadOnlySpan<T>";
-        private static bool TryGetArrayAsSpanSource(
+        private static bool TryGetAsSpanSource(
             IMethodSymbol method,
             EffectFlowValue receiver,
             IReadOnlyList<EffectFlowValue> arguments,
             out EffectFlowValue source) {
             source = EffectFlowValue.None;
             var definition = method.ReducedFrom ?? method;
+            var sourceType = definition.Parameters.FirstOrDefault()?.Type;
             if (definition is not {
                 Name: "AsSpan",
                 ContainingType: { } containingType,
                 Parameters.Length: > 0
             } ||
                 containingType.ToDisplayString() != "System.MemoryExtensions" ||
-                definition.Parameters[0].Type is not IArrayTypeSymbol ||
+                sourceType is not IArrayTypeSymbol && sourceType?.SpecialType != SpecialType.System_String ||
                 method.ReturnType.OriginalDefinition.ToDisplayString() is not
                     ("System.Span<T>" or "System.ReadOnlySpan<T>"))
                 return false;

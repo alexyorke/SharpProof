@@ -613,6 +613,29 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.WritesArgumentState,
             forbidden: SharpProofEffect.WritesFreshOwnedState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("StringAsSpanReadIsPureAndAllocationFree", """
+            using System;
+            class C {
+                static char M(string value) {
+                    var span = value.AsSpan();
+                    return span[0];
+                }
+            }
+            """, 3,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("StaticStringAsSpanReadIsPureAndAllocationFree", """
+            class C {
+                static char M(string value) {
+                    var span = System.MemoryExtensions.AsSpan(value);
+                    return span[0];
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
