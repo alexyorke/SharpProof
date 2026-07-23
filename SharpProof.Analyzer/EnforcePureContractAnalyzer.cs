@@ -6,6 +6,7 @@ internal static class EnforcePureContractAnalyzer {
                 .Any(source => SharpProofAttributeIdentityPolicy.HasAttribute(source, "EnforcePureAttribute")))
             return;
         if (method.IsAbstract) return;
+        if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         if (effects.Purity == SharpProofVerdict.Proven) return;
         var firstSite = effects.Sites.FirstOrDefault(site =>
