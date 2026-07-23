@@ -2407,6 +2407,19 @@ internal sealed class MethodEffectAnalysisSession(
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int64 };
         private static bool IsOneIndexArrayGetValue(IMethodSymbol method) =>
             IsOneInt32IndexArrayGetValue(method) || IsOneInt64IndexArrayGetValue(method);
+        private static bool IsTwoIndexArrayGetValue(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "GetValue",
+                IsStatic: false,
+                Parameters.Length: 2,
+                ReturnType.SpecialType: SpecialType.System_Object,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsArrayGetValue(IMethodSymbol method) =>
+            IsOneIndexArrayGetValue(method) || IsTwoIndexArrayGetValue(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2856,7 +2869,7 @@ internal sealed class MethodEffectAnalysisSession(
                     when IsThreeScalarLengthsArrayCreateInstance(method) =>
                     SharpProofEffect.Allocates | SharpProofEffect.Throws,
                 ("System.Array", MethodKind.Ordinary, "GetValue")
-                    when IsOneIndexArrayGetValue(method) =>
+                    when IsArrayGetValue(method) =>
                     SharpProofEffect.ReadsReceiverState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
@@ -2978,7 +2991,7 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
                             "framework_array_create_instance_model")
                     ]
-                : IsOneIndexArrayGetValue(method)
+                : IsArrayGetValue(method)
                     ? [
                         MethodExceptionFact.Boundary("System.IndexOutOfRangeException", MethodExceptionSource.Contract,
                             "framework_array_get_value_model"),
