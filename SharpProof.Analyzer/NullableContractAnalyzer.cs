@@ -20,8 +20,8 @@ internal static class NullableContractAnalyzer {
             .EnumerateSources(method, context.CancellationToken)
             .Any(source => NullableFlowFacts.GetMethodBodyReturnState(source, method.IsAsync) ==
                            NullableFlowFactState.NotNull);
-        var conditionalInputNames = NullableFlowFacts.GetNotNullIfNotNullParameterNames(method);
-        if (!requiresNonNull && conditionalInputNames.IsEmpty) return;
+        var conditionalContracts = CollectConditionalReturnContracts(method, context.CancellationToken);
+        if (!requiresNonNull && conditionalContracts.IsEmpty) return;
         foreach (var completion in completions) {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (completion.ResultExpression == null) continue;
@@ -35,22 +35,44 @@ internal static class NullableContractAnalyzer {
                     AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule"),
                     method.Name,
                     "non-null return");
-            foreach (var inputName in conditionalInputNames) {
-                if (method.Parameters.FirstOrDefault(parameter => parameter.Name == inputName) is { RefKind: not RefKind.Out }) {
-                    var conditionalContract = "[NotNullIfNotNull(\"" + inputName + "\")]";
-                    var escapedInput = EscapeIdentifier(inputName);
-                    Verify(
-                        context,
-                        session,
-                        completion,
-                        "old(" + escapedInput + ") == null || " + resultText + " != null",
-                        AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule"),
-                        [method.Name, conditionalContract],
-                        CSharpSyntaxFacts.IsNullLiteral(completion.ResultExpression),
-                        true);
-                }
+            foreach (var contract in conditionalContracts) {
+                var conditionalContract = "[NotNullIfNotNull(\"" + contract.SourceParameterName + "\")]";
+                var escapedInput = EscapeIdentifier(contract.ImplementationParameterName);
+                Verify(
+                    context,
+                    session,
+                    completion,
+                    "old(" + escapedInput + ") == null || " + resultText + " != null",
+                    AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule"),
+                    [method.Name, conditionalContract],
+                    CSharpSyntaxFacts.IsNullLiteral(completion.ResultExpression),
+                    true);
             }
         }
+    }
+    private static ImmutableArray<ConditionalReturnContract> CollectConditionalReturnContracts(
+        IMethodSymbol method,
+        CancellationToken cancellationToken) {
+        var contracts = ImmutableArray.CreateBuilder<ConditionalReturnContract>();
+        var seenOrdinals = new HashSet<int>();
+        foreach (var source in MethodContractHierarchy.EnumerateSources(method, cancellationToken))
+            foreach (var sourceParameterName in NullableFlowFacts.GetNotNullIfNotNullParameterNames(source)) {
+                cancellationToken.ThrowIfCancellationRequested();
+                var sourceParameter = source.Parameters.FirstOrDefault(parameter =>
+                    string.Equals(parameter.Name, sourceParameterName, StringComparison.Ordinal));
+                if (sourceParameter == null ||
+                    sourceParameter.Ordinal < 0 ||
+                    sourceParameter.Ordinal >= method.Parameters.Length)
+                    continue;
+                var implementationParameter = method.Parameters[sourceParameter.Ordinal];
+                if (implementationParameter.RefKind == RefKind.Out ||
+                    !seenOrdinals.Add(sourceParameter.Ordinal))
+                    continue;
+                contracts.Add(new ConditionalReturnContract(
+                    sourceParameterName,
+                    implementationParameter.Name));
+            }
+        return contracts.ToImmutable();
     }
     private static void VerifyParameterContracts(
         MethodBodyAnalysisContext context,
@@ -288,4 +310,7 @@ internal static class NullableContractAnalyzer {
     private static string FormatBoolean(bool value) => value ? "true" : "false";
     private static string Parenthesize(ExpressionSyntax expression) => "(" + expression.WithoutTrivia() + ")";
     private static string EscapeIdentifier(string identifier) => "@" + identifier;
+    private readonly record struct ConditionalReturnContract(
+        string SourceParameterName,
+        string ImplementationParameterName);
 }
