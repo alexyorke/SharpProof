@@ -644,9 +644,9 @@ Target: 18-30 lines.
 
 Target: 10-15 lines.
 
-- [ ] Use named cases sharing source, required diagnostic IDs, and forbidden
+- [x] Use named cases sharing source, required diagnostic IDs, and forbidden
       diagnostic IDs.
-- [ ] Preserve diagnostic message and location checks.
+- [x] Preserve diagnostic message and location checks.
 
 ## Phase 9: Tooling Implementation
 
