@@ -25,6 +25,10 @@ internal sealed class MethodEffectAnalysisSession(
     internal MethodEffects Analyze(IMethodSymbol method, SyntaxNode declaration, SemanticModel semanticModel) {
         lock (_gate) return AnalyzeCore(method, declaration, semanticModel);
     }
+    internal CompilerMethodEffectSummary AnalyzeCompilerSummary(
+        IMethodSymbol method, SyntaxNode declaration, SemanticModel semanticModel) {
+        lock (_gate) return AnalyzeSummary(method, declaration, semanticModel, null);
+    }
     private MethodEffects AnalyzeCore(IMethodSymbol method, SyntaxNode declaration, SemanticModel semanticModel) {
         var result = AnalyzeSummary(method, declaration, semanticModel, null).Effects;
         if (method.MethodKind == MethodKind.StaticConstructor) return result;

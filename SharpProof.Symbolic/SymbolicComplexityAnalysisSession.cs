@@ -1,3 +1,4 @@
+using SharpProof.Attributes;
 namespace SharpProof.Symbolic;
 
 internal sealed class SymbolicComplexityAnalysisSession {
@@ -5,10 +6,12 @@ internal sealed class SymbolicComplexityAnalysisSession {
     private readonly CancellationToken _cancellationToken;
     private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<IMethodSymbol, Summary> _cache = new(SymbolEqualityComparer.Default);
+    private readonly MethodEffectAnalysisSession _effectAnalysis;
 
     internal SymbolicComplexityAnalysisSession(Compilation compilation, CancellationToken cancellationToken) {
         _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         _cancellationToken = cancellationToken;
+        _effectAnalysis = new(compilation, cancellationToken);
     }
 
     public SymbolicComplexityResult Analyze(ResolvedMethodLikeTarget target) {
@@ -397,9 +400,49 @@ internal sealed class SymbolicComplexityAnalysisSession {
             if (SymbolMutationFacts.TryGetMutationTarget(node, out var target) &&
                 RefersTo(target, symbol, model))
                 return true;
+            if (node is InvocationExpressionSyntax invocation &&
+                InvocationMutatesDependency(invocation, symbol, model))
+                return true;
         }
         return false;
     }
+
+    private bool InvocationMutatesDependency(
+        InvocationExpressionSyntax invocation,
+        ISymbol boundDependency,
+        SemanticModel model) {
+        if (model.GetOperation(invocation, _cancellationToken) is not IInvocationOperation operation)
+            return false;
+        var receiverAliases = operation.Instance != null &&
+                              ReceiverReferencesDependency(operation.Instance, boundDependency, model);
+        var aliasedArguments = operation.Arguments.Where(argument =>
+            SymbolMutationFacts.ExpressionReferencesSymbol(
+                argument.Value.Syntax, boundDependency, model, _cancellationToken)).ToArray();
+        if (!receiverAliases && aliasedArguments.Length == 0) return false;
+        if (!SymbolicMethodSourceResolver.TryResolve(
+                _compilation, operation.TargetMethod, static _ => true, false, _cancellationToken,
+                out var declaration, out _, out var sourceModel))
+            return true;
+        var summary = _effectAnalysis.AnalyzeCompilerSummary(operation.TargetMethod, declaration, sourceModel);
+        var effects = summary.Effects;
+        var unknown = (effects.Effects & SharpProofEffect.Unknown) != 0 ||
+                      !effects.UnknownReasons.IsDefaultOrEmpty;
+        if (receiverAliases &&
+            ((effects.Effects & SharpProofEffect.WritesReceiverState) != 0 || unknown))
+            return true;
+        if (aliasedArguments.Any(argument => summary.WrittenArgumentOrdinals.Contains(argument.Parameter?.Ordinal ?? -1)))
+            return true;
+        return aliasedArguments.Length != 0 &&
+               ((effects.Effects & SharpProofEffect.WritesArgumentState) != 0 &&
+                summary.WrittenArgumentOrdinals.IsDefaultOrEmpty || unknown);
+    }
+
+    private bool ReceiverReferencesDependency(IOperation instance, ISymbol dependency, SemanticModel model) =>
+        dependency is IFieldSymbol or IPropertySymbol &&
+        !dependency.IsStatic &&
+        instance is IInstanceReferenceOperation ||
+        SymbolMutationFacts.ExpressionReferencesSymbol(
+            instance.Syntax, dependency, model, _cancellationToken);
 
     private IReadOnlyList<ISymbol> GetReferencedSymbols(ExpressionSyntax expression, SemanticModel model) {
         var symbols = new List<ISymbol>();
