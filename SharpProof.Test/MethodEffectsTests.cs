@@ -1116,6 +1116,22 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void UsingDefinitelyNullResourceSkipsDisposeEffects() {
+        var result = Analyze("""
+            sealed class D : System.IDisposable {
+                private static int state;
+                public void Dispose() { state++; }
+            }
+            class C {
+                static void M() { D? value = null; using (value) { } }
+            }
+            """, 6);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.False);
+        });
+    }
+    [Test]
     public void GenericUsingHasDisposalDispatchUncertainty() {
         var result = Analyze("""
             class C {
