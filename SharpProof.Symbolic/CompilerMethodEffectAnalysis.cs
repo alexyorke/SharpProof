@@ -2444,7 +2444,7 @@ internal sealed class MethodEffectAnalysisSession(
         private static bool IsArrayGetValue(IMethodSymbol method) =>
             IsOneIndexArrayGetValue(method) || IsTwoIndexArrayGetValue(method) ||
             IsThreeIndexArrayGetValue(method) || IsIndexesArrayGetValue(method);
-        private static bool IsOneIndexArraySetValue(IMethodSymbol method) =>
+        private static bool IsOneInt32IndexArraySetValue(IMethodSymbol method) =>
             method is {
                 MethodKind: MethodKind.Ordinary,
                 Name: "SetValue",
@@ -2455,6 +2455,19 @@ internal sealed class MethodEffectAnalysisSession(
             } &&
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Object } &&
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsOneInt64IndexArraySetValue(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "SetValue",
+                IsStatic: false,
+                Parameters.Length: 2,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Object } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int64 };
+        private static bool IsOneIndexArraySetValue(IMethodSymbol method) =>
+            IsOneInt32IndexArraySetValue(method) || IsOneInt64IndexArraySetValue(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {

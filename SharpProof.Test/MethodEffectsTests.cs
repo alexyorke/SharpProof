@@ -1966,6 +1966,29 @@ public sealed class MethodEffectsTests {
             required: SharpProofEffect.Allocates | SharpProofEffect.Throws,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                        SharpProofEffect.Unknown);
+        yield return Effect("ArraySetValueSupportsLongIndex", """
+            class C {
+                static void M(System.Array values, object replacement, long index) =>
+                    values.SetValue(replacement, index);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("ArraySetValueLongIndexKeepsLocalWriteOwned", """
+            class C {
+                static void M(object replacement) {
+                    System.Array values = new object[1];
+                    values.SetValue(replacement, 0L);
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.Allocates | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                       SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
