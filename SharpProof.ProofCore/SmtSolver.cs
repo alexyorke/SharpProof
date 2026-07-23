@@ -139,23 +139,14 @@ internal sealed class SmtSolver : IDisposable {
         => feasibility == Feasibility.Satisfiable && containsApproximateRegex
             ? Feasibility.Unknown
             : feasibility;
-    private static bool IsConservativeSolverFailure(Exception ex) => ex is InvalidOperationException ||
-               ex is Z3Exception ||
-               ex is ArgumentException ||
-               ex is InvalidCastException ||
-               ex is RegexMatchTimeoutException ||
-               ex is ArithmeticException;
+    private static bool IsConservativeSolverFailure(Exception ex) => ex is
+        InvalidOperationException or Z3Exception or ArgumentException or InvalidCastException or
+        RegexMatchTimeoutException or ArithmeticException;
     private static string GetConservativeSolverFailureReason(Exception ex) => ex switch {
         Z3Exception => "z3_transient_failure",
         RegexMatchTimeoutException => "solver_timeout",
         _ => "solver_encoding_failure"
     };
-    private static IReadOnlyList<SmtVariable> CollectVariables(IEnumerable<SmtFormula> formulas) {
-        var variables = new HashSet<SmtVariable>();
-        foreach (var formula in formulas)
-            foreach (var candidate in SmtFormulaTraversal.Enumerate(formula))
-                if (candidate is SmtVariable variable)
-                    variables.Add(variable);
-        return variables.ToArray();
-    }
+    private static IReadOnlyList<SmtVariable> CollectVariables(IEnumerable<SmtFormula> formulas) =>
+        [.. formulas.SelectMany(SmtFormulaTraversal.Enumerate).OfType<SmtVariable>().Distinct()];
 }

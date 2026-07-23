@@ -14,12 +14,7 @@ internal sealed class SmtRegexValidator {
             Cache(key, new RegexValidationResult(true, isMatch));
             return true;
         }
-        catch (ArgumentException) {
-            isMatch = false;
-            Cache(key, new RegexValidationResult(false, isMatch));
-            return false;
-        }
-        catch (RegexMatchTimeoutException) {
+        catch (Exception exception) when (exception is ArgumentException or RegexMatchTimeoutException) {
             isMatch = false;
             Cache(key, new RegexValidationResult(false, isMatch));
             return false;

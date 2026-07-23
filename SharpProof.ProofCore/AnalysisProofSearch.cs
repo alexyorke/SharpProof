@@ -60,7 +60,9 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
         if (query.Hazard.Visibility == AnalysisEffectVisibility.InternalOnly &&
             !descriptor.AcceptsInternalOnlyVisibility)
             return UnknownWithoutProof("invalid_internal_only_hazard");
-        return ClassifyKnownHazard(query.Hazard.Kind, pathConditions, query.Hazard.TriggerCondition, timeout);
+        return descriptor.Mode == HazardClassificationMode.InternalEffect
+            ? ClassifyInternalOnlyEffect(pathConditions, timeout, descriptor.PureReason)
+            : ClassifyTriggeredHazard(pathConditions, query.Hazard.TriggerCondition!, timeout, descriptor);
     }
     private AnalysisProofResult ClassifyInternalOnlyEffect(IEnumerable<SmtFormula> pathConditions, TimeSpan timeout, string pureReason) {
         var normalizedPathConditions = pathConditions.ToArray();
@@ -78,16 +80,6 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
                 "path_feasibility_unknown"),
             _ => new AnalysisProofResult(AnalysisProofOutcome.Proven, Attempted(path), NotAttempted(), pureReason)
         };
-    }
-    private AnalysisProofResult ClassifyKnownHazard(
-        AnalysisHazardKind kind,
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula? triggerCondition,
-        TimeSpan timeout) {
-        var descriptor = HazardDescriptors[kind];
-        return descriptor.Mode == HazardClassificationMode.InternalEffect
-            ? ClassifyInternalOnlyEffect(pathConditions, timeout, descriptor.PureReason)
-            : ClassifyTriggeredHazard(pathConditions, triggerCondition!, timeout, descriptor);
     }
     private AnalysisProofResult ClassifyTriggeredHazard(
         IEnumerable<SmtFormula> pathConditions,

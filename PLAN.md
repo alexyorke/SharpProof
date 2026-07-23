@@ -509,16 +509,16 @@ Target: 8-14 lines.
 
 Target: 20-35 lines total.
 
-- [ ] Merge identical exception catches in `SmtRegexValidator`.
-- [ ] Remove duplicated failure handling in `Z3RegexCharacterRanges`.
-- [ ] Simplify solver exception matching and variable collection.
-- [ ] Inline the one-use
+- [x] Merge identical exception catches in `SmtRegexValidator`.
+- [x] Remove duplicated failure handling in `Z3RegexCharacterRanges`.
+- [x] Simplify solver exception matching and variable collection.
+- [x] Inline the one-use
       `AnalysisProofSearch.ClassifyKnownHazard`.
-- [ ] Inline `TypeHierarchyEnumeration.EnumerateBaseTypes`; its `includeSelf`
+- [x] Inline `TypeHierarchyEnumeration.EnumerateBaseTypes`; its `includeSelf`
       argument is never false.
-- [ ] Match `BaseMethodDeclarationSyntax` once in
+- [x] Match `BaseMethodDeclarationSyntax` once in
       `AnalyzerFeaturePipeline.RequiresSyntaxFallback`.
-- [ ] Build `AnalyzerDiagnosticCatalog` descriptor sets once.
+- [x] Build `AnalyzerDiagnosticCatalog` descriptor sets once.
 
 ## Phase 7: Convert `MethodEffectsTests` to a Typed Matrix
 

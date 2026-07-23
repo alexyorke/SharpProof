@@ -63,10 +63,11 @@ internal static class AnalyzerDiagnosticCatalog {
             "Method '{0}' has a nullable contract for '{1}' that could not be verified: {2}", "Nullability",
             DiagnosticSeverity.Warning, "Reports nullable contracts that cannot be proven conservatively.")
     ];
-    private static readonly ImmutableDictionary<string, DiagnosticDescriptor> DescriptorsByField = Definitions
-        .ToImmutableDictionary(static value => value.Field, static value => value.Create(), StringComparer.Ordinal);
     internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [.. Definitions.Select(static value
         => value.Create())];
+    private static readonly ImmutableDictionary<string, DiagnosticDescriptor> DescriptorsByField = Definitions
+        .Select((definition, index) => (definition.Field, Descriptor: SupportedDiagnostics[index]))
+        .ToImmutableDictionary(static value => value.Field, static value => value.Descriptor, StringComparer.Ordinal);
     internal static DiagnosticDescriptor Get(string fieldName) => DescriptorsByField[fieldName];
     private sealed record Definition(
         string Field, string Id, string Title, string Message, string Category,

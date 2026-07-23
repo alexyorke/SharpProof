@@ -10,18 +10,11 @@ internal static class TypeHierarchyEnumeration {
                 return true;
         return false;
     }
-    internal static IEnumerable<INamedTypeSymbol> EnumerateBaseTypes(ITypeSymbol type, bool includeSelf = true) {
-        var namedType = type as INamedTypeSymbol;
-        for (var current = includeSelf ? namedType : namedType?.BaseType;
-             current != null;
-             current = current.BaseType)
-            yield return current;
-    }
     internal static bool IsSameOrDerivedFrom(
         ITypeSymbol candidate,
         ITypeSymbol expectedBase,
         TypeIdentityPolicy identityPolicy = TypeIdentityPolicy.Exact) {
-        foreach (var current in EnumerateBaseTypes(candidate)) {
+        for (var current = candidate as INamedTypeSymbol; current != null; current = current.BaseType) {
             if (SymbolEq.AreEqual(current, expectedBase)) return true;
             if (identityPolicy == TypeIdentityPolicy.ExactOrOriginalDefinition &&
                 SymbolEq.AreEqual(current.OriginalDefinition, expectedBase.OriginalDefinition))

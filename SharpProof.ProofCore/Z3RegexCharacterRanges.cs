@@ -29,17 +29,9 @@ internal static class Z3RegexCharacterRanges {
     }
     internal static bool TryGet(string atomPattern, out CharacterRange[] ranges) =>
         TryGet(atomPattern, RegexOptions.None, out ranges);
-    internal static bool TryGet(string atomPattern, RegexOptions options, out CharacterRange[] ranges) {
-        ranges = [];
-        try {
-            ranges = Cache.GetOrAdd((atomPattern, options), Create);
-            return ranges.Length is > 0 and <= MaxRangeCount;
-        }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or
-                                               RegexMatchTimeoutException) {
-            return false;
-        }
-    }
+    internal static bool TryGet(string atomPattern, RegexOptions options, out CharacterRange[] ranges) =>
+        TryCreate(() => Cache.GetOrAdd((atomPattern, options), Create), out ranges) &&
+               ranges.Length is > 0 and <= MaxRangeCount;
     internal static CharacterRange[] Merge(IEnumerable<CharacterRange> ranges) {
         var ordered = ranges
             .OrderBy(static range => range.Start)
@@ -99,13 +91,17 @@ internal static class Z3RegexCharacterRanges {
         if (rangeStart is { } finalStart) ranges.Add(new CharacterRange(finalStart, previous));
         return [.. ranges];
     }
-    private static CharacterRange[] CreateOrEmpty((string Pattern, RegexOptions Options) key) {
+    private static CharacterRange[] CreateOrEmpty((string Pattern, RegexOptions Options) key) =>
+        TryCreate(() => Create(key), out var ranges) ? ranges : [];
+    private static bool TryCreate(Func<CharacterRange[]> create, out CharacterRange[] ranges) {
         try {
-            return Create(key);
+            ranges = create();
+            return true;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or
                                                RegexMatchTimeoutException) {
-            return [];
+            ranges = [];
+            return false;
         }
     }
 }

@@ -16,13 +16,7 @@ internal static class AnalyzerFeaturePipeline {
             LocalFunctionStatementSyntax)
             return true;
         return node switch {
-            MethodDeclarationSyntax method => method.Body == null && method.ExpressionBody == null,
-            ConstructorDeclarationSyntax constructor =>
-                constructor.Body == null && constructor.ExpressionBody == null,
-            OperatorDeclarationSyntax operatorDeclaration =>
-                operatorDeclaration.Body == null && operatorDeclaration.ExpressionBody == null,
-            ConversionOperatorDeclarationSyntax conversion =>
-                conversion.Body == null && conversion.ExpressionBody == null,
+            BaseMethodDeclarationSyntax method => method.Body == null && method.ExpressionBody == null,
             AccessorDeclarationSyntax accessor => accessor.Body == null && accessor.ExpressionBody == null,
             _ => false
         };
