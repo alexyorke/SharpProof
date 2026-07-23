@@ -111,11 +111,11 @@ internal static class SymbolicIndexingLowerer {
     }
     internal static bool TryLowerArrayGetLengthInvocation(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol method,
+        IInvocationOperation operation,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         term = null!;
-        if (!TryGetArrayDimensionInvocation(invocation, method, context, out var receiverExpression, out var dimension))
+        if (!TryGetArrayDimensionInvocation(invocation, operation, context, out var receiverExpression, out var dimension))
             return false;
         if (dimension == 0 &&
             SymbolicStringLengthLowerer.GetPreferredLengthSemanticType(receiverExpression, context) is IArrayTypeSymbol { Rank: 1 } &&
@@ -125,12 +125,13 @@ internal static class SymbolicIndexingLowerer {
     }
     internal static bool TryLowerArrayBoundInvocation(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol method,
+        IInvocationOperation operation,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         term = null!;
-        if (!TryGetArrayDimensionInvocation(invocation, method, context, out var receiverExpression, out var dimension))
+        if (!TryGetArrayDimensionInvocation(invocation, operation, context, out var receiverExpression, out var dimension))
             return false;
+        var method = operation.TargetMethod;
         if (string.Equals(method.Name, nameof(Array.GetLowerBound), StringComparison.Ordinal)) {
             return TryLowerArrayDimensionLowerBoundTerm(receiverExpression, dimension, context, out term);
         }
@@ -146,20 +147,22 @@ internal static class SymbolicIndexingLowerer {
     }
     private static bool TryGetArrayDimensionInvocation(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol method,
+        IInvocationOperation operation,
         SymbolicLoweringContext context,
         out ExpressionSyntax receiverExpression,
         out int dimension) {
         receiverExpression = null!;
         dimension = default;
+        var method = operation.TargetMethod;
         if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
             invocation.ArgumentList.Arguments.Count != 1 ||
             method.ContainingType?.SpecialType != SpecialType.System_Array ||
             method.Parameters.Length != 1 ||
-            method.Parameters[0].Type.SpecialType != SpecialType.System_Int32)
+            method.Parameters[0].Type.SpecialType != SpecialType.System_Int32 ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var dimensionExpression))
             return false;
         var dimensionValue = context.SemanticModel.GetConstantValue(
-            invocation.ArgumentList.Arguments[0].Expression,
+            dimensionExpression,
             context.CancellationToken);
         if (dimensionValue is not { HasValue: true, Value: int constantDimension }) return false;
         receiverExpression = memberAccess.Expression;

@@ -2,16 +2,18 @@ namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicStringLowerer {
     internal static bool TryLowerStringPredicateInvocation(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol method,
+        IInvocationOperation operation,
         SymbolicLoweringContext context,
         out SymbolicCondition condition) {
         condition = null!;
+        var method = operation.TargetMethod;
         if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
             invocation.ArgumentList.Arguments.Count is not 1 and not 2 ||
             method.Parameters.Length != invocation.ArgumentList.Arguments.Count ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var argumentExpression) ||
             !TryLowerStringTerm(memberAccess.Expression, context, out var receiver) ||
             !TryLowerStringPredicateArgument(
-                invocation.ArgumentList.Arguments[0].Expression,
+                argumentExpression,
                 method.Parameters[0].Type,
                 context,
                 out var argument))
@@ -25,7 +27,8 @@ internal static class SymbolicStringLowerer {
         if (predicate == null) return false;
         var ignoreCase = false;
         if (invocation.ArgumentList.Arguments.Count == 2 &&
-            !TryGetOrdinalStringComparison(invocation.ArgumentList.Arguments[1].Expression, context, out ignoreCase))
+            (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 1, out var comparisonExpression) ||
+             !TryGetOrdinalStringComparison(comparisonExpression, context, out ignoreCase)))
             return false;
         if (predicate != SymbolicStringPredicateKind.Contains &&
             method.Parameters[0].Type.SpecialType != SpecialType.System_Char &&
@@ -57,39 +60,42 @@ internal static class SymbolicStringLowerer {
     }
     internal static bool TryLowerRegexIsMatchInvocation(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol method,
+        IInvocationOperation operation,
         SymbolicLoweringContext context,
         out SymbolicCondition condition) {
         condition = null!;
-        return string.Equals(method.Name, nameof(Regex.IsMatch), StringComparison.Ordinal) &&
+        return string.Equals(operation.TargetMethod.Name, nameof(Regex.IsMatch), StringComparison.Ordinal) &&
                SymbolicRegexLowerer.TryLowerRegexInvocationPredicate(invocation, context, out condition);
     }
     internal static bool TryLowerStringEqualsInvocation(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol method,
+        IInvocationOperation operation,
         SymbolicLoweringContext context,
         out SymbolicCondition condition) {
         condition = null!;
+        var method = operation.TargetMethod;
         if (!method.IsStatic) {
             if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
                 invocation.ArgumentList.Arguments.Count is not 1 and not 2 ||
                 method.Parameters.Length != invocation.ArgumentList.Arguments.Count ||
-                method.Parameters[0].Type.SpecialType != SpecialType.System_String)
+                method.Parameters[0].Type.SpecialType != SpecialType.System_String ||
+                !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var argumentExpression))
                 return false;
             var ignoreCase = false;
             if (invocation.ArgumentList.Arguments.Count == 2 &&
-                !TryGetOrdinalStringComparison(invocation.ArgumentList.Arguments[1].Expression, context, out ignoreCase))
+                (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 1, out var instanceComparisonExpression) ||
+                 !TryGetOrdinalStringComparison(instanceComparisonExpression, context, out ignoreCase)))
                 return false;
             if (ignoreCase)
                 return TryCreateOrdinalIgnoreCaseStringEqualityCondition(
                     memberAccess.Expression,
-                    invocation.ArgumentList.Arguments[0].Expression,
+                    argumentExpression,
                     invocation,
                     context,
                     out condition);
             return TryCreateStringEqualityCondition(
                 memberAccess.Expression,
-                invocation.ArgumentList.Arguments[0].Expression,
+                argumentExpression,
                 invocation,
                 context,
                 "ir.known-api.string.instance-equals",
@@ -98,22 +104,25 @@ internal static class SymbolicStringLowerer {
         if (invocation.ArgumentList.Arguments.Count is not 2 and not 3 ||
             method.Parameters.Length != invocation.ArgumentList.Arguments.Count ||
             method.Parameters[0].Type.SpecialType != SpecialType.System_String ||
-            method.Parameters[1].Type.SpecialType != SpecialType.System_String)
+            method.Parameters[1].Type.SpecialType != SpecialType.System_String ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var leftExpression) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 1, out var rightExpression))
             return false;
         var staticIgnoreCase = false;
         if (invocation.ArgumentList.Arguments.Count == 3 &&
-            !TryGetOrdinalStringComparison(invocation.ArgumentList.Arguments[2].Expression, context, out staticIgnoreCase))
+            (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 2, out var staticComparisonExpression) ||
+             !TryGetOrdinalStringComparison(staticComparisonExpression, context, out staticIgnoreCase)))
             return false;
         if (staticIgnoreCase)
             return TryCreateOrdinalIgnoreCaseStringEqualityCondition(
-                invocation.ArgumentList.Arguments[0].Expression,
-                invocation.ArgumentList.Arguments[1].Expression,
+                leftExpression,
+                rightExpression,
                 invocation,
                 context,
                 out condition);
         return TryCreateStringEqualityCondition(
-            invocation.ArgumentList.Arguments[0].Expression,
-            invocation.ArgumentList.Arguments[1].Expression,
+            leftExpression,
+            rightExpression,
             invocation,
             context,
             "ir.known-api.string.equals",
@@ -411,16 +420,18 @@ internal static class SymbolicStringLowerer {
     }
     internal static bool TryLowerStringNullOrPredicateInvocation(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol method,
+        IInvocationOperation operation,
         SymbolicLoweringContext context,
         out SymbolicCondition condition) {
         condition = null!;
+        var method = operation.TargetMethod;
         if (!method.IsStatic ||
             invocation.ArgumentList.Arguments.Count != 1 ||
             method.Parameters.Length != 1 ||
             method.Parameters[0].Type.SpecialType != SpecialType.System_String ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var argumentExpression) ||
             !TryLowerStringValueWithOptionalReference(
-                invocation.ArgumentList.Arguments[0].Expression,
+                argumentExpression,
                 context,
                 out var stringValue,
                 out var reference))
@@ -448,7 +459,7 @@ internal static class SymbolicStringLowerer {
             ? predicateCondition
             : new SymbolicBinaryCondition(
                 SymbolicConditionOperator.Or,
-                SymbolicIrLowerer.CreateReferenceIsNullCondition(reference, invocation.ArgumentList.Arguments[0].Expression),
+                SymbolicIrLowerer.CreateReferenceIsNullCondition(reference, argumentExpression),
                 predicateCondition);
         return true;
     }

@@ -250,10 +250,11 @@ internal static class SymbolicNullableLowerer {
     }
     internal static bool TryLowerNullableGetValueOrDefaultInvocation(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol method,
+        IInvocationOperation operation,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         term = null!;
+        var method = operation.TargetMethod;
         if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
             invocation.ArgumentList.Arguments.Count is not 0 and not 1 ||
             method.Parameters.Length != invocation.ArgumentList.Arguments.Count ||
@@ -265,7 +266,8 @@ internal static class SymbolicNullableLowerer {
         if (invocation.ArgumentList.Arguments.Count == 0) {
             if (!TryCreateDefaultTerm(method.ReturnType, out fallbackTerm)) return false;
         }
-        else if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocation.ArgumentList.Arguments[0].Expression, context),
+        else if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(operation, 0, out var fallbackExpression) ||
+                 !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(fallbackExpression, context),
             out fallbackTerm) ||
                  fallbackTerm.Kind != valueTerm.Kind) {
             return false;

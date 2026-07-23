@@ -1,7 +1,7 @@
 namespace SharpProof.Symbolic.Ir;
 internal delegate bool KnownApiLoweringHandler<TValue>(
     InvocationExpressionSyntax invocation,
-    IMethodSymbol method,
+    IInvocationOperation operation,
     SymbolicLoweringContext context,
     out TValue value);
 internal sealed class KnownApiLoweringDescriptor<TValue> {

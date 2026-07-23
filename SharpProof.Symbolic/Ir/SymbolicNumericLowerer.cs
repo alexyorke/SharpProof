@@ -24,11 +24,11 @@ internal static class SymbolicNumericLowerer {
     }
     internal static bool TryLowerIntegralMathClampInvocation(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol method,
+        IInvocationOperation operation,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         term = null!;
-        if (!TryGetIntegralMathInvocation(invocation, method, 3, context, out var operation) ||
+        if (!IsIntegralMathInvocation(operation, 3) ||
             !TryLowerIntegralMathArgument(operation, 0, context, out var value) ||
             !TryLowerIntegralMathArgument(operation, 1, context, out var min) ||
             !TryLowerIntegralMathArgument(operation, 2, context, out var max) ||
@@ -53,11 +53,11 @@ internal static class SymbolicNumericLowerer {
     }
     internal static bool TryLowerIntegralMathAbsInvocation(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol method,
+        IInvocationOperation operation,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         term = null!;
-        if (!TryGetIntegralMathInvocation(invocation, method, 1, context, out var operation) ||
+        if (!IsIntegralMathInvocation(operation, 1) ||
             !TryLowerIntegralMathArgument(operation, 0, context, out var value))
             return false;
         var nonNegative = SymbolicIrLowerer.CreateRelationCondition(
@@ -74,14 +74,15 @@ internal static class SymbolicNumericLowerer {
     }
     internal static bool TryLowerIntegralMathMinMaxInvocation(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol method,
+        IInvocationOperation operation,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         term = null!;
-        if (!TryGetIntegralMathInvocation(invocation, method, 2, context, out var operation) ||
+        if (!IsIntegralMathInvocation(operation, 2) ||
             !TryLowerIntegralMathArgument(operation, 0, context, out var left) ||
             !TryLowerIntegralMathArgument(operation, 1, context, out var right))
             return false;
+        var method = operation.TargetMethod;
         var comparisonOperator = method.Name == nameof(Math.Min)
             ? SymbolicRelationOperator.LessThanOrEqual
             : SymbolicRelationOperator.GreaterThanOrEqual;
@@ -107,24 +108,11 @@ internal static class SymbolicNumericLowerer {
                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argumentExpression, context), out term) &&
                term.Kind == SharpProof.ProofCore.Smt.SmtValueKind.Int;
     }
-    private static bool TryGetIntegralMathInvocation(
-        InvocationExpressionSyntax invocation,
-        IMethodSymbol method,
-        int expectedArity,
-        SymbolicLoweringContext context,
-        out IInvocationOperation operation) {
-        if (method.IsStatic &&
-            method.Parameters.Length == expectedArity &&
-            SymbolicTypeLowerer.IsIntegerSmtType(method.ReturnType) &&
-            method.Parameters.All(static parameter => SymbolicTypeLowerer.IsIntegerSmtType(parameter.Type)) &&
-            context.SemanticModel.GetOperation(invocation, context.CancellationToken) is
-                IInvocationOperation invocationOperation) {
-            operation = invocationOperation;
-            return true;
-        }
-        operation = null!;
-        return false;
-    }
+    private static bool IsIntegralMathInvocation(IInvocationOperation operation, int expectedArity) =>
+        operation.TargetMethod is { IsStatic: true } method &&
+        method.Parameters.Length == expectedArity &&
+        SymbolicTypeLowerer.IsIntegerSmtType(method.ReturnType) &&
+        method.Parameters.All(static parameter => SymbolicTypeLowerer.IsIntegerSmtType(parameter.Type));
     internal static bool TryLowerBigIntegerStaticValueMember(ISymbol? memberSymbol, out SymbolicTerm term) {
         if (memberSymbol is IPropertySymbol property &&
             IsBigIntegerType(property.Type)) {

@@ -80,7 +80,7 @@ internal static class SymbolicKnownApiLowerer {
             operation) return false;
         foreach (var descriptor in descriptors)
             if (descriptor.Matches(operation.TargetMethod) &&
-                descriptor.Handler(invocation, operation.TargetMethod, context, out value))
+                descriptor.Handler(invocation, operation, context, out value))
                 return true;
         return false;
     }
