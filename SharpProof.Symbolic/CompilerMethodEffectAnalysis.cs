@@ -1858,6 +1858,11 @@ internal sealed class MethodEffectAnalysisSession(
             destination.OriginalDefinition.ToDisplayString() == "System.Span<T>" &&
             SymbolEqualityComparer.Default.Equals(
                 method.ContainingType.TypeArguments[0], destination.TypeArguments[0]);
+        private static bool IsSpanFill(IMethodSymbol method) =>
+            method is { Name: "Fill", Parameters.Length: 1, ContainingType.TypeArguments.Length: 1 } &&
+            method.ContainingType.OriginalDefinition.ToDisplayString() == "System.Span<T>" &&
+            SymbolEqualityComparer.Default.Equals(
+                method.ContainingType.TypeArguments[0], method.Parameters[0].Type);
         private static bool IsMemorySpanProperty(IPropertySymbol property) =>
             property.Name == "Span" &&
             property.ContainingType.OriginalDefinition.ToDisplayString() is
@@ -2253,6 +2258,8 @@ internal sealed class MethodEffectAnalysisSession(
                     SharpProofEffect.WritesArgumentState,
                 (_, MethodKind.Ordinary, "CopyTo" or "TryCopyTo") when IsSpanCopy(method) =>
                     SharpProofEffect.WritesArgumentState,
+                (_, MethodKind.Ordinary, "Fill") when IsSpanFill(method) =>
+                    SharpProofEffect.WritesReceiverState,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
