@@ -7,6 +7,13 @@ using SharpProof.Symbolic;
 namespace SharpProof.Test;
 [TestFixture]
 public sealed class MethodEffectsTests {
+    [Test]
+    public void ConditionUnwrappingHandlesRepeatedMixedNesting() {
+        var expression = SyntaxFactory.ParseExpression("checked(((value!)))");
+        var unwrapped = CSharpSyntaxFacts.UnwrapConditionExpression(expression);
+        Assert.That(unwrapped, Is.TypeOf<IdentifierNameSyntax>());
+        Assert.That(unwrapped.ToString(), Is.EqualTo("value"));
+    }
     [TestCase("return new object();", SharpProofVerdict.Proven, SharpProofVerdict.Disproven)]
     [TestCase("throw null!;", SharpProofVerdict.Proven, SharpProofVerdict.Proven)]
     public void PurityIsDerivedIndependentlyFromAllocationAndThrows(string statement, SharpProofVerdict expectedPurity,

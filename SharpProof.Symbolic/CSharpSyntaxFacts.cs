@@ -168,7 +168,10 @@ internal static class CSharpSyntaxFacts {
     }
     internal static ExpressionSyntax UnwrapParenthesesAndNullableSuppression(ExpressionSyntax expression) =>
         UnwrapExpression(expression, ExpressionCastUnwrapPolicy.None);
-    internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression, ExpressionCastUnwrapPolicy castPolicy) {
+    internal static ExpressionSyntax UnwrapExpression(
+        ExpressionSyntax expression,
+        ExpressionCastUnwrapPolicy castPolicy,
+        bool unwrapChecked = false) {
         while (true) {
             if (expression is ParenthesizedExpressionSyntax parenthesized) {
                 expression = parenthesized.Expression;
@@ -186,6 +189,12 @@ internal static class CSharpSyntaxFacts {
                 expression = castExpression.Expression;
                 continue;
             }
+            if (unwrapChecked &&
+                expression is CheckedExpressionSyntax checkedExpression &&
+                checkedExpression.IsKind(SyntaxKind.CheckedExpression)) {
+                expression = checkedExpression.Expression;
+                continue;
+            }
             return expression;
         }
     }
@@ -195,23 +204,6 @@ internal static class CSharpSyntaxFacts {
                 if (!sizeExpression.IsKind(SyntaxKind.OmittedArraySizeExpression))
                     yield return sizeExpression;
     }
-    public static ExpressionSyntax UnwrapConditionExpression(ExpressionSyntax expression) {
-        while (true) {
-            if (expression is ParenthesizedExpressionSyntax parenthesizedExpression) {
-                expression = parenthesizedExpression.Expression;
-                continue;
-            }
-            if (expression is PostfixUnaryExpressionSyntax postfixUnary &&
-                postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression)) {
-                expression = postfixUnary.Operand;
-                continue;
-            }
-            if (expression is CheckedExpressionSyntax checkedExpression &&
-                checkedExpression.IsKind(SyntaxKind.CheckedExpression)) {
-                expression = checkedExpression.Expression;
-                continue;
-            }
-            return expression;
-        }
-    }
+    public static ExpressionSyntax UnwrapConditionExpression(ExpressionSyntax expression) =>
+        UnwrapExpression(expression, ExpressionCastUnwrapPolicy.None, unwrapChecked: true);
 }

@@ -309,10 +309,10 @@ Target: approximately 61-93 net lines.
 
 Target: 8-12 lines.
 
-- [ ] Add an `unwrapChecked` option to the existing expression-unwrapping loop
+- [x] Add an `unwrapChecked` option to the existing expression-unwrapping loop
       in `CSharpSyntaxFacts`.
-- [ ] Make `UnwrapConditionExpression` delegate to that loop.
-- [ ] Test repeated mixed nesting such as `checked((x!))`.
+- [x] Make `UnwrapConditionExpression` delegate to that loop.
+- [x] Test repeated mixed nesting such as `checked((x!))`.
 
 ### 5.2 Parameterize compiler-effect read/write direction
 
