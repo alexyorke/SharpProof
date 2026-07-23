@@ -2138,6 +2138,22 @@ internal sealed class MethodEffectAnalysisSession(
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array } &&
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array } &&
             method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsFiveArgumentArrayCopy(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "Copy",
+                IsStatic: true,
+                Parameters.Length: 5,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array } &&
+            method.Parameters[3] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[4] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsArrayCopy(IMethodSymbol method) =>
+            IsThreeArgumentArrayCopy(method) || IsFiveArgumentArrayCopy(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2538,7 +2554,7 @@ internal sealed class MethodEffectAnalysisSession(
                     when IsRuntimeHelpersGetSubArray(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
                 ("System.Array", MethodKind.Ordinary, "Copy")
-                    when IsThreeArgumentArrayCopy(method) =>
+                    when IsArrayCopy(method) =>
                     SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
@@ -2571,7 +2587,7 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
                             "framework_runtime_helpers_get_sub_array_model")
                     ]
-                : IsThreeArgumentArrayCopy(method)
+                : IsArrayCopy(method)
                     ? [
                         MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
                             "framework_array_copy_model"),
@@ -2602,6 +2618,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsMemoryMarshalTryRead(method)) return [1];
             if (IsMemoryMarshalTryWrite(method) || IsMemoryMarshalWrite(method)) return [0];
             if (IsThreeArgumentArrayCopy(method)) return [1];
+            if (IsFiveArgumentArrayCopy(method)) return [2];
             return (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
                     method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
@@ -2615,7 +2632,7 @@ internal sealed class MethodEffectAnalysisSession(
         private static ImmutableArray<int> FrameworkReadArgumentOrdinals(IMethodSymbol method) {
             if (IsMemoryMarshalTryWrite(method) || IsMemoryMarshalWrite(method)) return [1];
             return IsMemoryMarshalTryRead(method) || IsMemoryMarshalRead(method) ||
-                   IsRuntimeHelpersGetSubArray(method) || IsThreeArgumentArrayCopy(method) ||
+                   IsRuntimeHelpersGetSubArray(method) || IsArrayCopy(method) ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Read")
                 ? [0]

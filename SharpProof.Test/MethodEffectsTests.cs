@@ -1441,6 +1441,28 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Disproven,
             required: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Unknown);
+        yield return Effect("IndexedArrayCopyTracksSourceReadAndDestinationWrite", """
+            class C {
+                static void M(int[] source, int sourceIndex, int[] destination, int destinationIndex, int length) =>
+                    System.Array.Copy(source, sourceIndex, destination, destinationIndex, length);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("IndexedArrayCopyMapsWriteToThirdArgument", """
+            class C {
+                static void M(int[] destination) {
+                    var source = new[] { 1 };
+                    System.Array.Copy(source, 0, destination, 0, 1);
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Disproven,
+            required: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Throws,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
