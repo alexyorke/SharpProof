@@ -1968,18 +1968,23 @@ internal sealed class MethodEffectAnalysisSession(
             out EffectFlowValue source) {
             source = EffectFlowValue.None;
             if (method is not {
-                Name: "AsBytes",
+                Name: "AsBytes" or "Cast",
                 Parameters.Length: 1,
                 ReturnType: INamedTypeSymbol { TypeArguments.Length: 1 } returnType
             } ||
                 method.ContainingType.ToDisplayString() != "System.Runtime.InteropServices.MemoryMarshal" ||
                 method.Parameters[0].Type is not INamedTypeSymbol { TypeArguments.Length: 1 } inputType ||
-                returnType.TypeArguments[0].SpecialType != SpecialType.System_Byte ||
                 inputType.OriginalDefinition.ToDisplayString() != returnType.OriginalDefinition.ToDisplayString() ||
                 returnType.OriginalDefinition.ToDisplayString() is not
                     ("System.Span<T>" or "System.ReadOnlySpan<T>") ||
                 arguments.Count == 0)
                 return false;
+            var validElementTypes = method.Name == "AsBytes"
+                ? returnType.TypeArguments[0].SpecialType == SpecialType.System_Byte
+                : method.TypeArguments.Length == 2 &&
+                  SymbolEqualityComparer.Default.Equals(inputType.TypeArguments[0], method.TypeArguments[0]) &&
+                  SymbolEqualityComparer.Default.Equals(returnType.TypeArguments[0], method.TypeArguments[1]);
+            if (!validElementTypes) return false;
             source = arguments[0].WithExactType(method.ReturnType).AsDefinitelyNonNull();
             return true;
         }
