@@ -2740,6 +2740,13 @@ internal sealed class MethodEffectAnalysisSession(
                     "GetLength" or "GetLongLength" or "GetLowerBound" or "GetUpperBound")
                     when IsArrayDimensionQuery(method) =>
                     SharpProofEffect.ReadsReceiverState | SharpProofEffect.Throws,
+                ("System.Array", MethodKind.PropertyGet, "get_Rank")
+                    when method is {
+                        IsStatic: false,
+                        Parameters.Length: 0,
+                        ReturnType.SpecialType: SpecialType.System_Int32
+                    } =>
+                    SharpProofEffect.ReadsReceiverState,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
