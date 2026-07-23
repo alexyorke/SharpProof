@@ -576,6 +576,29 @@ public sealed class MethodEffectsTests {
             """, 2,
             purity: SharpProofVerdict.Disproven,
             required: SharpProofEffect.WritesArgumentState);
+        yield return Effect("ConstructedSpanMutationWritesArrayArgumentState", """
+            class C {
+                static void M(int[] values) {
+                    var span = new System.Span<int>(values);
+                    span[0] = 1;
+                }
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.WritesFreshOwnedState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
+            static class Globals { public static int Count; }
+            readonly struct Value {
+                public Value(int value) { Globals.Count += value; }
+            }
+            class C { static Value M() => new Value(1); }
+            """, 5,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesStaticState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("UnusedLocalIncrementDoesNotMakeRefForeachWrite", """
             class C {
                 static void M(System.Span<int> values) {
@@ -4322,6 +4345,8 @@ public sealed class MethodEffectsTests {
         });
     }
     [TestCase("unsafe static int M() { int* value = stackalloc int[1]; value[0] = 1; return value[0]; }")]
+    [TestCase("static System.Span<int> M(int[] values) => new System.Span<int>(values);")]
+    [TestCase("static R M() => new R(1); readonly record struct R(int X);")]
     [TestCase("static R M(R value) => value with { X = 2 }; readonly record struct R(int X);")]
     public void StackOnlyOperationsDoNotCreateManagedAllocationSites(string method) {
         var result = Analyze("class C {\n" + method + "\n}");

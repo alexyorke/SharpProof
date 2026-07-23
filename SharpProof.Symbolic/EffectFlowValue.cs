@@ -45,6 +45,8 @@ internal sealed class EffectFlowValue {
         [new EffectValueRoot(EffectValueRootKind.Fresh)], Exact(type), EmptyMembers, [callable], EffectNullState.NonNull);
     internal EffectFlowValue WithMember(string member, EffectFlowValue value) => new(
         Roots, ExactType, Members.SetItem(member, value), Callables, NullState);
+    internal EffectFlowValue WithExactType(ITypeSymbol? type) => new(
+        Roots, Exact(type), Members, Callables, NullState);
     internal EffectFlowValue WithCallables(ImmutableArray<EffectBoundCallable> callables) => new(
         Roots, ExactType, Members, callables, NullState);
     internal EffectFlowValue CombineDelegate(EffectFlowValue other) =>
