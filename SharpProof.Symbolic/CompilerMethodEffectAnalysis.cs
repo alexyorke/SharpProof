@@ -2195,6 +2195,13 @@ internal sealed class MethodEffectAnalysisSession(
                          method.Parameters[0].Type.SpecialType is
                              SpecialType.System_Int32 or SpecialType.System_Int64 =>
                     SharpProofEffect.WritesArgumentState,
+                ("System.Threading.Interlocked", MethodKind.Ordinary, "Exchange")
+                    when method.Parameters.Length == 2 &&
+                         method.Parameters[0].RefKind == RefKind.Ref &&
+                         method.Parameters[0].Type.SpecialType is
+                             SpecialType.System_Int32 or SpecialType.System_Int64 &&
+                         method.Parameters[1].Type.SpecialType == method.Parameters[0].Type.SpecialType =>
+                    SharpProofEffect.None,
                 (_, _, "IsNullOrEmpty" or "IsNullOrWhiteSpace") when type?.SpecialType == SpecialType.System_String =>
                     SharpProofEffect.None,
                 (_, _, "Contains" or "IndexOf" or "LastIndexOf" or "StartsWith" or "EndsWith")
