@@ -252,7 +252,7 @@ internal static class SymbolicStringLowerer {
                 ContainingType.SpecialType: SpecialType.System_String
             } method ||
             operation.Arguments.Length == 0 ||
-            operation.Arguments[0].Value.Syntax is not ExpressionSyntax searchExpression ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var searchExpression) ||
             !TryLowerStringTerm(receiverExpression, context, out var receiver) ||
             !TryLowerStringPredicateArgument(searchExpression, method.Parameters[0].Type, context, out var search))
             return false;
@@ -260,22 +260,14 @@ internal static class SymbolicStringLowerer {
                                  method.Parameters[0].Type.SpecialType == SpecialType.System_Char;
         var isIgnoreCase = false;
         var hasOrdinalComparison = method.Parameters.Length == 2 &&
-                                   TryGetOrdinalStringComparison(
-                                       operation.Arguments[1].Value.Syntax as ExpressionSyntax ??
-                                       invocation.ArgumentList.Arguments[1].Expression,
-                                       context,
-                                       out isIgnoreCase);
+                                   SymbolicValueFacts.TryGetInvocationArgumentExpression(
+                                       operation, 1, out var comparisonExpression) &&
+                                   TryGetOrdinalStringComparison(comparisonExpression, context, out isIgnoreCase);
         if (!isCharacterDefault && !hasOrdinalComparison) return false;
         if (isIgnoreCase) {
             if (search is not SymbolicStringConstantTerm constantSearch) return false;
-            condition = SymbolicIrLowerer.CreateFactCondition(
-                new SymbolicStringPredicateAtom(
-                    SymbolicStringPredicateKind.RegexMatch,
-                    receiver,
-                    new SymbolicStringConstantTerm(Regex.Escape(constantSearch.Value)),
-                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
-                invocation,
-                "ir.string-search.ordinal-ignore-case");
+            condition = CreateOrdinalIgnoreCasePredicateCondition(
+                SymbolicStringPredicateKind.Contains, receiver, constantSearch.Value, invocation, context);
             return true;
         }
         condition = SymbolicIrLowerer.CreateFactCondition(
