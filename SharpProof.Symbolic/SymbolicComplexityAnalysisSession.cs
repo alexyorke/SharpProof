@@ -6,6 +6,7 @@ internal sealed class SymbolicComplexityAnalysisSession {
     private readonly CancellationToken _cancellationToken;
     private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<IMethodSymbol, Summary> _cache = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<IMethodSymbol, ControlFlowGraph?> _graphs = new(SymbolEqualityComparer.Default);
     private readonly MethodEffectAnalysisSession _effectAnalysis;
 
     internal SymbolicComplexityAnalysisSession(Compilation compilation, CancellationToken cancellationToken) {
@@ -255,11 +256,77 @@ internal sealed class SymbolicComplexityAnalysisSession {
                 out var boundDependencies))
             return false;
         var steps = CSharpSyntaxFacts.DescendantNodesInExecution(body).OfType<ExpressionSyntax>()
-            .Select(expression => TryStep(expression, variable, model, out var step) ? step : Direction.None)
-            .Where(static step => step != Direction.None).ToArray();
-        return steps.Length == 1 && steps[0] == direction &&
+            .Select(expression => TryStep(expression, variable, model, out var step) ? (expression, step) : default)
+            .Where(static item => item.step != Direction.None).ToArray();
+        return steps.Length == 1 && steps[0].step == direction &&
+               StepDominatesLoopBackEdges(condition, steps[0].expression, model, method) &&
                !Mutates(variable, body, model, ignoreRecognizedStep: true) &&
                !boundDependencies.Any(symbol => Mutates(symbol, body, model, ignoreRecognizedStep: false));
+    }
+
+    private bool StepDominatesLoopBackEdges(
+        ExpressionSyntax condition,
+        ExpressionSyntax step,
+        SemanticModel model,
+        IMethodSymbol method) {
+        var graph = GetControlFlowGraph(condition, model, method);
+        if (graph == null ||
+            FindBlock(graph, condition) is not { } conditionBlock ||
+            FindBlock(graph, step) is not { } stepBlock)
+            return false;
+        if (ReferenceEquals(conditionBlock, stepBlock))
+            return ContainsSyntax(conditionBlock.Operations, step) &&
+                   ContainsSyntax(conditionBlock.BranchValue, condition);
+        var pending = new Stack<BasicBlock>(Successors(conditionBlock)
+            .Where(successor => !ReferenceEquals(successor, stepBlock)));
+        var visited = new HashSet<BasicBlock>();
+        while (pending.Count != 0) {
+            var block = pending.Pop();
+            if (ReferenceEquals(block, conditionBlock)) return false;
+            if (!visited.Add(block)) continue;
+            foreach (var successor in Successors(block))
+                if (!ReferenceEquals(successor, stepBlock))
+                    pending.Push(successor);
+        }
+        return true;
+    }
+
+    private ControlFlowGraph? GetControlFlowGraph(
+        SyntaxNode site,
+        SemanticModel model,
+        IMethodSymbol method) {
+        method = method.OriginalDefinition;
+        if (_graphs.TryGetValue(method, out var cached)) return cached;
+        var root = CSharpSyntaxFacts.GetContainingExecutionRoot(site, ExecutionRootPolicy.Callable);
+        ControlFlowGraph? graph = null;
+        if (root != null) {
+            try { graph = ControlFlowGraph.Create(root, model, _cancellationToken); }
+            catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { }
+        }
+        _graphs[method] = graph;
+        return graph;
+    }
+
+    private static BasicBlock? FindBlock(ControlFlowGraph graph, SyntaxNode syntax) =>
+        graph.Blocks.FirstOrDefault(block =>
+            block.Operations.Append(block.BranchValue).Where(static operation => operation != null)
+                .SelectMany(static operation => operation!.DescendantsAndSelf())
+                .Any(operation => operation.Syntax.Span == syntax.Span));
+
+    private static bool ContainsSyntax(IEnumerable<IOperation> operations, SyntaxNode syntax) =>
+        operations.SelectMany(static operation => operation.DescendantsAndSelf())
+            .Any(operation => operation.Syntax.Span == syntax.Span);
+
+    private static bool ContainsSyntax(IOperation? operation, SyntaxNode syntax) =>
+        operation != null && operation.DescendantsAndSelf()
+            .Any(item => item.Syntax.Span == syntax.Span);
+
+    private static IEnumerable<BasicBlock> Successors(BasicBlock block) {
+        var fallThrough = block.FallThroughSuccessor?.Destination;
+        if (fallThrough != null) yield return fallThrough;
+        var conditional = block.ConditionalSuccessor?.Destination;
+        if (conditional != null && !ReferenceEquals(conditional, fallThrough))
+            yield return conditional;
     }
 
     private bool TryCondition(

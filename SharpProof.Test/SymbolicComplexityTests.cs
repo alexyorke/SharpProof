@@ -92,6 +92,13 @@ public sealed class SymbolicComplexityTests {
             """public static class C { public static int Work(int n, bool skip) { var i=0; while(i<n){if(skip)continue;i++;} return i; } }""",
             "return i;", SymbolicComplexityKind.Unknown,
             unknowns: [SymbolicComplexityUnknownReason.UnsupportedWhileLoop]);
+        yield return Case("WhileLoopWithContinueAfterStep_StaysLinear",
+            """public static class C { public static int Work(int n, bool skip) { var i=0; while(i<n){i++;if(skip)continue;} return i; } }""",
+            "return i;", SymbolicComplexityKind.Linear, "O(n)");
+        yield return Case("DoLoopWithContinueBypassingStep_IsUnknown",
+            """public static class C { public static int Work(int n, bool skip) { var i=0; do{if(skip)continue;i++;}while(i<n); return i; } }""",
+            "return i;", SymbolicComplexityKind.Unknown,
+            unknowns: [SymbolicComplexityUnknownReason.UnsupportedWhileLoop]);
         yield return Case("KnownSourceCallee_ComposesIntoSurroundingLoop",
             """public static class C { public static void Helper(int m){for(var j=0;j<m;j++) { }} public static void Caller(int n,int m){for(var i=0;i<n;i++){Helper(m);}} }""",
             "Helper(m);", SymbolicComplexityKind.Product, "O(n * m)", callee: "Helper");
