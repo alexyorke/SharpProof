@@ -3,98 +3,103 @@ internal static class MethodExpectedComplexityAnalyzer {
     internal static void AnalyzeSymbolForExpectedComplexity(MethodBodyAnalysisContext context) {
         var methodSymbol = context.MethodSymbol;
         if (methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return;
-        if (!TryGetExpectedComplexity(
-                methodSymbol,
-                context.CancellationToken,
-                out var declaredComplexity,
-                out var attributeLocation,
-                out var invalidContract))
-            return;
-        if (invalidContract != null) {
-            var diagnostic = InvalidContractArgumentDiagnostics.Create(
-                "[ExpectedComplexity]",
-                invalidContract.Argument,
-                invalidContract.Reason,
-                attributeLocation ??
-                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken));
-            context.ReportDiagnostic(diagnostic);
-            return;
+        var contracts = CollectExpectedComplexities(methodSymbol, context.CancellationToken);
+        if (contracts.IsDefaultOrEmpty) return;
+        foreach (var contract in contracts) {
+            if (contract.InvalidContract is { } invalidContract) {
+                var diagnostic = InvalidContractArgumentDiagnostics.Create(
+                    "[ExpectedComplexity]",
+                    invalidContract.Argument,
+                    invalidContract.Reason,
+                    contract.AttributeLocation ??
+                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken));
+                context.ReportDiagnostic(diagnostic);
+            }
         }
+        var validContracts = contracts.Where(static contract => contract.InvalidContract == null).ToArray();
+        if (validContracts.Length == 0) return;
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
         var outcome = context.State.GetComplexityOutcome(context.CancellationToken);
         if (!outcome.IsSuccess) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var error = outcome.Error!;
-            var diagnostic = CreateDiagnostic(
-                "ComplexityCouldNotBeVerifiedRule",
-                methodSymbol,
-                declaredComplexity.Text,
-                attributeLocation,
-                "complexity query failed: " + error.Message,
-                context.CancellationToken);
-            context.ReportDiagnostic(diagnostic);
+            foreach (var contract in validContracts)
+                context.ReportDiagnostic(CreateDiagnostic(
+                    "ComplexityCouldNotBeVerifiedRule",
+                    methodSymbol,
+                    contract.DeclaredComplexity.Text,
+                    contract.AttributeLocation,
+                    "complexity query failed: " + error.Message,
+                    context.CancellationToken));
             return;
         }
         var result = outcome.Value!;
-        var classification = Classify(result, declaredComplexity);
-        switch (classification.Comparison) {
-            case SymbolicComplexityComparison.Within:
-                return;
-            case SymbolicComplexityComparison.Exceeds:
-                var exceededDiagnostic = CreateDiagnostic(
-                    "ComplexityExceededRule",
-                    methodSymbol,
-                    declaredComplexity.Text,
-                    attributeLocation,
-                    result.Complexity.Text,
-                    context.CancellationToken);
-                context.ReportDiagnostic(exceededDiagnostic);
-                return;
-            default:
-                var unknownDiagnostic = CreateDiagnostic(
-                    "ComplexityCouldNotBeVerifiedRule",
-                    methodSymbol,
-                    declaredComplexity.Text,
-                    attributeLocation,
-                    classification.Reason,
-                    context.CancellationToken);
-                context.ReportDiagnostic(unknownDiagnostic);
-                return;
+        foreach (var contract in validContracts) {
+            var classification = Classify(result, contract.DeclaredComplexity);
+            switch (classification.Comparison) {
+                case SymbolicComplexityComparison.Within:
+                    continue;
+                case SymbolicComplexityComparison.Exceeds:
+                    context.ReportDiagnostic(CreateDiagnostic(
+                        "ComplexityExceededRule",
+                        methodSymbol,
+                        contract.DeclaredComplexity.Text,
+                        contract.AttributeLocation,
+                        result.Complexity.Text,
+                        context.CancellationToken));
+                    continue;
+                default:
+                    context.ReportDiagnostic(CreateDiagnostic(
+                        "ComplexityCouldNotBeVerifiedRule",
+                        methodSymbol,
+                        contract.DeclaredComplexity.Text,
+                        contract.AttributeLocation,
+                        classification.Reason,
+                        context.CancellationToken));
+                    continue;
+            }
         }
     }
-    private static bool TryGetExpectedComplexity(
+    private static ImmutableArray<ExpectedComplexityContract> CollectExpectedComplexities(
         IMethodSymbol methodSymbol,
-        CancellationToken cancellationToken,
-        out (int Kind, string Text) declaredComplexity,
-        out Location? attributeLocation,
-        out InvalidContractArgument? invalidContract) {
-        declaredComplexity = default;
-        attributeLocation = null;
-        invalidContract = null;
+        CancellationToken cancellationToken) {
+        var contracts = ImmutableArray.CreateBuilder<ExpectedComplexityContract>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
             foreach (var attribute in SharpProofAttributeIdentityPolicy.GetAcceptedAttributes(
                          source, "ExpectedComplexityAttribute")) {
                 cancellationToken.ThrowIfCancellationRequested();
-                attributeLocation = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
+                var attributeLocation = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
                 if (attribute.ConstructorArguments.Length != 1 ||
                     attribute.ConstructorArguments[0].Value is not int intValue) {
-                    declaredComplexity = (default, "invalid");
-                    invalidContract = new InvalidContractArgument(
+                    var invalidContract = new InvalidContractArgument(
                         AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken),
                         "expected a ComplexityKind enum value");
-                    return true;
+                    Add((default, "invalid"), attributeLocation, invalidContract);
+                    continue;
                 }
                 if (!SymbolicComplexityFacts.IsDefinedBound(intValue)) {
-                    declaredComplexity = (intValue, intValue.ToString(CultureInfo.InvariantCulture));
-                    invalidContract = new InvalidContractArgument(
+                    var text = intValue.ToString(CultureInfo.InvariantCulture);
+                    var invalidContract = new InvalidContractArgument(
                         intValue.ToString(CultureInfo.InvariantCulture),
                         "undefined ComplexityKind value");
-                    return true;
+                    Add((intValue, text), attributeLocation, invalidContract);
+                    continue;
                 }
-                declaredComplexity = (intValue, SymbolicComplexityFacts.GetBoundText(intValue));
-                return true;
+                Add((intValue, SymbolicComplexityFacts.GetBoundText(intValue)), attributeLocation, null);
             }
-        return false;
+        return contracts.ToImmutable();
+        void Add(
+            (int Kind, string Text) declaredComplexity,
+            Location? attributeLocation,
+            InvalidContractArgument? invalidContract) {
+            var key = invalidContract == null
+                ? "valid:" + declaredComplexity.Kind.ToString(CultureInfo.InvariantCulture)
+                : "invalid:" + invalidContract.Argument + ":" + invalidContract.Reason;
+            if (seen.Add(key))
+                contracts.Add(new ExpectedComplexityContract(
+                    declaredComplexity, attributeLocation, invalidContract));
+        }
     }
     private static (SymbolicComplexityComparison Comparison, string Reason) Classify(
         SymbolicComplexityResult result,
@@ -131,5 +136,9 @@ internal static class MethodExpectedComplexityAnalyzer {
             declaredComplexity,
             detail);
     }
+    sealed record ExpectedComplexityContract(
+        (int Kind, string Text) DeclaredComplexity,
+        Location? AttributeLocation,
+        InvalidContractArgument? InvalidContract);
     sealed record InvalidContractArgument(string Argument, string Reason);
 }

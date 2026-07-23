@@ -167,4 +167,22 @@ public sealed class UnknownContractDiagnosticTests {
             """)).Select(static diagnostic => diagnostic.Id);
         Assert.That(diagnosticIds, Does.Contain("SP0030"));
     }
+    [Test]
+    public async Task InterfaceComplexityContractCannotBeMaskedByLooserImplementationContract() {
+        var diagnosticIds = (await AnalyzerTestHost.GetDiagnosticsAsync("""
+            using SharpProof.Attributes;
+            public interface IWorker {
+                [ExpectedComplexity(ComplexityKind.Linear)]
+                void Work(int count);
+            }
+            public sealed class Worker : IWorker {
+                [ExpectedComplexity(ComplexityKind.Quadratic)]
+                public void Work(int count) {
+                    for (var i = 0; i < count; i++)
+                        for (var j = 0; j < count; j++) { }
+                }
+            }
+            """)).Select(static diagnostic => diagnostic.Id);
+        Assert.That(diagnosticIds, Does.Contain("SP0021"));
+    }
 }
