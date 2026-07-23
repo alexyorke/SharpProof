@@ -2291,8 +2291,18 @@ internal sealed class MethodEffectAnalysisSession(
                 ContainingType.SpecialType: SpecialType.System_Array
             } &&
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
-        private static bool IsArrayDimensionLengthQuery(IMethodSymbol method) =>
-            IsArrayGetLength(method) || IsArrayGetLongLength(method);
+        private static bool IsArrayGetLowerBound(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "GetLowerBound",
+                IsStatic: false,
+                Parameters.Length: 1,
+                ReturnType.SpecialType: SpecialType.System_Int32,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsArrayDimensionQuery(IMethodSymbol method) =>
+            IsArrayGetLength(method) || IsArrayGetLongLength(method) || IsArrayGetLowerBound(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2715,8 +2725,8 @@ internal sealed class MethodEffectAnalysisSession(
                         ReturnType.SpecialType: SpecialType.System_Object
                     } =>
                     SharpProofEffect.ReadsReceiverState | SharpProofEffect.Allocates,
-                ("System.Array", MethodKind.Ordinary, "GetLength" or "GetLongLength")
-                    when IsArrayDimensionLengthQuery(method) =>
+                ("System.Array", MethodKind.Ordinary, "GetLength" or "GetLongLength" or "GetLowerBound")
+                    when IsArrayDimensionQuery(method) =>
                     SharpProofEffect.ReadsReceiverState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
@@ -2822,7 +2832,7 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
                             "framework_array_reverse_model")
                     ]
-                : IsArrayDimensionLengthQuery(method)
+                : IsArrayDimensionQuery(method)
                     ? [
                         MethodExceptionFact.Boundary("System.IndexOutOfRangeException", MethodExceptionSource.Contract,
                             "framework_array_get_length_model")
