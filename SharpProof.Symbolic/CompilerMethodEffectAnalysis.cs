@@ -2508,6 +2508,17 @@ internal sealed class MethodEffectAnalysisSession(
         private static bool IsArraySetValue(IMethodSymbol method) =>
             IsOneIndexArraySetValue(method) || IsTwoIndexArraySetValue(method) ||
             IsThreeIndexArraySetValue(method) || IsIndexesArraySetValue(method);
+        private static bool IsArrayCopyTo(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "CopyTo",
+                IsStatic: false,
+                Parameters.Length: 2,
+                ReturnsVoid: true,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Array } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
@@ -2969,6 +2980,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Array", MethodKind.Ordinary, "SetValue")
                     when IsArraySetValue(method) =>
                     SharpProofEffect.WritesReceiverState | SharpProofEffect.Throws,
+                ("System.Array", MethodKind.Ordinary, "CopyTo")
+                    when IsArrayCopyTo(method) =>
+                    SharpProofEffect.ReadsReceiverState | SharpProofEffect.WritesArgumentState | SharpProofEffect.Throws,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -3105,6 +3119,21 @@ internal sealed class MethodEffectAnalysisSession(
                         MethodExceptionFact.Boundary("System.InvalidCastException", MethodExceptionSource.Contract,
                             "framework_array_set_value_model")
                     ]
+                : IsArrayCopyTo(method)
+                    ? [
+                        MethodExceptionFact.Boundary("System.ArgumentNullException", MethodExceptionSource.Contract,
+                            "framework_array_copy_to_model"),
+                        MethodExceptionFact.Boundary("System.RankException", MethodExceptionSource.Contract,
+                            "framework_array_copy_to_model"),
+                        MethodExceptionFact.Boundary("System.ArrayTypeMismatchException", MethodExceptionSource.Contract,
+                            "framework_array_copy_to_model"),
+                        MethodExceptionFact.Boundary("System.InvalidCastException", MethodExceptionSource.Contract,
+                            "framework_array_copy_to_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentOutOfRangeException", MethodExceptionSource.Contract,
+                            "framework_array_copy_to_model"),
+                        MethodExceptionFact.Boundary("System.ArgumentException", MethodExceptionSource.Contract,
+                            "framework_array_copy_to_model")
+                    ]
                 : effects == SharpProofEffect.Throws
                     ? [
                         MethodExceptionFact.Boundary("System.FormatException", MethodExceptionSource.Contract,
@@ -3126,6 +3155,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsArrayFill(method)) return [0];
             if (IsArrayResize(method)) return [0];
             if (IsArrayReverse(method)) return [0];
+            if (IsArrayCopyTo(method)) return [0];
             return (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" &&
                     method.Name is "Increment" or "Decrement" or "Exchange" or "Add" or "CompareExchange") ||
                    (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
