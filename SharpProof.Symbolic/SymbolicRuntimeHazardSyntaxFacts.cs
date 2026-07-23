@@ -115,20 +115,19 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
         }
         if (method.IsStatic ||
             invocationOperation.Instance?.Syntax is not ExpressionSyntax instanceExpression ||
-            !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var firstArgument))
+            !TryGetIntSlicingArguments(invocationOperation, 0, out var firstArgument, out countExpression))
             return false;
         if (IsStringSlicingInvocation(method, "Substring")) {
             sourceExpression = instanceExpression;
             startExpression = firstArgument;
             oneArgumentUpperBoundIsInclusive = true;
             category = ExceptionCategories.DefiniteStringSubstringOutOfRange;
-            return TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression);
+            return true;
         }
         if (IsStringSlicingInvocation(method, "Remove")) {
             sourceExpression = instanceExpression;
             startExpression = firstArgument;
             category = ExceptionCategories.DefiniteStringRemoveOutOfRange;
-            if (!TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression)) return false;
             oneArgumentUpperBoundIsInclusive = true;
             return true;
         }
@@ -137,7 +136,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
             startExpression = firstArgument;
             oneArgumentUpperBoundIsInclusive = true;
             category = ExceptionCategories.DefiniteSliceOutOfRange;
-            return TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression);
+            return true;
         }
         return false;
     }
@@ -152,32 +151,28 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
         countExpression = null;
         if (!IsMemoryExtensionsViewInvocation(method)) return false;
         if (!SymbolicStringLengthLowerer.TryGetMemoryExtensionsViewSourceExpression(
-                invocationOperation, out sourceExpression, out _))
+                invocationOperation, out sourceExpression, out var firstArgumentIndex) ||
+            !TryGetIntSlicingArguments(
+                invocationOperation, firstArgumentIndex, out startExpression, out countExpression))
             return false;
-        var intArguments = invocationOperation.Arguments
-            .Where(static argument => argument.Parameter?.Type.SpecialType == SpecialType.System_Int32)
-            .Select(static argument => argument.Value.Syntax)
-            .OfType<ExpressionSyntax>()
-            .ToArray();
-        if (intArguments.Length is not (1 or 2)) return false;
-        startExpression = intArguments[0];
-        countExpression = intArguments.Length == 2 ? intArguments[1] : null;
         return true;
     }
-    internal static bool TryGetOptionalSecondIntArgument(
-        IInvocationOperation invocationOperation,
-        IMethodSymbol method,
+    private static bool TryGetIntSlicingArguments(
+        IInvocationOperation operation,
+        int firstParameterIndex,
+        out ExpressionSyntax firstArgument,
         out ExpressionSyntax? secondArgument) {
+        firstArgument = null!;
         secondArgument = null;
-        if (method.Parameters.Length == 1)
-            return invocationOperation.Arguments.Length == 1 &&
-                   method.Parameters[0].Type.SpecialType == SpecialType.System_Int32;
-        if (method.Parameters.Length != 2 ||
-            invocationOperation.Arguments.Length != 2 ||
-            method.Parameters[0].Type.SpecialType != SpecialType.System_Int32 ||
-            method.Parameters[1].Type.SpecialType != SpecialType.System_Int32)
+        var parameters = operation.TargetMethod.Parameters;
+        var count = parameters.Length - firstParameterIndex;
+        if (count is not (1 or 2) ||
+            !parameters.Skip(firstParameterIndex)
+                .All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, firstParameterIndex, out firstArgument))
             return false;
-        return SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1, out secondArgument);
+        return count == 1 ||
+               SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, firstParameterIndex + 1, out secondArgument);
     }
     internal static bool IsStringSlicingInvocation(IMethodSymbol method, string methodName) => method.Name == methodName &&
                method.ContainingType?.SpecialType == SpecialType.System_String &&

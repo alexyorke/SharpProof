@@ -76,6 +76,10 @@ internal static class SymbolicTypeFacts {
         ContainingNamespace: { } containingNamespace
     } &&
                containingNamespace.ToDisplayString() == "System";
+    internal static bool IsSystemRangeType(ITypeSymbol? typeSymbol, Compilation compilation) =>
+        IsSystemType(typeSymbol, compilation, "System.Range");
+    internal static bool IsSystemIndexType(ITypeSymbol? typeSymbol, Compilation compilation) =>
+        IsSystemType(typeSymbol, compilation, "System.Index");
     public static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol) => typeSymbol is INamedTypeSymbol namedType &&
                namedType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
     public static bool IsCharArrayType(ITypeSymbol? typeSymbol) => typeSymbol is IArrayTypeSymbol {
@@ -198,6 +202,10 @@ internal static class SymbolicTypeFacts {
                IsSameOriginalType(typeSymbol, compilation.GetTypeByMetadataName("System.Collections.Generic.IReadOnlyCollection`1"));
     private static bool IsSameOriginalType(INamedTypeSymbol candidate, INamedTypeSymbol? target) => target != null &&
                SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, target);
+    private static bool IsSystemType(ITypeSymbol? candidate, Compilation compilation, string metadataName) {
+        var expected = compilation.GetTypeByMetadataName(metadataName);
+        return expected != null && SymbolEqualityComparer.Default.Equals(candidate, expected);
+    }
     public static bool HasDeclaredInstanceInt32Member(ITypeSymbol typeSymbol, string memberName) =>
         typeSymbol.GetMembers(memberName).Any(static member => !member.IsStatic && member is
             IPropertySymbol { Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 } or

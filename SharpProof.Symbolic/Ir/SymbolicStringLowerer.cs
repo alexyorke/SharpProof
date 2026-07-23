@@ -601,9 +601,9 @@ internal static class SymbolicStringLowerer {
                 IFieldSymbol {
                     IsStatic: true,
                     Name: nameof(string.Empty),
-                    Type.SpecialType: SpecialType.System_String
-                } stringEmptyField &&
-            IsSystemStringType(stringEmptyField.ContainingType)) {
+                    Type.SpecialType: SpecialType.System_String,
+                    ContainingType.SpecialType: SpecialType.System_String
+                }) {
             term = new SymbolicStringConstantTerm(string.Empty);
             return true;
         }
@@ -762,17 +762,13 @@ internal static class SymbolicStringLowerer {
         if (memberSymbol is IFieldSymbol {
             IsStatic: true,
             Name: nameof(string.Empty),
-            Type.SpecialType: SpecialType.System_String
-        } stringField &&
-            IsSystemStringType(stringField.ContainingType)) {
+            Type.SpecialType: SpecialType.System_String,
+            ContainingType.SpecialType: SpecialType.System_String
+        }) {
             term = new SymbolicStringConstantTerm(string.Empty);
             return true;
         }
         term = null!;
         return false;
     }
-    private static bool IsSystemStringType(ITypeSymbol? type) => type?.SpecialType == SpecialType.System_String ||
-               (type is INamedTypeSymbol namedType &&
-                string.Equals(namedType.MetadataName, "String", StringComparison.Ordinal) &&
-                string.Equals(namedType.ContainingNamespace?.ToDisplayString(), "System", StringComparison.Ordinal));
 }

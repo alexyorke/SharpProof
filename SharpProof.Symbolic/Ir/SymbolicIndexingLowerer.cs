@@ -829,7 +829,8 @@ internal static class SymbolicIndexingLowerer {
         argumentExpression = UnwrapExpression(argumentExpression);
         if (TryCreateDirectRangeExpressionShape(argumentExpression, context, out rangeShape)) return true;
         if (!IsSystemRangeExpression(argumentExpression, context) ||
-            !TryGetLocalOrParameterShapeSymbol(argumentExpression, context, IsSystemRangeType, out var rangeSymbol)) {
+            !TryGetLocalOrParameterShapeSymbol(
+                argumentExpression, context, SymbolicTypeFacts.IsSystemRangeType, out var rangeSymbol)) {
             rangeShape = default;
             return false;
         }
@@ -956,7 +957,8 @@ internal static class SymbolicIndexingLowerer {
         argumentExpression = UnwrapExpression(argumentExpression);
         if (TryCreateDirectIndexExpressionShape(argumentExpression, context, out indexShape)) return true;
         if (!IsSystemIndexExpression(argumentExpression, context) ||
-            !TryGetLocalOrParameterShapeSymbol(argumentExpression, context, IsSystemIndexType, out var indexSymbol)) {
+            !TryGetLocalOrParameterShapeSymbol(
+                argumentExpression, context, SymbolicTypeFacts.IsSystemIndexType, out var indexSymbol)) {
             indexShape = default;
             return false;
         }
@@ -1029,9 +1031,9 @@ internal static class SymbolicIndexingLowerer {
         if (!TryGetInvocationOperation(expression, context, out _, out var invocationOperation) ||
             invocationOperation.TargetMethod.MethodKind != MethodKind.Ordinary ||
             invocationOperation.TargetMethod.ReturnType is not { } returnType ||
-            !IsSystemRangeType(returnType, context.SemanticModel.Compilation) ||
+            !SymbolicTypeFacts.IsSystemRangeType(returnType, context.SemanticModel.Compilation) ||
             invocationOperation.TargetMethod.ContainingType is not { } containingType ||
-            !IsSystemRangeType(containingType, context.SemanticModel.Compilation))
+            !SymbolicTypeFacts.IsSystemRangeType(containingType, context.SemanticModel.Compilation))
             return false;
         var startsAt = invocationOperation.TargetMethod.Name == "StartAt";
         if (!startsAt && invocationOperation.TargetMethod.Name != "EndAt" ||
@@ -1051,7 +1053,8 @@ internal static class SymbolicIndexingLowerer {
         if (context.SemanticModel.GetOperation(expression, context.CancellationToken) is not
                 IObjectCreationOperation objectCreationOperation ||
             objectCreationOperation.Constructor == null ||
-            !IsSystemRangeType(objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
+            !SymbolicTypeFacts.IsSystemRangeType(
+                objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
             !SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var startExpression) ||
             !SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var endExpression) ||
             !TryResolveBuiltInIndexLengthShape(startExpression, context, out var start) ||
@@ -1069,8 +1072,8 @@ internal static class SymbolicIndexingLowerer {
             Name: "All",
             IsStatic: true
         } propertySymbol ||
-            !IsSystemRangeType(propertySymbol.ContainingType, context.SemanticModel.Compilation) ||
-            !IsSystemRangeType(propertySymbol.Type, context.SemanticModel.Compilation))
+            !SymbolicTypeFacts.IsSystemRangeType(propertySymbol.ContainingType, context.SemanticModel.Compilation) ||
+            !SymbolicTypeFacts.IsSystemRangeType(propertySymbol.Type, context.SemanticModel.Compilation))
             return false;
         rangeShape = new RangeLengthShape(false, default, false, default);
         return true;
@@ -1083,9 +1086,9 @@ internal static class SymbolicIndexingLowerer {
         if (!TryGetInvocationOperation(expression, context, out _, out var invocationOperation) ||
             invocationOperation.TargetMethod.MethodKind != MethodKind.Ordinary ||
             invocationOperation.TargetMethod.ReturnType is not { } returnType ||
-            !IsSystemIndexType(returnType, context.SemanticModel.Compilation) ||
+            !SymbolicTypeFacts.IsSystemIndexType(returnType, context.SemanticModel.Compilation) ||
             invocationOperation.TargetMethod.ContainingType is not { } containingType ||
-            !IsSystemIndexType(containingType, context.SemanticModel.Compilation) ||
+            !SymbolicTypeFacts.IsSystemIndexType(containingType, context.SemanticModel.Compilation) ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var valueExpression))
             return false;
         var fromEnd = invocationOperation.TargetMethod.Name == "FromEnd";
@@ -1101,7 +1104,8 @@ internal static class SymbolicIndexingLowerer {
         if (context.SemanticModel.GetOperation(expression, context.CancellationToken) is not
                 IObjectCreationOperation objectCreationOperation ||
             objectCreationOperation.Constructor == null ||
-            !IsSystemIndexType(objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
+            !SymbolicTypeFacts.IsSystemIndexType(
+                objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
             !SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var valueExpression))
             return false;
         if (!SymbolicValueFacts.TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var fromEndExpression)) {
@@ -1134,21 +1138,13 @@ internal static class SymbolicIndexingLowerer {
     }
     private static bool IsSystemRangeExpression(ExpressionSyntax expression, SymbolicLoweringContext context) {
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
-        return IsSystemRangeType(typeInfo.ConvertedType ?? typeInfo.Type, context.SemanticModel.Compilation);
+        return SymbolicTypeFacts.IsSystemRangeType(
+            typeInfo.ConvertedType ?? typeInfo.Type, context.SemanticModel.Compilation);
     }
-    private static bool IsSystemRangeType(ITypeSymbol? typeSymbol, Compilation compilation) =>
-        IsSystemType(typeSymbol, compilation, "System.Range");
     private static bool IsSystemIndexExpression(ExpressionSyntax expression, SymbolicLoweringContext context) {
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
-        return IsSystemIndexType(typeInfo.ConvertedType ?? typeInfo.Type, context.SemanticModel.Compilation);
-    }
-    private static bool IsSystemIndexType(ITypeSymbol? typeSymbol, Compilation compilation) =>
-        IsSystemType(typeSymbol, compilation, "System.Index");
-    private static bool IsSystemType(ITypeSymbol? typeSymbol, Compilation compilation, string metadataName) {
-        var systemType = compilation.GetTypeByMetadataName(metadataName);
-        return typeSymbol != null &&
-               systemType != null &&
-               SymbolEqualityComparer.Default.Equals(typeSymbol, systemType);
+        return SymbolicTypeFacts.IsSystemIndexType(
+            typeInfo.ConvertedType ?? typeInfo.Type, context.SemanticModel.Compilation);
     }
     private static bool TryGetConstantBool(ExpressionSyntax expression, SymbolicLoweringContext context, out bool value) {
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
