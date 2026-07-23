@@ -1456,6 +1456,8 @@ internal sealed class MethodEffectAnalysisSession(
                 }
                 return returned;
             }
+            var parameterOffset = target.ReducedFrom == null ? 0 : 1;
+            if (parameterOffset != 0) values = [receiver, .. values];
             target = Normalize(target);
             var exactTarget = SymbolicDispatchFacts.ResolveExactDispatchTarget(target, null, receiver.ExactType);
             if (exactTarget != null) target = exactTarget;
@@ -1487,7 +1489,7 @@ internal sealed class MethodEffectAnalysisSession(
                 PublishesArgument(target, receiver.Roots.Count == 0 ||
                     receiver.Roots.Any(static root => root.Kind != EffectValueRootKind.Fresh)))
                 effects.Add(SharpProofEffect.WritesCapturedState, site.Syntax, target, "published_fresh_argument");
-            ApplyRefArguments(summary, target, arguments, receiver, values, ref state);
+            ApplyRefArguments(summary, target, arguments, receiver, values, ref state, parameterOffset);
             var returnedValue = summary.ReturnValue.Instantiate(receiver, values, sourceMethod: target);
             return target.ReturnsByRef && returnedValue.Roots.Any(static root => root.Kind == EffectValueRootKind.Unknown)
                 ? ResolveRefReturn(target, receiver, values)
@@ -1863,6 +1865,10 @@ internal sealed class MethodEffectAnalysisSession(
             method.ContainingType.OriginalDefinition.ToDisplayString() == "System.Span<T>" &&
             SymbolEqualityComparer.Default.Equals(
                 method.ContainingType.TypeArguments[0], method.Parameters[0].Type);
+        private static bool IsSpanReverse(IMethodSymbol method) =>
+            method is { Name: "Reverse", Parameters.Length: 1 } &&
+            method.ContainingType.ToDisplayString() == "System.MemoryExtensions" &&
+            method.Parameters[0].Type.OriginalDefinition.ToDisplayString() == "System.Span<T>";
         private static bool IsMemorySpanProperty(IPropertySymbol property) =>
             property.Name == "Span" &&
             property.ContainingType.OriginalDefinition.ToDisplayString() is
@@ -1988,13 +1994,14 @@ internal sealed class MethodEffectAnalysisSession(
             ImmutableArray<IArgumentOperation> arguments,
             EffectFlowValue receiver,
             IReadOnlyList<EffectFlowValue> values,
-            ref EffectFlowState state) {
+            ref EffectFlowState state,
+            int parameterOffset = 0) {
             foreach (var argument in arguments) {
-                if (argument.Parameter is not { RefKind: not RefKind.None } parameter ||
-                    parameter.Ordinal >= summary.Parameters.Length ||
-                    !summary.WrittenArgumentOrdinals.Contains(parameter.Ordinal))
-                    continue;
-                Assign(argument.Value, summary.Parameters[parameter.Ordinal].Instantiate(
+                if (argument.Parameter is not { RefKind: not RefKind.None } parameter) continue;
+                var ordinal = parameter.Ordinal + parameterOffset;
+                if (ordinal >= summary.Parameters.Length ||
+                    !summary.WrittenArgumentOrdinals.Contains(ordinal)) continue;
+                Assign(argument.Value, summary.Parameters[ordinal].Instantiate(
                     receiver, values, sourceMethod: target), false, ref state);
             }
         }
@@ -2263,6 +2270,9 @@ internal sealed class MethodEffectAnalysisSession(
                 ("System.Span<T>", MethodKind.Ordinary, "Clear")
                     when method.Parameters.Length == 0 =>
                     SharpProofEffect.WritesReceiverState,
+                ("System.MemoryExtensions", MethodKind.Ordinary, "Reverse")
+                    when IsSpanReverse(method) =>
+                    SharpProofEffect.WritesArgumentState,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
                 (_, _, "ToString") when numeric => SharpProofEffect.Allocates,
@@ -2290,7 +2300,8 @@ internal sealed class MethodEffectAnalysisSession(
             (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Write") ||
             (method.ContainingType?.SpecialType == SpecialType.System_String &&
              method.Name == "CopyTo" && HasSingleCharSpanParameter(method)) ||
-            IsSpanCopy(method)
+            IsSpanCopy(method) ||
+            IsSpanReverse(method)
                 ? [0]
                 : [];
         private static ImmutableArray<int> FrameworkReadArgumentOrdinals(IMethodSymbol method) =>

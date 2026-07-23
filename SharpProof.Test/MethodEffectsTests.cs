@@ -1044,6 +1044,39 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             required: SharpProofEffect.WritesArgumentState,
             forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("SpanReverseExtensionWritesReceiverWithoutAllocating", """
+            using System;
+            class C {
+                static void M(Span<int> destination) => destination.Reverse();
+            }
+            """, 3,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("SpanReverseStaticCallWritesArgumentWithoutAllocating", """
+            class C {
+                static void M(System.Span<int> destination) =>
+                    System.MemoryExtensions.Reverse(destination);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
+        yield return Effect("ReducedSourceExtensionMapsReceiverToFirstArgument", """
+            sealed class Box { public int Value; }
+            static class Extensions {
+                public static void Set(this Box box) { box.Value = 1; }
+            }
+            class C {
+                static void M(Box box) => box.Set();
+            }
+            """, 6,
+            purity: SharpProofVerdict.Disproven,
+            allocationFree: SharpProofVerdict.Proven,
+            required: SharpProofEffect.WritesArgumentState,
+            forbidden: SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
