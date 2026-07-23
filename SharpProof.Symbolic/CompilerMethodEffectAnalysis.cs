@@ -2215,6 +2215,11 @@ internal sealed class MethodEffectAnalysisSession(
                          method.Parameters[1].Type.SpecialType == method.Parameters[0].Type.SpecialType &&
                          method.Parameters[2].Type.SpecialType == method.Parameters[0].Type.SpecialType =>
                     SharpProofEffect.None,
+                ("System.Threading.Interlocked", MethodKind.Ordinary, "Read")
+                    when method.Parameters.Length == 1 &&
+                         method.Parameters[0].RefKind != RefKind.None &&
+                         method.Parameters[0].Type.SpecialType == SpecialType.System_Int64 =>
+                    SharpProofEffect.ReadsArgumentState,
                 ("System.Threading.Volatile", MethodKind.Ordinary, "Read")
                     when method.Parameters.Length == 1 && method.Parameters[0].RefKind != RefKind.None =>
                     SharpProofEffect.ReadsArgumentState,
@@ -2256,7 +2261,8 @@ internal sealed class MethodEffectAnalysisSession(
                 ? [0]
                 : [];
         private static ImmutableArray<int> FrameworkReadArgumentOrdinals(IMethodSymbol method) =>
-            method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read"
+            (method.ContainingType?.ToDisplayString() == "System.Threading.Volatile" && method.Name == "Read") ||
+            (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Read")
                 ? [0]
                 : [];
     }
