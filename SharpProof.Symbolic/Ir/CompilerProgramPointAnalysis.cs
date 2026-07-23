@@ -75,7 +75,8 @@ internal static class CompilerProgramPointAnalysis {
             SymbolicState state,
             IOperation? condition,
             ControlFlowConditionKind kind,
-            bool conditionalSuccessor) {
+            bool conditionalSuccessor,
+            BasicBlock _) {
             if (condition?.Syntax is not ExpressionSyntax expression) return state;
             if (forInitialEntry && site is ForStatementSyntax statement &&
                 statement.Condition != null && Contains(condition.Syntax, statement.Condition))

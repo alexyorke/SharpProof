@@ -367,12 +367,12 @@ internal sealed class MethodEffectAnalysisSession(
             return state;
         }
         public EffectFlowState Refine(EffectFlowState state, IOperation? condition, ControlFlowConditionKind kind,
-            bool conditionalSuccessor) {
+            bool conditionalSuccessor, BasicBlock source) {
             if (condition is not IIsNullOperation isNull) return state;
             var value = ResolveConditionValue(isNull.Operand, state);
             var testedSymbol = semanticModel.GetSymbolInfo(isNull.Operand.Syntax, session.CancellationToken).Symbol;
             if (_flowFacts != null && CanUseFlowNullFact(testedSymbol))
-                value = _flowFacts.RefineNullState(isNull.Operand, testedSymbol, value);
+                value = _flowFacts.RefineNullState(isNull.Operand, testedSymbol, source, value);
             var branchWhenTrue = kind switch {
                 ControlFlowConditionKind.WhenTrue => conditionalSuccessor,
                 ControlFlowConditionKind.WhenFalse => !conditionalSuccessor,
@@ -424,7 +424,7 @@ internal sealed class MethodEffectAnalysisSession(
             };
         }
         public void SetControlFlowGraph(ControlFlowGraph graph, PointsToAnalysisResult? pointsToAnalysisResult) {
-            if (pointsToAnalysisResult != null) _flowFacts = new(pointsToAnalysisResult, graph);
+            if (pointsToAnalysisResult != null) _flowFacts = new(pointsToAnalysisResult);
             foreach (var block in graph.Blocks) {
                 foreach (var operation in block.Operations.Append(block.BranchValue).Where(static value => value != null)
                              .SelectMany(static value => value!.DescendantsAndSelf())) {
@@ -434,7 +434,8 @@ internal sealed class MethodEffectAnalysisSession(
                 if (_flowFacts != null && block.BranchValue is IIsNullOperation isNull &&
                     semanticModel.GetSymbolInfo(isNull.Operand.Syntax, session.CancellationToken).Symbol is { } testedSymbol &&
                     CanUseFlowNullFact(testedSymbol)) {
-                    var value = _flowFacts.RefineNullState(isNull.Operand, testedSymbol, EffectFlowValue.Unknown);
+                    var value = _flowFacts.RefineNullState(
+                        isNull.Operand, testedSymbol, block, EffectFlowValue.Unknown);
                     var skippedConditionValue = value.IsDefinitelyNonNull ? true : value.IsDefinitelyNull ? false : (bool?)null;
                     if (skippedConditionValue is { } conditionValue &&
                         block.ConditionKind is ControlFlowConditionKind.WhenTrue or ControlFlowConditionKind.WhenFalse) {

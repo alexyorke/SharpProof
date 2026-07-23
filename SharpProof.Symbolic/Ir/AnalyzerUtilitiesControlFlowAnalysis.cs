@@ -213,7 +213,7 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             }
             var conditionalSuccessor = source.ConditionKind != ControlFlowConditionKind.None &&
                                        branch.ControlFlowConditionKind == source.ConditionKind;
-            state = context.Domain.Refine(state, branch.BranchValue, source.ConditionKind, conditionalSuccessor);
+            state = context.Domain.Refine(state, branch.BranchValue, source.ConditionKind, conditionalSuccessor, source);
             return (new(state), !context.Domain.IsUnreachable(state));
         }
         protected override EffectAbstractValue GetAbstractDefaultValue(ITypeSymbol? type) => EffectAbstractValue.Unknown;
