@@ -74,6 +74,23 @@ public sealed class SharpProofAnalysisSessionTests {
             "text.StartsWith(\"pre\", System.StringComparison.Ordinal)"));
         Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("ProvenTrue"));
     }
+    [TestCase("StartsWith")]
+    [TestCase("EndsWith")]
+    public void CultureSensitiveStringPredicatesDoNotImplyOrdinalFacts(string method) {
+        using var session = SharpProofAnalysisSession.FromText($$"""
+            class C {
+                static int M(string text) {
+                    if (!text.{{method}}("\u00AD")) return 0;
+                    return 1;
+                }
+            }
+            """);
+        var result = session.Analyze(new SharpProofAnalysisRequest(
+            new SharpProofTarget(SharpProofTargetKind.Point, Line: 4, Column: 9),
+            SharpProofAnalysisFacet.ProofFacts,
+            $"text.{method}(\"\\u00AD\", System.StringComparison.Ordinal)"));
+        Assert.That(result.ProofFacts.Single().Status, Is.EqualTo("Unknown"));
+    }
     [Test]
     public void ConditionProofInsideLocalFunctionResolvesCapturedParameters() {
         using var session = SharpProofAnalysisSession.FromText("""
