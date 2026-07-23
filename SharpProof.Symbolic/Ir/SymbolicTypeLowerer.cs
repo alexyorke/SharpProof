@@ -64,22 +64,8 @@ internal static class SymbolicTypeLowerer {
                 return false;
         }
     }
-    internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind) {
-        if (type.SpecialType == SpecialType.System_Boolean) {
-            kind = SmtValueKind.Bool;
-            return true;
-        }
-        if (IsIntegerSmtType(type)) {
-            kind = SmtValueKind.Int;
-            return true;
-        }
-        if (SymbolicTypeFacts.IsSymbolicReferenceLikeType(type)) {
-            kind = SmtValueKind.Reference;
-            return true;
-        }
-        kind = default;
-        return false;
-    }
+    internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind) => SymbolicFactFactory.TryGetValueKind(
+        type, IsIntegerSmtType, SymbolicTypeFacts.IsSymbolicReferenceLikeType, out kind);
     internal static bool IsIntegerSmtType(ITypeSymbol type) => SymbolicTypeFacts.IsBuiltInIntegralOrEnumType(type) ||
                SymbolicNumericLowerer.IsBigIntegerType(type);
 }

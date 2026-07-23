@@ -13,10 +13,6 @@ internal static class SymbolicStateFactBuilder {
                (left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference) ||
                (right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference);
     internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind) => SymbolicFactFactory.TryGetValueKind(
-            type,
-            SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
-            IsProgramPointReferenceLikeType,
-            out kind);
-    private static bool IsProgramPointReferenceLikeType(ITypeSymbol type) =>
-        SymbolicTypeFacts.IsSymbolicReferenceLikeType(type);
+        type, SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+        SymbolicTypeFacts.IsSymbolicReferenceLikeType, out kind);
 }

@@ -288,15 +288,15 @@ Target: 22-30 lines.
 
 Target: 12-16 lines.
 
-- [ ] Replace `SymbolicTypeLowerer.TryGetValueKind` with a delegation to
+- [x] Replace `SymbolicTypeLowerer.TryGetValueKind` with a delegation to
       `SymbolicFactFactory.TryGetValueKind`.
-- [ ] Pass `SymbolicTypeLowerer.IsIntegerSmtType` and
+- [x] Pass `SymbolicTypeLowerer.IsIntegerSmtType` and
       `SymbolicTypeFacts.IsSymbolicReferenceLikeType` as the policies.
-- [ ] Delegate
+- [x] Delegate
       `SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType` to
       `SymbolicTypeFacts.IsBuiltInIntegralOrEnumType` if equivalence remains
       confirmed by tests.
-- [ ] Simplify the corresponding wrapper in `SymbolicStateFactBuilder`.
+- [x] Simplify the corresponding wrapper in `SymbolicStateFactBuilder`.
 
 Do not collapse the policies themselves. IR lowering intentionally includes
 `BigInteger`; program-point facts currently do not.

@@ -86,13 +86,8 @@ internal static class SymbolicFactFactory {
         kind = default;
         return false;
     }
-    internal static bool IsSupportedSmtIntegralOrEnumType(ITypeSymbol? typeSymbol) {
-        if (typeSymbol == null) return false;
-        if (SymbolicTypeFacts.IsBuiltInIntegralType(typeSymbol))
-            return true;
-        return typeSymbol is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } underlyingType } &&
-               IsSupportedSmtIntegralOrEnumType(underlyingType);
-    }
+    internal static bool IsSupportedSmtIntegralOrEnumType(ITypeSymbol? typeSymbol) =>
+        SymbolicTypeFacts.IsBuiltInIntegralOrEnumType(typeSymbol);
     internal static string GetReferenceFormulaName(SmtFormula receiverFormula) => receiverFormula is SmtVariable variable
             ? variable.Name
             : receiverFormula.ToString() ?? string.Empty;
