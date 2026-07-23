@@ -687,7 +687,7 @@ Target: 45-65 net lines. Package and property removals are validation-gated.
 - [x] Share package-consumer scaffolding where it remains clear: 4-6 lines.
 - [x] In `Aggregate-FuzzRun.ps1`, factor the three identical summary-union
       pipelines: 5-7 lines.
-- [ ] In `scripts/package-consumers/SymbolicConsumer.cs`, simplify the
+- [x] In `scripts/package-consumers/SymbolicConsumer.cs`, simplify the
       required/graceful branch because `nativeAvailable == proofsHold`, and
       remove unreachable exit code 4: 3-4 lines.
 

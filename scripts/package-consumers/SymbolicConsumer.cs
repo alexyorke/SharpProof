@@ -31,12 +31,11 @@ var proofsHold = result.Status == SharpProofQueryStatus.Succeeded &&
                  result.UnknownReasons.IsDefaultOrEmpty &&
                  result.Truncations.IsDefaultOrEmpty;
 var unknownProofCount = result.UnknownReasons.Length;
-var nativeAvailable = proofsHold;
 Console.WriteLine(JsonSerializer.Serialize(new {
     runtimeIdentifier = RuntimeInformation.RuntimeIdentifier,
     processArchitecture = RuntimeInformation.ProcessArchitecture.ToString(),
     expectation,
-    nativeAvailable,
+    nativeAvailable = proofsHold,
     healthState = result.Status.ToString(),
     lastFailureCode = result.Error?.Code ?? string.Empty,
     executedQueryCount = result.ProofFacts.Length,
@@ -49,13 +48,13 @@ if (result.ProofFacts.Length == 0) {
     return 2;
 }
 if (expectation == "Required") {
-    if (!nativeAvailable || !proofsHold) {
+    if (!proofsHold) {
         Console.Error.WriteLine("A bundled native Z3 asset was required, but SMT proofs were unavailable.");
         return 3;
     }
     return 0;
 }
-if (nativeAvailable) return proofsHold ? 0 : 4;
+if (proofsHold) return 0;
 var stableFallback = result.Status == SharpProofQueryStatus.Unknown && unknownProofCount > 0;
 if (!stableFallback) {
     Console.Error.WriteLine("SMT was unavailable without the documented permanent conservative fallback.");
