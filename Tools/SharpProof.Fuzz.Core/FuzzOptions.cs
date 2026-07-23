@@ -36,15 +36,19 @@ public sealed record FuzzOptions {
                 default: throw new ArgumentException($"Unknown option '{option}'.");
             }
         }
-        if (options.Iterations < 0) throw new ArgumentException("--iterations must be non-negative.");
-        if (options.MaxInterestingCases < 0) throw new ArgumentException("--max-interesting must be non-negative.");
-        if (options.MaxInterestingCasesPerFamily < 0)
-            throw new ArgumentException("--max-interesting-per-family must be non-negative.");
-        if (options.CheckpointEvery < 0) throw new ArgumentException("--checkpoint-every must be non-negative.");
-        if (options.Parallelism <= 0) throw new ArgumentException("--parallelism must be positive.");
-        if (options.Iterations == 0 && options.Duration is null)
-            throw new ArgumentException("Duration-only runs need --seconds, --minutes, or --hours when --iterations is 0.");
+        options.Validate();
         return options;
+    }
+    internal void Validate() {
+        if (Iterations < 0) throw new ArgumentException("--iterations must be non-negative.");
+        if (Duration < TimeSpan.Zero) throw new ArgumentException("Duration must be non-negative.");
+        if (MaxInterestingCases < 0) throw new ArgumentException("--max-interesting must be non-negative.");
+        if (MaxInterestingCasesPerFamily < 0)
+            throw new ArgumentException("--max-interesting-per-family must be non-negative.");
+        if (CheckpointEvery < 0) throw new ArgumentException("--checkpoint-every must be non-negative.");
+        if (Parallelism <= 0) throw new ArgumentException("--parallelism must be positive.");
+        if (Iterations == 0 && Duration is null)
+            throw new ArgumentException("Duration-only runs need --seconds, --minutes, or --hours when --iterations is 0.");
     }
     private static string ReadValue(string[] args, ref int index, string option) =>
         ++index < args.Length ? args[index] : throw new ArgumentException($"{option} expects a value.");

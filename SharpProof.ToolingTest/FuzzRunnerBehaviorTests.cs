@@ -7,6 +7,24 @@ using SharpProof.Tools.Fuzz;
 namespace SharpProof.Test;
 [TestFixture]
 public sealed class FuzzRunnerBehaviorTests {
+    [Test]
+    public void RunAsyncRejectsNegativeProgrammaticIterations() {
+        var outputDirectory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "fuzz-invalid-options-" + Guid.NewGuid().ToString("N"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        try {
+            Assert.ThrowsAsync<ArgumentException>(async () =>
+                await FuzzRunner.RunAsync(new FuzzOptions {
+                    Iterations = -1,
+                    OutputDirectory = outputDirectory
+                }, cancellation.Token));
+        }
+        finally {
+            if (Directory.Exists(outputDirectory)) Directory.Delete(outputDirectory, recursive: true);
+        }
+    }
     [TestCase("fuzz-handler-projection-", 29, "InterpolatedStringHandler",
         TestName = "ProvenInterpolatedStringHandlerCallHasMatchingEnforcePureDiagnostic")]
     [TestCase("fuzz-projection-", 136, "DelegateCreation",

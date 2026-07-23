@@ -18,6 +18,8 @@ public static class FuzzRunner {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
     public static async Task<FuzzRunSummary> RunAsync(FuzzOptions options, CancellationToken cancellationToken = default) {
+        if (options == null) throw new ArgumentNullException(nameof(options));
+        options.Validate();
         var startedUtc = DateTimeOffset.UtcNow;
         var generator = new FuzzCaseGenerator(options.Seed);
         var maxIterations = options.Iterations is > 0 ? options.Iterations.Value : (int?)null;
