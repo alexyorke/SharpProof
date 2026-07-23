@@ -67,8 +67,6 @@ internal static class CompilerProgramPointAnalysis {
                     semanticModel, cancellationToken, "compiler-flow", out _)) {
                 SymbolicStateInvalidator.InvalidateNestedMutations(
                     ref updated, operation.Syntax, semanticModel, cancellationToken);
-                SymbolicCfgProgramPointStateCollector.AddOperationNormalCompletionFacts(
-                    ref updated, operation, semanticModel, cancellationToken);
             }
             if (target && includeCompletion) Capture(updated);
             return updated;

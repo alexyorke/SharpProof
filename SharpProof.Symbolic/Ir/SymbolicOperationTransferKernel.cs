@@ -1,37 +1,17 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicOperationTransferKernel {
-    internal static SymbolicOperationTransitionResult Apply(SymbolicState initialState, SymbolicOperationSequence sequence) {
+    internal static SymbolicOperationTransitionResult Apply(SymbolicState initialState, SymbolicOperationDescriptor operation) {
         if (initialState == null) throw new ArgumentNullException(nameof(initialState));
-        if (sequence == null) throw new ArgumentNullException(nameof(sequence));
+        if (operation == null) throw new ArgumentNullException(nameof(operation));
         var state = initialState;
-        var provenance = ImmutableArray.CreateBuilder<SymbolicLoweringProvenance>(sequence.Operations.Length);
-        var previousSequence = -1;
-        foreach (var operation in sequence.Operations) {
-            provenance.Add(new SymbolicLoweringProvenance("operation-transfer", operation.Origin.SourceSpan, operation.Origin.Provenance));
-            if (operation.Origin.Sequence <= previousSequence)
-                return SymbolicOperationTransitionResult.Unsupported(state, SymbolicUnknownReason.UnsupportedIrEncoding, provenance);
-            previousSequence = operation.Origin.Sequence;
-            if (operation is SymbolicAssignmentOperation assignment &&
-                TryApplyAssignment(ref state, assignment))
-                continue;
-            if (operation is SymbolicMutationOperation mutation &&
-                TryApplyMutation(ref state, mutation))
-                continue;
-            if (operation is SymbolicBranchAssumptionOperation branch) {
-                state = state.AddPathCondition(branch.AssumeTrue ? branch.Condition : new SymbolicNotCondition(branch.Condition));
-                continue;
-            }
-            if (operation is SymbolicCompletionOperation) {
-                state = state.MarkContradictory();
-                continue;
-            }
-            if (operation is SymbolicMergeOperation merge) {
-                state = SymbolicStateMerger.MergeCompletionStates(merge.IncomingStates, state, merge.Source);
-                continue;
-            }
-            return SymbolicOperationTransitionResult.Unsupported(state, SymbolicUnknownReason.UnsupportedIrEncoding, provenance);
-        }
-        return SymbolicOperationTransitionResult.Exact(state, provenance);
+        var applied = operation switch {
+            SymbolicAssignmentOperation assignment => TryApplyAssignment(ref state, assignment),
+            SymbolicMutationOperation mutation => TryApplyMutation(ref state, mutation),
+            _ => false
+        };
+        return applied
+            ? SymbolicOperationTransitionResult.Exact(state)
+            : SymbolicOperationTransitionResult.Unsupported(state);
     }
     internal static SymbolicOperationTransitionResult Invalidate(
         SymbolicState state,
@@ -41,58 +21,23 @@ internal static class SymbolicOperationTransferKernel {
         var operation = new SymbolicMutationOperation(
             [],
             targets,
-            new SymbolicOperationOrigin(sourceSpan, 0, provenance));
-        return Apply(state, SymbolicOperationSequence.Single(operation));
+            new SymbolicOperationOrigin(sourceSpan, provenance));
+        return Apply(state, operation);
     }
-    internal static SymbolicOperationTransitionResult Assume(
-        SymbolicState state,
-        SymbolicCondition condition,
-        bool assumeTrue,
-        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
-        string provenance) => Apply(
-            state,
-            SymbolicOperationSequence.Single(new SymbolicBranchAssumptionOperation(
-                condition,
-                assumeTrue,
-                new SymbolicOperationOrigin(sourceSpan, 0, provenance))));
     internal static SymbolicOperationTransitionResult AssumeAll(
         SymbolicState state,
-        IReadOnlyList<SymbolicCondition> conditions,
-        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
-        string provenance) {
+        IReadOnlyList<SymbolicCondition> conditions) {
         if (conditions.Count == 0)
-            return SymbolicOperationTransitionResult.Exact(state, ImmutableArray<SymbolicLoweringProvenance>.Empty);
-        var operations = ImmutableArray.CreateBuilder<SymbolicOperationDescriptor>(conditions.Count);
-        for (var index = 0; index < conditions.Count; index++)
-            operations.Add(new SymbolicBranchAssumptionOperation(
-                conditions[index],
-                true,
-                new SymbolicOperationOrigin(sourceSpan, index, provenance)));
-        return Apply(state, new SymbolicOperationSequence(operations.MoveToImmutable()));
+            return SymbolicOperationTransitionResult.Exact(state);
+        foreach (var condition in conditions)
+            state = state.AddPathCondition(condition);
+        return SymbolicOperationTransitionResult.Exact(state);
     }
-    internal static SymbolicOperationTransitionResult Complete(SymbolicState state, Microsoft.CodeAnalysis.Text.TextSpan sourceSpan) =>
-        Apply(
-            state,
-            SymbolicOperationSequence.Single(new SymbolicCompletionOperation(
-                new SymbolicOperationOrigin(sourceSpan, 0, "operation-transfer.no-fallthrough"))));
-    internal static SymbolicOperationTransitionResult Merge(
-        SymbolicState entryState,
-        ImmutableArray<SymbolicState> incomingStates,
-        Microsoft.CodeAnalysis.SyntaxNode source) =>
-        Apply(
-            entryState,
-            SymbolicOperationSequence.Single(new SymbolicMergeOperation(
-                incomingStates,
-                source,
-                new SymbolicOperationOrigin(source.Span, 0, "operation-transfer.completion-merge"))));
     private static bool TryApplyAssignment(ref SymbolicState state, SymbolicAssignmentOperation assignment) {
         ApplyInvalidations(ref state, assignment.Invalidations);
         if (!TryApplyBindings(ref state, assignment.Bindings, assignment.Origin)) return false;
         foreach (var postcondition in assignment.Postconditions)
             state = state.AddPathCondition(postcondition);
-        if (!assignment.Propagations.IsDefaultOrEmpty)
-            foreach (var propagation in assignment.Propagations)
-                state = PropagateSourceFacts(state, propagation.Source, propagation.Target);
         foreach (var binding in assignment.Bindings)
             if (binding.DeriveIntegerBounds)
                 AddDerivedIntegerBounds(ref state, binding, assignment.Origin);

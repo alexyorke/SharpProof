@@ -1,16 +1,6 @@
 namespace SharpProof.Symbolic;
 internal enum SymbolicAnalysisLimitKind {
-    IfElseFactMerge,
-    SwitchFactMerge,
-    TryFactMerge,
-    TryCompletionBranches,
-    ForeachElementFacts,
-    ScopedBlockCompletionStatements,
-    StructuralNullStateDepth,
-    MergedPathConditions,
-    MergeableFactsPerTargetPerState,
-    FactChoiceCombinationsPerTarget,
-    GuardFactsPerTargetPerState
+    TryFactMerge
 }
 internal sealed record SymbolicAnalysisTruncationEvent(
     SymbolicAnalysisLimitKind Kind,
@@ -61,12 +51,6 @@ internal static class SymbolicAnalysisLimitContext {
     }
     internal static void Record(SymbolicAnalysisLimitKind kind, int limit, int observed, SyntaxNode? sourceNode, string provenance)
         => CurrentScope.Value?.Record(kind, limit, observed, sourceNode, provenance);
-    internal static bool CanAddMergedSwitchFact(int addedCount, SyntaxNode sourceNode, string provenance) {
-        var limit = Limits.MaxMergedSwitchFacts;
-        if (addedCount < limit) return true;
-        Record(SymbolicAnalysisLimitKind.SwitchFactMerge, limit, addedCount + 1, sourceNode, provenance);
-        return false;
-    }
     internal sealed class Scope(Scope? parent, SharpProofAnalysisBudget limits, int? defaultSourceSpanStart,
         bool propagateEvents) : IDisposable {
         private readonly SymbolicAnalysisTruncationEventAccumulator _events = new();

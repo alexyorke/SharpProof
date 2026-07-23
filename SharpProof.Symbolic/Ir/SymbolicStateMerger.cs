@@ -4,12 +4,19 @@ internal static class SymbolicStateMerger {
         => MergePathConditionsAcrossAll(
             states.Select(static state => (IReadOnlyList<SymbolicCondition>)state.PathConditions).ToArray());
     internal static ImmutableArray<SymbolicCondition> MergePathConditionsAcrossAll(
-        IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets) =>
-        PathConditionMergeEngine.MergeAcrossAll(conditionSets, SymbolicAnalysisLimitContext.Limits);
-    internal static SymbolicCondition CreateGuardedChoice(SymbolicCondition guard, SymbolicCondition value) =>
-        value is SymbolicConstantCondition { Value: false }
-            ? new SymbolicNotCondition(guard)
-            : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, new SymbolicNotCondition(guard), value);
+        IReadOnlyList<IReadOnlyList<SymbolicCondition>> conditionSets) {
+        if (conditionSets.Count == 0) return [];
+        var commonKeys = new HashSet<string>(
+            conditionSets[0].Select(SymbolicState.CreateProofConditionKey),
+            StringComparer.Ordinal);
+        for (var index = 1; index < conditionSets.Count; index++)
+            commonKeys.IntersectWith(conditionSets[index].Select(SymbolicState.CreateProofConditionKey));
+        var emitted = new HashSet<string>(StringComparer.Ordinal);
+        return [.. conditionSets[0].Where(condition => {
+            var key = SymbolicState.CreateProofConditionKey(condition);
+            return commonKeys.Contains(key) && emitted.Add(key);
+        })];
+    }
     internal static ImmutableArray<SymbolicFact> IntersectFactsAcrossAll(
         IReadOnlyList<SymbolicState> states,
         Func<SymbolicFact, SymbolicFact, bool>? equivalent = null) {
@@ -92,53 +99,6 @@ internal static class SymbolicStateMerger {
             }
             retained.Add(candidate);
             addedCount++;
-        }
-    }
-    internal static SymbolicCondition Combine(SymbolicConditionOperator op, IReadOnlyList<SymbolicCondition> conditions) {
-        var result = conditions[0];
-        for (var index = 1; index < conditions.Count; index++)
-            result = new SymbolicBinaryCondition(op, result, conditions[index]);
-        return result;
-    }
-    internal static bool TryGetMergeTargetKey(SymbolicCondition condition, out string targetKey) {
-        if (TryGetMergeTarget(condition, out var target)) {
-            targetKey = SymbolicState.CreateProofTermKey(target);
-            return true;
-        }
-        targetKey = string.Empty;
-        return false;
-    }
-    private static bool TryGetMergeTarget(SymbolicCondition condition, out SymbolicTerm target) {
-        if (condition is SymbolicNotCondition { Operand: { } operand }) condition = operand;
-        if (condition is SymbolicFactCondition { Fact.Atom: SymbolicRelationAtom relation } &&
-            (TryGetTargetTerm(relation.Left, out target) || TryGetTargetTerm(relation.Right, out target)))
-            return true;
-        if (condition is SymbolicFactCondition {
-            Fact.Atom: SymbolicTruthAtom { Condition: SymbolicVariableTerm variable }
-        }) {
-            target = variable;
-            return true;
-        }
-        target = null!;
-        return false;
-    }
-    private static bool TryGetTargetTerm(SymbolicTerm term, out SymbolicTerm target) {
-        switch (term) {
-            case SymbolicVariableTerm:
-            case SymbolicMemberTerm:
-            case SymbolicElementTerm:
-            case SymbolicMultiElementTerm:
-            case SymbolicNullableHasValueTerm:
-            case SymbolicNullableValueTerm:
-            case SymbolicLengthTerm:
-            case SymbolicArrayDimensionLengthTerm:
-            case SymbolicCountTerm:
-            case SymbolicStringContentTerm:
-                target = term;
-                return true;
-            default:
-                target = null!;
-                return false;
         }
     }
 }

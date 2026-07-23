@@ -1,20 +1,4 @@
 namespace SharpProof.Symbolic.Ir;
-/// <summary>
-/// The direct children of an IR atom or term, in the one shape every structural
-/// walker needs: at most two term children, an optional condition child, and the
-/// variable-length indices carried by a multi-element term.
-/// </summary>
-/// <remarks>
-/// This is deliberately a struct returned by value rather than an iterator: the
-/// walkers below run per symbolic state on the analysis hot path, where an
-/// allocation per visited node would be charged against the SMT wall-clock budget.
-/// Children are consumed in field order, so a walker observes terms before the
-/// condition child. Both <see cref="SymbolicIrVisitor"/> subclasses are
-/// order-insensitive (one sorts its output by key, the other sets a found flag),
-/// and the folds built on this are boolean, so the order is not load-bearing.
-/// Rewriting is not expressible here because it must reconstruct each record with
-/// its own constructor; see <see cref="SymbolicIrRewriter"/>.
-/// </remarks>
 internal readonly record struct SymbolicIrChildren(
     SymbolicTerm? First = null,
     SymbolicTerm? Second = null,
@@ -31,13 +15,6 @@ internal readonly record struct SymbolicIrChildren(
             new(precondition.Subject, Condition: precondition.Trigger),
         _ => default,
     };
-    /// <summary>
-    /// Children of the terms whose sub-terms are traversed uniformly. Leaves and the
-    /// name-carrying terms yield nothing; <see cref="SymbolicBinaryTerm"/> and
-    /// <see cref="SymbolicConditionalTerm"/> are included, but callers that treat
-    /// either specially — the divide/remainder predicate, or refining a context across
-    /// a conditional — must match those before falling back to this.
-    /// </summary>
     internal static SymbolicIrChildren OfTerm(SymbolicTerm term) => term switch {
         SymbolicMemberTerm member => new(member.Receiver),
         SymbolicElementTerm element => new(element.Receiver, element.Index),
@@ -54,10 +31,6 @@ internal readonly record struct SymbolicIrChildren(
             new(conditional.WhenTrue, conditional.WhenFalse, conditional.Condition),
         _ => default,
     };
-    /// <summary>
-    /// Returns whether any child term satisfies <paramref name="predicate"/>. Pass a
-    /// static method group so the delegate is cached rather than allocated per call.
-    /// </summary>
     internal bool AnyTerm(Func<SymbolicTerm, bool> predicate) =>
         First != null && predicate(First) ||
         Second != null && predicate(Second) ||

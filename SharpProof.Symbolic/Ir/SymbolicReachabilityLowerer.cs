@@ -13,15 +13,7 @@ internal static class SymbolicReachabilityLowerer {
             branchWhenTrue,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
         return lowering is { IsExact: true, Value: { } branch }
-            ? SymbolicOperationTransferKernel.Assume(
-                state,
-                branch,
-                assumeTrue: true,
-                condition.Span,
-                "compiler-flow.branch")
-            : SymbolicOperationTransitionResult.Unsupported(
-                state,
-                SymbolicUnknownReason.UnsupportedIrEncoding,
-                [new SymbolicLoweringProvenance("compiler-flow.branch", condition.Span, "unsupported")]);
+            ? SymbolicOperationTransitionResult.Exact(state.AddPathCondition(branch))
+            : SymbolicOperationTransitionResult.Unsupported(state);
     }
 }

@@ -1189,7 +1189,7 @@ internal static partial class SymbolicOperationLowerer {
             confidence,
             exceptionType,
             category,
-            new SymbolicOperationOrigin(site.Span, 0, provenance));
+            new SymbolicOperationOrigin(site.Span, provenance));
     }
     private static SymbolicCondition CreateIntegerEquality(SymbolicTerm value, long constant, SyntaxNode source, string provenance) =>
         SymbolicIrLowerer.CreateRelationCondition(

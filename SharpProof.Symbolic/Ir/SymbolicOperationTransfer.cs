@@ -8,11 +8,9 @@ internal static class SymbolicOperationTransfer {
         CancellationToken cancellationToken,
         Func<ISymbol, int>? getTargetVersion = null,
         Func<ISymbol, int>? getValueVersion = null,
-        int sequence = 0,
         string provenance = "operation-lowering.assignment",
         string? bindingProvenance = null,
         string? evidenceKey = null,
-        string? asExpressionProvenanceRoot = null,
         SymbolicAssignmentPostconditionProfile postconditionProfile = SymbolicAssignmentPostconditionProfile.Analyzer,
         SymbolicTerm? preInvalidationTargetValue = null) {
         var targetContext = new SymbolicLoweringContext(semanticModel, cancellationToken, getTargetVersion);
@@ -29,11 +27,9 @@ internal static class SymbolicOperationTransfer {
             valueSyntax,
             targetContext,
             valueContext,
-            sequence,
             provenance,
             bindingProvenance,
             evidenceKey,
-            asExpressionProvenanceRoot,
             postconditionProfile);
         return ApplyLowering(state, lowering);
     }
@@ -46,7 +42,7 @@ internal static class SymbolicOperationTransfer {
         CancellationToken cancellationToken,
         string provenance) {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicOperationLowerer.LowerComputedUpdate(targetSymbol, sourceTerm, source, context, sequence: 0, provenance);
+        var lowering = SymbolicOperationLowerer.LowerComputedUpdate(targetSymbol, sourceTerm, source, context, provenance);
         return ApplyLowering(state, lowering);
     }
     internal static SymbolicOperationTransitionResult ApplyCoalesceAssignment(
@@ -59,7 +55,7 @@ internal static class SymbolicOperationTransfer {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         return ApplyLowering(
             state,
-            SymbolicOperationLowerer.LowerCoalesceAssignment(targetSymbol, rightExpression, context, sequence: 0, provenance));
+            SymbolicOperationLowerer.LowerCoalesceAssignment(targetSymbol, rightExpression, context, provenance));
     }
     internal static SymbolicOperationTransitionResult ApplyBindings(
         SymbolicState state,
@@ -69,17 +65,12 @@ internal static class SymbolicOperationTransfer {
         var operation = new SymbolicAssignmentOperation(
             bindings,
             [],
-            new SymbolicOperationOrigin(source.Span, 0, provenance));
-        return SymbolicOperationTransferKernel.Apply(state, SymbolicOperationSequence.Single(operation));
+            new SymbolicOperationOrigin(source.Span, provenance));
+        return SymbolicOperationTransferKernel.Apply(state, operation);
     }
     internal static SymbolicOperationTransitionResult ApplyLowering(
         SymbolicState state,
-        SymbolicLoweringResult<SymbolicOperationSequence> lowering) => lowering is { IsExact: true, Value: { } operations }
-            ? SymbolicOperationTransferKernel.Apply(state, operations)
-            : SymbolicOperationTransitionResult.Unsupported(
-                state,
-                lowering.UnknownReason == SymbolicUnknownReason.None
-                    ? SymbolicUnknownReason.UnsupportedIrEncoding
-                    : lowering.UnknownReason,
-                lowering.Provenance);
+        SymbolicLoweringResult<SymbolicOperationDescriptor> lowering) => lowering is { IsExact: true, Value: { } operation }
+            ? SymbolicOperationTransferKernel.Apply(state, operation)
+            : SymbolicOperationTransitionResult.Unsupported(state);
 }

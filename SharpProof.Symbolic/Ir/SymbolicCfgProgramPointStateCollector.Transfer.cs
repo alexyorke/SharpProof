@@ -140,32 +140,14 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             state,
             expressionStatement.Expression,
             expressionStatement,
-            includeThrowGuardFacts: true,
             semanticModel,
-            cancellationToken).State;
+            cancellationToken);
         var expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expressionStatement.Expression);
         if (expression is InvocationExpressionSyntax invocation &&
             semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation &&
             NullableFlowFacts.HasDoesNotReturn(invocationOperation.TargetMethod))
             state = state.MarkContradictory();
         return true;
-    }
-    internal static void AddOperationNormalCompletionFacts(
-        ref SymbolicState state,
-        IOperation operation,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        if (operation.Syntax.FirstAncestorOrSelf<ExpressionStatementSyntax>() is not
-            { Expression: AssignmentExpressionSyntax assignment } statement)
-            return;
-        var target = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
-        state = SymbolicSourceCompletionLowerer.ApplyNormalCompletion(
-            state,
-            assignment.Right,
-            statement,
-            target is not (ILocalSymbol or IParameterSymbol),
-            semanticModel,
-            cancellationToken).State;
     }
     internal static bool TryApplyAssignment(
         ref SymbolicState state,
@@ -201,7 +183,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             cancellationToken,
             provenance: provenance,
             bindingProvenance: provenance + ".assigned-value",
-            asExpressionProvenanceRoot: provenance + ".as",
             postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic,
             preInvalidationTargetValue: previousValue);
         if (!transition.IsExact)
@@ -223,7 +204,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             new SymbolicLoweringContext(semanticModel, cancellationToken),
             provenance);
         if (condition != null)
-            state = SymbolicOperationTransferKernel.Assume(state, condition, assumeTrue: true, expression.Span, provenance).State;
+            state = state.AddPathCondition(condition);
     }
     private static bool TryApplyExplicitTargetAssignment(
         ref SymbolicState state,

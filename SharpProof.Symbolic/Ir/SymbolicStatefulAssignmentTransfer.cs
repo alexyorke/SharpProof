@@ -40,7 +40,6 @@ internal static class SymbolicStatefulAssignmentTransfer {
                 cancellationToken,
                 provenance: "ir.path.prior-statement.coalesce-assignment",
                 bindingProvenance: "ir.path.prior-statement.coalesce-assignment.assigned-value",
-                asExpressionProvenanceRoot: "ir.path.prior-statement.coalesce-assignment.as",
                 postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic,
                 preInvalidationTargetValue: previousValue);
         else if (assignment.Value.Syntax is ExpressionSyntax right)

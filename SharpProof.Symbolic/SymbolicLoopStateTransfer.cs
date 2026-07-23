@@ -32,21 +32,9 @@ internal static class SymbolicLoopStateTransfer {
             : AnyConditionSymbolInvalidatedInStatement(expression, statement, semanticModel, cancellationToken);
     }
 
-    internal static bool ExpressionMutatesAnySymbol(
-        ExpressionSyntax expression,
-        IReadOnlyCollection<ISymbol> symbols,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken) =>
-        SymbolicMutationInventory.Create(expression, semanticModel, cancellationToken).MutatesAny(symbols);
-
     private static IReadOnlyList<ISymbol> GetConditionDependencySymbols(
         SyntaxNode root,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
-        var symbols = new List<ISymbol>();
-        SymbolicBranchCompletionStateTransfer.AddReferencedSymbols(root, semanticModel, cancellationToken, symbols);
-        SymbolicBranchCompletionStateTransfer.AddDeclaredPatternSymbols(root, semanticModel, cancellationToken, symbols);
-        SymbolicBranchCompletionStateTransfer.AddMemberNotNullWhenTargetSymbols(root, semanticModel, cancellationToken, symbols);
-        return symbols;
-    }
+        CancellationToken cancellationToken) =>
+        SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(root, semanticModel, cancellationToken);
 }
