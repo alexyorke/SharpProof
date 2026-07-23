@@ -541,9 +541,7 @@ internal sealed class SymbolicComplexityAnalysisSession {
     private static bool IsConstantProperty(IPropertySymbol property) =>
         property.Name is "Length" or "Count" &&
         (property.ContainingType.SpecialType == SpecialType.System_String ||
-         property.ContainingType is IArrayTypeSymbol ||
-         property.ContainingType.AllInterfaces.Any(interfaceType =>
-             interfaceType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T)) ||
+         property.ContainingType is IArrayTypeSymbol) ||
         property.IsIndexer && property.ContainingType.SpecialType == SpecialType.System_String;
 
     private static Summary Sequence(params Summary[] parts) => Sequence(parts.AsEnumerable());
