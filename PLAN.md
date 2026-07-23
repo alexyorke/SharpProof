@@ -222,14 +222,14 @@ recursive `SubstituteCanonicalTerms` overloads near lines 266-342.
 `SharpProof.Symbolic/Ir/SymbolicIrSubstitution.cs` and
 `SymbolicIrTraversal.cs` already provide the generic mechanism.
 
-- [ ] Add a small name-map rewriter beside `SymbolicIrSubstitution`.
-- [ ] Change the call near `SwitchPathConditionBuilder.cs:209` to use the
+- [x] Add a small name-map rewriter beside `SymbolicIrSubstitution`.
+- [x] Change the call near `SwitchPathConditionBuilder.cs:209` to use the
       generic rewriter.
-- [ ] Delete the switch-specific term, atom, and condition substitution
+- [x] Delete the switch-specific term, atom, and condition substitution
       overloads.
-- [ ] Replace duplicate `CanCompareCanonicalTerms` with
+- [x] Replace duplicate `CanCompareCanonicalTerms` with
       `SymbolicStateFactBuilder.CanCompareIrTerms`.
-- [ ] Preserve first-match and designation-variable semantics.
+- [x] Preserve first-match and designation-variable semantics.
 
 The old walker has three concrete drift defects:
 
@@ -240,9 +240,9 @@ The old walker has three concrete drift defects:
 Add regressions for designation variables used by switch `when` guards that
 contain:
 
-- [ ] A string-slice term.
-- [ ] An exception-precondition atom.
-- [ ] Checked arithmetic whose `MayOverflow` flag must survive substitution.
+- [x] A string-slice term.
+- [x] An exception-precondition atom.
+- [x] Checked arithmetic whose `MayOverflow` flag must survive substitution.
 
 Run targeted switch, source-predicate, runtime-hazard, and symbolic formula
 tests before the full Symbolic suite.
