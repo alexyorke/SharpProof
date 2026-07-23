@@ -312,4 +312,30 @@ public sealed class UnknownContractDiagnosticTests {
             Assert.That(diagnosticIds, Does.Not.Contain("SP0046"));
         });
     }
+    [Test]
+    public async Task ConstantInterpolatedStringDoesNotViolateZeroAllocations() {
+        var diagnosticIds = (await AnalyzerTestHost.GetDiagnosticsAsync("""
+            using SharpProof.Attributes;
+            public static class Worker {
+                private const string Text = "constant";
+                [ZeroAllocations]
+                public static string GetText() => $"{Text}";
+            }
+            """)).Select(static diagnostic => diagnostic.Id);
+        Assert.Multiple(() => {
+            Assert.That(diagnosticIds, Does.Not.Contain("SP0013"));
+            Assert.That(diagnosticIds, Does.Not.Contain("SP0045"));
+        });
+    }
+    [Test]
+    public async Task RuntimeInterpolatedStringStillViolatesZeroAllocations() {
+        var diagnosticIds = (await AnalyzerTestHost.GetDiagnosticsAsync("""
+            using SharpProof.Attributes;
+            public static class Worker {
+                [ZeroAllocations]
+                public static string Format(string value) => $"{value}";
+            }
+            """)).Select(static diagnostic => diagnostic.Id);
+        Assert.That(diagnosticIds, Does.Contain("SP0013"));
+    }
 }

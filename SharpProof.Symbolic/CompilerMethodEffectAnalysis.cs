@@ -283,7 +283,8 @@ internal sealed class MethodEffectAnalysisSession(
                 BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.AddExpression) &&
                                                   type?.SpecialType == SpecialType.System_String &&
                                                   !model.GetConstantValue(expression).HasValue => true,
-                InterpolatedStringExpressionSyntax when type?.SpecialType == SpecialType.System_String => true,
+                InterpolatedStringExpressionSyntax when type?.SpecialType == SpecialType.System_String &&
+                                                        !model.GetConstantValue(expression).HasValue => true,
                 WithExpressionSyntax when type?.IsReferenceType == true => true,
                 AnonymousFunctionExpressionSyntax when type?.TypeKind == TypeKind.Delegate => true,
                 CollectionExpressionSyntax when type is IArrayTypeSymbol || type?.IsReferenceType == true => true,
