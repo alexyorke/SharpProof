@@ -456,11 +456,11 @@ Target: 20-24 lines if confirmed behaviorally redundant, medium risk.
 suppresses a diagnostic when the proof is `ProvenTrue`; the normal
 non-invalidated `ProvenTrue` path also reports nothing.
 
-- [ ] Add a regression that establishes the intended behavior for a stale
+- [x] Add a regression that establishes the intended behavior for a stale
       member proof.
-- [ ] If no downgrade is intended, delete the variable, branch, and helper and
+- [x] If no downgrade is intended, delete the variable, branch, and helper and
       flatten unknown-result reporting.
-- [ ] If a downgrade is intended, fix the behavior instead and do not claim
+- [x] If a downgrade is intended, fix the behavior instead and do not claim
       this LOC estimate.
 
 ### 6.6 Simplify expected-complexity classification

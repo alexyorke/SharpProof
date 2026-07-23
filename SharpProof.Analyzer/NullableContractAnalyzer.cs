@@ -182,37 +182,29 @@ internal static class NullableContractAnalyzer {
             var operand = suppression.Operand;
             var condition = Parenthesize(operand) + " != null";
             if (IsStaticallyNonNullInput(operand, context)) continue;
-            var memberFactInvalidated = HasPotentiallyInvalidatingCallBefore(suppression, operand, context);
             var proof = context.State.ProveAtNode(
                 suppression,
                 condition,
                 session.SmtAnalysis,
                 false,
                 context.CancellationToken);
-            if (memberFactInvalidated && proof.TruthValue == SymbolicTruthValue.ProvenTrue) {
+            if (proof.TruthValue is SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable) continue;
+            if (proof.TruthValue == SymbolicTruthValue.ProvenFalse) {
+                ReportUnsafeSuppression(context, suppression);
                 continue;
             }
-            if (proof.TruthValue == SymbolicTruthValue.Unreachable) continue;
-            if (proof.TruthValue is not (SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.ProvenFalse)) {
-                if (proof.CounterexampleWitness.Status == SymbolicWitnessStatus.Exact &&
-                    CanUseSuppressionCounterexample(operand, context)) {
-                    ReportUnsafeSuppression(context, suppression);
-                    continue;
-                }
-                var roslynStateBeforeSuppression = NullableFlowFacts.GetExpressionStateAtPosition(
-                    operand,
-                    suppression.SpanStart,
-                    context.SemanticModel,
-                    context.CancellationToken);
-                if (roslynStateBeforeSuppression == NullableFlowFactState.NotNull) continue;
-                if (roslynStateBeforeSuppression == NullableFlowFactState.MaybeNull &&
-                    CanUseSuppressionCounterexample(operand, context)) {
-                    ReportUnsafeSuppression(context, suppression);
-                    continue;
-                }
+            if (proof.CounterexampleWitness.Status == SymbolicWitnessStatus.Exact &&
+                CanUseSuppressionCounterexample(operand, context)) {
+                ReportUnsafeSuppression(context, suppression);
                 continue;
             }
-            if (proof.TruthValue == SymbolicTruthValue.ProvenFalse)
+            var roslynStateBeforeSuppression = NullableFlowFacts.GetExpressionStateAtPosition(
+                operand,
+                suppression.SpanStart,
+                context.SemanticModel,
+                context.CancellationToken);
+            if (roslynStateBeforeSuppression == NullableFlowFactState.MaybeNull &&
+                CanUseSuppressionCounterexample(operand, context))
                 ReportUnsafeSuppression(context, suppression);
         }
     }
@@ -284,21 +276,6 @@ internal static class NullableContractAnalyzer {
             IPropertySymbol property => property.NullableAnnotation == NullableAnnotation.Annotated,
             _ => false
         };
-    }
-    private static bool HasPotentiallyInvalidatingCallBefore(
-        PostfixUnaryExpressionSyntax suppression,
-        ExpressionSyntax operand,
-        MethodBodyAnalysisContext context) {
-        if (context.SemanticModel.GetSymbolInfo(operand, context.CancellationToken).Symbol is not
-            (IFieldSymbol or IPropertySymbol))
-            return false;
-        foreach (var invocation in context.Snapshot.VisibleOperations
-                     .OfType<IInvocationOperation>()
-                     .Where(invocation => invocation.Syntax.SpanStart < suppression.SpanStart)) {
-            context.CancellationToken.ThrowIfCancellationRequested();
-            if (invocation.TargetMethod.DeclaringSyntaxReferences.IsDefaultOrEmpty) return true;
-        }
-        return false;
     }
     private static string ConditionalImplication(ExpressionSyntax result, bool expected, string consequence) =>
         Parenthesize(result) + " != " + FormatBoolean(expected) + " || " + consequence;

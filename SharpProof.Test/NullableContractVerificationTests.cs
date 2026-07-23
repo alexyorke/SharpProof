@@ -33,6 +33,9 @@ public sealed class NullableContractVerificationTests {
                 "SP0044", true);
         yield return Case("NullForgivingOperator_InUnreachableCodeIsIgnored",
             Class("public static string Get(string? value)\n{\n    if (false)\n    {\n        return value!;\n    }\n    return \"fallback\";\n}", Nullable), "SP0044", false);
+        yield return Case("NullForgivingOperator_StaleMemberProofAfterExternalCall_DoesNotReport",
+            Class("private string? _value;\n\npublic int Length()\n{\n    if (_value is null) return 0;\n    System.GC.KeepAlive(this);\n    return _value!.Length;\n}",
+                Nullable, false), "SP0044", false);
         yield return Case("InferredGuardPostcondition_IsConsumedByCaller",
             Class("public static void Guard(string? value)\n{\n    if (value is null) throw new System.ArgumentNullException(nameof(value));\n}\n\npublic static int Length(string? value)\n{\n    Guard(value);\n    return value!.Length;\n}", Nullable), "SP0044", false);
         yield return Case("NotNullRef_NullCompletion_ReportsViolation",
