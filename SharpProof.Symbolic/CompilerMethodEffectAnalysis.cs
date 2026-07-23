@@ -1417,6 +1417,10 @@ internal sealed class MethodEffectAnalysisSession(
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
                 return spanSource.WithExactType(target.ReturnType).AsDefinitelyNonNull();
             }
+            if (TryGetRefBackedSpanSource(target, values, out var refSpanSource)) {
+                effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+                return refSpanSource;
+            }
             if (IsMemoryViewSlice(target)) {
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
                 return receiver.WithExactType(target.ReturnType).AsDefinitelyNonNull();
@@ -1931,6 +1935,27 @@ internal sealed class MethodEffectAnalysisSession(
                 : arguments.Count == 0
                     ? EffectFlowValue.Unknown
                     : arguments[0];
+            return true;
+        }
+        private static bool TryGetRefBackedSpanSource(
+            IMethodSymbol method,
+            IReadOnlyList<EffectFlowValue> arguments,
+            out EffectFlowValue source) {
+            source = EffectFlowValue.None;
+            if (method is not {
+                Name: "CreateSpan" or "CreateReadOnlySpan",
+                Parameters.Length: 2,
+                ReturnType: INamedTypeSymbol { TypeArguments.Length: 1 } returnType
+            } ||
+                method.ContainingType.ToDisplayString() != "System.Runtime.InteropServices.MemoryMarshal" ||
+                method.Parameters[0].RefKind == RefKind.None ||
+                method.Parameters[1].Type.SpecialType != SpecialType.System_Int32 ||
+                returnType.OriginalDefinition.ToDisplayString() is not
+                    ("System.Span<T>" or "System.ReadOnlySpan<T>") ||
+                !SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, returnType.TypeArguments[0]) ||
+                arguments.Count == 0)
+                return false;
+            source = arguments[0].WithExactType(method.ReturnType).AsDefinitelyNonNull();
             return true;
         }
         private CompilerMethodEffectSummary GetSummary(
