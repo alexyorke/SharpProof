@@ -1675,6 +1675,7 @@ internal sealed class MethodEffectAnalysisSession(
             IOperation site,
             bool asynchronous,
             ref EffectFlowState state) {
+            if (receiver.IsDefinitelyNull) return;
             var interfaceType = session.Compilation.GetTypeByMetadataName(
                 asynchronous ? "System.IAsyncDisposable" : "System.IDisposable");
             var name = asynchronous ? "DisposeAsync" : "Dispose";
