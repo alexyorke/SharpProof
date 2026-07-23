@@ -679,6 +679,23 @@ public sealed class MethodEffectsTests {
         });
     }
     [Test]
+    public void RangeIndexerExpressionIncludesSliceMethodEffects() {
+        var result = Analyze("""
+            sealed class D {
+                private static int state;
+                public int Length => 0;
+                public D Slice(int start, int length) { state++; return this; }
+            }
+            class C {
+                static D M(D value) => value[1..2];
+            }
+            """, 7);
+        Assert.Multiple(() => {
+            Assert.That(result.MethodEffects!.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(result.MethodEffects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+        });
+    }
+    [Test]
     public void AwaitUsingIncludesDisposeAsyncEffects() {
         var result = Analyze("""
             sealed class D : System.IAsyncDisposable {
