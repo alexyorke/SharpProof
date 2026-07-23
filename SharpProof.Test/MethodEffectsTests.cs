@@ -1569,6 +1569,7 @@ public sealed class MethodEffectsTests {
     [TestCase("static string M(int value) => value.ToString();")]
     [TestCase("static string[] M(string value) => value.Split(',');")]
     [TestCase("static int[] M(System.Span<int> value) => value.ToArray();")]
+    [TestCase("static int[] M(int[] a) => a[1..2];")]
     public void ExactFrameworkAllocationModelsDisproveAllocationFreedom(string method) {
         var result = Analyze("class C {\n" + method + "\n}");
         Assert.Multiple(() => {
