@@ -1657,9 +1657,11 @@ internal sealed class MethodEffectAnalysisSession(
         private void AnalyzeEnumeration(ITypeSymbol? type, EffectFlowValue collection, IOperation site,
             ref EffectFlowState state) {
             var getEnumerator = FindProtocolMethod(type, "GetEnumerator", 0) ??
-                                FindImplementedProtocolMethod(type, "GetEnumerator", 0);
+                                FindImplementedProtocolMethod(type, "GetEnumerator", 0) ??
+                                FindExtensionProtocolMethod(type, "GetEnumerator", 0, site);
             if (getEnumerator == null) return;
-            var enumerator = InvokeCore(getEnumerator, collection, [], [], site, ref state);
+            var enumerator = InvokeCore(getEnumerator, collection,
+                getEnumerator.ReducedFrom != null || getEnumerator.IsExtensionMethod ? [collection] : [], [], site, ref state);
             if (enumerator.Roots.Count == 0) return;
             InvokeCoreOrValue(ResolveProtocolImplementation(
                 FindProtocolMethod(getEnumerator.ReturnType, "MoveNext", 0), enumerator), enumerator, site, ref state);
@@ -1709,14 +1711,24 @@ internal sealed class MethodEffectAnalysisSession(
             EffectFlowValue receiver,
             IOperation site,
             ref EffectFlowState state) {
-            var extensionAwaiters = semanticModel.LookupSymbols(site.Syntax.SpanStart, name: "GetAwaiter", includeReducedExtensionMethods: true)
-                .OfType<IMethodSymbol>().Concat(session.Compilation.GetSymbolsWithName("GetAwaiter", SymbolFilter.Member,
-                    session.CancellationToken).OfType<IMethodSymbol>().Where(static method => method.IsExtensionMethod));
-            var getAwaiter = FindProtocolMethod(type, "GetAwaiter", 0) ?? extensionAwaiters
-                .Select(method => method.ReducedFrom != null ? method : type == null ? null : method.ReduceExtensionMethod(type))
-                .FirstOrDefault(static method => method?.Parameters.Length == 0);
+            var getAwaiter = FindProtocolMethod(type, "GetAwaiter", 0) ??
+                             FindExtensionProtocolMethod(type, "GetAwaiter", 0, site);
             AnalyzeAwaiter(getAwaiter, null, FindProtocolMethod(getAwaiter?.ReturnType, "GetResult", 0),
                 receiver, site, ref state);
+        }
+        private IMethodSymbol? FindExtensionProtocolMethod(
+            ITypeSymbol? type,
+            string name,
+            int parameterCount,
+            IOperation site) {
+            if (type == null) return null;
+            return semanticModel.LookupSymbols(site.Syntax.SpanStart, name: name, includeReducedExtensionMethods: true)
+                .OfType<IMethodSymbol>()
+                .Concat(session.Compilation.GetSymbolsWithName(name, SymbolFilter.Member, session.CancellationToken)
+                    .OfType<IMethodSymbol>().Where(static method => method.IsExtensionMethod))
+                .Where(static method => method.ReducedFrom != null || method.IsExtensionMethod)
+                .Select(method => method.ReducedFrom != null ? method : method.ReduceExtensionMethod(type))
+                .FirstOrDefault(method => method?.Parameters.Length == parameterCount);
         }
         private void AnalyzeAwaiter(
             IMethodSymbol? getAwaiter,
