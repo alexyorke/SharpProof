@@ -2418,8 +2418,21 @@ internal sealed class MethodEffectAnalysisSession(
             } &&
             method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
             method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
+        private static bool IsThreeIndexArrayGetValue(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "GetValue",
+                IsStatic: false,
+                Parameters.Length: 3,
+                ReturnType.SpecialType: SpecialType.System_Object,
+                ContainingType.SpecialType: SpecialType.System_Array
+            } &&
+            method.Parameters[0] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[1] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 } &&
+            method.Parameters[2] is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Int32 };
         private static bool IsArrayGetValue(IMethodSymbol method) =>
-            IsOneIndexArrayGetValue(method) || IsTwoIndexArrayGetValue(method);
+            IsOneIndexArrayGetValue(method) || IsTwoIndexArrayGetValue(method) ||
+            IsThreeIndexArrayGetValue(method);
         private CompilerMethodEffectSummary GetSummary(
             IMethodSymbol target,
             ImmutableDictionary<string, EffectFlowValue>? captures) {
