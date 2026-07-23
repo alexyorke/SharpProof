@@ -1266,6 +1266,8 @@ internal sealed class MethodEffectAnalysisSession(
             else
                 effects.Read(receiver, property.Syntax, property.Property, "property_read");
             var key = MemberKey(property) ?? MemberKey(property.Property);
+            if (IsMemorySpanProperty(property.Property))
+                return receiver.WithExactType(property.Type).AsDefinitelyNonNull();
             if (IsSpanIndexer(property.Property)) return receiver;
             if (property.Property.GetMethod == null) return receiver.Member(key);
             if (!property.Property.GetMethod.IsVirtual && !property.Property.GetMethod.IsOverride &&
@@ -1409,7 +1411,7 @@ internal sealed class MethodEffectAnalysisSession(
             ImmutableArray<IArgumentOperation> arguments,
             IOperation site,
             ref EffectFlowState state) {
-            if (TryGetAsSpanSource(target, receiver, values, out var spanSource)) {
+            if (TryGetMemoryViewSource(target, receiver, values, out var spanSource)) {
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
                 return spanSource.WithExactType(target.ReturnType).AsDefinitelyNonNull();
             }
@@ -1836,7 +1838,13 @@ internal sealed class MethodEffectAnalysisSession(
             property.IsIndexer &&
             property.ContainingType.OriginalDefinition.ToDisplayString() is
                 "System.Span<T>" or "System.ReadOnlySpan<T>";
-        private static bool TryGetAsSpanSource(
+        private static bool IsMemorySpanProperty(IPropertySymbol property) =>
+            property.Name == "Span" &&
+            property.ContainingType.OriginalDefinition.ToDisplayString() is
+                "System.Memory<T>" or "System.ReadOnlyMemory<T>" &&
+            property.Type.OriginalDefinition.ToDisplayString() is
+                "System.Span<T>" or "System.ReadOnlySpan<T>";
+        private static bool TryGetMemoryViewSource(
             IMethodSymbol method,
             EffectFlowValue receiver,
             IReadOnlyList<EffectFlowValue> arguments,
@@ -1845,14 +1853,15 @@ internal sealed class MethodEffectAnalysisSession(
             var definition = method.ReducedFrom ?? method;
             var sourceType = definition.Parameters.FirstOrDefault()?.Type;
             if (definition is not {
-                Name: "AsSpan",
+                Name: "AsSpan" or "AsMemory",
                 ContainingType: { } containingType,
                 Parameters.Length: > 0
             } ||
                 containingType.ToDisplayString() != "System.MemoryExtensions" ||
                 sourceType is not IArrayTypeSymbol && sourceType?.SpecialType != SpecialType.System_String ||
                 method.ReturnType.OriginalDefinition.ToDisplayString() is not
-                    ("System.Span<T>" or "System.ReadOnlySpan<T>"))
+                    ("System.Span<T>" or "System.ReadOnlySpan<T>" or
+                    "System.Memory<T>" or "System.ReadOnlyMemory<T>"))
                 return false;
             source = method.ReducedFrom != null
                 ? receiver
