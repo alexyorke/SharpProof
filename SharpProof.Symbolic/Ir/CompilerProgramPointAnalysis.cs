@@ -135,35 +135,43 @@ internal static class CompilerProgramPointAnalysis {
             }
             captured = state;
         }
+        private readonly record struct SequencePredicateStep(
+            ExpressionSyntax Predicate,
+            bool GuaranteesTruth);
         private void ApplyContainingSequencePredicateFacts(ref SymbolicState state) {
             foreach (var loop in site.Ancestors().OfType<ForEachStatementSyntax>()) {
                 if (!loop.Statement.Span.Contains(site.SpanStart) ||
                     semanticModel.GetDeclaredSymbol(loop, cancellationToken) is not ILocalSymbol iterationVariable ||
-                    !TryGetGuaranteedSequencePredicates(loop.Expression, out var predicates) ||
+                    !TryGetSequencePredicateSteps(loop.Expression, out var predicateSteps) ||
                     SymbolicMutationInventory.Create(loop.Statement, semanticModel, cancellationToken)
                         .InvalidatesBetween(loop.Statement.SpanStart - 1, site.SpanStart, iterationVariable, true) ||
                     !SymbolicStateFactBuilder.TryCreateSymbolTerm(iterationVariable, out var iterationTerm))
                     continue;
                 var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-                foreach (var predicate in predicates) {
+                foreach (var step in predicateSteps) {
                     if (!SymbolicSourcePredicateLowerer.TryLowerSequencePredicate(
-                            predicate,
+                            step.Predicate,
                             iterationTerm,
                             context,
                             out var condition))
                         break;
-                    state = state.AddPathCondition(condition).Normalize();
+                    if (step.GuaranteesTruth)
+                        state = state.AddPathCondition(condition).Normalize();
                 }
             }
         }
-        private bool TryGetGuaranteedSequencePredicates(
+        private bool TryGetSequencePredicateSteps(
             ExpressionSyntax collection,
-            out ImmutableArray<ExpressionSyntax> predicates) {
-            var builder = ImmutableArray.CreateBuilder<ExpressionSyntax>();
+            out ImmutableArray<SequencePredicateStep> steps) {
+            var builder = ImmutableArray.CreateBuilder<SequencePredicateStep>();
             var resolvedUses = new List<(ISymbol Symbol, int Position)>();
             while (true) {
-                if (TryGetGuaranteedSequencePredicateStep(collection, out var source, out var predicate)) {
-                    builder.Add(predicate);
+                if (TryGetSequencePredicateStep(
+                        collection,
+                        out var source,
+                        out var predicate,
+                        out var guaranteesTruth)) {
+                    builder.Add(new(predicate, guaranteesTruth));
                     collection = source;
                     continue;
                 }
@@ -188,8 +196,8 @@ internal static class CompilerProgramPointAnalysis {
                     break;
                 resolvedUses.Add((symbol, usePosition));
             }
-            predicates = builder.ToImmutable();
-            return predicates.Length != 0;
+            steps = builder.ToImmutable();
+            return steps.Length != 0;
         }
         private bool TryGetLazySequencePreservingStep(
             ExpressionSyntax collection,
@@ -213,12 +221,14 @@ internal static class CompilerProgramPointAnalysis {
                 return false;
             return TryGetStandardSequenceSource(invocation, out source);
         }
-        private bool TryGetGuaranteedSequencePredicateStep(
+        private bool TryGetSequencePredicateStep(
             ExpressionSyntax collection,
             out ExpressionSyntax source,
-            out ExpressionSyntax predicate) {
+            out ExpressionSyntax predicate,
+            out bool guaranteesTruth) {
             source = null!;
             predicate = null!;
+            guaranteesTruth = false;
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is not InvocationExpressionSyntax invocation ||
                 invocation.ArgumentList.Arguments.LastOrDefault()?.Expression is not { } candidatePredicate ||
@@ -229,7 +239,7 @@ internal static class CompilerProgramPointAnalysis {
             var containingType = definition.ContainingType.ToDisplayString();
             var supported = containingType switch {
                 "System.Linq.Enumerable" => definition.Name is
-                    nameof(Enumerable.Where) or nameof(Enumerable.TakeWhile),
+                    nameof(Enumerable.Where) or nameof(Enumerable.TakeWhile) or nameof(Enumerable.SkipWhile),
                 "System.Linq.ImmutableArrayExtensions" =>
                     definition.Name == nameof(Enumerable.Where),
                 "System.Linq.Queryable" =>
@@ -240,6 +250,7 @@ internal static class CompilerProgramPointAnalysis {
                 return false;
             if (!TryGetStandardSequenceSource(invocation, out source)) return false;
             predicate = candidatePredicate;
+            guaranteesTruth = definition.Name != nameof(Enumerable.SkipWhile);
             return true;
         }
         private bool TryGetStandardSequenceSource(
