@@ -319,6 +319,8 @@ internal static class CompilerProgramPointAnalysis {
         }
         private bool IsDefinitelyEmptySequenceSource(ExpressionSyntax collection) {
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (IsDefinitelyEmptyString(collection))
+                return true;
             if (IsKnownImmutableEmptySingleton(collection))
                 return true;
             if (collection is CollectionExpressionSyntax { Elements.Count: 0 })
@@ -354,6 +356,18 @@ internal static class CompilerProgramPointAnalysis {
                    TryGetInvocationArgument(operation, countParameter, out var count) &&
                    semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount } &&
                    constantCount == 0;
+        }
+        private bool IsDefinitelyEmptyString(ExpressionSyntax collection) {
+            if (semanticModel.GetConstantValue(collection, cancellationToken) is { HasValue: true, Value: string constant } &&
+                constant.Length == 0)
+                return true;
+            return semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol is
+                IFieldSymbol {
+                    Name: "Empty",
+                    IsStatic: true,
+                    IsReadOnly: true,
+                    ContainingType.SpecialType: SpecialType.System_String
+                };
         }
         private bool IsKnownImmutableEmptySingleton(ExpressionSyntax collection) {
             var symbol = semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol;
