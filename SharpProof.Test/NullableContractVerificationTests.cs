@@ -178,6 +178,22 @@ public sealed class NullableContractVerificationTests {
     public Task NullForgivingOperator_ReportsUnsafeUse() => AssertDiagnosticAsync(
         Class("public static int Unsafe()\n{\n    string? value = null;\n    return value!.Length;\n}\n\npublic static int Unnecessary(string value) => value!.Length;", Nullable), "SP0044");
     [Test]
+    public async Task NullForgivingOperator_GuardedByCorrelatedNullableCondition_DoesNotReport() {
+        var diagnostics = await AnalyzeAsync(Class("""
+            private sealed class Completion {
+                public string? ResultExpression { get; init; }
+            }
+
+            public static string Select(Completion completion, bool? expectedResult)
+            {
+                if (expectedResult.HasValue && completion.ResultExpression == null)
+                    return "";
+                return expectedResult.HasValue ? completion.ResultExpression! : "";
+            }
+            """, Nullable));
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Not.Contain("SP0044"));
+    }
+    [Test]
     public async Task MultipleReturns_ReportOnlyReachableViolatingCompletion() {
         var diagnostics = await AnalyzeAsync(Class(
             "public static string Select(bool valid)\n{\n    if (valid) return \"value\";\n    return null;\n}", Nullable));

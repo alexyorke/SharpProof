@@ -108,6 +108,21 @@ internal static class CompilerProgramPointAnalysis {
             SymbolicCfgProgramPointStateCollector.IsTargetOperation(
                 operation, site, includeCompletion, semanticModel, cancellationToken);
         private void Capture(SymbolicState state) {
+            foreach (var conditional in site.Ancestors().OfType<ConditionalExpressionSyntax>()) {
+                bool? branchWhenTrue = conditional.WhenTrue.Span.Contains(site.SpanStart)
+                    ? true
+                    : conditional.WhenFalse.Span.Contains(site.SpanStart)
+                        ? false
+                        : null;
+                if (!branchWhenTrue.HasValue) continue;
+                var enclosingTransition = SymbolicReachabilityLowerer.ApplyConditionOnly(
+                    state,
+                    conditional.Condition,
+                    branchWhenTrue.Value,
+                    semanticModel,
+                    cancellationToken);
+                if (enclosingTransition.IsExact) state = enclosingTransition.State;
+            }
             if (site.FirstAncestorOrSelf<StatementSyntax>() is { Parent: BlockSyntax block } target) {
                 foreach (var statement in block.Statements.TakeWhile(candidate => !ReferenceEquals(candidate, target))) {
                     if (statement is not IfStatementSyntax { Else: null } conditional ||
