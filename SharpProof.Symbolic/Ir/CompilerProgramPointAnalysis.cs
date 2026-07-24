@@ -175,6 +175,7 @@ internal static class CompilerProgramPointAnalysis {
             var builder = ImmutableArray.CreateBuilder<SequencePredicateStep>();
             var resolvedUses = new List<(ISymbol Symbol, int Position)>();
             definitelyEmpty = false;
+            var preservesElementIdentity = true;
             while (true) {
                 collection = SymbolicConversionLowerer.UnwrapIdentityConversions(
                     collection,
@@ -185,7 +186,8 @@ internal static class CompilerProgramPointAnalysis {
                         out var source,
                         out var predicate,
                         out var guaranteesTruth)) {
-                    builder.Add(new(predicate, guaranteesTruth));
+                    if (preservesElementIdentity)
+                        builder.Add(new(predicate, guaranteesTruth));
                     collection = source;
                     continue;
                 }
@@ -197,7 +199,11 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
-                if (TryGetIdentitySequenceProjectionStep(collection, out source)) {
+                if (TryGetSequenceProjectionStep(
+                        collection,
+                        out source,
+                        out var projectionPreservesElementIdentity)) {
+                    preservesElementIdentity &= projectionPreservesElementIdentity;
                     collection = source;
                     continue;
                 }
@@ -304,29 +310,33 @@ internal static class CompilerProgramPointAnalysis {
             elementType = candidates[0];
             return true;
         }
-        private bool TryGetIdentitySequenceProjectionStep(
+        private bool TryGetSequenceProjectionStep(
             ExpressionSyntax collection,
-            out ExpressionSyntax source) {
+            out ExpressionSyntax source,
+            out bool preservesElementIdentity) {
             source = null!;
+            preservesElementIdentity = false;
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is not InvocationExpressionSyntax invocation ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
                     IInvocationOperation { TargetMethod: { } targetMethod } operation ||
-                targetMethod.Parameters.Length == 0 ||
-                !TryGetInvocationArgument(
-                    operation,
-                    targetMethod.Parameters[targetMethod.Parameters.Length - 1],
-                    out var selector))
+                targetMethod.Parameters.Length == 0)
                 return false;
             var definition = targetMethod.ReducedFrom ?? targetMethod;
             if (definition.Name != nameof(Enumerable.Select) ||
                 definition.ContainingType.ToDisplayString() is not
                     ("System.Linq.Enumerable" or "System.Linq.Queryable") ||
-                !SymbolicSourcePredicateLowerer.IsIdentitySequenceSelector(
-                    selector,
-                    new(semanticModel, cancellationToken)))
+                !TryGetStandardSequenceSource(invocation, operation, out source))
                 return false;
-            return TryGetStandardSequenceSource(invocation, operation, out source);
+            preservesElementIdentity =
+                TryGetInvocationArgument(
+                    operation,
+                    targetMethod.Parameters[targetMethod.Parameters.Length - 1],
+                    out var selector) &&
+                SymbolicSourcePredicateLowerer.IsIdentitySequenceSelector(
+                    selector,
+                    new(semanticModel, cancellationToken));
+            return true;
         }
         private bool TryGetLazySequencePreservingStep(
             ExpressionSyntax collection,

@@ -133,6 +133,70 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptySourceThroughProjectionLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<int>().Select(static _ => new Item(null)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptySourceThroughNamedStaticProjectionLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Select(
+                        selector: static _ => new Item(null),
+                        source: Enumerable.Empty<int>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptyQueryableThroughProjectionLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<int>()
+                        .AsQueryable()
+                        .Select(_ => new Item(null)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_CustomSelectOverEmptySourceLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static IEnumerable<Item> Select(
+                    IEnumerable<int> source,
+                    Func<int, Item> selector) =>
+                    new[] { new Item(null) };
+                public static object FirstValue() {
+                    foreach (var item in Select(
+                        Enumerable.Empty<int>(),
+                        static _ => new Item(new object())))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ZeroLengthArrayLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable
