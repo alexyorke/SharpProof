@@ -8,6 +8,8 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class MetadataMethodEffectAnalyzerTests {
     private string _fixturePath = string.Empty;
+    private string _dependencyFixturePath = string.Empty;
+    private string _bridgeFixturePath = string.Empty;
     [OneTimeSetUp]
     public void BuildFixture() {
         _fixturePath = Path.Combine(Path.GetTempPath(), "SharpProof.MetadataFixture." + Guid.NewGuid().ToString("N") + ".dll");
@@ -62,10 +64,40 @@ public sealed class MetadataMethodEffectAnalyzerTests {
         var emit = compilation.Emit(_fixturePath);
         Assert.That(emit.Success, Is.True, string.Join(Environment.NewLine, emit.Diagnostics));
         RewriteVolatilePrefixAsCpblk(_fixturePath);
+        _dependencyFixturePath = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.MetadataDependency." + Guid.NewGuid().ToString("N") + ".dll");
+        _bridgeFixturePath = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.MetadataBridge." + Guid.NewGuid().ToString("N") + ".dll");
+        EmitFixture(
+            _dependencyFixturePath,
+            "SharpProof.MetadataDependency",
+            """
+            namespace MetadataDependency;
+            public static class PureLeaf {
+                public static int State;
+                public static int Increment(int value) => value + 1;
+                public static void Mutate() { State++; }
+            }
+            """);
+        EmitFixture(
+            _bridgeFixturePath,
+            "SharpProof.MetadataBridge",
+            """
+            namespace MetadataBridge;
+            public static class PureBridge {
+                public static int Increment(int value) => MetadataDependency.PureLeaf.Increment(value);
+                public static void Mutate() { MetadataDependency.PureLeaf.Mutate(); }
+            }
+            """,
+            MetadataReference.CreateFromFile(_dependencyFixturePath));
     }
     [OneTimeTearDown]
     public void DeleteFixture() {
         if (File.Exists(_fixturePath)) File.Delete(_fixturePath);
+        if (File.Exists(_dependencyFixturePath)) File.Delete(_dependencyFixturePath);
+        if (File.Exists(_bridgeFixturePath)) File.Delete(_bridgeFixturePath);
     }
     [Test]
     public void ElementAndIndirectWritesCannotBeCertifiedPure() {
@@ -140,9 +172,32 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
         });
     }
+    [Test]
+    public void ManagedCallsAcrossReferencedAssembliesAreAnalyzedRecursively() {
+        var effects = Analyze("static int M(int value) => MetadataBridge.PureBridge.Increment(value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.UnknownReasons, Has.None.Property(nameof(SharpProofUnknownReason.Message))
+                .EqualTo("metadata_external_call_unresolved"));
+        });
+    }
+    [Test]
+    public void EffectsFromManagedCallsAcrossReferencedAssembliesArePreserved() {
+        var effects = Analyze("static void M() => MetadataBridge.PureBridge.Mutate();");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(effects.UnknownReasons, Has.None.Property(nameof(SharpProofUnknownReason.Message))
+                .EqualTo("metadata_external_call_unresolved"));
+        });
+    }
     private MethodEffects Analyze(string method) {
         var reference = MetadataReference.CreateFromFile(_fixturePath);
-        var references = SymbolicSourceCompilation.GetTrustedPlatformReferences().Add(reference);
+        var references = SymbolicSourceCompilation.GetTrustedPlatformReferences()
+            .Add(reference)
+            .Add(MetadataReference.CreateFromFile(_dependencyFixturePath))
+            .Add(MetadataReference.CreateFromFile(_bridgeFixturePath));
         var source = "public static class Query { " + method + " }";
         var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
             source,
@@ -156,6 +211,21 @@ public sealed class MetadataMethodEffectAnalyzerTests {
         var symbol = semanticModel.GetDeclaredSymbol(declaration)!;
         return new MethodEffectAnalysisSession(compilation, CancellationToken.None)
             .Analyze(symbol, declaration, semanticModel);
+    }
+    private static void EmitFixture(
+        string path,
+        string assemblyName,
+        string source,
+        params MetadataReference[] additionalReferences) {
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+        var references = SymbolicSourceCompilation.GetTrustedPlatformReferences().AddRange(additionalReferences);
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            [syntaxTree],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
+        var emit = compilation.Emit(path);
+        Assert.That(emit.Success, Is.True, string.Join(Environment.NewLine, emit.Diagnostics));
     }
     private static void RewriteVolatilePrefixAsCpblk(string path) {
         var image = File.ReadAllBytes(path);

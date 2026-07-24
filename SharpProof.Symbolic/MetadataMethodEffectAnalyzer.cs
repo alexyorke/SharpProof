@@ -3,6 +3,7 @@ using System.Reflection.Emit;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
 using SharpProof.Attributes;
 namespace SharpProof.Symbolic;
 internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
@@ -14,6 +15,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         .Where(static field => field.FieldType == typeof(OpCode))
         .Select(static field => (OpCode)field.GetValue(null)!)
         .ToImmutableDictionary(static opcode => opcode.Value);
+    private readonly ImmutableDictionary<AssemblyLookupKey, string> _referencePaths = BuildReferencePaths(compilation);
     private readonly ConcurrentDictionary<(Guid Mvid, int Token, string Context), Lazy<MethodEffects>> _cache = new();
     internal MethodEffects Analyze(IMethodSymbol method) {
         if (method.ContainingAssembly == null) return Unknown("metadata_assembly_unavailable");
@@ -40,12 +42,9 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             return Unknown("malformed_or_unavailable_metadata");
         }
     }
-    private static MethodEffects AnalyzeBody(string path, MethodDefinitionHandle root) {
-        using var stream = File.OpenRead(path);
-        using var pe = new PEReader(stream, PEStreamOptions.PrefetchEntireImage);
-        var reader = pe.GetMetadataReader();
-        var active = new HashSet<int>();
-        var analyzed = new HashSet<int>();
+    private MethodEffects AnalyzeBody(string path, MethodDefinitionHandle root) {
+        var active = new HashSet<MethodLocation>();
+        var analyzed = new HashSet<MethodLocation>();
         var effects = SharpProofEffect.None;
         var unknowns = ImmutableArray.CreateBuilder<SharpProofUnknownReason>();
         var exceptions = ImmutableArray.CreateBuilder<string>();
@@ -56,19 +55,21 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             hasUnknownExceptionBoundary |= exceptionBoundary;
             unknowns.Add(Reason(reason));
         }
-        void Visit(MethodDefinitionHandle handle, int depth) {
-            var token = MetadataTokens.GetToken(handle);
+        void Visit(MethodLocation location, int depth) {
             if (depth > MaxDepth || analyzed.Count >= MaxMethods) {
                 MarkUnknown("metadata_budget_exhausted", SharpProofEffect.BudgetExhaustion);
                 return;
             }
-            if (analyzed.Contains(token)) return;
-            if (!active.Add(token)) {
+            if (analyzed.Contains(location)) return;
+            if (!active.Add(location)) {
                 MarkUnknown("metadata_recursive_cycle");
                 return;
             }
             try {
-                var definition = reader.GetMethodDefinition(handle);
+                using var stream = File.OpenRead(location.Path);
+                using var pe = new PEReader(stream, PEStreamOptions.PrefetchEntireImage);
+                var reader = pe.GetMetadataReader();
+                var definition = reader.GetMethodDefinition(location.Handle);
                 if ((definition.Attributes & MethodAttributes.PinvokeImpl) != 0) {
                     MarkUnknown("metadata_native_exception_boundary", SharpProofEffect.UsesNativeCode, true);
                     return;
@@ -95,8 +96,8 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                         effects |= SharpProofEffect.Allocates;
                         if (opcode == OpCodes.Newobj) {
                             var constructor = MetadataTokens.Handle(operand);
-                            if (TryResolveMethod(reader, constructor, out var constructorDefinition))
-                                Visit(constructorDefinition, depth + 1);
+                            if (TryResolveMethod(location.Path, reader, constructor, out var constructorLocation))
+                                Visit(constructorLocation, depth + 1);
                             else {
                                 MarkUnknown("metadata_constructor_unresolved", exceptionBoundary: true);
                             }
@@ -121,9 +122,11 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                             MarkUnknown("metadata_virtual_dispatch_unresolved", SharpProofEffect.DispatchUncertainty, true);
                         }
                         var called = MetadataTokens.Handle(operand);
-                        if (opcode == OpCodes.Call && TryResolveMethod(reader, called, out var calledDefinition))
-                            Visit(calledDefinition, depth + 1);
-                        else if (opcode == OpCodes.Call || !TryResolveMethod(reader, called, out _)) {
+                        if (opcode == OpCodes.Call &&
+                            TryResolveMethod(location.Path, reader, called, out var calledLocation))
+                            Visit(calledLocation, depth + 1);
+                        else if (opcode == OpCodes.Call ||
+                                 !TryResolveMethod(location.Path, reader, called, out _)) {
                             MarkUnknown("metadata_external_call_unresolved", exceptionBoundary: true);
                         }
                     }
@@ -140,11 +143,11 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 }
             }
             finally {
-                active.Remove(token);
-                analyzed.Add(token);
+                active.Remove(location);
+                analyzed.Add(location);
             }
         }
-        Visit(root, 0);
+        Visit(new MethodLocation(path, root), 0);
         var exceptionFacts = ImmutableArray.CreateBuilder<MethodExceptionFact>();
         exceptionFacts.AddRange(exceptions.Select(static type =>
             MethodExceptionFact.Boundary(type, MethodExceptionSource.Metadata, "metadata_throw")));
@@ -201,39 +204,153 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         result = default;
         return false;
     }
-    private static bool TryResolveMethod(
+    private bool TryResolveMethod(
+        string currentPath,
         MetadataReader reader,
         Handle candidate,
-        out MethodDefinitionHandle result) {
+        out MethodLocation result) {
         if (candidate.Kind == HandleKind.MethodDefinition) {
-            result = (MethodDefinitionHandle)candidate;
+            result = new MethodLocation(currentPath, (MethodDefinitionHandle)candidate);
             return true;
         }
         if (candidate.Kind == HandleKind.MethodSpecification) {
             var specification = reader.GetMethodSpecification((MethodSpecificationHandle)candidate);
-            return TryResolveMethod(reader, specification.Method, out result);
+            return TryResolveMethod(currentPath, reader, specification.Method, out result);
         }
         if (candidate.Kind != HandleKind.MemberReference) {
             result = default;
             return false;
         }
         var member = reader.GetMemberReference((MemberReferenceHandle)candidate);
-        if (member.Parent.Kind != HandleKind.TypeDefinition) {
+        if (!TryResolveContainingType(
+                currentPath,
+                reader,
+                member.Parent,
+                out var declaringPath,
+                out var declaringType)) {
             result = default;
             return false;
         }
+        using var declaringStream = File.OpenRead(declaringPath);
+        using var declaringPe = new PEReader(declaringStream, PEStreamOptions.PrefetchMetadata);
+        var declaringReader = declaringPe.GetMetadataReader();
         var wantedName = reader.GetString(member.Name);
-        var wantedSignature = reader.GetBlobBytes(member.Signature);
-        foreach (var methodHandle in reader.GetTypeDefinition((TypeDefinitionHandle)member.Parent).GetMethods()) {
-            var definition = reader.GetMethodDefinition(methodHandle);
-            if (!string.Equals(reader.GetString(definition.Name), wantedName, StringComparison.Ordinal) ||
-                !reader.GetBlobBytes(definition.Signature).AsSpan().SequenceEqual(wantedSignature))
+        var wantedSignature = member.DecodeMethodSignature(new StructuralTypeProvider(), null);
+        foreach (var methodHandle in declaringReader.GetTypeDefinition(declaringType).GetMethods()) {
+            var definition = declaringReader.GetMethodDefinition(methodHandle);
+            if (!string.Equals(declaringReader.GetString(definition.Name), wantedName, StringComparison.Ordinal) ||
+                !SignaturesMatch(wantedSignature, definition.DecodeSignature(new StructuralTypeProvider(), null)))
                 continue;
-            result = methodHandle;
+            result = new MethodLocation(declaringPath, methodHandle);
             return true;
         }
         result = default;
         return false;
+    }
+    private bool TryResolveContainingType(
+        string currentPath,
+        MetadataReader reader,
+        EntityHandle parent,
+        out string declaringPath,
+        out TypeDefinitionHandle declaringType) {
+        if (parent.Kind == HandleKind.TypeDefinition) {
+            declaringPath = currentPath;
+            declaringType = (TypeDefinitionHandle)parent;
+            return true;
+        }
+        if (parent.Kind != HandleKind.TypeReference) {
+            declaringPath = string.Empty;
+            declaringType = default;
+            return false;
+        }
+        var referenceHandle = (TypeReferenceHandle)parent;
+        var reference = reader.GetTypeReference(referenceHandle);
+        if (!TryResolveAssemblyPath(reader, reference.ResolutionScope, currentPath, out declaringPath)) {
+            declaringType = default;
+            return false;
+        }
+        var wantedType = EcmaStructuralMethodIdentity.GetTypeReferenceMetadataName(reader, referenceHandle);
+        using var stream = File.OpenRead(declaringPath);
+        using var pe = new PEReader(stream, PEStreamOptions.PrefetchMetadata);
+        var declaringReader = pe.GetMetadataReader();
+        foreach (var typeHandle in declaringReader.TypeDefinitions) {
+            if (!string.Equals(
+                    EcmaStructuralMethodIdentity.GetTypeDefinitionMetadataName(declaringReader, typeHandle),
+                    wantedType,
+                    StringComparison.Ordinal))
+                continue;
+            declaringType = typeHandle;
+            return true;
+        }
+        declaringType = default;
+        return false;
+    }
+    private bool TryResolveAssemblyPath(
+        MetadataReader reader,
+        EntityHandle resolutionScope,
+        string currentPath,
+        out string path) {
+        while (resolutionScope.Kind == HandleKind.TypeReference)
+            resolutionScope = reader.GetTypeReference((TypeReferenceHandle)resolutionScope).ResolutionScope;
+        if (resolutionScope.Kind is HandleKind.ModuleDefinition or HandleKind.ModuleReference) {
+            path = currentPath;
+            return true;
+        }
+        if (resolutionScope.Kind != HandleKind.AssemblyReference) {
+            path = string.Empty;
+            return false;
+        }
+        var reference = reader.GetAssemblyReference((AssemblyReferenceHandle)resolutionScope);
+        return _referencePaths.TryGetValue(
+            AssemblyLookupKey.Create(
+                reader.GetString(reference.Name),
+                reference.Version,
+                reference.Culture.IsNil ? string.Empty : reader.GetString(reference.Culture),
+                GetPublicKeyToken(
+                    reader.GetBlobBytes(reference.PublicKeyOrToken),
+                    (reference.Flags & AssemblyFlags.PublicKey) != 0)),
+            out path!);
+    }
+    private static bool SignaturesMatch(
+        MethodSignature<StructuralDecodedType> left,
+        MethodSignature<StructuralDecodedType> right) {
+        if (left.Header.RawValue != right.Header.RawValue ||
+            left.GenericParameterCount != right.GenericParameterCount ||
+            left.RequiredParameterCount != right.RequiredParameterCount ||
+            left.ParameterTypes.Length != right.ParameterTypes.Length ||
+            !TypesMatch(left.ReturnType, right.ReturnType))
+            return false;
+        for (var index = 0; index < left.ParameterTypes.Length; index++)
+            if (!TypesMatch(left.ParameterTypes[index], right.ParameterTypes[index]))
+                return false;
+        return true;
+    }
+    private static bool TypesMatch(StructuralDecodedType left, StructuralDecodedType right) =>
+        left.IsByRef == right.IsByRef && string.Equals(left.Key, right.Key, StringComparison.Ordinal);
+    private static ImmutableDictionary<AssemblyLookupKey, string> BuildReferencePaths(Compilation compilation) {
+        var builder = ImmutableDictionary.CreateBuilder<AssemblyLookupKey, string>();
+        foreach (var reference in compilation.References.OfType<PortableExecutableReference>()) {
+            if (string.IsNullOrWhiteSpace(reference.FilePath) ||
+                !File.Exists(reference.FilePath) ||
+                compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol assembly)
+                continue;
+            var identity = assembly.Identity;
+            builder[AssemblyLookupKey.Create(
+                identity.Name,
+                identity.Version,
+                identity.CultureName,
+                [.. identity.PublicKeyToken])] = reference.FilePath!;
+        }
+        return builder.ToImmutable();
+    }
+    private static byte[] GetPublicKeyToken(byte[] keyOrToken, bool isFullKey) {
+        if (!isFullKey || keyOrToken.Length == 0) return keyOrToken;
+        using var sha1 = SHA1.Create();
+        var hash = sha1.ComputeHash(keyOrToken);
+        var token = new byte[8];
+        for (var index = 0; index < token.Length; index++)
+            token[index] = hash[hash.Length - 1 - index];
+        return token;
     }
     private static bool TryRead(byte[] bytes, ref int offset, out OpCode opcode, out int operand) {
         opcode = default;
@@ -271,4 +388,17 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         [],
         [Reason(code)]);
     private static SharpProofUnknownReason Reason(string code) => new("SP-EFFECT-METADATA", "Effects", code, false, false);
+    private readonly record struct MethodLocation(string Path, MethodDefinitionHandle Handle);
+    private readonly record struct AssemblyLookupKey(string Name, Version Version, string Culture, string PublicKeyToken) {
+        internal static AssemblyLookupKey Create(
+            string name,
+            Version version,
+            string? culture,
+            byte[] publicKeyToken) =>
+            new(
+                name.ToUpperInvariant(),
+                version,
+                (culture ?? string.Empty).ToUpperInvariant(),
+                Convert.ToBase64String(publicKeyToken));
+    }
 }
