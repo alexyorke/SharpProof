@@ -386,6 +386,101 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_IntersectEmptySecondLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items.Intersect(Enumerable.Empty<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_IntersectByEmptyKeysLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(int Key, object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items.IntersectBy(
+                        Enumerable.Empty<int>(),
+                        static item => item.Key))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_JoinEmptyInnerLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(int Key, object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items.Join(
+                        Enumerable.Empty<int>(),
+                        static item => item.Key,
+                        static key => key,
+                        static (item, _) => item))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ZipEmptySecondLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items.Zip(
+                        Enumerable.Empty<int>(),
+                        static (item, _) => item))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ExceptEmptySecondLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new[] { new Item(null) }
+                        .Except(Enumerable.Empty<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_GroupJoinEmptyInnerLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(int Key, object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new[] { new Item(0, null) }.GroupJoin(
+                        Enumerable.Empty<int>(),
+                        static item => item.Key,
+                        static key => key,
+                        static (item, _) => item))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_QueryableConcatEmptySourcesLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable

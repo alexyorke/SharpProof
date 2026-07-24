@@ -238,7 +238,12 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
-                if (TryGetZeroPreservingSequenceOperatorStep(collection, out source)) {
+                if (TryGetZeroPreservingSequenceOperatorStep(
+                        collection,
+                        visited,
+                        out source,
+                        out var operatorProducesNoElements)) {
+                    definitelyNoElements |= operatorProducesNoElements;
                     preservesElementIdentity = false;
                     collection = source;
                     continue;
@@ -380,8 +385,11 @@ internal static class CompilerProgramPointAnalysis {
         }
         private bool TryGetZeroPreservingSequenceOperatorStep(
             ExpressionSyntax collection,
-            out ExpressionSyntax source) {
+            HashSet<SyntaxNode> visited,
+            out ExpressionSyntax source,
+            out bool definitelyNoElements) {
             source = null!;
+            definitelyNoElements = false;
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is not InvocationExpressionSyntax invocation ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
@@ -417,7 +425,18 @@ internal static class CompilerProgramPointAnalysis {
                     "ToLookup" or
                     "Zip"))
                 return false;
-            return TryGetStandardSequenceSource(invocation, operation, out source);
+            if (!TryGetStandardSequenceSource(invocation, operation, out source))
+                return false;
+            if (definition.Name is "Intersect" or "IntersectBy" or "Join" or "Zip" &&
+                definition.Parameters.Length >= 2 &&
+                TryGetInvocationArgument(operation, definition.Parameters[1], out var second) &&
+                TryGetSequencePredicateSteps(
+                    second,
+                    [.. visited],
+                    out _,
+                    out var secondProducesNoElements))
+                definitelyNoElements = secondProducesNoElements;
+            return true;
         }
         private bool DefinitelyProducesNoElements(ExpressionSyntax collection) {
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
