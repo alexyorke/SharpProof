@@ -17,6 +17,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             namespace MetadataFixture;
             public sealed class MutableBox {
                 public int Value;
+                public void MutateViaHelper() { Effects.FieldWrite(this); }
             }
             public static class Effects {
                 public static int State;
@@ -25,6 +26,11 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                 public static int[] FreshElementWrite() {
                     var values = new int[1];
                     values[0] = 1;
+                    return values;
+                }
+                public static int[] FreshElementWriteViaHelper() {
+                    var values = new int[1];
+                    ElementWrite(values);
                     return values;
                 }
                 public static void FieldWrite(MutableBox value) { value.Value = 1; }
@@ -135,6 +141,16 @@ public sealed class MetadataMethodEffectAnalyzerTests {
         });
     }
     [Test]
+    public void MetadataCallsMapArgumentEffectsBackToFreshCallerState() {
+        var effects = Analyze("static int[] M() => MetadataFixture.Effects.FreshElementWriteViaHelper();");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void MetadataFieldWritesThroughArgumentsAreArgumentEffects() {
         var effects = Analyze(
             "static void M(MetadataFixture.MutableBox value) => MetadataFixture.Effects.FieldWrite(value);");
@@ -151,6 +167,17 @@ public sealed class MetadataMethodEffectAnalyzerTests {
         Assert.Multiple(() => {
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.ReadsArgumentState), Is.True);
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.ReadsReceiverState), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataCallsMapArgumentEffectsBackToTheCallerReceiver() {
+        var effects = Analyze(
+            "static void M(MetadataFixture.MutableBox value) => value.MutateViaHelper();");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesReceiverState), Is.False);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
         });
     }
     [Test]
