@@ -179,6 +179,10 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
+                if (TryGetIdentitySequenceProjectionStep(collection, out source)) {
+                    collection = source;
+                    continue;
+                }
                 collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
                 var symbol = semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol?.OriginalDefinition;
                 var usePosition = collection.SpanStart;
@@ -198,6 +202,26 @@ internal static class CompilerProgramPointAnalysis {
             }
             steps = builder.ToImmutable();
             return steps.Length != 0;
+        }
+        private bool TryGetIdentitySequenceProjectionStep(
+            ExpressionSyntax collection,
+            out ExpressionSyntax source) {
+            source = null!;
+            collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (collection is not InvocationExpressionSyntax invocation ||
+                invocation.ArgumentList.Arguments.LastOrDefault()?.Expression is not { } selector ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not
+                    IInvocationOperation { TargetMethod: { } targetMethod })
+                return false;
+            var definition = targetMethod.ReducedFrom ?? targetMethod;
+            if (definition.Name != nameof(Enumerable.Select) ||
+                definition.ContainingType.ToDisplayString() is not
+                    ("System.Linq.Enumerable" or "System.Linq.Queryable") ||
+                !SymbolicSourcePredicateLowerer.IsIdentitySequenceSelector(
+                    selector,
+                    new(semanticModel, cancellationToken)))
+                return false;
+            return TryGetStandardSequenceSource(invocation, out source);
         }
         private bool TryGetLazySequencePreservingStep(
             ExpressionSyntax collection,

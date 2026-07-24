@@ -1,5 +1,49 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicSourcePredicateLowerer {
+    internal static bool IsIdentitySequenceSelector(
+        ExpressionSyntax selector,
+        SymbolicLoweringContext context) {
+        selector = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(selector);
+        if (selector is not AnonymousFunctionExpressionSyntax lambda ||
+            context.SemanticModel.GetOperation(lambda, context.CancellationToken) is not
+                IAnonymousFunctionOperation { Symbol: { } lambdaMethod })
+            return false;
+        var parameters = GetLambdaParameterSymbols(lambda, context).ToArray();
+        if (parameters.Length is < 1 or > 2 ||
+            parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
+            parameters.Length == 2 &&
+            parameters[1].Type.SpecialType != SpecialType.System_Int32 ||
+            !SymbolEqualityComparer.Default.Equals(lambdaMethod.ReturnType, parameters[0].Type) ||
+            !TryGetSingleReturnedExpression(lambda, out var returned) ||
+            !LambdaBodyReferencesOnlyParameters(lambda, context) ||
+            !LambdaReadsOnlyStableParameterMembers(lambda, parameters[0], context))
+            return false;
+        returned = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(returned);
+        return SymbolEqualityComparer.Default.Equals(
+            context.SemanticModel.GetSymbolInfo(returned, context.CancellationToken).Symbol?.OriginalDefinition,
+            parameters[0]);
+    }
+    private static bool TryGetSingleReturnedExpression(
+        AnonymousFunctionExpressionSyntax lambda,
+        out ExpressionSyntax returned) {
+        returned = lambda switch {
+            SimpleLambdaExpressionSyntax { ExpressionBody: { } expression } => expression,
+            ParenthesizedLambdaExpressionSyntax { ExpressionBody: { } expression } => expression,
+            _ => null!
+        };
+        if (returned != null) return true;
+        var block = lambda switch {
+            SimpleLambdaExpressionSyntax simple => simple.Block,
+            ParenthesizedLambdaExpressionSyntax parenthesized => parenthesized.Block,
+            AnonymousMethodExpressionSyntax anonymous => anonymous.Block,
+            _ => null
+        };
+        if (block?.Statements.Count != 1 ||
+            block.Statements[0] is not ReturnStatementSyntax { Expression: { } blockExpression })
+            return false;
+        returned = blockExpression;
+        return true;
+    }
     internal static bool TryLowerSequencePredicate(
         ExpressionSyntax predicate,
         SymbolicTerm argument,
