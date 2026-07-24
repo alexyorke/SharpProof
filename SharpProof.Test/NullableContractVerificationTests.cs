@@ -166,6 +166,49 @@ public sealed class NullableContractVerificationTests {
             Has.None.EqualTo("SP0042").And.None.EqualTo("SP0047"));
     }
     [Test]
+    public async Task MaybeNullWhen_DelegatedGenericTryGetValue_DoesNotReportUnknownContract() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Diagnostics.CodeAnalysis;
+            internal sealed class Cache<TKey, TValue> where TKey : notnull {
+                private readonly Dictionary<TKey, TValue> _entries = new();
+
+                internal bool TryGetValue(
+                    TKey key,
+                    [MaybeNullWhen(false)] out TValue value) =>
+                    _entries.TryGetValue(key, out value);
+            }
+            """);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Has.None.EqualTo("SP0042").And.None.EqualTo("SP0047"));
+    }
+    [Test]
+    public async Task MaybeNullWhen_BranchControlledGenericTryGetValue_DoesNotReportUnknownContract() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Diagnostics.CodeAnalysis;
+            internal sealed class Cache<TKey, TValue> where TKey : notnull {
+                private readonly Dictionary<TKey, TValue> _entries = new();
+
+                internal bool TryGetValue(
+                    TKey key,
+                    [MaybeNullWhen(false)] out TValue value)
+                {
+                    if (_entries.TryGetValue(key, out value))
+                        return true;
+                    value = default;
+                    return false;
+                }
+            }
+            """);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Has.None.EqualTo("SP0042").And.None.EqualTo("SP0047"));
+    }
+    [Test]
     public async Task NotNullWhen_OppositeConstantCompletion_DoesNotReportUnknownContract() {
         var diagnostics = await AnalyzeAsync("""
             #nullable enable

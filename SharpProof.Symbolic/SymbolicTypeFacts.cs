@@ -41,6 +41,10 @@ internal static class SymbolicTypeFacts {
                IsReferenceType(typeSymbol);
     public static bool IsSymbolicReferenceLikeType(ITypeSymbol? typeSymbol) => typeSymbol != null &&
                (IsReferenceLikeType(typeSymbol) ||
+                typeSymbol is ITypeParameterSymbol {
+                    HasValueTypeConstraint: false,
+                    HasUnmanagedTypeConstraint: false
+                } ||
                 IsBuiltInSpanOrMemoryType(typeSymbol) ||
                 IsSupportedTupleCarrierType(typeSymbol));
     public static bool IsNullableType(ITypeSymbol? typeSymbol) => typeSymbol is INamedTypeSymbol {

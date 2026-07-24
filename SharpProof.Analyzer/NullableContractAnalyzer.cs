@@ -194,6 +194,9 @@ internal static class NullableContractAnalyzer {
                     out var argumentTarget) ||
                 !SymbolEq.AreEqual(argumentTarget, callerParameter))
                 continue;
+            if (NullableFlowFacts.GetParameterOutputState(calleeParameter, methodReturnValue) ==
+                NullableFlowFactState.NotNull)
+                return true;
             return MethodContractHierarchy
                 .EnumerateSources(invocation.TargetMethod, context.CancellationToken)
                 .Any(source =>

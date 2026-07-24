@@ -144,11 +144,18 @@ internal static class NullableFlowFacts {
     }
     internal static NullableFlowFactState GetParameterOutputState(IParameterSymbol parameter, bool? methodReturnValue = null) {
         if (parameter == null) throw new ArgumentNullException(nameof(parameter));
-        if (!SymbolicTypeFacts.IsReferenceLikeType(parameter.Type)) return NullableFlowFactState.Unknown;
+        if (!SymbolicTypeFacts.IsReferenceLikeType(parameter.Type) &&
+            parameter.Type.TypeKind != TypeKind.TypeParameter)
+            return NullableFlowFactState.Unknown;
         if (methodReturnValue.HasValue) {
             if (TryGetMaybeNullWhenValue(parameter, out var maybeNullWhen) &&
                 maybeNullWhen == methodReturnValue.Value)
                 return NullableFlowFactState.MaybeNull;
+            if (parameter.Type.TypeKind == TypeKind.TypeParameter &&
+                parameter.NullableAnnotation != NullableAnnotation.Annotated &&
+                TryGetMaybeNullWhenValue(parameter, out _) &&
+                !HasParameterAttribute(parameter, MaybeNullAttributeName))
+                return NullableFlowFactState.NotNull;
             if (TryGetNotNullWhenValue(parameter, out var notNullWhen) &&
                 notNullWhen == methodReturnValue.Value)
                 return NullableFlowFactState.NotNull;
