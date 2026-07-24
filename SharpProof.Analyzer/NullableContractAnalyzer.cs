@@ -108,6 +108,10 @@ internal static class NullableContractAnalyzer {
                 var contract = FormatBooleanAttribute("NotNullWhen", notNullWhen);
                 foreach (var completion in completions)
                     if (completion.ResultExpression != null &&
+                        ConditionalContractCanApply(
+                            context,
+                            completion.ResultExpression,
+                            notNullWhen) &&
                         !DelegatedInvocationGuaranteesNonNullOutput(
                             context,
                             completion.ResultExpression,
@@ -130,6 +134,10 @@ internal static class NullableContractAnalyzer {
                 var contract = FormatBooleanAttribute("MaybeNullWhen", maybeNullWhen);
                 foreach (var completion in completions)
                     if (completion.ResultExpression != null &&
+                        ConditionalContractCanApply(
+                            context,
+                            completion.ResultExpression,
+                            !maybeNullWhen) &&
                         !DelegatedInvocationGuaranteesNonNullOutput(
                             context,
                             completion.ResultExpression,
@@ -146,6 +154,15 @@ internal static class NullableContractAnalyzer {
                             contract);
             }
         }
+    }
+    private static bool ConditionalContractCanApply(
+        MethodBodyAnalysisContext context,
+        ExpressionSyntax resultExpression,
+        bool expectedResult) {
+        var constant = context.SemanticModel.GetConstantValue(
+            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(resultExpression),
+            context.CancellationToken);
+        return constant is not { HasValue: true, Value: bool value } || value == expectedResult;
     }
     private static bool DelegatedInvocationGuaranteesNonNullOutput(
         MethodBodyAnalysisContext context,
