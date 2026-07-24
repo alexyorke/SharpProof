@@ -30,9 +30,30 @@ internal static class SymbolCurrentValueResolver {
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         bool allowSelfReferentialAssignments,
+        out ExpressionSyntax valueExpression) =>
+        TryResolveCurrentSimpleValueExpression(
+            symbol,
+            useNode,
+            semanticModel,
+            cancellationToken,
+            allowSelfReferentialAssignments,
+            false,
+            out valueExpression);
+    internal static bool TryResolveCurrentSimpleValueExpression(
+        ISymbol symbol,
+        SyntaxNode useNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        bool allowSelfReferentialAssignments,
+        bool rejectMutableExposures,
         out ExpressionSyntax valueExpression) {
         valueExpression = null!;
-        if (IsMutatedAfterUseInContainingLoop(symbol, useNode, semanticModel, cancellationToken))
+        if (IsInvalidatedAfterUseInContainingLoop(
+                symbol,
+                useNode,
+                semanticModel,
+                cancellationToken,
+                rejectMutableExposures))
             return false;
         ExpressionSyntax? currentValue = null;
         foreach (var (block, containingStatement) in CSharpSyntaxFacts
@@ -49,7 +70,10 @@ internal static class SymbolCurrentValueResolver {
                             currentValue = declarator.Initializer?.Value;
                             declaredHere = true;
                         }
-                    if (!declaredHere && mutations.MutatesSymbol(symbol))
+                    if (!declaredHere && InvalidatesCurrentValue(
+                            mutations,
+                            symbol,
+                            rejectMutableExposures))
                         currentValue = null;
                     continue;
                 }
@@ -70,21 +94,35 @@ internal static class SymbolCurrentValueResolver {
                     currentValue = assignment.Right;
                     continue;
                 }
-                if (mutations.MutatesSymbol(symbol))
+                if (InvalidatesCurrentValue(mutations, symbol, rejectMutableExposures))
                     currentValue = null;
             }
         if (currentValue == null) return false;
         valueExpression = currentValue;
         return true;
     }
-    private static bool IsMutatedAfterUseInContainingLoop(
+    private static bool InvalidatesCurrentValue(
+        SymbolicMutationInventory mutations,
+        ISymbol symbol,
+        bool rejectMutableExposures) =>
+        rejectMutableExposures
+            ? mutations.InvalidatesSymbol(symbol, mutableExposures: true)
+            : mutations.MutatesSymbol(symbol);
+    private static bool IsInvalidatedAfterUseInContainingLoop(
         ISymbol symbol,
         SyntaxNode useNode,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        bool rejectMutableExposures) {
         var loopBody = CSharpSyntaxFacts.GetContainingLoopBody(useNode);
         if (loopBody == null) return false;
-        return SymbolicMutationInventory.Create(loopBody, semanticModel, cancellationToken)
-            .MutatesBetween(useNode.SpanStart, loopBody.Span.End, symbol);
+        var mutations = SymbolicMutationInventory.Create(loopBody, semanticModel, cancellationToken);
+        return rejectMutableExposures
+            ? mutations.InvalidatesBetween(
+                useNode.SpanStart,
+                loopBody.Span.End,
+                symbol,
+                mutableExposures: true)
+            : mutations.MutatesBetween(useNode.SpanStart, loopBody.Span.End, symbol);
     }
 }

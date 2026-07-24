@@ -184,6 +184,8 @@ internal static class CompilerProgramPointAnalysis {
             out bool definitelyNoElements) {
             var builder = ImmutableArray.CreateBuilder<SequencePredicateStep>();
             var resolvedUses = new List<(ISymbol Symbol, int Position)>();
+            var resolutionUsePosition = collection.SpanStart;
+            SymbolicMutationInventory? resolutionMutations = null;
             definitelyNoElements = false;
             var preservesElementIdentity = true;
             while (true) {
@@ -267,11 +269,20 @@ internal static class CompilerProgramPointAnalysis {
                     resolvedUses.Any(candidate =>
                         candidate.Position == usePosition &&
                         SymbolEqualityComparer.Default.Equals(candidate.Symbol, symbol)) ||
+                    usePosition < resolutionUsePosition &&
+                    (resolutionMutations ??= SymbolicMutationInventory.Create(
+                        CSharpSyntaxFacts.GetContainingExecutionRoot(collection),
+                        semanticModel,
+                        cancellationToken)).InvalidatesCapturedValueBetween(
+                        usePosition,
+                        resolutionUsePosition,
+                        symbol) ||
                     !SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
                         symbol,
                         collection,
                         semanticModel,
                         cancellationToken,
+                        true,
                         true,
                         out collection))
                     break;
@@ -454,6 +465,8 @@ internal static class CompilerProgramPointAnalysis {
                 return true;
             if (IsKnownImmutableEmptySingleton(collection))
                 return true;
+            if (IsKnownEmptyCollectionConstruction(collection))
+                return true;
             if (collection is CollectionExpressionSyntax { Elements.Count: 0 })
                 return true;
             if (collection is ArrayCreationExpressionSyntax arrayCreation) {
@@ -487,6 +500,86 @@ internal static class CompilerProgramPointAnalysis {
                    TryGetInvocationArgument(operation, countParameter, out var count) &&
                    semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount } &&
                    constantCount <= 0;
+        }
+        private bool IsKnownEmptyCollectionConstruction(ExpressionSyntax collection) {
+            if (semanticModel.GetOperation(collection, cancellationToken) is not
+                IObjectCreationOperation {
+                    Constructor: { } constructor,
+                    Type: INamedTypeSymbol type
+                } creation ||
+                creation.Initializer is { Initializers.Length: > 0 } ||
+                !IsKnownMutableCollectionType(type))
+                return false;
+            foreach (var parameter in constructor.Parameters) {
+                if (IsNonPopulatingCollectionConstructorParameter(parameter))
+                    continue;
+                if (!CopiesCollectionConstructorSources(type))
+                    return false;
+                var argument = creation.Arguments.FirstOrDefault(candidate =>
+                    candidate.Parameter != null &&
+                    SymbolEqualityComparer.Default.Equals(
+                        candidate.Parameter.OriginalDefinition,
+                        parameter.OriginalDefinition));
+                if (argument?.Value.Syntax is not ExpressionSyntax source ||
+                    !TryGetSequencePredicateSteps(
+                        source,
+                        out _,
+                        out var sourceProducesNoElements) ||
+                    !sourceProducesNoElements)
+                    return false;
+            }
+            return true;
+        }
+        private static bool CopiesCollectionConstructorSources(INamedTypeSymbol candidate) {
+            var type = candidate.OriginalDefinition;
+            return (type.ContainingNamespace.ToDisplayString(), type.Name, type.Arity) is not
+                ("System.Collections.ObjectModel", "Collection", 1);
+        }
+        private static bool IsKnownMutableCollectionType(INamedTypeSymbol candidate) {
+            var type = candidate.OriginalDefinition;
+            if (type.ContainingAssembly?.Name is not (
+                    "System.Collections" or
+                    "System.Collections.Concurrent" or
+                    "System.ObjectModel" or
+                    "System.Private.CoreLib" or
+                    "mscorlib"))
+                return false;
+            return (type.ContainingNamespace.ToDisplayString(), type.Name, type.Arity) is
+                ("System.Collections", "ArrayList", 0) or
+                ("System.Collections", "Hashtable", 0) or
+                ("System.Collections", "Queue", 0) or
+                ("System.Collections", "SortedList", 0) or
+                ("System.Collections", "Stack", 0) or
+                ("System.Collections.Concurrent", "ConcurrentBag", 1) or
+                ("System.Collections.Concurrent", "ConcurrentDictionary", 2) or
+                ("System.Collections.Concurrent", "ConcurrentQueue", 1) or
+                ("System.Collections.Concurrent", "ConcurrentStack", 1) or
+                ("System.Collections.Generic", "Dictionary", 2) or
+                ("System.Collections.Generic", "HashSet", 1) or
+                ("System.Collections.Generic", "LinkedList", 1) or
+                ("System.Collections.Generic", "List", 1) or
+                ("System.Collections.Generic", "PriorityQueue", 2) or
+                ("System.Collections.Generic", "Queue", 1) or
+                ("System.Collections.Generic", "SortedDictionary", 2) or
+                ("System.Collections.Generic", "SortedList", 2) or
+                ("System.Collections.Generic", "SortedSet", 1) or
+                ("System.Collections.Generic", "Stack", 1) or
+                ("System.Collections.ObjectModel", "Collection", 1) or
+                ("System.Collections.ObjectModel", "ObservableCollection", 1);
+        }
+        private static bool IsNonPopulatingCollectionConstructorParameter(IParameterSymbol parameter) {
+            if (parameter.Type.SpecialType is
+                SpecialType.System_Int32 or
+                SpecialType.System_Single)
+                return true;
+            if (parameter.Type is not INamedTypeSymbol type)
+                return false;
+            var definition = type.OriginalDefinition;
+            return (definition.ContainingNamespace.ToDisplayString(), definition.Name, definition.Arity) is
+                ("System.Collections", "IComparer", 0) or
+                ("System.Collections", "IEqualityComparer", 0) or
+                ("System.Collections.Generic", "IComparer", 1) or
+                ("System.Collections.Generic", "IEqualityComparer", 1);
         }
         private bool IsDefinitelyEmptyString(ExpressionSyntax collection) {
             if (semanticModel.GetConstantValue(collection, cancellationToken) is { HasValue: true, Value: string constant } &&

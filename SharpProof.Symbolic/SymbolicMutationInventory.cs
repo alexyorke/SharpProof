@@ -47,6 +47,32 @@ internal sealed class SymbolicMutationInventory(
             (entry.Target is { } target && References(target, symbol) ||
              mutableExposures && IsMutableReference(SymbolicFactFactory.GetTrackedSymbolType(symbol)) &&
              entry.Exposure is { } exposure && References(exposure, symbol)));
+    internal bool InvalidatesCapturedValueBetween(int after, int before, ISymbol symbol) {
+        if (!IsMutableReference(SymbolicFactFactory.GetTrackedSymbolType(symbol)))
+            return false;
+        foreach (var entry in entries
+                     .Where(candidate =>
+                         !ReferenceEquals(candidate.Source, root) &&
+                         candidate.Source.SpanStart > after &&
+                         candidate.Source.SpanStart < before)
+                     .OrderBy(static candidate => candidate.Source.SpanStart)) {
+            if (entry.Target is { } target && ExactTargetMatchesAny(target, [symbol])) {
+                if (entry.Source is AssignmentExpressionSyntax assignment &&
+                    assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                    !SymbolMutationFacts.ExpressionReferencesSymbol(
+                        assignment.Right,
+                        symbol,
+                        semanticModel,
+                        cancellationToken))
+                    return false;
+                return true;
+            }
+            if (entry.Target is { } nestedTarget && References(nestedTarget, symbol) ||
+                entry.Exposure is { } exposure && References(exposure, symbol))
+                return true;
+        }
+        return false;
+    }
     internal SymbolicNestedMutationInvalidationPlan ToInvalidationPlan() {
         var steps = ImmutableArray.CreateBuilder<SymbolicMutationInvalidationStep>();
         var unsupported = false;
