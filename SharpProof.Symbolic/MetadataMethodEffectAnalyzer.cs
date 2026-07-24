@@ -161,6 +161,13 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                     else if (opcode == OpCodes.Newobj) {
                         var constructor = MetadataTokens.Handle(operand);
                         if (TryResolveMethod(location.Path, reader, constructor, out var constructorLocation)) {
+                            if (TryFindDeclaringTypeInitializer(
+                                    constructorLocation,
+                                    requireStaticMember: false,
+                                    out var initializer) &&
+                                !active.Any(key => key.Location == initializer)) {
+                                _ = Visit(initializer, depth + 1);
+                            }
                             if (!IsValueTypeConstructor(constructorLocation))
                                 effects |= SharpProofEffect.Allocates;
                             _ = Visit(constructorLocation, depth + 1, invocationContext);
@@ -243,6 +250,13 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                         var called = MetadataTokens.Handle(operand);
                         if (opcode == OpCodes.Call &&
                             TryResolveMethod(location.Path, reader, called, out var calledLocation)) {
+                            if (TryFindDeclaringTypeInitializer(
+                                    calledLocation,
+                                    requireStaticMember: true,
+                                    out var initializer) &&
+                                !active.Any(key => key.Location == initializer)) {
+                                _ = Visit(initializer, depth + 1);
+                            }
                             var calledReturn = Visit(calledLocation, depth + 1, invocationContext);
                             if (invocationReturnsValue) provenance.PushInvocationReturn(calledReturn);
                         }
@@ -541,6 +555,28 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             if (!string.Equals(reader.GetString(method.Name), ".cctor", StringComparison.Ordinal))
                 continue;
             initializer = new MethodLocation(path, methodHandle);
+            return true;
+        }
+        initializer = default;
+        return false;
+    }
+    private static bool TryFindDeclaringTypeInitializer(
+        MethodLocation memberLocation,
+        bool requireStaticMember,
+        out MethodLocation initializer) {
+        using var stream = File.OpenRead(memberLocation.Path);
+        using var pe = new PEReader(stream, PEStreamOptions.PrefetchMetadata);
+        var reader = pe.GetMetadataReader();
+        var member = reader.GetMethodDefinition(memberLocation.Handle);
+        if (requireStaticMember && (member.Attributes & MethodAttributes.Static) == 0) {
+            initializer = default;
+            return false;
+        }
+        foreach (var methodHandle in reader.GetTypeDefinition(member.GetDeclaringType()).GetMethods()) {
+            var method = reader.GetMethodDefinition(methodHandle);
+            if (!string.Equals(reader.GetString(method.Name), ".cctor", StringComparison.Ordinal))
+                continue;
+            initializer = new MethodLocation(memberLocation.Path, methodHandle);
             return true;
         }
         initializer = default;

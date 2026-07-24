@@ -29,6 +29,10 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             public static class ThrowingStatic {
                 public static int Value;
                 static ThrowingStatic() { throw null!; }
+                public static int Constant() => 1;
+            }
+            public sealed class ThrowingConstructed {
+                static ThrowingConstructed() { throw null!; }
             }
             public static class Effects {
                 public static int State;
@@ -101,6 +105,8 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                 }
                 public static SmallValue CreateValue(int value) => new SmallValue(value);
                 public static int ReadThrowingStatic() => ThrowingStatic.Value;
+                public static int CallThrowingStaticMethod() => ThrowingStatic.Constant();
+                public static ThrowingConstructed CreateThrowingConstructed() => new ThrowingConstructed();
                 public static unsafe int SizeOf<T>() where T : unmanaged => sizeof(T);
                 public static void CopyBlockOpcodeFixture() { VolatileState = 1; }
                 private static void Helper() { State++; }
@@ -363,6 +369,27 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.Throws), Is.True);
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.ReadsStaticState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataStaticCallIncludesTypeInitializerExceptions() {
+        var effects = Analyze("static int M() => MetadataFixture.Effects.CallThrowingStaticMethod();");
+        Assert.Multiple(() => {
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Throws), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataConstructionIncludesTypeInitializerExceptions() {
+        var effects = Analyze(
+            "static MetadataFixture.ThrowingConstructed M() => " +
+            "MetadataFixture.Effects.CreateThrowingConstructed();");
+        Assert.Multiple(() => {
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Throws), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Allocates), Is.True);
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
         });
     }
