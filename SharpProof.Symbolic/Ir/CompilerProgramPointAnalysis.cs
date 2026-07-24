@@ -183,7 +183,7 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
-                if (TryGetSameElementSequenceCastStep(collection, out source)) {
+                if (TryGetSameElementTypeOperatorStep(collection, out source)) {
                     collection = source;
                     continue;
                 }
@@ -207,7 +207,7 @@ internal static class CompilerProgramPointAnalysis {
             steps = builder.ToImmutable();
             return steps.Length != 0;
         }
-        private bool TryGetSameElementSequenceCastStep(
+        private bool TryGetSameElementTypeOperatorStep(
             ExpressionSyntax collection,
             out ExpressionSyntax source) {
             source = null!;
@@ -217,7 +217,7 @@ internal static class CompilerProgramPointAnalysis {
                     IInvocationOperation { TargetMethod: { } targetMethod })
                 return false;
             var definition = targetMethod.ReducedFrom ?? targetMethod;
-            if (definition.Name != nameof(Enumerable.Cast) ||
+            if (definition.Name is not (nameof(Enumerable.Cast) or nameof(Enumerable.OfType)) ||
                 definition.ContainingType.ToDisplayString() is not
                     ("System.Linq.Enumerable" or "System.Linq.Queryable") ||
                 targetMethod.TypeArguments.Length != 1 ||
