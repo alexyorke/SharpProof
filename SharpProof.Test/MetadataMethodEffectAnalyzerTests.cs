@@ -70,6 +70,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                     return values != null;
                 }
                 private static int Identity(int value) => value;
+                public static unsafe delegate*<int, int> FunctionPointer() => &Identity;
                 public static unsafe int IndirectCall(int value) {
                     delegate*<int, int> target = &Identity;
                     return target(value);
@@ -218,6 +219,17 @@ public sealed class MetadataMethodEffectAnalyzerTests {
     public void MetadataSizeOfIsPureAndAllocationFree() {
         var effects = Analyze(
             "static int M() => MetadataFixture.Effects.SizeOf<long>();");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataFunctionPointerCreationIsPureAndAllocationFree() {
+        var effects = Analyze(
+            "static unsafe delegate*<int, int> M() => MetadataFixture.Effects.FunctionPointer();");
         Assert.Multiple(() => {
             Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
