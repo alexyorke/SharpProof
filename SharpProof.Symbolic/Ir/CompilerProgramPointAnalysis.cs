@@ -244,7 +244,11 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
-                if (TryGetZeroPreservingSequenceViewStep(collection, out source)) {
+                if (TryGetZeroPreservingSequenceViewStep(
+                        collection,
+                        out source,
+                        out var viewProducesNoElements)) {
+                    definitelyNoElements |= viewProducesNoElements;
                     preservesElementIdentity = false;
                     collection = source;
                     continue;
@@ -423,8 +427,10 @@ internal static class CompilerProgramPointAnalysis {
         }
         private bool TryGetZeroPreservingSequenceViewStep(
             ExpressionSyntax collection,
-            out ExpressionSyntax source) {
+            out ExpressionSyntax source,
+            out bool definitelyNoElements) {
             source = null!;
+            definitelyNoElements = false;
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is MemberAccessExpressionSyntax memberAccess &&
                 semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol is
@@ -456,9 +462,18 @@ internal static class CompilerProgramPointAnalysis {
                 definition.ContainingType.Name == "MemoryExtensions" &&
                 definition.Name is "AsMemory" or "AsSpan" or "ToArray" ||
                 IsKnownCoreSequenceType(definition.ContainingType) &&
-                definition.Name is "Slice" or "ToArray";
-            return supported &&
-                   TryGetStandardSequenceSource(invocation, operation, out source);
+                definition.Name is "Slice" or "ToArray" ||
+                definition.ContainingType.SpecialType == SpecialType.System_String &&
+                definition.Name == "ToCharArray";
+            if (!supported ||
+                !TryGetStandardSequenceSource(invocation, operation, out source))
+                return false;
+            var lengthParameter = targetMethod.Parameters.FirstOrDefault(parameter =>
+                parameter.Name == "length");
+            if (lengthParameter != null &&
+                TryGetInvocationArgument(operation, lengthParameter, out var length))
+                definitelyNoElements = DefinitelyCapsSequenceAtZero(length);
+            return true;
         }
         private static bool IsKnownDictionaryViewType(INamedTypeSymbol candidate) {
             var type = candidate.OriginalDefinition;
