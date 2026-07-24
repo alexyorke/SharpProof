@@ -20,9 +20,8 @@ internal static class MethodExpectedComplexityAnalyzer {
         if (validContracts.Length == 0 || methodSymbol.IsAbstract) return;
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
         var outcome = context.State.GetComplexityOutcome(context.CancellationToken);
-        if (!outcome.IsSuccess) {
+        if (outcome.Error is { } error) {
             context.CancellationToken.ThrowIfCancellationRequested();
-            var error = outcome.Error!;
             foreach (var contract in validContracts)
                 context.ReportDiagnostic(CreateDiagnostic(
                     "ComplexityCouldNotBeVerifiedRule",
@@ -33,7 +32,17 @@ internal static class MethodExpectedComplexityAnalyzer {
                     context.CancellationToken));
             return;
         }
-        var result = outcome.Value!;
+        if (outcome.Value is not { } result) {
+            foreach (var contract in validContracts)
+                context.ReportDiagnostic(CreateDiagnostic(
+                    "ComplexityCouldNotBeVerifiedRule",
+                    methodSymbol,
+                    contract.DeclaredComplexity.Text,
+                    contract.AttributeLocation,
+                    "complexity query completed without a result",
+                    context.CancellationToken));
+            return;
+        }
         foreach (var contract in validContracts) {
             var classification = Classify(result, contract.DeclaredComplexity);
             switch (classification.Comparison) {

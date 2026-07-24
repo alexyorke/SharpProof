@@ -75,7 +75,10 @@ internal sealed class MethodBodyAnalysisState {
 internal static class AnalyzerSymbolicQueryBoundary {
     internal static AnalyzerQueryOutcome<T> TryExecute<T>(Func<T> operation) where T : class {
         try {
-            return new AnalyzerQueryOutcome<T>(operation(), null);
+            var value = operation();
+            if (value == null)
+                throw new InvalidOperationException("The symbolic query completed without returning a result.");
+            return new AnalyzerQueryOutcome<T>(value, null);
         }
         catch (Exception exception) when (!SymbolicErrorClassifier.IsFatal(exception)) {
             return new AnalyzerQueryOutcome<T>(null, SymbolicErrorClassifier.FromException(exception));
