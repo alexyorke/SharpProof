@@ -106,6 +106,99 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EnumerableEmptyLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<Item>())
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayEmptyThroughWhereLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Array.Empty<Item>().Where(static _ => true))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ZeroLengthArrayLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new Item[0])
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ZeroDimensionArrayLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new Item[2, 0])
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptyCollectionExpressionAliasLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    IEnumerable<Item> items = [];
+                    foreach (var item in items)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_NonemptyArrayLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new[] { new Item(null) })
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_CustomEmptyMethodLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static IEnumerable<Item> Empty() {
+                    yield return new Item(null);
+                }
+                public static object FirstValue() {
+                    foreach (var item in Empty())
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_NamedStaticTakeZeroLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable

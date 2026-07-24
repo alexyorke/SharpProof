@@ -205,6 +205,10 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
+                if (IsDefinitelyEmptySequenceSource(collection)) {
+                    definitelyEmpty = true;
+                    break;
+                }
                 collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
                 var symbol = semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol?.OriginalDefinition;
                 var usePosition = collection.SpanStart;
@@ -224,6 +228,30 @@ internal static class CompilerProgramPointAnalysis {
             }
             steps = builder.ToImmutable();
             return steps.Length != 0 || definitelyEmpty;
+        }
+        private bool IsDefinitelyEmptySequenceSource(ExpressionSyntax collection) {
+            collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (collection is CollectionExpressionSyntax { Elements.Count: 0 })
+                return true;
+            if (collection is ArrayCreationExpressionSyntax arrayCreation) {
+                if (arrayCreation.Initializer is { Expressions.Count: 0 })
+                    return true;
+                if (arrayCreation.Type.RankSpecifiers
+                    .SelectMany(rank => rank.Sizes)
+                    .Any(size =>
+                        semanticModel.GetConstantValue(size, cancellationToken) is { HasValue: true, Value: int length } &&
+                        length == 0))
+                    return true;
+            }
+            if (collection is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not
+                    IInvocationOperation { TargetMethod: { } targetMethod })
+                return false;
+            var definition = targetMethod.OriginalDefinition;
+            return definition.Name == nameof(Enumerable.Empty) &&
+                   definition.Parameters.Length == 0 &&
+                   definition.ContainingType.ToDisplayString() is
+                       ("System.Linq.Enumerable" or "System.Array");
         }
         private bool TryGetSameElementTypeOperatorStep(
             ExpressionSyntax collection,
