@@ -119,6 +119,70 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_LocalWhereSequenceRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    var filtered = items.Where(static item => item.Value is not null);
+                    foreach (var item in filtered)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ChainedLocalWhereSequenceAliasRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    var filtered = items.Where(static item => item.Value is not null);
+                    var alias = filtered;
+                    foreach (var item in alias)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReassignedLocalWhereSequenceDoesNotRefineLoopElement_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    var filtered = items.Where(static item => item.Value is not null);
+                    filtered = items;
+                    foreach (var item in filtered)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_LaterSourcePredicateDoesNotRefineCapturedSequence_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    var source = items;
+                    var filtered = source.Where(static item => true);
+                    source = items.Where(static item => item.Value is not null);
+                    foreach (var item in filtered)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_IndexedQueryableWherePredicateRefinesLoopElement_DoesNotReport",
             """
             #nullable enable

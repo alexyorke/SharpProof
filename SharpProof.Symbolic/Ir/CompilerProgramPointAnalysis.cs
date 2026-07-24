@@ -160,9 +160,24 @@ internal static class CompilerProgramPointAnalysis {
             ExpressionSyntax collection,
             out ImmutableArray<ExpressionSyntax> predicates) {
             var builder = ImmutableArray.CreateBuilder<ExpressionSyntax>();
-            while (TryGetEnumerableWhereStep(collection, out var source, out var predicate)) {
-                builder.Add(predicate);
-                collection = source;
+            var resolvedSymbols = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            while (true) {
+                if (TryGetEnumerableWhereStep(collection, out var source, out var predicate)) {
+                    builder.Add(predicate);
+                    collection = source;
+                    continue;
+                }
+                collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+                var symbol = semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol?.OriginalDefinition;
+                if (symbol is not (ILocalSymbol or IParameterSymbol) ||
+                    !resolvedSymbols.Add(symbol) ||
+                    !SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
+                        symbol,
+                        collection,
+                        semanticModel,
+                        cancellationToken,
+                        out collection))
+                    break;
             }
             predicates = builder.ToImmutable();
             return predicates.Length != 0;
