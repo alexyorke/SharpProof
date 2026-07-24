@@ -15,10 +15,19 @@ public sealed class MetadataMethodEffectAnalyzerTests {
         _fixturePath = Path.Combine(Path.GetTempPath(), "SharpProof.MetadataFixture." + Guid.NewGuid().ToString("N") + ".dll");
         const string source = """
             namespace MetadataFixture;
+            public sealed class MutableBox {
+                public int Value;
+            }
             public static class Effects {
                 public static int State;
                 public static volatile int VolatileState;
                 public static void ElementWrite(int[] values) { values[0] = 1; }
+                public static int[] FreshElementWrite() {
+                    var values = new int[1];
+                    values[0] = 1;
+                    return values;
+                }
+                public static void FieldWrite(MutableBox value) { value.Value = 1; }
                 public static unsafe void IndirectWrite(int* value) { *value = 1; }
                 public static void CopyBlockOpcodeFixture() { VolatileState = 1; }
                 private static void Helper() { State++; }
@@ -112,6 +121,26 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(element.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
             Assert.That(indirect.Purity, Is.Not.EqualTo(SharpProofVerdict.Proven));
             Assert.That(indirect.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+        });
+    }
+    [Test]
+    public void ElementWritesToFreshMetadataArraysRemainPure() {
+        var effects = Analyze("static int[] M() => MetadataFixture.Effects.FreshElementWrite();");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataFieldWritesThroughArgumentsAreArgumentEffects() {
+        var effects = Analyze(
+            "static void M(MetadataFixture.MutableBox value) => MetadataFixture.Effects.FieldWrite(value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesReceiverState), Is.False);
         });
     }
     [Test]

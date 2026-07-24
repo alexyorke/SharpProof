@@ -82,6 +82,8 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 if (body.ExceptionRegions.Length != 0) {
                     MarkUnknown("metadata_exception_regions_unsupported", SharpProofEffect.UnsupportedOperation, true);
                 }
+                var provenance = new MetadataProvenanceState(
+                    (definition.Attributes & MethodAttributes.Static) != 0);
                 var bytes = body.GetILBytes() ?? [];
                 for (var offset = 0; offset < bytes.Length;) {
                     if (++instructionCount > MaxInstructions) {
@@ -92,6 +94,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                         MarkUnknown("malformed_il", SharpProofEffect.UnsupportedOperation);
                         return;
                     }
+                    var writeOrigin = provenance.Observe(opcode, operand);
                     if (opcode == OpCodes.Newobj || opcode == OpCodes.Newarr || opcode == OpCodes.Box) {
                         effects |= SharpProofEffect.Allocates;
                         if (opcode == OpCodes.Newobj) {
@@ -112,8 +115,20 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                         effects |= SharpProofEffect.WritesStaticState;
                     else if (opcode == OpCodes.Ldsfld || opcode == OpCodes.Ldsflda)
                         effects |= SharpProofEffect.ReadsStaticState;
-                    else if (opcode == OpCodes.Stfld)
-                        effects |= SharpProofEffect.WritesReceiverState;
+                    else if (opcode == OpCodes.Stfld) {
+                        if (writeOrigin is MetadataValueOrigin.Fresh)
+                            effects |= SharpProofEffect.WritesFreshOwnedState;
+                        else if (writeOrigin is MetadataValueOrigin.Argument)
+                            effects |= SharpProofEffect.WritesArgumentState;
+                        else if (writeOrigin is MetadataValueOrigin.Receiver)
+                            effects |= SharpProofEffect.WritesReceiverState;
+                        else
+                            MarkUnknown(
+                                "metadata_field_write_origin_unknown",
+                                SharpProofEffect.WritesArgumentState | SharpProofEffect.WritesReceiverState,
+                                true);
+                        hasUnknownExceptionBoundary = true;
+                    }
                     else if (opcode == OpCodes.Ldfld || opcode == OpCodes.Ldflda)
                         effects |= SharpProofEffect.ReadsReceiverState;
                     else if (opcode == OpCodes.Call || opcode == OpCodes.Callvirt) {
@@ -131,8 +146,18 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                         }
                     }
                     else if (IsIndirectOrElementWrite(opcode)) {
-                        MarkUnknown("metadata_indirect_write_origin_unknown",
-                            SharpProofEffect.WritesArgumentState | SharpProofEffect.UnsupportedOperation, true);
+                        if (writeOrigin is MetadataValueOrigin.Fresh)
+                            effects |= SharpProofEffect.WritesFreshOwnedState;
+                        else if (writeOrigin is MetadataValueOrigin.Argument)
+                            effects |= SharpProofEffect.WritesArgumentState;
+                        else if (writeOrigin is MetadataValueOrigin.Receiver)
+                            effects |= SharpProofEffect.WritesReceiverState;
+                        else if (writeOrigin is MetadataValueOrigin.Static)
+                            effects |= SharpProofEffect.WritesStaticState;
+                        else
+                            MarkUnknown("metadata_indirect_write_origin_unknown",
+                                SharpProofEffect.WritesArgumentState | SharpProofEffect.UnsupportedOperation, true);
+                        if (IsElementWrite(opcode)) hasUnknownExceptionBoundary = true;
                     }
                     else if (MayThrowImplicitly(opcode)) {
                         MarkUnknown("metadata_implicit_exception", exceptionBoundary: true);
@@ -169,6 +194,8 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                opcode == OpCodes.Stind_I8 || opcode == OpCodes.Stind_R4 || opcode == OpCodes.Stind_R8 ||
                opcode == OpCodes.Stind_Ref || opcode == OpCodes.Stobj || opcode == OpCodes.Cpblk ||
                opcode == OpCodes.Initblk || opcode.Name?.StartsWith("stelem", StringComparison.Ordinal) == true;
+    private static bool IsElementWrite(OpCode opcode) =>
+        opcode.Name?.StartsWith("stelem", StringComparison.Ordinal) == true;
     private static bool MayThrowImplicitly(OpCode opcode) => opcode == OpCodes.Div || opcode == OpCodes.Div_Un ||
                opcode == OpCodes.Rem || opcode == OpCodes.Rem_Un || opcode == OpCodes.Castclass ||
                opcode == OpCodes.Unbox || opcode == OpCodes.Unbox_Any || opcode == OpCodes.Ldlen ||
@@ -396,7 +423,9 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         if (!OpCodesByValue.TryGetValue(value, out opcode)) return false;
         var size = OperandSize(opcode.OperandType, bytes, offset);
         if (size < 0 || offset + size > bytes.Length) return false;
-        if (size == 4) operand = BitConverter.ToInt32(bytes, offset);
+        if (size == 1) operand = bytes[offset];
+        else if (size == 2) operand = BitConverter.ToUInt16(bytes, offset);
+        else if (size == 4) operand = BitConverter.ToInt32(bytes, offset);
         offset += size;
         return true;
     }
@@ -500,5 +529,241 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             byte rawTypeKind) =>
             reader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
         private static DecodedDeclaringType Type(StructuralDecodedType type) => new(default, type, []);
+    }
+    private enum MetadataValueOrigin { Scalar, Receiver, Argument, Fresh, Static, Unknown }
+    private sealed class MetadataProvenanceState(bool isStatic) {
+        private readonly List<MetadataValueOrigin> _stack = [];
+        private readonly Dictionary<int, MetadataValueOrigin> _locals = [];
+        internal MetadataValueOrigin? Observe(OpCode opcode, int operand) {
+            if (TryArgumentIndex(opcode, operand, out var argumentIndex)) {
+                Push(ArgumentOrigin(argumentIndex));
+                return null;
+            }
+            if (TryArgumentAddressIndex(opcode, operand, out argumentIndex)) {
+                Push(ArgumentOrigin(argumentIndex));
+                return null;
+            }
+            if (TryLocalLoadIndex(opcode, operand, out var localIndex)) {
+                Push(_locals.TryGetValue(localIndex, out var local) ? local : MetadataValueOrigin.Unknown);
+                return null;
+            }
+            if (TryLocalStoreIndex(opcode, operand, out localIndex)) {
+                _locals[localIndex] = Pop();
+                return null;
+            }
+            if (TryLocalAddressIndex(opcode, operand, out localIndex)) {
+                Push(_locals.TryGetValue(localIndex, out var local) ? local : MetadataValueOrigin.Unknown);
+                return null;
+            }
+            if (opcode == OpCodes.Dup) {
+                Push(Peek());
+                return null;
+            }
+            if (opcode == OpCodes.Pop) {
+                Pop();
+                return null;
+            }
+            if (opcode == OpCodes.Newarr) {
+                Pop();
+                Push(MetadataValueOrigin.Fresh);
+                return null;
+            }
+            if (opcode == OpCodes.Newobj) {
+                ResetStack();
+                Push(MetadataValueOrigin.Fresh);
+                return null;
+            }
+            if (opcode == OpCodes.Box) {
+                Pop();
+                Push(MetadataValueOrigin.Fresh);
+                return null;
+            }
+            if (IsElementWrite(opcode)) {
+                Pop();
+                Pop();
+                return Pop();
+            }
+            if (IsSimpleIndirectWrite(opcode)) {
+                Pop();
+                return Pop();
+            }
+            if (opcode == OpCodes.Stfld) {
+                Pop();
+                return Pop();
+            }
+            if (opcode == OpCodes.Ldflda) {
+                var receiver = Pop();
+                Push(receiver);
+                return null;
+            }
+            if (opcode == OpCodes.Ldfld) {
+                Pop();
+                Push(MetadataValueOrigin.Unknown);
+                return null;
+            }
+            if (opcode == OpCodes.Ldelema) {
+                Pop();
+                var array = Pop();
+                Push(array);
+                return null;
+            }
+            if (opcode.Name?.StartsWith("ldelem", StringComparison.Ordinal) == true) {
+                Pop();
+                Pop();
+                Push(MetadataValueOrigin.Unknown);
+                return null;
+            }
+            if (opcode == OpCodes.Stsfld) {
+                Pop();
+                return MetadataValueOrigin.Static;
+            }
+            if (opcode == OpCodes.Ldsflda) {
+                Push(MetadataValueOrigin.Static);
+                return null;
+            }
+            if (opcode == OpCodes.Ldsfld) {
+                Push(MetadataValueOrigin.Unknown);
+                return null;
+            }
+            if (opcode.Name?.StartsWith("ldc", StringComparison.Ordinal) == true) {
+                Push(MetadataValueOrigin.Scalar);
+                return null;
+            }
+            if (opcode == OpCodes.Ldnull || opcode == OpCodes.Ldstr || opcode == OpCodes.Ldtoken) {
+                Push(MetadataValueOrigin.Scalar);
+                return null;
+            }
+            if (IsBinaryValueOperation(opcode)) {
+                Pop();
+                Pop();
+                Push(MetadataValueOrigin.Scalar);
+                return null;
+            }
+            if (IsUnaryValueOperation(opcode)) {
+                Pop();
+                Push(MetadataValueOrigin.Scalar);
+                return null;
+            }
+            if (opcode == OpCodes.Call || opcode == OpCodes.Callvirt || opcode == OpCodes.Calli) {
+                ResetStack();
+                Push(MetadataValueOrigin.Unknown);
+                return null;
+            }
+            if (opcode.FlowControl is FlowControl.Branch or FlowControl.Cond_Branch) {
+                ResetStack();
+                foreach (var index in _locals.Keys.ToArray()) _locals[index] = MetadataValueOrigin.Unknown;
+                return null;
+            }
+            if (opcode == OpCodes.Ret || opcode == OpCodes.Throw || opcode == OpCodes.Rethrow) {
+                ResetStack();
+                return null;
+            }
+            return null;
+        }
+        private MetadataValueOrigin ArgumentOrigin(int ilIndex) {
+            if (!isStatic && ilIndex == 0) return MetadataValueOrigin.Receiver;
+            return MetadataValueOrigin.Argument;
+        }
+        private MetadataValueOrigin Pop() {
+            if (_stack.Count == 0) return MetadataValueOrigin.Unknown;
+            var index = _stack.Count - 1;
+            var value = _stack[index];
+            _stack.RemoveAt(index);
+            return value;
+        }
+        private MetadataValueOrigin Peek() =>
+            _stack.Count == 0 ? MetadataValueOrigin.Unknown : _stack[_stack.Count - 1];
+        private void Push(MetadataValueOrigin value) => _stack.Add(value);
+        private void ResetStack() => _stack.Clear();
+        private static bool TryArgumentIndex(OpCode opcode, int operand, out int index) =>
+            TryVariableIndex(
+                opcode,
+                operand,
+                OpCodes.Ldarg_0,
+                OpCodes.Ldarg_1,
+                OpCodes.Ldarg_2,
+                OpCodes.Ldarg_3,
+                OpCodes.Ldarg_S,
+                OpCodes.Ldarg,
+                out index);
+        private static bool TryArgumentAddressIndex(OpCode opcode, int operand, out int index) =>
+            TryVariableIndex(
+                opcode,
+                operand,
+                default,
+                default,
+                default,
+                default,
+                OpCodes.Ldarga_S,
+                OpCodes.Ldarga,
+                out index);
+        private static bool TryLocalLoadIndex(OpCode opcode, int operand, out int index) =>
+            TryVariableIndex(
+                opcode,
+                operand,
+                OpCodes.Ldloc_0,
+                OpCodes.Ldloc_1,
+                OpCodes.Ldloc_2,
+                OpCodes.Ldloc_3,
+                OpCodes.Ldloc_S,
+                OpCodes.Ldloc,
+                out index);
+        private static bool TryLocalStoreIndex(OpCode opcode, int operand, out int index) =>
+            TryVariableIndex(
+                opcode,
+                operand,
+                OpCodes.Stloc_0,
+                OpCodes.Stloc_1,
+                OpCodes.Stloc_2,
+                OpCodes.Stloc_3,
+                OpCodes.Stloc_S,
+                OpCodes.Stloc,
+                out index);
+        private static bool TryLocalAddressIndex(OpCode opcode, int operand, out int index) =>
+            TryVariableIndex(
+                opcode,
+                operand,
+                default,
+                default,
+                default,
+                default,
+                OpCodes.Ldloca_S,
+                OpCodes.Ldloca,
+                out index);
+        private static bool TryVariableIndex(
+            OpCode opcode,
+            int operand,
+            OpCode zero,
+            OpCode one,
+            OpCode two,
+            OpCode three,
+            OpCode shortForm,
+            OpCode longForm,
+            out int index) {
+            if (opcode == zero && zero.Size != 0) index = 0;
+            else if (opcode == one && one.Size != 0) index = 1;
+            else if (opcode == two && two.Size != 0) index = 2;
+            else if (opcode == three && three.Size != 0) index = 3;
+            else if (opcode == shortForm || opcode == longForm) index = operand;
+            else {
+                index = -1;
+                return false;
+            }
+            return true;
+        }
+        private static bool IsSimpleIndirectWrite(OpCode opcode) =>
+            opcode == OpCodes.Stind_I || opcode == OpCodes.Stind_I1 || opcode == OpCodes.Stind_I2 ||
+            opcode == OpCodes.Stind_I4 || opcode == OpCodes.Stind_I8 || opcode == OpCodes.Stind_R4 ||
+            opcode == OpCodes.Stind_R8 || opcode == OpCodes.Stind_Ref || opcode == OpCodes.Stobj;
+        private static bool IsBinaryValueOperation(OpCode opcode) =>
+            opcode == OpCodes.Add || opcode == OpCodes.Sub || opcode == OpCodes.Mul ||
+            opcode == OpCodes.Div || opcode == OpCodes.Div_Un || opcode == OpCodes.Rem ||
+            opcode == OpCodes.Rem_Un || opcode == OpCodes.And || opcode == OpCodes.Or ||
+            opcode == OpCodes.Xor || opcode == OpCodes.Shl || opcode == OpCodes.Shr ||
+            opcode == OpCodes.Shr_Un || opcode == OpCodes.Ceq || opcode == OpCodes.Cgt ||
+            opcode == OpCodes.Cgt_Un || opcode == OpCodes.Clt || opcode == OpCodes.Clt_Un;
+        private static bool IsUnaryValueOperation(OpCode opcode) =>
+            opcode == OpCodes.Neg || opcode == OpCodes.Not ||
+            opcode.Name?.StartsWith("conv", StringComparison.Ordinal) == true;
     }
 }
