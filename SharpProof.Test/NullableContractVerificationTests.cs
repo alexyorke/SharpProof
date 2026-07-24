@@ -190,6 +190,26 @@ public sealed class NullableContractVerificationTests {
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Has.None.EqualTo("SP0042").And.None.EqualTo("SP0047"));
     }
+    [Test]
+    public async Task NotNullWhen_OverloadedEqualityOutput_DoesNotReportUnknownContract() {
+        var diagnostics = await AnalyzeAsync(Class("""
+            private sealed class Result {
+                public static bool operator ==(Result? left, Result? right) => false;
+                public static bool operator !=(Result? left, Result? right) => true;
+                public override bool Equals(object? value) => ReferenceEquals(this, value);
+                public override int GetHashCode() => 0;
+            }
+
+            private static bool TryGet([NotNullWhen(true)] out Result? value)
+            {
+                value = new Result();
+                return true;
+            }
+            """, CodeAnalysis, false));
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Has.None.EqualTo("SP0042").And.None.EqualTo("SP0047"));
+    }
     [ReadmeExample("sp0041-nullable-return-contract")]
     [Test]
     public Task NonNullableReturn_NullLiteral_ReportsViolation() =>

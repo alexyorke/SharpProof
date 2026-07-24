@@ -35,7 +35,7 @@ internal static class NullableContractAnalyzer {
                     context,
                     session,
                     completion,
-                    resultText + " != null",
+                    resultText + " is not null",
                     AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule"),
                     method.Name,
                     "non-null return");
@@ -46,7 +46,7 @@ internal static class NullableContractAnalyzer {
                     context,
                     session,
                     completion,
-                    "old(" + escapedInput + ") == null || " + resultText + " != null",
+                    "old(" + escapedInput + ") is null || " + resultText + " is not null",
                     AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule"),
                     [method.Name, conditionalContract],
                     CSharpSyntaxFacts.IsNullLiteral(completion.ResultExpression),
@@ -96,7 +96,7 @@ internal static class NullableContractAnalyzer {
                         context,
                         session,
                         completion,
-                        target + " != null",
+                        target + " is not null",
                         AnalyzerDiagnosticCatalog.Get("NullableParameterPostconditionViolationRule"),
                         context.MethodSymbol.Name,
                         parameter.Name,
@@ -121,7 +121,7 @@ internal static class NullableContractAnalyzer {
                             context,
                             session,
                             completion,
-                            ConditionalImplication(completion.ResultExpression, notNullWhen, target + " != null"),
+                            ConditionalImplication(completion.ResultExpression, notNullWhen, target + " is not null"),
                             AnalyzerDiagnosticCatalog.Get("NullableParameterPostconditionViolationRule"),
                             context.MethodSymbol.Name,
                             parameter.Name,
@@ -147,7 +147,7 @@ internal static class NullableContractAnalyzer {
                             context,
                             session,
                             completion,
-                            ConditionalImplication(completion.ResultExpression, !maybeNullWhen, target + " != null"),
+                            ConditionalImplication(completion.ResultExpression, !maybeNullWhen, target + " is not null"),
                             AnalyzerDiagnosticCatalog.Get("NullableParameterPostconditionViolationRule"),
                             context.MethodSymbol.Name,
                             parameter.Name,
@@ -323,7 +323,7 @@ internal static class NullableContractAnalyzer {
         var receiver = SymbolEq.AreEqual(method.ContainingType, contractContainingType)
             ? "this"
             : "((" + contractContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ")this)";
-        return receiver + "." + EscapeIdentifier(member.Name) + " != null";
+        return receiver + "." + EscapeIdentifier(member.Name) + " is not null";
     }
     private static bool IsAutoProperty(IPropertySymbol property, CancellationToken cancellationToken) {
         foreach (var syntaxReference in property.DeclaringSyntaxReferences) {
@@ -352,7 +352,7 @@ internal static class NullableContractAnalyzer {
         foreach (var suppression in suppressions) {
             context.CancellationToken.ThrowIfCancellationRequested();
             var operand = suppression.Operand;
-            var condition = Parenthesize(operand) + " != null";
+            var condition = Parenthesize(operand) + " is not null";
             if (IsStaticallyNonNullInput(operand, context)) continue;
             var proof = context.State.ProveAtNode(
                 suppression,
