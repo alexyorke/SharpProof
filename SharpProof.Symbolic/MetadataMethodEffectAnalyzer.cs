@@ -782,7 +782,10 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 return null;
             }
             if (TryLocalStoreIndex(opcode, operand, out localIndex)) {
-                _locals[localIndex] = Pop();
+                var origin = Pop();
+                _locals[localIndex] = _hasControlFlowBranch
+                    ? MetadataValueOrigin.Unknown
+                    : origin;
                 return null;
             }
             if (TryLocalAddressIndex(opcode, operand, out localIndex)) {

@@ -61,6 +61,12 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                     if (replace) value = new MutableBox();
                     value.Value = 1;
                 }
+                public static void ConditionalLocalAlias(MutableBox value, bool useArgument) {
+                    MutableBox target;
+                    if (useArgument) target = value;
+                    else target = new MutableBox();
+                    target.Value = 1;
+                }
                 public static unsafe int SizeOf<T>() where T : unmanaged => sizeof(T);
                 public static void CopyBlockOpcodeFixture() { VolatileState = 1; }
                 private static void Helper() { State++; }
@@ -243,6 +249,16 @@ public sealed class MetadataMethodEffectAnalyzerTests {
         var effects = Analyze(
             "static void M(MetadataFixture.MutableBox value, bool replace) => " +
             "MetadataFixture.Effects.MaybeReassignParameterToFresh(value, replace);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.Not.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+        });
+    }
+    [Test]
+    public void MetadataConditionalLocalOriginsRemainConservative() {
+        var effects = Analyze(
+            "static void M(MetadataFixture.MutableBox value, bool useArgument) => " +
+            "MetadataFixture.Effects.ConditionalLocalAlias(value, useArgument);");
         Assert.Multiple(() => {
             Assert.That(effects.Purity, Is.Not.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
