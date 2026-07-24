@@ -28,6 +28,28 @@ internal static class CSharpSyntaxFacts {
     }
     public static bool IsNestedLocalCallableBoundary(SyntaxNode node) => node is AnonymousFunctionExpressionSyntax ||
                node is LocalFunctionStatementSyntax;
+    internal static bool IsStableStorageProperty(
+        IPropertySymbol property,
+        CancellationToken cancellationToken) {
+        if (property.IsStatic || property.IsIndexer) return false;
+        foreach (var syntaxReference in property.DeclaringSyntaxReferences) {
+            cancellationToken.ThrowIfCancellationRequested();
+            var syntax = syntaxReference.GetSyntax(cancellationToken);
+            if (syntax is PropertyDeclarationSyntax { ExpressionBody: null, AccessorList: { } accessorList }) {
+                var accessors = accessorList.Accessors;
+                if (accessors.Any(static accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration)) &&
+                    accessors.All(static accessor => accessor.Body == null && accessor.ExpressionBody == null))
+                    return true;
+            }
+            if (syntax is ParameterSyntax parameter &&
+                parameter.Parent?.Parent is RecordDeclarationSyntax &&
+                string.Equals(parameter.Identifier.ValueText, property.Name, StringComparison.Ordinal))
+                return true;
+        }
+        return property.ContainingType.IsRecord &&
+               property.SetMethod?.IsInitOnly == true &&
+               property.GetMethod != null;
+    }
     public static StatementSyntax? GetContainingLoopBody(SyntaxNode node) => node.Ancestors().Select(static ancestor => ancestor switch {
         WhileStatementSyntax whileStatement => whileStatement.Statement,
         DoStatementSyntax doStatement => doStatement.Statement,

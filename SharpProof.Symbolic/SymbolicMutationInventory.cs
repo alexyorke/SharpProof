@@ -39,6 +39,14 @@ internal sealed class SymbolicMutationInventory(
         entries.Any(entry => entry.Target is { } target &&
             !ReferenceEquals(entry.Source, root) && entry.Source.SpanStart > after &&
             entry.Source.SpanStart < before && References(target, symbol));
+    internal bool InvalidatesBetween(int after, int before, ISymbol symbol, bool mutableExposures) =>
+        entries.Any(entry =>
+            !ReferenceEquals(entry.Source, root) &&
+            entry.Source.SpanStart > after &&
+            entry.Source.SpanStart < before &&
+            (entry.Target is { } target && References(target, symbol) ||
+             mutableExposures && IsMutableReference(SymbolicFactFactory.GetTrackedSymbolType(symbol)) &&
+             entry.Exposure is { } exposure && References(exposure, symbol)));
     internal SymbolicNestedMutationInvalidationPlan ToInvalidationPlan() {
         var steps = ImmutableArray.CreateBuilder<SymbolicMutationInvalidationStep>();
         var unsupported = false;

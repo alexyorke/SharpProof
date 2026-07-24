@@ -1,5 +1,44 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicSourcePredicateLowerer {
+    internal static bool TryLowerSingleParameterLambdaPredicate(
+        AnonymousFunctionExpressionSyntax lambda,
+        SymbolicTerm argument,
+        SymbolicLoweringContext callerContext,
+        out SymbolicCondition condition) {
+        condition = null!;
+        var parameters = GetLambdaParameterSymbols(lambda, callerContext).ToArray();
+        if (parameters.Length != 1 ||
+            !LambdaBodyReferencesOnlyParameters(lambda, callerContext) ||
+            !LambdaReadsOnlyStableParameterMembers(lambda, parameters[0], callerContext))
+            return false;
+        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default) {
+            [parameters[0]] = argument
+        };
+        return TryLowerReturnedBooleanSyntax(
+            lambda,
+            Rebind(callerContext, substitutions, nested: true),
+            substitutions,
+            out condition);
+    }
+    private static bool LambdaReadsOnlyStableParameterMembers(
+        AnonymousFunctionExpressionSyntax lambda,
+        IParameterSymbol parameter,
+        SymbolicLoweringContext context) {
+        foreach (var member in GetLambdaBody(lambda)?.DescendantNodesAndSelf()
+                     .OfType<MemberAccessExpressionSyntax>() ?? []) {
+            if (!SymbolEqualityComparer.Default.Equals(
+                    context.SemanticModel.GetSymbolInfo(member.Expression, context.CancellationToken).Symbol,
+                    parameter))
+                continue;
+            var symbol = context.SemanticModel.GetSymbolInfo(member, context.CancellationToken).Symbol;
+            if (symbol is IFieldSymbol) continue;
+            if (symbol is IPropertySymbol property &&
+                CSharpSyntaxFacts.IsStableStorageProperty(property, context.CancellationToken))
+                continue;
+            return false;
+        }
+        return true;
+    }
     internal static bool TryLowerSourceBooleanInvocation(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,

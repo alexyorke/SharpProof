@@ -108,6 +108,7 @@ internal static class CompilerProgramPointAnalysis {
             SymbolicCfgProgramPointStateCollector.IsTargetOperation(
                 operation, site, includeCompletion, semanticModel, cancellationToken);
         private void Capture(SymbolicState state) {
+            ApplyContainingSequencePredicateFacts(ref state);
             ApplyContainingSwitchFacts(ref state);
             foreach (var conditional in site.Ancestors().OfType<ConditionalExpressionSyntax>()) {
                 bool? branchWhenTrue = conditional.WhenTrue.Span.Contains(site.SpanStart)
@@ -133,6 +134,42 @@ internal static class CompilerProgramPointAnalysis {
                 }
             }
             captured = state;
+        }
+        private void ApplyContainingSequencePredicateFacts(ref SymbolicState state) {
+            foreach (var loop in site.Ancestors().OfType<ForEachStatementSyntax>()) {
+                if (!loop.Statement.Span.Contains(site.SpanStart) ||
+                    semanticModel.GetDeclaredSymbol(loop, cancellationToken) is not ILocalSymbol iterationVariable ||
+                    !TryGetEnumerableWherePredicate(loop.Expression, out var predicate) ||
+                    SymbolicMutationInventory.Create(loop.Statement, semanticModel, cancellationToken)
+                        .InvalidatesBetween(loop.Statement.SpanStart - 1, site.SpanStart, iterationVariable, true) ||
+                    !SymbolicStateFactBuilder.TryCreateSymbolTerm(iterationVariable, out var iterationTerm) ||
+                    !SymbolicSourcePredicateLowerer.TryLowerSingleParameterLambdaPredicate(
+                        predicate,
+                        iterationTerm,
+                        new SymbolicLoweringContext(semanticModel, cancellationToken),
+                        out var condition))
+                    continue;
+                state = state.AddPathCondition(condition).Normalize();
+            }
+        }
+        private bool TryGetEnumerableWherePredicate(
+            ExpressionSyntax collection,
+            out AnonymousFunctionExpressionSyntax predicate) {
+            predicate = null!;
+            collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (collection is not InvocationExpressionSyntax invocation ||
+                invocation.ArgumentList.Arguments.LastOrDefault()?.Expression is not
+                    AnonymousFunctionExpressionSyntax lambda ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not
+                    IInvocationOperation { TargetMethod: { } targetMethod })
+                return false;
+            var definition = targetMethod.ReducedFrom ?? targetMethod;
+            if (definition.Name != nameof(Enumerable.Where) ||
+                definition.ContainingType.ToDisplayString() is not
+                    ("System.Linq.Enumerable" or "System.Linq.ImmutableArrayExtensions"))
+                return false;
+            predicate = lambda;
+            return true;
         }
         private void ApplyContainingSwitchFacts(ref SymbolicState state) {
             foreach (var arm in site.Ancestors().OfType<SwitchExpressionArmSyntax>()) {
