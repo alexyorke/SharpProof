@@ -56,12 +56,14 @@ internal static class ContractConditionHelpers {
             location ?? contract.Location,
             reason,
             additionalLocations));
-    internal static bool TryParse(string conditionText, out IfStatementSyntax conditionStatement,
-        out ExpressionSyntax conditionExpression) {
+    internal static bool TryParse(
+        string conditionText,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IfStatementSyntax? conditionStatement,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ExpressionSyntax? conditionExpression) {
         var statement = SyntaxFactory.ParseStatement("if (" + conditionText + ") { }");
         if (statement.ContainsDiagnostics || statement is not IfStatementSyntax ifStatement) {
-            conditionStatement = null!;
-            conditionExpression = null!;
+            conditionStatement = null;
+            conditionExpression = null;
             return false;
         }
         conditionStatement = ifStatement;
@@ -72,13 +74,13 @@ internal static class ContractConditionHelpers {
         SemanticModel semanticModel,
         int position,
         IfStatementSyntax conditionStatement,
-        out SemanticModel speculativeModel) {
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out SemanticModel? speculativeModel) {
         if (semanticModel.TryGetSpeculativeSemanticModel(position, conditionStatement, out var model) &&
             model != null) {
             speculativeModel = model;
             return true;
         }
-        speculativeModel = null!;
+        speculativeModel = null;
         return false;
     }
     private static string? GetInvalidReason(AttributeData attribute, string? condition) {
