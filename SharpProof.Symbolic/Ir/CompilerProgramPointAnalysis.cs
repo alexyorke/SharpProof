@@ -142,8 +142,16 @@ internal static class CompilerProgramPointAnalysis {
             foreach (var loop in site.Ancestors().OfType<ForEachStatementSyntax>()) {
                 if (!loop.Statement.Span.Contains(site.SpanStart) ||
                     semanticModel.GetDeclaredSymbol(loop, cancellationToken) is not ILocalSymbol iterationVariable ||
-                    !TryGetSequencePredicateSteps(loop.Expression, out var predicateSteps) ||
-                    SymbolicMutationInventory.Create(loop.Statement, semanticModel, cancellationToken)
+                    !TryGetSequencePredicateSteps(
+                        loop.Expression,
+                        out var predicateSteps,
+                        out var definitelyEmpty))
+                    continue;
+                if (definitelyEmpty) {
+                    state = state.MarkContradictory();
+                    continue;
+                }
+                if (SymbolicMutationInventory.Create(loop.Statement, semanticModel, cancellationToken)
                         .InvalidatesBetween(loop.Statement.SpanStart - 1, site.SpanStart, iterationVariable, true) ||
                     !SymbolicStateFactBuilder.TryCreateSymbolTerm(iterationVariable, out var iterationTerm))
                     continue;
@@ -162,9 +170,11 @@ internal static class CompilerProgramPointAnalysis {
         }
         private bool TryGetSequencePredicateSteps(
             ExpressionSyntax collection,
-            out ImmutableArray<SequencePredicateStep> steps) {
+            out ImmutableArray<SequencePredicateStep> steps,
+            out bool definitelyEmpty) {
             var builder = ImmutableArray.CreateBuilder<SequencePredicateStep>();
             var resolvedUses = new List<(ISymbol Symbol, int Position)>();
+            definitelyEmpty = false;
             while (true) {
                 collection = SymbolicConversionLowerer.UnwrapIdentityConversions(
                     collection,
@@ -179,7 +189,11 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
-                if (TryGetLazySequencePreservingStep(collection, out source)) {
+                if (TryGetLazySequencePreservingStep(
+                        collection,
+                        out source,
+                        out var stepIsDefinitelyEmpty)) {
+                    definitelyEmpty |= stepIsDefinitelyEmpty;
                     collection = source;
                     continue;
                 }
@@ -209,7 +223,7 @@ internal static class CompilerProgramPointAnalysis {
                 resolvedUses.Add((symbol, usePosition));
             }
             steps = builder.ToImmutable();
-            return steps.Length != 0;
+            return steps.Length != 0 || definitelyEmpty;
         }
         private bool TryGetSameElementTypeOperatorStep(
             ExpressionSyntax collection,
@@ -288,8 +302,10 @@ internal static class CompilerProgramPointAnalysis {
         }
         private bool TryGetLazySequencePreservingStep(
             ExpressionSyntax collection,
-            out ExpressionSyntax source) {
+            out ExpressionSyntax source,
+            out bool definitelyEmpty) {
             source = null!;
+            definitelyEmpty = false;
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is not InvocationExpressionSyntax invocation ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
@@ -306,7 +322,17 @@ internal static class CompilerProgramPointAnalysis {
             };
             if (!supported)
                 return false;
-            return TryGetStandardSequenceSource(invocation, operation, out source);
+            if (!TryGetStandardSequenceSource(invocation, operation, out source))
+                return false;
+            if (definition.Name == nameof(Enumerable.Take) &&
+                targetMethod.Parameters.Length != 0 &&
+                TryGetInvocationArgument(
+                    operation,
+                    targetMethod.Parameters[targetMethod.Parameters.Length - 1],
+                    out var count) &&
+                semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount })
+                definitelyEmpty = constantCount <= 0;
+            return true;
         }
         private bool TryGetSequencePredicateStep(
             ExpressionSyntax collection,
