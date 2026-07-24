@@ -49,6 +49,18 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                 public static int Divide(int left, int right) => left / right;
                 public static int CheckedAdd(int left, int right) => checked(left + right);
                 public static int CheckedConvert(long value) => checked((int)value);
+                public static int ReassignParameter(int value) {
+                    value = value + 1;
+                    return value;
+                }
+                public static void ReassignParameterToFresh(MutableBox value) {
+                    value = new MutableBox();
+                    value.Value = 1;
+                }
+                public static void MaybeReassignParameterToFresh(MutableBox value, bool replace) {
+                    if (replace) value = new MutableBox();
+                    value.Value = 1;
+                }
                 public static unsafe int SizeOf<T>() where T : unmanaged => sizeof(T);
                 public static void CopyBlockOpcodeFixture() { VolatileState = 1; }
                 private static void Helper() { State++; }
@@ -199,6 +211,41 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataParameterSlotReassignmentIsPure() {
+        var effects = Analyze(
+            "static int M(int value) => MetadataFixture.Effects.ReassignParameter(value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.UnsupportedOperation), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataParameterSlotReassignmentTracksTheNewOrigin() {
+        var effects = Analyze(
+            "static void M(MetadataFixture.MutableBox value) => " +
+            "MetadataFixture.Effects.ReassignParameterToFresh(value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataConditionalParameterSlotReassignmentRemainsConservative() {
+        var effects = Analyze(
+            "static void M(MetadataFixture.MutableBox value, bool replace) => " +
+            "MetadataFixture.Effects.MaybeReassignParameterToFresh(value, replace);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.Not.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
         });
     }
     [Test]

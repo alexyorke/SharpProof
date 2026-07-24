@@ -339,7 +339,8 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                opcode == OpCodes.Cgt || opcode == OpCodes.Cgt_Un || opcode == OpCodes.Clt || opcode == OpCodes.Clt_Un ||
                opcode == OpCodes.Ldnull || opcode == OpCodes.Ldstr || opcode == OpCodes.Ldtoken ||
                name.StartsWith("ldarg", StringComparison.Ordinal) || name.StartsWith("ldloc", StringComparison.Ordinal) ||
-               name.StartsWith("stloc", StringComparison.Ordinal) || name.StartsWith("ldc", StringComparison.Ordinal) ||
+               name.StartsWith("starg", StringComparison.Ordinal) || name.StartsWith("stloc", StringComparison.Ordinal) ||
+               name.StartsWith("ldc", StringComparison.Ordinal) ||
                name.StartsWith("br", StringComparison.Ordinal) || name.StartsWith("leave", StringComparison.Ordinal) ||
                name.StartsWith("conv", StringComparison.Ordinal) || name.StartsWith("readonly", StringComparison.Ordinal) ||
                name.StartsWith("constrained", StringComparison.Ordinal) || name.StartsWith("tail", StringComparison.Ordinal) ||
@@ -733,7 +734,9 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         private readonly bool _isStatic;
         private readonly MetadataCallContext _context;
         private readonly List<MetadataValueOrigin> _stack = [];
+        private readonly Dictionary<int, MetadataValueOrigin> _arguments = [];
         private readonly Dictionary<int, MetadataValueOrigin> _locals = [];
+        private bool _hasControlFlowBranch;
         internal MetadataProvenanceState(bool isStatic, MetadataCallContext context) {
             _isStatic = isStatic;
             _context = context;
@@ -765,6 +768,13 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             }
             if (TryArgumentAddressIndex(opcode, operand, out argumentIndex)) {
                 Push(ArgumentOrigin(argumentIndex));
+                return null;
+            }
+            if (TryArgumentStoreIndex(opcode, operand, out argumentIndex)) {
+                var origin = Pop();
+                _arguments[argumentIndex] = _hasControlFlowBranch
+                    ? MetadataValueOrigin.Unknown
+                    : origin;
                 return null;
             }
             if (TryLocalLoadIndex(opcode, operand, out var localIndex)) {
@@ -912,7 +922,10 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 return null;
             }
             if (opcode.FlowControl is FlowControl.Branch or FlowControl.Cond_Branch) {
+                _hasControlFlowBranch = true;
                 ResetStack();
+                foreach (var index in _arguments.Keys.ToArray())
+                    _arguments[index] = MetadataValueOrigin.Unknown;
                 foreach (var index in _locals.Keys.ToArray()) _locals[index] = MetadataValueOrigin.Unknown;
                 return null;
             }
@@ -923,6 +936,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             return null;
         }
         private MetadataValueOrigin ArgumentOrigin(int ilIndex) {
+            if (_arguments.TryGetValue(ilIndex, out var assigned)) return assigned;
             if (!_isStatic && ilIndex == 0) return _context.Receiver;
             var parameterIndex = _isStatic ? ilIndex : ilIndex - 1;
             return parameterIndex >= 0 && parameterIndex < _context.Arguments.Length
@@ -961,6 +975,17 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 default,
                 OpCodes.Ldarga_S,
                 OpCodes.Ldarga,
+                out index);
+        private static bool TryArgumentStoreIndex(OpCode opcode, int operand, out int index) =>
+            TryVariableIndex(
+                opcode,
+                operand,
+                default,
+                default,
+                default,
+                default,
+                OpCodes.Starg_S,
+                OpCodes.Starg,
                 out index);
         private static bool TryLocalLoadIndex(OpCode opcode, int operand, out int index) =>
             TryVariableIndex(
