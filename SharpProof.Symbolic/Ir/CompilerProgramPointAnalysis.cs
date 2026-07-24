@@ -167,6 +167,10 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
+                if (TryGetLazySequencePreservingStep(collection, out source)) {
+                    collection = source;
+                    continue;
+                }
                 collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
                 var symbol = semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol?.OriginalDefinition;
                 var usePosition = collection.SpanStart;
@@ -187,6 +191,28 @@ internal static class CompilerProgramPointAnalysis {
             predicates = builder.ToImmutable();
             return predicates.Length != 0;
         }
+        private bool TryGetLazySequencePreservingStep(
+            ExpressionSyntax collection,
+            out ExpressionSyntax source) {
+            source = null!;
+            collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (collection is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not
+                    IInvocationOperation { TargetMethod: { } targetMethod })
+                return false;
+            var definition = targetMethod.ReducedFrom ?? targetMethod;
+            var containingType = definition.ContainingType.ToDisplayString();
+            var supported = containingType switch {
+                "System.Linq.Enumerable" => definition.Name is
+                    nameof(Enumerable.AsEnumerable) or nameof(Enumerable.Skip) or nameof(Enumerable.Take),
+                "System.Linq.Queryable" => definition.Name is
+                    nameof(Queryable.AsQueryable) or nameof(Queryable.Skip) or nameof(Queryable.Take),
+                _ => false
+            };
+            if (!supported)
+                return false;
+            return TryGetStandardSequenceSource(invocation, out source);
+        }
         private bool TryGetEnumerableWhereStep(
             ExpressionSyntax collection,
             out ExpressionSyntax source,
@@ -206,14 +232,19 @@ internal static class CompilerProgramPointAnalysis {
                      "System.Linq.ImmutableArrayExtensions" or
                      "System.Linq.Queryable"))
                 return false;
+            if (!TryGetStandardSequenceSource(invocation, out source)) return false;
+            predicate = candidatePredicate;
+            return true;
+        }
+        private bool TryGetStandardSequenceSource(
+            InvocationExpressionSyntax invocation,
+            out ExpressionSyntax source) {
             source = invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
                      semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not
                          INamedTypeSymbol
                 ? memberAccess.Expression
                 : invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression!;
-            if (source == null) return false;
-            predicate = candidatePredicate;
-            return true;
+            return source != null;
         }
         private void ApplyContainingSwitchFacts(ref SymbolicState state) {
             foreach (var arm in site.Ancestors().OfType<SwitchExpressionArmSyntax>()) {
