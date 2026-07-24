@@ -167,6 +167,57 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_XorFalseConditionalOutputAlias_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    var shouldUseExpression = factory.TryGet(out var expression) ^ false;
+                    return shouldUseExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ConstantBooleanOperatorIdentities_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryTrue([NotNullWhen(true)] out object? value);
+                bool TryFalse([NotNullWhen(false)] out object? value);
+            }
+            public static class Consumer {
+                public static object AndTrue(IFactory factory) {
+                    var failed = factory.TryFalse(out var expression) && true;
+                    return !failed ? expression! : new object();
+                }
+                public static object OrFalse(IFactory factory) {
+                    var shouldUseExpression = false || factory.TryTrue(out var expression);
+                    return shouldUseExpression ? expression! : new object();
+                }
+                public static object XorTrue(IFactory factory) {
+                    var shouldSkipExpression = true ^ factory.TryTrue(out var expression);
+                    return !shouldSkipExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_AbsorbingBooleanConstantDoesNotInventContract",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    var alwaysFalse = factory.TryGet(out var expression) && false;
+                    return !alwaysFalse ? expression! : new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_LogicalImplicationPolarity_DoesNotReport",
             """
             #nullable enable

@@ -246,8 +246,6 @@ internal static class SymbolicReachabilityLowerer {
             return true;
         }
         if (expression is not BinaryExpressionSyntax binary ||
-            !binary.IsKind(SyntaxKind.EqualsExpression) &&
-            !binary.IsKind(SyntaxKind.NotEqualsExpression) ||
             semanticModel.GetOperation(binary, cancellationToken) is not
                 IBinaryOperation { OperatorMethod: null, Type.SpecialType: SpecialType.System_Boolean })
             return false;
@@ -262,8 +260,25 @@ internal static class SymbolicReachabilityLowerer {
         }
         else
             return false;
-        negated = binary.IsKind(SyntaxKind.EqualsExpression) ? !constant : constant;
-        return true;
+        if (binary.IsKind(SyntaxKind.EqualsExpression)) {
+            negated = !constant;
+            return true;
+        }
+        if (binary.IsKind(SyntaxKind.NotEqualsExpression) ||
+            binary.IsKind(SyntaxKind.ExclusiveOrExpression)) {
+            negated = constant;
+            return true;
+        }
+        if ((binary.IsKind(SyntaxKind.LogicalAndExpression) ||
+             binary.IsKind(SyntaxKind.BitwiseAndExpression)) &&
+            constant)
+            return true;
+        if ((binary.IsKind(SyntaxKind.LogicalOrExpression) ||
+             binary.IsKind(SyntaxKind.BitwiseOrExpression)) &&
+            !constant)
+            return true;
+        operand = null!;
+        return false;
     }
     private static bool TryGetBooleanPatternValue(
         PatternSyntax pattern,
