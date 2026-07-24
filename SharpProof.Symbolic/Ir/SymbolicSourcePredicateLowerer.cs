@@ -19,7 +19,17 @@ internal static class SymbolicSourcePredicateLowerer {
                      (symbolInfo.CandidateSymbols.Length == 1
                          ? symbolInfo.CandidateSymbols[0] as IMethodSymbol
                          : null);
-        return method != null && IsIdentitySourceSequenceSelector(method, context);
+        if (method == null) return false;
+        if (!method.IsStatic) {
+            if (context.SemanticModel.GetOperation(selector, context.CancellationToken) is not
+                    IMethodReferenceOperation methodReference ||
+                SymbolicDispatchFacts.ResolveExactDispatchTarget(
+                    method,
+                    SymbolicDispatchFacts.GetReceiverOperation(methodReference)) is not { } exactMethod)
+                return false;
+            method = exactMethod;
+        }
+        return IsIdentitySourceSequenceSelector(method, context);
     }
     private static bool IsIdentityLambdaSequenceSelector(
         AnonymousFunctionExpressionSyntax lambda,
@@ -42,8 +52,7 @@ internal static class SymbolicSourcePredicateLowerer {
         IMethodSymbol method,
         SymbolicLoweringContext callerContext) {
         method = method.OriginalDefinition;
-        if (!method.IsStatic ||
-            !HasIdentitySelectorSignature(method.Parameters, method.ReturnType) ||
+        if (!HasIdentitySelectorSignature(method.Parameters, method.ReturnType) ||
             method.DeclaringSyntaxReferences.Length != 1)
             return false;
         var callable = method.DeclaringSyntaxReferences[0].GetSyntax(callerContext.CancellationToken);

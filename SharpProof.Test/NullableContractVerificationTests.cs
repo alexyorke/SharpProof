@@ -629,6 +629,117 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_WhereThroughExactInstanceIdentitySelectRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public sealed class IdentitySelector {
+                public Item Identity(Item item) => item;
+            }
+            public static class Consumer {
+                public static object FirstValue(
+                    IEnumerable<Item> items,
+                    IdentitySelector selector) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(selector.Identity))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_WhereThroughExactOverrideIdentitySelectRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public class IdentitySelector {
+                public virtual Item Identity(Item item) => new(null);
+            }
+            public sealed class ExactIdentitySelector : IdentitySelector {
+                public override Item Identity(Item item) => item;
+            }
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(new ExactIdentitySelector().Identity))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_InterfaceIdentitySelectDoesNotPreserveWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public interface IIdentitySelector {
+                Item Identity(Item item);
+            }
+            public static class Consumer {
+                public static object FirstValue(
+                    IEnumerable<Item> items,
+                    IIdentitySelector selector) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(selector.Identity))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_VirtualIdentitySelectDoesNotPreserveWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public class IdentitySelector {
+                public virtual Item Identity(Item item) => item;
+            }
+            public static class Consumer {
+                public static object FirstValue(
+                    IEnumerable<Item> items,
+                    IdentitySelector selector) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(selector.Identity))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_MutatingInstanceIdentitySelectDoesNotPreserveWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed class Item {
+                public object? Value { get; set; }
+            }
+            public sealed class IdentitySelector {
+                public Item Reset(Item item) {
+                    item.Value = null;
+                    return item;
+                }
+            }
+            public static class Consumer {
+                public static object FirstValue(
+                    IEnumerable<Item> items,
+                    IdentitySelector selector) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(selector.Reset))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_WhereThroughLocalIdentityDelegateSelectRefinesLoopElement_DoesNotReport",
             """
             #nullable enable
