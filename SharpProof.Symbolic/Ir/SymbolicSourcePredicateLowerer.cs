@@ -14,6 +14,22 @@ internal static class SymbolicSourcePredicateLowerer {
                 out condition);
         condition = null!;
         var symbolInfo = callerContext.SemanticModel.GetSymbolInfo(predicate, callerContext.CancellationToken);
+        if (symbolInfo.Symbol is ILocalSymbol local &&
+            predicate.FirstAncestorOrSelf<InvocationExpressionSyntax>() is { } invocation &&
+            TryGetLocalDelegateInitializer(
+                (ILocalSymbol)local.OriginalDefinition,
+                invocation,
+                callerContext,
+                out var initializer)) {
+            predicate = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(initializer);
+            if (predicate is AnonymousFunctionExpressionSyntax initializerLambda)
+                return TryLowerSingleParameterLambdaPredicate(
+                    initializerLambda,
+                    argument,
+                    callerContext,
+                    out condition);
+            symbolInfo = callerContext.SemanticModel.GetSymbolInfo(predicate, callerContext.CancellationToken);
+        }
         var method = symbolInfo.Symbol as IMethodSymbol ??
                      (symbolInfo.CandidateSymbols.Length == 1
                          ? symbolInfo.CandidateSymbols[0] as IMethodSymbol

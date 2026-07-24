@@ -169,6 +169,72 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_LocalDelegateWherePredicateRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    Func<Item, bool> hasValue = static item => item.Value is not null;
+                    foreach (var item in items.Where(hasValue))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_LocalMethodDelegateWherePredicateRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static bool HasValue(Item item) => item.Value is not null;
+                public static object FirstValue(IEnumerable<Item> items) {
+                    Func<Item, bool> predicate = HasValue;
+                    foreach (var item in items.Where(predicate))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReassignedLocalDelegateWherePredicate_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    Func<Item, bool> predicate = static item => item.Value is not null;
+                    predicate = static item => true;
+                    foreach (var item in items.Where(predicate))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_CapturedLocalDelegateWherePredicate_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items, object? expected) {
+                    Func<Item, bool> predicate = item => item.Value == expected;
+                    foreach (var item in items.Where(predicate))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_BlockMethodGroupWherePredicateRefinesLoopElement_DoesNotReport",
             """
             #nullable enable
