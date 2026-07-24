@@ -350,7 +350,7 @@ internal static class SymbolicReachabilityLowerer {
         operand = null!;
         return false;
     }
-    private static bool TryGetBooleanPatternValue(
+    internal static bool TryGetBooleanPatternValue(
         PatternSyntax pattern,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,

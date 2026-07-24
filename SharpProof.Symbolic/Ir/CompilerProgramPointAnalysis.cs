@@ -108,6 +108,7 @@ internal static class CompilerProgramPointAnalysis {
             SymbolicCfgProgramPointStateCollector.IsTargetOperation(
                 operation, site, includeCompletion, semanticModel, cancellationToken);
         private void Capture(SymbolicState state) {
+            ApplyContainingSwitchFacts(ref state);
             foreach (var conditional in site.Ancestors().OfType<ConditionalExpressionSyntax>()) {
                 bool? branchWhenTrue = conditional.WhenTrue.Span.Contains(site.SpanStart)
                     ? true
@@ -132,6 +133,60 @@ internal static class CompilerProgramPointAnalysis {
                 }
             }
             captured = state;
+        }
+        private void ApplyContainingSwitchFacts(ref SymbolicState state) {
+            foreach (var arm in site.Ancestors().OfType<SwitchExpressionArmSyntax>()) {
+                if (arm.Parent is not SwitchExpressionSyntax switchExpression ||
+                    !SymbolicReachabilityLowerer.TryGetBooleanPatternValue(
+                        arm.Pattern,
+                        semanticModel,
+                        cancellationToken,
+                        out var value))
+                    continue;
+                SymbolicReachabilityLowerer.Apply(
+                    ref state,
+                    switchExpression.GoverningExpression,
+                    value,
+                    semanticModel,
+                    cancellationToken);
+            }
+            foreach (var section in site.Ancestors().OfType<SwitchSectionSyntax>()) {
+                if (section.Parent is not SwitchStatementSyntax switchStatement ||
+                    !TryGetSectionBooleanValue(section, out var value))
+                    continue;
+                SymbolicReachabilityLowerer.Apply(
+                    ref state,
+                    switchStatement.Expression,
+                    value,
+                    semanticModel,
+                    cancellationToken);
+            }
+        }
+        private bool TryGetSectionBooleanValue(SwitchSectionSyntax section, out bool value) {
+            value = false;
+            bool? sectionValue = null;
+            foreach (var label in section.Labels) {
+                bool? labelValue = label switch {
+                    CasePatternSwitchLabelSyntax patternLabel =>
+                        SymbolicReachabilityLowerer.TryGetBooleanPatternValue(
+                            patternLabel.Pattern,
+                            semanticModel,
+                            cancellationToken,
+                            out var patternValue)
+                            ? patternValue
+                            : null,
+                    CaseSwitchLabelSyntax constantLabel
+                        when semanticModel.GetConstantValue(constantLabel.Value, cancellationToken) is { HasValue: true, Value: bool constantValue } => constantValue,
+                    _ => null
+                };
+                if (!labelValue.HasValue ||
+                    sectionValue.HasValue && sectionValue.Value != labelValue.Value)
+                    return false;
+                sectionValue = labelValue.Value;
+            }
+            if (!sectionValue.HasValue) return false;
+            value = sectionValue.Value;
+            return true;
         }
         private static bool AlwaysCompletes(StatementSyntax statement) => statement switch {
             ReturnStatementSyntax or ThrowStatementSyntax or ContinueStatementSyntax or BreakStatementSyntax => true,

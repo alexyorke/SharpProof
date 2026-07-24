@@ -137,6 +137,68 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_SwitchArmConditionalOutput_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    var shouldUseExpression = factory.TryGet(out var expression);
+                    return shouldUseExpression switch {
+                        true => expression!,
+                        false => new object()
+                    };
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_SwitchControlFlowConditionalOutputs_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryTrue([NotNullWhen(true)] out object? value);
+                bool TryFalse([NotNullWhen(false)] out object? value);
+            }
+            public static class Consumer {
+                public static object FalseExpressionArm(IFactory factory) {
+                    var failed = factory.TryFalse(out var expression);
+                    return failed switch {
+                        false => expression!,
+                        true => new object()
+                    };
+                }
+                public static object TrueStatementCase(IFactory factory) {
+                    var succeeded = factory.TryTrue(out var expression);
+                    switch (succeeded) {
+                        case true:
+                            return expression!;
+                        default:
+                            return new object();
+                    }
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_AmbiguousSwitchSection_Reports",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    var succeeded = factory.TryGet(out var expression);
+                    switch (succeeded) {
+                        case true:
+                        case false:
+                            return expression!;
+                    }
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ReassignedConditionalOutputAlias_Reports",
             """
             #nullable enable
