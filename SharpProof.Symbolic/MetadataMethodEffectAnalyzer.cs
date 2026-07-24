@@ -323,6 +323,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     private static bool IsModeledNoEffectOpcode(OpCode opcode) {
         var name = opcode.Name ?? string.Empty;
         return opcode == OpCodes.Nop || opcode == OpCodes.Ret || opcode == OpCodes.Pop || opcode == OpCodes.Dup ||
+               opcode == OpCodes.Isinst ||
                opcode == OpCodes.Add || opcode == OpCodes.Sub || opcode == OpCodes.Mul || opcode == OpCodes.Neg ||
                opcode == OpCodes.Not || opcode == OpCodes.And || opcode == OpCodes.Or || opcode == OpCodes.Xor ||
                opcode == OpCodes.Shl || opcode == OpCodes.Shr || opcode == OpCodes.Shr_Un || opcode == OpCodes.Ceq ||
@@ -836,7 +837,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 Push(MetadataValueOrigin.Scalar);
                 return null;
             }
-            if (opcode == OpCodes.Castclass) {
+            if (opcode == OpCodes.Castclass || opcode == OpCodes.Isinst) {
                 var origin = Pop();
                 Push(origin);
                 return null;
