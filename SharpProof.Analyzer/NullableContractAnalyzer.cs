@@ -107,7 +107,12 @@ internal static class NullableContractAnalyzer {
                          context.CancellationToken)) {
                 var contract = FormatBooleanAttribute("NotNullWhen", notNullWhen);
                 foreach (var completion in completions)
-                    if (completion.ResultExpression != null)
+                    if (completion.ResultExpression != null &&
+                        !DelegatedInvocationGuaranteesNonNullOutput(
+                            context,
+                            completion.ResultExpression,
+                            parameter,
+                            notNullWhen))
                         Verify(
                             context,
                             session,
@@ -124,7 +129,12 @@ internal static class NullableContractAnalyzer {
                          context.CancellationToken)) {
                 var contract = FormatBooleanAttribute("MaybeNullWhen", maybeNullWhen);
                 foreach (var completion in completions)
-                    if (completion.ResultExpression != null)
+                    if (completion.ResultExpression != null &&
+                        !DelegatedInvocationGuaranteesNonNullOutput(
+                            context,
+                            completion.ResultExpression,
+                            parameter,
+                            !maybeNullWhen))
                         Verify(
                             context,
                             session,
@@ -136,6 +146,46 @@ internal static class NullableContractAnalyzer {
                             contract);
             }
         }
+    }
+    private static bool DelegatedInvocationGuaranteesNonNullOutput(
+        MethodBodyAnalysisContext context,
+        ExpressionSyntax resultExpression,
+        IParameterSymbol callerParameter,
+        bool methodReturnValue) {
+        resultExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(resultExpression);
+        if (context.SemanticModel.GetOperation(resultExpression, context.CancellationToken) is not
+                IInvocationOperation invocation ||
+            invocation.TargetMethod.ReturnType.SpecialType != SpecialType.System_Boolean)
+            return false;
+        foreach (var argument in invocation.Arguments) {
+            if (argument is not
+                {
+                    ArgumentKind: ArgumentKind.Explicit,
+                    Parameter: { RefKind: RefKind.Ref or RefKind.Out } calleeParameter,
+                    Syntax: ArgumentSyntax syntax
+                } ||
+                !SymbolicFrameworkPostconditionLowerer.ArgumentRefKindMatches(calleeParameter, syntax) ||
+                !SymbolicFrameworkPostconditionLowerer.IsUniqueOutputArgumentTarget(
+                    invocation,
+                    argument,
+                    context.SemanticModel,
+                    context.CancellationToken) ||
+                !NullableFlowFacts.TryGetArgumentTargetSymbol(
+                    syntax.Expression,
+                    context.SemanticModel,
+                    context.CancellationToken,
+                    out var argumentTarget) ||
+                !SymbolEq.AreEqual(argumentTarget, callerParameter))
+                continue;
+            return MethodContractHierarchy
+                .EnumerateSources(invocation.TargetMethod, context.CancellationToken)
+                .Any(source =>
+                    calleeParameter.Ordinal < source.Parameters.Length &&
+                    NullableFlowFacts.GetParameterOutputState(
+                        source.Parameters[calleeParameter.Ordinal],
+                        methodReturnValue) == NullableFlowFactState.NotNull);
+        }
+        return false;
     }
     private static ImmutableArray<bool> CollectNotNullWhenValues(
         IMethodSymbol method,

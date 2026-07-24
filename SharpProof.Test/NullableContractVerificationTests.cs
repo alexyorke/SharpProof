@@ -149,6 +149,22 @@ public sealed class NullableContractVerificationTests {
                     (diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1).ToString()),
             Is.Empty);
     }
+    [Test]
+    public async Task NotNullWhen_DelegatedTryHelper_DoesNotReportUnknownContract() {
+        var diagnostics = await AnalyzeAsync(Class("""
+            private static bool TryInner([NotNullWhen(true)] out object? value)
+            {
+                value = new object();
+                return true;
+            }
+
+            public static bool TryOuter([NotNullWhen(true)] out object? value) =>
+                TryInner(out value);
+            """, CodeAnalysis));
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Has.None.EqualTo("SP0042").And.None.EqualTo("SP0047"));
+    }
     [ReadmeExample("sp0041-nullable-return-contract")]
     [Test]
     public Task NonNullableReturn_NullLiteral_ReportsViolation() =>
