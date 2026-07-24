@@ -2044,6 +2044,171 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReadOnlyCollectionOverEmptyListLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Collections.ObjectModel;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new ReadOnlyCollection<Item>(
+                        new List<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_CollectionOverEmptyListLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Collections.ObjectModel;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new Collection<Item>(new List<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReadOnlyDictionaryOverEmptyDictionaryValuesLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Collections.ObjectModel;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new ReadOnlyDictionary<int, Item>(
+                        new Dictionary<int, Item>()).Values)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReadOnlyObservableCollectionOverEmptySourceLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.ObjectModel;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new ReadOnlyObservableCollection<Item>(
+                        new ObservableCollection<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReadOnlyCollectionOverNonemptyListLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Collections.ObjectModel;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new ReadOnlyCollection<Item>(
+                        new List<Item> { new(null) }))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ReadOnlyCollectionBackingPopulatedLaterLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Collections.ObjectModel;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var backing = new List<Item>();
+                    var items = new ReadOnlyCollection<Item>(backing);
+                    backing.Add(new Item(null));
+                    foreach (var item in items)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ReboundBackingDoesNotMutateReadOnlyCollection_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Collections.ObjectModel;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var backing = new List<Item>();
+                    var items = new ReadOnlyCollection<Item>(backing);
+                    backing = new List<Item> { new(null) };
+                    foreach (var item in items)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ObservableCollectionSnapshotsEmptySource_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Collections.ObjectModel;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var source = new List<Item>();
+                    var items = new ObservableCollection<Item>(source);
+                    source.Add(new Item(null));
+                    foreach (var item in items)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_PopulatedCollectionWrapperInitializerLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Collections.ObjectModel;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new Collection<Item>(new List<Item>()) {
+                        new(null)
+                    })
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_SourceDefinedCollectionWrapperLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections;
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            namespace Mine {
+                public sealed class ReadOnlyCollection : IEnumerable<Item> {
+                    public ReadOnlyCollection(IEnumerable<Item> source) {
+                    }
+                    public IEnumerator<Item> GetEnumerator() {
+                        yield return new Item(null);
+                    }
+                    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+                }
+            }
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new Mine.ReadOnlyCollection(
+                        System.Linq.Enumerable.Empty<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_FreshArrayListLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable

@@ -230,6 +230,11 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
+                if (TryGetZeroPreservingCollectionWrapperStep(collection, out source)) {
+                    preservesElementIdentity = false;
+                    collection = source;
+                    continue;
+                }
                 if (TryGetZeroPreservingSequenceViewStep(collection, out source)) {
                     preservesElementIdentity = false;
                     collection = source;
@@ -332,6 +337,43 @@ internal static class CompilerProgramPointAnalysis {
             source = second;
             preservesElementIdentity = true;
             return true;
+        }
+        private bool TryGetZeroPreservingCollectionWrapperStep(
+            ExpressionSyntax collection,
+            out ExpressionSyntax source) {
+            source = null!;
+            collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (semanticModel.GetOperation(collection, cancellationToken) is not
+                IObjectCreationOperation {
+                    Constructor: { Parameters.Length: 1 } constructor,
+                    Type: INamedTypeSymbol type
+                } creation ||
+                creation.Initializer is { Initializers.Length: > 0 } ||
+                !IsKnownCollectionWrapperType(type))
+                return false;
+            var parameter = constructor.Parameters[0];
+            source = creation.Arguments
+                .FirstOrDefault(argument =>
+                    argument.Parameter != null &&
+                    SymbolEqualityComparer.Default.Equals(
+                        argument.Parameter.OriginalDefinition,
+                        parameter.OriginalDefinition))
+                ?.Value.Syntax as ExpressionSyntax ?? null!;
+            return source != null;
+        }
+        private static bool IsKnownCollectionWrapperType(INamedTypeSymbol candidate) {
+            var type = candidate.OriginalDefinition;
+            if (type.ContainingAssembly?.Name is not (
+                    "System.ObjectModel" or
+                    "System.Private.CoreLib" or
+                    "System.Runtime" or
+                    "mscorlib"))
+                return false;
+            return (type.ContainingNamespace.ToDisplayString(), type.Name, type.Arity) is
+                ("System.Collections.ObjectModel", "Collection", 1) or
+                ("System.Collections.ObjectModel", "ReadOnlyCollection", 1) or
+                ("System.Collections.ObjectModel", "ReadOnlyDictionary", 2) or
+                ("System.Collections.ObjectModel", "ReadOnlyObservableCollection", 1);
         }
         private bool TryGetZeroPreservingSequenceViewStep(
             ExpressionSyntax collection,
