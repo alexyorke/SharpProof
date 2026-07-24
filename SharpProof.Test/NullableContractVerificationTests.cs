@@ -218,6 +218,57 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", true);
+        yield return Case("NullForgivingOperator_TernaryConditionalOutputAlias_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory, bool enabled) {
+                    object? expression = null;
+                    var shouldUseExpression = enabled ? factory.TryGet(out expression) : false;
+                    return shouldUseExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_TernaryImplicationPolarity_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryTrue([NotNullWhen(true)] out object? value);
+                bool TryFalse([NotNullWhen(false)] out object? value);
+            }
+            public static class Consumer {
+                public static object FalseContract(IFactory factory, bool enabled) {
+                    object? expression = null;
+                    var failed = enabled ? factory.TryFalse(out expression) : true;
+                    return !failed ? expression! : new object();
+                }
+                public static object ReversedArm(IFactory factory, bool enabled) {
+                    object? expression = null;
+                    var shouldUseExpression = enabled ? false : factory.TryTrue(out expression);
+                    return shouldUseExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_NonImplyingTernaryBranch_Reports",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory, bool enabled) {
+                    object? expression = null;
+                    var maybeUseExpression = enabled ? factory.TryGet(out expression) : true;
+                    return maybeUseExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_LogicalImplicationPolarity_DoesNotReport",
             """
             #nullable enable

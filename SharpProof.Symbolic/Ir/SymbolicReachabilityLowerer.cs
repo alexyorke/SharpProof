@@ -146,6 +146,20 @@ internal static class SymbolicReachabilityLowerer {
                 visitedLocals,
                 out invocations);
         }
+        if (TryGetImpliedConditionalOperand(
+                expression,
+                expressionValue,
+                semanticModel,
+                cancellationToken,
+                out var conditionalOperand)) {
+            return TryResolveConditionalInvocation(
+                conditionalOperand,
+                expressionValue,
+                semanticModel,
+                cancellationToken,
+                visitedLocals,
+                out invocations);
+        }
         if (TryGetImpliedBooleanOperandValue(expression, expressionValue, semanticModel, cancellationToken,
                 out var impliedValue) &&
             expression is BinaryExpressionSyntax logical) {
@@ -197,6 +211,31 @@ internal static class SymbolicReachabilityLowerer {
             return false;
         }
         return true;
+    }
+    private static bool TryGetImpliedConditionalOperand(
+        ExpressionSyntax expression,
+        bool expressionValue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out ExpressionSyntax operand) {
+        operand = null!;
+        if (expression is not ConditionalExpressionSyntax conditional ||
+            CSharpSyntaxFacts.GetExpressionType(
+                conditional,
+                semanticModel,
+                cancellationToken)?.SpecialType != SpecialType.System_Boolean)
+            return false;
+        if (semanticModel.GetConstantValue(conditional.WhenFalse, cancellationToken) is { HasValue: true, Value: bool falseArmValue } &&
+            falseArmValue != expressionValue) {
+            operand = conditional.WhenTrue;
+            return true;
+        }
+        if (semanticModel.GetConstantValue(conditional.WhenTrue, cancellationToken) is { HasValue: true, Value: bool trueArmValue } &&
+            trueArmValue != expressionValue) {
+            operand = conditional.WhenFalse;
+            return true;
+        }
+        return false;
     }
     private static bool TryGetImpliedBooleanOperandValue(
         ExpressionSyntax expression,
