@@ -321,6 +321,8 @@ internal static class CompilerProgramPointAnalysis {
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (IsDefinitelyEmptyString(collection))
                 return true;
+            if (IsKnownCoreEmptySingleton(collection))
+                return true;
             if (IsKnownImmutableEmptySingleton(collection))
                 return true;
             if (collection is CollectionExpressionSyntax { Elements.Count: 0 })
@@ -368,6 +370,27 @@ internal static class CompilerProgramPointAnalysis {
                     IsReadOnly: true,
                     ContainingType.SpecialType: SpecialType.System_String
                 };
+        }
+        private bool IsKnownCoreEmptySingleton(ExpressionSyntax collection) {
+            if (semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol is not
+                IPropertySymbol {
+                    Name: "Empty",
+                    IsStatic: true,
+                    Parameters.Length: 0,
+                    GetMethod: not null
+                } property)
+                return false;
+            var type = property.ContainingType.OriginalDefinition;
+            return type.ContainingAssembly?.Name is
+                       "System.Private.CoreLib" or "System.Runtime" or "mscorlib" &&
+                   type.ContainingNamespace.ToDisplayString() == "System" &&
+                   type.Arity == 1 &&
+                   type.Name is
+                       "ArraySegment" or
+                       "Memory" or
+                       "ReadOnlyMemory" or
+                       "ReadOnlySpan" or
+                       "Span";
         }
         private bool IsKnownImmutableEmptySingleton(ExpressionSyntax collection) {
             var symbol = semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol;

@@ -119,6 +119,99 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArraySegmentEmptyLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in ArraySegment<Item>.Empty)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArraySegmentEmptyAliasProjectionLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var values = ArraySegment<int>.Empty;
+                    foreach (var item in values.Select(static _ => new Item(null)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_SpanEmptyLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Span<Item>.Empty)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReadOnlySpanEmptyLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in ReadOnlySpan<Item>.Empty)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_NonemptySpanLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new Span<Item>(new[] { new Item(null) }))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_SourceDefinedArraySegmentEmptyLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections;
+            using System.Collections.Generic;
+            namespace Contoso {
+                public sealed class ArraySegment<T> : IEnumerable<T> {
+                    public static ArraySegment<T> Empty { get; } =
+                        new([(T)(object)new Demo.Item(null)]);
+                    private readonly IEnumerable<T> values;
+                    private ArraySegment(IEnumerable<T> values) => this.values = values;
+                    public IEnumerator<T> GetEnumerator() => values.GetEnumerator();
+                    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+                }
+            }
+            namespace Demo {
+                public sealed record Item(object? Value);
+                public static class Consumer {
+                    public static object FirstValue() {
+                        foreach (var item in Contoso.ArraySegment<Item>.Empty)
+                            return item.Value!;
+                        return new object();
+                    }
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_StringEmptyProjectionLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable
