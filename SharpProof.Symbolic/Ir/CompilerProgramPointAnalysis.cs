@@ -323,12 +323,13 @@ internal static class CompilerProgramPointAnalysis {
                 targetMethod.Parameters.Length == 0)
                 return false;
             var definition = targetMethod.ReducedFrom ?? targetMethod;
-            if (definition.Name != nameof(Enumerable.Select) ||
+            if (definition.Name is not (nameof(Enumerable.Select) or nameof(Enumerable.SelectMany)) ||
                 definition.ContainingType.ToDisplayString() is not
                     ("System.Linq.Enumerable" or "System.Linq.Queryable") ||
                 !TryGetStandardSequenceSource(invocation, operation, out source))
                 return false;
             preservesElementIdentity =
+                definition.Name == nameof(Enumerable.Select) &&
                 TryGetInvocationArgument(
                     operation,
                     targetMethod.Parameters[targetMethod.Parameters.Length - 1],

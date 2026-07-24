@@ -146,6 +146,88 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptyOuterSourceThroughSelectManyLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<int>()
+                        .SelectMany(static _ => new[] { new Item(null) }))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptyOuterSourceThroughNamedSelectManyResultLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.SelectMany(
+                        resultSelector: static (_, _) => new Item(null),
+                        collectionSelector: static _ => new[] { 1 },
+                        source: Enumerable.Empty<int>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptyQueryableThroughSelectManyLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<int>()
+                        .AsQueryable()
+                        .SelectMany(_ => new[] { new Item(null) }))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_SelectManyDoesNotLeakOuterPredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .SelectMany(static _ => new[] { new Item(null) }))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_CustomSelectManyOverEmptySourceLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static IEnumerable<Item> SelectMany(
+                    IEnumerable<int> source,
+                    Func<int, IEnumerable<Item>> selector) =>
+                    new[] { new Item(null) };
+                public static object FirstValue() {
+                    foreach (var item in SelectMany(
+                        Enumerable.Empty<int>(),
+                        static _ => new[] { new Item(new object()) }))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_EmptySourceThroughNamedStaticProjectionLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable
