@@ -243,7 +243,8 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                         else
                             MarkUnknown("metadata_indirect_write_origin_unknown",
                                 SharpProofEffect.WritesArgumentState | SharpProofEffect.UnsupportedOperation, true);
-                        if (IsElementWrite(opcode)) hasUnknownExceptionBoundary = true;
+                        if (IsElementWrite(opcode) || IsIndirectWrite(opcode))
+                            hasUnknownExceptionBoundary = true;
                     }
                     else if (MayThrowImplicitly(opcode)) {
                         MarkUnknown("metadata_implicit_exception", exceptionBoundary: true);
@@ -286,6 +287,16 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                opcode == OpCodes.Initblk || opcode.Name?.StartsWith("stelem", StringComparison.Ordinal) == true;
     private static bool IsElementWrite(OpCode opcode) =>
         opcode.Name?.StartsWith("stelem", StringComparison.Ordinal) == true;
+    private static bool IsIndirectWrite(OpCode opcode) =>
+        opcode == OpCodes.Stind_I ||
+        opcode == OpCodes.Stind_I1 ||
+        opcode == OpCodes.Stind_I2 ||
+        opcode == OpCodes.Stind_I4 ||
+        opcode == OpCodes.Stind_I8 ||
+        opcode == OpCodes.Stind_R4 ||
+        opcode == OpCodes.Stind_R8 ||
+        opcode == OpCodes.Stind_Ref ||
+        opcode == OpCodes.Stobj;
     private static bool IsElementRead(OpCode opcode) =>
         opcode == OpCodes.Ldlen ||
         opcode == OpCodes.Ldelema ||
@@ -744,7 +755,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 Pop();
                 return Pop();
             }
-            if (IsSimpleIndirectWrite(opcode)) {
+            if (IsIndirectWrite(opcode)) {
                 Pop();
                 return Pop();
             }
@@ -925,10 +936,6 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             }
             return true;
         }
-        private static bool IsSimpleIndirectWrite(OpCode opcode) =>
-            opcode == OpCodes.Stind_I || opcode == OpCodes.Stind_I1 || opcode == OpCodes.Stind_I2 ||
-            opcode == OpCodes.Stind_I4 || opcode == OpCodes.Stind_I8 || opcode == OpCodes.Stind_R4 ||
-            opcode == OpCodes.Stind_R8 || opcode == OpCodes.Stind_Ref || opcode == OpCodes.Stobj;
         private static bool IsBinaryValueOperation(OpCode opcode) =>
             opcode == OpCodes.Add || opcode == OpCodes.Sub || opcode == OpCodes.Mul ||
             opcode == OpCodes.Div || opcode == OpCodes.Div_Un || opcode == OpCodes.Rem ||

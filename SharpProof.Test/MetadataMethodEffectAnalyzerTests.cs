@@ -133,6 +133,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(element.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
             Assert.That(indirect.Purity, Is.Not.EqualTo(SharpProofVerdict.Proven));
             Assert.That(indirect.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(indirect.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
         });
     }
     [Test]
