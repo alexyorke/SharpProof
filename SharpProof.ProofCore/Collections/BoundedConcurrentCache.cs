@@ -36,14 +36,16 @@ internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull 
                 return _evictions;
         }
     }
-    internal bool TryGetValue(TKey key, out TValue value) {
+    internal bool TryGetValue(
+        TKey key,
+        [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out TValue value) {
         lock (_gate) {
-            if (_entries.TryGetValue(key, out value!)) {
+            if (_entries.TryGetValue(key, out value)) {
                 _hits++;
                 return true;
             }
             _misses++;
-            value = default!;
+            value = default;
             return false;
         }
     }

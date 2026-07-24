@@ -180,9 +180,7 @@ public sealed class NullableContractVerificationTests {
     [Test]
     public async Task NullForgivingOperator_GuardedByCorrelatedNullableCondition_DoesNotReport() {
         var diagnostics = await AnalyzeAsync(Class("""
-            private sealed class Completion {
-                public string? ResultExpression { get; init; }
-            }
+            private readonly record struct Completion(string? ResultExpression);
 
             public static string Select(Completion completion, bool? expectedResult)
             {

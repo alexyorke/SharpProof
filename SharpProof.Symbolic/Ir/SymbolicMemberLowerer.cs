@@ -61,6 +61,18 @@ internal static class SymbolicMemberLowerer {
                 SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(receiverType))
                 return SymbolicIndexingLowerer.TryLowerBuiltInLengthTerm(memberAccess.Expression, context, out term);
         }
+        if (receiverType?.IsValueType == true &&
+            SymbolicLoweringValueFacts.TryGetStableVariableSymbol(
+                memberAccess.Expression,
+                context,
+                out var valueTypeReceiver) &&
+            TryGetInstanceMemberValueKind(memberAccess, context, out var valueTypeMemberKind)) {
+            term = new SymbolicMemberTerm(
+                new SymbolicVariableTerm(context.GetVariableName(valueTypeReceiver), SmtValueKind.Reference),
+                memberName,
+                valueTypeMemberKind);
+            return true;
+        }
         if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(memberAccess.Expression, context), out var receiver)) return false;
         if (string.Equals(memberName, "Count", StringComparison.Ordinal) &&
             receiver.Kind == SmtValueKind.Reference &&

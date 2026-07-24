@@ -16,12 +16,17 @@ internal sealed class SmtProofResultCache {
     public static long SharedHitCount => s_sharedResults.HitCount;
     public static long SharedMissCount => s_sharedResults.MissCount;
     public static long SharedEvictionCount => s_sharedResults.EvictionCount;
-    public bool TryGetLocal(string queryKey, out AnalysisProofResult result) =>
+    public bool TryGetLocal(
+        string queryKey,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out AnalysisProofResult? result) =>
         _localResults.TryGetValue(queryKey, out result);
-    public bool TryGetShared(SmtAnalysisOptions options, string queryKey, out AnalysisProofResult result) {
+    public bool TryGetShared(
+        SmtAnalysisOptions options,
+        string queryKey,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out AnalysisProofResult? result) {
         if (options.UseSharedResultCache)
             return s_sharedResults.TryGetValue(CreateSharedKey(options, queryKey), out result);
-        result = default!;
+        result = null;
         return false;
     }
     public void AddLocalIfCacheable(string queryKey, AnalysisProofResult result) {

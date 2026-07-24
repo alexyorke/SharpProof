@@ -166,7 +166,7 @@ internal sealed class Z3FormulaEncoder : IDisposable {
         var translation = Z3RegexTranslator.Translate(_context, formula.Pattern, formula.Options);
         if (!translation.Success)
             throw new InvalidOperationException("Unsupported SMT regex pattern.");
-        return _context.MkInRe(EncodeString(formula.Value), translation.Regex!);
+        return _context.MkInRe(EncodeString(formula.Value), translation.Regex);
     }
     private BoolExpr EncodeRuntimeTypeTest(SmtRuntimeTypeTestFormula formula) {
         if (formula.Value.Kind != SmtValueKind.Reference)
