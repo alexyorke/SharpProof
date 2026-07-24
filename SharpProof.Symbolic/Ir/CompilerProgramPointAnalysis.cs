@@ -251,13 +251,23 @@ internal static class CompilerProgramPointAnalysis {
             }
             if (collection is not InvocationExpressionSyntax invocation ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
-                    IInvocationOperation { TargetMethod: { } targetMethod })
+                    IInvocationOperation { TargetMethod: { } targetMethod } operation)
                 return false;
             var definition = targetMethod.OriginalDefinition;
-            return definition.Name == nameof(Enumerable.Empty) &&
-                   definition.Parameters.Length == 0 &&
-                   definition.ContainingType.ToDisplayString() is
-                       ("System.Linq.Enumerable" or "System.Array");
+            var containingType = definition.ContainingType.ToDisplayString();
+            if (definition.Name == nameof(Enumerable.Empty) &&
+                definition.Parameters.Length == 0 &&
+                containingType is "System.Linq.Enumerable" or "System.Array")
+                return true;
+            if (containingType != "System.Linq.Enumerable" ||
+                definition.Name is not (nameof(Enumerable.Range) or nameof(Enumerable.Repeat)))
+                return false;
+            var countParameter = targetMethod.Parameters.FirstOrDefault(parameter =>
+                parameter.Name == "count");
+            return countParameter != null &&
+                   TryGetInvocationArgument(operation, countParameter, out var count) &&
+                   semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount } &&
+                   constantCount == 0;
         }
         private bool TryGetSameElementTypeOperatorStep(
             ExpressionSyntax collection,
