@@ -312,6 +312,170 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ConcatEmptySourcesLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<Item>()
+                        .Concat(Enumerable.Empty<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ConcatAliasedEmptySourcesLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var empty = Enumerable.Empty<Item>();
+                    foreach (var item in empty.Concat(empty))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_UpdatedConcatEmptyAliasLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    IEnumerable<Item> combined = Enumerable.Empty<Item>();
+                    combined = combined.Concat(combined);
+                    foreach (var item in combined)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_UnionEmptyPipelinesLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<int>()
+                        .Select(static _ => new Item(null))
+                        .Union(Enumerable.Empty<Item>().OrderBy(static item => item.Value)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_UnionByEmptySourcesLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<Item>().UnionBy(
+                        Enumerable.Empty<Item>(),
+                        static item => item.Value))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_QueryableConcatEmptySourcesLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var first = Enumerable.Empty<Item>().AsQueryable();
+                    var second = Enumerable.Empty<Item>().AsQueryable();
+                    foreach (var item in first.Concat(second))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ConcatNonemptySecondLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<Item>()
+                        .Concat(new[] { new Item(null) }))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ConcatEmptySecondPreservesWherePredicate_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Concat(Enumerable.Empty<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_MutatingUnionComparerDoesNotPreserveWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed class Item {
+                public object? Value { get; set; }
+            }
+            public sealed class MutatingComparer : IEqualityComparer<Item> {
+                public bool Equals(Item? left, Item? right) => ReferenceEquals(left, right);
+                public int GetHashCode(Item item) {
+                    item.Value = null;
+                    return 0;
+                }
+            }
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Union(Enumerable.Empty<Item>(), new MutatingComparer()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_CustomConcatEmptySourcesLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static IEnumerable<Item> Concat(
+                    IEnumerable<Item> first,
+                    IEnumerable<Item> second) =>
+                    new[] { new Item(null) };
+                public static object FirstValue() {
+                    foreach (var item in Concat(
+                        Enumerable.Empty<Item>(),
+                        Enumerable.Empty<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ArraySegmentEmptyLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable

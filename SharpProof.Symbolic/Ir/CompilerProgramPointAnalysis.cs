@@ -171,6 +171,16 @@ internal static class CompilerProgramPointAnalysis {
         private bool TryGetSequencePredicateSteps(
             ExpressionSyntax collection,
             out ImmutableArray<SequencePredicateStep> steps,
+            out bool definitelyNoElements) =>
+            TryGetSequencePredicateSteps(
+                collection,
+                [],
+                out steps,
+                out definitelyNoElements);
+        private bool TryGetSequencePredicateSteps(
+            ExpressionSyntax collection,
+            HashSet<SyntaxNode> visited,
+            out ImmutableArray<SequencePredicateStep> steps,
             out bool definitelyNoElements) {
             var builder = ImmutableArray.CreateBuilder<SequencePredicateStep>();
             var resolvedUses = new List<(ISymbol Symbol, int Position)>();
@@ -181,6 +191,8 @@ internal static class CompilerProgramPointAnalysis {
                     collection,
                     semanticModel,
                     cancellationToken);
+                if (!visited.Add(collection))
+                    break;
                 if (TryGetSequencePredicateStep(
                         collection,
                         out var source,
@@ -204,6 +216,15 @@ internal static class CompilerProgramPointAnalysis {
                         out source,
                         out var projectionPreservesElementIdentity)) {
                     preservesElementIdentity &= projectionPreservesElementIdentity;
+                    collection = source;
+                    continue;
+                }
+                if (TryGetEmptySecondSequenceCombinationStep(
+                        collection,
+                        visited,
+                        out source,
+                        out var combinationPreservesElementIdentity)) {
+                    preservesElementIdentity &= combinationPreservesElementIdentity;
                     collection = source;
                     continue;
                 }
@@ -253,6 +274,36 @@ internal static class CompilerProgramPointAnalysis {
             }
             steps = builder.ToImmutable();
             return steps.Length != 0 || definitelyNoElements;
+        }
+        private bool TryGetEmptySecondSequenceCombinationStep(
+            ExpressionSyntax collection,
+            HashSet<SyntaxNode> visited,
+            out ExpressionSyntax source,
+            out bool preservesElementIdentity) {
+            source = null!;
+            preservesElementIdentity = false;
+            collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (collection is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not
+                    IInvocationOperation { TargetMethod: { } targetMethod } operation)
+                return false;
+            var definition = targetMethod.ReducedFrom ?? targetMethod;
+            if (definition.ContainingType.ToDisplayString() is not
+                    ("System.Linq.Enumerable" or "System.Linq.Queryable") ||
+                definition.Name is not ("Concat" or "Union" or "UnionBy") ||
+                !TryGetStandardSequenceSource(invocation, operation, out source))
+                return false;
+            if (definition.Parameters.Length < 2 ||
+                !TryGetInvocationArgument(operation, definition.Parameters[1], out var second) ||
+                !TryGetSequencePredicateSteps(
+                    second,
+                    [.. visited],
+                    out _,
+                    out var secondProducesNoElements) ||
+                !secondProducesNoElements)
+                return false;
+            preservesElementIdentity = definition.Name == "Concat";
+            return true;
         }
         private bool TryGetZeroPreservingCoreSequenceViewStep(
             ExpressionSyntax collection,
