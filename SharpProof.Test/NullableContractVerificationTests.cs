@@ -106,6 +106,46 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_QueryableWherePredicateRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IQueryable<Item> items) {
+                    foreach (var item in items.Where(static item => item.Value is not null))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_IndexedQueryableWherePredicateRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IQueryable<Item> items) {
+                    foreach (var item in items.Where(
+                        static (item, index) => index > 0 && item.Value is not null))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_CapturedQueryableWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IQueryable<Item> items, object? expected) {
+                    foreach (var item in items.Where(item => item.Value == expected))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ChainedWherePredicatesRefineLoopElement_DoesNotReport",
             """
             #nullable enable

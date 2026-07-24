@@ -182,7 +182,9 @@ internal static class CompilerProgramPointAnalysis {
             var definition = targetMethod.ReducedFrom ?? targetMethod;
             if (definition.Name != nameof(Enumerable.Where) ||
                 definition.ContainingType.ToDisplayString() is not
-                    ("System.Linq.Enumerable" or "System.Linq.ImmutableArrayExtensions"))
+                    ("System.Linq.Enumerable" or
+                     "System.Linq.ImmutableArrayExtensions" or
+                     "System.Linq.Queryable"))
                 return false;
             source = invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
                      semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not
