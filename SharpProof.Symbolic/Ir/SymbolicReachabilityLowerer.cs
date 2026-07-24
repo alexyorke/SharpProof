@@ -178,22 +178,30 @@ internal static class SymbolicReachabilityLowerer {
         return CSharpSyntaxFacts.DescendantNodesInExecution(
                 executionRoot,
                 includeNestedCallables: true)
-            .Where(node =>
-                node.SpanStart >= origin.Span.End && node.Span.End <= condition.SpanStart ||
-                IsInsideRepeatedLoopMutationRegion(node, repeatedLoop) ||
-                IsInsideNestedCallable(node, executionRoot))
             .Any(node =>
                 SymbolMutationFacts.TryGetMutationTarget(node, out var target) &&
+                (node.SpanStart >= origin.Span.End && node.Span.End <= condition.SpanStart ||
+                 IsInsideRepeatedLoopMutationRegion(node, repeatedLoop) ||
+                 IsInsidePotentiallyPriorNestedCallable(node, executionRoot, condition)) &&
                 SymbolMutationFacts.ExpressionMatchesSymbol(
                     target,
                     symbol,
                     semanticModel,
                     cancellationToken));
     }
-    private static bool IsInsideNestedCallable(SyntaxNode node, SyntaxNode executionRoot) =>
-        node.Ancestors()
+    private static bool IsInsidePotentiallyPriorNestedCallable(
+        SyntaxNode node,
+        SyntaxNode executionRoot,
+        ExpressionSyntax condition) {
+        var boundaries = node.Ancestors()
             .TakeWhile(ancestor => !ReferenceEquals(ancestor, executionRoot))
-            .Any(CSharpSyntaxFacts.IsNestedLocalCallableBoundary);
+            .Where(CSharpSyntaxFacts.IsNestedLocalCallableBoundary)
+            .ToArray();
+        return boundaries.Any(static boundary => boundary is LocalFunctionStatementSyntax) ||
+               boundaries.Any(boundary =>
+                   boundary is AnonymousFunctionExpressionSyntax &&
+                   boundary.SpanStart < condition.SpanStart);
+    }
     private static StatementSyntax? GetRepeatedLoop(ExpressionSyntax condition) {
         foreach (var ancestor in condition.Ancestors())
             switch (ancestor) {

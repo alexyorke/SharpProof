@@ -107,6 +107,23 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_CopiedAliasSurvivesLaterSourceCapture",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    var isExact = factory.TryGet(out var expression);
+                    var shouldUseExpression = isExact;
+                    System.Action mutateSource = () => isExact = false;
+                    mutateSource();
+                    return shouldUseExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", false);
         yield return Case("NullForgivingOperator_CapturedConditionalOutputAlias_Reports",
             """
             #nullable enable
@@ -120,6 +137,22 @@ public sealed class NullableContractVerificationTests {
                     System.Action mutate = () => isExact = true;
                     mutate();
                     return isExact ? expression! : new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_LocalFunctionMutatedConditionalAlias_Reports",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    var isExact = factory.TryGet(out var expression);
+                    Mutate();
+                    return isExact ? expression! : new object();
+                    void Mutate() => isExact = true;
                 }
             }
             """, "SP0044", true);
