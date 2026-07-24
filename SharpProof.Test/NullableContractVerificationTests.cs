@@ -544,6 +544,38 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_WhereThroughIdentityCastSelectRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(static item => (Item)item))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_WhereThroughIdentityAsSelectRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(static item => item as Item))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
         yield return Case("NullForgivingOperator_WhereThroughIndexedIdentitySelectRefinesLoopElement_DoesNotReport",
             """
             #nullable enable
@@ -586,6 +618,23 @@ public sealed class NullableContractVerificationTests {
             public sealed record Item(object? Value);
             public static class Consumer {
                 private static Item Identity(Item item) => item;
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(Identity))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_WhereThroughIdentityCastMethodSelectRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static Item Identity(Item item) => (Item)item;
                 public static object FirstValue(IEnumerable<Item> items) {
                     foreach (var item in items
                         .Where(static item => item.Value is not null)

@@ -40,13 +40,13 @@ internal static class SymbolicSourcePredicateLowerer {
         var parameters = GetLambdaParameterSymbols(lambda, context).ToArray();
         if (!HasIdentitySelectorSignature(parameters, lambdaMethod.ReturnType) ||
             !TryGetSingleReturnedExpression(lambda, out var returned) ||
-            !LambdaBodyReferencesOnlyParameters(lambda, context) ||
             !LambdaReadsOnlyStableParameterMembers(lambda, parameters[0], context))
             return false;
-        returned = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(returned);
-        return SymbolEqualityComparer.Default.Equals(
-            context.SemanticModel.GetSymbolInfo(returned, context.CancellationToken).Symbol?.OriginalDefinition,
-            parameters[0]);
+        return ReturnedExpressionIsIdentityParameter(
+            returned,
+            parameters[0],
+            context.SemanticModel,
+            context.CancellationToken);
     }
     private static bool IsIdentitySourceSequenceSelector(
         IMethodSymbol method,
@@ -64,9 +64,31 @@ internal static class SymbolicSourcePredicateLowerer {
                    callable,
                    semanticModel,
                    callerContext.CancellationToken).InvalidatesSymbol(parameter, true) &&
-               SymbolEqualityComparer.Default.Equals(
-                   semanticModel.GetSymbolInfo(returned, callerContext.CancellationToken).Symbol?.OriginalDefinition,
-                   parameter);
+               ReturnedExpressionIsIdentityParameter(
+                   returned,
+                   parameter,
+                   semanticModel,
+                   callerContext.CancellationToken);
+    }
+    private static bool ReturnedExpressionIsIdentityParameter(
+        ExpressionSyntax returned,
+        IParameterSymbol parameter,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) {
+        while (true) {
+            returned = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(returned);
+            if (semanticModel.GetOperation(returned, cancellationToken) is not
+                    IConversionOperation {
+                        Conversion.IsIdentity: true,
+                        Operand.Syntax: ExpressionSyntax operand
+                    } ||
+                ReferenceEquals(operand, returned))
+                break;
+            returned = operand;
+        }
+        return SymbolEqualityComparer.Default.Equals(
+            semanticModel.GetSymbolInfo(returned, cancellationToken).Symbol?.OriginalDefinition,
+            parameter);
     }
     private static bool HasIdentitySelectorSignature(
         IReadOnlyList<IParameterSymbol> parameters,
