@@ -207,6 +207,11 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
+                if (TryGetZeroPreservingSequenceOperatorStep(collection, out source)) {
+                    preservesElementIdentity = false;
+                    collection = source;
+                    continue;
+                }
                 if (TryGetElementTypeOperatorStep(
                         collection,
                         out source,
@@ -238,6 +243,47 @@ internal static class CompilerProgramPointAnalysis {
             }
             steps = builder.ToImmutable();
             return steps.Length != 0 || definitelyEmpty;
+        }
+        private bool TryGetZeroPreservingSequenceOperatorStep(
+            ExpressionSyntax collection,
+            out ExpressionSyntax source) {
+            source = null!;
+            collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (collection is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not
+                    IInvocationOperation { TargetMethod: { } targetMethod } operation)
+                return false;
+            var definition = targetMethod.ReducedFrom ?? targetMethod;
+            if (definition.ContainingType.ToDisplayString() is not
+                    ("System.Linq.Enumerable" or "System.Linq.Queryable") ||
+                definition.Name is not (
+                    "Chunk" or
+                    "Distinct" or
+                    "DistinctBy" or
+                    "Except" or
+                    "ExceptBy" or
+                    "GroupBy" or
+                    "GroupJoin" or
+                    "Intersect" or
+                    "IntersectBy" or
+                    "Join" or
+                    "Order" or
+                    "OrderBy" or
+                    "OrderByDescending" or
+                    "OrderDescending" or
+                    "Reverse" or
+                    "SkipLast" or
+                    "TakeLast" or
+                    "ThenBy" or
+                    "ThenByDescending" or
+                    "ToArray" or
+                    "ToDictionary" or
+                    "ToHashSet" or
+                    "ToList" or
+                    "ToLookup" or
+                    "Zip"))
+                return false;
+            return TryGetStandardSequenceSource(invocation, operation, out source);
         }
         private bool IsDefinitelyEmptySequenceSource(ExpressionSyntax collection) {
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);

@@ -216,6 +216,121 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptySourceThroughOrderByLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<Item>()
+                        .OrderBy(static item => item.Value))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptyQueryableThroughOrderByLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<Item>()
+                        .AsQueryable()
+                        .OrderBy(item => item.Value))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptySourceThroughGroupByProjectionLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<Item>()
+                        .GroupBy(static item => item.Value)
+                        .Select(static _ => new Item(null)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptySourceThroughZipLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<int>()
+                        .Zip(
+                            new[] { 1 },
+                            static (_, _) => new Item(null)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptySourceThroughMaterializerLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<Item>().ToList())
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_MutatingOrderByDoesNotPreserveWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed class Item {
+                public object? Value { get; set; }
+            }
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .OrderBy(static item => {
+                            item.Value = null;
+                            return 0;
+                        }))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_CustomOrderByOverEmptySourceLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static IEnumerable<Item> OrderBy(
+                    IEnumerable<Item> source,
+                    Func<Item, object?> selector) =>
+                    new[] { new Item(null) };
+                public static object FirstValue() {
+                    foreach (var item in OrderBy(
+                        Enumerable.Empty<Item>(),
+                        static item => item.Value))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_EmptySourceThroughTypeChangingOfTypeLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable
