@@ -41,6 +41,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                 public static void FieldWriteViaIdentity(MutableBox value) { Identity(value).Value = 1; }
                 public static unsafe int IndirectRead(int* value) => *value;
                 public static unsafe void IndirectWrite(int* value) { *value = 1; }
+                public static int Divide(int left, int right) => left / right;
                 public static void CopyBlockOpcodeFixture() { VolatileState = 1; }
                 private static void Helper() { State++; }
                 public static void RepeatHelper() { Helper(); Helper(); }
@@ -175,6 +176,17 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.ReadsArgumentState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataArithmeticHazardsDoNotMakeEffectsUnknown() {
+        var effects = Analyze(
+            "static int M(int left, int right) => MetadataFixture.Effects.Divide(left, right);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
         });
     }

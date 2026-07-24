@@ -246,6 +246,9 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                         if (IsElementWrite(opcode) || IsIndirectWrite(opcode))
                             hasUnknownExceptionBoundary = true;
                     }
+                    else if (IsArithmeticExceptionOnly(opcode)) {
+                        hasUnknownExceptionBoundary = true;
+                    }
                     else if (MayThrowImplicitly(opcode)) {
                         MarkUnknown("metadata_implicit_exception", exceptionBoundary: true);
                     }
@@ -304,8 +307,12 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     private static bool IsIndirectRead(OpCode opcode) =>
         opcode == OpCodes.Ldobj ||
         opcode.Name?.StartsWith("ldind", StringComparison.Ordinal) == true;
-    private static bool MayThrowImplicitly(OpCode opcode) => opcode == OpCodes.Div || opcode == OpCodes.Div_Un ||
-               opcode == OpCodes.Rem || opcode == OpCodes.Rem_Un || opcode == OpCodes.Castclass ||
+    private static bool IsArithmeticExceptionOnly(OpCode opcode) =>
+        opcode == OpCodes.Div ||
+        opcode == OpCodes.Div_Un ||
+        opcode == OpCodes.Rem ||
+        opcode == OpCodes.Rem_Un;
+    private static bool MayThrowImplicitly(OpCode opcode) => opcode == OpCodes.Castclass ||
                opcode == OpCodes.Unbox || opcode == OpCodes.Unbox_Any || opcode == OpCodes.Ldlen ||
                opcode == OpCodes.Ldelema || opcode.Name?.StartsWith("ldelem", StringComparison.Ordinal) == true ||
                opcode.Name?.IndexOf("ovf", StringComparison.Ordinal) >= 0 ||
