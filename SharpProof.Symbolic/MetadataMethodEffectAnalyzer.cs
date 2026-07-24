@@ -311,11 +311,11 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         opcode == OpCodes.Div ||
         opcode == OpCodes.Div_Un ||
         opcode == OpCodes.Rem ||
-        opcode == OpCodes.Rem_Un;
+        opcode == OpCodes.Rem_Un ||
+        opcode.Name?.IndexOf("ovf", StringComparison.Ordinal) >= 0;
     private static bool MayThrowImplicitly(OpCode opcode) => opcode == OpCodes.Castclass ||
                opcode == OpCodes.Unbox || opcode == OpCodes.Unbox_Any || opcode == OpCodes.Ldlen ||
                opcode == OpCodes.Ldelema || opcode.Name?.StartsWith("ldelem", StringComparison.Ordinal) == true ||
-               opcode.Name?.IndexOf("ovf", StringComparison.Ordinal) >= 0 ||
                opcode.Name?.StartsWith("ldind", StringComparison.Ordinal) == true;
     private static bool IsModeledNoEffectOpcode(OpCode opcode) {
         var name = opcode.Name ?? string.Empty;
@@ -945,6 +945,9 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         }
         private static bool IsBinaryValueOperation(OpCode opcode) =>
             opcode == OpCodes.Add || opcode == OpCodes.Sub || opcode == OpCodes.Mul ||
+            opcode == OpCodes.Add_Ovf || opcode == OpCodes.Add_Ovf_Un ||
+            opcode == OpCodes.Sub_Ovf || opcode == OpCodes.Sub_Ovf_Un ||
+            opcode == OpCodes.Mul_Ovf || opcode == OpCodes.Mul_Ovf_Un ||
             opcode == OpCodes.Div || opcode == OpCodes.Div_Un || opcode == OpCodes.Rem ||
             opcode == OpCodes.Rem_Un || opcode == OpCodes.And || opcode == OpCodes.Or ||
             opcode == OpCodes.Xor || opcode == OpCodes.Shl || opcode == OpCodes.Shr ||
