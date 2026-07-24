@@ -667,6 +667,37 @@ internal static class SymbolicIndexingLowerer {
             return false;
         return TryResolveAssignedShape(expression, symbol, context, TryBindDirectRange, out range);
     }
+    internal static bool DefinitelyProducesNoElements(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context) {
+        if (!TryBindRange(expression, context, out var range) ||
+            !TryGetConstantIndex(range.Start, false, context, out var startValue, out var startFromEnd) ||
+            !TryGetConstantIndex(range.End, true, context, out var endValue, out var endFromEnd))
+            return false;
+        return startValue == endValue &&
+               startFromEnd == endFromEnd;
+    }
+    private static bool TryGetConstantIndex(
+        IndexShape? shape,
+        bool defaultFromEnd,
+        SymbolicLoweringContext context,
+        out int value,
+        out bool fromEnd) {
+        if (shape == null) {
+            value = 0;
+            fromEnd = defaultFromEnd;
+            return true;
+        }
+        fromEnd = shape.Value.FromEnd;
+        if (context.SemanticModel.GetConstantValue(
+                shape.Value.ValueExpression,
+                context.CancellationToken) is { HasValue: true, Value: int constant }) {
+            value = constant;
+            return true;
+        }
+        value = 0;
+        return false;
+    }
     private static bool TryBindDirectRange(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,

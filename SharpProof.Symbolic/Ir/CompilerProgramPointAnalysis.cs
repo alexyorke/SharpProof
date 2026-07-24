@@ -591,8 +591,12 @@ internal static class CompilerProgramPointAnalysis {
                     operation,
                     targetMethod.Parameters[targetMethod.Parameters.Length - 1],
                     out var count) &&
-                semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount })
-                definitelyNoElements = constantCount <= 0;
+                (semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount } &&
+                 constantCount <= 0 ||
+                 SymbolicIndexingLowerer.DefinitelyProducesNoElements(
+                     count,
+                     new(semanticModel, cancellationToken))))
+                definitelyNoElements = true;
             return true;
         }
         private bool TryGetSequencePredicateStep(
