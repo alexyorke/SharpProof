@@ -132,6 +132,101 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ImmutableArrayCreateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Immutable;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in ImmutableArray.Create<Item>())
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ImmutableListCreateThroughProjectionLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Immutable;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in ImmutableList.Create<int>()
+                        .Select(static _ => new Item(null)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ImmutableQueueCreateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Immutable;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in ImmutableQueue.Create<Item>())
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ImmutableDictionaryCreateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Immutable;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var pair in ImmutableDictionary.Create<int, Item>())
+                        return pair.Value.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_NonemptyImmutableCreateLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections.Immutable;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in ImmutableArray.Create(new Item(null)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_SourceDefinedImmutableCreateLookalikeLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections;
+            using System.Collections.Generic;
+            namespace Contoso {
+                public sealed class ImmutableArray<T> : IEnumerable<T> {
+                    private readonly IEnumerable<T> values;
+                    public ImmutableArray(IEnumerable<T> values) => this.values = values;
+                    public IEnumerator<T> GetEnumerator() => values.GetEnumerator();
+                    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+                }
+                public static class ImmutableArray {
+                    public static ImmutableArray<T> Create<T>() =>
+                        new([(T)(object)new Demo.Item(null)]);
+                }
+            }
+            namespace Demo {
+                public sealed record Item(object? Value);
+                public static class Consumer {
+                    public static object FirstValue() {
+                        foreach (var item in Contoso.ImmutableArray.Create<Item>())
+                            return item.Value!;
+                        return new object();
+                    }
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ImmutableListEmptyThroughProjectionLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable

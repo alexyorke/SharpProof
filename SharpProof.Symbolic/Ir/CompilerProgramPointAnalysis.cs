@@ -305,6 +305,8 @@ internal static class CompilerProgramPointAnalysis {
                 semanticModel.GetOperation(invocation, cancellationToken) is not
                     IInvocationOperation { TargetMethod: { } targetMethod } operation)
                 return false;
+            if (IsKnownImmutableEmptyFactory(targetMethod))
+                return true;
             var definition = targetMethod.OriginalDefinition;
             var containingType = definition.ContainingType.ToDisplayString();
             if (definition.Name == nameof(Enumerable.Empty) &&
@@ -333,11 +335,24 @@ internal static class CompilerProgramPointAnalysis {
                 } => true,
                 _ => false
             };
-            if (!isEmptySingleton ||
-                symbol!.ContainingAssembly?.Name != "System.Collections.Immutable" ||
-                symbol.ContainingNamespace.ToDisplayString() != "System.Collections.Immutable")
+            return isEmptySingleton &&
+                   IsKnownImmutableCollectionType(symbol!.ContainingType);
+        }
+        private static bool IsKnownImmutableEmptyFactory(IMethodSymbol targetMethod) {
+            var definition = targetMethod.OriginalDefinition;
+            return definition.Name == "Create" &&
+                   definition.IsStatic &&
+                   definition.Parameters.Length == 0 &&
+                   definition.ContainingType.Arity == 0 &&
+                   targetMethod.ReturnType is INamedTypeSymbol returnType &&
+                   definition.ContainingType.Name == returnType.OriginalDefinition.Name &&
+                   IsKnownImmutableCollectionType(returnType);
+        }
+        private static bool IsKnownImmutableCollectionType(INamedTypeSymbol candidate) {
+            var type = candidate.OriginalDefinition;
+            if (type.ContainingAssembly?.Name != "System.Collections.Immutable" ||
+                type.ContainingNamespace.ToDisplayString() != "System.Collections.Immutable")
                 return false;
-            var type = symbol.ContainingType.OriginalDefinition;
             return (type.Name, type.Arity) is
                 ("ImmutableArray", 1) or
                 ("ImmutableDictionary", 2) or
