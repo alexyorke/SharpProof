@@ -183,6 +183,10 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
+                if (TryGetSameElementSequenceCastStep(collection, out source)) {
+                    collection = source;
+                    continue;
+                }
                 collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
                 var symbol = semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol?.OriginalDefinition;
                 var usePosition = collection.SpanStart;
@@ -202,6 +206,57 @@ internal static class CompilerProgramPointAnalysis {
             }
             steps = builder.ToImmutable();
             return steps.Length != 0;
+        }
+        private bool TryGetSameElementSequenceCastStep(
+            ExpressionSyntax collection,
+            out ExpressionSyntax source) {
+            source = null!;
+            collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (collection is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not
+                    IInvocationOperation { TargetMethod: { } targetMethod })
+                return false;
+            var definition = targetMethod.ReducedFrom ?? targetMethod;
+            if (definition.Name != nameof(Enumerable.Cast) ||
+                definition.ContainingType.ToDisplayString() is not
+                    ("System.Linq.Enumerable" or "System.Linq.Queryable") ||
+                targetMethod.TypeArguments.Length != 1 ||
+                !TryGetStandardSequenceSource(invocation, out source))
+                return false;
+            var sourceTypeInfo = semanticModel.GetTypeInfo(source, cancellationToken);
+            return TryGetUniqueEnumerableElementType(
+                       sourceTypeInfo.Type ?? sourceTypeInfo.ConvertedType,
+                       out var sourceElement) &&
+                   SymbolEqualityComparer.Default.Equals(
+                       sourceElement,
+                       targetMethod.TypeArguments[0]);
+        }
+        private static bool TryGetUniqueEnumerableElementType(
+            ITypeSymbol? sequenceType,
+            out ITypeSymbol elementType) {
+            elementType = null!;
+            if (sequenceType is IArrayTypeSymbol array) {
+                elementType = array.ElementType;
+                return true;
+            }
+            if (sequenceType == null) return false;
+            var candidates = new List<ITypeSymbol>();
+            void AddCandidate(ITypeSymbol candidate) {
+                if (!candidates.Any(existing =>
+                        SymbolEqualityComparer.Default.Equals(existing, candidate)))
+                    candidates.Add(candidate);
+            }
+            if (sequenceType is INamedTypeSymbol named &&
+                named.OriginalDefinition.SpecialType ==
+                    SpecialType.System_Collections_Generic_IEnumerable_T)
+                AddCandidate(named.TypeArguments[0]);
+            foreach (var candidate in sequenceType.AllInterfaces)
+                if (candidate.OriginalDefinition.SpecialType ==
+                    SpecialType.System_Collections_Generic_IEnumerable_T)
+                    AddCandidate(candidate.TypeArguments[0]);
+            if (candidates.Count != 1) return false;
+            elementType = candidates[0];
+            return true;
         }
         private bool TryGetIdentitySequenceProjectionStep(
             ExpressionSyntax collection,
