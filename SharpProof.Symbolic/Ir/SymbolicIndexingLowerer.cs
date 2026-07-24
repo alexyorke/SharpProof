@@ -674,8 +674,11 @@ internal static class SymbolicIndexingLowerer {
             !TryGetConstantIndex(range.Start, false, context, out var startValue, out var startFromEnd) ||
             !TryGetConstantIndex(range.End, true, context, out var endValue, out var endFromEnd))
             return false;
-        return startValue == endValue &&
-               startFromEnd == endFromEnd;
+        if (startFromEnd != endFromEnd)
+            return false;
+        return startFromEnd
+            ? startValue <= endValue
+            : startValue >= endValue;
     }
     private static bool TryGetConstantIndex(
         IndexShape? shape,
