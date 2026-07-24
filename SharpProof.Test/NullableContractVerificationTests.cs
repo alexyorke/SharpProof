@@ -106,6 +106,76 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ChainedWherePredicatesRefineLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value, bool Enabled);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Where(static item => item.Enabled))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_MixedChainedWherePredicatesRefineLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Immutable;
+            using System.Linq;
+            public sealed record Item(object? Value, bool Enabled);
+            public static class Consumer {
+                public static object FirstValue(ImmutableArray<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Where(static item => item.Enabled))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_StaticWherePredicateRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in Enumerable.Where(
+                        items,
+                        static item => item.Value is not null))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_MutatingOuterWhereInvalidatesInnerPredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed class Item {
+                public object? Value { get; set; }
+            }
+            public static class Consumer {
+                private static bool Reset(Item item) {
+                    item.Value = null;
+                    return true;
+                }
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Where(static item => Reset(item)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_BlockWherePredicateRefinesLoopElement_DoesNotReport",
             """
             #nullable enable

@@ -139,22 +139,39 @@ internal static class CompilerProgramPointAnalysis {
             foreach (var loop in site.Ancestors().OfType<ForEachStatementSyntax>()) {
                 if (!loop.Statement.Span.Contains(site.SpanStart) ||
                     semanticModel.GetDeclaredSymbol(loop, cancellationToken) is not ILocalSymbol iterationVariable ||
-                    !TryGetEnumerableWherePredicate(loop.Expression, out var predicate) ||
+                    !TryGetEnumerableWherePredicates(loop.Expression, out var predicates) ||
                     SymbolicMutationInventory.Create(loop.Statement, semanticModel, cancellationToken)
                         .InvalidatesBetween(loop.Statement.SpanStart - 1, site.SpanStart, iterationVariable, true) ||
-                    !SymbolicStateFactBuilder.TryCreateSymbolTerm(iterationVariable, out var iterationTerm) ||
-                    !SymbolicSourcePredicateLowerer.TryLowerSingleParameterLambdaPredicate(
-                        predicate,
-                        iterationTerm,
-                        new SymbolicLoweringContext(semanticModel, cancellationToken),
-                        out var condition))
+                    !SymbolicStateFactBuilder.TryCreateSymbolTerm(iterationVariable, out var iterationTerm))
                     continue;
-                state = state.AddPathCondition(condition).Normalize();
+                var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+                foreach (var predicate in predicates) {
+                    if (!SymbolicSourcePredicateLowerer.TryLowerSingleParameterLambdaPredicate(
+                            predicate,
+                            iterationTerm,
+                            context,
+                            out var condition))
+                        break;
+                    state = state.AddPathCondition(condition).Normalize();
+                }
             }
         }
-        private bool TryGetEnumerableWherePredicate(
+        private bool TryGetEnumerableWherePredicates(
             ExpressionSyntax collection,
+            out ImmutableArray<AnonymousFunctionExpressionSyntax> predicates) {
+            var builder = ImmutableArray.CreateBuilder<AnonymousFunctionExpressionSyntax>();
+            while (TryGetEnumerableWhereStep(collection, out var source, out var predicate)) {
+                builder.Add(predicate);
+                collection = source;
+            }
+            predicates = builder.ToImmutable();
+            return predicates.Length != 0;
+        }
+        private bool TryGetEnumerableWhereStep(
+            ExpressionSyntax collection,
+            out ExpressionSyntax source,
             out AnonymousFunctionExpressionSyntax predicate) {
+            source = null!;
             predicate = null!;
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is not InvocationExpressionSyntax invocation ||
@@ -168,6 +185,12 @@ internal static class CompilerProgramPointAnalysis {
                 definition.ContainingType.ToDisplayString() is not
                     ("System.Linq.Enumerable" or "System.Linq.ImmutableArrayExtensions"))
                 return false;
+            source = invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
+                     semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not
+                         INamedTypeSymbol
+                ? memberAccess.Expression
+                : invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression!;
+            if (source == null) return false;
             predicate = lambda;
             return true;
         }
