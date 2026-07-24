@@ -39,6 +39,8 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                 public static int FieldRead(MutableBox value) => value.Value;
                 public static MutableBox Identity(MutableBox value) => value;
                 public static void FieldWriteViaIdentity(MutableBox value) { Identity(value).Value = 1; }
+                public static MutableBox Cast(object value) => (MutableBox)value;
+                public static void FieldWriteViaCast(object value) { Cast(value).Value = 1; }
                 public static unsafe int IndirectRead(int* value) => *value;
                 public static unsafe void IndirectWrite(int* value) { *value = 1; }
                 public static int Divide(int left, int right) => left / right;
@@ -257,6 +259,22 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesReceiverState), Is.False);
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataCastFailuresDoNotMakeEffectsUnknown() {
+        var cast = Analyze(
+            "static MetadataFixture.MutableBox M(object value) => MetadataFixture.Effects.Cast(value);");
+        var write = Analyze(
+            "static void M(object value) => MetadataFixture.Effects.FieldWriteViaCast(value);");
+        Assert.Multiple(() => {
+            Assert.That(cast.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(cast.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(cast.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(cast.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+            Assert.That(write.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(write.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(write.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
         });
     }
     [Test]
