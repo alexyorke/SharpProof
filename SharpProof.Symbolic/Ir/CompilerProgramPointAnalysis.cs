@@ -207,6 +207,11 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
+                if (TryGetZeroPreservingCoreSequenceViewStep(collection, out source)) {
+                    preservesElementIdentity = false;
+                    collection = source;
+                    continue;
+                }
                 if (TryGetZeroPreservingImmutableFactoryStep(collection, out source)) {
                     preservesElementIdentity = false;
                     collection = source;
@@ -248,6 +253,40 @@ internal static class CompilerProgramPointAnalysis {
             }
             steps = builder.ToImmutable();
             return steps.Length != 0 || definitelyEmpty;
+        }
+        private bool TryGetZeroPreservingCoreSequenceViewStep(
+            ExpressionSyntax collection,
+            out ExpressionSyntax source) {
+            source = null!;
+            collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (collection is MemberAccessExpressionSyntax memberAccess &&
+                semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol is
+                    IPropertySymbol {
+                        Name: "Span",
+                        IsStatic: false,
+                        Parameters.Length: 0,
+                        GetMethod: not null
+                    } property &&
+                property.ContainingType.OriginalDefinition.Name is "Memory" or "ReadOnlyMemory" &&
+                IsKnownCoreSequenceType(property.ContainingType)) {
+                source = memberAccess.Expression;
+                return true;
+            }
+            if (collection is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not
+                    IInvocationOperation { TargetMethod: { } targetMethod } operation)
+                return false;
+            var definition = targetMethod.ReducedFrom ?? targetMethod;
+            if (!IsCoreLibraryType(definition.ContainingType) ||
+                definition.ContainingNamespace.ToDisplayString() != "System")
+                return false;
+            var supported =
+                definition.ContainingType.Name == "MemoryExtensions" &&
+                definition.Name is "AsMemory" or "AsSpan" or "ToArray" ||
+                IsKnownCoreSequenceType(definition.ContainingType) &&
+                definition.Name is "Slice" or "ToArray";
+            return supported &&
+                   TryGetStandardSequenceSource(invocation, operation, out source);
         }
         private bool TryGetZeroPreservingImmutableFactoryStep(
             ExpressionSyntax collection,
@@ -381,8 +420,11 @@ internal static class CompilerProgramPointAnalysis {
                 } property)
                 return false;
             var type = property.ContainingType.OriginalDefinition;
-            return type.ContainingAssembly?.Name is
-                       "System.Private.CoreLib" or "System.Runtime" or "mscorlib" &&
+            return IsKnownCoreSequenceType(type);
+        }
+        private static bool IsKnownCoreSequenceType(INamedTypeSymbol candidate) {
+            var type = candidate.OriginalDefinition;
+            return IsCoreLibraryType(type) &&
                    type.ContainingNamespace.ToDisplayString() == "System" &&
                    type.Arity == 1 &&
                    type.Name is
@@ -392,6 +434,9 @@ internal static class CompilerProgramPointAnalysis {
                        "ReadOnlySpan" or
                        "Span";
         }
+        private static bool IsCoreLibraryType(INamedTypeSymbol type) =>
+            type.ContainingAssembly?.Name is
+                "System.Private.CoreLib" or "System.Runtime" or "mscorlib";
         private bool IsKnownImmutableEmptySingleton(ExpressionSyntax collection) {
             var symbol = semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol;
             var isEmptySingleton = symbol switch {

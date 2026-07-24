@@ -132,6 +132,100 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReadOnlyMemoryEmptySpanLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in ReadOnlyMemory<Item>.Empty.Span)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_MemoryEmptySpanLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Memory<Item>.Empty.Span)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptyStringAsMemorySpanLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var _ in string.Empty.AsMemory().Span)
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptyMemorySliceSpanLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in ReadOnlyMemory<Item>.Empty.Slice(0).Span)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptySpanToArrayLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in ReadOnlySpan<Item>.Empty.ToArray())
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_NonemptyMemorySpanLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var memory = new Memory<Item>(new[] { new Item(null) });
+                    foreach (var item in memory.Span)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_CustomAsSpanOverEmptyArrayLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static IEnumerable<Item> AsSpan(Item[] source) =>
+                    new[] { new Item(null) };
+                public static object FirstValue() {
+                    foreach (var item in AsSpan(Array.Empty<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ArraySegmentEmptyAliasProjectionLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable
