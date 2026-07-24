@@ -146,7 +146,7 @@ internal static class CompilerProgramPointAnalysis {
                     continue;
                 var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
                 foreach (var predicate in predicates) {
-                    if (!SymbolicSourcePredicateLowerer.TryLowerSingleParameterLambdaPredicate(
+                    if (!SymbolicSourcePredicateLowerer.TryLowerSingleParameterSequencePredicate(
                             predicate,
                             iterationTerm,
                             context,
@@ -158,8 +158,8 @@ internal static class CompilerProgramPointAnalysis {
         }
         private bool TryGetEnumerableWherePredicates(
             ExpressionSyntax collection,
-            out ImmutableArray<AnonymousFunctionExpressionSyntax> predicates) {
-            var builder = ImmutableArray.CreateBuilder<AnonymousFunctionExpressionSyntax>();
+            out ImmutableArray<ExpressionSyntax> predicates) {
+            var builder = ImmutableArray.CreateBuilder<ExpressionSyntax>();
             while (TryGetEnumerableWhereStep(collection, out var source, out var predicate)) {
                 builder.Add(predicate);
                 collection = source;
@@ -170,13 +170,12 @@ internal static class CompilerProgramPointAnalysis {
         private bool TryGetEnumerableWhereStep(
             ExpressionSyntax collection,
             out ExpressionSyntax source,
-            out AnonymousFunctionExpressionSyntax predicate) {
+            out ExpressionSyntax predicate) {
             source = null!;
             predicate = null!;
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is not InvocationExpressionSyntax invocation ||
-                invocation.ArgumentList.Arguments.LastOrDefault()?.Expression is not
-                    AnonymousFunctionExpressionSyntax lambda ||
+                invocation.ArgumentList.Arguments.LastOrDefault()?.Expression is not { } candidatePredicate ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
                     IInvocationOperation { TargetMethod: { } targetMethod })
                 return false;
@@ -191,7 +190,7 @@ internal static class CompilerProgramPointAnalysis {
                 ? memberAccess.Expression
                 : invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression!;
             if (source == null) return false;
-            predicate = lambda;
+            predicate = candidatePredicate;
             return true;
         }
         private void ApplyContainingSwitchFacts(ref SymbolicState state) {

@@ -1,6 +1,41 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicSourcePredicateLowerer {
-    internal static bool TryLowerSingleParameterLambdaPredicate(
+    internal static bool TryLowerSingleParameterSequencePredicate(
+        ExpressionSyntax predicate,
+        SymbolicTerm argument,
+        SymbolicLoweringContext callerContext,
+        out SymbolicCondition condition) {
+        predicate = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(predicate);
+        if (predicate is AnonymousFunctionExpressionSyntax lambda)
+            return TryLowerSingleParameterLambdaPredicate(
+                lambda,
+                argument,
+                callerContext,
+                out condition);
+        condition = null!;
+        var symbolInfo = callerContext.SemanticModel.GetSymbolInfo(predicate, callerContext.CancellationToken);
+        var method = symbolInfo.Symbol as IMethodSymbol ??
+                     (symbolInfo.CandidateSymbols.Length == 1
+                         ? symbolInfo.CandidateSymbols[0] as IMethodSymbol
+                         : null);
+        if (method == null) return false;
+        method = method.OriginalDefinition;
+        if (!method.IsStatic ||
+            !CanInlineSourceBooleanPredicate(method) ||
+            method.Parameters.Length != 1 ||
+            !SourcePredicateParameterIsStable(method, method.Parameters[0], callerContext))
+            return false;
+        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default) {
+            [method.Parameters[0].OriginalDefinition] = argument
+        };
+        return TryLowerReturnedBoolean(
+            method,
+            callerContext,
+            substitutions,
+            callerContext.ImplicitThis,
+            out condition);
+    }
+    private static bool TryLowerSingleParameterLambdaPredicate(
         AnonymousFunctionExpressionSyntax lambda,
         SymbolicTerm argument,
         SymbolicLoweringContext callerContext,
@@ -20,20 +55,47 @@ internal static class SymbolicSourcePredicateLowerer {
             substitutions,
             out condition);
     }
+    private static bool SourcePredicateParameterIsStable(
+        IMethodSymbol method,
+        IParameterSymbol parameter,
+        SymbolicLoweringContext callerContext) {
+        var callable = method.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(callerContext.CancellationToken))
+            .FirstOrDefault();
+        if (callable == null) return false;
+        var semanticModel = callerContext.Compilation.GetSemanticModel(callable.SyntaxTree);
+        if (SymbolicMutationInventory.Create(callable, semanticModel, callerContext.CancellationToken)
+            .InvalidatesSymbol(parameter, true))
+            return false;
+        return ReadsOnlyStableParameterMembers(
+            callable,
+            parameter,
+            semanticModel,
+            callerContext.CancellationToken);
+    }
     private static bool LambdaReadsOnlyStableParameterMembers(
         AnonymousFunctionExpressionSyntax lambda,
         IParameterSymbol parameter,
-        SymbolicLoweringContext context) {
-        foreach (var member in GetLambdaBody(lambda)?.DescendantNodesAndSelf()
-                     .OfType<MemberAccessExpressionSyntax>() ?? []) {
+        SymbolicLoweringContext context) =>
+        ReadsOnlyStableParameterMembers(
+            GetLambdaBody(lambda),
+            parameter,
+            context.SemanticModel,
+            context.CancellationToken);
+    private static bool ReadsOnlyStableParameterMembers(
+        SyntaxNode? body,
+        IParameterSymbol parameter,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) {
+        foreach (var member in body?.DescendantNodesAndSelf().OfType<MemberAccessExpressionSyntax>() ?? []) {
             if (!SymbolEqualityComparer.Default.Equals(
-                    context.SemanticModel.GetSymbolInfo(member.Expression, context.CancellationToken).Symbol,
+                    semanticModel.GetSymbolInfo(member.Expression, cancellationToken).Symbol,
                     parameter))
                 continue;
-            var symbol = context.SemanticModel.GetSymbolInfo(member, context.CancellationToken).Symbol;
+            var symbol = semanticModel.GetSymbolInfo(member, cancellationToken).Symbol;
             if (symbol is IFieldSymbol) continue;
             if (symbol is IPropertySymbol property &&
-                CSharpSyntaxFacts.IsStableStorageProperty(property, context.CancellationToken))
+                CSharpSyntaxFacts.IsStableStorageProperty(property, cancellationToken))
                 continue;
             return false;
         }
