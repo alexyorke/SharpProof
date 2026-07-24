@@ -98,7 +98,9 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 }
                 var provenance = new MetadataProvenanceState(
                     isStatic,
-                    context);
+                    context,
+                    [.. definitionSignature.ParameterTypes.Select(
+                        static type => type.IsValueType && !type.IsByRef)]);
                 var bytes = body.GetILBytes() ?? [];
                 for (var offset = 0; offset < bytes.Length;) {
                     if (++instructionCount > MaxInstructions) {
@@ -880,13 +882,18 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     private sealed class MetadataProvenanceState {
         private readonly bool _isStatic;
         private readonly MetadataCallContext _context;
+        private readonly ImmutableArray<bool> _copiedValueParameters;
         private readonly List<MetadataValueOrigin> _stack = [];
         private readonly Dictionary<int, MetadataValueOrigin> _arguments = [];
         private readonly Dictionary<int, MetadataValueOrigin> _locals = [];
         private bool _hasControlFlowBranch;
-        internal MetadataProvenanceState(bool isStatic, MetadataCallContext context) {
+        internal MetadataProvenanceState(
+            bool isStatic,
+            MetadataCallContext context,
+            ImmutableArray<bool> copiedValueParameters) {
             _isStatic = isStatic;
             _context = context;
+            _copiedValueParameters = copiedValueParameters;
         }
         internal MetadataCallContext ObserveInvocation(
             int parameterCount,
@@ -914,7 +921,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 return null;
             }
             if (TryArgumentAddressIndex(opcode, operand, out argumentIndex)) {
-                Push(ArgumentOrigin(argumentIndex));
+                Push(MetadataValueOrigin.Local);
                 return null;
             }
             if (TryArgumentStoreIndex(opcode, operand, out argumentIndex)) {
@@ -1092,6 +1099,10 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             if (_arguments.TryGetValue(ilIndex, out var assigned)) return assigned;
             if (!_isStatic && ilIndex == 0) return _context.Receiver;
             var parameterIndex = _isStatic ? ilIndex : ilIndex - 1;
+            if (parameterIndex >= 0 &&
+                parameterIndex < _copiedValueParameters.Length &&
+                _copiedValueParameters[parameterIndex])
+                return MetadataValueOrigin.Local;
             return parameterIndex >= 0 && parameterIndex < _context.Arguments.Length
                 ? _context.Arguments[parameterIndex]
                 : MetadataValueOrigin.Unknown;

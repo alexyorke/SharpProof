@@ -91,7 +91,11 @@ internal static class EcmaStructuralMethodIdentity {
         return namespaceName.Length == 0 ? name : namespaceName + "." + name;
     }
 }
-internal readonly record struct StructuralDecodedType(string Key, bool IsByRef = false, bool IsReadOnlyModifier = false);
+internal readonly record struct StructuralDecodedType(
+    string Key,
+    bool IsByRef = false,
+    bool IsReadOnlyModifier = false,
+    bool IsValueType = false);
 internal readonly record struct StructuralGenericContext(
     ImmutableArray<StructuralDecodedType> TypeArguments,
     ImmutableArray<StructuralDecodedType> MethodArguments);
@@ -110,12 +114,14 @@ internal sealed class StructuralTypeProvider : ISignatureTypeProvider<Structural
             : StructuralRefKinds.None;
         return new StructuralDecodedType(
             "fnptr:" + signature.Header.CallingConvention.ToString().ToLowerInvariant() + "(" + parameters +
-            ")->" + returnRefKind + ":" + signature.ReturnType.Key);
+            ")->" + returnRefKind + ":" + signature.ReturnType.Key,
+            IsValueType: true);
     }
     public StructuralDecodedType GetGenericInstantiation(
         StructuralDecodedType genericType,
         ImmutableArray<StructuralDecodedType> typeArguments) => new(
-            genericType.Key + "[" + string.Join(";", typeArguments.Select(static argument => argument.Key)) + "]");
+            genericType.Key + "[" + string.Join(";", typeArguments.Select(static argument => argument.Key)) + "]",
+            IsValueType: genericType.IsValueType);
     public StructuralDecodedType GetGenericMethodParameter(object? genericContext, int index) =>
         genericContext is StructuralGenericContext context && index < context.MethodArguments.Length
             ? context.MethodArguments[index]
@@ -134,33 +140,39 @@ internal sealed class StructuralTypeProvider : ISignatureTypeProvider<Structural
         elementType;
     public StructuralDecodedType GetPointerType(StructuralDecodedType elementType) =>
         new("pointer[" + elementType.Key + "]");
-    public StructuralDecodedType GetPrimitiveType(PrimitiveTypeCode typeCode) => new("named:" + (typeCode switch {
-        PrimitiveTypeCode.Boolean => "System.Boolean",
-        PrimitiveTypeCode.Byte => "System.Byte",
-        PrimitiveTypeCode.Char => "System.Char",
-        PrimitiveTypeCode.Double => "System.Double",
-        PrimitiveTypeCode.Int16 => "System.Int16",
-        PrimitiveTypeCode.Int32 => "System.Int32",
-        PrimitiveTypeCode.Int64 => "System.Int64",
-        PrimitiveTypeCode.IntPtr => "System.IntPtr",
-        PrimitiveTypeCode.Object => "System.Object",
-        PrimitiveTypeCode.SByte => "System.SByte",
-        PrimitiveTypeCode.Single => "System.Single",
-        PrimitiveTypeCode.String => "System.String",
-        PrimitiveTypeCode.TypedReference => "System.TypedReference",
-        PrimitiveTypeCode.UInt16 => "System.UInt16",
-        PrimitiveTypeCode.UInt32 => "System.UInt32",
-        PrimitiveTypeCode.UInt64 => "System.UInt64",
-        PrimitiveTypeCode.UIntPtr => "System.UIntPtr",
-        PrimitiveTypeCode.Void => "System.Void",
-        _ => "<unknown>"
-    }));
+    public StructuralDecodedType GetPrimitiveType(PrimitiveTypeCode typeCode) => new(
+        "named:" + (typeCode switch {
+            PrimitiveTypeCode.Boolean => "System.Boolean",
+            PrimitiveTypeCode.Byte => "System.Byte",
+            PrimitiveTypeCode.Char => "System.Char",
+            PrimitiveTypeCode.Double => "System.Double",
+            PrimitiveTypeCode.Int16 => "System.Int16",
+            PrimitiveTypeCode.Int32 => "System.Int32",
+            PrimitiveTypeCode.Int64 => "System.Int64",
+            PrimitiveTypeCode.IntPtr => "System.IntPtr",
+            PrimitiveTypeCode.Object => "System.Object",
+            PrimitiveTypeCode.SByte => "System.SByte",
+            PrimitiveTypeCode.Single => "System.Single",
+            PrimitiveTypeCode.String => "System.String",
+            PrimitiveTypeCode.TypedReference => "System.TypedReference",
+            PrimitiveTypeCode.UInt16 => "System.UInt16",
+            PrimitiveTypeCode.UInt32 => "System.UInt32",
+            PrimitiveTypeCode.UInt64 => "System.UInt64",
+            PrimitiveTypeCode.UIntPtr => "System.UIntPtr",
+            PrimitiveTypeCode.Void => "System.Void",
+            _ => "<unknown>"
+        }),
+        IsValueType: typeCode is not (PrimitiveTypeCode.Object or PrimitiveTypeCode.String or PrimitiveTypeCode.Void));
     public StructuralDecodedType GetSZArrayType(StructuralDecodedType elementType) =>
         new("array:1[" + elementType.Key + "]");
     public StructuralDecodedType GetTypeFromDefinition(MetadataReader reader, TypeDefinitionHandle handle, byte rawTypeKind)
-        => new("named:" + EcmaStructuralMethodIdentity.GetTypeDefinitionMetadataName(reader, handle));
+        => new(
+            "named:" + EcmaStructuralMethodIdentity.GetTypeDefinitionMetadataName(reader, handle),
+            IsValueType: rawTypeKind == (byte)SignatureTypeKind.ValueType);
     public StructuralDecodedType GetTypeFromReference(MetadataReader reader, TypeReferenceHandle handle, byte rawTypeKind)
-        => new("named:" + EcmaStructuralMethodIdentity.GetTypeReferenceMetadataName(reader, handle));
+        => new(
+            "named:" + EcmaStructuralMethodIdentity.GetTypeReferenceMetadataName(reader, handle),
+            IsValueType: rawTypeKind == (byte)SignatureTypeKind.ValueType);
     public StructuralDecodedType GetTypeFromSpecification(
         MetadataReader reader,
         object? genericContext,
