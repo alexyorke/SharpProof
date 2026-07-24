@@ -153,6 +153,69 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ConjoinedConditionalOutputAlias_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory, bool enabled) {
+                    var shouldUseExpression = enabled && factory.TryGet(out var expression);
+                    return shouldUseExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_LogicalImplicationPolarity_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryTrue([NotNullWhen(true)] out object? value);
+                bool TryFalse([NotNullWhen(false)] out object? value);
+            }
+            public static class Consumer {
+                public static object DisjoinedFalse(IFactory factory, bool disabled) {
+                    var failed = disabled || factory.TryFalse(out var expression);
+                    return !failed ? expression! : new object();
+                }
+                public static object BitwiseConjoinedTrue(IFactory factory, bool enabled) {
+                    var shouldUseExpression = enabled & factory.TryTrue(out var expression);
+                    return shouldUseExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_MultipleImpliedConditionalOutputs_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryFirst([NotNullWhen(true)] out object? value);
+                bool TrySecond([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    var shouldUseExpressions =
+                        factory.TryFirst(out var first) && factory.TrySecond(out var second);
+                    return shouldUseExpressions ? (first!, second!) : (new object(), new object());
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_NonImplyingLogicalBranch_Reports",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory, bool enabled) {
+                    var shouldUseExpression = enabled && factory.TryGet(out var expression);
+                    return !shouldUseExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_BooleanComparisonPolarity_DoesNotReport",
             """
             #nullable enable

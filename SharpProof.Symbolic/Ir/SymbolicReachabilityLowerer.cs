@@ -45,97 +45,92 @@ internal static class SymbolicReachabilityLowerer {
         bool branchWhenTrue,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
-        var methodReturnValue = branchWhenTrue;
-        if (condition is PrefixUnaryExpressionSyntax logicalNot &&
-            logicalNot.IsKind(SyntaxKind.LogicalNotExpression)) {
-            condition = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(logicalNot.Operand);
-            methodReturnValue = !methodReturnValue;
-        }
         if (!TryResolveConditionalInvocation(
                 condition,
+                branchWhenTrue,
                 semanticModel,
                 cancellationToken,
-                out var invocation,
-                out var aliasNegated) ||
-            semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation)
+                out var invocations))
             return false;
-        if (aliasNegated)
-            methodReturnValue = !methodReturnValue;
         var applied = false;
-        foreach (var argument in operation.Arguments) {
-            if (argument is not
-                {
-                    ArgumentKind: ArgumentKind.Explicit,
-                    Parameter: { RefKind: RefKind.Ref or RefKind.Out } parameter,
-                    Syntax: ArgumentSyntax syntax
-                } ||
-                !SymbolicFrameworkPostconditionLowerer.ArgumentRefKindMatches(parameter, syntax) ||
-                !SymbolicFrameworkPostconditionLowerer.IsUniqueOutputArgumentTarget(
-                    operation,
-                    argument,
-                    semanticModel,
-                    cancellationToken) ||
-                !NullableFlowFacts.TryGetArgumentTargetSymbol(
+        foreach (var resolved in invocations) {
+            if (semanticModel.GetOperation(resolved.Invocation, cancellationToken) is not IInvocationOperation operation)
+                continue;
+            foreach (var argument in operation.Arguments) {
+                if (argument is not
+                    {
+                        ArgumentKind: ArgumentKind.Explicit,
+                        Parameter: { RefKind: RefKind.Ref or RefKind.Out } parameter,
+                        Syntax: ArgumentSyntax syntax
+                    } ||
+                    !SymbolicFrameworkPostconditionLowerer.ArgumentRefKindMatches(parameter, syntax) ||
+                    !SymbolicFrameworkPostconditionLowerer.IsUniqueOutputArgumentTarget(
+                        operation,
+                        argument,
+                        semanticModel,
+                        cancellationToken) ||
+                    !NullableFlowFacts.TryGetArgumentTargetSymbol(
+                        syntax.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        out var target) ||
+                    IsMutatedBetween(
+                        target,
+                        resolved.Invocation,
+                        condition,
+                        semanticModel,
+                        cancellationToken))
+                    continue;
+                state = SymbolicStateValueFacts.RemoveReferences(state, target);
+                applied = true;
+                if (NullableFlowFacts.GetParameterOutputState(parameter, resolved.ReturnValue) !=
+                        NullableFlowFactState.NotNull ||
+                    !SymbolicStateFactBuilder.TryCreateSymbolTerm(target, out var term) ||
+                    term.Kind != SmtValueKind.Reference)
+                    continue;
+                state = state.AddPathCondition(SymbolicIrLowerer.CreateRelationCondition(
+                    SymbolicRelationOperator.NotEqual,
+                    term,
+                    new SymbolicNullTerm(),
                     syntax.Expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var target) ||
-                IsMutatedBetween(
-                    target,
-                    invocation,
-                    condition,
-                    semanticModel,
-                    cancellationToken))
-                continue;
-            state = SymbolicStateValueFacts.RemoveReferences(state, target);
-            applied = true;
-            if (NullableFlowFacts.GetParameterOutputState(parameter, methodReturnValue) !=
-                    NullableFlowFactState.NotNull ||
-                !SymbolicStateFactBuilder.TryCreateSymbolTerm(target, out var term) ||
-                term.Kind != SmtValueKind.Reference)
-                continue;
-            state = state.AddPathCondition(SymbolicIrLowerer.CreateRelationCondition(
-                SymbolicRelationOperator.NotEqual,
-                term,
-                new SymbolicNullTerm(),
-                syntax.Expression,
-                "ir.path.branch.parameter-not-null"));
+                    "ir.path.branch.parameter-not-null"));
+            }
         }
         return applied;
     }
+    private readonly record struct ConditionalInvocation(
+        InvocationExpressionSyntax Invocation,
+        bool ReturnValue);
     private static bool TryResolveConditionalInvocation(
         ExpressionSyntax condition,
+        bool conditionValue,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out InvocationExpressionSyntax invocation,
-        out bool negated) => TryResolveConditionalInvocation(
+        out IReadOnlyList<ConditionalInvocation> invocations) => TryResolveConditionalInvocation(
             condition,
+            conditionValue,
             semanticModel,
             cancellationToken,
             new HashSet<ISymbol>(SymbolEqualityComparer.Default),
-            out invocation,
-            out negated);
+            out invocations);
     private static bool TryResolveConditionalInvocation(
         ExpressionSyntax expression,
+        bool expressionValue,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         HashSet<ISymbol> visitedLocals,
-        out InvocationExpressionSyntax invocation,
-        out bool negated) {
+        out IReadOnlyList<ConditionalInvocation> invocations) {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        negated = false;
+        invocations = [];
         if (expression is PrefixUnaryExpressionSyntax logicalNot &&
             logicalNot.IsKind(SyntaxKind.LogicalNotExpression)) {
-            if (!TryResolveConditionalInvocation(
-                    logicalNot.Operand,
-                    semanticModel,
-                    cancellationToken,
-                    visitedLocals,
-                    out invocation,
-                    out negated))
-                return false;
-            negated = !negated;
-            return true;
+            return TryResolveConditionalInvocation(
+                logicalNot.Operand,
+                !expressionValue,
+                semanticModel,
+                cancellationToken,
+                visitedLocals,
+                out invocations);
         }
         if (TryGetBooleanWrapperOperand(
                 expression,
@@ -143,19 +138,40 @@ internal static class SymbolicReachabilityLowerer {
                 cancellationToken,
                 out var comparedOperand,
                 out var comparisonNegated)) {
-            if (!TryResolveConditionalInvocation(
-                    comparedOperand,
+            return TryResolveConditionalInvocation(
+                comparedOperand,
+                expressionValue ^ comparisonNegated,
+                semanticModel,
+                cancellationToken,
+                visitedLocals,
+                out invocations);
+        }
+        if (TryGetImpliedBooleanOperandValue(expression, expressionValue, semanticModel, cancellationToken,
+                out var impliedValue) &&
+            expression is BinaryExpressionSyntax logical) {
+            var resolved = new List<ConditionalInvocation>();
+            var leftVisited = new HashSet<ISymbol>(visitedLocals, SymbolEqualityComparer.Default);
+            if (TryResolveConditionalInvocation(
+                    logical.Left,
+                    impliedValue,
+                    semanticModel,
+                    cancellationToken,
+                    leftVisited,
+                    out var leftInvocations))
+                resolved.AddRange(leftInvocations);
+            if (TryResolveConditionalInvocation(
+                    logical.Right,
+                    impliedValue,
                     semanticModel,
                     cancellationToken,
                     visitedLocals,
-                    out invocation,
-                    out negated))
-                return false;
-            negated ^= comparisonNegated;
-            return true;
+                    out var rightInvocations))
+                resolved.AddRange(rightInvocations);
+            invocations = resolved;
+            return resolved.Count > 0;
         }
         if (expression is InvocationExpressionSyntax directInvocation) {
-            invocation = directInvocation;
+            invocations = [new ConditionalInvocation(directInvocation, expressionValue)];
             return true;
         }
         if (semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not ILocalSymbol local ||
@@ -163,7 +179,6 @@ internal static class SymbolicReachabilityLowerer {
             local.DeclaringSyntaxReferences.Length != 1 ||
             local.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not
                 VariableDeclaratorSyntax { Initializer.Value: { } initializer }) {
-            invocation = null!;
             return false;
         }
         var initializerExpression =
@@ -173,16 +188,40 @@ internal static class SymbolicReachabilityLowerer {
             IsMutatedBetween(local, initializerExpression, expression, semanticModel, cancellationToken) ||
             !TryResolveConditionalInvocation(
                 initializerExpression,
+                expressionValue,
                 semanticModel,
                 cancellationToken,
                 visitedLocals,
-                out invocation,
-                out negated)) {
-            invocation = null!;
-            negated = false;
+                out invocations)) {
+            invocations = [];
             return false;
         }
         return true;
+    }
+    private static bool TryGetImpliedBooleanOperandValue(
+        ExpressionSyntax expression,
+        bool expressionValue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out bool operandValue) {
+        operandValue = false;
+        if (expression is not BinaryExpressionSyntax binary ||
+            semanticModel.GetOperation(binary, cancellationToken) is not
+                IBinaryOperation { OperatorMethod: null, Type.SpecialType: SpecialType.System_Boolean })
+            return false;
+        var isAnd = binary.IsKind(SyntaxKind.LogicalAndExpression) ||
+                    binary.IsKind(SyntaxKind.BitwiseAndExpression);
+        var isOr = binary.IsKind(SyntaxKind.LogicalOrExpression) ||
+                   binary.IsKind(SyntaxKind.BitwiseOrExpression);
+        if (isAnd && expressionValue) {
+            operandValue = true;
+            return true;
+        }
+        if (isOr && !expressionValue) {
+            operandValue = false;
+            return true;
+        }
+        return false;
     }
     private static bool TryGetBooleanWrapperOperand(
         ExpressionSyntax expression,
