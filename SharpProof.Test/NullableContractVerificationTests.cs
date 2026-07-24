@@ -108,6 +108,38 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", true);
+        yield return Case("NullForgivingOperator_MutatedConditionalOutputTarget_Reports",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    var isExact = factory.TryGet(out var expression);
+                    expression = null;
+                    return isExact ? expression! : new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_DirectConditionalOutputIgnoresLaterCapture",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    object? expression = null;
+                    System.Action mutateLater = () => expression = null;
+                    if (factory.TryGet(out expression)) return expression!;
+                    System.GC.KeepAlive(mutateLater);
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
         yield return Case("NullForgivingOperator_UserEqualityPredicate_RemainsConservative",
             """
             #nullable enable

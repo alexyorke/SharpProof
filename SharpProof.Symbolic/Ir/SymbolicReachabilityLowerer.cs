@@ -79,7 +79,13 @@ internal static class SymbolicReachabilityLowerer {
                     syntax.Expression,
                     semanticModel,
                     cancellationToken,
-                    out var target))
+                    out var target) ||
+                IsMutatedBetween(
+                    target,
+                    invocation,
+                    condition,
+                    semanticModel,
+                    cancellationToken))
                 continue;
             state = SymbolicStateValueFacts.RemoveReferences(state, target);
             applied = true;
@@ -136,8 +142,8 @@ internal static class SymbolicReachabilityLowerer {
         return true;
     }
     private static bool IsMutatedBetween(
-        ILocalSymbol local,
-        InvocationExpressionSyntax initializer,
+        ISymbol symbol,
+        SyntaxNode origin,
         ExpressionSyntax condition,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
@@ -146,13 +152,13 @@ internal static class SymbolicReachabilityLowerer {
                 executionRoot,
                 includeNestedCallables: true)
             .Where(node =>
-                node.SpanStart >= initializer.Span.End && node.Span.End <= condition.SpanStart ||
+                node.SpanStart >= origin.Span.End && node.Span.End <= condition.SpanStart ||
                 IsInsideNestedCallable(node, executionRoot))
             .Any(node =>
                 SymbolMutationFacts.TryGetMutationTarget(node, out var target) &&
                 SymbolMutationFacts.ExpressionMatchesSymbol(
                     target,
-                    local,
+                    symbol,
                     semanticModel,
                     cancellationToken));
     }
