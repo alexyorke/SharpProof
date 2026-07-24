@@ -149,6 +149,13 @@ internal static class CompilerProgramPointAnalysis {
                     value,
                     semanticModel,
                     cancellationToken);
+                if (arm.WhenClause is { } whenClause &&
+                    !whenClause.Span.Contains(site.SpanStart))
+                    SymbolicStateInvalidator.InvalidateNestedMutations(
+                        ref state,
+                        whenClause.Condition,
+                        semanticModel,
+                        cancellationToken);
             }
             foreach (var section in site.Ancestors().OfType<SwitchSectionSyntax>()) {
                 if (section.Parent is not SwitchStatementSyntax switchStatement ||
@@ -160,6 +167,14 @@ internal static class CompilerProgramPointAnalysis {
                     value,
                     semanticModel,
                     cancellationToken);
+                foreach (var patternLabel in section.Labels.OfType<CasePatternSwitchLabelSyntax>())
+                    if (patternLabel.WhenClause is { } whenClause &&
+                        !whenClause.Span.Contains(site.SpanStart))
+                        SymbolicStateInvalidator.InvalidateNestedMutations(
+                            ref state,
+                            whenClause.Condition,
+                            semanticModel,
+                            cancellationToken);
             }
         }
         private bool TryGetSectionBooleanValue(SwitchSectionSyntax section, out bool value) {
