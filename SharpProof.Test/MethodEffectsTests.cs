@@ -3050,6 +3050,15 @@ public sealed class MethodEffectsTests {
             allocationFree: SharpProofVerdict.Proven,
             forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
                        SharpProofEffect.Allocates | SharpProofEffect.Throws | SharpProofEffect.Unknown);
+        yield return Effect("MathAtan2IsPureAndAllocationFree", """
+            class C {
+                static double M(double y, double x) => System.Math.Atan2(y, x);
+            }
+            """, 2,
+            purity: SharpProofVerdict.Proven,
+            allocationFree: SharpProofVerdict.Proven,
+            forbidden: SharpProofEffect.ReadsArgumentState | SharpProofEffect.WritesArgumentState |
+                       SharpProofEffect.Allocates | SharpProofEffect.Throws | SharpProofEffect.Unknown);
         yield return Effect("StructConstructionKeepsConstructorEffectsWithoutAllocating", """
             static class Globals { public static int Count; }
             readonly struct Value {
