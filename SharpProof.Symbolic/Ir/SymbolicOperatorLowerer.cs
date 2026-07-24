@@ -36,6 +36,14 @@ internal static class SymbolicOperatorLowerer {
                (left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference) ||
                (right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference);
     }
+    internal static bool HasBuiltInNullSemantics(Microsoft.CodeAnalysis.Operations.IBinaryOperation operation) {
+        if (operation.OperatorMethod == null) return true;
+        if (operation.OperatorMethod.ContainingType is not { IsRecord: true })
+            return false;
+        return IsNullConstant(operation.LeftOperand) || IsNullConstant(operation.RightOperand);
+    }
+    private static bool IsNullConstant(IOperation operation) =>
+        operation.ConstantValue is { HasValue: true, Value: null };
     internal static bool IsEqualityExpression(BinaryExpressionSyntax binaryExpression)
         => binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
                binaryExpression.IsKind(SyntaxKind.NotEqualsExpression);

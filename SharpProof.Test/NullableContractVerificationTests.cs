@@ -43,6 +43,61 @@ public sealed class NullableContractVerificationTests {
                 Nullable, false), "SP0044", false);
         yield return Case("InferredGuardPostcondition_IsConsumedByCaller",
             Class("public static void Guard(string? value)\n{\n    if (value is null) throw new System.ArgumentNullException(nameof(value));\n}\n\npublic static int Length(string? value)\n{\n    Guard(value);\n    return value!.Length;\n}", Nullable), "SP0044", false);
+        yield return Case("NullForgivingOperator_SourcePredicateGuard_DoesNotReport",
+            """
+            #nullable enable
+            public sealed record Failure(string Message);
+            public sealed record Outcome<T>(T? Value, Failure? Failure) where T : class {
+                public bool IsSuccess => Failure == null;
+            }
+            public static class Consumer {
+                private static Outcome<string> Query() => new(null, new("failed"));
+                public static int ErrorLength(System.Threading.CancellationToken cancellationToken) {
+                    var outcome = Query();
+                    if (!outcome.IsSuccess) {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var failure = outcome.Failure!;
+                        return failure.Message.Length;
+                    }
+                    return 0;
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_MetadataRecordPredicateGuard_DoesNotReport",
+            """
+            #nullable enable
+            public sealed record Outcome<T>(
+                T? Value,
+                SharpProof.Symbolic.SharpProofError? Error) where T : class {
+                public bool IsSuccess => Error == null;
+            }
+            public static class Consumer {
+                public static int ErrorLength(Outcome<string> outcome) {
+                    if (!outcome.IsSuccess) return outcome.Error!.Message.Length;
+                    return 0;
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_UserEqualityPredicate_RemainsConservative",
+            """
+            #nullable enable
+            public sealed class Failure {
+                public string Message => "failed";
+                public static bool operator ==(Failure? left, Failure? right) => false;
+                public static bool operator !=(Failure? left, Failure? right) => true;
+                public override bool Equals(object? value) => ReferenceEquals(this, value);
+                public override int GetHashCode() => 0;
+            }
+            public sealed record Outcome(Failure? Failure) {
+                public bool IsSuccess => Failure == null;
+            }
+            public static class Consumer {
+                public static int ErrorLength(Outcome outcome) {
+                    if (!outcome.IsSuccess) return outcome.Failure!.Message.Length;
+                    return 0;
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NotNullRef_NullCompletion_ReportsViolation",
             Class("public static void Reset([NotNull] ref string? value) => value = null;", CodeAnalysis), "SP0042", true);
         yield return Case("MaybeNullWhen_OppositeBranchMustHonorNonNullAnnotation",
