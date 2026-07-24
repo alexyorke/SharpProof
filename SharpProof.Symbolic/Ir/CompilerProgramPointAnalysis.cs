@@ -230,6 +230,15 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
+                if (TryGetZeroPreservingCoreSequenceConstructionStep(
+                        collection,
+                        out source,
+                        out var constructionProducesNoElements)) {
+                    definitelyNoElements |= constructionProducesNoElements;
+                    preservesElementIdentity = false;
+                    collection = source;
+                    continue;
+                }
                 if (TryGetZeroPreservingCollectionWrapperStep(collection, out source)) {
                     preservesElementIdentity = false;
                     collection = source;
@@ -336,6 +345,43 @@ internal static class CompilerProgramPointAnalysis {
                 return false;
             source = second;
             preservesElementIdentity = true;
+            return true;
+        }
+        private bool TryGetZeroPreservingCoreSequenceConstructionStep(
+            ExpressionSyntax collection,
+            out ExpressionSyntax source,
+            out bool definitelyNoElements) {
+            source = null!;
+            definitelyNoElements = false;
+            collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (semanticModel.GetOperation(collection, cancellationToken) is not
+                IObjectCreationOperation {
+                    Constructor: { Parameters.Length: > 0 } constructor,
+                    Type: INamedTypeSymbol type
+                } creation ||
+                creation.Initializer is { Initializers.Length: > 0 } ||
+                !IsKnownCoreSequenceType(type) ||
+                constructor.Parameters[0].Type is not IArrayTypeSymbol)
+                return false;
+            var sourceParameter = constructor.Parameters[0];
+            source = creation.Arguments
+                .FirstOrDefault(argument =>
+                    argument.Parameter != null &&
+                    SymbolEqualityComparer.Default.Equals(
+                        argument.Parameter.OriginalDefinition,
+                        sourceParameter.OriginalDefinition))
+                ?.Value.Syntax as ExpressionSyntax ?? null!;
+            if (source == null)
+                return false;
+            var limitParameter = constructor.Parameters.FirstOrDefault(parameter =>
+                parameter.Name is "count" or "length");
+            if (limitParameter != null &&
+                creation.Arguments.FirstOrDefault(argument =>
+                    argument.Parameter != null &&
+                    SymbolEqualityComparer.Default.Equals(
+                        argument.Parameter.OriginalDefinition,
+                        limitParameter.OriginalDefinition))?.Value.Syntax is ExpressionSyntax limit)
+                definitelyNoElements = DefinitelyCapsSequenceAtZero(limit);
             return true;
         }
         private bool TryGetZeroPreservingCollectionWrapperStep(
@@ -538,6 +584,8 @@ internal static class CompilerProgramPointAnalysis {
                 return true;
             if (IsKnownImmutableEmptySingleton(collection))
                 return true;
+            if (IsKnownDefaultEmptyCoreSequenceValue(collection))
+                return true;
             if (IsKnownEmptyCollectionConstruction(collection))
                 return true;
             if (collection is CollectionExpressionSyntax { Elements.Count: 0 })
@@ -573,6 +621,21 @@ internal static class CompilerProgramPointAnalysis {
                    TryGetInvocationArgument(operation, countParameter, out var count) &&
                    semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount } &&
                    constantCount <= 0;
+        }
+        private bool IsKnownDefaultEmptyCoreSequenceValue(ExpressionSyntax collection) {
+            if (semanticModel.GetOperation(collection, cancellationToken) is
+                    IObjectCreationOperation {
+                        Constructor.Parameters.Length: 0,
+                        Type: INamedTypeSymbol constructedType
+                    } creation &&
+                creation.Initializer is not { Initializers.Length: > 0 })
+                return IsKnownCoreSequenceType(constructedType);
+            if (collection is not DefaultExpressionSyntax &&
+                !collection.IsKind(SyntaxKind.DefaultLiteralExpression))
+                return false;
+            var typeInfo = semanticModel.GetTypeInfo(collection, cancellationToken);
+            return (typeInfo.Type ?? typeInfo.ConvertedType) is INamedTypeSymbol defaultType &&
+                   IsKnownCoreSequenceType(defaultType);
         }
         private bool IsKnownEmptyCollectionConstruction(ExpressionSyntax collection) {
             if (semanticModel.GetOperation(collection, cancellationToken) is not

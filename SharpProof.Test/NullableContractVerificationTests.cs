@@ -788,6 +788,219 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArraySegmentZeroCountLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var items = new[] { new Item(null) };
+                    foreach (var item in new ArraySegment<Item>(
+                        items,
+                        offset: 0,
+                        count: 0))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArraySegmentOverEmptyArrayLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new ArraySegment<Item>(
+                        Array.Empty<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_DefaultConstructedArraySegmentLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new ArraySegment<Item>())
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_DefaultReadOnlySpanLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    ReadOnlySpan<Item> items = default;
+                    foreach (var item in items)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_DefaultMemorySpanLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in default(Memory<Item>).Span)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_SourceDefinedDefaultSegmentLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            public sealed record Item(object? Value);
+            public readonly struct Segment {
+                public Enumerator GetEnumerator() => new();
+                public struct Enumerator {
+                    private bool moved;
+                    public Item Current => new(null);
+                    public bool MoveNext() {
+                        if (moved) return false;
+                        moved = true;
+                        return true;
+                    }
+                }
+            }
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in default(Segment))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArraySegmentZeroCountAliasLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var count = 1;
+                    count = 0;
+                    foreach (var item in new ArraySegment<Item>(
+                        new[] { new Item(null) },
+                        0,
+                        count))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArraySegmentPositiveCountLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new ArraySegment<Item>(
+                        new[] { new Item(null) },
+                        0,
+                        1))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_SpanZeroLengthLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var items = new[] { new Item(null) };
+                    foreach (var item in new Span<Item>(items, 0, 0))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReadOnlySpanOverEmptyArrayLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new ReadOnlySpan<Item>(Array.Empty<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_MemoryZeroLengthSpanLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var items = new[] { new Item(null) };
+                    foreach (var item in new Memory<Item>(items, 0, 0).Span)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReadOnlyMemoryPositiveLengthSpanLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new ReadOnlyMemory<Item>(
+                        new[] { new Item(null) },
+                        0,
+                        1).Span)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_SourceDefinedArraySegmentConstructorLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections;
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            namespace Mine {
+                public sealed class ArraySegment : IEnumerable<Item> {
+                    public ArraySegment(Item[] items, int offset, int count) {
+                    }
+                    public IEnumerator<Item> GetEnumerator() {
+                        yield return new Item(null);
+                    }
+                    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+                }
+            }
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new Mine.ArraySegment(
+                        System.Array.Empty<Item>(),
+                        0,
+                        0))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ReadOnlyMemoryEmptySpanLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable
