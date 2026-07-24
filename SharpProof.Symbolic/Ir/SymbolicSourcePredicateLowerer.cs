@@ -1,6 +1,6 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicSourcePredicateLowerer {
-    internal static bool TryLowerSingleParameterSequencePredicate(
+    internal static bool TryLowerSequencePredicate(
         ExpressionSyntax predicate,
         SymbolicTerm argument,
         SymbolicLoweringContext callerContext,
@@ -52,12 +52,13 @@ internal static class SymbolicSourcePredicateLowerer {
         }
         method = method.OriginalDefinition;
         if (!CanInlineSourceBooleanPredicate(method) ||
-            method.Parameters.Length != 1 ||
+            !TryCreateSequencePredicateSubstitutions(
+                method.Parameters,
+                argument,
+                predicate.SpanStart,
+                out var substitutions) ||
             !SourcePredicateParameterIsStable(method, method.Parameters[0], callerContext))
             return false;
-        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default) {
-            [method.Parameters[0].OriginalDefinition] = argument
-        };
         return TryLowerReturnedBoolean(
             method,
             callerContext,
@@ -72,18 +73,37 @@ internal static class SymbolicSourcePredicateLowerer {
         out SymbolicCondition condition) {
         condition = null!;
         var parameters = GetLambdaParameterSymbols(lambda, callerContext).ToArray();
-        if (parameters.Length != 1 ||
+        if (!TryCreateSequencePredicateSubstitutions(
+                parameters,
+                argument,
+                lambda.SpanStart,
+                out var substitutions) ||
             !LambdaBodyReferencesOnlyParameters(lambda, callerContext) ||
             !LambdaReadsOnlyStableParameterMembers(lambda, parameters[0], callerContext))
             return false;
-        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default) {
-            [parameters[0]] = argument
-        };
         return TryLowerReturnedBooleanSyntax(
             lambda,
             Rebind(callerContext, substitutions, nested: true),
             substitutions,
             out condition);
+    }
+    private static bool TryCreateSequencePredicateSubstitutions(
+        IReadOnlyList<IParameterSymbol> parameters,
+        SymbolicTerm argument,
+        int predicatePosition,
+        out Dictionary<ISymbol, SymbolicTerm> substitutions) {
+        substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default);
+        if (parameters.Count is < 1 or > 2 ||
+            parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
+            parameters.Count == 2 &&
+            parameters[1].Type.SpecialType != SpecialType.System_Int32)
+            return false;
+        substitutions[parameters[0].OriginalDefinition] = argument;
+        if (parameters.Count == 2)
+            substitutions[parameters[1].OriginalDefinition] = new SymbolicVariableTerm(
+                "where_index_" + predicatePosition.ToString(CultureInfo.InvariantCulture),
+                SmtValueKind.Int);
+        return true;
     }
     private static bool SourcePredicateParameterIsStable(
         IMethodSymbol method,

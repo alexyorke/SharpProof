@@ -146,7 +146,7 @@ internal static class CompilerProgramPointAnalysis {
                     continue;
                 var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
                 foreach (var predicate in predicates) {
-                    if (!SymbolicSourcePredicateLowerer.TryLowerSingleParameterSequencePredicate(
+                    if (!SymbolicSourcePredicateLowerer.TryLowerSequencePredicate(
                             predicate,
                             iterationTerm,
                             context,
