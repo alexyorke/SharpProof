@@ -28,6 +28,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                     return values;
                 }
                 public static void FieldWrite(MutableBox value) { value.Value = 1; }
+                public static int FieldRead(MutableBox value) => value.Value;
                 public static unsafe void IndirectWrite(int* value) { *value = 1; }
                 public static void CopyBlockOpcodeFixture() { VolatileState = 1; }
                 private static void Helper() { State++; }
@@ -141,6 +142,15 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesReceiverState), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataFieldReadsThroughArgumentsAreArgumentEffects() {
+        var effects = Analyze(
+            "static int M(MetadataFixture.MutableBox value) => MetadataFixture.Effects.FieldRead(value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.ReadsArgumentState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.ReadsReceiverState), Is.False);
         });
     }
     [Test]
