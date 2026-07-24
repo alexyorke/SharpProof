@@ -49,6 +49,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                 public static int Divide(int left, int right) => left / right;
                 public static int CheckedAdd(int left, int right) => checked(left + right);
                 public static int CheckedConvert(long value) => checked((int)value);
+                public static unsafe int SizeOf<T>() where T : unmanaged => sizeof(T);
                 public static void CopyBlockOpcodeFixture() { VolatileState = 1; }
                 private static void Helper() { State++; }
                 public static void RepeatHelper() { Helper(); Helper(); }
@@ -211,6 +212,17 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(conversion.Purity, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(conversion.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
             Assert.That(conversion.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataSizeOfIsPureAndAllocationFree() {
+        var effects = Analyze(
+            "static int M() => MetadataFixture.Effects.SizeOf<long>();");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
         });
     }
     [Test]
