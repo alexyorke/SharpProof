@@ -137,7 +137,10 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                     else {
                         accessOrigin = provenance.Observe(opcode, operand);
                     }
-                    if (opcode == OpCodes.Newobj || opcode == OpCodes.Newarr || opcode == OpCodes.Box) {
+                    if (opcode == OpCodes.Volatile) {
+                        effects |= SharpProofEffect.Synchronizes;
+                    }
+                    else if (opcode == OpCodes.Newobj || opcode == OpCodes.Newarr || opcode == OpCodes.Box) {
                         effects |= SharpProofEffect.Allocates;
                         if (opcode == OpCodes.Newobj) {
                             var constructor = MetadataTokens.Handle(operand);
@@ -349,7 +352,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                name.StartsWith("br", StringComparison.Ordinal) || name.StartsWith("leave", StringComparison.Ordinal) ||
                name.StartsWith("conv", StringComparison.Ordinal) || name.StartsWith("readonly", StringComparison.Ordinal) ||
                name.StartsWith("constrained", StringComparison.Ordinal) || name.StartsWith("tail", StringComparison.Ordinal) ||
-               name.StartsWith("unaligned", StringComparison.Ordinal) || name.StartsWith("volatile", StringComparison.Ordinal);
+               name.StartsWith("unaligned", StringComparison.Ordinal);
     }
     private static bool TryFindMethod(MetadataReader reader, IMethodSymbol symbol, out MethodDefinitionHandle result) {
         var wantedKey = RoslynStructuralMethodIdentity.GetCanonicalKey(symbol);
