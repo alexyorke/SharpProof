@@ -218,14 +218,14 @@ internal static class CompilerProgramPointAnalysis {
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is not InvocationExpressionSyntax invocation ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
-                    IInvocationOperation { TargetMethod: { } targetMethod })
+                    IInvocationOperation { TargetMethod: { } targetMethod } operation)
                 return false;
             var definition = targetMethod.ReducedFrom ?? targetMethod;
             if (definition.Name is not (nameof(Enumerable.Cast) or nameof(Enumerable.OfType)) ||
                 definition.ContainingType.ToDisplayString() is not
                     ("System.Linq.Enumerable" or "System.Linq.Queryable") ||
                 targetMethod.TypeArguments.Length != 1 ||
-                !TryGetStandardSequenceSource(invocation, out source))
+                !TryGetStandardSequenceSource(invocation, operation, out source))
                 return false;
             var sourceTypeInfo = semanticModel.GetTypeInfo(source, cancellationToken);
             return TryGetUniqueEnumerableElementType(
@@ -268,9 +268,13 @@ internal static class CompilerProgramPointAnalysis {
             source = null!;
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is not InvocationExpressionSyntax invocation ||
-                invocation.ArgumentList.Arguments.LastOrDefault()?.Expression is not { } selector ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
-                    IInvocationOperation { TargetMethod: { } targetMethod })
+                    IInvocationOperation { TargetMethod: { } targetMethod } operation ||
+                targetMethod.Parameters.Length == 0 ||
+                !TryGetInvocationArgument(
+                    operation,
+                    targetMethod.Parameters[targetMethod.Parameters.Length - 1],
+                    out var selector))
                 return false;
             var definition = targetMethod.ReducedFrom ?? targetMethod;
             if (definition.Name != nameof(Enumerable.Select) ||
@@ -280,7 +284,7 @@ internal static class CompilerProgramPointAnalysis {
                     selector,
                     new(semanticModel, cancellationToken)))
                 return false;
-            return TryGetStandardSequenceSource(invocation, out source);
+            return TryGetStandardSequenceSource(invocation, operation, out source);
         }
         private bool TryGetLazySequencePreservingStep(
             ExpressionSyntax collection,
@@ -289,7 +293,7 @@ internal static class CompilerProgramPointAnalysis {
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is not InvocationExpressionSyntax invocation ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
-                    IInvocationOperation { TargetMethod: { } targetMethod })
+                    IInvocationOperation { TargetMethod: { } targetMethod } operation)
                 return false;
             var definition = targetMethod.ReducedFrom ?? targetMethod;
             var containingType = definition.ContainingType.ToDisplayString();
@@ -302,7 +306,7 @@ internal static class CompilerProgramPointAnalysis {
             };
             if (!supported)
                 return false;
-            return TryGetStandardSequenceSource(invocation, out source);
+            return TryGetStandardSequenceSource(invocation, operation, out source);
         }
         private bool TryGetSequencePredicateStep(
             ExpressionSyntax collection,
@@ -314,9 +318,13 @@ internal static class CompilerProgramPointAnalysis {
             guaranteesTruth = false;
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is not InvocationExpressionSyntax invocation ||
-                invocation.ArgumentList.Arguments.LastOrDefault()?.Expression is not { } candidatePredicate ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
-                    IInvocationOperation { TargetMethod: { } targetMethod })
+                    IInvocationOperation { TargetMethod: { } targetMethod } operation ||
+                targetMethod.Parameters.Length == 0 ||
+                !TryGetInvocationArgument(
+                    operation,
+                    targetMethod.Parameters[targetMethod.Parameters.Length - 1],
+                    out var candidatePredicate))
                 return false;
             var definition = targetMethod.ReducedFrom ?? targetMethod;
             var containingType = definition.ContainingType.ToDisplayString();
@@ -331,20 +339,41 @@ internal static class CompilerProgramPointAnalysis {
             };
             if (!supported)
                 return false;
-            if (!TryGetStandardSequenceSource(invocation, out source)) return false;
+            if (!TryGetStandardSequenceSource(invocation, operation, out source)) return false;
             predicate = candidatePredicate;
             guaranteesTruth = definition.Name != nameof(Enumerable.SkipWhile);
             return true;
         }
         private bool TryGetStandardSequenceSource(
             InvocationExpressionSyntax invocation,
+            IInvocationOperation operation,
             out ExpressionSyntax source) {
-            source = invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
-                     semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not
-                         INamedTypeSymbol
-                ? memberAccess.Expression
-                : invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression!;
-            return source != null;
+            if (invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
+                semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not
+                    INamedTypeSymbol) {
+                source = memberAccess.Expression;
+                return true;
+            }
+            if (operation.TargetMethod.Parameters.Length != 0)
+                return TryGetInvocationArgument(
+                    operation,
+                    operation.TargetMethod.Parameters[0],
+                    out source);
+            source = null!;
+            return false;
+        }
+        private static bool TryGetInvocationArgument(
+            IInvocationOperation invocation,
+            IParameterSymbol parameter,
+            out ExpressionSyntax expression) {
+            expression = invocation.Arguments
+                .FirstOrDefault(argument =>
+                    argument.Parameter != null &&
+                    SymbolEqualityComparer.Default.Equals(
+                        argument.Parameter.OriginalDefinition,
+                        parameter.OriginalDefinition))
+                ?.Value.Syntax as ExpressionSyntax ?? null!;
+            return expression != null;
         }
         private void ApplyContainingSwitchFacts(ref SymbolicState state) {
             foreach (var arm in site.Ancestors().OfType<SwitchExpressionArmSyntax>()) {

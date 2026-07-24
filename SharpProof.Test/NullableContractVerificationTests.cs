@@ -1125,6 +1125,75 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReorderedNamedWhereArgumentsRefineLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in Enumerable.Where(
+                        predicate: static item => item.Value is not null,
+                        source: items))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReorderedNamedSubsetArgumentsRefineLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in Enumerable.Take(
+                        count: 2,
+                        source: Enumerable.Skip(
+                            count: 1,
+                            source: Enumerable.Where(
+                                predicate: static item => item.Value is not null,
+                                source: items))))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReorderedNamedIdentitySelectArgumentsRefineLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in Enumerable.Select(
+                        selector: static item => item,
+                        source: Enumerable.Where(
+                            predicate: static item => item.Value is not null,
+                            source: items)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ReorderedNamedQueryableWhereArgumentsRefineLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IQueryable<Item> items) {
+                    foreach (var item in Queryable.Where(
+                        predicate: static item => item.Value is not null,
+                        source: items))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
         yield return Case("NullForgivingOperator_IndexedWherePredicateRefinesLoopElement_DoesNotReport",
             """
             #nullable enable
