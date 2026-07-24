@@ -145,6 +145,121 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ImmutableArrayCreateRangeFromEmptyLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Immutable;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in ImmutableArray.CreateRange(Enumerable.Empty<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ToImmutableListFromEmptyLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Immutable;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in Enumerable.Empty<Item>().ToImmutableList())
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ImmutableDictionaryCreateRangeFromEmptyLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Collections.Immutable;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var pair in ImmutableDictionary.CreateRange(
+                        Enumerable.Empty<KeyValuePair<int, Item>>()))
+                        return pair.Value.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ToImmutableDictionaryFromEmptyLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Immutable;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var pair in Enumerable.Empty<Item>().ToImmutableDictionary(
+                        static item => item,
+                        static item => item))
+                        return pair.Value.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_MutatingImmutableConversionDoesNotPreserveWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Collections.Immutable;
+            using System.Linq;
+            public sealed class Item {
+                public object? Value { get; set; }
+            }
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var pair in items
+                        .Where(static item => item.Value is not null)
+                        .ToImmutableDictionary(
+                            static item => {
+                                item.Value = null;
+                                return item;
+                            },
+                            static item => item))
+                        return pair.Value.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_NonemptyImmutableCreateRangeLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections.Immutable;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in ImmutableArray.CreateRange(
+                        new[] { new Item(null) }))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_CustomCreateRangeOverEmptySourceLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Collections.Immutable;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static ImmutableArray<Item> CreateRange(IEnumerable<Item> source) =>
+                    ImmutableArray.Create(new Item(null));
+                public static object FirstValue() {
+                    foreach (var item in CreateRange(Enumerable.Empty<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ImmutableListCreateThroughProjectionLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable

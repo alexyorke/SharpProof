@@ -207,6 +207,11 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
+                if (TryGetZeroPreservingImmutableFactoryStep(collection, out source)) {
+                    preservesElementIdentity = false;
+                    collection = source;
+                    continue;
+                }
                 if (TryGetZeroPreservingSequenceOperatorStep(collection, out source)) {
                     preservesElementIdentity = false;
                     collection = source;
@@ -243,6 +248,33 @@ internal static class CompilerProgramPointAnalysis {
             }
             steps = builder.ToImmutable();
             return steps.Length != 0 || definitelyEmpty;
+        }
+        private bool TryGetZeroPreservingImmutableFactoryStep(
+            ExpressionSyntax collection,
+            out ExpressionSyntax source) {
+            source = null!;
+            collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (collection is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not
+                    IInvocationOperation { TargetMethod: { } targetMethod } operation)
+                return false;
+            var definition = targetMethod.ReducedFrom ?? targetMethod;
+            if (definition.ContainingAssembly?.Name != "System.Collections.Immutable" ||
+                definition.ContainingNamespace.ToDisplayString() != "System.Collections.Immutable" ||
+                definition.Name is not (
+                    "CreateRange" or
+                    "ToImmutableArray" or
+                    "ToImmutableDictionary" or
+                    "ToImmutableHashSet" or
+                    "ToImmutableList" or
+                    "ToImmutableQueue" or
+                    "ToImmutableSortedDictionary" or
+                    "ToImmutableSortedSet" or
+                    "ToImmutableStack") ||
+                targetMethod.ReturnType is not INamedTypeSymbol returnType ||
+                !IsKnownImmutableCollectionType(returnType))
+                return false;
+            return TryGetStandardSequenceSource(invocation, operation, out source);
         }
         private bool TryGetZeroPreservingSequenceOperatorStep(
             ExpressionSyntax collection,
