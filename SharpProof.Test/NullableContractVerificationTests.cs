@@ -1900,6 +1900,137 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_FreshDictionaryValuesLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new Dictionary<int, Item>().Values)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_FreshDictionaryKeysLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new Dictionary<Item, int>().Keys)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_FreshConcurrentDictionaryValuesLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Concurrent;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new ConcurrentDictionary<int, Item>().Values)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_EmptyDictionaryInterfaceValuesLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    IDictionary<int, Item> items = new Dictionary<int, Item>();
+                    foreach (var item in items.Values)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ImmutableDictionaryEmptyValuesLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Immutable;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in ImmutableDictionary<int, Item>.Empty.Values)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_NonemptyDictionaryValuesLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new Dictionary<int, Item> {
+                        [0] = new Item(null)
+                    }.Values)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_CapturedDictionaryValuesPopulatedLaterLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var items = new Dictionary<int, Item>();
+                    var values = items.Values;
+                    items.Add(0, new Item(null));
+                    foreach (var item in values)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ReboundDictionaryDoesNotMutateCapturedValues_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var items = new Dictionary<int, Item>();
+                    var values = items.Values;
+                    items = new Dictionary<int, Item> {
+                        [0] = new Item(null)
+                    };
+                    foreach (var item in values)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_SourceDefinedValuesPropertyLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            public sealed class Items {
+                public IEnumerable<Item> Values => new[] { new Item(null) };
+            }
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var item in new Items().Values)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_FreshObservableCollectionLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable

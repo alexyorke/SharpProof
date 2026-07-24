@@ -230,7 +230,7 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
-                if (TryGetZeroPreservingCoreSequenceViewStep(collection, out source)) {
+                if (TryGetZeroPreservingSequenceViewStep(collection, out source)) {
                     preservesElementIdentity = false;
                     collection = source;
                     continue;
@@ -333,7 +333,7 @@ internal static class CompilerProgramPointAnalysis {
             preservesElementIdentity = true;
             return true;
         }
-        private bool TryGetZeroPreservingCoreSequenceViewStep(
+        private bool TryGetZeroPreservingSequenceViewStep(
             ExpressionSyntax collection,
             out ExpressionSyntax source) {
             source = null!;
@@ -341,15 +341,20 @@ internal static class CompilerProgramPointAnalysis {
             if (collection is MemberAccessExpressionSyntax memberAccess &&
                 semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol is
                     IPropertySymbol {
-                        Name: "Span",
                         IsStatic: false,
                         Parameters.Length: 0,
                         GetMethod: not null
-                    } property &&
-                property.ContainingType.OriginalDefinition.Name is "Memory" or "ReadOnlyMemory" &&
-                IsKnownCoreSequenceType(property.ContainingType)) {
-                source = memberAccess.Expression;
-                return true;
+                    } property) {
+                var supportedProperty =
+                    property.Name == "Span" &&
+                    property.ContainingType.OriginalDefinition.Name is "Memory" or "ReadOnlyMemory" &&
+                    IsKnownCoreSequenceType(property.ContainingType) ||
+                    property.Name is "Keys" or "Values" &&
+                    IsKnownDictionaryViewType(property.ContainingType);
+                if (supportedProperty) {
+                    source = memberAccess.Expression;
+                    return true;
+                }
             }
             if (collection is not InvocationExpressionSyntax invocation ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
@@ -366,6 +371,32 @@ internal static class CompilerProgramPointAnalysis {
                 definition.Name is "Slice" or "ToArray";
             return supported &&
                    TryGetStandardSequenceSource(invocation, operation, out source);
+        }
+        private static bool IsKnownDictionaryViewType(INamedTypeSymbol candidate) {
+            var type = candidate.OriginalDefinition;
+            if (type.ContainingAssembly?.Name is not (
+                    "System.Collections" or
+                    "System.Collections.Concurrent" or
+                    "System.Collections.Immutable" or
+                    "System.ObjectModel" or
+                    "System.Private.CoreLib" or
+                    "System.Runtime" or
+                    "mscorlib"))
+                return false;
+            return (type.ContainingNamespace.ToDisplayString(), type.Name, type.Arity) is
+                ("System.Collections", "Hashtable", 0) or
+                ("System.Collections", "IDictionary", 0) or
+                ("System.Collections", "SortedList", 0) or
+                ("System.Collections.Concurrent", "ConcurrentDictionary", 2) or
+                ("System.Collections.Frozen", "FrozenDictionary", 2) or
+                ("System.Collections.Generic", "Dictionary", 2) or
+                ("System.Collections.Generic", "IDictionary", 2) or
+                ("System.Collections.Generic", "IReadOnlyDictionary", 2) or
+                ("System.Collections.Generic", "SortedDictionary", 2) or
+                ("System.Collections.Generic", "SortedList", 2) or
+                ("System.Collections.Immutable", "ImmutableDictionary", 2) or
+                ("System.Collections.Immutable", "ImmutableSortedDictionary", 2) or
+                ("System.Collections.ObjectModel", "ReadOnlyDictionary", 2);
         }
         private bool TryGetZeroPreservingImmutableFactoryStep(
             ExpressionSyntax collection,
