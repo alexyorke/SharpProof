@@ -253,6 +253,32 @@ public sealed class NullableContractVerificationTests {
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Has.None.EqualTo("SP0042").And.None.EqualTo("SP0047"));
     }
+    [Test]
+    public async Task NotNullWhen_SwitchAssignmentWithObliviousNonNullFlow_DoesNotReportUnknownContract() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            using Microsoft.Z3;
+            internal static class Parser {
+                private static bool TryGet(
+                    Context context,
+                    ReExpr seed,
+                    [NotNullWhen(true)] out ReExpr? value)
+                {
+                    value = seed;
+                    var quantifier = '*';
+                    value = quantifier switch {
+                        '*' => context.MkStar(value),
+                        _ => context.MkPlus(value)
+                    };
+                    return true;
+                }
+            }
+            """);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Has.None.EqualTo("SP0042").And.None.EqualTo("SP0047"));
+    }
     [ReadmeExample("sp0041-nullable-return-contract")]
     [Test]
     public Task NonNullableReturn_NullLiteral_ReportsViolation() =>

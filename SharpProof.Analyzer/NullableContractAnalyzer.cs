@@ -92,15 +92,16 @@ internal static class NullableContractAnalyzer {
                     NullableFlowFacts.HasNotNullPostcondition(source.Parameters[parameter.Ordinal]));
             if (hasNotNullPostcondition)
                 foreach (var completion in completions)
-                    Verify(
-                        context,
-                        session,
-                        completion,
-                        target + " is not null",
-                        AnalyzerDiagnosticCatalog.Get("NullableParameterPostconditionViolationRule"),
-                        context.MethodSymbol.Name,
-                        parameter.Name,
-                        "[NotNull]");
+                    if (!ParameterIsDefinitelyNotNullAtCompletion(context, completion, parameter))
+                        Verify(
+                            context,
+                            session,
+                            completion,
+                            target + " is not null",
+                            AnalyzerDiagnosticCatalog.Get("NullableParameterPostconditionViolationRule"),
+                            context.MethodSymbol.Name,
+                            parameter.Name,
+                            "[NotNull]");
             foreach (var notNullWhen in CollectNotNullWhenValues(
                          context.MethodSymbol,
                          parameter.Ordinal,
@@ -112,6 +113,7 @@ internal static class NullableContractAnalyzer {
                             context,
                             completion.ResultExpression,
                             notNullWhen) &&
+                        !ParameterIsDefinitelyNotNullAtCompletion(context, completion, parameter) &&
                         !DelegatedInvocationGuaranteesNonNullOutput(
                             context,
                             completion.ResultExpression,
@@ -138,6 +140,7 @@ internal static class NullableContractAnalyzer {
                             context,
                             completion.ResultExpression,
                             !maybeNullWhen) &&
+                        !ParameterIsDefinitelyNotNullAtCompletion(context, completion, parameter) &&
                         !DelegatedInvocationGuaranteesNonNullOutput(
                             context,
                             completion.ResultExpression,
@@ -155,6 +158,15 @@ internal static class NullableContractAnalyzer {
             }
         }
     }
+    private static bool ParameterIsDefinitelyNotNullAtCompletion(
+        MethodBodyAnalysisContext context,
+        MethodNormalCompletion completion,
+        IParameterSymbol parameter) =>
+        NullableFlowFacts.GetExpressionStateAtPosition(
+            SyntaxFactory.ParseExpression(EscapeIdentifier(parameter.Name)),
+            completion.QueryNode.SpanStart,
+            context.SemanticModel,
+            context.CancellationToken) == NullableFlowFactState.NotNull;
     private static bool ConditionalContractCanApply(
         MethodBodyAnalysisContext context,
         ExpressionSyntax resultExpression,
