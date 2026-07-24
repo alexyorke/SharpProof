@@ -71,6 +71,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                 }
                 private static int Identity(int value) => value;
                 public static unsafe delegate*<int, int> FunctionPointer() => &Identity;
+                public static System.Func<int, int> VirtualDelegate(VirtualBase value) => value.Transform;
                 public static unsafe int IndirectCall(int value) {
                     delegate*<int, int> target = &Identity;
                     return target(value);
@@ -81,6 +82,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             }
             public class VirtualBase {
                 public virtual void Work() { }
+                public virtual int Transform(int value) => value;
             }
             """;
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
@@ -235,6 +237,22 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataVirtualDelegateCreationHasKnownEffects() {
+        var effects = Analyze(
+            "static System.Func<int, int> M(MetadataFixture.VirtualBase value) => " +
+            "MetadataFixture.Effects.VirtualDelegate(value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(
+                effects.Effects.HasFlag(SharpProofEffect.Unknown),
+                Is.False,
+                string.Join(", ", effects.UnknownReasons.Select(static reason => reason.Message)));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.UnsupportedOperation), Is.False);
         });
     }
     [Test]

@@ -87,6 +87,8 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                     return methodReturn;
                 }
                 if (definition.RelativeVirtualAddress == 0) {
+                    if (IsRuntimeDelegateConstructor(reader, location.Handle))
+                        return MetadataValueOrigin.Scalar;
                     MarkUnknown("metadata_body_unavailable", exceptionBoundary: true);
                     return methodReturn;
                 }
@@ -255,6 +257,9 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                     else if (opcode == OpCodes.Unbox || opcode == OpCodes.Unbox_Any) {
                         hasUnknownExceptionBoundary = true;
                     }
+                    else if (opcode == OpCodes.Ldvirtftn) {
+                        hasUnknownExceptionBoundary = true;
+                    }
                     else if (MayThrowImplicitly(opcode)) {
                         MarkUnknown("metadata_implicit_exception", exceptionBoundary: true);
                     }
@@ -326,7 +331,8 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     private static bool IsModeledNoEffectOpcode(OpCode opcode) {
         var name = opcode.Name ?? string.Empty;
         return opcode == OpCodes.Nop || opcode == OpCodes.Ret || opcode == OpCodes.Pop || opcode == OpCodes.Dup ||
-               opcode == OpCodes.Isinst || opcode == OpCodes.Sizeof || opcode == OpCodes.Ldftn ||
+               opcode == OpCodes.Isinst || opcode == OpCodes.Sizeof ||
+               opcode == OpCodes.Ldftn || opcode == OpCodes.Ldvirtftn ||
                opcode == OpCodes.Add || opcode == OpCodes.Sub || opcode == OpCodes.Mul || opcode == OpCodes.Neg ||
                opcode == OpCodes.Not || opcode == OpCodes.And || opcode == OpCodes.Or || opcode == OpCodes.Xor ||
                opcode == OpCodes.Shl || opcode == OpCodes.Shr || opcode == OpCodes.Shr_Un || opcode == OpCodes.Ceq ||
@@ -425,6 +431,38 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     }
     private static bool IsVoid(StructuralDecodedType type) =>
         string.Equals(type.Key, "named:System.Void", StringComparison.Ordinal);
+    private static bool IsRuntimeDelegateConstructor(
+        MetadataReader reader,
+        MethodDefinitionHandle methodHandle) {
+        var method = reader.GetMethodDefinition(methodHandle);
+        if (!string.Equals(reader.GetString(method.Name), ".ctor", StringComparison.Ordinal))
+            return false;
+        var declaringType = reader.GetTypeDefinition(method.GetDeclaringType());
+        return IsNamedType(reader, declaringType.BaseType, "System", "MulticastDelegate");
+    }
+    private static bool IsNamedType(
+        MetadataReader reader,
+        EntityHandle handle,
+        string @namespace,
+        string name) {
+        StringHandle namespaceHandle;
+        StringHandle nameHandle;
+        if (handle.Kind == HandleKind.TypeDefinition) {
+            var type = reader.GetTypeDefinition((TypeDefinitionHandle)handle);
+            namespaceHandle = type.Namespace;
+            nameHandle = type.Name;
+        }
+        else if (handle.Kind == HandleKind.TypeReference) {
+            var type = reader.GetTypeReference((TypeReferenceHandle)handle);
+            namespaceHandle = type.Namespace;
+            nameHandle = type.Name;
+        }
+        else {
+            return false;
+        }
+        return string.Equals(reader.GetString(namespaceHandle), @namespace, StringComparison.Ordinal) &&
+               string.Equals(reader.GetString(nameHandle), name, StringComparison.Ordinal);
+    }
     private static MetadataValueOrigin MergeOrigins(
         MetadataValueOrigin? current,
         MetadataValueOrigin next) =>
@@ -830,6 +868,11 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 return null;
             }
             if (opcode == OpCodes.Ldftn) {
+                Push(MetadataValueOrigin.Scalar);
+                return null;
+            }
+            if (opcode == OpCodes.Ldvirtftn) {
+                Pop();
                 Push(MetadataValueOrigin.Scalar);
                 return null;
             }
