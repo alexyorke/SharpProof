@@ -132,6 +132,19 @@ internal static class SymbolicReachabilityLowerer {
                 visitedLocals,
                 out invocations);
         }
+        if (TryGetIdentityBooleanConversionOperand(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out var convertedOperand)) {
+            return TryResolveConditionalInvocation(
+                convertedOperand,
+                expressionValue,
+                semanticModel,
+                cancellationToken,
+                visitedLocals,
+                out invocations);
+        }
         if (TryGetBooleanWrapperOperand(
                 expression,
                 semanticModel,
@@ -210,6 +223,22 @@ internal static class SymbolicReachabilityLowerer {
             invocations = [];
             return false;
         }
+        return true;
+    }
+    private static bool TryGetIdentityBooleanConversionOperand(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out ExpressionSyntax operand) {
+        operand = null!;
+        if (semanticModel.GetOperation(expression, cancellationToken) is not IConversionOperation conversion ||
+            !conversion.Conversion.IsIdentity ||
+            conversion.OperatorMethod != null ||
+            conversion.Type?.SpecialType != SpecialType.System_Boolean ||
+            conversion.Operand.Type?.SpecialType != SpecialType.System_Boolean ||
+            conversion.Operand.Syntax is not ExpressionSyntax operandSyntax)
+            return false;
+        operand = operandSyntax;
         return true;
     }
     private static bool TryGetImpliedConditionalOperand(

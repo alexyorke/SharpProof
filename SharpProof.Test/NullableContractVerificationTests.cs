@@ -121,6 +121,54 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_IdentityCastConditionalAlias_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    var shouldUseExpression = (bool)factory.TryGet(out var expression);
+                    return shouldUseExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_IdentityCastPolarity_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(false)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    var shouldUseExpression = (bool)!factory.TryGet(out var expression);
+                    return shouldUseExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_UserBooleanConversion_RemainsConservative",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public readonly struct Flag {
+                private readonly bool value;
+                public Flag(bool value) => this.value = value;
+                public static implicit operator Flag(bool value) => new(value);
+                public static explicit operator bool(Flag value) => true;
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    var shouldUseExpression = (bool)(Flag)factory.TryGet(out var expression);
+                    return shouldUseExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_BooleanPatternConditionalAlias_DoesNotReport",
             """
             #nullable enable
