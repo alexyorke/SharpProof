@@ -67,6 +67,13 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                     else target = new MutableBox();
                     target.Value = 1;
                 }
+                public static System.Guid DefaultGuid() {
+                    System.Guid value = default;
+                    return value;
+                }
+                public static void ClearGuid(ref System.Guid value) {
+                    value = default;
+                }
                 public static unsafe int SizeOf<T>() where T : unmanaged => sizeof(T);
                 public static void CopyBlockOpcodeFixture() { VolatileState = 1; }
                 private static void Helper() { State++; }
@@ -262,6 +269,30 @@ public sealed class MetadataMethodEffectAnalyzerTests {
         Assert.Multiple(() => {
             Assert.That(effects.Purity, Is.Not.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+        });
+    }
+    [Test]
+    public void MetadataLocalValueInitializationIsPure() {
+        var effects = Analyze("static System.Guid M() => MetadataFixture.Effects.DefaultGuid();");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.UnsupportedOperation), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataByRefValueInitializationWritesArgumentState() {
+        var effects = Analyze(
+            "static void M(ref System.Guid value) => MetadataFixture.Effects.ClearGuid(ref value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.UnsupportedOperation), Is.False);
         });
     }
     [Test]

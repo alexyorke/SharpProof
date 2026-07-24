@@ -164,12 +164,12 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                             effects |= SharpProofEffect.WritesArgumentState;
                         else if (accessOrigin is MetadataValueOrigin.Receiver)
                             effects |= SharpProofEffect.WritesReceiverState;
-                        else
+                        else if (accessOrigin is not MetadataValueOrigin.Local)
                             MarkUnknown(
                                 "metadata_field_write_origin_unknown",
                                 SharpProofEffect.WritesArgumentState | SharpProofEffect.WritesReceiverState,
                                 true);
-                        hasUnknownExceptionBoundary = true;
+                        if (!IsInternalStorage(accessOrigin)) hasUnknownExceptionBoundary = true;
                     }
                     else if (opcode == OpCodes.Ldfld || opcode == OpCodes.Ldflda) {
                         if (accessOrigin is MetadataValueOrigin.Argument)
@@ -178,12 +178,12 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                             effects |= SharpProofEffect.ReadsReceiverState;
                         else if (accessOrigin is MetadataValueOrigin.Static)
                             effects |= SharpProofEffect.ReadsStaticState;
-                        else if (accessOrigin is not MetadataValueOrigin.Fresh)
+                        else if (!IsInternalStorage(accessOrigin))
                             MarkUnknown(
                                 "metadata_field_read_origin_unknown",
                                 SharpProofEffect.ReadsArgumentState | SharpProofEffect.ReadsReceiverState,
                                 true);
-                        if (accessOrigin is not MetadataValueOrigin.Fresh) hasUnknownExceptionBoundary = true;
+                        if (!IsInternalStorage(accessOrigin)) hasUnknownExceptionBoundary = true;
                     }
                     else if (IsElementRead(opcode)) {
                         if (accessOrigin is MetadataValueOrigin.Argument)
@@ -192,7 +192,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                             effects |= SharpProofEffect.ReadsReceiverState;
                         else if (accessOrigin is MetadataValueOrigin.Static)
                             effects |= SharpProofEffect.ReadsStaticState;
-                        else if (accessOrigin is not MetadataValueOrigin.Fresh)
+                        else if (!IsInternalStorage(accessOrigin))
                             MarkUnknown(
                                 "metadata_element_read_origin_unknown",
                                 SharpProofEffect.ReadsArgumentState | SharpProofEffect.ReadsReceiverState,
@@ -206,12 +206,12 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                             effects |= SharpProofEffect.ReadsReceiverState;
                         else if (accessOrigin is MetadataValueOrigin.Static)
                             effects |= SharpProofEffect.ReadsStaticState;
-                        else if (accessOrigin is not MetadataValueOrigin.Fresh)
+                        else if (!IsInternalStorage(accessOrigin))
                             MarkUnknown(
                                 "metadata_indirect_read_origin_unknown",
                                 SharpProofEffect.ReadsArgumentState | SharpProofEffect.ReadsReceiverState,
                                 true);
-                        hasUnknownExceptionBoundary = true;
+                        if (!IsInternalStorage(accessOrigin)) hasUnknownExceptionBoundary = true;
                     }
                     else if (opcode == OpCodes.Call || opcode == OpCodes.Callvirt) {
                         effects |= SharpProofEffect.DirectCall;
@@ -242,10 +242,11 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                             effects |= SharpProofEffect.WritesReceiverState;
                         else if (accessOrigin is MetadataValueOrigin.Static)
                             effects |= SharpProofEffect.WritesStaticState;
-                        else
+                        else if (accessOrigin is not MetadataValueOrigin.Local)
                             MarkUnknown("metadata_indirect_write_origin_unknown",
                                 SharpProofEffect.WritesArgumentState | SharpProofEffect.UnsupportedOperation, true);
-                        if (IsElementWrite(opcode) || IsIndirectWrite(opcode))
+                        if (IsElementWrite(opcode) ||
+                            (IsIndirectWrite(opcode) && !IsInternalStorage(accessOrigin)))
                             hasUnknownExceptionBoundary = true;
                     }
                     else if (IsArithmeticExceptionOnly(opcode)) {
@@ -297,7 +298,8 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     private static bool IsIndirectOrElementWrite(OpCode opcode) => opcode == OpCodes.Stind_I ||
                opcode == OpCodes.Stind_I1 || opcode == OpCodes.Stind_I2 || opcode == OpCodes.Stind_I4 ||
                opcode == OpCodes.Stind_I8 || opcode == OpCodes.Stind_R4 || opcode == OpCodes.Stind_R8 ||
-               opcode == OpCodes.Stind_Ref || opcode == OpCodes.Stobj || opcode == OpCodes.Cpblk ||
+               opcode == OpCodes.Stind_Ref || opcode == OpCodes.Stobj || opcode == OpCodes.Initobj ||
+               opcode == OpCodes.Cpblk ||
                opcode == OpCodes.Initblk || opcode.Name?.StartsWith("stelem", StringComparison.Ordinal) == true;
     private static bool IsElementWrite(OpCode opcode) =>
         opcode.Name?.StartsWith("stelem", StringComparison.Ordinal) == true;
@@ -310,7 +312,10 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         opcode == OpCodes.Stind_R4 ||
         opcode == OpCodes.Stind_R8 ||
         opcode == OpCodes.Stind_Ref ||
-        opcode == OpCodes.Stobj;
+        opcode == OpCodes.Stobj ||
+        opcode == OpCodes.Initobj;
+    private static bool IsInternalStorage(MetadataValueOrigin? origin) =>
+        origin is MetadataValueOrigin.Fresh or MetadataValueOrigin.Local;
     private static bool IsElementRead(OpCode opcode) =>
         opcode == OpCodes.Ldlen ||
         opcode == OpCodes.Ldelema ||
@@ -718,7 +723,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             reader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
         private static DecodedDeclaringType Type(StructuralDecodedType type) => new(default, type, []);
     }
-    private enum MetadataValueOrigin { Scalar, Receiver, Argument, Fresh, Static, Unknown }
+    private enum MetadataValueOrigin { Scalar, Receiver, Argument, Fresh, Local, Static, Unknown }
     private readonly record struct MethodAnalysisKey(MethodLocation Location, string Context);
     private readonly record struct MetadataCallContext(
         MetadataValueOrigin Receiver,
@@ -789,7 +794,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 return null;
             }
             if (TryLocalAddressIndex(opcode, operand, out localIndex)) {
-                Push(_locals.TryGetValue(localIndex, out var local) ? local : MetadataValueOrigin.Unknown);
+                Push(MetadataValueOrigin.Local);
                 return null;
             }
             if (opcode == OpCodes.Dup) {
@@ -818,6 +823,9 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             if (IsElementWrite(opcode)) {
                 Pop();
                 Pop();
+                return Pop();
+            }
+            if (opcode == OpCodes.Initobj) {
                 return Pop();
             }
             if (IsIndirectWrite(opcode)) {
