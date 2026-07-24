@@ -108,14 +108,41 @@ internal static class SymbolicReachabilityLowerer {
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out InvocationExpressionSyntax invocation,
+        out bool negated) => TryResolveConditionalInvocation(
+            condition,
+            semanticModel,
+            cancellationToken,
+            new HashSet<ISymbol>(SymbolEqualityComparer.Default),
+            out invocation,
+            out negated);
+    private static bool TryResolveConditionalInvocation(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        HashSet<ISymbol> visitedLocals,
+        out InvocationExpressionSyntax invocation,
         out bool negated) {
-        condition = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition);
+        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         negated = false;
-        if (condition is InvocationExpressionSyntax directInvocation) {
+        if (expression is PrefixUnaryExpressionSyntax logicalNot &&
+            logicalNot.IsKind(SyntaxKind.LogicalNotExpression)) {
+            if (!TryResolveConditionalInvocation(
+                    logicalNot.Operand,
+                    semanticModel,
+                    cancellationToken,
+                    visitedLocals,
+                    out invocation,
+                    out negated))
+                return false;
+            negated = !negated;
+            return true;
+        }
+        if (expression is InvocationExpressionSyntax directInvocation) {
             invocation = directInvocation;
             return true;
         }
-        if (semanticModel.GetSymbolInfo(condition, cancellationToken).Symbol is not ILocalSymbol local ||
+        if (semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not ILocalSymbol local ||
+            !visitedLocals.Add(local) ||
             local.DeclaringSyntaxReferences.Length != 1 ||
             local.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not
                 VariableDeclaratorSyntax { Initializer.Value: { } initializer }) {
@@ -124,21 +151,20 @@ internal static class SymbolicReachabilityLowerer {
         }
         var initializerExpression =
             CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(initializer);
-        if (initializerExpression is PrefixUnaryExpressionSyntax logicalNot &&
-            logicalNot.IsKind(SyntaxKind.LogicalNotExpression)) {
-            initializerExpression =
-                CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(logicalNot.Operand);
-            negated = true;
-        }
-        if (initializerExpression is not InvocationExpressionSyntax aliasedInvocation ||
-            !ReferenceEquals(aliasedInvocation.SyntaxTree, condition.SyntaxTree) ||
-            aliasedInvocation.Span.End > condition.SpanStart ||
-            IsMutatedBetween(local, aliasedInvocation, condition, semanticModel, cancellationToken)) {
+        if (!ReferenceEquals(initializerExpression.SyntaxTree, expression.SyntaxTree) ||
+            initializerExpression.Span.End > expression.SpanStart ||
+            IsMutatedBetween(local, initializerExpression, expression, semanticModel, cancellationToken) ||
+            !TryResolveConditionalInvocation(
+                initializerExpression,
+                semanticModel,
+                cancellationToken,
+                visitedLocals,
+                out invocation,
+                out negated)) {
             invocation = null!;
             negated = false;
             return false;
         }
-        invocation = aliasedInvocation;
         return true;
     }
     private static bool IsMutatedBetween(
