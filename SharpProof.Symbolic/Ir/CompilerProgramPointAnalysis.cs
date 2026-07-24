@@ -145,9 +145,9 @@ internal static class CompilerProgramPointAnalysis {
                     !TryGetSequencePredicateSteps(
                         loop.Expression,
                         out var predicateSteps,
-                        out var definitelyEmpty))
+                        out var definitelyNoElements))
                     continue;
-                if (definitelyEmpty) {
+                if (definitelyNoElements) {
                     state = state.MarkContradictory();
                     continue;
                 }
@@ -171,10 +171,10 @@ internal static class CompilerProgramPointAnalysis {
         private bool TryGetSequencePredicateSteps(
             ExpressionSyntax collection,
             out ImmutableArray<SequencePredicateStep> steps,
-            out bool definitelyEmpty) {
+            out bool definitelyNoElements) {
             var builder = ImmutableArray.CreateBuilder<SequencePredicateStep>();
             var resolvedUses = new List<(ISymbol Symbol, int Position)>();
-            definitelyEmpty = false;
+            definitelyNoElements = false;
             var preservesElementIdentity = true;
             while (true) {
                 collection = SymbolicConversionLowerer.UnwrapIdentityConversions(
@@ -194,8 +194,8 @@ internal static class CompilerProgramPointAnalysis {
                 if (TryGetLazySequencePreservingStep(
                         collection,
                         out source,
-                        out var stepIsDefinitelyEmpty)) {
-                    definitelyEmpty |= stepIsDefinitelyEmpty;
+                        out var stepProducesNoElements)) {
+                    definitelyNoElements |= stepProducesNoElements;
                     collection = source;
                     continue;
                 }
@@ -230,8 +230,8 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
-                if (IsDefinitelyEmptySequenceSource(collection)) {
-                    definitelyEmpty = true;
+                if (DefinitelyProducesNoElements(collection)) {
+                    definitelyNoElements = true;
                     break;
                 }
                 collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
@@ -252,7 +252,7 @@ internal static class CompilerProgramPointAnalysis {
                 resolvedUses.Add((symbol, usePosition));
             }
             steps = builder.ToImmutable();
-            return steps.Length != 0 || definitelyEmpty;
+            return steps.Length != 0 || definitelyNoElements;
         }
         private bool TryGetZeroPreservingCoreSequenceViewStep(
             ExpressionSyntax collection,
@@ -356,7 +356,7 @@ internal static class CompilerProgramPointAnalysis {
                 return false;
             return TryGetStandardSequenceSource(invocation, operation, out source);
         }
-        private bool IsDefinitelyEmptySequenceSource(ExpressionSyntax collection) {
+        private bool DefinitelyProducesNoElements(ExpressionSyntax collection) {
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (IsDefinitelyEmptyString(collection))
                 return true;
@@ -396,7 +396,7 @@ internal static class CompilerProgramPointAnalysis {
             return countParameter != null &&
                    TryGetInvocationArgument(operation, countParameter, out var count) &&
                    semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount } &&
-                   constantCount == 0;
+                   constantCount <= 0;
         }
         private bool IsDefinitelyEmptyString(ExpressionSyntax collection) {
             if (semanticModel.GetConstantValue(collection, cancellationToken) is { HasValue: true, Value: string constant } &&
@@ -564,9 +564,9 @@ internal static class CompilerProgramPointAnalysis {
         private bool TryGetLazySequencePreservingStep(
             ExpressionSyntax collection,
             out ExpressionSyntax source,
-            out bool definitelyEmpty) {
+            out bool definitelyNoElements) {
             source = null!;
-            definitelyEmpty = false;
+            definitelyNoElements = false;
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is not InvocationExpressionSyntax invocation ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
@@ -592,7 +592,7 @@ internal static class CompilerProgramPointAnalysis {
                     targetMethod.Parameters[targetMethod.Parameters.Length - 1],
                     out var count) &&
                 semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount })
-                definitelyEmpty = constantCount <= 0;
+                definitelyNoElements = constantCount <= 0;
             return true;
         }
         private bool TryGetSequencePredicateStep(
