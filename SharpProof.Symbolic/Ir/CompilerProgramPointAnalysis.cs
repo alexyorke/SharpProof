@@ -207,7 +207,11 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
-                if (TryGetSameElementTypeOperatorStep(collection, out source)) {
+                if (TryGetElementTypeOperatorStep(
+                        collection,
+                        out source,
+                        out var operatorPreservesElementIdentity)) {
+                    preservesElementIdentity &= operatorPreservesElementIdentity;
                     collection = source;
                     continue;
                 }
@@ -269,10 +273,12 @@ internal static class CompilerProgramPointAnalysis {
                    semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount } &&
                    constantCount == 0;
         }
-        private bool TryGetSameElementTypeOperatorStep(
+        private bool TryGetElementTypeOperatorStep(
             ExpressionSyntax collection,
-            out ExpressionSyntax source) {
+            out ExpressionSyntax source,
+            out bool preservesElementIdentity) {
             source = null!;
+            preservesElementIdentity = false;
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
             if (collection is not InvocationExpressionSyntax invocation ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
@@ -286,12 +292,14 @@ internal static class CompilerProgramPointAnalysis {
                 !TryGetStandardSequenceSource(invocation, operation, out source))
                 return false;
             var sourceTypeInfo = semanticModel.GetTypeInfo(source, cancellationToken);
-            return TryGetUniqueEnumerableElementType(
-                       sourceTypeInfo.Type ?? sourceTypeInfo.ConvertedType,
-                       out var sourceElement) &&
-                   SymbolEqualityComparer.Default.Equals(
-                       sourceElement,
-                       targetMethod.TypeArguments[0]);
+            preservesElementIdentity =
+                TryGetUniqueEnumerableElementType(
+                    sourceTypeInfo.Type ?? sourceTypeInfo.ConvertedType,
+                    out var sourceElement) &&
+                SymbolEqualityComparer.Default.Equals(
+                    sourceElement,
+                    targetMethod.TypeArguments[0]);
+            return true;
         }
         private static bool TryGetUniqueEnumerableElementType(
             ITypeSymbol? sequenceType,
