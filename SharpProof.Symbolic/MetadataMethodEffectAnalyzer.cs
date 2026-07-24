@@ -314,7 +314,10 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 analyzed[analysisKey] = methodReturn;
             }
         }
-        _ = Visit(new MethodLocation(path, root), 0);
+        var rootLocation = new MethodLocation(path, root);
+        if (TryFindRootTypeInitializer(rootLocation, out var rootInitializer))
+            _ = Visit(rootInitializer, 0);
+        _ = Visit(rootLocation, 0);
         var exceptionFacts = ImmutableArray.CreateBuilder<MethodExceptionFact>();
         exceptionFacts.AddRange(exceptions.Select(static type =>
             MethodExceptionFact.Boundary(type, MethodExceptionSource.Metadata, "metadata_throw")));
@@ -577,6 +580,32 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             if (!string.Equals(reader.GetString(method.Name), ".cctor", StringComparison.Ordinal))
                 continue;
             initializer = new MethodLocation(memberLocation.Path, methodHandle);
+            return true;
+        }
+        initializer = default;
+        return false;
+    }
+    private static bool TryFindRootTypeInitializer(
+        MethodLocation rootLocation,
+        out MethodLocation initializer) {
+        using var stream = File.OpenRead(rootLocation.Path);
+        using var pe = new PEReader(stream, PEStreamOptions.PrefetchMetadata);
+        var reader = pe.GetMetadataReader();
+        var root = reader.GetMethodDefinition(rootLocation.Handle);
+        var name = reader.GetString(root.Name);
+        var triggersInitialization =
+            ((root.Attributes & MethodAttributes.Static) != 0 &&
+             !string.Equals(name, ".cctor", StringComparison.Ordinal)) ||
+            string.Equals(name, ".ctor", StringComparison.Ordinal);
+        if (!triggersInitialization) {
+            initializer = default;
+            return false;
+        }
+        foreach (var methodHandle in reader.GetTypeDefinition(root.GetDeclaringType()).GetMethods()) {
+            var method = reader.GetMethodDefinition(methodHandle);
+            if (!string.Equals(reader.GetString(method.Name), ".cctor", StringComparison.Ordinal))
+                continue;
+            initializer = new MethodLocation(rootLocation.Path, methodHandle);
             return true;
         }
         initializer = default;

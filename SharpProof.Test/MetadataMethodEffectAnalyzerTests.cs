@@ -394,6 +394,26 @@ public sealed class MetadataMethodEffectAnalyzerTests {
         });
     }
     [Test]
+    public void MetadataRootStaticCallIncludesTypeInitializerExceptions() {
+        var effects = Analyze("static int M() => MetadataFixture.ThrowingStatic.Constant();");
+        Assert.Multiple(() => {
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Throws), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataRootConstructionIncludesTypeInitializerExceptions() {
+        var effects = Analyze(
+            "static MetadataFixture.ThrowingConstructed M() => new MetadataFixture.ThrowingConstructed();");
+        Assert.Multiple(() => {
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Throws), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Allocates), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void MetadataOverflowHazardsDoNotMakeEffectsUnknown() {
         var effects = Analyze(
             "static int M(int left, int right) => MetadataFixture.Effects.CheckedAdd(left, right);");
