@@ -219,7 +219,7 @@ internal static class CompilerProgramPointAnalysis {
                     collection = source;
                     continue;
                 }
-                if (TryGetEmptySecondSequenceCombinationStep(
+                if (TryGetSequenceCombinationStep(
                         collection,
                         visited,
                         out source,
@@ -275,7 +275,7 @@ internal static class CompilerProgramPointAnalysis {
             steps = builder.ToImmutable();
             return steps.Length != 0 || definitelyNoElements;
         }
-        private bool TryGetEmptySecondSequenceCombinationStep(
+        private bool TryGetSequenceCombinationStep(
             ExpressionSyntax collection,
             HashSet<SyntaxNode> visited,
             out ExpressionSyntax source,
@@ -294,15 +294,27 @@ internal static class CompilerProgramPointAnalysis {
                 !TryGetStandardSequenceSource(invocation, operation, out source))
                 return false;
             if (definition.Parameters.Length < 2 ||
-                !TryGetInvocationArgument(operation, definition.Parameters[1], out var second) ||
-                !TryGetSequencePredicateSteps(
+                !TryGetInvocationArgument(operation, definition.Parameters[1], out var second))
+                return false;
+            if (TryGetSequencePredicateSteps(
                     second,
                     [.. visited],
                     out _,
-                    out var secondProducesNoElements) ||
-                !secondProducesNoElements)
+                    out var secondProducesNoElements) &&
+                secondProducesNoElements) {
+                preservesElementIdentity = definition.Name == "Concat";
+                return true;
+            }
+            if (definition.Name != "Concat" ||
+                !TryGetSequencePredicateSteps(
+                    source,
+                    [.. visited],
+                    out _,
+                    out var sourceProducesNoElements) ||
+                !sourceProducesNoElements)
                 return false;
-            preservesElementIdentity = definition.Name == "Concat";
+            source = second;
+            preservesElementIdentity = true;
             return true;
         }
         private bool TryGetZeroPreservingCoreSequenceViewStep(

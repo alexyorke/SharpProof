@@ -431,6 +431,94 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ConcatEmptyFirstPreservesWherePredicate_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in Enumerable.Empty<Item>().Concat(
+                        items.Where(static item => item.Value is not null)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_StaticNamedConcatEmptyFirstPreservesWherePredicate_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in Enumerable.Concat(
+                        second: items.Where(static item => item.Value is not null),
+                        first: Enumerable.Empty<Item>()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_QueryableConcatEmptyFirstPreservesWherePredicate_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    var empty = Enumerable.Empty<Item>().AsQueryable();
+                    var filtered = items.AsQueryable()
+                        .Where(static item => item.Value is not null);
+                    foreach (var item in empty.Concat(filtered))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ConcatNonemptyFirstDoesNotAdoptSecondWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in new[] { new Item(null) }.Concat(
+                        items.Where(static item => item.Value is not null)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_UnionEmptyFirstDoesNotAdoptSecondWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed class Item {
+                public object? Value { get; set; }
+            }
+            public sealed class MutatingComparer : IEqualityComparer<Item> {
+                public bool Equals(Item? left, Item? right) => ReferenceEquals(left, right);
+                public int GetHashCode(Item item) {
+                    item.Value = null;
+                    return 0;
+                }
+            }
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in Enumerable.Empty<Item>().Union(
+                        items.Where(static item => item.Value is not null),
+                        new MutatingComparer()))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_MutatingUnionComparerDoesNotPreserveWherePredicate_Reports",
             """
             #nullable enable
