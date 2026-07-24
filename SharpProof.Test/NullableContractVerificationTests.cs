@@ -78,6 +78,43 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_NullFailureSentinelImpliesValue_DoesNotReport",
+            """
+            #nullable enable
+            public sealed record Outcome<T>(T? Value, System.Exception? Error) where T : class;
+            public static class Consumer {
+                public static T Get<T>(Outcome<T> outcome) where T : class {
+                    var failure = outcome.Error is not null
+                        ? "query failed"
+                        : outcome.Value is null ? "query returned no value" : null;
+                    if (failure is not null) throw new System.InvalidOperationException(failure);
+                    return outcome.Value!;
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_InvertedNullSentinelDoesNotImplyValue_Reports",
+            """
+            #nullable enable
+            public static class Consumer {
+                public static object Get(object? value) {
+                    var failure = value is null ? null : "unexpected value";
+                    if (failure is not null) throw new System.InvalidOperationException(failure);
+                    return value!;
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_MutatedNullSentinelInput_Reports",
+            """
+            #nullable enable
+            public static class Consumer {
+                public static object Get(object? value) {
+                    var failure = value is null ? "missing value" : null;
+                    value = null;
+                    if (failure is not null) throw new System.InvalidOperationException(failure);
+                    return value!;
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_AliasedConditionalOutputGuard_DoesNotReport",
             """
             #nullable enable

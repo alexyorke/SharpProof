@@ -52,6 +52,18 @@ internal static partial class SymbolicOperationLowerer {
                     valueExpression,
                     provenance + ".assigned-non-null",
                     targetSymbol));
+            if (target.Kind == SmtValueKind.Reference &&
+                SymbolicReferenceLowerer.TryLowerReferenceNullCondition(
+                    valueExpression,
+                    valueContext,
+                    out var valueIsNull))
+                postconditions.Add(SymbolicReferenceLowerer.CreateEquivalentCondition(
+                    SymbolicIrLowerer.CreateReferenceNullCondition(
+                        target,
+                        true,
+                        valueExpression,
+                        provenance + ".assigned-null-state"),
+                    valueIsNull));
             if (postconditionProfile == SymbolicAssignmentPostconditionProfile.Symbolic &&
                 SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(
                     SymbolicFactFactory.GetTrackedSymbolType(targetSymbol),
