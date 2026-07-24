@@ -169,6 +169,79 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_InstanceMethodWherePredicateRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public sealed class Validator {
+                public bool HasValue(Item item) => item.Value is not null;
+            }
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items, Validator validator) {
+                    foreach (var item in items.Where(validator.HasValue))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_InterfaceMethodWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public interface IValidator {
+                bool HasValue(Item item);
+            }
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items, IValidator validator) {
+                    foreach (var item in items.Where(validator.HasValue))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_VirtualMethodWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public class Validator {
+                public virtual bool HasValue(Item item) => item.Value is not null;
+            }
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items, Validator validator) {
+                    foreach (var item in items.Where(validator.HasValue))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_MutatingInstanceMethodWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed class Item {
+                public object? Value { get; set; }
+            }
+            public sealed class Validator {
+                public bool Reset(Item item) {
+                    item.Value = null;
+                    return true;
+                }
+            }
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items, Validator validator) {
+                    foreach (var item in items.Where(validator.Reset))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_LocalDelegateWherePredicateRefinesLoopElement_DoesNotReport",
             """
             #nullable enable

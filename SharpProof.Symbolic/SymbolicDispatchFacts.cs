@@ -27,6 +27,7 @@ internal static class SymbolicDispatchFacts {
     public static IOperation? GetReceiverOperation(IOperation operation) => operation switch {
         IInvocationOperation invocationOperation => UnwrapImplicitConversion(invocationOperation.Instance),
         IPropertyReferenceOperation propertyReferenceOperation => UnwrapImplicitConversion(propertyReferenceOperation.Instance),
+        IMethodReferenceOperation methodReferenceOperation => UnwrapImplicitConversion(methodReferenceOperation.Instance),
         _ => null
     };
     private static INamedTypeSymbol? GetSyntacticallyExactReceiverType(IOperation? operation) {

@@ -35,9 +35,23 @@ internal static class SymbolicSourcePredicateLowerer {
                          ? symbolInfo.CandidateSymbols[0] as IMethodSymbol
                          : null);
         if (method == null) return false;
+        var implicitThis = callerContext.ImplicitThis;
+        if (!method.IsStatic) {
+            if (callerContext.SemanticModel.GetOperation(predicate, callerContext.CancellationToken) is not
+                    IMethodReferenceOperation methodReference ||
+                SymbolicDispatchFacts.ResolveExactDispatchTarget(
+                    method,
+                    SymbolicDispatchFacts.GetReceiverOperation(methodReference)) is not { } exactMethod ||
+                predicate is not MemberAccessExpressionSyntax memberAccess ||
+                !SymbolicIrLowerer.TryLowerReferenceTerm(
+                    memberAccess.Expression,
+                    callerContext,
+                    out implicitThis))
+                return false;
+            method = exactMethod;
+        }
         method = method.OriginalDefinition;
-        if (!method.IsStatic ||
-            !CanInlineSourceBooleanPredicate(method) ||
+        if (!CanInlineSourceBooleanPredicate(method) ||
             method.Parameters.Length != 1 ||
             !SourcePredicateParameterIsStable(method, method.Parameters[0], callerContext))
             return false;
@@ -48,7 +62,7 @@ internal static class SymbolicSourcePredicateLowerer {
             method,
             callerContext,
             substitutions,
-            callerContext.ImplicitThis,
+            implicitThis,
             out condition);
     }
     private static bool TryLowerSingleParameterLambdaPredicate(
