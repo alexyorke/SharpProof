@@ -137,7 +137,7 @@ internal static class SymbolicReachabilityLowerer {
             negated = !negated;
             return true;
         }
-        if (TryGetBooleanComparisonOperand(
+        if (TryGetBooleanWrapperOperand(
                 expression,
                 semanticModel,
                 cancellationToken,
@@ -184,7 +184,7 @@ internal static class SymbolicReachabilityLowerer {
         }
         return true;
     }
-    private static bool TryGetBooleanComparisonOperand(
+    private static bool TryGetBooleanWrapperOperand(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -192,6 +192,20 @@ internal static class SymbolicReachabilityLowerer {
         out bool negated) {
         operand = null!;
         negated = false;
+        if (expression is IsPatternExpressionSyntax isPattern &&
+            CSharpSyntaxFacts.GetExpressionType(
+                isPattern.Expression,
+                semanticModel,
+                cancellationToken)?.SpecialType == SpecialType.System_Boolean &&
+            TryGetBooleanPatternValue(
+                isPattern.Pattern,
+                semanticModel,
+                cancellationToken,
+                out var patternValue)) {
+            operand = isPattern.Expression;
+            negated = !patternValue;
+            return true;
+        }
         if (expression is not BinaryExpressionSyntax binary ||
             !binary.IsKind(SyntaxKind.EqualsExpression) &&
             !binary.IsKind(SyntaxKind.NotEqualsExpression) ||
@@ -211,6 +225,35 @@ internal static class SymbolicReachabilityLowerer {
             return false;
         negated = binary.IsKind(SyntaxKind.EqualsExpression) ? !constant : constant;
         return true;
+    }
+    private static bool TryGetBooleanPatternValue(
+        PatternSyntax pattern,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out bool value) {
+        if (pattern is ParenthesizedPatternSyntax parenthesized)
+            return TryGetBooleanPatternValue(
+                parenthesized.Pattern,
+                semanticModel,
+                cancellationToken,
+                out value);
+        if (pattern is UnaryPatternSyntax unary &&
+            unary.IsKind(SyntaxKind.NotPattern) &&
+            TryGetBooleanPatternValue(
+                unary.Pattern,
+                semanticModel,
+                cancellationToken,
+                out var nestedValue)) {
+            value = !nestedValue;
+            return true;
+        }
+        if (pattern is ConstantPatternSyntax constant &&
+            semanticModel.GetConstantValue(constant.Expression, cancellationToken) is { HasValue: true, Value: bool booleanValue }) {
+            value = booleanValue;
+            return true;
+        }
+        value = false;
+        return false;
     }
     private static bool IsMutatedBetween(
         ISymbol symbol,
