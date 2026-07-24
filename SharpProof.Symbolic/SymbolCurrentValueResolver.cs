@@ -16,6 +16,20 @@ internal static class SymbolCurrentValueResolver {
         SyntaxNode useNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
+        out ExpressionSyntax valueExpression) =>
+        TryResolveCurrentSimpleValueExpression(
+            symbol,
+            useNode,
+            semanticModel,
+            cancellationToken,
+            false,
+            out valueExpression);
+    internal static bool TryResolveCurrentSimpleValueExpression(
+        ISymbol symbol,
+        SyntaxNode useNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        bool allowSelfReferentialAssignments,
         out ExpressionSyntax valueExpression) {
         valueExpression = null!;
         if (IsMutatedAfterUseInContainingLoop(symbol, useNode, semanticModel, cancellationToken))
@@ -44,7 +58,12 @@ internal static class SymbolCurrentValueResolver {
                 } &&
                     SymbolMutationFacts.ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken)) {
                     if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-                        SymbolMutationFacts.ExpressionReferencesSymbol(assignment.Right, symbol, semanticModel, cancellationToken)) {
+                        !allowSelfReferentialAssignments &&
+                        SymbolMutationFacts.ExpressionReferencesSymbol(
+                            assignment.Right,
+                            symbol,
+                            semanticModel,
+                            cancellationToken)) {
                         currentValue = null;
                         continue;
                     }

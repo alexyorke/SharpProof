@@ -160,7 +160,7 @@ internal static class CompilerProgramPointAnalysis {
             ExpressionSyntax collection,
             out ImmutableArray<ExpressionSyntax> predicates) {
             var builder = ImmutableArray.CreateBuilder<ExpressionSyntax>();
-            var resolvedSymbols = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            var resolvedUses = new List<(ISymbol Symbol, int Position)>();
             while (true) {
                 if (TryGetEnumerableWhereStep(collection, out var source, out var predicate)) {
                     builder.Add(predicate);
@@ -169,15 +169,20 @@ internal static class CompilerProgramPointAnalysis {
                 }
                 collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
                 var symbol = semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol?.OriginalDefinition;
+                var usePosition = collection.SpanStart;
                 if (symbol is not (ILocalSymbol or IParameterSymbol) ||
-                    !resolvedSymbols.Add(symbol) ||
+                    resolvedUses.Any(candidate =>
+                        candidate.Position == usePosition &&
+                        SymbolEqualityComparer.Default.Equals(candidate.Symbol, symbol)) ||
                     !SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
                         symbol,
                         collection,
                         semanticModel,
                         cancellationToken,
+                        true,
                         out collection))
                     break;
+                resolvedUses.Add((symbol, usePosition));
             }
             predicates = builder.ToImmutable();
             return predicates.Length != 0;

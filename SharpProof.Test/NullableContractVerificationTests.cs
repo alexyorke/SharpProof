@@ -183,6 +183,52 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", true);
+        yield return Case("NullForgivingOperator_UpdatedWhereSequenceRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    items = items.Where(static item => item.Value is not null);
+                    foreach (var item in items)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_MultiplyUpdatedWhereSequenceRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value, object? Other);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    items = items.Where(static item => item.Value is not null);
+                    items = items.Where(static item => item.Other is not null);
+                    foreach (var item in items)
+                        return (item.Value!, item.Other!);
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_UpdatedNonFilteringSequenceDoesNotRefineLoopElement_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    items = items.Select(static item => item);
+                    foreach (var item in items)
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_IndexedQueryableWherePredicateRefinesLoopElement_DoesNotReport",
             """
             #nullable enable
