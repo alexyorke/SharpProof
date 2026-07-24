@@ -137,6 +137,23 @@ internal static class SymbolicReachabilityLowerer {
             negated = !negated;
             return true;
         }
+        if (TryGetBooleanComparisonOperand(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out var comparedOperand,
+                out var comparisonNegated)) {
+            if (!TryResolveConditionalInvocation(
+                    comparedOperand,
+                    semanticModel,
+                    cancellationToken,
+                    visitedLocals,
+                    out invocation,
+                    out negated))
+                return false;
+            negated ^= comparisonNegated;
+            return true;
+        }
         if (expression is InvocationExpressionSyntax directInvocation) {
             invocation = directInvocation;
             return true;
@@ -165,6 +182,34 @@ internal static class SymbolicReachabilityLowerer {
             negated = false;
             return false;
         }
+        return true;
+    }
+    private static bool TryGetBooleanComparisonOperand(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out ExpressionSyntax operand,
+        out bool negated) {
+        operand = null!;
+        negated = false;
+        if (expression is not BinaryExpressionSyntax binary ||
+            !binary.IsKind(SyntaxKind.EqualsExpression) &&
+            !binary.IsKind(SyntaxKind.NotEqualsExpression) ||
+            semanticModel.GetOperation(binary, cancellationToken) is not
+                IBinaryOperation { OperatorMethod: null, Type.SpecialType: SpecialType.System_Boolean })
+            return false;
+        bool constant;
+        if (semanticModel.GetConstantValue(binary.Left, cancellationToken) is { HasValue: true, Value: bool leftConstant }) {
+            operand = binary.Right;
+            constant = leftConstant;
+        }
+        else if (semanticModel.GetConstantValue(binary.Right, cancellationToken) is { HasValue: true, Value: bool rightConstant }) {
+            operand = binary.Left;
+            constant = rightConstant;
+        }
+        else
+            return false;
+        negated = binary.IsKind(SyntaxKind.EqualsExpression) ? !constant : constant;
         return true;
     }
     private static bool IsMutatedBetween(

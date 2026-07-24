@@ -107,6 +107,38 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_BooleanComparedConditionalAlias_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object Get(IFactory factory) {
+                    var shouldUseExpression = factory.TryGet(out var expression) == true;
+                    return shouldUseExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_BooleanComparisonPolarity_DoesNotReport",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                public static object NotFalse(IFactory factory) {
+                    var shouldUseExpression = factory.TryGet(out var expression) != false;
+                    return shouldUseExpression ? expression! : new object();
+                }
+                public static object FalseOnLeft(IFactory factory) {
+                    var shouldSkipExpression = false == factory.TryGet(out var expression);
+                    return !shouldSkipExpression ? expression! : new object();
+                }
+            }
+            """, "SP0044", false);
         yield return Case("NullForgivingOperator_CopiedAliasSurvivesLaterSourceCapture",
             """
             #nullable enable
