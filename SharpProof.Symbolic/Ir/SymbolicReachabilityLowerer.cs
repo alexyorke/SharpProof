@@ -148,13 +148,13 @@ internal static class SymbolicReachabilityLowerer {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(condition);
-        var repeatedLoopBody = GetRepeatedLoopBody(condition);
+        var repeatedLoop = GetRepeatedLoop(condition);
         return CSharpSyntaxFacts.DescendantNodesInExecution(
                 executionRoot,
                 includeNestedCallables: true)
             .Where(node =>
                 node.SpanStart >= origin.Span.End && node.Span.End <= condition.SpanStart ||
-                repeatedLoopBody?.Span.Contains(node.Span) == true ||
+                IsInsideRepeatedLoopMutationRegion(node, repeatedLoop) ||
                 IsInsideNestedCallable(node, executionRoot))
             .Any(node =>
                 SymbolMutationFacts.TryGetMutationTarget(node, out var target) &&
@@ -168,19 +168,28 @@ internal static class SymbolicReachabilityLowerer {
         node.Ancestors()
             .TakeWhile(ancestor => !ReferenceEquals(ancestor, executionRoot))
             .Any(CSharpSyntaxFacts.IsNestedLocalCallableBoundary);
-    private static StatementSyntax? GetRepeatedLoopBody(ExpressionSyntax condition) {
+    private static StatementSyntax? GetRepeatedLoop(ExpressionSyntax condition) {
         foreach (var ancestor in condition.Ancestors())
             switch (ancestor) {
                 case WhileStatementSyntax whileStatement
                     when whileStatement.Condition.Span.Contains(condition.Span):
-                    return whileStatement.Statement;
+                    return whileStatement;
                 case DoStatementSyntax doStatement
                     when doStatement.Condition.Span.Contains(condition.Span):
-                    return doStatement.Statement;
+                    return doStatement;
                 case ForStatementSyntax { Condition: { } forCondition } forStatement
                     when forCondition.Span.Contains(condition.Span):
-                    return forStatement.Statement;
+                    return forStatement;
             }
         return null;
     }
+    private static bool IsInsideRepeatedLoopMutationRegion(SyntaxNode node, StatementSyntax? loop) =>
+        loop switch {
+            WhileStatementSyntax whileStatement => whileStatement.Statement.Span.Contains(node.Span),
+            DoStatementSyntax doStatement => doStatement.Statement.Span.Contains(node.Span),
+            ForStatementSyntax forStatement =>
+                forStatement.Statement.Span.Contains(node.Span) ||
+                forStatement.Incrementors.Any(incrementor => incrementor.Span.Contains(node.Span)),
+            _ => false
+        };
 }
