@@ -287,6 +287,8 @@ internal static class CompilerProgramPointAnalysis {
         }
         private bool IsDefinitelyEmptySequenceSource(ExpressionSyntax collection) {
             collection = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(collection);
+            if (IsKnownImmutableEmptySingleton(collection))
+                return true;
             if (collection is CollectionExpressionSyntax { Elements.Count: 0 })
                 return true;
             if (collection is ArrayCreationExpressionSyntax arrayCreation) {
@@ -318,6 +320,33 @@ internal static class CompilerProgramPointAnalysis {
                    TryGetInvocationArgument(operation, countParameter, out var count) &&
                    semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount } &&
                    constantCount == 0;
+        }
+        private bool IsKnownImmutableEmptySingleton(ExpressionSyntax collection) {
+            var symbol = semanticModel.GetSymbolInfo(collection, cancellationToken).Symbol;
+            var isEmptySingleton = symbol switch {
+                IFieldSymbol { Name: "Empty", IsStatic: true, IsReadOnly: true } => true,
+                IPropertySymbol {
+                    Name: "Empty",
+                    IsStatic: true,
+                    Parameters.Length: 0,
+                    GetMethod: not null
+                } => true,
+                _ => false
+            };
+            if (!isEmptySingleton ||
+                symbol!.ContainingAssembly?.Name != "System.Collections.Immutable" ||
+                symbol.ContainingNamespace.ToDisplayString() != "System.Collections.Immutable")
+                return false;
+            var type = symbol.ContainingType.OriginalDefinition;
+            return (type.Name, type.Arity) is
+                ("ImmutableArray", 1) or
+                ("ImmutableDictionary", 2) or
+                ("ImmutableHashSet", 1) or
+                ("ImmutableList", 1) or
+                ("ImmutableQueue", 1) or
+                ("ImmutableSortedDictionary", 2) or
+                ("ImmutableSortedSet", 1) or
+                ("ImmutableStack", 1);
         }
         private bool TryGetElementTypeOperatorStep(
             ExpressionSyntax collection,
