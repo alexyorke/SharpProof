@@ -44,7 +44,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     }
     private MethodEffects AnalyzeBody(string path, MethodDefinitionHandle root) {
         var active = new HashSet<MethodAnalysisKey>();
-        var analyzed = new HashSet<MethodAnalysisKey>();
+        var analyzed = new Dictionary<MethodAnalysisKey, MetadataValueOrigin>();
         var effects = SharpProofEffect.None;
         var unknowns = ImmutableArray.CreateBuilder<SharpProofUnknownReason>();
         var exceptions = ImmutableArray.CreateBuilder<string>();
@@ -55,10 +55,13 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             hasUnknownExceptionBoundary |= exceptionBoundary;
             unknowns.Add(Reason(reason));
         }
-        void Visit(MethodLocation location, int depth, MetadataCallContext? suppliedContext = null) {
+        MetadataValueOrigin Visit(
+            MethodLocation location,
+            int depth,
+            MetadataCallContext? suppliedContext = null) {
             if (depth > MaxDepth || analyzed.Count >= MaxMethods) {
                 MarkUnknown("metadata_budget_exhausted", SharpProofEffect.BudgetExhaustion);
-                return;
+                return MetadataValueOrigin.Unknown;
             }
             using var stream = File.OpenRead(location.Path);
             using var pe = new PEReader(stream, PEStreamOptions.PrefetchEntireImage);
@@ -69,20 +72,23 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             var context = suppliedContext ?? MetadataCallContext.Root(
                 isStatic,
                 definitionSignature.ParameterTypes.Length);
+            var returnsVoid = IsVoid(definitionSignature.ReturnType);
             var analysisKey = new MethodAnalysisKey(location, context.Key);
-            if (analyzed.Contains(analysisKey)) return;
+            if (analyzed.TryGetValue(analysisKey, out var cachedReturn)) return cachedReturn;
             if (!active.Add(analysisKey)) {
                 MarkUnknown("metadata_recursive_cycle");
-                return;
+                return MetadataValueOrigin.Unknown;
             }
+            var methodReturn = MetadataValueOrigin.Unknown;
+            MetadataValueOrigin? observedReturn = null;
             try {
                 if ((definition.Attributes & MethodAttributes.PinvokeImpl) != 0) {
                     MarkUnknown("metadata_native_exception_boundary", SharpProofEffect.UsesNativeCode, true);
-                    return;
+                    return methodReturn;
                 }
                 if (definition.RelativeVirtualAddress == 0) {
                     MarkUnknown("metadata_body_unavailable", exceptionBoundary: true);
-                    return;
+                    return methodReturn;
                 }
                 var body = pe.GetMethodBody(definition.RelativeVirtualAddress);
                 if (body.ExceptionRegions.Length != 0) {
@@ -95,13 +101,14 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 for (var offset = 0; offset < bytes.Length;) {
                     if (++instructionCount > MaxInstructions) {
                         MarkUnknown("metadata_instruction_budget_exhausted", SharpProofEffect.BudgetExhaustion);
-                        return;
+                        return methodReturn;
                     }
                     if (!TryRead(bytes, ref offset, out var opcode, out var operand)) {
                         MarkUnknown("malformed_il", SharpProofEffect.UnsupportedOperation);
-                        return;
+                        return methodReturn;
                     }
                     MetadataCallContext? invocationContext = null;
+                    var invocationReturnsValue = false;
                     MetadataValueOrigin? accessOrigin;
                     if ((opcode == OpCodes.Call ||
                          opcode == OpCodes.Callvirt ||
@@ -113,8 +120,16 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                         invocationContext = provenance.ObserveInvocation(
                             invocationSignature.ParameterTypes.Length,
                             opcode != OpCodes.Newobj && invocationSignature.Header.IsInstance,
-                            opcode == OpCodes.Newobj,
-                            !IsVoid(invocationSignature.ReturnType));
+                            opcode == OpCodes.Newobj);
+                        invocationReturnsValue = opcode != OpCodes.Newobj &&
+                                                 !IsVoid(invocationSignature.ReturnType);
+                        accessOrigin = null;
+                    }
+                    else if (opcode == OpCodes.Ret) {
+                        if (!returnsVoid)
+                            observedReturn = MergeOrigins(observedReturn, provenance.ObserveReturn());
+                        else
+                            provenance.ObserveReturn();
                         accessOrigin = null;
                     }
                     else {
@@ -125,7 +140,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                         if (opcode == OpCodes.Newobj) {
                             var constructor = MetadataTokens.Handle(operand);
                             if (TryResolveMethod(location.Path, reader, constructor, out var constructorLocation))
-                                Visit(constructorLocation, depth + 1, invocationContext);
+                                _ = Visit(constructorLocation, depth + 1, invocationContext);
                             else {
                                 MarkUnknown("metadata_constructor_unresolved", exceptionBoundary: true);
                             }
@@ -175,12 +190,18 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                         }
                         var called = MetadataTokens.Handle(operand);
                         if (opcode == OpCodes.Call &&
-                            TryResolveMethod(location.Path, reader, called, out var calledLocation))
-                            Visit(calledLocation, depth + 1, invocationContext);
+                            TryResolveMethod(location.Path, reader, called, out var calledLocation)) {
+                            var calledReturn = Visit(calledLocation, depth + 1, invocationContext);
+                            if (invocationReturnsValue) provenance.PushInvocationReturn(calledReturn);
+                        }
                         else if (opcode == OpCodes.Call ||
                                  !TryResolveMethod(location.Path, reader, called, out _)) {
+                            if (invocationReturnsValue)
+                                provenance.PushInvocationReturn(MetadataValueOrigin.Unknown);
                             MarkUnknown("metadata_external_call_unresolved", exceptionBoundary: true);
                         }
+                        else if (invocationReturnsValue)
+                            provenance.PushInvocationReturn(MetadataValueOrigin.Unknown);
                     }
                     else if (IsIndirectOrElementWrite(opcode)) {
                         if (accessOrigin is MetadataValueOrigin.Fresh)
@@ -203,13 +224,17 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                         MarkUnknown("metadata_opcode_unsupported", SharpProofEffect.UnsupportedOperation, true);
                     }
                 }
+                methodReturn = returnsVoid
+                    ? MetadataValueOrigin.Scalar
+                    : observedReturn ?? MetadataValueOrigin.Unknown;
+                return methodReturn;
             }
             finally {
                 active.Remove(analysisKey);
-                analyzed.Add(analysisKey);
+                analyzed[analysisKey] = methodReturn;
             }
         }
-        Visit(new MethodLocation(path, root), 0);
+        _ = Visit(new MethodLocation(path, root), 0);
         var exceptionFacts = ImmutableArray.CreateBuilder<MethodExceptionFact>();
         exceptionFacts.AddRange(exceptions.Select(static type =>
             MethodExceptionFact.Boundary(type, MethodExceptionSource.Metadata, "metadata_throw")));
@@ -340,6 +365,10 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     }
     private static bool IsVoid(StructuralDecodedType type) =>
         string.Equals(type.Key, "named:System.Void", StringComparison.Ordinal);
+    private static MetadataValueOrigin MergeOrigins(
+        MetadataValueOrigin? current,
+        MetadataValueOrigin next) =>
+        current == null || current == next ? next : MetadataValueOrigin.Unknown;
     private bool TryResolveContainingType(
         string currentPath,
         MetadataReader reader,
@@ -614,8 +643,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         internal MetadataCallContext ObserveInvocation(
             int parameterCount,
             bool hasReceiver,
-            bool createsFreshReceiver,
-            bool returnsValue) {
+            bool createsFreshReceiver) {
             var arguments = new MetadataValueOrigin[parameterCount];
             for (var index = parameterCount - 1; index >= 0; index--) arguments[index] = Pop();
             var receiver = createsFreshReceiver
@@ -624,8 +652,13 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                     ? Pop()
                     : MetadataValueOrigin.Unknown;
             if (createsFreshReceiver) Push(MetadataValueOrigin.Fresh);
-            else if (returnsValue) Push(MetadataValueOrigin.Unknown);
             return new MetadataCallContext(receiver, [.. arguments]);
+        }
+        internal void PushInvocationReturn(MetadataValueOrigin origin) => Push(origin);
+        internal MetadataValueOrigin ObserveReturn() {
+            var origin = Pop();
+            ResetStack();
+            return origin;
         }
         internal MetadataValueOrigin? Observe(OpCode opcode, int operand) {
             if (TryArgumentIndex(opcode, operand, out var argumentIndex)) {
