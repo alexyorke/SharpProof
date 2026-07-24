@@ -26,6 +26,10 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                 public readonly int Value;
                 public SmallValue(int value) { Value = value; }
             }
+            public static class ThrowingStatic {
+                public static int Value;
+                static ThrowingStatic() { throw null!; }
+            }
             public static class Effects {
                 public static int State;
                 public static volatile int VolatileState;
@@ -96,6 +100,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                     }
                 }
                 public static SmallValue CreateValue(int value) => new SmallValue(value);
+                public static int ReadThrowingStatic() => ThrowingStatic.Value;
                 public static unsafe int SizeOf<T>() where T : unmanaged => sizeof(T);
                 public static void CopyBlockOpcodeFixture() { VolatileState = 1; }
                 private static void Helper() { State++; }
@@ -348,6 +353,16 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.Allocates), Is.False);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataStaticFieldAccessIncludesTypeInitializerExceptions() {
+        var effects = Analyze("static int M() => MetadataFixture.Effects.ReadThrowingStatic();");
+        Assert.Multiple(() => {
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Disproven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Throws), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.ReadsStaticState), Is.True);
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
         });
     }

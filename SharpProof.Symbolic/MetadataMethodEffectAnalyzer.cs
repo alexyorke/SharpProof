@@ -137,6 +137,21 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                     else {
                         accessOrigin = provenance.Observe(opcode, operand);
                     }
+                    if (IsStaticFieldAccess(opcode)) {
+                        var field = MetadataTokens.Handle(operand);
+                        if (!TryResolveFieldDeclaringType(
+                                location.Path,
+                                reader,
+                                field,
+                                out var fieldPath,
+                                out var fieldType)) {
+                            MarkUnknown("metadata_static_initializer_unresolved", exceptionBoundary: true);
+                        }
+                        else if (TryFindTypeInitializer(fieldPath, fieldType, out var initializer) &&
+                                 !active.Any(key => key.Location == initializer)) {
+                            _ = Visit(initializer, depth + 1);
+                        }
+                    }
                     if (opcode == OpCodes.Volatile) {
                         effects |= SharpProofEffect.Synchronizes;
                     }
@@ -330,6 +345,8 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     private static bool IsIndirectRead(OpCode opcode) =>
         opcode == OpCodes.Ldobj ||
         opcode.Name?.StartsWith("ldind", StringComparison.Ordinal) == true;
+    private static bool IsStaticFieldAccess(OpCode opcode) =>
+        opcode == OpCodes.Ldsfld || opcode == OpCodes.Ldsflda || opcode == OpCodes.Stsfld;
     private static bool IsArithmeticExceptionOnly(OpCode opcode) =>
         opcode == OpCodes.Div ||
         opcode == OpCodes.Div_Un ||
@@ -486,6 +503,48 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         }
         return string.Equals(reader.GetString(namespaceHandle), @namespace, StringComparison.Ordinal) &&
                string.Equals(reader.GetString(nameHandle), name, StringComparison.Ordinal);
+    }
+    private bool TryResolveFieldDeclaringType(
+        string currentPath,
+        MetadataReader reader,
+        Handle field,
+        out string declaringPath,
+        out TypeDefinitionHandle declaringType) {
+        if (field.Kind == HandleKind.FieldDefinition) {
+            declaringPath = currentPath;
+            declaringType = reader.GetFieldDefinition((FieldDefinitionHandle)field).GetDeclaringType();
+            return true;
+        }
+        if (field.Kind == HandleKind.MemberReference) {
+            var member = reader.GetMemberReference((MemberReferenceHandle)field);
+            return TryResolveContainingType(
+                currentPath,
+                reader,
+                member.Parent,
+                out declaringPath,
+                out declaringType,
+                out _);
+        }
+        declaringPath = string.Empty;
+        declaringType = default;
+        return false;
+    }
+    private static bool TryFindTypeInitializer(
+        string path,
+        TypeDefinitionHandle typeHandle,
+        out MethodLocation initializer) {
+        using var stream = File.OpenRead(path);
+        using var pe = new PEReader(stream, PEStreamOptions.PrefetchMetadata);
+        var reader = pe.GetMetadataReader();
+        foreach (var methodHandle in reader.GetTypeDefinition(typeHandle).GetMethods()) {
+            var method = reader.GetMethodDefinition(methodHandle);
+            if (!string.Equals(reader.GetString(method.Name), ".cctor", StringComparison.Ordinal))
+                continue;
+            initializer = new MethodLocation(path, methodHandle);
+            return true;
+        }
+        initializer = default;
+        return false;
     }
     private static MetadataValueOrigin MergeOrigins(
         MetadataValueOrigin? current,
