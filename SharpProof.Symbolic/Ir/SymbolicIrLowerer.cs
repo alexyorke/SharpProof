@@ -187,8 +187,10 @@ internal static partial class SymbolicIrLowerer {
         if (SymbolicStringLowerer.TryLowerStringExpressionTerm(expression, context, out term)) return true;
         if (expression is InvocationExpressionSyntax customInvocation &&
             context.InvocationTermLowerer != null &&
-            context.InvocationTermLowerer(customInvocation, context, out term))
+            context.InvocationTermLowerer(customInvocation, context, out var customTerm)) {
+            term = customTerm;
             return true;
+        }
         if (expression is InvocationExpressionSyntax invocation &&
             SymbolicKnownApiLowerer.TryLowerKnownApiInvocationTerm(invocation, context, out term))
             return true;

@@ -2,7 +2,7 @@ namespace SharpProof.Symbolic.Ir;
 internal delegate bool SymbolicInvocationTermLowerer(
     InvocationExpressionSyntax invocation,
     SymbolicLoweringContext context,
-    out SymbolicTerm term);
+    [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out SymbolicTerm? term);
 internal delegate ITypeSymbol? SymbolicInvocationTermTypeResolver(InvocationExpressionSyntax invocation);
 internal sealed class SymbolicLoweringContext(
     SemanticModel semanticModel,

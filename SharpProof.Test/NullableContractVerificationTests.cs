@@ -122,7 +122,32 @@ public sealed class NullableContractVerificationTests {
         var value = result.ToString().ToLowerInvariant();
         var source = Class("public static bool TryGet([NotNullWhen(" + value +
             ")] out string? value)\n{\n    value = \"value\";\n    return " + value + ";\n}", CodeAnalysis);
-        Assert.That((await AnalyzeAsync(source)).Select(static diagnostic => diagnostic.Id), Does.Not.Contain("SP0042"));
+        Assert.That(
+            (await AnalyzeAsync(source)).Select(static diagnostic => diagnostic.Id),
+            Has.None.EqualTo("SP0042").And.None.EqualTo("SP0047"));
+    }
+    [Test]
+    public async Task NotNullWhen_TryGetValueOrAssignedObject_DoesNotReportUnknownContract() {
+        var source = Class("""
+            public static bool TryGet(
+                System.Collections.Generic.Dictionary<string, object> values,
+                [NotNullWhen(true)] out object? value)
+            {
+                if (values.TryGetValue("key", out value))
+                    return true;
+                value = new object();
+                values.Add("fallback", value);
+                return true;
+            }
+            """, CodeAnalysis);
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics
+                .Where(static diagnostic => diagnostic.Id is "SP0042" or "SP0047")
+                .Select(static diagnostic =>
+                    diagnostic.Id + "@" +
+                    (diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1).ToString()),
+            Is.Empty);
     }
     [ReadmeExample("sp0041-nullable-return-contract")]
     [Test]

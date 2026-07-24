@@ -163,9 +163,9 @@ internal static class MethodEnsuresAnalyzer {
         MethodNormalCompletion completionSite,
         NullableFlowFactState resultState,
         out string rewrittenCondition,
-        out ExpressionSyntax rewrittenExpression) {
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ExpressionSyntax? rewrittenExpression) {
         rewrittenCondition = conditionText;
-        rewrittenExpression = null!;
+        rewrittenExpression = null;
         if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
         if (completionSite.ResultExpression == null) {
             rewrittenExpression = conditionExpression;
@@ -185,10 +185,10 @@ internal static class MethodEnsuresAnalyzer {
         SemanticModel semanticModel,
         int speculativePosition,
         CancellationToken cancellationToken,
-        out SymbolicCondition symbolicCondition,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out SymbolicCondition? symbolicCondition,
         out SymbolicState initialState,
         out string? failureReason) {
-        symbolicCondition = null!;
+        symbolicCondition = null;
         initialState = new SymbolicState();
         failureReason = null;
         if (!ContractConditionHelpers.TryParse(proofCondition, out var proofStatement, out var proofExpression)) {
@@ -298,9 +298,12 @@ internal static class MethodEnsuresAnalyzer {
         private int _nextSnapshotId;
         public string? FailureReason { get; private set; }
         public bool HasSnapshots => _snapshotFacts.Count != 0;
-        public bool TryLowerInvocationTerm(InvocationExpressionSyntax invocation, SymbolicLoweringContext context, out SymbolicTerm term) {
+        public bool TryLowerInvocationTerm(
+            InvocationExpressionSyntax invocation,
+            SymbolicLoweringContext context,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out SymbolicTerm? term) {
             _ = context;
-            term = null!;
+            term = null;
             if (!IsOldValueInvocation(invocation)) return false;
             if (invocation.ArgumentList.Arguments.Count != 1) {
                 FailureReason = "old(...) requires exactly one argument";

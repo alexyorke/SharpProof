@@ -113,7 +113,7 @@ internal static class CompilerProgramPointAnalysis {
                     if (statement is not IfStatementSyntax { Else: null } conditional ||
                         !AlwaysCompletes(conditional.Statement))
                         continue;
-                    var transition = SymbolicReachabilityLowerer.Apply(
+                    var transition = SymbolicReachabilityLowerer.ApplyConditionOnly(
                         state, conditional.Condition, false, semanticModel, cancellationToken);
                     if (transition.IsExact) state = transition.State;
                 }

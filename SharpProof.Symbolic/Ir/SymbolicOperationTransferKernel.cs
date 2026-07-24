@@ -50,9 +50,15 @@ internal static class SymbolicOperationTransferKernel {
     private static void ApplyInvalidations(ref SymbolicState state, ImmutableArray<SymbolicInvalidationTarget> targets) {
         if (targets.IsDefaultOrEmpty) return;
         foreach (var target in targets) {
-            state = target.MatchKind == SymbolicInvalidationMatchKind.VariablePrefix
-                ? SymbolicIrReferenceScanner.RemoveVariableReferences(state, target.Key)
-                : SymbolicIrReferenceScanner.RemoveVariableOrMemberReferences(state, target.Key);
+            state = target.MatchKind switch {
+                SymbolicInvalidationMatchKind.VariablePrefix =>
+                    SymbolicIrReferenceScanner.RemoveVariableReferences(state, target.Key),
+                SymbolicInvalidationMatchKind.VariableOrMember =>
+                    SymbolicIrReferenceScanner.RemoveVariableOrMemberReferences(state, target.Key),
+                SymbolicInvalidationMatchKind.VariableDescendants =>
+                    SymbolicIrReferenceScanner.RemoveVariableDescendantReferences(state, target.Key),
+                _ => state
+            };
             if (target.DefinitionVersion is { } definitionVersion)
                 state = state.WithSymbolVersion(target.Key, definitionVersion);
         }

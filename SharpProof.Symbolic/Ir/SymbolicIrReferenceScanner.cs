@@ -21,6 +21,11 @@ internal static class SymbolicIrReferenceScanner {
             state,
             fact => ContainsVariableOrMember(fact, variableName),
             condition => ContainsVariableOrMember(condition, variableName));
+    internal static SymbolicState RemoveVariableDescendantReferences(SymbolicState state, string variableName) =>
+        RemoveReferences(
+            state,
+            fact => ContainsVariableDescendant(fact, variableName),
+            condition => ContainsVariableDescendant(condition, variableName));
     private static SymbolicState RemoveReferences(
         SymbolicState state,
         Func<SymbolicFact, bool> containsReferenceInFact,
@@ -35,6 +40,16 @@ internal static class SymbolicIrReferenceScanner {
     }
     private static bool ContainsVariable(SymbolicCondition condition, Func<string, bool> match) {
         var scanner = new VariableReferenceVisitor(match);
+        scanner.Visit(condition);
+        return scanner.Found;
+    }
+    private static bool ContainsVariableDescendant(SymbolicFact fact, string variableName) {
+        var scanner = new VariableDescendantReferenceVisitor(variableName);
+        scanner.Visit(fact);
+        return scanner.Found;
+    }
+    private static bool ContainsVariableDescendant(SymbolicCondition condition, string variableName) {
+        var scanner = new VariableDescendantReferenceVisitor(variableName);
         scanner.Visit(condition);
         return scanner.Found;
     }
@@ -75,6 +90,21 @@ internal static class SymbolicIrReferenceScanner {
         }
         protected override void OnVariableLikeName(string name) {
             if (!Found && _match(name)) Found = true;
+        }
+    }
+    sealed class VariableDescendantReferenceVisitor(string variableName) : SymbolicIrVisitor {
+        internal bool Found { get; private set; }
+        protected override void OnTerm(SymbolicTerm term) {
+            if (!Found &&
+                term is not SymbolicVariableTerm &&
+                ContainsVariableOrMember(term, variableName))
+                Found = true;
+        }
+        protected override void OnVariableLikeName(string name) {
+            if (!Found &&
+                (name.StartsWith(variableName + ".", StringComparison.Ordinal) ||
+                 name.StartsWith(variableName + "[", StringComparison.Ordinal)))
+                Found = true;
         }
     }
 }

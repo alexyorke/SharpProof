@@ -52,7 +52,10 @@ internal sealed class SymbolicMutationInventory(
             if (entry.Exposure is not { } exposure) continue;
             foreach (var symbol in SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(exposure, semanticModel, cancellationToken))
                 if (IsMutableReference(SymbolicFactFactory.GetTrackedSymbolType(symbol)))
-                    steps.Add(new([ForSymbol(symbol)], entry.Source.Span, "operation-transfer.reference-invalidation"));
+                    steps.Add(new(
+                        [ForExposedSymbol(symbol)],
+                        entry.Source.Span,
+                        "operation-transfer.reference-invalidation"));
         }
         return new(steps.ToImmutable(), unsupported);
     }
@@ -100,6 +103,10 @@ internal sealed class SymbolicMutationInventory(
     }
     private static SymbolicInvalidationTarget ForSymbol(ISymbol symbol) =>
         new(SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition));
+    private static SymbolicInvalidationTarget ForExposedSymbol(ISymbol symbol) =>
+        new(
+            SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition),
+            SymbolicInvalidationMatchKind.VariableDescendants);
     private static bool IsMutableReference(ITypeSymbol? type) =>
         type is IArrayTypeSymbol || type?.IsReferenceType == true && type.SpecialType != SpecialType.System_String;
 }

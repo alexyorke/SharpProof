@@ -45,4 +45,53 @@ public sealed class ContractConditionHelperTests {
             Assert.That(notNullWhen?.ConstructorArguments.Single().Value, Is.True);
         });
     }
+    [TestCase(
+        "SharpProof.Analyzer.MethodEnsuresAnalyzer",
+        "TryRewriteConditionForCompletionSite",
+        4,
+        "Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax")]
+    [TestCase(
+        "SharpProof.Analyzer.MethodEnsuresAnalyzer",
+        "TryCreateEntrySnapshotProofCondition",
+        5,
+        "SharpProof.Symbolic.Ir.SymbolicCondition")]
+    [TestCase(
+        "SharpProof.Analyzer.MethodEnsuresAnalyzer+OldValueSnapshotBuilder",
+        "TryLowerInvocationTerm",
+        2,
+        "SharpProof.Symbolic.Ir.SymbolicTerm")]
+    public void MethodEnsuresTryHelper_FailureOutputHasNullableFlowContract(
+        string typeName,
+        string methodName,
+        int parameterIndex,
+        string parameterTypeName) {
+        var analyzerAssembly = typeof(SharpProofAnalyzer).Assembly;
+        var declaringType = analyzerAssembly.GetType(typeName, throwOnError: true)!;
+        var method = declaringType.GetMethod(
+            methodName,
+            BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)!;
+        var parameter = method.GetParameters()[parameterIndex];
+        var notNullWhen = parameter.CustomAttributes.SingleOrDefault(attribute =>
+            attribute.AttributeType.FullName == "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute");
+        Assert.Multiple(() => {
+            Assert.That(parameter.ParameterType.IsByRef, Is.True);
+            Assert.That(parameter.ParameterType.GetElementType()?.FullName, Is.EqualTo(parameterTypeName));
+            Assert.That(new NullabilityInfoContext().Create(parameter).WriteState, Is.EqualTo(NullabilityState.Nullable));
+            Assert.That(notNullWhen?.ConstructorArguments.Single().Value, Is.True);
+        });
+    }
+    [Test]
+    public void SymbolicInvocationTermLowerer_FailureOutputHasNullableFlowContract() {
+        var symbolicAssembly = typeof(SharpProof.Symbolic.MethodEffects).Assembly;
+        var delegateType = symbolicAssembly.GetType(
+            "SharpProof.Symbolic.Ir.SymbolicInvocationTermLowerer",
+            throwOnError: true)!;
+        var parameter = delegateType.GetMethod("Invoke")!.GetParameters()[2];
+        var notNullWhen = parameter.CustomAttributes.SingleOrDefault(attribute =>
+            attribute.AttributeType.FullName == "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute");
+        Assert.Multiple(() => {
+            Assert.That(new NullabilityInfoContext().Create(parameter).WriteState, Is.EqualTo(NullabilityState.Nullable));
+            Assert.That(notNullWhen?.ConstructorArguments.Single().Value, Is.True);
+        });
+    }
 }

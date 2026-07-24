@@ -139,14 +139,14 @@ internal static class SymbolicFrameworkPostconditionLowerer {
             ? NullableFlowFacts.HasNotNullPostcondition(parameter) ||
               NullableFlowFacts.HasInferredNotNullNormalCompletionPostcondition(parameter, cancellationToken)
             : NullableFlowFacts.GetParameterOutputState(parameter) == NullableFlowFactState.NotNull;
-    private static bool ArgumentRefKindMatches(IParameterSymbol parameter, ArgumentSyntax argument) =>
+    internal static bool ArgumentRefKindMatches(IParameterSymbol parameter, ArgumentSyntax argument) =>
         parameter.RefKind switch {
             RefKind.None => argument.RefKindKeyword.IsKind(SyntaxKind.None),
             RefKind.Ref => argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword),
             RefKind.Out => argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword),
             _ => false
         };
-    private static bool IsUniqueOutputArgumentTarget(
+    internal static bool IsUniqueOutputArgumentTarget(
         IInvocationOperation invocation,
         IArgumentOperation argument,
         SemanticModel semanticModel,
