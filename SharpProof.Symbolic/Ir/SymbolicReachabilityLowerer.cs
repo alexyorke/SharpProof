@@ -148,11 +148,13 @@ internal static class SymbolicReachabilityLowerer {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(condition);
+        var repeatedLoopBody = GetRepeatedLoopBody(condition);
         return CSharpSyntaxFacts.DescendantNodesInExecution(
                 executionRoot,
                 includeNestedCallables: true)
             .Where(node =>
                 node.SpanStart >= origin.Span.End && node.Span.End <= condition.SpanStart ||
+                repeatedLoopBody?.Span.Contains(node.Span) == true ||
                 IsInsideNestedCallable(node, executionRoot))
             .Any(node =>
                 SymbolMutationFacts.TryGetMutationTarget(node, out var target) &&
@@ -166,4 +168,19 @@ internal static class SymbolicReachabilityLowerer {
         node.Ancestors()
             .TakeWhile(ancestor => !ReferenceEquals(ancestor, executionRoot))
             .Any(CSharpSyntaxFacts.IsNestedLocalCallableBoundary);
+    private static StatementSyntax? GetRepeatedLoopBody(ExpressionSyntax condition) {
+        foreach (var ancestor in condition.Ancestors())
+            switch (ancestor) {
+                case WhileStatementSyntax whileStatement
+                    when whileStatement.Condition.Span.Contains(condition.Span):
+                    return whileStatement.Statement;
+                case DoStatementSyntax doStatement
+                    when doStatement.Condition.Span.Contains(condition.Span):
+                    return doStatement.Statement;
+                case ForStatementSyntax { Condition: { } forCondition } forStatement
+                    when forCondition.Span.Contains(condition.Span):
+                    return forStatement.Statement;
+            }
+        return null;
+    }
 }

@@ -140,6 +140,25 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_AliasedConditionalOutputInvalidatedAcrossLoop",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            public interface IFactory {
+                bool TryGet([NotNullWhen(true)] out object? value);
+            }
+            public static class Consumer {
+                private static void Reset(ref object? value) => value = null;
+                public static object Get(IFactory factory) {
+                    var isExact = factory.TryGet(out var expression);
+                    while (isExact) {
+                        System.GC.KeepAlive(expression!);
+                        Reset(ref expression);
+                    }
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_UserEqualityPredicate_RemainsConservative",
             """
             #nullable enable
