@@ -166,6 +166,10 @@ internal static class CompilerProgramPointAnalysis {
             var builder = ImmutableArray.CreateBuilder<SequencePredicateStep>();
             var resolvedUses = new List<(ISymbol Symbol, int Position)>();
             while (true) {
+                collection = SymbolicConversionLowerer.UnwrapIdentityConversions(
+                    collection,
+                    semanticModel,
+                    cancellationToken);
                 if (TryGetSequencePredicateStep(
                         collection,
                         out var source,

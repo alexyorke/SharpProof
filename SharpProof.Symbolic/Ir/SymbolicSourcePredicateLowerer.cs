@@ -75,17 +75,10 @@ internal static class SymbolicSourcePredicateLowerer {
         IParameterSymbol parameter,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
-        while (true) {
-            returned = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(returned);
-            if (semanticModel.GetOperation(returned, cancellationToken) is not
-                    IConversionOperation {
-                        Conversion.IsIdentity: true,
-                        Operand.Syntax: ExpressionSyntax operand
-                    } ||
-                ReferenceEquals(operand, returned))
-                break;
-            returned = operand;
-        }
+        returned = SymbolicConversionLowerer.UnwrapIdentityConversions(
+            returned,
+            semanticModel,
+            cancellationToken);
         return SymbolEqualityComparer.Default.Equals(
             semanticModel.GetSymbolInfo(returned, cancellationToken).Symbol?.OriginalDefinition,
             parameter);

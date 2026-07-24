@@ -1,5 +1,23 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicConversionLowerer {
+    internal static ExpressionSyntax UnwrapIdentityConversions(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) {
+        while (true) {
+            expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+            if (semanticModel.GetOperation(expression, cancellationToken) is not
+                    IConversionOperation {
+                        Conversion.IsIdentity: true,
+                        Operand.Syntax: ExpressionSyntax operand
+                    } ||
+                ReferenceEquals(operand, expression) ||
+                (operand.SyntaxTree == expression.SyntaxTree &&
+                 operand.Span == expression.Span))
+                return expression;
+            expression = operand;
+        }
+    }
     internal static bool TryLowerDecimalZeroComparison(
         BinaryExpressionSyntax expression,
         SymbolicLoweringContext context,
