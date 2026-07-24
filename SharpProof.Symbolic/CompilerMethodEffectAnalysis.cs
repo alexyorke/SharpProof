@@ -3297,6 +3297,17 @@ internal sealed class MethodEffectAnalysisSession(
             method.ContainingType.ToDisplayString() == "System.Math" &&
             method.Parameters.All(parameter =>
                 parameter is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Double });
+        private static bool IsMathFAtan2(IMethodSymbol method) =>
+            method is {
+                MethodKind: MethodKind.Ordinary,
+                Name: "Atan2",
+                IsStatic: true,
+                Parameters.Length: 2,
+                ReturnType.SpecialType: SpecialType.System_Single
+            } &&
+            method.ContainingType.ToDisplayString() == "System.MathF" &&
+            method.Parameters.All(parameter =>
+                parameter is { RefKind: RefKind.None, Type.SpecialType: SpecialType.System_Single });
         private static bool IsBitConverterToStringArray(IMethodSymbol method) =>
             method is {
                 MethodKind: MethodKind.Ordinary,
@@ -4393,6 +4404,9 @@ internal sealed class MethodEffectAnalysisSession(
                     SharpProofEffect.None,
                 ("System.Math", MethodKind.Ordinary, "Atan2")
                     when IsMathAtan2(method) =>
+                    SharpProofEffect.None,
+                ("System.MathF", MethodKind.Ordinary, "Atan2")
+                    when IsMathFAtan2(method) =>
                     SharpProofEffect.None,
                 ("System.Math" or "System.MathF", _, "Min" or "Max" or "Sqrt") => SharpProofEffect.None,
                 (_, _, "Parse") when numeric => SharpProofEffect.Throws,
