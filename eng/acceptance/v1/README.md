@@ -12,6 +12,10 @@ production files that are expected to change:
   changing a listed file requires separate evidence that the baseline test or
   harness was invalid. The net472 project hash includes its approved analyzer
   loader repair.
+- `approved-test-updates.gitblob` preserves the original frozen hashes while
+  allowing exact, reviewed post-baseline test blobs. Each approval records its
+  evidence commits in comments, and the verifier rejects missing, stale, or
+  unlisted updates.
 - `dependency-references.txt` freezes package and project references without
   freezing unrelated project-file formatting.
 - `production-inventory.tsv` records the pinned baseline's counted files and

@@ -41,10 +41,27 @@ function Get-ManifestLines {
 function Test-GitBlobManifest {
     param(
         [Parameter(Mandatory = $true)][string]$ManifestPath,
-        [Parameter(Mandatory = $true)][string]$DisplayName
+        [Parameter(Mandatory = $true)][string]$DisplayName,
+        [Parameter()][string]$ApprovedUpdatesPath
     )
 
     $entries = Get-ManifestLines $ManifestPath
+    $approvedUpdates = [Collections.Generic.Dictionary[string, string]]::new(
+        [StringComparer]::Ordinal)
+    if (-not [string]::IsNullOrWhiteSpace($ApprovedUpdatesPath))
+    {
+        foreach ($approvedEntry in Get-ManifestLines $ApprovedUpdatesPath)
+        {
+            if ($approvedEntry -notmatch '^(?<oid>[0-9a-f]{40})  (?<path>.+)$')
+            {
+                throw "Malformed approved $DisplayName update line: '$approvedEntry'."
+            }
+            Assert-Acceptance (-not $approvedUpdates.ContainsKey($Matches.path)) (
+                "approved $DisplayName update '$($Matches.path)' is duplicated.")
+            $approvedUpdates.Add($Matches.path, $Matches.oid)
+        }
+    }
+    $usedApprovals = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($entry in $entries)
     {
         if ($entry -notmatch '^(?<oid>[0-9a-f]{40})  (?<path>.+)$')
@@ -58,10 +75,20 @@ function Test-GitBlobManifest {
         Assert-Acceptance (Test-Path -LiteralPath $fullPath -PathType Leaf) "$DisplayName file '$path' is missing."
         $actualOid = (& git -C $repoRoot hash-object --path $path $path).Trim()
         Assert-Acceptance ($LASTEXITCODE -eq 0) "git hash-object failed for '$path'."
-        Assert-Equal $actualOid $expectedOid "$DisplayName Git blob for $path"
+        if ($actualOid -cne $expectedOid)
+        {
+            Assert-Acceptance ($approvedUpdates.ContainsKey($path)) (
+                "$DisplayName Git blob for $path is '$actualOid'; expected baseline '$expectedOid' " +
+                'and no approved update exists.')
+            Assert-Equal $actualOid $approvedUpdates[$path] "approved $DisplayName Git blob for $path"
+            [void]$usedApprovals.Add($path)
+        }
     }
+    Assert-Equal $usedApprovals.Count $approvedUpdates.Count "used approved $DisplayName updates"
 
-    Write-Host "Verified $($entries.Count) frozen $DisplayName files."
+    Write-Host (
+        "Verified $($entries.Count) frozen $DisplayName files " +
+        "with $($usedApprovals.Count) approved post-baseline updates.")
 }
 
 function Get-XmlNodeValue {
@@ -244,7 +271,10 @@ try
     }
     Write-Host "Verified pinned production inventory: $($inventory.Count) files, $inventoryPhysical physical, $inventoryNonblank nonblank."
 
-    Test-GitBlobManifest (Join-Path $acceptanceRoot 'frozen-tests.gitblob') 'test'
+    Test-GitBlobManifest `
+        (Join-Path $acceptanceRoot 'frozen-tests.gitblob') `
+        'test' `
+        (Join-Path $acceptanceRoot 'approved-test-updates.gitblob')
     Test-GitBlobManifest (Join-Path $acceptanceRoot 'corpus-inventory.gitblob') 'corpus'
 
     $expectedReferences = Get-ManifestLines (Join-Path $acceptanceRoot 'dependency-references.txt')

@@ -1,0 +1,5 @@
+# Exact post-baseline test updates approved without replacing the pinned baseline blob.
+# NullableContractVerificationTests.cs has additive TDD coverage only (103 added
+# lines, no removed lines) from f7694bdf, e15f487a, 5527f4c5, and the aliased
+# conditional output regression covered by this integration change.
+83d0f2f56961a704e1b586be466866520bbb5bb5  SharpProof.Test/NullableContractVerificationTests.cs
