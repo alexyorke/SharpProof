@@ -25,4 +25,24 @@ public sealed class ContractConditionHelperTests {
             Assert.That(notNullWhen?.ConstructorArguments.Single().Value, Is.True);
         });
     }
+    [TestCase("TryCreateOperationBlockContext")]
+    [TestCase("TryCreateSyntaxContext")]
+    public void PipelineTryHelper_FailureOutputHasNullableFlowContract(string methodName) {
+        var analyzerAssembly = typeof(SharpProofAnalyzer).Assembly;
+        var pipelineType = analyzerAssembly.GetType(
+            "SharpProof.Analyzer.AnalyzerFeaturePipeline",
+            throwOnError: true)!;
+        var contextType = analyzerAssembly.GetType(
+            "SharpProof.Analyzer.MethodBodyAnalysisContext",
+            throwOnError: true)!;
+        var method = pipelineType.GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic)!;
+        var parameter = method.GetParameters()[2];
+        var notNullWhen = parameter.CustomAttributes.SingleOrDefault(attribute =>
+            attribute.AttributeType.FullName == "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute");
+        Assert.Multiple(() => {
+            Assert.That(parameter.ParameterType, Is.EqualTo(contextType.MakeByRefType()));
+            Assert.That(new NullabilityInfoContext().Create(parameter).WriteState, Is.EqualTo(NullabilityState.Nullable));
+            Assert.That(notNullWhen?.ConstructorArguments.Single().Value, Is.True);
+        });
+    }
 }

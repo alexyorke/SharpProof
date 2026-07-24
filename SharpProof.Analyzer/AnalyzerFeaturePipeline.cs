@@ -37,8 +37,8 @@ internal static class AnalyzerFeaturePipeline {
     private static bool TryCreateOperationBlockContext(
         OperationBlockAnalysisContext context,
         AnalyzerSession session,
-        out MethodBodyAnalysisContext methodContext) {
-        methodContext = null!;
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out MethodBodyAnalysisContext? methodContext) {
+        methodContext = null;
         if (context.OwningSymbol is not IMethodSymbol methodSymbol || methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty)
             return false;
         var declaration = FindDeclaration(methodSymbol, context.OperationBlocks, context.CancellationToken);
@@ -57,8 +57,8 @@ internal static class AnalyzerFeaturePipeline {
     private static bool TryCreateSyntaxContext(
         SyntaxNodeAnalysisContext context,
         AnalyzerSession session,
-        out MethodBodyAnalysisContext methodContext) {
-        methodContext = null!;
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out MethodBodyAnalysisContext? methodContext) {
+        methodContext = null;
         var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken);
         var methodSymbol = declaredSymbol as IMethodSymbol;
         if (methodSymbol == null &&
