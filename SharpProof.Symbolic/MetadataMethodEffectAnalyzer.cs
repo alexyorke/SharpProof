@@ -140,15 +140,19 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                     if (opcode == OpCodes.Volatile) {
                         effects |= SharpProofEffect.Synchronizes;
                     }
-                    else if (opcode == OpCodes.Newobj || opcode == OpCodes.Newarr || opcode == OpCodes.Box) {
+                    else if (opcode == OpCodes.Newarr || opcode == OpCodes.Box) {
                         effects |= SharpProofEffect.Allocates;
-                        if (opcode == OpCodes.Newobj) {
-                            var constructor = MetadataTokens.Handle(operand);
-                            if (TryResolveMethod(location.Path, reader, constructor, out var constructorLocation))
-                                _ = Visit(constructorLocation, depth + 1, invocationContext);
-                            else {
-                                MarkUnknown("metadata_constructor_unresolved", exceptionBoundary: true);
-                            }
+                    }
+                    else if (opcode == OpCodes.Newobj) {
+                        var constructor = MetadataTokens.Handle(operand);
+                        if (TryResolveMethod(location.Path, reader, constructor, out var constructorLocation)) {
+                            if (!IsValueTypeConstructor(constructorLocation))
+                                effects |= SharpProofEffect.Allocates;
+                            _ = Visit(constructorLocation, depth + 1, invocationContext);
+                        }
+                        else {
+                            effects |= SharpProofEffect.Allocates;
+                            MarkUnknown("metadata_constructor_unresolved", exceptionBoundary: true);
                         }
                     }
                     else if (opcode == OpCodes.Throw || opcode == OpCodes.Rethrow) {
@@ -449,6 +453,16 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             return false;
         var declaringType = reader.GetTypeDefinition(method.GetDeclaringType());
         return IsNamedType(reader, declaringType.BaseType, "System", "MulticastDelegate");
+    }
+    private static bool IsValueTypeConstructor(MethodLocation location) {
+        using var stream = File.OpenRead(location.Path);
+        using var pe = new PEReader(stream, PEStreamOptions.PrefetchMetadata);
+        var reader = pe.GetMetadataReader();
+        var method = reader.GetMethodDefinition(location.Handle);
+        if (!string.Equals(reader.GetString(method.Name), ".ctor", StringComparison.Ordinal))
+            return false;
+        var declaringType = reader.GetTypeDefinition(method.GetDeclaringType());
+        return IsNamedType(reader, declaringType.BaseType, "System", "ValueType");
     }
     private static bool IsNamedType(
         MetadataReader reader,

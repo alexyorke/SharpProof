@@ -22,6 +22,10 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             public sealed class VolatileBox {
                 public volatile int Value;
             }
+            public readonly struct SmallValue {
+                public readonly int Value;
+                public SmallValue(int value) { Value = value; }
+            }
             public static class Effects {
                 public static int State;
                 public static volatile int VolatileState;
@@ -91,6 +95,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                         default: return -1;
                     }
                 }
+                public static SmallValue CreateValue(int value) => new SmallValue(value);
                 public static unsafe int SizeOf<T>() where T : unmanaged => sizeof(T);
                 public static void CopyBlockOpcodeFixture() { VolatileState = 1; }
                 private static void Helper() { State++; }
@@ -332,6 +337,18 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.UnsupportedOperation), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataValueTypeConstructionDoesNotAllocate() {
+        var effects = Analyze(
+            "static MetadataFixture.SmallValue M(int value) => MetadataFixture.Effects.CreateValue(value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Allocates), Is.False);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
         });
     }
     [Test]
