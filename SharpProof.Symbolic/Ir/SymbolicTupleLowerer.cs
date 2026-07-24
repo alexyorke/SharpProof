@@ -42,12 +42,12 @@ internal static class SymbolicTupleLowerer {
         });
     }
     internal static bool TryLowerTupleElementMemberTerm(
-        MemberAccessExpressionSyntax memberAccess,
-        SymbolicLoweringContext context,
+        BoundNode node,
         out SymbolicTerm term) {
+        var memberAccess = (MemberAccessExpressionSyntax)node.Syntax;
+        var context = node.Context;
         term = null!;
-        if (context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is not IFieldSymbol
-                field ||
+        if (node.Symbol is not IFieldSymbol field ||
             !TryGetTupleElementStorageName(field, out var storageName) ||
             !SymbolicTypeLowerer.TryGetValueKind(field.Type, out var kind))
             return false;

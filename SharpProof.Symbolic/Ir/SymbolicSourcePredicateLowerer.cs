@@ -33,14 +33,11 @@ internal static class SymbolicSourcePredicateLowerer {
         }
         return TryLowerReturnedBoolean(method, context, substitutions, implicitThis, out condition);
     }
-    private static bool CanInlineSourceBooleanPredicate(IMethodSymbol method) => method is {
-        ReturnsVoid: false,
-        ReturnsByRef: false,
-        ReturnsByRefReadonly: false,
-        ReturnType.SpecialType: SpecialType.System_Boolean,
-        DeclaringSyntaxReferences.Length: > 0
-    } &&
-               method.Parameters.All(static parameter => parameter.RefKind == RefKind.None);
+    private static bool CanInlineSourceBooleanPredicate(IMethodSymbol method) =>
+        !method.ReturnsVoid && !method.ReturnsByRef && !method.ReturnsByRefReadonly &&
+        method.ReturnType.SpecialType == SpecialType.System_Boolean &&
+        method.DeclaringSyntaxReferences.Length > 0 &&
+        method.Parameters.All(static parameter => parameter.RefKind == RefKind.None);
     internal static bool TryLowerReturnedBoolean(
         ISymbol symbol,
         SymbolicLoweringContext callerContext,
@@ -53,98 +50,110 @@ internal static class SymbolicSourcePredicateLowerer {
             .FirstOrDefault();
         if (callable == null) return false;
         var semanticModel = callerContext.Compilation.GetSemanticModel(callable.SyntaxTree);
-        var nestedContext = new SymbolicLoweringContext(
-            semanticModel,
-            callerContext.CancellationToken,
-            callerContext.GetSymbolVersion,
-            callerContext.SmtAnalysis,
-            callerContext.InvocationTermLowerer,
-            implicitThis,
-            callerContext.InlineDepth + 1,
-            substitutions,
-            callerContext.InvocationTermTypeResolver);
+        var nestedContext = Rebind(callerContext, substitutions, semanticModel, implicitThis, true);
         return TryLowerReturnedBooleanSyntax(callable, nestedContext, substitutions, out condition);
     }
+    private static SymbolicLoweringContext Rebind(
+        SymbolicLoweringContext context,
+        IReadOnlyDictionary<ISymbol, SymbolicTerm> substitutions,
+        SemanticModel? semanticModel = null,
+        SymbolicTerm? implicitThis = null,
+        bool nested = false) => new(
+            semanticModel ?? context.SemanticModel, context.CancellationToken, context.GetSymbolVersion,
+            context.SmtAnalysis, context.InvocationTermLowerer, implicitThis ?? context.ImplicitThis,
+            context.InlineDepth + (nested ? 1 : 0), substitutions,
+            context.InvocationTermTypeResolver);
     private static bool TryLowerReturnedBooleanSyntax(
         SyntaxNode callable,
         SymbolicLoweringContext context,
         Dictionary<ISymbol, SymbolicTerm> substitutions,
         out SymbolicCondition condition) {
-        switch (callable) {
-            case MethodDeclarationSyntax { ExpressionBody.Expression: { } expression }:
-                return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(expression, context), out condition);
-            case MethodDeclarationSyntax { Body: { } body }:
-                return TryLowerReturnedBooleanBlock(body, context, substitutions, out condition);
-            case LocalFunctionStatementSyntax { ExpressionBody.Expression: { } expression }:
-                return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(expression, context), out condition);
-            case LocalFunctionStatementSyntax { Body: { } body }:
-                return TryLowerReturnedBooleanBlock(body, context, substitutions, out condition);
-            case AccessorDeclarationSyntax { ExpressionBody.Expression: { } expression }:
-                return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(expression, context), out condition);
-            case AccessorDeclarationSyntax { Body: { } body }:
-                return TryLowerReturnedBooleanBlock(body, context, substitutions, out condition);
-            case PropertyDeclarationSyntax { ExpressionBody.Expression: { } expression }:
-                return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(expression, context), out condition);
-            case PropertyDeclarationSyntax { AccessorList: { } accessorList }: {
-                    var getter = accessorList.Accessors
-                        .FirstOrDefault(static accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
-                    if (getter != null)
-                        return TryLowerReturnedBooleanSyntax(getter, context, substitutions, out condition);
-                    condition = null!;
-                    return false;
-                }
-            default:
-                condition = null!;
-                return false;
-        }
-    }
-    private static bool TryLowerReturnedBooleanBlock(
-        BlockSyntax body,
-        SymbolicLoweringContext context,
-        Dictionary<ISymbol, SymbolicTerm> substitutions,
-        out SymbolicCondition condition) {
         condition = null!;
-        var statementIndex = 0;
-        while (statementIndex < body.Statements.Count) {
-            if (body.Statements[statementIndex] is LocalDeclarationStatementSyntax declaration) {
-                if (!TryApplyLocalDeclarationSubstitutions(declaration, context, substitutions)) return false;
-                statementIndex++;
-                continue;
-            }
-            if (body.Statements[statementIndex] is ExpressionStatementSyntax {
-                Expression: AssignmentExpressionSyntax assignment
-            } && assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)) {
-                if (!TryApplyLocalAssignmentSubstitution(assignment, context, substitutions)) return false;
-                statementIndex++;
-                continue;
-            }
-            break;
-        }
-        return TryLowerReturnedBooleanStatements(body.Statements, statementIndex, context, out condition);
+        if (callable is PropertyDeclarationSyntax { AccessorList: { } accessors })
+            callable = accessors.Accessors.FirstOrDefault(static accessor =>
+                accessor.IsKind(SyntaxKind.GetAccessorDeclaration))!;
+        var expression = callable switch {
+            MethodDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
+            LocalFunctionStatementSyntax { ExpressionBody.Expression: { } value } => value,
+            AccessorDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
+            PropertyDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
+            SimpleLambdaExpressionSyntax { ExpressionBody: { } value } => value,
+            ParenthesizedLambdaExpressionSyntax { ExpressionBody: { } value } => value,
+            _ => null
+        };
+        if (expression != null)
+            return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(expression, context), out condition);
+        var body = callable switch {
+            MethodDeclarationSyntax value => value.Body,
+            LocalFunctionStatementSyntax value => value.Body,
+            AccessorDeclarationSyntax value => value.Body,
+            SimpleLambdaExpressionSyntax value => value.Block,
+            ParenthesizedLambdaExpressionSyntax value => value.Block,
+            AnonymousMethodExpressionSyntax value => value.Block,
+            _ => null
+        };
+        if (body == null) return false;
+        if (callable is AnonymousFunctionExpressionSyntax)
+            return TryCompose(body.Statements, SkipBindings(body.Statements), context, out condition);
+        ControlFlowGraph? graph;
+        try { graph = ControlFlowGraph.Create(callable, context.SemanticModel, context.CancellationToken); }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { return false; }
+        var owner = context.SemanticModel.GetDeclaredSymbol(callable, context.CancellationToken) ??
+                    (context.SemanticModel.GetOperation(callable, context.CancellationToken) as
+                        IAnonymousFunctionOperation)?.Symbol ??
+                    context.SemanticModel.GetEnclosingSymbol(callable.SpanStart, context.CancellationToken);
+        if (graph == null || owner == null) return false;
+        var domain = new InlinePredicateDomain(context, substitutions);
+        var result = AnalyzerUtilitiesControlFlowAnalysis.Run(
+            graph, InlinePredicateState.Bottom, domain, context.Compilation, owner, context.CancellationToken);
+        return !result.Truncated && result.ExitState == InlinePredicateState.Valid &&
+               TryCompose(body.Statements, SkipBindings(body.Statements), context, out condition);
     }
-    private static bool TryApplyLocalDeclarationSubstitutions(
-        LocalDeclarationStatementSyntax declaration,
-        SymbolicLoweringContext context,
-        IDictionary<ISymbol, SymbolicTerm> substitutions) {
-        foreach (var variable in declaration.Declaration.Variables) {
-            if (context.SemanticModel.GetDeclaredSymbol(variable, context.CancellationToken) is not ILocalSymbol local)
-                return false;
-            if (variable.Initializer == null) continue;
-            if (!TryLowerBooleanValueTerm(variable.Initializer.Value, context, out var value)) return false;
-            substitutions[local.OriginalDefinition] = value;
-        }
-        return true;
+    private static int SkipBindings(SyntaxList<StatementSyntax> statements) {
+        var index = 0;
+        while (index < statements.Count && IsBindingStatement(statements[index])) index++;
+        return index;
     }
-    private static bool TryApplyLocalAssignmentSubstitution(
-        AssignmentExpressionSyntax assignment,
+    private static bool IsBindingStatement(StatementSyntax statement) =>
+        statement is LocalDeclarationStatementSyntax ||
+        statement is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } &&
+        assignment.IsKind(SyntaxKind.SimpleAssignmentExpression);
+    private enum InlinePredicateState { Bottom, Valid, Invalid }
+    private sealed class InlinePredicateDomain(
         SymbolicLoweringContext context,
-        IDictionary<ISymbol, SymbolicTerm> substitutions) {
-        if (context.SemanticModel.GetSymbolInfo(assignment.Left, context.CancellationToken).Symbol is not
-                ILocalSymbol local ||
-            !TryLowerBooleanValueTerm(assignment.Right, context, out var value))
-            return false;
-        substitutions[local.OriginalDefinition] = value;
-        return true;
+        IDictionary<ISymbol, SymbolicTerm> substitutions) : IControlFlowDomain<InlinePredicateState> {
+        private readonly HashSet<IOperation> branchValues = [];
+        private readonly HashSet<IOperation> assignments = [];
+        public void SetControlFlowGraph(ControlFlowGraph graph, PointsToAnalysisResult? _) {
+            foreach (var branch in graph.Blocks.Select(static block => block.BranchValue).Where(static value => value != null))
+                branchValues.Add(branch!);
+        }
+        public InlinePredicateState Transfer(InlinePredicateState state, IOperation operation) {
+            if (state != InlinePredicateState.Valid || branchValues.Contains(operation)) return state;
+            operation = operation is IExpressionStatementOperation expression ? expression.Operation : operation;
+            if (operation is IFlowCaptureOperation) return state;
+            if (operation is not ISimpleAssignmentOperation assignment ||
+                assignment.Target is not ILocalReferenceOperation local ||
+                assignment.Value.Syntax is not ExpressionSyntax value)
+                return InlinePredicateState.Invalid;
+            if (!assignments.Add(assignment)) return state;
+            if (!TryLowerBooleanValueTerm(value, context, out var term)) return InlinePredicateState.Invalid;
+            substitutions[local.Local.OriginalDefinition] = term;
+            return state;
+        }
+        public InlinePredicateState Refine(InlinePredicateState state, IOperation? _, ControlFlowConditionKind __,
+            bool ___, BasicBlock ____) => state;
+        public InlinePredicateState Merge(InlinePredicateState current, InlinePredicateState incoming) =>
+            current == InlinePredicateState.Bottom ? incoming :
+            incoming == InlinePredicateState.Bottom ? current :
+            current == InlinePredicateState.Invalid || incoming == InlinePredicateState.Invalid
+                ? InlinePredicateState.Invalid
+                : InlinePredicateState.Valid;
+        public InlinePredicateState CompleteBlock(InlinePredicateState state, BasicBlock block) =>
+            block.Kind == BasicBlockKind.Entry ? InlinePredicateState.Valid : state;
+        public bool Equivalent(InlinePredicateState left, InlinePredicateState right) => left == right;
+        public bool IsUnreachable(InlinePredicateState state) => state == InlinePredicateState.Bottom;
+        public string GetKey(InlinePredicateState state) => state.ToString();
     }
     internal static bool TryLowerBooleanValueTerm(ExpressionSyntax expression, SymbolicLoweringContext context, out SymbolicTerm term) {
         if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out term)) return true;
@@ -155,7 +164,7 @@ internal static class SymbolicSourcePredicateLowerer {
         term = null!;
         return false;
     }
-    private static bool TryLowerReturnedBooleanStatements(
+    private static bool TryCompose(
         SyntaxList<StatementSyntax> statements,
         int statementIndex,
         SymbolicLoweringContext context,
@@ -172,15 +181,24 @@ internal static class SymbolicSourcePredicateLowerer {
                 TryGetSingleReturnExpression(whenFalseStatement, out var whenFalse))
                 return TryLowerBooleanConditional(ifStatement.Condition, whenTrue, whenFalse, context, out condition);
             if (statements[statementIndex] is SwitchStatementSyntax switchStatement)
-                return TryLowerReturnedBooleanSwitch(switchStatement, null, context, out condition);
+                return TryComposeSwitch(switchStatement, null, context, out condition);
         }
-        if (remaining >= 2 &&
-            TryLowerGuardReturnChain(statements, statementIndex, context, out condition))
-            return true;
-        return remaining == 2 &&
-               statements[statementIndex] is SwitchStatementSyntax switchWithFallback &&
-               statements[statementIndex + 1] is ReturnStatementSyntax { Expression: { } fallback } &&
-               TryLowerReturnedBooleanSwitch(switchWithFallback, fallback, context, out condition);
+        if (remaining == 2 && statements[statementIndex] is SwitchStatementSyntax switchWithFallback &&
+            statements[statementIndex + 1] is ReturnStatementSyntax { Expression: { } fallback })
+            return TryComposeSwitch(switchWithFallback, fallback, context, out condition);
+        if (remaining < 2 ||
+            statements[statements.Count - 1] is not ReturnStatementSyntax { Expression: { } finalReturn } ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(finalReturn, context), out condition))
+            return false;
+        for (var index = statements.Count - 2; index >= statementIndex; index--) {
+            if (statements[index] is not IfStatementSyntax { Else: null } guard ||
+                !TryGetSingleReturnExpression(guard.Statement, out var returned) ||
+                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(guard.Condition, context), out var test) ||
+                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(returned, context), out var result))
+                return false;
+            condition = CreateBooleanConditional(test, result, condition);
+        }
+        return true;
     }
     internal static bool TryLowerBooleanConditional(
         ExpressionSyntax test,
@@ -203,32 +221,7 @@ internal static class SymbolicSourcePredicateLowerer {
             SymbolicConditionOperator.Or,
             new SymbolicBinaryCondition(SymbolicConditionOperator.And, test, whenTrue),
             new SymbolicBinaryCondition(SymbolicConditionOperator.And, new SymbolicNotCondition(test), whenFalse));
-    private static bool TryLowerGuardReturnChain(
-        SyntaxList<StatementSyntax> statements,
-        int statementIndex,
-        SymbolicLoweringContext context,
-        out SymbolicCondition condition) {
-        condition = null!;
-        if (statements[statements.Count - 1] is not ReturnStatementSyntax { Expression: { } finalReturn } ||
-            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(finalReturn, context), out condition))
-            return false;
-        var guards = new List<(ExpressionSyntax Test, ExpressionSyntax Result)>();
-        for (var index = statementIndex; index < statements.Count - 1; index++) {
-            if (statements[index] is not IfStatementSyntax { Else: null } guard ||
-                !TryGetSingleReturnExpression(guard.Statement, out var guardReturn))
-                return false;
-            guards.Add((guard.Condition, guardReturn));
-        }
-        if (guards.Count == 0) return false;
-        for (var index = guards.Count - 1; index >= 0; index--) {
-            if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(guards[index].Test, context), out var test) ||
-                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(guards[index].Result, context), out var result))
-                return false;
-            condition = CreateBooleanConditional(test, result, condition);
-        }
-        return true;
-    }
-    private static bool TryLowerReturnedBooleanSwitch(
+    private static bool TryComposeSwitch(
         SwitchStatementSyntax switchStatement,
         ExpressionSyntax? fallbackExpression,
         SymbolicLoweringContext context,
@@ -236,7 +229,8 @@ internal static class SymbolicSourcePredicateLowerer {
         condition = new SymbolicConstantCondition(false);
         var selections = new List<SymbolicCondition>();
         foreach (var section in switchStatement.Sections) {
-            if (!TryGetSwitchSectionReturnExpression(section, out var returned) ||
+            if (section.Statements.Count != 1 ||
+                !TryGetSingleReturnExpression(section.Statements[0], out var returned) ||
                 !SwitchPathConditionBuilder.TryCreateSwitchStatementSectionSymbolicCondition(
                     switchStatement.Expression,
                     section,
@@ -259,30 +253,19 @@ internal static class SymbolicSourcePredicateLowerer {
             new SymbolicBinaryCondition(SymbolicConditionOperator.And, new SymbolicNotCondition(anySelected), fallback));
         return true;
     }
-    private static SymbolicCondition CreateConditionDisjunction(IReadOnlyList<SymbolicCondition> conditions) {
-        if (conditions.Count == 0) return new SymbolicConstantCondition(false);
-        var result = conditions[0];
-        for (var index = 1; index < conditions.Count; index++)
-            result = new SymbolicBinaryCondition(SymbolicConditionOperator.Or, result, conditions[index]);
-        return result;
-    }
-    private static bool TryGetSwitchSectionReturnExpression(SwitchSectionSyntax section, out ExpressionSyntax expression) {
-        expression = null!;
-        return section.Statements.Count == 1 &&
-               TryGetSingleReturnExpression(section.Statements[0], out expression);
-    }
+    private static SymbolicCondition CreateConditionDisjunction(IReadOnlyList<SymbolicCondition> conditions) =>
+        conditions.Count == 0
+            ? new SymbolicConstantCondition(false)
+            : conditions.Skip(1).Aggregate(conditions[0], static (left, right) =>
+                new SymbolicBinaryCondition(SymbolicConditionOperator.Or, left, right));
     private static bool TryGetSingleReturnExpression(StatementSyntax statement, out ExpressionSyntax expression) {
-        expression = null!;
-        if (statement is ReturnStatementSyntax { Expression: { } direct }) {
-            expression = direct;
-            return true;
-        }
-        if (statement is BlockSyntax { Statements.Count: 1 } block &&
-            block.Statements[0] is ReturnStatementSyntax { Expression: { } nested }) {
-            expression = nested;
-            return true;
-        }
-        return false;
+        expression = statement switch {
+            ReturnStatementSyntax { Expression: { } direct } => direct,
+            BlockSyntax { Statements.Count: 1 } block when block.Statements[0] is
+                ReturnStatementSyntax { Expression: { } nested } => nested,
+            _ => null!
+        };
+        return expression != null;
     }
     private static bool TryCreateParameterSubstitutions(
         IReadOnlyList<IParameterSymbol> parameters,
@@ -311,8 +294,13 @@ internal static class SymbolicSourcePredicateLowerer {
             return false;
         if (initializer is AnonymousFunctionExpressionSyntax lambda)
             return LambdaBodyReferencesOnlyParameters(lambda, context) &&
-                   TryCreateLambdaParameterSubstitutions(lambda, invocation, context, out var substitutions) &&
-                   TryLowerLambdaBooleanBody(lambda, context, substitutions, out condition);
+                   TryCreateParameterSubstitutions(
+                       GetLambdaParameterSymbols(lambda, context).ToArray(),
+                       invocation,
+                       context,
+                       out var substitutions) &&
+                   TryLowerReturnedBooleanSyntax(
+                       lambda, Rebind(context, substitutions, nested: true), substitutions, out condition);
         var methodInfo = context.SemanticModel.GetSymbolInfo(initializer, context.CancellationToken);
         var method = methodInfo.Symbol ??
                      (methodInfo.CandidateSymbols.Length == 1 ? methodInfo.CandidateSymbols[0] : null);
@@ -391,15 +379,6 @@ internal static class SymbolicSourcePredicateLowerer {
                ReferenceEquals(member.Name, identifier) &&
                context.SemanticModel.GetSymbolInfo(member.Expression, context.CancellationToken).Symbol is { } receiver &&
                parameters.Contains(receiver);
-    private static bool TryCreateLambdaParameterSubstitutions(
-        AnonymousFunctionExpressionSyntax lambda,
-        IInvocationOperation invocation,
-        SymbolicLoweringContext context,
-        out Dictionary<ISymbol, SymbolicTerm> substitutions) => TryCreateParameterSubstitutions(
-            GetLambdaParameterSymbols(lambda, context).ToArray(),
-            invocation,
-            context,
-            out substitutions);
     private static IEnumerable<IParameterSymbol> GetLambdaParameterSymbols(
         AnonymousFunctionExpressionSyntax lambda,
         SymbolicLoweringContext context) {
@@ -422,36 +401,4 @@ internal static class SymbolicSourcePredicateLowerer {
         AnonymousMethodExpressionSyntax { Block: { } block } => block,
         _ => null
     };
-    private static bool TryLowerLambdaBooleanBody(
-        AnonymousFunctionExpressionSyntax lambda,
-        SymbolicLoweringContext callerContext,
-        Dictionary<ISymbol, SymbolicTerm> substitutions,
-        out SymbolicCondition condition) {
-        var nestedContext = new SymbolicLoweringContext(
-            callerContext.SemanticModel,
-            callerContext.CancellationToken,
-            callerContext.GetSymbolVersion,
-            callerContext.SmtAnalysis,
-            callerContext.InvocationTermLowerer,
-            callerContext.ImplicitThis,
-            callerContext.InlineDepth + 1,
-            substitutions,
-            callerContext.InvocationTermTypeResolver);
-        switch (lambda) {
-            case SimpleLambdaExpressionSyntax { ExpressionBody: { } simpleExpression }:
-                return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(simpleExpression, nestedContext), out condition);
-            case ParenthesizedLambdaExpressionSyntax { ExpressionBody: { } parenthesizedExpression }:
-                return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(parenthesizedExpression, nestedContext),
-                    out condition);
-            case SimpleLambdaExpressionSyntax { Block: { } simpleBlock }:
-                return TryLowerReturnedBooleanBlock(simpleBlock, nestedContext, substitutions, out condition);
-            case ParenthesizedLambdaExpressionSyntax { Block: { } parenthesizedBlock }:
-                return TryLowerReturnedBooleanBlock(parenthesizedBlock, nestedContext, substitutions, out condition);
-            case AnonymousMethodExpressionSyntax { Block: { } anonymousBlock }:
-                return TryLowerReturnedBooleanBlock(anonymousBlock, nestedContext, substitutions, out condition);
-            default:
-                condition = null!;
-                return false;
-        }
-    }
 }

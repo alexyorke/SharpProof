@@ -1,5 +1,5 @@
 namespace SharpProof.ProofCore.Smt;
-internal static class Z3RegexPatternNormalizer {
+internal sealed partial class Z3RegexCompiler {
     internal static bool TryNormalize(string pattern, RegexOptions options, out NormalizedRegexPattern normalized) {
         var multiline = (options & RegexOptions.Multiline) != 0;
         var effectivePatternLength = FindEffectivePatternLength(pattern, options);
@@ -52,22 +52,11 @@ internal static class Z3RegexPatternNormalizer {
             }
             if (TrySkipInlineComment(pattern, ref position)) continue;
             if (pattern[position] == '(') {
-                var optionPosition = position + 2;
-                if (position + 2 < pattern.Length &&
-                    pattern[position + 1] == '?' &&
-                    TryReadOptionsUntil(pattern, ref optionPosition, ')', currentScope, true, out var unscopedOptions)) {
-                    currentScope = unscopedOptions;
-                    position = optionPosition;
-                    lastSignificantEnd = position;
-                    continue;
-                }
-                optionPosition = position + 2;
-                if (position + 2 < pattern.Length &&
-                    pattern[position + 1] == '?' &&
-                    TryReadOptionsUntil(pattern, ref optionPosition, ':', currentScope, true, out var scopedOptions)) {
-                    scopes.Push(currentScope);
-                    currentScope = scopedOptions;
-                    position = optionPosition;
+                if (TryReadOptionGroup(pattern, position, currentScope, true,
+                        out var nextScope, out var nextPosition, out var scoped)) {
+                    if (scoped) scopes.Push(currentScope);
+                    currentScope = nextScope;
+                    position = nextPosition;
                     lastSignificantEnd = position;
                     continue;
                 }
@@ -81,40 +70,42 @@ internal static class Z3RegexPatternNormalizer {
         }
         return lastSignificantEnd;
     }
-    private static void SkipCharacterClass(string pattern, ref int position) {
+    private static void SkipCharacterClass(string pattern, ref int position) =>
+        position = TryFindCharacterClassEnd(pattern, position, out var end) ? end : pattern.Length;
+    internal static bool TryFindCharacterClassEnd(string pattern, int start, out int end) {
+        end = -1;
+        if (start < 0 || start >= pattern.Length || pattern[start] != '[') return false;
         var depth = 1;
         var firstCharacter = true;
-        position++;
-        while (position < pattern.Length && depth > 0) {
-            if (pattern[position] == '\\') {
-                position = Math.Min(position + 2, pattern.Length);
+        var escaped = false;
+        for (var index = start + 1; index < pattern.Length; index++) {
+            var current = pattern[index];
+            if (escaped) {
+                escaped = false;
                 firstCharacter = false;
                 continue;
             }
-            if (firstCharacter && pattern[position] == '^') {
-                position++;
+            if (current == '\\') {
+                escaped = true;
                 continue;
             }
-            if (firstCharacter && pattern[position] == ']') {
-                position++;
+            if (firstCharacter && current == '^') continue;
+            if (firstCharacter && current == ']') {
                 firstCharacter = false;
                 continue;
             }
-            if (pattern[position] == '[' && position > 0 && pattern[position - 1] == '-') {
+            if (current == '[' && pattern[index - 1] == '-') {
                 depth++;
-                position++;
                 firstCharacter = true;
                 continue;
             }
-            if (pattern[position] == ']') {
-                depth--;
-                position++;
-                firstCharacter = false;
-                continue;
+            if (current == ']' && --depth == 0) {
+                end = index + 1;
+                return true;
             }
-            position++;
             firstCharacter = false;
         }
+        return false;
     }
     internal static RegexOptionScope CreateInitialOptionScope(RegexOptions options) => new(
         (options & RegexOptions.IgnorePatternWhitespace) != 0,
@@ -153,6 +144,30 @@ internal static class Z3RegexPatternNormalizer {
         position++;
         return true;
     }
+    private static bool TryReadOptionGroup(
+        string pattern,
+        int start,
+        RegexOptionScope currentScope,
+        bool canUseIgnoreCase,
+        out RegexOptionScope nextScope,
+        out int nextPosition,
+        out bool scoped) {
+        nextScope = currentScope;
+        nextPosition = start;
+        scoped = false;
+        if (start + 2 >= pattern.Length || pattern[start] != '(' || pattern[start + 1] != '?') return false;
+        var position = start + 2;
+        if (TryReadOptionsUntil(pattern, ref position, ')', currentScope, canUseIgnoreCase, out nextScope)) {
+            nextPosition = position;
+            return true;
+        }
+        position = start + 2;
+        if (!TryReadOptionsUntil(pattern, ref position, ':', currentScope, canUseIgnoreCase, out nextScope))
+            return false;
+        nextPosition = position;
+        scoped = true;
+        return true;
+    }
     internal static void SkipIgnoredTrivia(string pattern, ref int position, bool ignorePatternWhitespace) {
         while (position < pattern.Length) {
             if (TrySkipInlineComment(pattern, ref position)) continue;
@@ -184,7 +199,8 @@ internal static class Z3RegexPatternNormalizer {
         var canUseIgnoreCase = (options & RegexOptions.CultureInvariant) != 0;
         while (true) {
             SkipIgnoredTrivia(pattern, ref index, optionScope.IgnorePatternWhitespace);
-            if (TryReadInlineOptionGroup(pattern, index, optionScope, canUseIgnoreCase, out var nextScope, out var nextIndex)) {
+            if (TryReadOptionGroup(pattern, index, optionScope, canUseIgnoreCase,
+                    out var nextScope, out var nextIndex, out var scoped) && !scoped) {
                 optionScope = nextScope;
                 index = nextIndex;
                 continue;
@@ -206,36 +222,16 @@ internal static class Z3RegexPatternNormalizer {
         return false;
     }
     private static bool TrySkipEmptyGroup(string pattern, ref int position) {
-        if (position + 1 < pattern.Length &&
-            pattern[position] == '(' &&
-            pattern[position + 1] == ')') {
-            position += 2;
-            return true;
-        }
-        if (position + 3 < pattern.Length &&
+        var length = position + 1 < pattern.Length &&
+                     pattern[position] == '(' &&
+                     pattern[position + 1] == ')' ? 2 :
+            position + 3 < pattern.Length &&
             pattern[position] == '(' &&
             pattern[position + 1] == '?' &&
             pattern[position + 2] is ':' or '>' &&
-            pattern[position + 3] == ')') {
-            position += 4;
-            return true;
-        }
-        return false;
-    }
-    private static bool TryReadInlineOptionGroup(
-        string pattern,
-        int start,
-        RegexOptionScope currentScope,
-        bool canUseIgnoreCase,
-        out RegexOptionScope nextScope,
-        out int nextIndex) {
-        nextScope = currentScope;
-        nextIndex = start;
-        if (start + 2 >= pattern.Length || pattern[start] != '(' || pattern[start + 1] != '?') return false;
-        var index = start + 2;
-        if (!TryReadOptionsUntil(pattern, ref index, ')', currentScope, canUseIgnoreCase, out nextScope)) return false;
-        nextIndex = index;
-        return true;
+            pattern[position + 3] == ')' ? 4 : 0;
+        position += length;
+        return length != 0;
     }
     private static bool TrySkipInlineComment(string pattern, ref int position) {
         if (position + 2 >= pattern.Length || pattern[position] != '(' || pattern[position + 1] != '?' ||

@@ -1,7 +1,7 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicOperationTransfer {
-    internal static SymbolicOperationTransitionResult ApplyAssignment(
-        SymbolicState state,
+    internal static bool ApplyAssignment(
+        ref SymbolicState state,
         ISymbol targetSymbol,
         SyntaxNode valueSyntax,
         SemanticModel semanticModel,
@@ -31,10 +31,10 @@ internal static class SymbolicOperationTransfer {
             bindingProvenance,
             evidenceKey,
             postconditionProfile);
-        return ApplyLowering(state, lowering);
+        return ApplyLowering(ref state, lowering);
     }
-    internal static SymbolicOperationTransitionResult ApplyComputedUpdate(
-        SymbolicState state,
+    internal static bool ApplyComputedUpdate(
+        ref SymbolicState state,
         ISymbol targetSymbol,
         SymbolicTerm sourceTerm,
         SyntaxNode source,
@@ -43,10 +43,10 @@ internal static class SymbolicOperationTransfer {
         string provenance) {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var lowering = SymbolicOperationLowerer.LowerComputedUpdate(targetSymbol, sourceTerm, source, context, provenance);
-        return ApplyLowering(state, lowering);
+        return ApplyLowering(ref state, lowering);
     }
-    internal static SymbolicOperationTransitionResult ApplyCoalesceAssignment(
-        SymbolicState state,
+    internal static bool ApplyCoalesceAssignment(
+        ref SymbolicState state,
         ISymbol targetSymbol,
         Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax rightExpression,
         SemanticModel semanticModel,
@@ -54,23 +54,21 @@ internal static class SymbolicOperationTransfer {
         string provenance) {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         return ApplyLowering(
-            state,
+            ref state,
             SymbolicOperationLowerer.LowerCoalesceAssignment(targetSymbol, rightExpression, context, provenance));
     }
-    internal static SymbolicOperationTransitionResult ApplyBindings(
-        SymbolicState state,
+    internal static bool ApplyBindings(
+        ref SymbolicState state,
         System.Collections.Immutable.ImmutableArray<SymbolicAssignmentBinding> bindings,
         SyntaxNode source,
         string provenance) {
-        var operation = new SymbolicAssignmentOperation(
+        var operation = new SymbolicStateDelta(
             bindings,
-            [],
             new SymbolicOperationOrigin(source.Span, provenance));
-        return SymbolicOperationTransferKernel.Apply(state, operation);
+        return SymbolicOperationTransferKernel.TryApply(ref state, operation);
     }
-    internal static SymbolicOperationTransitionResult ApplyLowering(
-        SymbolicState state,
-        SymbolicLoweringResult<SymbolicOperationDescriptor> lowering) => lowering is { IsExact: true, Value: { } operation }
-            ? SymbolicOperationTransferKernel.Apply(state, operation)
-            : SymbolicOperationTransitionResult.Unsupported(state);
+    internal static bool ApplyLowering(
+        ref SymbolicState state,
+        SymbolicLoweringResult<SymbolicStateDelta> lowering) => lowering is { IsExact: true, Value: { } delta }
+            && SymbolicOperationTransferKernel.TryApply(ref state, delta);
 }

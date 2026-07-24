@@ -3,8 +3,8 @@ internal sealed class Z3FormulaEncoder : IDisposable {
     private readonly Context _context = new();
     private readonly Expr _nullReference;
     private readonly Sort _referenceSort;
-    private readonly Dictionary<(string Pattern, RegexOptions Options), RegexTranslationPrecision>
-        _regexPrecisionCache = [];
+    private readonly Dictionary<(string Pattern, RegexOptions Options), Z3RegexTranslationResult>
+        _regexTranslations = [];
     private readonly Dictionary<string, FuncDecl> _runtimeTypeTests = new(StringComparer.Ordinal);
     private readonly Dictionary<SmtIntegerBinaryOperator, FuncDecl> _opaqueIntegerOperations = [];
     private readonly Dictionary<(string Name, SmtValueKind Kind), Expr> _variables = [];
@@ -59,8 +59,7 @@ internal sealed class Z3FormulaEncoder : IDisposable {
     public bool ContainsApproximateRegex(SmtFormula formula) =>
         SmtFormulaTraversal.Contains(formula, candidate =>
             candidate is SmtRegexMatchFormula regexMatch &&
-            GetRegexTranslationPrecision(regexMatch.Pattern, regexMatch.Options) ==
-            RegexTranslationPrecision.Approximate);
+            GetRegexTranslation(regexMatch.Pattern, regexMatch.Options) is { Success: true, IsExact: false });
     private Expr Encode(SmtFormula formula) => formula switch {
         SmtBooleanConstant booleanConstant => booleanConstant.Value ? _context.MkTrue() : _context.MkFalse(),
         SmtIntegerConstant integerConstant => _context.MkInt(integerConstant.Value),
@@ -161,9 +160,9 @@ internal sealed class Z3FormulaEncoder : IDisposable {
         return (SeqExpr)Encode(formula);
     }
     private BoolExpr EncodeRegexMatch(SmtRegexMatchFormula formula) {
-        if (!SmtRegexSemantics.CanEncodeOptions(formula.Options))
+        if (!Z3RegexCompiler.CanEncodeOptions(formula.Options))
             throw new InvalidOperationException("Unsupported SMT regex options.");
-        var translation = Z3RegexTranslator.Translate(_context, formula.Pattern, formula.Options);
+        var translation = GetRegexTranslation(formula.Pattern, formula.Options);
         if (!translation.Success)
             throw new InvalidOperationException("Unsupported SMT regex pattern.");
         return _context.MkInRe(EncodeString(formula.Value), translation.Regex);
@@ -183,7 +182,7 @@ internal sealed class Z3FormulaEncoder : IDisposable {
     private void EnsureSafeRegexPolarity(SmtFormula formula, bool isNegativeContext) {
         switch (formula) {
             case SmtRegexMatchFormula regexMatch:
-                if (!SmtRegexSemantics.CanEncodeOptions(regexMatch.Options))
+                if (!Z3RegexCompiler.CanEncodeOptions(regexMatch.Options))
                     throw new InvalidOperationException("Unsupported SMT regex options.");
                 if (isNegativeContext && IsApproximateRegexPattern(regexMatch.Pattern, regexMatch.Options))
                     throw new InvalidOperationException("Approximate SMT regex patterns cannot be safely negated.");
@@ -240,25 +239,20 @@ internal sealed class Z3FormulaEncoder : IDisposable {
     }
     private void EnsureExactRegexUse(SmtFormula formula) {
         foreach (var regexMatch in SmtFormulaTraversal.Enumerate(formula).OfType<SmtRegexMatchFormula>()) {
-            if (!SmtRegexSemantics.CanEncodeOptions(regexMatch.Options))
+            if (!Z3RegexCompiler.CanEncodeOptions(regexMatch.Options))
                 throw new InvalidOperationException("Unsupported SMT regex options.");
             if (IsApproximateRegexPattern(regexMatch.Pattern, regexMatch.Options))
                 throw new InvalidOperationException("Approximate SMT regex patterns require positive polarity.");
         }
     }
     private bool IsApproximateRegexPattern(string pattern, RegexOptions options) =>
-        GetRegexTranslationPrecision(pattern, options) == RegexTranslationPrecision.Approximate;
-    private RegexTranslationPrecision GetRegexTranslationPrecision(string pattern, RegexOptions options) {
+        GetRegexTranslation(pattern, options) is { Success: true, IsExact: false };
+    private Z3RegexTranslationResult GetRegexTranslation(string pattern, RegexOptions options) {
         var key = (pattern, options);
-        if (_regexPrecisionCache.TryGetValue(key, out var cached)) return cached;
-        var translation = Z3RegexTranslator.Translate(_context, pattern, options);
-        var precision = translation.Success
-            ? translation.IsExact
-                ? RegexTranslationPrecision.Exact
-                : RegexTranslationPrecision.Approximate
-            : RegexTranslationPrecision.Unsupported;
-        _regexPrecisionCache.Add(key, precision);
-        return precision;
+        if (_regexTranslations.TryGetValue(key, out var cached)) return cached;
+        var translation = Z3RegexCompiler.Compile(_context, pattern, options);
+        _regexTranslations.Add(key, translation);
+        return translation;
     }
     private static bool GetBooleanComparisonOperandPolarity(SmtBinaryOperator op, bool constantValue, bool isNegativeContext) {
         var preservesPolarity =
@@ -328,10 +322,5 @@ internal sealed class Z3FormulaEncoder : IDisposable {
                 }
         }
         return new SmtModelAssignment(variable.Name, variable.Kind, evaluated.ToString(), Status: SmtWitnessStatus.Approximate);
-    }
-    enum RegexTranslationPrecision {
-        Unsupported,
-        Exact,
-        Approximate
     }
 }

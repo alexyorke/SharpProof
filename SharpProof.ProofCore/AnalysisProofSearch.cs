@@ -17,14 +17,8 @@ internal interface IAnalysisProofSearchSession : IDisposable {
 internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
     private static readonly IReadOnlyDictionary<AnalysisHazardKind, HazardDescriptor> HazardDescriptors =
         new Dictionary<AnalysisHazardKind, HazardDescriptor> {
-            [AnalysisHazardKind.BranchReachability] = HazardDescriptor.Triggered(
-                "branch_unreachable",
-                "branch_reachable",
-                "branch_feasibility_unknown"),
-            [AnalysisHazardKind.EffectViolationReachability] = HazardDescriptor.Triggered(
-                "impure_call_unreachable",
-                "impure_call_reachable",
-                "impure_call_feasibility_unknown"),
+            [AnalysisHazardKind.BranchReachability] = HazardDescriptor.Triggered("branch"),
+            [AnalysisHazardKind.EffectViolationReachability] = HazardDescriptor.Triggered("impure_call"),
             [AnalysisHazardKind.StaticCacheRead] = HazardDescriptor.InternalEffect("safe_static_cache_read"),
             [AnalysisHazardKind.FreshOwnedObjectWrite] =
                 HazardDescriptor.InternalEffect("fresh_owned_object_write"),
@@ -35,14 +29,8 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
                 "caller_visible_memory_write_reachable",
                 "caller_visible_memory_write_feasibility_unknown",
                 acceptsInternalOnlyVisibility: true),
-            [AnalysisHazardKind.NullDereference] = HazardDescriptor.Triggered(
-                "null_dereference_unreachable",
-                "null_dereference_reachable",
-                "null_dereference_feasibility_unknown"),
-            [AnalysisHazardKind.DivideByZero] = HazardDescriptor.Triggered(
-                "divide_by_zero_unreachable",
-                "divide_by_zero_reachable",
-                "divide_by_zero_feasibility_unknown")
+            [AnalysisHazardKind.NullDereference] = HazardDescriptor.Triggered("null_dereference"),
+            [AnalysisHazardKind.DivideByZero] = HazardDescriptor.Triggered("divide_by_zero")
         };
     private readonly SmtSolver _solver = new();
     /// <summary>
@@ -64,59 +52,43 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
             ? ClassifyInternalOnlyEffect(pathConditions, timeout, descriptor.PureReason)
             : ClassifyTriggeredHazard(pathConditions, query.Hazard.TriggerCondition!, timeout, descriptor);
     }
-    private AnalysisProofResult ClassifyInternalOnlyEffect(IEnumerable<SmtFormula> pathConditions, TimeSpan timeout, string pureReason) {
-        var normalizedPathConditions = pathConditions.ToArray();
-        var path = _solver.CheckSatisfiability(normalizedPathConditions, timeout);
+    private AnalysisProofResult ClassifyInternalOnlyEffect(
+        IReadOnlyList<SmtFormula> pathConditions,
+        TimeSpan timeout,
+        string pureReason) {
+        var path = _solver.CheckSatisfiability(pathConditions.ToArray(), timeout);
         return path.Feasibility switch {
-            Feasibility.Unsatisfiable => new AnalysisProofResult(
-                AnalysisProofOutcome.Proven,
-                Attempted(path),
-                NotAttempted(),
-                "path_unsatisfiable"),
-            Feasibility.Unknown => new AnalysisProofResult(
-                AnalysisProofOutcome.Unknown,
-                Attempted(path),
-                NotAttempted(),
-                "path_feasibility_unknown"),
-            _ => new AnalysisProofResult(AnalysisProofOutcome.Proven, Attempted(path), NotAttempted(), pureReason)
+            Feasibility.Unsatisfiable => Result(AnalysisProofOutcome.Proven, path, "path_unsatisfiable"),
+            Feasibility.Unknown => Result(AnalysisProofOutcome.Unknown, path, "path_feasibility_unknown"),
+            _ => Result(AnalysisProofOutcome.Proven, path, pureReason)
         };
     }
     private AnalysisProofResult ClassifyTriggeredHazard(
-        IEnumerable<SmtFormula> pathConditions,
+        IReadOnlyList<SmtFormula> pathConditions,
         SmtFormula impurityCondition,
         TimeSpan timeout,
         HazardDescriptor descriptor) {
-        var normalizedPathConditions = pathConditions.ToArray();
-        var check = _solver.CheckPathAndHazardWithWitness(normalizedPathConditions, impurityCondition, timeout);
+        var check = _solver.CheckPathAndHazardWithWitness(pathConditions.ToArray(), impurityCondition, timeout);
         var pathFeasibility = check.Path.Feasibility;
         var impurityFeasibility = check.Impurity.Feasibility;
         if (pathFeasibility == Feasibility.Unsatisfiable)
-            return new AnalysisProofResult(AnalysisProofOutcome.Proven, Attempted(check.Path), NotAttempted(), "path_unsatisfiable");
+            return Result(AnalysisProofOutcome.Proven, check.Path, "path_unsatisfiable");
         if (impurityFeasibility == Feasibility.Unsatisfiable)
-            return new AnalysisProofResult(
-                AnalysisProofOutcome.Proven,
-                Attempted(check.Path),
-                Attempted(check.Impurity),
-                descriptor.PureReason);
+            return Result(AnalysisProofOutcome.Proven, check.Path, descriptor.PureReason, check.Impurity);
         if (pathFeasibility == Feasibility.Unknown)
-            return new AnalysisProofResult(
-                AnalysisProofOutcome.Unknown,
-                Attempted(check.Path),
-                Attempted(check.Impurity),
-                "path_feasibility_unknown");
+            return Result(AnalysisProofOutcome.Unknown, check.Path, "path_feasibility_unknown", check.Impurity);
         return impurityFeasibility switch {
-            Feasibility.Satisfiable => new AnalysisProofResult(
-                AnalysisProofOutcome.Disproven,
-                Attempted(check.Path),
-                Attempted(check.Impurity),
-                descriptor.ImpureReason),
-            _ => new AnalysisProofResult(
-                AnalysisProofOutcome.Unknown,
-                Attempted(check.Path),
-                Attempted(check.Impurity),
-                descriptor.UnknownReason)
+            Feasibility.Satisfiable =>
+                Result(AnalysisProofOutcome.Disproven, check.Path, descriptor.ImpureReason, check.Impurity),
+            _ => Result(AnalysisProofOutcome.Unknown, check.Path, descriptor.UnknownReason, check.Impurity)
         };
     }
+    private static AnalysisProofResult Result(
+        AnalysisProofOutcome outcome,
+        SmtFeasibilityResult path,
+        string reason,
+        SmtFeasibilityResult? hazard = null) =>
+        new(outcome, Attempted(path), hazard == null ? NotAttempted() : Attempted(hazard), reason);
     private static AnalysisProofResult UnknownWithoutProof(string reason)
         => new(AnalysisProofOutcome.Unknown, NotAttempted(), NotAttempted(), reason);
     private static ProofCheckInfo Attempted(SmtFeasibilityResult result) =>
@@ -133,6 +105,8 @@ internal sealed class AnalysisProofSearch : IAnalysisProofSearchSession {
         string ImpureReason,
         string UnknownReason,
         bool AcceptsInternalOnlyVisibility) {
+        internal static HazardDescriptor Triggered(string reason) =>
+            Triggered(reason + "_unreachable", reason + "_reachable", reason + "_feasibility_unknown");
         internal static HazardDescriptor Triggered(
             string pureReason,
             string impureReason,

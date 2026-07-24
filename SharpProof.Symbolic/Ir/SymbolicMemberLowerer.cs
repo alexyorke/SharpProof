@@ -21,11 +21,12 @@ internal static class SymbolicMemberLowerer {
         memberSymbol = null!;
         return false;
     }
-    internal static bool TryLowerImplicitThisMemberTerm(ExpressionSyntax expression, SymbolicLoweringContext context,
-        out SymbolicTerm term) {
+    internal static bool TryLowerImplicitThisMemberTerm(BoundNode node, out SymbolicTerm term) {
+        var expression = node.Syntax;
+        var context = node.Context;
         term = null!;
         if (expression is not IdentifierNameSyntax ||
-            !TryGetInstanceMemberSymbol(expression, context, out var memberSymbol) ||
+            !TryGetInstanceMemberSymbol(node, out var memberSymbol) ||
             !SymbolicTypeLowerer.TryGetSymbolType(memberSymbol, out var memberType) ||
             !SymbolicTypeLowerer.TryGetValueKind(memberType, out var memberKind))
             return false;
@@ -33,15 +34,15 @@ internal static class SymbolicMemberLowerer {
         return true;
     }
     internal static bool TryLowerMemberTerm(
-        MemberAccessExpressionSyntax memberAccess,
-        SymbolicLoweringContext context,
+        BoundNode node,
         out SymbolicTerm term) {
+        var memberAccess = (MemberAccessExpressionSyntax)node.Syntax;
+        var context = node.Context;
         var memberName = memberAccess.Name.Identifier.ValueText;
         if (SymbolicKnownApiLowerer.TryLowerKnownStaticValueMember(memberAccess, context, out term)) return true;
         var receiverType = context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type;
-        if (SymbolicTupleLowerer.TryLowerTupleElementMemberTerm(memberAccess, context, out term)) return true;
-        if (context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is
-                IPropertySymbol propertySymbol &&
+        if (SymbolicTupleLowerer.TryLowerTupleElementMemberTerm(node, out term)) return true;
+        if (node.Symbol is IPropertySymbol propertySymbol &&
             TryLowerSourceBooleanPropertyTerm(memberAccess, propertySymbol, context, out term))
             return true;
         if (string.Equals(memberName, nameof(Array.Rank), StringComparison.Ordinal) &&
@@ -66,7 +67,7 @@ internal static class SymbolicMemberLowerer {
                 memberAccess.Expression,
                 context,
                 out var valueTypeReceiver) &&
-            TryGetInstanceMemberValueKind(memberAccess, context, out var valueTypeMemberKind)) {
+            TryGetInstanceMemberValueKind(node.Symbol, out var valueTypeMemberKind)) {
             term = new SymbolicMemberTerm(
                 new SymbolicVariableTerm(context.GetVariableName(valueTypeReceiver), SmtValueKind.Reference),
                 memberName,
@@ -76,13 +77,12 @@ internal static class SymbolicMemberLowerer {
         if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(memberAccess.Expression, context), out var receiver)) return false;
         if (string.Equals(memberName, "Count", StringComparison.Ordinal) &&
             receiver.Kind == SmtValueKind.Reference &&
-            context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is
-                IPropertySymbol countProperty &&
+            node.Symbol is IPropertySymbol countProperty &&
             SymbolicTypeFacts.IsKnownNonNegativeCollectionCountProperty(countProperty, receiverType, context.Compilation)) {
             term = new SymbolicCountTerm(receiver);
             return true;
         }
-        if (TryGetInstanceMemberValueKind(memberAccess, context, out var memberKind) &&
+        if (TryGetInstanceMemberValueKind(node.Symbol, out var memberKind) &&
             receiver.Kind == SmtValueKind.Reference) {
             term = new SymbolicMemberTerm(receiver, memberName, memberKind);
             return true;
@@ -129,11 +129,7 @@ internal static class SymbolicMemberLowerer {
             return true;
         return SymbolicSourcePredicateLowerer.TryLowerReturnedBoolean(propertySymbol, context, substitutions, receiver, out condition);
     }
-    private static bool TryGetInstanceMemberValueKind(
-        MemberAccessExpressionSyntax memberAccess,
-        SymbolicLoweringContext context,
-        out SmtValueKind kind) {
-        var symbol = context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol;
+    private static bool TryGetInstanceMemberValueKind(ISymbol? symbol, out SmtValueKind kind) {
         if (symbol is IPropertySymbol { IsStatic: false } property &&
             SymbolicTypeLowerer.TryGetValueKind(property.Type, out kind))
             return true;
@@ -142,5 +138,12 @@ internal static class SymbolicMemberLowerer {
             return true;
         kind = default;
         return false;
+    }
+    private static bool TryGetInstanceMemberSymbol(BoundNode node, out ISymbol memberSymbol) {
+        if (node.Symbol is IPropertySymbol { IsStatic: false } or IFieldSymbol { IsStatic: false }) {
+            memberSymbol = node.Symbol;
+            return true;
+        }
+        return TryGetInstanceMemberSymbol(node.Syntax, node.Context, out memberSymbol);
     }
 }

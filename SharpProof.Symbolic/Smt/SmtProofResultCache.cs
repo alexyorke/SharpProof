@@ -52,14 +52,8 @@ internal sealed class SmtProofResultCache {
         => string.Equals(result.Reason, "smt_transient_failure", StringComparison.Ordinal) ||
                string.Equals(result.PathCheck.Witness?.Reason, "z3_transient_failure", StringComparison.Ordinal) ||
                string.Equals(result.HazardCheck.Witness?.Reason, "z3_transient_failure", StringComparison.Ordinal);
-    private static string CreateSharedKey(SmtAnalysisOptions options, string queryKey) => options.Mode +
-               "|timeout_ms=" +
-               (long)options.QueryTimeout.TotalMilliseconds +
-               "|max_path=" +
-               options.MaxPathConditions +
-               "|max_expr=" +
-               options.MaxExpressionNodes +
-               "|" +
-               queryKey;
+    private static string CreateSharedKey(SmtAnalysisOptions options, string queryKey) =>
+        $"{options.Mode}|timeout_ms={(long)options.QueryTimeout.TotalMilliseconds}" +
+        $"|max_path={options.MaxPathConditions}|max_expr={options.MaxExpressionNodes}|{queryKey}";
     internal sealed record SharedFlightLease(string Key, Lazy<AnalysisProofResult> Result, bool OwnsFlight);
 }

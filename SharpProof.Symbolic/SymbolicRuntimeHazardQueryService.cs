@@ -13,41 +13,27 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken = default,
         SymbolicRuntimeHazardQueryOptions? options = null) {
-        var scope = target.Kind switch {
-            SharpProofTargetKind.Line => new RuntimeHazardScope(
-                SymbolicSourceLocation.GetLineSpan(syntaxTree, target.Line!.Value, cancellationToken)),
-            SharpProofTargetKind.Point => CreatePositionScope(
-                syntaxTree,
-                SymbolicSourceLocation.GetPosition(
-                    syntaxTree,
-                    target.Line!.Value,
-                    target.Column ?? 1,
-                    cancellationToken),
-                cancellationToken),
-            SharpProofTargetKind.Position => CreatePositionScope(
-                syntaxTree,
-                target.Position!.Value,
-                cancellationToken),
-            SharpProofTargetKind.Span => new RuntimeHazardScope(
-                SymbolicSourceLocation.GetSourceSpan(syntaxTree, target.SpanStart!.Value, target.SpanEnd!.Value, cancellationToken)),
+        var source = SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation);
+        return QuerySyntaxTreeRuntimeHazards(
+            ResolvedQueryTarget.Create(source, target, cancellationToken),
+            smtAnalysis,
+            cancellationToken,
+            options);
+    }
+    internal SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazards(
+        ResolvedQueryTarget target,
+        SmtAnalysisService smtAnalysis,
+        CancellationToken cancellationToken = default,
+        SymbolicRuntimeHazardQueryOptions? options = null) {
+        var scope = target.Target.Kind switch {
+            SharpProofTargetKind.Point or SharpProofTargetKind.Position =>
+                new RuntimeHazardScope(target.PositionContainer.Span, target.Position),
+            SharpProofTargetKind.Line or SharpProofTargetKind.Span => new RuntimeHazardScope(target.Span),
             SharpProofTargetKind.AllLines => RuntimeHazardScope.All,
             _ => throw new NotSupportedException("Target kind is not supported for runtime hazard queries.")
         };
-        return QuerySyntaxTreeRuntimeHazardsCore(syntaxTree, compilation, scope, smtAnalysis, cancellationToken, options);
-    }
-    private static RuntimeHazardScope CreatePositionScope(
-        SyntaxTree syntaxTree,
-        int position,
-        CancellationToken cancellationToken) {
-        var text = syntaxTree.GetText(cancellationToken);
-        if (position < 0 || position > text.Length)
-            throw new ArgumentOutOfRangeException(nameof(position), "--position must be within the source text span.");
-        var root = syntaxTree.GetRoot(cancellationToken);
-        var narrow = SymbolicSourceTargetSelector.FindNarrowestAtPosition(root, position);
-        var container = narrow.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault() ??
-                        narrow.AncestorsAndSelf().OfType<ArrowExpressionClauseSyntax>().FirstOrDefault()?.Expression ??
-                        narrow;
-        return new RuntimeHazardScope(container.Span, position);
+        return QueryRuntimeHazardsCore(
+            target.Source.SyntaxTree, target.SemanticModel, target.Root, scope, smtAnalysis, cancellationToken, options, true);
     }
     public SymbolicRuntimeHazardQueryResult QueryNodeRuntimeHazards(
         SyntaxNode node,
@@ -66,21 +52,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService {
             cancellationToken,
             options,
             includeNestedCallables);
-    }
-    private SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazardsCore(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        RuntimeHazardScope scope,
-        SmtAnalysisService smtAnalysis,
-        CancellationToken cancellationToken,
-        SymbolicRuntimeHazardQueryOptions? options) {
-        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
-        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
-        options ??= SymbolicRuntimeHazardQueryOptions.Default;
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var root = syntaxTree.GetRoot(cancellationToken);
-        return QueryRuntimeHazardsCore(syntaxTree, semanticModel, root, scope, smtAnalysis, cancellationToken, options, true);
     }
     private SymbolicRuntimeHazardQueryResult QueryRuntimeHazardsCore(
         SyntaxTree syntaxTree,

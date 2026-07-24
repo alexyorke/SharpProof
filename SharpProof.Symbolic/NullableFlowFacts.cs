@@ -5,24 +5,77 @@ internal enum NullableFlowFactState {
     NotNull
 }
 internal static class NullableFlowFacts {
-    private const string AllowNullAttributeName = "System.Diagnostics.CodeAnalysis.AllowNullAttribute";
-    private const string DisallowNullAttributeName = "System.Diagnostics.CodeAnalysis.DisallowNullAttribute";
-    private const string DoesNotReturnAttributeName =
-        "System.Diagnostics.CodeAnalysis.DoesNotReturnAttribute";
-    private const string DoesNotReturnIfAttributeName =
-        "System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute";
-    private const string MaybeNullAttributeName = "System.Diagnostics.CodeAnalysis.MaybeNullAttribute";
-    private const string MaybeNullWhenAttributeName =
-        "System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute";
-    private const string MemberNotNullAttributeName =
-        "System.Diagnostics.CodeAnalysis.MemberNotNullAttribute";
-    private const string MemberNotNullWhenAttributeName =
-        "System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute";
-    private const string NotNullAttributeName = "System.Diagnostics.CodeAnalysis.NotNullAttribute";
-    private const string NotNullIfNotNullAttributeName =
-        "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute";
-    private const string NotNullWhenAttributeName =
-        "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute";
+    private const string AttributePrefix = "System.Diagnostics.CodeAnalysis.";
+    private enum ContractProjection {
+        Input,
+        Output,
+        Return
+    }
+    private readonly record struct NullableAttributeSet(ImmutableArray<AttributeData> Values) {
+        internal bool Has(string name) => Values.Any(attribute => IsAttribute(attribute, name));
+        internal bool? GetBoolean(string name) {
+            foreach (var attribute in Values.Where(attribute => IsAttribute(attribute, name)))
+                if (GetSingleBoolean(attribute) is { } value)
+                    return value;
+            return null;
+        }
+        internal NullableFlowFactState Project(
+            ContractProjection projection,
+            NullableAnnotation annotation,
+            RefKind refKind = RefKind.None,
+            bool? methodReturnValue = null) {
+            if (projection == ContractProjection.Input) {
+                if (Has("AllowNullAttribute") == Has("DisallowNullAttribute"))
+                    return Has("AllowNullAttribute")
+                        ? NullableFlowFactState.Unknown
+                        : FromAnnotation(annotation);
+                return Has("AllowNullAttribute")
+                    ? NullableFlowFactState.MaybeNull
+                    : NullableFlowFactState.NotNull;
+            }
+            if (projection == ContractProjection.Output) {
+                if (methodReturnValue.HasValue &&
+                    GetBoolean("MaybeNullWhenAttribute") == methodReturnValue)
+                    return NullableFlowFactState.MaybeNull;
+                if (methodReturnValue.HasValue &&
+                    GetBoolean("NotNullWhenAttribute") == methodReturnValue)
+                    return NullableFlowFactState.NotNull;
+                if (Has("MaybeNullAttribute")) return NullableFlowFactState.MaybeNull;
+                if (Has("NotNullAttribute")) return NullableFlowFactState.NotNull;
+                return refKind is RefKind.Ref or RefKind.Out
+                    ? FromAnnotation(annotation)
+                    : NullableFlowFactState.Unknown;
+            }
+            if (Has("MaybeNullAttribute")) return NullableFlowFactState.MaybeNull;
+            return Has("NotNullAttribute")
+                ? NullableFlowFactState.NotNull
+                : FromAnnotation(annotation);
+        }
+        internal ImmutableArray<string> GetMemberTargets(string name, bool? returnValue = null) {
+            var targets = ImmutableArray.CreateBuilder<string>();
+            foreach (var attribute in Values.Where(attribute => IsAttribute(attribute, name))) {
+                var start = 0;
+                if (returnValue.HasValue) {
+                    if (attribute.ConstructorArguments.Length < 2 ||
+                        attribute.ConstructorArguments[0].Value is not bool actual ||
+                        actual != returnValue.Value)
+                        continue;
+                    start = 1;
+                }
+                targets.AddRange(FlattenMemberTargets(attribute.ConstructorArguments.Skip(start)));
+            }
+            return [.. targets.Distinct(StringComparer.Ordinal)];
+        }
+        internal ImmutableArray<string> GetParameterNames(string name) =>
+            [.. Values
+                .Where(attribute =>
+                    IsAttribute(attribute, name) &&
+                    attribute.ConstructorArguments.Length == 1 &&
+                    attribute.ConstructorArguments[0].Value is string parameterName &&
+                    !string.IsNullOrEmpty(parameterName))
+                .Select(static attribute => (string)attribute.ConstructorArguments[0].Value!)
+                .Distinct(StringComparer.Ordinal)];
+    }
     internal static NullableFlowFactState GetExpressionState(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -30,16 +83,10 @@ internal static class NullableFlowFacts {
         if (expression == null) throw new ArgumentNullException(nameof(expression));
         if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
         expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
-        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
-        var type = typeInfo.ConvertedType ?? typeInfo.Type;
-        if (type == null || !SymbolicTypeFacts.IsReferenceLikeType(type))
-            return NullableFlowFactState.Unknown;
-        var flowState = typeInfo.Nullability.FlowState != NullableFlowState.None
-            ? typeInfo.Nullability.FlowState
-            : typeInfo.ConvertedNullability.FlowState;
-        if (flowState == NullableFlowState.NotNull) return NullableFlowFactState.NotNull;
-        if (flowState == NullableFlowState.MaybeNull) return NullableFlowFactState.MaybeNull;
-        return GetStructuralExpressionState(expression, semanticModel, cancellationToken, exactContract: false);
+        var state = GetTypeInfoState(semanticModel.GetTypeInfo(expression, cancellationToken));
+        return state != NullableFlowFactState.Unknown
+            ? state
+            : GetStructuralExpressionState(expression, semanticModel, cancellationToken, exactContract: false);
     }
     internal static NullableFlowFactState GetExpressionStateAtPosition(
         ExpressionSyntax expression,
@@ -50,21 +97,10 @@ internal static class NullableFlowFacts {
         if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
         cancellationToken.ThrowIfCancellationRequested();
         try {
-            var typeInfo = semanticModel.GetSpeculativeTypeInfo(
+            return GetTypeInfoState(semanticModel.GetSpeculativeTypeInfo(
                 position,
                 CSharpSyntaxFacts.UnwrapParentheses(expression).WithoutTrivia(),
-                SpeculativeBindingOption.BindAsExpression);
-            var type = typeInfo.ConvertedType ?? typeInfo.Type;
-            if (type == null || !SymbolicTypeFacts.IsReferenceLikeType(type))
-                return NullableFlowFactState.Unknown;
-            var flowState = typeInfo.Nullability.FlowState != NullableFlowState.None
-                ? typeInfo.Nullability.FlowState
-                : typeInfo.ConvertedNullability.FlowState;
-            return flowState switch {
-                NullableFlowState.NotNull => NullableFlowFactState.NotNull,
-                NullableFlowState.MaybeNull => NullableFlowFactState.MaybeNull,
-                _ => NullableFlowFactState.Unknown
-            };
+                SpeculativeBindingOption.BindAsExpression));
         }
         catch (ArgumentException) {
             return NullableFlowFactState.Unknown;
@@ -73,8 +109,8 @@ internal static class NullableFlowFacts {
     internal static bool IsDefinitelyNotNullReferenceValue(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken) => GetExpressionState(expression, semanticModel, cancellationToken) ==
-               NullableFlowFactState.NotNull;
+        CancellationToken cancellationToken) =>
+        GetExpressionState(expression, semanticModel, cancellationToken) == NullableFlowFactState.NotNull;
     internal static bool TryEvaluateNullTest(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -93,9 +129,7 @@ internal static class NullableFlowFacts {
             semanticModel.GetOperation(binary, cancellationToken) is IBinaryOperation { OperatorMethod: null }) {
             var target = CSharpSyntaxFacts.IsNullLiteral(binary.Left)
                 ? binary.Right
-                : CSharpSyntaxFacts.IsNullLiteral(binary.Right)
-                    ? binary.Left
-                    : null;
+                : CSharpSyntaxFacts.IsNullLiteral(binary.Right) ? binary.Left : null;
             if (target != null &&
                 GetExactExpressionState(target, semanticModel, cancellationToken) == NullableFlowFactState.NotNull) {
                 value = binary.IsKind(SyntaxKind.NotEqualsExpression);
@@ -125,50 +159,48 @@ internal static class NullableFlowFacts {
             symbol = declaredLocal.OriginalDefinition;
             return true;
         }
-        return SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(expression, semanticModel, cancellationToken, out symbol);
+        return SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+            expression, semanticModel, cancellationToken, out symbol);
     }
     internal static NullableFlowFactState GetParameterInputState(IParameterSymbol parameter) {
         if (parameter == null) throw new ArgumentNullException(nameof(parameter));
-        if (!SymbolicTypeFacts.IsReferenceLikeType(parameter.Type)) return NullableFlowFactState.Unknown;
-        var allowsNull = HasParameterAttribute(parameter, AllowNullAttributeName);
-        var disallowsNull = HasParameterAttribute(parameter, DisallowNullAttributeName);
-        if (allowsNull && disallowsNull) return NullableFlowFactState.Unknown;
-        if (allowsNull) return NullableFlowFactState.MaybeNull;
-        if (disallowsNull) return NullableFlowFactState.NotNull;
-        return FromAnnotation(parameter.NullableAnnotation);
+        return SymbolicTypeFacts.IsReferenceLikeType(parameter.Type)
+            ? Decode(GetInputAttributes(parameter)).Project(ContractProjection.Input, parameter.NullableAnnotation)
+            : NullableFlowFactState.Unknown;
     }
     internal static bool HasExplicitNotNullInputContract(IParameterSymbol parameter) {
         if (parameter == null) throw new ArgumentNullException(nameof(parameter));
-        return HasParameterAttribute(parameter, DisallowNullAttributeName) &&
-               !HasParameterAttribute(parameter, AllowNullAttributeName);
+        var contract = Decode(GetInputAttributes(parameter));
+        return contract.Has("DisallowNullAttribute") && !contract.Has("AllowNullAttribute");
     }
-    internal static NullableFlowFactState GetParameterOutputState(IParameterSymbol parameter, bool? methodReturnValue = null) {
+    internal static NullableFlowFactState GetParameterOutputState(
+        IParameterSymbol parameter,
+        bool? methodReturnValue = null) {
         if (parameter == null) throw new ArgumentNullException(nameof(parameter));
         if (!SymbolicTypeFacts.IsReferenceLikeType(parameter.Type) &&
             parameter.Type.TypeKind != TypeKind.TypeParameter)
             return NullableFlowFactState.Unknown;
-        if (methodReturnValue.HasValue) {
-            if (TryGetMaybeNullWhenValue(parameter, out var maybeNullWhen) &&
-                maybeNullWhen == methodReturnValue.Value)
-                return NullableFlowFactState.MaybeNull;
-            if (parameter.Type.TypeKind == TypeKind.TypeParameter &&
-                parameter.NullableAnnotation != NullableAnnotation.Annotated &&
-                TryGetMaybeNullWhenValue(parameter, out _) &&
-                !HasParameterAttribute(parameter, MaybeNullAttributeName))
-                return NullableFlowFactState.NotNull;
-            if (TryGetNotNullWhenValue(parameter, out var notNullWhen) &&
-                notNullWhen == methodReturnValue.Value)
-                return NullableFlowFactState.NotNull;
-        }
-        if (HasParameterAttribute(parameter, MaybeNullAttributeName)) return NullableFlowFactState.MaybeNull;
-        if (HasParameterAttribute(parameter, NotNullAttributeName)) return NullableFlowFactState.NotNull;
-        return parameter.RefKind is RefKind.Ref or RefKind.Out
-            ? FromAnnotation(parameter.NullableAnnotation)
-            : NullableFlowFactState.Unknown;
+        var contract = Decode(GetAttributes(parameter));
+        if (parameter.Type.TypeKind == TypeKind.TypeParameter &&
+            parameter.NullableAnnotation != NullableAnnotation.Annotated &&
+            methodReturnValue.HasValue &&
+            contract.GetBoolean("MaybeNullWhenAttribute") is { } maybeNullWhen &&
+            maybeNullWhen != methodReturnValue.Value &&
+            !contract.Has("MaybeNullAttribute"))
+            return NullableFlowFactState.NotNull;
+        return contract.Project(
+            ContractProjection.Output,
+            parameter.NullableAnnotation,
+            parameter.RefKind,
+            methodReturnValue);
     }
-    internal static bool HasNotNullPostcondition(IParameterSymbol parameter) =>
-        HasParameterAttribute(parameter, NotNullAttributeName);
-    internal static bool HasInferredNotNullNormalCompletionPostcondition(IParameterSymbol parameter, CancellationToken cancellationToken) {
+    internal static bool HasNotNullPostcondition(IParameterSymbol parameter) {
+        if (parameter == null) throw new ArgumentNullException(nameof(parameter));
+        return Decode(GetAttributes(parameter)).Has("NotNullAttribute");
+    }
+    internal static bool HasInferredNotNullNormalCompletionPostcondition(
+        IParameterSymbol parameter,
+        CancellationToken cancellationToken) {
         if (parameter == null) throw new ArgumentNullException(nameof(parameter));
         if (parameter.RefKind != RefKind.None ||
             parameter.ContainingSymbol is not IMethodSymbol method)
@@ -198,21 +230,21 @@ internal static class NullableFlowFacts {
         return false;
     }
     internal static bool TryGetNotNullWhenValue(IParameterSymbol parameter, out bool value) =>
-        TryGetParameterBooleanAttributeValue(parameter, NotNullWhenAttributeName, out value);
+        TryGetBoolean(Decode(GetAttributes(parameter)).GetBoolean("NotNullWhenAttribute"), out value);
     internal static bool TryGetMaybeNullWhenValue(IParameterSymbol parameter, out bool value) =>
-        TryGetParameterBooleanAttributeValue(parameter, MaybeNullWhenAttributeName, out value);
+        TryGetBoolean(Decode(GetAttributes(parameter)).GetBoolean("MaybeNullWhenAttribute"), out value);
     internal static bool TryGetDoesNotReturnIfValue(IParameterSymbol parameter, out bool value) =>
-        TryGetParameterBooleanAttributeValue(parameter, DoesNotReturnIfAttributeName, out value);
+        TryGetBoolean(Decode(GetAttributes(parameter)).GetBoolean("DoesNotReturnIfAttribute"), out value);
     internal static bool HasDoesNotReturn(IMethodSymbol method) {
         if (method == null) throw new ArgumentNullException(nameof(method));
-        return HasAttribute(GetAttributes(method), DoesNotReturnAttributeName);
+        return Decode(GetAttributes(method)).Has("DoesNotReturnAttribute");
     }
     internal static NullableFlowFactState GetMethodReturnState(IMethodSymbol method) {
         if (method == null) throw new ArgumentNullException(nameof(method));
-        if (!SymbolicTypeFacts.IsReferenceLikeType(method.ReturnType)) return NullableFlowFactState.Unknown;
-        var contractState = GetMethodReturnContractState(method);
-        if (contractState != NullableFlowFactState.Unknown) return contractState;
-        return FromAnnotation(method.ReturnNullableAnnotation);
+        return SymbolicTypeFacts.IsReferenceLikeType(method.ReturnType)
+            ? Decode(GetReturnAttributes(method)).Project(
+                ContractProjection.Return, method.ReturnNullableAnnotation)
+            : NullableFlowFactState.Unknown;
     }
     internal static NullableFlowFactState GetMethodBodyReturnState(IMethodSymbol method) {
         if (method == null) throw new ArgumentNullException(nameof(method));
@@ -231,21 +263,23 @@ internal static class NullableFlowFacts {
     }
     internal static ImmutableArray<string> GetMemberNotNullTargets(IMethodSymbol method) {
         if (method == null) throw new ArgumentNullException(nameof(method));
-        var targets = ImmutableArray.CreateBuilder<string>();
-        AddMemberTargets(GetAttributes(method), MemberNotNullAttributeName, null, targets);
-        return [.. targets.Distinct(StringComparer.Ordinal)];
+        return Decode(GetAttributes(method)).GetMemberTargets("MemberNotNullAttribute");
     }
-    internal static ImmutableArray<string> GetMemberNotNullWhenTargets(IMethodSymbol method, bool methodReturnValue) {
+    internal static ImmutableArray<string> GetMemberNotNullWhenTargets(
+        IMethodSymbol method,
+        bool methodReturnValue) {
         if (method == null) throw new ArgumentNullException(nameof(method));
-        var targets = ImmutableArray.CreateBuilder<string>();
-        AddMemberTargets(GetAttributes(method), MemberNotNullWhenAttributeName, methodReturnValue, targets);
-        return [.. targets.Distinct(StringComparer.Ordinal)];
+        return Decode(GetAttributes(method))
+            .GetMemberTargets("MemberNotNullWhenAttribute", methodReturnValue);
     }
-    internal static ImmutableArray<string> GetMemberNotNullWhenTargets(IMethodSymbol method)
-        => [.. GetMemberNotNullWhenTargets(method, true)
+    internal static ImmutableArray<string> GetMemberNotNullWhenTargets(IMethodSymbol method) =>
+        [.. GetMemberNotNullWhenTargets(method, true)
             .Concat(GetMemberNotNullWhenTargets(method, false))
             .Distinct(StringComparer.Ordinal)];
-    internal static bool TryResolveInstanceMemberTarget(INamedTypeSymbol containingType, string target, out ISymbol member) {
+    internal static bool TryResolveInstanceMemberTarget(
+        INamedTypeSymbol containingType,
+        string target,
+        out ISymbol member) {
         if (containingType == null) throw new ArgumentNullException(nameof(containingType));
         member = null!;
         var memberName = NormalizeMemberTarget(target);
@@ -279,12 +313,32 @@ internal static class NullableFlowFacts {
         }
     }
     internal static ImmutableArray<string> GetNotNullIfNotNullParameterNames(IMethodSymbol method) =>
-        GetNotNullIfNotNullParameterNames(GetReturnAttributes(method));
-    internal static bool TryGetNotNullIfNotNullParameterName(IMethodSymbol method, out string parameterName) =>
-        TryGetFirstNotNullIfNotNullParameterName(GetNotNullIfNotNullParameterNames(method), out parameterName);
-    internal static bool TryGetNotNullIfNotNullParameterName(IPropertySymbol property, out string parameterName) =>
-        TryGetFirstNotNullIfNotNullParameterName(
-            GetNotNullIfNotNullParameterNames(GetReadAttributes(property)), out parameterName);
+        Decode(GetReturnAttributes(method)).GetParameterNames("NotNullIfNotNullAttribute");
+    internal static bool TryGetNotNullIfNotNullParameterName(
+        IMethodSymbol method,
+        out string parameterName) =>
+        TryGetFirst(
+            Decode(GetReturnAttributes(method)).GetParameterNames("NotNullIfNotNullAttribute"),
+            out parameterName);
+    internal static bool TryGetNotNullIfNotNullParameterName(
+        IPropertySymbol property,
+        out string parameterName) =>
+        TryGetFirst(
+            Decode(GetReadAttributes(property)).GetParameterNames("NotNullIfNotNullAttribute"),
+            out parameterName);
+    private static NullableFlowFactState GetTypeInfoState(TypeInfo typeInfo) {
+        var type = typeInfo.ConvertedType ?? typeInfo.Type;
+        if (type == null || !SymbolicTypeFacts.IsReferenceLikeType(type))
+            return NullableFlowFactState.Unknown;
+        var flowState = typeInfo.Nullability.FlowState != NullableFlowState.None
+            ? typeInfo.Nullability.FlowState
+            : typeInfo.ConvertedNullability.FlowState;
+        return flowState switch {
+            NullableFlowState.NotNull => NullableFlowFactState.NotNull,
+            NullableFlowState.MaybeNull => NullableFlowFactState.MaybeNull,
+            _ => NullableFlowFactState.Unknown
+        };
+    }
     private static NullableFlowFactState GetExactExpressionState(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -301,8 +355,9 @@ internal static class NullableFlowFacts {
             IInstanceReferenceOperation => NullableFlowFactState.NotNull,
             _ => NullableFlowFactState.Unknown
         };
-        if (contractState != NullableFlowFactState.Unknown) return contractState;
-        return GetStructuralExpressionState(expression, semanticModel, cancellationToken, exactContract: true);
+        return contractState != NullableFlowFactState.Unknown
+            ? contractState
+            : GetStructuralExpressionState(expression, semanticModel, cancellationToken, exactContract: true);
     }
     private static NullableFlowFactState GetStructuralExpressionState(
         ExpressionSyntax expression,
@@ -317,9 +372,9 @@ internal static class NullableFlowFacts {
             return constantValue.Value == null
                 ? NullableFlowFactState.MaybeNull
                 : NullableFlowFactState.NotNull;
-        if (expression is ConditionalExpressionSyntax conditionalExpression) {
-            var whenTrue = GetNested(conditionalExpression.WhenTrue);
-            var whenFalse = GetNested(conditionalExpression.WhenFalse);
+        if (expression is ConditionalExpressionSyntax conditional) {
+            var whenTrue = GetNested(conditional.WhenTrue);
+            var whenFalse = GetNested(conditional.WhenFalse);
             if (whenTrue == NullableFlowFactState.NotNull && whenFalse == NullableFlowFactState.NotNull)
                 return NullableFlowFactState.NotNull;
             var maybeNull = exactContract
@@ -327,13 +382,11 @@ internal static class NullableFlowFacts {
                 : whenTrue == NullableFlowFactState.MaybeNull || whenFalse == NullableFlowFactState.MaybeNull;
             if (maybeNull) return NullableFlowFactState.MaybeNull;
         }
-        if (expression is BinaryExpressionSyntax coalesceExpression &&
-            coalesceExpression.IsKind(SyntaxKind.CoalesceExpression)) {
-            var left = GetNested(coalesceExpression.Left);
-            var right = GetNested(coalesceExpression.Right);
-            if (left == NullableFlowFactState.NotNull || right == NullableFlowFactState.NotNull)
-                return NullableFlowFactState.NotNull;
-        }
+        if (expression is BinaryExpressionSyntax coalesce &&
+            coalesce.IsKind(SyntaxKind.CoalesceExpression) &&
+            (GetNested(coalesce.Left) == NullableFlowFactState.NotNull ||
+             GetNested(coalesce.Right) == NullableFlowFactState.NotNull))
+            return NullableFlowFactState.NotNull;
         return expression is ObjectCreationExpressionSyntax or
             AnonymousObjectCreationExpressionSyntax or
             ArrayCreationExpressionSyntax or
@@ -345,17 +398,9 @@ internal static class NullableFlowFacts {
                 : NullableFlowFactState.Unknown;
     }
     private static NullableFlowFactState GetMethodReturnContractState(IMethodSymbol method) =>
-        GetAttributeState(GetReturnAttributes(method));
-    private static NullableFlowFactState GetAttributeState(IEnumerable<AttributeData> source) {
-        var attributes = source.ToArray();
-        if (HasAttribute(attributes, MaybeNullAttributeName))
-            return NullableFlowFactState.MaybeNull;
-        return HasAttribute(attributes, NotNullAttributeName)
-            ? NullableFlowFactState.NotNull
-            : NullableFlowFactState.Unknown;
-    }
+        Decode(GetReturnAttributes(method)).Project(ContractProjection.Return, NullableAnnotation.None);
     private static NullableFlowFactState GetPropertyReadContractState(IPropertySymbol property) =>
-        GetAttributeState(GetReadAttributes(property));
+        Decode(GetReadAttributes(property)).Project(ContractProjection.Return, NullableAnnotation.None);
     private static NullableFlowFactState GetFieldReadContractState(IFieldSymbol field) {
         if (field is {
             IsStatic: true,
@@ -364,15 +409,13 @@ internal static class NullableFlowFacts {
             ContainingType.SpecialType: SpecialType.System_String
         })
             return NullableFlowFactState.NotNull;
-        return GetAttributeState(GetAttributes(field));
+        return Decode(GetAttributes(field)).Project(ContractProjection.Return, NullableAnnotation.None);
     }
     private static NullableFlowFactState FromAnnotation(NullableAnnotation annotation) => annotation switch {
         NullableAnnotation.NotAnnotated => NullableFlowFactState.NotNull,
         NullableAnnotation.Annotated => NullableFlowFactState.MaybeNull,
         _ => NullableFlowFactState.Unknown
     };
-    private static bool HasParameterAttribute(IParameterSymbol parameter, string attributeName) =>
-        HasAttribute(GetInputAttributes(parameter), attributeName);
     private static bool IsNullGuardForParameter(ExpressionSyntax condition, IParameterSymbol parameter) {
         condition = CSharpSyntaxFacts.UnwrapParentheses(condition);
         if (condition is IsPatternExpressionSyntax {
@@ -399,8 +442,6 @@ internal static class NullableFlowFacts {
                 return true;
         return false;
     }
-    private static bool TryGetParameterBooleanAttributeValue(IParameterSymbol parameter, string attributeName, out bool value) =>
-        TryGetBooleanAttributeValue(GetAttributes(parameter), attributeName, out value);
     private static IEnumerable<AttributeData> GetInputAttributes(IParameterSymbol parameter) {
         foreach (var attribute in GetAttributes(parameter)) yield return attribute;
         if (parameter.ContainingSymbol is not IMethodSymbol {
@@ -427,77 +468,41 @@ internal static class NullableFlowFacts {
         if (SymbolEqualityComparer.Default.Equals(symbol, symbol.OriginalDefinition)) yield break;
         foreach (var attribute in symbol.OriginalDefinition.GetAttributes()) yield return attribute;
     }
-    private static bool HasAttribute(IEnumerable<AttributeData> attributes, string attributeName) => attributes.Any(attribute =>
-            string.Equals(SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass), attributeName, StringComparison.Ordinal));
-    private static bool TryGetBooleanAttributeValue(IEnumerable<AttributeData> attributes, string attributeName, out bool value) {
-        foreach (var attribute in attributes) {
-            if (!string.Equals(SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass), attributeName, StringComparison.Ordinal) ||
-                attribute.ConstructorArguments.Length != 1 ||
-                attribute.ConstructorArguments[0].Value is not bool attributeValue)
-                continue;
-            value = attributeValue;
-            return true;
-        }
-        value = false;
-        return false;
-    }
-    private static void AddMemberTargets(
-        IEnumerable<AttributeData> attributes,
-        string attributeName,
-        bool? methodReturnValue,
-        ICollection<string> targets) {
-        foreach (var attribute in attributes) {
-            if (!string.Equals(SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass), attributeName, StringComparison.Ordinal))
-                continue;
-            var startIndex = 0;
-            if (methodReturnValue.HasValue) {
-                if (attribute.ConstructorArguments.Length < 2 ||
-                    attribute.ConstructorArguments[0].Value is not bool attributeReturnValue ||
-                    attributeReturnValue != methodReturnValue.Value)
-                    continue;
-                startIndex = 1;
+    private static NullableAttributeSet Decode(IEnumerable<AttributeData> source) => new([.. source]);
+    private static bool IsAttribute(AttributeData attribute, string name) =>
+        string.Equals(
+            SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
+            AttributePrefix + name,
+            StringComparison.Ordinal);
+    private static bool? GetSingleBoolean(AttributeData attribute) =>
+        attribute.ConstructorArguments.Length == 1 &&
+        attribute.ConstructorArguments[0].Value is bool value
+            ? value
+            : null;
+    private static IEnumerable<string> FlattenMemberTargets(IEnumerable<TypedConstant> arguments) {
+        foreach (var argument in arguments) {
+            if (argument.Kind == TypedConstantKind.Array) {
+                foreach (var target in FlattenMemberTargets(argument.Values)) yield return target;
             }
-            for (var index = startIndex; index < attribute.ConstructorArguments.Length; index++)
-                AddMemberTarget(attribute.ConstructorArguments[index], targets);
+            else if (argument.Value is string target && !string.IsNullOrWhiteSpace(target)) {
+                yield return target;
+            }
         }
     }
-    private static void AddMemberTarget(TypedConstant argument, ICollection<string> targets) {
-        if (argument.Kind == TypedConstantKind.Array) {
-            foreach (var item in argument.Values) AddMemberTarget(item, targets);
-            return;
-        }
-        if (argument.Value is string target && !string.IsNullOrWhiteSpace(target)) targets.Add(target);
+    private static bool TryGetBoolean(bool? candidate, out bool value) {
+        value = candidate.GetValueOrDefault();
+        return candidate.HasValue;
+    }
+    private static bool TryGetFirst(ImmutableArray<string> values, out string value) {
+        value = values.IsEmpty ? string.Empty : values[0];
+        return !values.IsEmpty;
     }
     private static string? NormalizeMemberTarget(string target) {
         target = target.Trim();
-        if (target.StartsWith("this.", StringComparison.Ordinal)) target = target.Substring("this.".Length);
+        if (target.StartsWith("this.", StringComparison.Ordinal))
+            target = target.Substring("this.".Length);
         return target.Length != 0 && target.IndexOf(".", StringComparison.Ordinal) < 0
             ? target
             : null;
-    }
-    private static ImmutableArray<string> GetNotNullIfNotNullParameterNames(IEnumerable<AttributeData> attributes) {
-        var parameterNames = ImmutableArray.CreateBuilder<string>();
-        foreach (var attribute in attributes) {
-            if (!string.Equals(
-                    SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                    NotNullIfNotNullAttributeName,
-                    StringComparison.Ordinal) ||
-                attribute.ConstructorArguments.Length != 1 ||
-                attribute.ConstructorArguments[0].Value is not string candidate ||
-                string.IsNullOrEmpty(candidate))
-                continue;
-            parameterNames.Add(candidate);
-        }
-        return [.. parameterNames.Distinct(StringComparer.Ordinal)];
-    }
-    private static bool TryGetFirstNotNullIfNotNullParameterName(
-        ImmutableArray<string> parameterNames,
-        out string parameterName) {
-        if (!parameterNames.IsEmpty) {
-            parameterName = parameterNames[0];
-            return true;
-        }
-        parameterName = string.Empty;
-        return false;
     }
 }

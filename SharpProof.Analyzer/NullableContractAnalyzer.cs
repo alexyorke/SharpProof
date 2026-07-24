@@ -4,157 +4,190 @@ internal static class NullableContractAnalyzer {
         if (context.Snapshot.RootOperation == null) return;
         var completions = MethodCompletionAnalysis.Collect(context, distinctByQueryPosition: true);
         if (completions.Length != 0) {
-            VerifyReturnContracts(context, session, completions);
-            VerifyParameterContracts(context, session, completions);
-            VerifyMemberContracts(context, session, completions);
+            var contract = DecodeContract(context.MethodSymbol, context.CancellationToken);
+            foreach (var obligation in CreateObligations(context, contract, completions))
+                Verify(context, session, obligation);
         }
         AuditNullForgivingOperators(context, session);
     }
-    private static void VerifyReturnContracts(
+    private static NullableMethodContract DecodeContract(IMethodSymbol method, CancellationToken cancellationToken) {
+        var sources = MethodContractHierarchy.EnumerateSources(method, cancellationToken).ToImmutableArray();
+        var returnContracts = ImmutableArray.CreateBuilder<ConditionalReturnContract>();
+        var requiresReturn = false;
+        if (!method.ReturnsVoid && method.ReturnType.SpecialType != SpecialType.System_Void) {
+            requiresReturn = sources.Any(source =>
+                NullableFlowFacts.GetMethodBodyReturnState(source, method.IsAsync) == NullableFlowFactState.NotNull);
+            var seenOrdinals = new HashSet<int>();
+            foreach (var source in sources)
+                foreach (var sourceName in NullableFlowFacts.GetNotNullIfNotNullParameterNames(source)) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var sourceParameter = source.Parameters.FirstOrDefault(parameter =>
+                        string.Equals(parameter.Name, sourceName, StringComparison.Ordinal));
+                    if (sourceParameter == null ||
+                        sourceParameter.Ordinal < 0 ||
+                        sourceParameter.Ordinal >= method.Parameters.Length ||
+                        method.Parameters[sourceParameter.Ordinal].RefKind == RefKind.Out ||
+                        !seenOrdinals.Add(sourceParameter.Ordinal))
+                        continue;
+                    returnContracts.Add(new ConditionalReturnContract(
+                        sourceName,
+                        method.Parameters[sourceParameter.Ordinal].Name));
+                }
+        }
+        var parameterContracts = ImmutableArray.CreateBuilder<ParameterContract>();
+        foreach (var parameter in method.Parameters) {
+            cancellationToken.ThrowIfCancellationRequested();
+            var requiresNonNull = sources.Any(source =>
+                parameter.Ordinal < source.Parameters.Length &&
+                NullableFlowFacts.HasNotNullPostcondition(source.Parameters[parameter.Ordinal]));
+            var conditional = ImmutableArray.CreateBuilder<ConditionalParameterContract>();
+            AddConditionalValues(false);
+            AddConditionalValues(true);
+            if (requiresNonNull || conditional.Count != 0)
+                parameterContracts.Add(new ParameterContract(parameter, requiresNonNull, conditional.ToImmutable()));
+            void AddConditionalValues(bool maybeNull) {
+                var seen = new HashSet<bool>();
+                foreach (var source in sources) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (parameter.Ordinal >= source.Parameters.Length) continue;
+                    var sourceParameter = source.Parameters[parameter.Ordinal];
+                    var value = false;
+                    var found = maybeNull
+                        ? sourceParameter.NullableAnnotation == NullableAnnotation.NotAnnotated &&
+                          NullableFlowFacts.TryGetMaybeNullWhenValue(sourceParameter, out value)
+                        : NullableFlowFacts.TryGetNotNullWhenValue(sourceParameter, out value);
+                    if (found && seen.Add(value))
+                        conditional.Add(new ConditionalParameterContract(
+                            maybeNull ? !value : value,
+                            FormatBooleanAttribute(maybeNull ? "MaybeNullWhen" : "NotNullWhen", value)));
+                }
+            }
+        }
+        var memberContracts = ImmutableArray.CreateBuilder<MemberContract>();
+        if (!method.IsStatic && method.ContainingType != null) {
+            AddMembers(null);
+            AddMembers(false);
+            AddMembers(true);
+        }
+        return new NullableMethodContract(
+            requiresReturn,
+            returnContracts.ToImmutable(),
+            parameterContracts.ToImmutable(),
+            memberContracts.ToImmutable());
+        void AddMembers(bool? expectedResult) {
+            var seen = new HashSet<ISymbol>(SymbolEq.Default);
+            foreach (var source in sources) {
+                var targetNames = expectedResult.HasValue
+                    ? NullableFlowFacts.GetMemberNotNullWhenTargets(source, expectedResult.Value)
+                    : NullableFlowFacts.GetMemberNotNullTargets(source);
+                foreach (var targetName in targetNames)
+                    if (source.ContainingType != null &&
+                        NullableFlowFacts.TryResolveInstanceMemberTarget(
+                            source.ContainingType,
+                            targetName,
+                            out var member) &&
+                        seen.Add(member.OriginalDefinition))
+                        memberContracts.Add(new MemberContract(
+                            targetName,
+                            member,
+                            source.ContainingType,
+                            expectedResult));
+            }
+        }
+    }
+    private static IEnumerable<CompletionObligation> CreateObligations(
         MethodBodyAnalysisContext context,
-        AnalyzerSession session,
+        NullableMethodContract contract,
         ImmutableArray<MethodNormalCompletion> completions) {
         var method = context.MethodSymbol;
-        if (method.ReturnsVoid || method.ReturnType.SpecialType == SpecialType.System_Void) return;
-        var requiresNonNull = MethodContractHierarchy
-            .EnumerateSources(method, context.CancellationToken)
-            .Any(source => NullableFlowFacts.GetMethodBodyReturnState(source, method.IsAsync) ==
-                           NullableFlowFactState.NotNull);
-        var conditionalContracts = CollectConditionalReturnContracts(method, context.CancellationToken);
-        if (!requiresNonNull && conditionalContracts.IsEmpty) return;
+        var returnRule = AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule");
         foreach (var completion in completions) {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (completion.ResultExpression == null) continue;
-            var resultText = Parenthesize(completion.ResultExpression);
-            if (requiresNonNull &&
+            var result = Parenthesize(completion.ResultExpression);
+            if (contract.RequiresNonNullReturn &&
                 !NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
                     completion.ResultExpression,
                     context.SemanticModel,
                     context.CancellationToken))
-                Verify(
-                    context,
-                    session,
+                yield return new CompletionObligation(
                     completion,
-                    resultText + " is not null",
-                    AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule"),
-                    method.Name,
-                    "non-null return");
-            foreach (var contract in conditionalContracts) {
-                var conditionalContract = "[NotNullIfNotNull(\"" + contract.SourceParameterName + "\")]";
-                var escapedInput = EscapeIdentifier(contract.ImplementationParameterName);
-                Verify(
-                    context,
-                    session,
+                    result + " is not null",
+                    returnRule,
+                    [method.Name, "non-null return"]);
+            foreach (var conditional in contract.ConditionalReturns)
+                yield return new CompletionObligation(
                     completion,
-                    "old(" + escapedInput + ") is null || " + resultText + " is not null",
-                    AnalyzerDiagnosticCatalog.Get("NullableReturnContractViolationRule"),
-                    [method.Name, conditionalContract],
+                    "old(" + EscapeIdentifier(conditional.ImplementationParameterName) + ") is null || " +
+                    result + " is not null",
+                    returnRule,
+                    [method.Name, "[NotNullIfNotNull(\"" + conditional.SourceParameterName + "\")]"],
                     CSharpSyntaxFacts.IsNullLiteral(completion.ResultExpression),
                     true);
-            }
         }
-    }
-    private static ImmutableArray<ConditionalReturnContract> CollectConditionalReturnContracts(
-        IMethodSymbol method,
-        CancellationToken cancellationToken) {
-        var contracts = ImmutableArray.CreateBuilder<ConditionalReturnContract>();
-        var seenOrdinals = new HashSet<int>();
-        foreach (var source in MethodContractHierarchy.EnumerateSources(method, cancellationToken))
-            foreach (var sourceParameterName in NullableFlowFacts.GetNotNullIfNotNullParameterNames(source)) {
-                cancellationToken.ThrowIfCancellationRequested();
-                var sourceParameter = source.Parameters.FirstOrDefault(parameter =>
-                    string.Equals(parameter.Name, sourceParameterName, StringComparison.Ordinal));
-                if (sourceParameter == null ||
-                    sourceParameter.Ordinal < 0 ||
-                    sourceParameter.Ordinal >= method.Parameters.Length)
-                    continue;
-                var implementationParameter = method.Parameters[sourceParameter.Ordinal];
-                if (implementationParameter.RefKind == RefKind.Out ||
-                    !seenOrdinals.Add(sourceParameter.Ordinal))
-                    continue;
-                contracts.Add(new ConditionalReturnContract(
-                    sourceParameterName,
-                    implementationParameter.Name));
-            }
-        return contracts.ToImmutable();
-    }
-    private static void VerifyParameterContracts(
-        MethodBodyAnalysisContext context,
-        AnalyzerSession session,
-        ImmutableArray<MethodNormalCompletion> completions) {
-        foreach (var parameter in context.MethodSymbol.Parameters) {
-            context.CancellationToken.ThrowIfCancellationRequested();
-            var target = EscapeIdentifier(parameter.Name);
-            var hasNotNullPostcondition = MethodContractHierarchy
-                .EnumerateSources(context.MethodSymbol, context.CancellationToken)
-                .Any(source =>
-                    parameter.Ordinal < source.Parameters.Length &&
-                    NullableFlowFacts.HasNotNullPostcondition(source.Parameters[parameter.Ordinal]));
-            if (hasNotNullPostcondition)
+        var parameterRule = AnalyzerDiagnosticCatalog.Get("NullableParameterPostconditionViolationRule");
+        foreach (var parameterContract in contract.Parameters) {
+            var parameter = parameterContract.Parameter;
+            var target = EscapeIdentifier(parameter.Name) + " is not null";
+            if (parameterContract.RequiresNonNull)
                 foreach (var completion in completions)
                     if (!ParameterIsDefinitelyNotNullAtCompletion(context, completion, parameter))
-                        Verify(
-                            context,
-                            session,
+                        yield return new CompletionObligation(
                             completion,
-                            target + " is not null",
-                            AnalyzerDiagnosticCatalog.Get("NullableParameterPostconditionViolationRule"),
-                            context.MethodSymbol.Name,
-                            parameter.Name,
-                            "[NotNull]");
-            foreach (var notNullWhen in CollectNotNullWhenValues(
-                         context.MethodSymbol,
-                         parameter.Ordinal,
-                         context.CancellationToken)) {
-                var contract = FormatBooleanAttribute("NotNullWhen", notNullWhen);
+                            target,
+                            parameterRule,
+                            [method.Name, parameter.Name, "[NotNull]"]);
+            foreach (var conditional in parameterContract.Conditional)
                 foreach (var completion in completions)
                     if (completion.ResultExpression != null &&
-                        ConditionalContractCanApply(
-                            context,
-                            completion.ResultExpression,
-                            notNullWhen) &&
+                        ConditionalContractCanApply(context, completion.ResultExpression, conditional.ExpectedResult) &&
                         !ParameterIsDefinitelyNotNullAtCompletion(context, completion, parameter) &&
                         !DelegatedInvocationGuaranteesNonNullOutput(
                             context,
                             completion.ResultExpression,
                             parameter,
-                            notNullWhen))
-                        Verify(
-                            context,
-                            session,
+                            conditional.ExpectedResult))
+                        yield return new CompletionObligation(
                             completion,
-                            ConditionalImplication(completion.ResultExpression, notNullWhen, target + " is not null"),
-                            AnalyzerDiagnosticCatalog.Get("NullableParameterPostconditionViolationRule"),
-                            context.MethodSymbol.Name,
-                            parameter.Name,
-                            contract);
+                            ConditionalImplication(
+                                completion.ResultExpression,
+                                conditional.ExpectedResult,
+                                target),
+                            parameterRule,
+                            [method.Name, parameter.Name, conditional.Display]);
+        }
+        var memberRule = AnalyzerDiagnosticCatalog.Get("NullableMemberContractViolationRule");
+        foreach (var memberContract in contract.Members) {
+            var member = memberContract.Member;
+            if (member is IPropertySymbol property && !IsAutoProperty(property, context.CancellationToken)) {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    AnalyzerDiagnosticCatalog.Get("NullableContractNotVerifiedRule"),
+                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
+                    method.Name,
+                    memberContract.TargetName,
+                    "user-defined property getters are not stable storage"));
+                continue;
             }
-            foreach (var maybeNullWhen in CollectMaybeNullWhenValues(
-                         context.MethodSymbol,
-                         parameter.Ordinal,
-                         context.CancellationToken)) {
-                var contract = FormatBooleanAttribute("MaybeNullWhen", maybeNullWhen);
-                foreach (var completion in completions)
-                    if (completion.ResultExpression != null &&
-                        ConditionalContractCanApply(
-                            context,
-                            completion.ResultExpression,
-                            !maybeNullWhen) &&
-                        !ParameterIsDefinitelyNotNullAtCompletion(context, completion, parameter) &&
-                        !DelegatedInvocationGuaranteesNonNullOutput(
-                            context,
-                            completion.ResultExpression,
-                            parameter,
-                            !maybeNullWhen))
-                        Verify(
-                            context,
-                            session,
-                            completion,
-                            ConditionalImplication(completion.ResultExpression, !maybeNullWhen, target + " is not null"),
-                            AnalyzerDiagnosticCatalog.Get("NullableParameterPostconditionViolationRule"),
-                            context.MethodSymbol.Name,
-                            parameter.Name,
-                            contract);
+            var target = FormatMemberTarget(method, member, memberContract.ContainingType);
+            var expected = memberContract.ExpectedResult;
+            var display = expected.HasValue
+                ? "[MemberNotNullWhen(" + FormatBoolean(expected.Value) + ", \"" +
+                  memberContract.TargetName + "\")]"
+                : "[MemberNotNull(\"" + memberContract.TargetName + "\")]";
+            var unknownIsViolation = member is IFieldSymbol &&
+                NullableFlowFacts.TryGetMemberType(member, out var memberType) &&
+                memberType.NullableAnnotation == NullableAnnotation.Annotated &&
+                !HasVisibleAssignmentToMember(context, member);
+            foreach (var completion in completions) {
+                if (expected.HasValue && completion.ResultExpression == null) continue;
+                yield return new CompletionObligation(
+                    completion,
+                    expected.HasValue
+                        ? ConditionalImplication(completion.ResultExpression!, expected.Value, target)
+                        : target,
+                    memberRule,
+                    [method.Name, memberContract.TargetName, display],
+                    unknownIsViolation);
             }
         }
     }
@@ -203,8 +236,8 @@ internal static class NullableContractAnalyzer {
                     syntax.Expression,
                     context.SemanticModel,
                     context.CancellationToken,
-                    out var argumentTarget) ||
-                !SymbolEq.AreEqual(argumentTarget, callerParameter))
+                    out var target) ||
+                !SymbolEq.AreEqual(target, callerParameter))
                 continue;
             if (NullableFlowFacts.GetParameterOutputState(calleeParameter, methodReturnValue) ==
                 NullableFlowFactState.NotNull)
@@ -218,118 +251,6 @@ internal static class NullableContractAnalyzer {
                         methodReturnValue) == NullableFlowFactState.NotNull);
         }
         return false;
-    }
-    private static ImmutableArray<bool> CollectNotNullWhenValues(
-        IMethodSymbol method,
-        int parameterOrdinal,
-        CancellationToken cancellationToken) {
-        var values = ImmutableArray.CreateBuilder<bool>();
-        var seen = new HashSet<bool>();
-        foreach (var source in MethodContractHierarchy.EnumerateSources(method, cancellationToken)) {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (parameterOrdinal >= source.Parameters.Length ||
-                !NullableFlowFacts.TryGetNotNullWhenValue(source.Parameters[parameterOrdinal], out var value) ||
-                !seen.Add(value))
-                continue;
-            values.Add(value);
-        }
-        return values.ToImmutable();
-    }
-    private static ImmutableArray<bool> CollectMaybeNullWhenValues(
-        IMethodSymbol method,
-        int parameterOrdinal,
-        CancellationToken cancellationToken) {
-        var values = ImmutableArray.CreateBuilder<bool>();
-        var seen = new HashSet<bool>();
-        foreach (var source in MethodContractHierarchy.EnumerateSources(method, cancellationToken)) {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (parameterOrdinal >= source.Parameters.Length) continue;
-            var sourceParameter = source.Parameters[parameterOrdinal];
-            if (sourceParameter.NullableAnnotation != NullableAnnotation.NotAnnotated ||
-                !NullableFlowFacts.TryGetMaybeNullWhenValue(sourceParameter, out var value) ||
-                !seen.Add(value))
-                continue;
-            values.Add(value);
-        }
-        return values.ToImmutable();
-    }
-    private static void VerifyMemberContracts(
-        MethodBodyAnalysisContext context,
-        AnalyzerSession session,
-        ImmutableArray<MethodNormalCompletion> completions) {
-        var method = context.MethodSymbol;
-        if (method.IsStatic || method.ContainingType == null) return;
-        var sources = MethodContractHierarchy
-            .EnumerateSources(method, context.CancellationToken)
-            .ToImmutableArray();
-        var seenMembers = new HashSet<ISymbol>(SymbolEq.Default);
-        foreach (var source in sources)
-            foreach (var targetName in NullableFlowFacts.GetMemberNotNullTargets(source))
-                if (source.ContainingType != null &&
-                    NullableFlowFacts.TryResolveInstanceMemberTarget(source.ContainingType, targetName, out var member) &&
-                    seenMembers.Add(member.OriginalDefinition))
-                    VerifyMemberTarget(
-                        context, session, completions, targetName, member, source.ContainingType, null);
-        foreach (var expectedResult in new[] { false, true }) {
-            seenMembers.Clear();
-            foreach (var source in sources)
-                foreach (var targetName in NullableFlowFacts.GetMemberNotNullWhenTargets(source, expectedResult))
-                    if (source.ContainingType != null &&
-                        NullableFlowFacts.TryResolveInstanceMemberTarget(source.ContainingType, targetName, out var member) &&
-                        seenMembers.Add(member.OriginalDefinition))
-                        VerifyMemberTarget(
-                            context,
-                            session,
-                            completions,
-                            targetName,
-                            member,
-                            source.ContainingType,
-                            expectedResult);
-        }
-    }
-    private static void VerifyMemberTarget(
-        MethodBodyAnalysisContext context,
-        AnalyzerSession session,
-        ImmutableArray<MethodNormalCompletion> completions,
-        string targetName,
-        ISymbol member,
-        INamedTypeSymbol contractContainingType,
-        bool? expectedResult) {
-        // User-defined getters are not necessarily stable or repeatable. Auto-properties
-        // have field-like storage and can use the same assignment proof as fields.
-        if (member is IPropertySymbol property &&
-            !IsAutoProperty(property, context.CancellationToken)) {
-            context.ReportDiagnostic(Diagnostic.Create(
-                AnalyzerDiagnosticCatalog.Get("NullableContractNotVerifiedRule"),
-                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
-                context.MethodSymbol.Name,
-                targetName,
-                "user-defined property getters are not stable storage"));
-            return;
-        }
-        var target = FormatMemberTarget(context.MethodSymbol, member, contractContainingType);
-        var contract = expectedResult.HasValue
-            ? "[MemberNotNullWhen(" + FormatBoolean(expectedResult.Value) + ", \"" +
-              targetName + "\")]"
-            : "[MemberNotNull(\"" + targetName + "\")]";
-        foreach (var completion in completions) {
-            if (expectedResult.HasValue && completion.ResultExpression == null) continue;
-            var condition = expectedResult.HasValue
-                ? ConditionalImplication(completion.ResultExpression!, expectedResult.Value, target)
-                : target;
-            Verify(
-                context,
-                session,
-                completion,
-                condition,
-                AnalyzerDiagnosticCatalog.Get("NullableMemberContractViolationRule"),
-                [context.MethodSymbol.Name, targetName, contract],
-                member is IFieldSymbol &&
-                NullableFlowFacts.TryGetMemberType(member, out var memberType) &&
-                memberType.NullableAnnotation == NullableAnnotation.Annotated &&
-                !HasVisibleAssignmentToMember(context, member),
-                false);
-        }
     }
     private static string FormatMemberTarget(
         IMethodSymbol method,
@@ -353,6 +274,33 @@ internal static class NullableContractAnalyzer {
                 return true;
         }
         return false;
+    }
+    private static void Verify(
+        MethodBodyAnalysisContext context,
+        AnalyzerSession session,
+        CompletionObligation obligation) {
+        var proof = MethodCompletionAnalysis.Prove(
+            context,
+            session.SmtAnalysis,
+            obligation.Completion,
+            obligation.Condition);
+        if (proof.TruthValue is SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable) return;
+        if (proof.TruthValue == SymbolicTruthValue.ProvenFalse ||
+            obligation.ExactCounterexampleIsViolation &&
+            proof.CounterexampleWitness.Status == SymbolicWitnessStatus.Exact ||
+            obligation.UnknownIsViolation) {
+            context.ReportDiagnostic(Diagnostic.Create(
+                obligation.ViolationDescriptor,
+                obligation.Completion.Location,
+                obligation.MessageArguments));
+            return;
+        }
+        context.ReportDiagnostic(Diagnostic.Create(
+            AnalyzerDiagnosticCatalog.Get("NullableContractNotVerifiedRule"),
+            obligation.Completion.Location,
+            context.MethodSymbol.Name,
+            obligation.Condition,
+            ContractDiagnosticSupport.FormatUnknownReason(proof, "nullable contract")));
     }
     private static void AuditNullForgivingOperators(MethodBodyAnalysisContext context, AnalyzerSession session) {
         var suppressions = context.Node.DescendantNodes(node => node == context.Node || node is not LocalFunctionStatementSyntax)
@@ -385,55 +333,23 @@ internal static class NullableContractAnalyzer {
                 ReportUnsafeSuppression(context, suppression);
                 continue;
             }
-            var roslynStateBeforeSuppression = NullableFlowFacts.GetExpressionStateAtPosition(
+            var roslynState = NullableFlowFacts.GetExpressionStateAtPosition(
                 operand,
                 suppression.SpanStart,
                 context.SemanticModel,
                 context.CancellationToken);
-            if (roslynStateBeforeSuppression == NullableFlowFactState.MaybeNull &&
+            if (roslynState == NullableFlowFactState.MaybeNull &&
                 CanUseSuppressionCounterexample(operand, context))
                 ReportUnsafeSuppression(context, suppression);
         }
     }
-    private static void ReportUnsafeSuppression(MethodBodyAnalysisContext context, PostfixUnaryExpressionSyntax suppression)
-        => context.ReportDiagnostic(Diagnostic.Create(
+    private static void ReportUnsafeSuppression(
+        MethodBodyAnalysisContext context,
+        PostfixUnaryExpressionSyntax suppression) =>
+        context.ReportDiagnostic(Diagnostic.Create(
             AnalyzerDiagnosticCatalog.Get("UnsafeNullForgivingOperatorRule"),
             suppression.OperatorToken.GetLocation(),
             suppression.Operand.ToString()));
-    private static void Verify(
-        MethodBodyAnalysisContext context,
-        AnalyzerSession session,
-        MethodNormalCompletion completion,
-        string condition,
-        DiagnosticDescriptor violationDescriptor,
-        params object[] messageArguments)
-            => Verify(context, session, completion, condition, violationDescriptor, messageArguments, false, false);
-    private static void Verify(
-        MethodBodyAnalysisContext context,
-        AnalyzerSession session,
-        MethodNormalCompletion completion,
-        string condition,
-        DiagnosticDescriptor violationDescriptor,
-        object[] messageArguments,
-        bool unknownIsViolation,
-        bool counterexampleIsViolation) {
-        var proof = MethodCompletionAnalysis.Prove(context, session.SmtAnalysis, completion, condition);
-        if (proof.TruthValue is SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable) return;
-        var definiteViolation = proof.TruthValue == SymbolicTruthValue.ProvenFalse ||
-            counterexampleIsViolation &&
-            proof.CounterexampleWitness.Status == SymbolicWitnessStatus.Exact ||
-            unknownIsViolation;
-        if (definiteViolation) {
-            context.ReportDiagnostic(Diagnostic.Create(violationDescriptor, completion.Location, messageArguments));
-            return;
-        }
-        context.ReportDiagnostic(Diagnostic.Create(
-            AnalyzerDiagnosticCatalog.Get("NullableContractNotVerifiedRule"),
-            completion.Location,
-            context.MethodSymbol.Name,
-            condition,
-            ContractDiagnosticSupport.FormatUnknownReason(proof, "nullable contract")));
-    }
     private static bool HasVisibleAssignmentToMember(MethodBodyAnalysisContext context, ISymbol member) {
         foreach (var operation in context.Snapshot.VisibleOperations) {
             context.CancellationToken.ThrowIfCancellationRequested();
@@ -448,15 +364,18 @@ internal static class NullableContractAnalyzer {
         }
         return false;
     }
-    private static bool IsStaticallyNonNullInput(ExpressionSyntax expression, MethodBodyAnalysisContext context)
-        => context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol is
-                   IParameterSymbol { NullableAnnotation: NullableAnnotation.NotAnnotated } &&
-               NullableFlowFacts.GetExpressionState(expression, context.SemanticModel,
-                   context.CancellationToken) == NullableFlowFactState.NotNull;
-    private static bool CanUseSuppressionCounterexample(ExpressionSyntax expression, MethodBodyAnalysisContext context) {
+    private static bool IsStaticallyNonNullInput(ExpressionSyntax expression, MethodBodyAnalysisContext context) =>
+        context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol is
+            IParameterSymbol { NullableAnnotation: NullableAnnotation.NotAnnotated } &&
+        NullableFlowFacts.GetExpressionState(
+            expression,
+            context.SemanticModel,
+            context.CancellationToken) == NullableFlowFactState.NotNull;
+    private static bool CanUseSuppressionCounterexample(
+        ExpressionSyntax expression,
+        MethodBodyAnalysisContext context) {
         if (expression is BinaryExpressionSyntax binary && binary.IsKind(SyntaxKind.AsExpression)) return true;
-        var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
-        return symbol switch {
+        return context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol switch {
             IParameterSymbol parameter => parameter.NullableAnnotation == NullableAnnotation.Annotated,
             ILocalSymbol local => local.NullableAnnotation == NullableAnnotation.Annotated,
             IFieldSymbol field => field.NullableAnnotation == NullableAnnotation.Annotated,
@@ -471,7 +390,29 @@ internal static class NullableContractAnalyzer {
     private static string FormatBoolean(bool value) => value ? "true" : "false";
     private static string Parenthesize(ExpressionSyntax expression) => "(" + expression.WithoutTrivia() + ")";
     private static string EscapeIdentifier(string identifier) => "@" + identifier;
+    private readonly record struct NullableMethodContract(
+        bool RequiresNonNullReturn,
+        ImmutableArray<ConditionalReturnContract> ConditionalReturns,
+        ImmutableArray<ParameterContract> Parameters,
+        ImmutableArray<MemberContract> Members);
     private readonly record struct ConditionalReturnContract(
         string SourceParameterName,
         string ImplementationParameterName);
+    private readonly record struct ParameterContract(
+        IParameterSymbol Parameter,
+        bool RequiresNonNull,
+        ImmutableArray<ConditionalParameterContract> Conditional);
+    private readonly record struct ConditionalParameterContract(bool ExpectedResult, string Display);
+    private readonly record struct MemberContract(
+        string TargetName,
+        ISymbol Member,
+        INamedTypeSymbol ContainingType,
+        bool? ExpectedResult);
+    private readonly record struct CompletionObligation(
+        MethodNormalCompletion Completion,
+        string Condition,
+        DiagnosticDescriptor ViolationDescriptor,
+        object[] MessageArguments,
+        bool UnknownIsViolation = false,
+        bool ExactCounterexampleIsViolation = false);
 }

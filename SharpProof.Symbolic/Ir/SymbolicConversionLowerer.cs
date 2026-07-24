@@ -211,52 +211,44 @@ internal static class SymbolicConversionLowerer {
         return false;
     }
     internal static bool TryLowerSupportedConversionTerm(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context,
+        BoundNode node,
         out SymbolicTerm term) {
+        var expression = node.Syntax;
+        var context = node.Context;
         if (expression is CheckedExpressionSyntax checkedExpression &&
             checkedExpression.IsKind(SyntaxKind.UncheckedExpression)) {
             if (checkedExpression.Expression is CastExpressionSyntax)
-                return TryLowerSupportedConversionTerm(checkedExpression.Expression, context, out term);
+                return TryLowerSupportedConversionTerm(BoundNode.Bind(checkedExpression.Expression, context), out term);
             term = null!;
             return false;
         }
-        if (expression is CastExpressionSyntax castExpression) {
-            if (context.SemanticModel.GetOperation(castExpression, context.CancellationToken) is
-                    Microsoft.CodeAnalysis.Operations.IConversionOperation { Conversion.IsIdentity: true } &&
-                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var identityOperand)) {
-                term = identityOperand;
-                return true;
-            }
-            if (IsIdentityPreservingReferenceConversion(castExpression.Expression, castExpression.Type, context) &&
-                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var referenceOperand) &&
-                referenceOperand.Kind == SmtValueKind.Reference) {
-                term = referenceOperand;
-                return true;
-            }
-            var sourceType = context.SemanticModel.GetTypeInfo(castExpression.Expression, context.CancellationToken)
-                .Type;
-            var targetType = context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type;
-            if (sourceType != null &&
-                targetType != null &&
-                IsValuePreservingIntegralConversion(sourceType, targetType) &&
-                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var operand) &&
-                operand.Kind == SmtValueKind.Int) {
-                term = operand;
-                return true;
-            }
-            if (sourceType != null &&
-                targetType != null &&
-                TryCreateNumericConversionTerm(castExpression, sourceType, targetType, context, out term))
-                return true;
+        if (expression is not CastExpressionSyntax cast)
+            return NoTerm(out term);
+        var operation = node.Operation as IConversionOperation;
+        var operand = SymbolicIrLowerer.LowerTerm(cast.Expression, context);
+        if (operation?.Conversion.IsIdentity == true && operand != null ||
+            operand is { Kind: SmtValueKind.Reference } &&
+            IsIdentityPreservingReferenceConversion(cast.Expression, cast.Type, context)) {
+            term = operand!;
+            return true;
         }
-        term = null!;
-        return false;
+        var sourceType = context.SemanticModel.GetTypeInfo(cast.Expression, context.CancellationToken).Type;
+        var targetType = context.SemanticModel.GetTypeInfo(cast.Type, context.CancellationToken).Type;
+        if (sourceType == null || targetType == null)
+            return NoTerm(out term);
+        if (operand is { Kind: SmtValueKind.Int } &&
+            IsValuePreservingIntegralConversion(sourceType, targetType)) {
+            term = operand;
+            return true;
+        }
+        return TryCreateNumericConversionTerm(cast, sourceType, targetType, operand, operation, context, out term);
     }
     private static bool TryCreateNumericConversionTerm(
         CastExpressionSyntax castExpression,
         ITypeSymbol sourceType,
         ITypeSymbol targetType,
+        SymbolicTerm? operand,
+        IConversionOperation? operation,
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         term = null!;
@@ -264,7 +256,7 @@ internal static class SymbolicConversionLowerer {
             !SymbolicTypeFacts.TryGetIntegralShape(targetType.SpecialType, out _, out _))
             return false;
         string operandIdentity;
-        if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var operand)) {
+        if (operand != null) {
             operandIdentity = SymbolicState.CreateProofTermKey(operand);
         }
         else {
@@ -274,10 +266,13 @@ internal static class SymbolicConversionLowerer {
             if (operandSymbol is not ILocalSymbol and not IParameterSymbol) return false;
             operandIdentity = "symbol:" + context.GetVariableName(operandSymbol);
         }
-        var isChecked = context.SemanticModel.GetOperation(castExpression, context.CancellationToken) is
-            Microsoft.CodeAnalysis.Operations.IConversionOperation { IsChecked: true };
-        term = new SymbolicNumericConversionTerm(operandIdentity, sourceType.SpecialType, targetType.SpecialType, isChecked);
+        term = new SymbolicNumericConversionTerm(
+            operandIdentity, sourceType.SpecialType, targetType.SpecialType, operation?.IsChecked == true);
         return true;
+    }
+    private static bool NoTerm(out SymbolicTerm term) {
+        term = null!;
+        return false;
     }
     private static bool IsValuePreservingIntegralConversion(ITypeSymbol sourceType, ITypeSymbol targetType) {
         if (sourceType is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } enumUnderlyingType })

@@ -1,29 +1,16 @@
 using SharpProof.ProofCore.Collections;
 namespace SharpProof.ProofCore.Smt;
-internal static class Z3RegexCharacterRanges {
+internal sealed partial class Z3RegexCompiler {
     private const int CacheLimit = 1024;
-    private const int MaxRangeCount = 512;
-    private static readonly TimeSpan ValidationTimeout = TimeSpan.FromMilliseconds(50);
     private static readonly BoundedConcurrentCache<(string Pattern, RegexOptions Options), CharacterRange[]> Cache =
         new(CacheLimit);
-    private static readonly Lazy<CharacterRange[]> DecimalDigits =
-        new(() => CreateOrEmpty((@"\d", RegexOptions.None)));
-    private static readonly Lazy<CharacterRange[]> Whitespace =
-        new(() => CreateOrEmpty((@"\s", RegexOptions.None)));
-    private static readonly Lazy<CharacterRange[]> Words =
-        new(() => CreateOrEmpty((@"\w", RegexOptions.None)));
-    internal static CharacterRange[] Word => Words.Value;
+    internal static CharacterRange[] Word => GetOrEmpty(@"\w");
     internal static bool TryGetShorthand(char escaped, out CharacterRange[] ranges) {
-        var baseRanges = escaped switch {
-            'd' or 'D' => DecimalDigits.Value,
-            's' or 'S' => Whitespace.Value,
-            'w' or 'W' => Words.Value,
-            _ => null,
-        };
-        if (baseRanges is null) {
+        if (escaped is not ('d' or 'D' or 's' or 'S' or 'w' or 'W')) {
             ranges = [];
             return false;
         }
+        var baseRanges = GetOrEmpty("\\" + char.ToLowerInvariant(escaped));
         ranges = escaped is 'D' or 'S' or 'W' ? Complement(baseRanges) : baseRanges;
         return true;
     }
@@ -31,7 +18,7 @@ internal static class Z3RegexCharacterRanges {
         TryGet(atomPattern, RegexOptions.None, out ranges);
     internal static bool TryGet(string atomPattern, RegexOptions options, out CharacterRange[] ranges) =>
         TryCreate(() => Cache.GetOrAdd((atomPattern, options), Create), out ranges) &&
-               ranges.Length is > 0 and <= MaxRangeCount;
+               ranges.Length is > 0 and <= MaxCharacterClassRangeCount;
     internal static CharacterRange[] Merge(IEnumerable<CharacterRange> ranges) {
         var ordered = ranges
             .OrderBy(static range => range.Start)
@@ -91,8 +78,8 @@ internal static class Z3RegexCharacterRanges {
         if (rangeStart is { } finalStart) ranges.Add(new CharacterRange(finalStart, previous));
         return [.. ranges];
     }
-    private static CharacterRange[] CreateOrEmpty((string Pattern, RegexOptions Options) key) =>
-        TryCreate(() => Create(key), out var ranges) ? ranges : [];
+    private static CharacterRange[] GetOrEmpty(string pattern) =>
+        TryCreate(() => Cache.GetOrAdd((pattern, RegexOptions.None), Create), out var ranges) ? ranges : [];
     private static bool TryCreate(Func<CharacterRange[]> create, out CharacterRange[] ranges) {
         try {
             ranges = create();

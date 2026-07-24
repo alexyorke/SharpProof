@@ -29,11 +29,11 @@ internal static class SymbolicStatefulAssignmentTransfer {
             SymbolicStateValueFacts.IsKnownNullableHasValue(state, target))
             return true;
         SymbolicStateValueFacts.TryGetCurrentValue(state, target, out var previousValue);
-        SymbolicOperationTransitionResult transition;
+        bool applied;
         if (SymbolicStateValueFacts.IsKnownNullReference(state, target) ||
             SymbolicStateValueFacts.IsKnownNullableNoValue(state, target))
-            transition = SymbolicOperationTransfer.ApplyAssignment(
-                state,
+            applied = SymbolicOperationTransfer.ApplyAssignment(
+                ref state,
                 target,
                 assignment.Value.Syntax,
                 semanticModel,
@@ -43,8 +43,8 @@ internal static class SymbolicStatefulAssignmentTransfer {
                 postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic,
                 preInvalidationTargetValue: previousValue);
         else if (assignment.Value.Syntax is ExpressionSyntax right)
-            transition = SymbolicOperationTransfer.ApplyCoalesceAssignment(
-                state,
+            applied = SymbolicOperationTransfer.ApplyCoalesceAssignment(
+                ref state,
                 target,
                 right,
                 semanticModel,
@@ -52,10 +52,7 @@ internal static class SymbolicStatefulAssignmentTransfer {
                 "ir.path.coalesce-assignment");
         else
             return false;
-        if (!transition.IsExact)
-            return false;
-        state = transition.State;
-        return true;
+        return applied;
     }
     internal static bool TryApplyDeconstructionAssignment(
         ref SymbolicState state,
@@ -124,13 +121,11 @@ internal static class SymbolicStatefulAssignmentTransfer {
         }
         if (bindings.Count == 0)
             return true;
-        var transition = SymbolicOperationTransfer.ApplyBindings(
-            state,
+        SymbolicOperationTransfer.ApplyBindings(
+            ref state,
             bindings.ToImmutable(),
             right,
             "ir.path.prior-statement.tuple-target");
-        if (transition.IsExact)
-            state = transition.State;
         return true;
     }
     private static ISymbol? ResolveDeconstructionTarget(
@@ -217,18 +212,14 @@ internal static class SymbolicStatefulAssignmentTransfer {
                     mathematical)
                 : mathematical;
         }
-        var transition = SymbolicOperationTransfer.ApplyComputedUpdate(
-            state,
+        return SymbolicOperationTransfer.ApplyComputedUpdate(
+            ref state,
             target,
             updated,
             source,
             semanticModel,
             cancellationToken,
             provenance);
-        if (!transition.IsExact)
-            return false;
-        state = transition.State;
-        return true;
     }
     private static bool TryEvaluateConstantUpdate(
         long left,

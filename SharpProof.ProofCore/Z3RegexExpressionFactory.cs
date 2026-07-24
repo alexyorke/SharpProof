@@ -1,8 +1,6 @@
 namespace SharpProof.ProofCore.Smt;
-internal sealed class Z3RegexExpressionFactory {
-    private readonly Context _context;
+internal sealed partial class Z3RegexCompiler {
     private ReExpr? _anyCharacter;
-    internal Z3RegexExpressionFactory(Context context) => _context = context ?? throw new ArgumentNullException(nameof(context));
     internal ReExpr AnyString() => _context.MkStar(AnyCharacter());
     internal ReExpr OptionalFinalNewline() => _context.MkOption(Literal("\n"));
     internal ReExpr AnyCharacter() {
@@ -40,4 +38,17 @@ internal sealed class Z3RegexExpressionFactory {
     internal ReExpr Concat(ReExpr left, ReExpr right) => _context.MkConcat(left, right);
     internal ReExpr Concat(params ReExpr[] expressions) => _context.MkConcat(expressions);
     internal ReExpr Literal(string value) => _context.MkToRe(_context.MkString(value));
+}
+internal sealed class Z3RegexExpressionFactory {
+    private readonly Z3RegexCompiler _compiler;
+    internal Z3RegexExpressionFactory(Context context) => _compiler = new(context);
+    internal ReExpr AnyString() => _compiler.AnyString();
+    internal ReExpr OptionalFinalNewline() => _compiler.OptionalFinalNewline();
+    internal ReExpr AnyCharacter() => _compiler.AnyCharacter();
+    internal ReExpr CharacterRange(char start, char end) => _compiler.CharacterRange(start, end);
+    internal ReExpr Dot(bool singleline) => _compiler.Dot(singleline);
+    internal ReExpr ExactRepeat(ReExpr regex, uint count) => _compiler.ExactRepeat(regex, count);
+    internal ReExpr Concat(ReExpr left, ReExpr right) => _compiler.Concat(left, right);
+    internal ReExpr Concat(params ReExpr[] expressions) => _compiler.Concat(expressions);
+    internal ReExpr Literal(string value) => _compiler.Literal(value);
 }

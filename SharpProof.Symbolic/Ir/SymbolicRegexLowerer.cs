@@ -3,6 +3,8 @@ internal static class SymbolicRegexLowerer {
     private const string RegexMetadataName = "System.Text.RegularExpressions.Regex";
     private const string GeneratedRegexAttributeMetadataName =
         "System.Text.RegularExpressions.GeneratedRegexAttribute";
+    private readonly record struct RegexSource(string Pattern, RegexOptions Options);
+    private readonly record struct RegexInvocation(ExpressionSyntax Input, RegexSource Source);
     internal static bool TryLowerRegexMatchSuccessCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -98,97 +100,88 @@ internal static class SymbolicRegexLowerer {
                 IInvocationOperation operation ||
             operation.TargetMethod.Name is not ("IsMatch" or "Match" or "Matches") ||
             !IsRegexType(operation.TargetMethod.ContainingType) ||
-            !TryResolveRegexInvocation(invocation, operation, context, out var inputExpression, out var pattern, out var options) ||
-            !SymbolicStringLowerer.TryLowerStringTerm(inputExpression, context, out var input))
+            ResolveRegexInvocation(invocation, operation, context) is not { } resolved ||
+            !SymbolicStringLowerer.TryLowerStringTerm(resolved.Input, context, out var input))
             return false;
         predicate = SymbolicIrLowerer.CreateFactCondition(
             new SymbolicStringPredicateAtom(SymbolicStringPredicateKind.RegexMatch, input,
-                new SymbolicStringConstantTerm(pattern), options),
+                new SymbolicStringConstantTerm(resolved.Source.Pattern), resolved.Source.Options),
             invocation,
             "ir.regex." + operation.TargetMethod.Name.ToLowerInvariant());
-        if (SymbolicReferenceLowerer.TryLowerReferenceTerm(inputExpression, context, out var inputReference))
-            evaluation = SymbolicIrLowerer.CreateReferenceNullCondition(inputReference, false, inputExpression, "ir.regex.input-non-null");
+        if (SymbolicIrLowerer.TryLowerReferenceTerm(resolved.Input, context, out var inputReference))
+            evaluation = SymbolicIrLowerer.CreateReferenceNullCondition(
+                inputReference, false, resolved.Input, "ir.regex.input-non-null");
         return true;
     }
     private static SymbolicCondition CombineRegexEvaluationAndValue(SymbolicCondition? evaluation, SymbolicCondition value)
         => evaluation == null
             ? value
             : new SymbolicBinaryCondition(SymbolicConditionOperator.And, evaluation, value);
-    private static bool TryResolveRegexInvocation(
+    private static RegexInvocation? ResolveRegexInvocation(
         InvocationExpressionSyntax invocation,
         IInvocationOperation operation,
-        SymbolicLoweringContext context,
-        out ExpressionSyntax inputExpression,
-        out string pattern,
-        out RegexOptions options) {
-        inputExpression = null!;
-        pattern = string.Empty;
-        options = RegexOptions.None;
+        SymbolicLoweringContext context) {
         if (operation.TargetMethod.IsStatic) {
             if (operation.Arguments.Length is not 2 and not 3 ||
                 operation.Arguments[0].Value.Syntax is not ExpressionSyntax input ||
-                operation.Arguments[1].Value.Syntax is not ExpressionSyntax patternExpression ||
-                !TryGetConstantString(patternExpression, context, out pattern))
-                return false;
-            if (operation.Arguments.Length == 3 &&
-                (operation.Arguments[2].Value.Syntax is not ExpressionSyntax optionsExpression ||
-                 !SymbolicStringLowerer.TryGetRegexOptions(optionsExpression, context, out options)))
-                return false;
-            inputExpression = input;
-            return true;
+                ResolveRegexArguments(operation.Arguments, 1, context) is not { } source)
+                return null;
+            return new RegexInvocation(input, source);
         }
         if (operation.Instance?.Syntax is not ExpressionSyntax receiver ||
             operation.Arguments.Length is not 1 and not 2 ||
             operation.Arguments[0].Value.Syntax is not ExpressionSyntax instanceInput ||
             operation.Arguments.Length == 2 && !IsConstantZero(operation.Arguments[1].Value.Syntax, context) ||
-            !TryResolveRegexSource(receiver, invocation, context, out pattern, out options))
-            return false;
-        inputExpression = instanceInput;
-        return true;
+            ResolveRegexSource(receiver, invocation, context) is not { } instanceSource)
+            return null;
+        return new RegexInvocation(instanceInput, instanceSource);
     }
-    private static bool TryResolveRegexSource(
+    private static RegexSource? ResolveRegexArguments(
+        ImmutableArray<IArgumentOperation> arguments,
+        int patternIndex,
+        SymbolicLoweringContext context) {
+        var optionsIndex = patternIndex + 1;
+        if (arguments.Length is var count &&
+            count != optionsIndex &&
+            count != optionsIndex + 1 ||
+            arguments[patternIndex].Value.Syntax is not ExpressionSyntax patternExpression ||
+            !SymbolicStringLowerer.TryGetConstantString(patternExpression, context, out var pattern))
+            return null;
+        var options = RegexOptions.None;
+        if (arguments.Length > optionsIndex &&
+            (arguments[optionsIndex].Value.Syntax is not ExpressionSyntax optionsExpression ||
+             !SymbolicStringLowerer.TryGetRegexOptions(optionsExpression, context, out options)))
+            return null;
+        return new RegexSource(pattern, options);
+    }
+    private static RegexSource? ResolveRegexSource(
         ExpressionSyntax expression,
         SyntaxNode useSite,
-        SymbolicLoweringContext context,
-        out string pattern,
-        out RegexOptions options) {
-        pattern = string.Empty;
-        options = RegexOptions.None;
+        SymbolicLoweringContext context) {
         expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         if (expression is ObjectCreationExpressionSyntax creation)
-            return TryResolveRegexObjectCreation(creation, context, out pattern, out options);
+            return ResolveRegexObjectCreation(creation, context);
         if (expression is InvocationExpressionSyntax factoryInvocation &&
             context.SemanticModel.GetOperation(factoryInvocation, context.CancellationToken) is
-                IInvocationOperation factoryOperation &&
-            TryResolveGeneratedRegexFactory(factoryOperation.TargetMethod, out pattern, out options))
-            return true;
-        if (context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol is ILocalSymbol local)
-            return TryResolveLocalRegexSource(local, useSite, context, out pattern, out options);
-        if (context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol is IFieldSymbol field)
-            return TryResolveReadonlyRegexFieldSource(field, context, out pattern, out options);
-        return false;
+                IInvocationOperation factoryOperation)
+            return ResolveGeneratedRegexFactory(factoryOperation.TargetMethod);
+        return context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol switch {
+            ILocalSymbol local => ResolveLocalRegexSource(local, useSite, context),
+            IFieldSymbol field => ResolveReadonlyRegexFieldSource(field, context),
+            _ => null
+        };
     }
-    private static bool TryResolveRegexObjectCreation(
+    private static RegexSource? ResolveRegexObjectCreation(
         ObjectCreationExpressionSyntax creation,
-        SymbolicLoweringContext context,
-        out string pattern,
-        out RegexOptions options) {
-        pattern = string.Empty;
-        options = RegexOptions.None;
+        SymbolicLoweringContext context) {
         if (context.SemanticModel.GetOperation(creation, context.CancellationToken) is not
                 IObjectCreationOperation operation ||
             !IsRegexType(operation.Constructor?.ContainingType) ||
-            operation.Arguments.Length is not 1 and not 2 ||
-            operation.Arguments[0].Value.Syntax is not ExpressionSyntax patternExpression ||
-            !TryGetConstantString(patternExpression, context, out pattern))
-            return false;
-        return operation.Arguments.Length == 1 ||
-               operation.Arguments[1].Value.Syntax is ExpressionSyntax optionsExpression &&
-               SymbolicStringLowerer.TryGetRegexOptions(optionsExpression, context, out options);
+            operation.Arguments.Length is not 1 and not 2)
+            return null;
+        return ResolveRegexArguments(operation.Arguments, 0, context);
     }
-    private static bool TryResolveGeneratedRegexFactory(IMethodSymbol method, out string pattern, out RegexOptions options) {
-        pattern = string.Empty;
-        options = RegexOptions.None;
+    private static RegexSource? ResolveGeneratedRegexFactory(IMethodSymbol method) {
         foreach (var attribute in method.GetAttributes()) {
             if (!string.Equals(
                     SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
@@ -197,22 +190,20 @@ internal static class SymbolicRegexLowerer {
                 attribute.ConstructorArguments.Length == 0 ||
                 attribute.ConstructorArguments[0].Value is not string generatedPattern)
                 continue;
-            pattern = generatedPattern;
+            var options = RegexOptions.None;
             if (attribute.ConstructorArguments.Length > 1 &&
                 attribute.ConstructorArguments[1].Value is int rawOptions)
                 options = (RegexOptions)rawOptions;
-            return SymbolicStringLowerer.CanRepresentRegexOptions(options);
+            return SymbolicStringLowerer.CanRepresentRegexOptions(options)
+                ? new RegexSource(generatedPattern, options)
+                : null;
         }
-        return false;
+        return null;
     }
-    private static bool TryResolveLocalRegexSource(
+    private static RegexSource? ResolveLocalRegexSource(
         ILocalSymbol local,
         SyntaxNode useSite,
-        SymbolicLoweringContext context,
-        out string pattern,
-        out RegexOptions options) {
-        pattern = string.Empty;
-        options = RegexOptions.None;
+        SymbolicLoweringContext context) {
         if (local.DeclaringSyntaxReferences.Length != 1 ||
             local.DeclaringSyntaxReferences[0].GetSyntax(context.CancellationToken) is not VariableDeclaratorSyntax {
                 Initializer.Value: { } initializer
@@ -221,33 +212,29 @@ internal static class SymbolicRegexLowerer {
             useSite.FirstAncestorOrSelf<StatementSyntax>() is not { } useStatement ||
             declaration.Parent is not BlockSyntax block ||
             !ReferenceEquals(block, useStatement.Parent))
-            return false;
+            return null;
         var declarationIndex = block.Statements.IndexOf(declaration);
         var useIndex = block.Statements.IndexOf(useStatement);
         if (declarationIndex < 0 || useIndex <= declarationIndex ||
             SymbolicSourcePredicateLowerer.CountLocalSymbolReferences(useStatement, local, context) != 1)
-            return false;
+            return null;
         for (var index = declarationIndex + 1; index < useIndex; index++)
             if (SymbolicSourcePredicateLowerer.CountLocalSymbolReferences(block.Statements[index], local, context) != 0)
-                return false;
-        return TryResolveRegexSource(initializer, declarator, context, out pattern, out options);
+                return null;
+        return ResolveRegexSource(initializer, declarator, context);
     }
-    private static bool TryResolveReadonlyRegexFieldSource(
+    private static RegexSource? ResolveReadonlyRegexFieldSource(
         IFieldSymbol field,
-        SymbolicLoweringContext callerContext,
-        out string pattern,
-        out RegexOptions options) {
-        pattern = string.Empty;
-        options = RegexOptions.None;
+        SymbolicLoweringContext callerContext) {
         if (!field.IsReadOnly ||
             !IsRegexType(field.Type) ||
             FieldHasAssignmentOutsideInitializer(field, callerContext))
-            return false;
+            return null;
         var declarator = field.DeclaringSyntaxReferences
             .Select(reference => reference.GetSyntax(callerContext.CancellationToken))
             .OfType<VariableDeclaratorSyntax>()
             .FirstOrDefault(static syntax => syntax.Initializer?.Value != null);
-        if (declarator?.Initializer?.Value is not { } initializer) return false;
+        if (declarator?.Initializer?.Value is not { } initializer) return null;
         var semanticModel = callerContext.Compilation.GetSemanticModel(initializer.SyntaxTree);
         var initializerContext = new SymbolicLoweringContext(
             semanticModel,
@@ -259,7 +246,7 @@ internal static class SymbolicRegexLowerer {
             callerContext.InlineDepth,
             callerContext.SymbolSubstitutions,
             callerContext.InvocationTermTypeResolver);
-        return TryResolveRegexSource(initializer, declarator, initializerContext, out pattern, out options);
+        return ResolveRegexSource(initializer, declarator, initializerContext);
     }
     private static bool FieldHasAssignmentOutsideInitializer(IFieldSymbol field, SymbolicLoweringContext context) {
         foreach (var typeReference in field.ContainingType.DeclaringSyntaxReferences) {
@@ -273,23 +260,11 @@ internal static class SymbolicRegexLowerer {
         }
         return false;
     }
-    private static bool TryGetConstantString(ExpressionSyntax expression, SymbolicLoweringContext context, out string value) {
-        var constant = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
-        if (constant is { HasValue: true, Value: string stringValue }) {
-            value = stringValue;
-            return true;
-        }
-        value = string.Empty;
-        return false;
-    }
-    private static bool IsConstantZero(SyntaxNode expression, SymbolicLoweringContext context) {
-        if (expression is not ExpressionSyntax expressionSyntax) return false;
-        var constant = context.SemanticModel.GetConstantValue(expressionSyntax, context.CancellationToken);
-        return constant.HasValue &&
-               constant.Value != null &&
-               SymbolicLoweringValueFacts.TryGetIntegralConstant(constant.Value, out var value) &&
-               value == 0;
-    }
+    private static bool IsConstantZero(SyntaxNode expression, SymbolicLoweringContext context) =>
+        expression is ExpressionSyntax expressionSyntax &&
+        SymbolicLoweringValueFacts.TryGetIntegralConstant(
+            expressionSyntax, context.SemanticModel, context.CancellationToken, out var value) &&
+        value == 0;
     private static bool IsRegexType(ITypeSymbol? type) =>
         string.Equals(type?.ToDisplayString(), RegexMetadataName, StringComparison.Ordinal);
 }

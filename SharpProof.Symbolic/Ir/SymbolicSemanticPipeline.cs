@@ -36,7 +36,7 @@ internal static class SymbolicSemanticPipeline {
             "pattern");
     internal static SymbolicLoweringResult<SymbolicTerm> LowerReferenceTerm(ExpressionSyntax expression, SymbolicLoweringContext context) =>
         LowerExactOrUnsupported(
-            SymbolicReferenceLowerer.TryLowerReferenceTerm(expression, context, out var term) ? term : null,
+            SymbolicIrLowerer.TryLowerReferenceTerm(expression, context, out var term) ? term : null,
             expression,
             "reference-term");
     internal static SymbolicLoweringResult<SymbolicTerm> LowerBooleanValueTerm(ExpressionSyntax expression,
@@ -96,7 +96,8 @@ internal static class SymbolicSemanticPipeline {
         var condition = (SymbolicCondition)new SymbolicNotCondition(inRangeCondition);
         foreach (var candidate in elementAccess.ArgumentList.Arguments
                      .SelectMany(static argument => argument.Expression.DescendantNodesAndSelf())) {
-            if (!TryGetIndexConstructionValueExpression(candidate, context, out var valueExpression) ||
+            if (!SymbolicIndexingLowerer.TryGetIndexConstructionValueExpression(
+                    candidate, context, out var valueExpression) ||
                 LowerTerm(valueExpression, context) is not
                     { IsExact: true, Value: { Kind: SmtValueKind.Int } value })
                 continue;
@@ -111,7 +112,8 @@ internal static class SymbolicSemanticPipeline {
     internal static SymbolicLoweringResult<SymbolicCondition> LowerIndexConstructionArgumentOutOfRangeCondition(
         ExpressionSyntax indexConstructionExpression,
         SymbolicLoweringContext context) {
-        if (!TryGetIndexConstructionValueExpression(indexConstructionExpression, context, out var valueExpression) ||
+        if (!SymbolicIndexingLowerer.TryGetIndexConstructionValueExpression(
+                indexConstructionExpression, context, out var valueExpression) ||
             LowerTerm(valueExpression, context) is not
                 { IsExact: true, Value: { Kind: SmtValueKind.Int } value })
             return Unsupported<SymbolicCondition>(indexConstructionExpression, "index-construction-argument-out-of-range");
@@ -120,43 +122,6 @@ internal static class SymbolicSemanticPipeline {
             indexConstructionExpression,
             "ir.runtime-hazard.index.constructor-argument-out-of-range"));
         return Exact(condition, indexConstructionExpression, "index-construction-argument-out-of-range");
-    }
-    private static bool TryGetIndexConstructionValueExpression(
-        SyntaxNode candidate,
-        SymbolicLoweringContext context,
-        out ExpressionSyntax valueExpression) {
-        if (candidate is PrefixUnaryExpressionSyntax prefix &&
-            (prefix.IsKind(SyntaxKind.IndexExpression) ||
-             prefix.OperatorToken.IsKind(SyntaxKind.CaretToken))) {
-            valueExpression = prefix.Operand;
-            return true;
-        }
-        if (candidate is InvocationExpressionSyntax invocation &&
-            context.SemanticModel.GetOperation(invocation, context.CancellationToken) is IInvocationOperation {
-                TargetMethod.Name: "FromStart" or "FromEnd",
-                TargetMethod.ContainingType: { } containingType
-            } invocationOperation &&
-            SymbolicTypeFacts.IsSystemIndexType(containingType) &&
-            SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out valueExpression))
-            return true;
-        if (candidate is ObjectCreationExpressionSyntax objectCreation &&
-            context.SemanticModel.GetOperation(objectCreation, context.CancellationToken) is IObjectCreationOperation {
-                Constructor.ContainingType: { } objectType
-            } objectCreationOperation &&
-            SymbolicTypeFacts.IsSystemIndexType(objectType)) {
-            var argument = objectCreationOperation.Arguments
-                .FirstOrDefault(static item => item.Parameter?.Ordinal == 0);
-            if (argument?.Syntax is ArgumentSyntax argumentSyntax) {
-                valueExpression = argumentSyntax.Expression;
-                return true;
-            }
-            if (argument?.Value.Syntax is ExpressionSyntax argumentExpression) {
-                valueExpression = argumentExpression;
-                return true;
-            }
-        }
-        valueExpression = null!;
-        return false;
     }
     internal static SymbolicLoweringResult<SymbolicCondition> LowerBuiltInElementAccessInRangeCondition(
         ExpressionSyntax receiverExpression,

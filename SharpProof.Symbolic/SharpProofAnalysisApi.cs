@@ -177,38 +177,20 @@ public sealed class SharpProofAnalysisSession : IDisposable {
     }
     private SharpProofAnalysisResult Execute(SharpProofAnalysisRequest request, CancellationToken cancellationToken) {
         try {
-            ValidateRequest(request);
+            var target = ResolveRequest(request, cancellationToken);
             if (TryCreateSourceError(out var sourceError))
                 return Failed(request.Target, sourceError);
             using var smtBudgetScope = _ownedSmtAnalysis.BeginMethodBudgetScope();
-            MethodEffects? effects = null;
-            var unknowns = ImmutableArray.CreateBuilder<SharpProofUnknownReason>();
-            var proofFacts = ImmutableArray.CreateBuilder<SharpProofProofFact>();
-            var hazards = ImmutableArray.CreateBuilder<SharpProofHazard>();
-            var truncations = ImmutableArray.CreateBuilder<SharpProofTruncationReason>();
-            string? complexity = null;
-            if ((request.Facets & SharpProofAnalysisFacet.Effects) != 0) {
-                effects = AnalyzeMethodEffects(request.Target, cancellationToken);
-                unknowns.AddRange(effects.UnknownReasons);
-            }
+            var result = new AnalysisResultAccumulator(request.Target);
+            if ((request.Facets & SharpProofAnalysisFacet.Effects) != 0)
+                result.Add(AnalyzeMethodEffects(target, cancellationToken));
             if ((request.Facets & SharpProofAnalysisFacet.ProofFacts) != 0)
-                AnalyzeProofFacts(request, proofFacts, unknowns, truncations, cancellationToken);
+                AnalyzeProofFacts(request, target, result, cancellationToken);
             if ((request.Facets & SharpProofAnalysisFacet.RuntimeHazards) != 0)
-                AnalyzeHazards(request.Target, hazards, unknowns, truncations, cancellationToken);
+                AnalyzeHazards(target, result, cancellationToken);
             if ((request.Facets & SharpProofAnalysisFacet.Complexity) != 0)
-                complexity = AnalyzeComplexity(request.Target, unknowns, cancellationToken);
-            return new SharpProofAnalysisResult(
-                request.Target,
-                unknowns.Count == 0 && truncations.Count == 0
-                    ? SharpProofQueryStatus.Succeeded
-                    : SharpProofQueryStatus.Unknown,
-                effects,
-                proofFacts.ToImmutable(),
-                hazards.ToImmutable(),
-                complexity,
-                [.. unknowns.Distinct()],
-                truncations.ToImmutable(),
-                null);
+                AnalyzeComplexity(target, result);
+            return result.Build();
         }
         catch (Exception exception) when (!SymbolicErrorClassifier.IsFatal(exception)) {
             var error = SymbolicErrorClassifier.FromException(exception);
@@ -227,45 +209,79 @@ public sealed class SharpProofAnalysisSession : IDisposable {
         [],
         [],
         error);
-    private void ValidateRequest(SharpProofAnalysisRequest request) {
+    private sealed class AnalysisResultAccumulator(SharpProofTarget target) {
+        private readonly List<SharpProofProofFact> _facts = [];
+        private readonly List<SharpProofHazard> _hazards = [];
+        private readonly List<SharpProofUnknownReason> _unknowns = [];
+        private readonly List<SharpProofTruncationReason> _truncations = [];
+        private MethodEffects? _effects;
+        private string? _complexity;
+        internal void Add(MethodEffects effects) {
+            _effects = effects;
+            _unknowns.AddRange(effects.UnknownReasons);
+        }
+        internal void Add(SymbolicConditionProofResult proof) {
+            _facts.Add(Project(proof));
+            if (proof.TruthValue == SymbolicTruthValue.Unknown)
+                _unknowns.Add(Convert(SymbolicUnknownReasonTaxonomy.ForProof(
+                    SymbolicUnknownReason.Unknown, proof.Reason)));
+            Add(proof.AnalysisTruncation);
+        }
+        internal void Add(IReadOnlyList<SymbolicProgramPointAnalysis> points) {
+            var hasUnknown = points.Any(static point => point.Reachability == SymbolicReachability.Unknown);
+            _facts.Add(new SharpProofProofFact(
+                "invariant",
+                hasUnknown ? "Unknown" : "Proven",
+                "merged_symbolic_invariant",
+                SymbolicMergedPathFactMerger.MergeInvariantText(points),
+                null));
+            _unknowns.AddRange(points
+                .Where(static point => point.Reachability == SymbolicReachability.Unknown)
+                .Select(static point => Convert(SymbolicUnknownReasonTaxonomy.ForProof(
+                    SymbolicUnknownReason.Unknown, point.ReachabilityReason))));
+            Add(SymbolicAnalysisTruncationInfo.Combine(points.Select(static point => point.AnalysisTruncation)));
+        }
+        internal void Add(SymbolicRuntimeHazardQueryResult result) {
+            _hazards.AddRange(result.Hazards.Select(static hazard => new SharpProofHazard(
+                hazard.Kind.ToString(), hazard.Status.ToString(), hazard.StatusReason, hazard.ExceptionType,
+                hazard.OperationText, hazard.SpanStart, hazard.SpanEnd,
+                FormatCounterexample(hazard.TriggerWitness))));
+            _unknowns.AddRange(result.Hazards
+                .Where(static hazard => hazard.Status is SymbolicRuntimeHazardStatus.Unknown or
+                    SymbolicRuntimeHazardStatus.Unsupported)
+                .Select(static hazard => Convert(hazard.UnknownReasonInfo)));
+            Add(result.AnalysisTruncation);
+        }
+        internal void Add(SymbolicComplexityResult result) {
+            _complexity = result.Complexity.Text;
+            _unknowns.AddRange(result.UnknownReasons.Select(static reason =>
+                Convert(SymbolicUnknownReasonTaxonomy.ForComplexity(reason))));
+        }
+        private void Add(SymbolicAnalysisTruncationInfo truncation) =>
+            _truncations.AddRange(truncation.Events.Select(static item => new SharpProofTruncationReason(
+                item.Code, item.Limit, item.Observed, item.Provenance, item.SourceSpanStart)));
+        internal SharpProofAnalysisResult Build() => new(
+            target,
+            _unknowns.Count == 0 && _truncations.Count == 0
+                ? SharpProofQueryStatus.Succeeded
+                : SharpProofQueryStatus.Unknown,
+            _effects,
+            [.. _facts],
+            [.. _hazards],
+            _complexity,
+            [.. _unknowns.Distinct()],
+            [.. _truncations],
+            null);
+    }
+    private ResolvedQueryTarget ResolveRequest(
+        SharpProofAnalysisRequest request,
+        CancellationToken cancellationToken) {
         var target = request.Target ?? throw new ArgumentException("A query target is required.", nameof(request));
-        if (!Enum.IsDefined(typeof(SharpProofTargetKind), target.Kind))
-            throw new ArgumentException("The target kind is not defined.", nameof(request));
+        var resolved = ResolvedQueryTarget.Create(_source, target, cancellationToken, nameof(request));
         if (request.Facets == SharpProofAnalysisFacet.None ||
             (request.Facets & ~SharpProofAnalysisFacet.All) != 0)
             throw new ArgumentException("At least one defined analysis facet is required.", nameof(request));
-        var sourceText = _source.SyntaxTree.GetText();
-        switch (target.Kind) {
-            case SharpProofTargetKind.Point:
-                RequirePositive(target.Line, "Point targets require a positive line.");
-                if (target.Column is { } column && column <= 0)
-                    throw new ArgumentOutOfRangeException(nameof(request), "Point target columns must be positive.");
-                ValidateLine(target.Line!.Value, sourceText);
-                var pointLine = sourceText.Lines[target.Line.Value - 1];
-                if ((target.Column ?? 1) > pointLine.Span.Length + 1)
-                    throw new ArgumentOutOfRangeException(nameof(request), "Point target columns must be within the selected line.");
-                break;
-            case SharpProofTargetKind.Line:
-                RequirePositive(target.Line, "Line targets require a positive line.");
-                ValidateLine(target.Line!.Value, sourceText);
-                break;
-            case SharpProofTargetKind.Position:
-                if (target.Position is not { } position || position < 0 || position > sourceText.Length)
-                    throw new ArgumentOutOfRangeException(nameof(request),
-                        "Position targets require a position within the source text span.");
-                break;
-            case SharpProofTargetKind.Span:
-                if (target.SpanStart is not { } spanStart || spanStart < 0 ||
-                    target.SpanEnd is not { } spanEnd || spanEnd <= spanStart || spanEnd > sourceText.Length)
-                    throw new ArgumentOutOfRangeException(nameof(request),
-                        "Span targets require non-negative bounds with span-end greater than span-start.");
-                break;
-            case SharpProofTargetKind.AllLines:
-                if (sourceText.Length == 0)
-                    throw new ArgumentOutOfRangeException(nameof(request), "All-lines targets require nonempty source text.");
-                break;
-        }
-        if (string.IsNullOrWhiteSpace(request.Condition)) return;
+        if (string.IsNullOrWhiteSpace(request.Condition)) return resolved;
         if ((request.Facets & SharpProofAnalysisFacet.ProofFacts) == 0)
             throw new ArgumentException("A proof condition requires the proof-facts facet.", nameof(request));
         if (target.Kind != SharpProofTargetKind.Point)
@@ -275,15 +291,7 @@ public sealed class SharpProofAnalysisSession : IDisposable {
             diagnostic.Severity == DiagnosticSeverity.Error);
         if (parseError != null)
             throw new FormatException("The proof condition is not valid C#: " + parseError.GetMessage());
-        return;
-        static void RequirePositive(int? value, string message) {
-            if (value is not { } actual || actual <= 0)
-                throw new ArgumentOutOfRangeException(nameof(request), message);
-        }
-        static void ValidateLine(int line, SourceText text) {
-            if (line > text.Lines.Count)
-                throw new ArgumentOutOfRangeException(nameof(request), "Target lines must be within the source text.");
-        }
+        return resolved;
     }
     private bool TryCreateSourceError(out SharpProofError error) {
         var errors = !_sourceSyntaxErrors.IsDefaultOrEmpty
@@ -308,14 +316,11 @@ public sealed class SharpProofAnalysisSession : IDisposable {
             details);
         return true;
     }
-    private MethodEffects AnalyzeMethodEffects(SharpProofTarget target, CancellationToken cancellationToken) {
-        if (target.Kind is SharpProofTargetKind.Span or SharpProofTargetKind.AllLines)
-            return AnalyzeSyntaxTree(_source.SyntaxTree, _source.Compilation, target, cancellationToken);
-        return SymbolicMethodLikeQueryDispatcher.Execute(
-            _source,
-            target,
+    private MethodEffects AnalyzeMethodEffects(ResolvedQueryTarget target, CancellationToken cancellationToken) {
+        if (target.Target.Kind is SharpProofTargetKind.Span or SharpProofTargetKind.AllLines)
+            return AnalyzeSyntaxTree(target, cancellationToken);
+        return target.Execute(
             "Method-effect analysis supports point, position, line, span, or all-lines targets.",
-            static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true),
             (resolved, compilation, token) => {
                 if (resolved.MethodSymbol == null)
                     throw new ArgumentException("Could not resolve the target method.");
@@ -323,53 +328,40 @@ public sealed class SharpProofAnalysisSession : IDisposable {
                     resolved.MethodSymbol,
                     resolved.Declaration,
                     resolved.SemanticModel);
-            },
-            cancellationToken);
+            });
     }
-    private MethodEffects AnalyzeSyntaxTree(
-        SyntaxTree syntaxTree,
-        Compilation compilation,
-        SharpProofTarget target,
-        CancellationToken cancellationToken) {
-        var root = syntaxTree.GetRoot(cancellationToken);
-        var declarations = root.DescendantNodesAndSelf()
+    private MethodEffects AnalyzeSyntaxTree(ResolvedQueryTarget target, CancellationToken cancellationToken) {
+        var declarations = target.Root.DescendantNodesAndSelf()
             .Where(static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true));
-        if (target.Kind == SharpProofTargetKind.Span) {
-            var start = target.SpanStart ?? throw new ArgumentException("Span start is required.");
-            var end = target.SpanEnd ?? throw new ArgumentException("Span end is required.");
-            if (start < 0 || end < start || end > root.FullSpan.End)
-                throw new ArgumentOutOfRangeException(nameof(target), "The target span must be within the source.");
-            var span = TextSpan.FromBounds(start, end);
+        if (target.Target.Kind == SharpProofTargetKind.Span) {
+            var span = target.Span!.Value;
             declarations = declarations.Where(declaration => span.IsEmpty
-                ? declaration.FullSpan.Contains(start)
+                ? declaration.FullSpan.Contains(span.Start)
                 : declaration.FullSpan.OverlapsWith(span));
         }
-        var model = compilation.GetSemanticModel(syntaxTree);
-        var session = new MethodEffectAnalysisSession(compilation, cancellationToken, smtAnalysis: _ownedSmtAnalysis);
+        var session = new MethodEffectAnalysisSession(
+            target.Source.Compilation, cancellationToken, smtAnalysis: _ownedSmtAnalysis);
         var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-        var effects = ImmutableArray.CreateBuilder<MethodEffects>();
-        foreach (var declaration in declarations) {
-            cancellationToken.ThrowIfCancellationRequested();
-            var resolved = ResolvedMethodLikeTarget.Create(declaration, model, cancellationToken);
-            if (resolved.BodyNode == null || resolved.MethodSymbol == null ||
-                !seen.Add(resolved.MethodSymbol.OriginalDefinition))
-                continue;
-            effects.Add(session.Analyze(resolved.MethodSymbol, resolved.Declaration, model));
-        }
-        if (effects.Count == 0)
-            throw new ArgumentOutOfRangeException(nameof(target), "No analyzable method bodies were found in the requested target.");
         var combinedEffects = SharpProofEffect.None;
         var capabilities = SharpProofCapability.None;
         var exceptions = ImmutableArray.CreateBuilder<MethodExceptionFact>();
         var sites = ImmutableArray.CreateBuilder<MethodEffectSite>();
         var unknowns = ImmutableArray.CreateBuilder<SharpProofUnknownReason>();
-        foreach (var method in effects) {
+        foreach (var declaration in declarations) {
+            cancellationToken.ThrowIfCancellationRequested();
+            var resolved = ResolvedMethodLikeTarget.Create(declaration, target.SemanticModel, cancellationToken);
+            if (resolved.BodyNode == null || resolved.MethodSymbol == null ||
+                !seen.Add(resolved.MethodSymbol.OriginalDefinition))
+                continue;
+            var method = session.Analyze(resolved.MethodSymbol, resolved.Declaration, target.SemanticModel);
             combinedEffects |= method.Effects;
             capabilities |= method.Capabilities;
             exceptions.AddRange(method.ExceptionFacts);
             sites.AddRange(method.Sites);
             unknowns.AddRange(method.UnknownReasons);
         }
+        if (seen.Count == 0)
+            throw new ArgumentOutOfRangeException(nameof(target), "No analyzable method bodies were found in the requested target.");
         return new MethodEffects(
             combinedEffects,
             capabilities,
@@ -379,139 +371,62 @@ public sealed class SharpProofAnalysisSession : IDisposable {
     }
     private void AnalyzeProofFacts(
         SharpProofAnalysisRequest request,
-        ImmutableArray<SharpProofProofFact>.Builder facts,
-        ImmutableArray<SharpProofUnknownReason>.Builder unknowns,
-        ImmutableArray<SharpProofTruncationReason>.Builder truncations,
+        ResolvedQueryTarget target,
+        AnalysisResultAccumulator result,
         CancellationToken cancellationToken) {
         using var limitScope = SymbolicAnalysisLimitContext.Push(_analysisLimits);
         if (!string.IsNullOrWhiteSpace(request.Condition)) {
-            if (request.Target.Kind != SharpProofTargetKind.Point)
-                throw new ArgumentException("Condition proof requests require a point target.", nameof(request));
-            if (SymbolicSourceTargetSelector.FindOnLine(
-                    _source.SyntaxTree,
-                    request.Target.Line!.Value,
-                    cancellationToken).Count == 0)
+            if (!target.HasProgramPointOnTargetLine)
                 throw new ArgumentOutOfRangeException(nameof(request), "No program point exists at the requested point.");
             var proof = _conditionProofEngine.ProveAtSyntaxTree(
-                _source.SyntaxTree,
-                _source.Compilation,
+                target.Source.SyntaxTree,
+                target.Source.Compilation,
                 request.Target.Line!.Value,
                 request.Target.Column ?? 1,
                 request.Condition!,
                 _ownedSmtAnalysis,
                 cancellationToken);
-            facts.Add(Project(proof));
-            if (proof.TruthValue == SymbolicTruthValue.Unknown)
-                unknowns.Add(Convert(SymbolicUnknownReasonTaxonomy.ForProof(SymbolicUnknownReason.Unknown, proof.Reason)));
-            AddTruncations(truncations, proof.AnalysisTruncation);
+            result.Add(proof);
             return;
         }
-        var points = QueryProgramPoints(request.Target, cancellationToken);
-        var hasUnknown = points.Any(static point => point.Reachability == SymbolicReachability.Unknown);
-        facts.Add(new SharpProofProofFact(
-            "invariant",
-            hasUnknown ? "Unknown" : "Proven",
-            "merged_symbolic_invariant",
-            SymbolicMergedPathFactMerger.MergeInvariantText(points),
-            null));
-        foreach (var point in points)
-            if (point.Reachability == SymbolicReachability.Unknown)
-                unknowns.Add(Convert(SymbolicUnknownReasonTaxonomy.ForProof(SymbolicUnknownReason.Unknown, point.ReachabilityReason)));
-        AddTruncations(truncations, SymbolicAnalysisTruncationInfo.Combine(
-            points.Select(static point => point.AnalysisTruncation)));
+        result.Add(QueryProgramPoints(target, cancellationToken));
     }
     private void AnalyzeHazards(
-        SharpProofTarget target,
-        ImmutableArray<SharpProofHazard>.Builder hazards,
-        ImmutableArray<SharpProofUnknownReason>.Builder unknowns,
-        ImmutableArray<SharpProofTruncationReason>.Builder truncations,
+        ResolvedQueryTarget target,
+        AnalysisResultAccumulator accumulator,
         CancellationToken cancellationToken) {
         using var limitScope = SymbolicAnalysisLimitContext.Push(_analysisLimits);
-        var result = _runtimeHazardService.QuerySyntaxTreeRuntimeHazards(
-            _source.SyntaxTree,
-            _source.Compilation,
+        accumulator.Add(_runtimeHazardService.QuerySyntaxTreeRuntimeHazards(
             target,
             _ownedSmtAnalysis,
             cancellationToken,
-            new SymbolicRuntimeHazardQueryOptions(true));
-        hazards.AddRange(result.Hazards.Select(static hazard => new SharpProofHazard(
-            hazard.Kind.ToString(),
-            hazard.Status.ToString(),
-            hazard.StatusReason,
-            hazard.ExceptionType,
-            hazard.OperationText,
-            hazard.SpanStart,
-            hazard.SpanEnd,
-            FormatCounterexample(hazard.TriggerWitness))));
-        unknowns.AddRange(result.Hazards
-            .Where(static hazard => hazard.Status is SymbolicRuntimeHazardStatus.Unknown or SymbolicRuntimeHazardStatus.Unsupported)
-            .Select(static hazard => Convert(hazard.UnknownReasonInfo)));
-        AddTruncations(truncations, result.AnalysisTruncation);
+            new SymbolicRuntimeHazardQueryOptions(true)));
     }
-    private string AnalyzeComplexity(
-        SharpProofTarget target,
-        ImmutableArray<SharpProofUnknownReason>.Builder unknowns,
-        CancellationToken cancellationToken) {
+    private void AnalyzeComplexity(
+        ResolvedQueryTarget target,
+        AnalysisResultAccumulator accumulator) {
         using var limitScope = SymbolicAnalysisLimitContext.Push(_analysisLimits);
-        var result = SymbolicMethodLikeQueryDispatcher.Execute(
-            _source,
-            target,
+        accumulator.Add(target.Execute(
             "Complexity queries support point, position, or line targets only.",
-            static node => SymbolicMethodLikeDeclaration.IsSupported(node, includeDestructors: true),
             static (resolved, compilation, token) => {
                 if (resolved.BodyNode == null)
                     throw new ArgumentException("The requested method-like declaration does not have a body.");
                 if (resolved.MethodSymbol == null)
                     throw new ArgumentException("Could not resolve the symbol for the requested method-like body.");
                 return new SymbolicComplexityAnalysisSession(compilation, token).Analyze(resolved);
-            },
-            cancellationToken);
-        unknowns.AddRange(result.UnknownReasons.Select(static reason => Convert(SymbolicUnknownReasonTaxonomy.ForComplexity(reason))));
-        return result.Complexity.Text;
+            }));
     }
     private IReadOnlyList<SymbolicProgramPointAnalysis> QueryProgramPoints(
-        SharpProofTarget target,
+        ResolvedQueryTarget target,
         CancellationToken cancellationToken) {
-        var syntaxTree = _source.SyntaxTree;
-        var compilation = _source.Compilation;
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var root = syntaxTree.GetRoot(cancellationToken);
-        var points = new List<SymbolicProgramPointAnalysis>();
-        void Add(SyntaxNode node) => points.Add(node is ForStatementSyntax forStatement
-            ? _invariantService.AnalyzeForInitialEntry(forStatement, semanticModel, _ownedSmtAnalysis, cancellationToken)
-            : _invariantService.AnalyzeAt(node, semanticModel, _ownedSmtAnalysis, cancellationToken));
-        switch (target.Kind) {
-            case SharpProofTargetKind.Point:
-                var pointPosition = SymbolicSourceLocation.GetPosition(
-                    syntaxTree, target.Line!.Value, target.Column ?? 1, cancellationToken);
-                Add(SymbolicSourceTargetSelector.FindNarrowestAtPosition(root, pointPosition));
-                break;
-            case SharpProofTargetKind.Position:
-                var position = target.Position!.Value;
-                var text = syntaxTree.GetText(cancellationToken);
-                if (position < 0 || position > text.Length)
-                    throw new ArgumentOutOfRangeException(nameof(target), "--position must be within the source text span.");
-                Add(SymbolicSourceTargetSelector.FindNarrowestAtPosition(root, position));
-                break;
-            case SharpProofTargetKind.Line:
-                foreach (var node in SymbolicSourceTargetSelector.FindOnLine(syntaxTree, target.Line!.Value, cancellationToken)) Add(node);
-                break;
-            case SharpProofTargetKind.Span:
-                var span = SymbolicSourceLocation.GetSourceSpan(
-                    syntaxTree, target.SpanStart!.Value, target.SpanEnd!.Value, cancellationToken);
-                foreach (var node in SymbolicSourceTargetSelector.FindInSpan(syntaxTree, span, cancellationToken)) Add(node);
-                break;
-            case SharpProofTargetKind.AllLines:
-                var lineCount = syntaxTree.GetText(cancellationToken).Lines.Count;
-                for (var line = 1; line <= lineCount; line++)
-                    foreach (var node in SymbolicSourceTargetSelector.FindOnLine(syntaxTree, line, cancellationToken)) Add(node);
-                break;
-            default:
-                throw new NotSupportedException("Target kind is not supported for syntax tree queries.");
-        }
-        if (points.Count == 0)
+        if (target.ProgramPointNodes.Count == 0)
             throw new ArgumentOutOfRangeException(nameof(target), "No program points were found in the requested target.");
-        return points;
+        return target.ProgramPointNodes.Select(node => node is ForStatementSyntax forStatement
+                ? _invariantService.AnalyzeForInitialEntry(
+                    forStatement, target.SemanticModel, _ownedSmtAnalysis, cancellationToken)
+                : _invariantService.AnalyzeAt(
+                    node, target.SemanticModel, _ownedSmtAnalysis, cancellationToken))
+            .ToArray();
     }
     private static SharpProofUnknownReason Convert(SymbolicUnknownReasonInfo reason) => new(
         reason.Code,
@@ -531,14 +446,6 @@ public sealed class SharpProofAnalysisSession : IDisposable {
             .OrderBy(static assignment => assignment.SourceName, StringComparer.Ordinal)
             .Select(static assignment => assignment.SourceName + "=" + assignment.Value));
     }
-    private static void AddTruncations(ImmutableArray<SharpProofTruncationReason>.Builder target,
-        SymbolicAnalysisTruncationInfo truncation) =>
-        target.AddRange(truncation.Events.Select(static item => new SharpProofTruncationReason(
-            item.Code,
-            item.Limit,
-            item.Observed,
-            item.Provenance,
-            item.SourceSpanStart)));
     private static SharpProofAnalysisBudget ResolveAnalysisLimits(SharpProofAnalysisOptions options) =>
         (options.AnalysisBudget ?? SharpProofAnalysisBudget.Default).Validate();
     private static SymbolicSourceInput CompileSource(string sourceText, string filePath) {

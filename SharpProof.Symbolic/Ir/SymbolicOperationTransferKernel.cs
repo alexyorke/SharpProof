@@ -1,51 +1,39 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicOperationTransferKernel {
-    internal static SymbolicOperationTransitionResult Apply(SymbolicState initialState, SymbolicOperationDescriptor operation) {
-        if (initialState == null) throw new ArgumentNullException(nameof(initialState));
-        if (operation == null) throw new ArgumentNullException(nameof(operation));
-        var state = initialState;
-        var applied = operation switch {
-            SymbolicAssignmentOperation assignment => TryApplyAssignment(ref state, assignment),
-            SymbolicMutationOperation mutation => TryApplyMutation(ref state, mutation),
-            _ => false
-        };
-        return applied
-            ? SymbolicOperationTransitionResult.Exact(state)
-            : SymbolicOperationTransitionResult.Unsupported(state);
+    internal static bool TryApply(ref SymbolicState state, SymbolicStateDelta delta) {
+        if (state == null) throw new ArgumentNullException(nameof(state));
+        if (delta == null) throw new ArgumentNullException(nameof(delta));
+        var candidate = state;
+        ApplyInvalidations(ref candidate, delta.Invalidations);
+        if (!TryApplyBindings(ref candidate, delta.Bindings, delta.Origin))
+            return false;
+        if (!delta.Assumptions.IsDefaultOrEmpty)
+            foreach (var assumption in delta.Assumptions)
+                candidate = candidate.AddPathCondition(assumption);
+        foreach (var binding in delta.Bindings)
+            if (binding.DeriveIntegerBounds)
+                AddDerivedIntegerBounds(ref candidate, binding, delta.Origin);
+        state = candidate.Normalize();
+        return true;
     }
-    internal static SymbolicOperationTransitionResult Invalidate(
+    internal static SymbolicState Invalidate(
         SymbolicState state,
         ImmutableArray<SymbolicInvalidationTarget> targets,
         Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
         string provenance) {
-        var operation = new SymbolicMutationOperation(
+        var operation = new SymbolicStateDelta(
             [],
-            targets,
-            new SymbolicOperationOrigin(sourceSpan, provenance));
-        return Apply(state, operation);
+            new SymbolicOperationOrigin(sourceSpan, provenance),
+            Invalidations: targets);
+        TryApply(ref state, operation);
+        return state;
     }
-    internal static SymbolicOperationTransitionResult AssumeAll(
+    internal static SymbolicState AssumeAll(
         SymbolicState state,
         IReadOnlyList<SymbolicCondition> conditions) {
-        if (conditions.Count == 0)
-            return SymbolicOperationTransitionResult.Exact(state);
         foreach (var condition in conditions)
             state = state.AddPathCondition(condition);
-        return SymbolicOperationTransitionResult.Exact(state);
-    }
-    private static bool TryApplyAssignment(ref SymbolicState state, SymbolicAssignmentOperation assignment) {
-        ApplyInvalidations(ref state, assignment.Invalidations);
-        if (!TryApplyBindings(ref state, assignment.Bindings, assignment.Origin)) return false;
-        foreach (var postcondition in assignment.Postconditions)
-            state = state.AddPathCondition(postcondition);
-        foreach (var binding in assignment.Bindings)
-            if (binding.DeriveIntegerBounds)
-                AddDerivedIntegerBounds(ref state, binding, assignment.Origin);
-        return true;
-    }
-    private static bool TryApplyMutation(ref SymbolicState state, SymbolicMutationOperation mutation) {
-        ApplyInvalidations(ref state, mutation.Invalidations);
-        return TryApplyBindings(ref state, mutation.Bindings, mutation.Origin);
+        return state.Normalize();
     }
     private static void ApplyInvalidations(ref SymbolicState state, ImmutableArray<SymbolicInvalidationTarget> targets) {
         if (targets.IsDefaultOrEmpty) return;

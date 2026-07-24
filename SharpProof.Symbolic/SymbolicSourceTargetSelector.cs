@@ -95,25 +95,17 @@ internal static class SymbolicSourceTargetSelector {
             var nodes = new List<SyntaxNode>();
             for (var line = startLine; line <= endLine; line++) {
                 cancellationToken.ThrowIfCancellationRequested();
-                AddNodes(_baseNodesByLine, line, span, seen, nodes);
+                if (!_baseNodesByLine.TryGetValue(line, out var candidates)) continue;
+                foreach (var candidate in candidates) {
+                    if (!candidate.Span.IntersectsWith(span)) continue;
+                    var key = (candidate.RawKind, candidate.SpanStart, candidate.Span.End);
+                    if (seen.Add(key)) nodes.Add(candidate);
+                }
             }
             return nodes
                 .OrderBy(static node => node.SpanStart)
                 .ThenBy(static node => node.Span.Length)
                 .ToArray();
-        }
-        private static void AddNodes(
-            IReadOnlyDictionary<int, ImmutableArray<SyntaxNode>> index,
-            int line,
-            TextSpan span,
-            ISet<(int RawKind, int Start, int End)> seen,
-            ICollection<SyntaxNode> nodes) {
-            if (!index.TryGetValue(line, out var candidates)) return;
-            foreach (var candidate in candidates) {
-                if (!candidate.Span.IntersectsWith(span)) continue;
-                var key = (candidate.RawKind, candidate.SpanStart, candidate.Span.End);
-                if (seen.Add(key)) nodes.Add(candidate);
-            }
         }
     }
 }

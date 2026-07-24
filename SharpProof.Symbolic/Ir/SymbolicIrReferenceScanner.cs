@@ -1,110 +1,72 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicIrReferenceScanner {
-    internal static bool ContainsVariablePrefix(SymbolicFact fact, string variablePrefix) =>
-        ContainsVariable(fact, name => MatchesVariablePrefix(name, variablePrefix));
-    internal static bool ContainsVariablePrefix(SymbolicCondition condition, string variablePrefix) =>
-        ContainsVariable(condition, name => MatchesVariablePrefix(name, variablePrefix));
-    internal static bool ContainsVariableOrMember(SymbolicFact fact, string variableName) =>
-        ContainsVariable(fact, name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
-    internal static bool ContainsVariableOrMember(SymbolicCondition condition, string variableName) => ContainsVariable(condition,
-            name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
-    internal static bool ContainsVariableOrMember(SymbolicTerm term, string variableName) {
-        var scanner = new VariableReferenceVisitor(name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
-        scanner.Visit(term);
-        return scanner.Found;
-    }
-    internal static SymbolicState RemoveVariableReferences(SymbolicState state, string variablePrefix) => RemoveReferences(
-            state,
-            fact => ContainsVariablePrefix(fact, variablePrefix),
-            condition => ContainsVariablePrefix(condition, variablePrefix));
-    internal static SymbolicState RemoveVariableOrMemberReferences(SymbolicState state, string variableName) => RemoveReferences(
-            state,
-            fact => ContainsVariableOrMember(fact, variableName),
-            condition => ContainsVariableOrMember(condition, variableName));
-    internal static SymbolicState RemoveVariableDescendantReferences(SymbolicState state, string variableName) =>
-        RemoveReferences(
-            state,
-            fact => ContainsVariableDescendant(fact, variableName),
-            condition => ContainsVariableDescendant(condition, variableName));
-    private static SymbolicState RemoveReferences(
+    internal static bool ContainsVariablePrefix(SymbolicFact fact, string prefix) =>
+        Contains(fact, name => MatchesPrefix(name, prefix));
+    internal static bool ContainsVariablePrefix(SymbolicCondition condition, string prefix) =>
+        Contains(condition, name => MatchesPrefix(name, prefix));
+    internal static bool ContainsVariableOrMember(SymbolicFact fact, string name) =>
+        Contains(fact, candidate => SymbolicFactFactory.MatchesVariableOrMemberName(candidate, name));
+    internal static bool ContainsVariableOrMember(SymbolicCondition condition, string name) =>
+        Contains(condition, candidate => SymbolicFactFactory.MatchesVariableOrMemberName(candidate, name));
+    internal static bool ContainsVariableOrMember(SymbolicTerm term, string name) =>
+        Contains(term, candidate => SymbolicFactFactory.MatchesVariableOrMemberName(candidate, name));
+    internal static SymbolicState RemoveVariableReferences(SymbolicState state, string prefix) =>
+        Remove(state, fact => ContainsVariablePrefix(fact, prefix), condition => ContainsVariablePrefix(condition, prefix));
+    internal static SymbolicState RemoveVariableOrMemberReferences(SymbolicState state, string name) =>
+        Remove(state, fact => ContainsVariableOrMember(fact, name), condition => ContainsVariableOrMember(condition, name));
+    internal static SymbolicState RemoveVariableDescendantReferences(SymbolicState state, string name) =>
+        Remove(state, fact => ContainsDescendant(fact, name), condition => ContainsDescendant(condition, name));
+    private static SymbolicState Remove(
         SymbolicState state,
-        Func<SymbolicFact, bool> containsReferenceInFact,
-        Func<SymbolicCondition, bool> containsReferenceInCondition) => new SymbolicState(
-            state.Facts.Where(fact => !containsReferenceInFact(fact)),
-            state.PathConditions.Where(condition => !containsReferenceInCondition(condition)),
-            state.SymbolVersions).Normalize();
-    private static bool ContainsVariable(SymbolicFact fact, Func<string, bool> match) {
-        var scanner = new VariableReferenceVisitor(match);
-        scanner.Visit(fact);
-        return scanner.Found;
+        Func<SymbolicFact, bool> factMatches,
+        Func<SymbolicCondition, bool> conditionMatches) => new SymbolicState(
+        state.Facts.Where(fact => !factMatches(fact)),
+        state.PathConditions.Where(condition => !conditionMatches(condition)),
+        state.SymbolVersions).Normalize();
+    private static bool Contains(SymbolicFact fact, Func<string, bool> match) =>
+        SymbolicAlgebra.Any(fact, term => Matches(term, match));
+    private static bool Contains(SymbolicCondition condition, Func<string, bool> match) =>
+        SymbolicAlgebra.Any(condition, term => Matches(term, match));
+    private static bool Contains(SymbolicTerm term, Func<string, bool> match) =>
+        SymbolicAlgebra.Any(term, candidate => Matches(candidate, match));
+    private static bool Matches(SymbolicTerm term, Func<string, bool> match) {
+        if (term is SymbolicMemberTerm && TryCreatePath(term, out var path) && match(path)) return true;
+        var name = term switch {
+            SymbolicVariableTerm variable => variable.Name,
+            SymbolicNullableHasValueTerm nullable => nullable.NullableName,
+            SymbolicNullableValueTerm nullable => nullable.NullableName,
+            _ => null
+        };
+        return name != null && match(name);
     }
-    private static bool ContainsVariable(SymbolicCondition condition, Func<string, bool> match) {
-        var scanner = new VariableReferenceVisitor(match);
-        scanner.Visit(condition);
-        return scanner.Found;
-    }
-    private static bool ContainsVariableDescendant(SymbolicFact fact, string variableName) {
-        var scanner = new VariableDescendantReferenceVisitor(variableName);
-        scanner.Visit(fact);
-        return scanner.Found;
-    }
-    private static bool ContainsVariableDescendant(SymbolicCondition condition, string variableName) {
-        var scanner = new VariableDescendantReferenceVisitor(variableName);
-        scanner.Visit(condition);
-        return scanner.Found;
-    }
-    private static bool TryCreateVariableOrMemberPath(SymbolicTerm term, out string path) {
-        switch (term) {
-            case SymbolicVariableTerm variable:
-                path = variable.Name;
-                return true;
-            case SymbolicMemberTerm member when
-                TryCreateVariableOrMemberPath(member.Receiver, out var receiverPath):
-                path = receiverPath + "." + member.MemberName;
-                return true;
-            default:
-                path = string.Empty;
-                return false;
+    private static bool ContainsDescendant(SymbolicFact fact, string name) =>
+        SymbolicAlgebra.Any(fact, term => IsDescendant(term, name));
+    private static bool ContainsDescendant(SymbolicCondition condition, string name) =>
+        SymbolicAlgebra.Any(condition, term => IsDescendant(term, name));
+    private static bool IsDescendant(SymbolicTerm term, string name) =>
+        term is not SymbolicVariableTerm &&
+        Contains(term, candidate => SymbolicFactFactory.MatchesVariableOrMemberName(candidate, name)) ||
+        Matches(term, candidate => candidate.StartsWith(name + ".", StringComparison.Ordinal) ||
+                                   candidate.StartsWith(name + "[", StringComparison.Ordinal));
+    private static bool TryCreatePath(SymbolicTerm term, out string path) {
+        if (term is SymbolicVariableTerm variable) {
+            path = variable.Name;
+            return true;
         }
+        if (term is SymbolicMemberTerm member && TryCreatePath(member.Receiver, out var receiver)) {
+            path = receiver + "." + member.MemberName;
+            return true;
+        }
+        path = string.Empty;
+        return false;
     }
-    private static bool MatchesVariablePrefix(string candidate, string variablePrefix) {
-        if (SymbolicFactFactory.MatchesVariableOrMemberName(candidate, variablePrefix)) return true;
-        var versionPrefix = variablePrefix + "@v";
+    private static bool MatchesPrefix(string candidate, string prefix) {
+        if (SymbolicFactFactory.MatchesVariableOrMemberName(candidate, prefix)) return true;
+        var versionPrefix = prefix + "@v";
         if (!candidate.StartsWith(versionPrefix, StringComparison.Ordinal)) return false;
         var index = versionPrefix.Length;
         var digitStart = index;
         while (index < candidate.Length && char.IsDigit(candidate[index])) index++;
-        return index > digitStart &&
-               (index == candidate.Length || candidate[index] is '.' or '[');
-    }
-    sealed class VariableReferenceVisitor : SymbolicIrVisitor {
-        private readonly Func<string, bool> _match;
-        internal VariableReferenceVisitor(Func<string, bool> match) => _match = match;
-        internal bool Found { get; private set; }
-        protected override void OnTerm(SymbolicTerm term) {
-            if (!Found &&
-                term is SymbolicMemberTerm &&
-                TryCreateVariableOrMemberPath(term, out var memberPath) &&
-                _match(memberPath))
-                Found = true;
-        }
-        protected override void OnVariableLikeName(string name) {
-            if (!Found && _match(name)) Found = true;
-        }
-    }
-    sealed class VariableDescendantReferenceVisitor(string variableName) : SymbolicIrVisitor {
-        internal bool Found { get; private set; }
-        protected override void OnTerm(SymbolicTerm term) {
-            if (!Found &&
-                term is not SymbolicVariableTerm &&
-                ContainsVariableOrMember(term, variableName))
-                Found = true;
-        }
-        protected override void OnVariableLikeName(string name) {
-            if (!Found &&
-                (name.StartsWith(variableName + ".", StringComparison.Ordinal) ||
-                 name.StartsWith(variableName + "[", StringComparison.Ordinal)))
-                Found = true;
-        }
+        return index > digitStart && (index == candidate.Length || candidate[index] is '.' or '[');
     }
 }

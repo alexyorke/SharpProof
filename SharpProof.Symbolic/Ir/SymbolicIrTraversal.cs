@@ -4,168 +4,129 @@ internal readonly record struct SymbolicIrChildren(
     SymbolicTerm? Second = null,
     SymbolicCondition? Condition = null,
     ImmutableArray<SymbolicTerm> Rest = default) {
-    internal static SymbolicIrChildren OfAtom(SymbolicAtom atom) => atom switch {
-        // Named Condition, but declared as a term: SymbolicTruthAtom(SymbolicTerm Condition).
+    internal static SymbolicIrChildren Of(SymbolicAtom atom) => atom switch {
         SymbolicTruthAtom truth => new(truth.Condition),
         SymbolicRelationAtom relation => new(relation.Left, relation.Right),
         SymbolicStringPredicateAtom predicate => new(predicate.Value, predicate.Argument),
         SymbolicBoundsAtom bounds => new(bounds.Index, bounds.Length),
         SymbolicTypeTestAtom typeTest => new(typeTest.Value),
-        SymbolicExceptionPreconditionAtom precondition =>
-            new(precondition.Subject, Condition: precondition.Trigger),
-        _ => default,
+        SymbolicExceptionPreconditionAtom precondition => new(precondition.Subject, Condition: precondition.Trigger),
+        _ => default
     };
-    internal static SymbolicIrChildren OfTerm(SymbolicTerm term) => term switch {
+    internal static SymbolicIrChildren Of(SymbolicTerm term) => term switch {
         SymbolicMemberTerm member => new(member.Receiver),
         SymbolicElementTerm element => new(element.Receiver, element.Index),
         SymbolicMultiElementTerm element => new(element.Receiver, Rest: element.Indices),
         SymbolicFromEndIndexTerm fromEnd => new(fromEnd.Value),
-        SymbolicStringContentTerm stringContent => new(stringContent.Reference),
-        SymbolicStringConcatTerm stringConcat => new(stringConcat.Left, stringConcat.Right),
+        SymbolicStringContentTerm content => new(content.Reference),
+        SymbolicStringConcatTerm concat => new(concat.Left, concat.Right),
         SymbolicStringSliceTerm slice => new(slice.Value, slice.Offset, Rest: [slice.Length]),
         SymbolicLengthTerm length => new(length.Value),
-        SymbolicArrayDimensionLengthTerm arrayLength => new(arrayLength.Value),
+        SymbolicArrayDimensionLengthTerm length => new(length.Value),
         SymbolicCountTerm count => new(count.Value),
         SymbolicBinaryTerm binary => new(binary.Left, binary.Right),
-        SymbolicConditionalTerm conditional =>
-            new(conditional.WhenTrue, conditional.WhenFalse, conditional.Condition),
-        _ => default,
+        SymbolicConditionalTerm conditional => new(conditional.WhenTrue, conditional.WhenFalse, conditional.Condition),
+        _ => default
     };
 }
-internal abstract class SymbolicIrRewriter {
-    internal SymbolicFact Rewrite(SymbolicFact fact) {
-        var atom = Rewrite(fact.Atom);
-        return ReferenceEquals(atom, fact.Atom) ? fact : fact with { Atom = atom };
-    }
-    internal SymbolicCondition Rewrite(SymbolicCondition condition) => condition switch {
-        SymbolicConstantCondition => condition,
-        SymbolicFactCondition factCondition => RewriteFactCondition(factCondition),
-        SymbolicNotCondition notCondition => RewriteNotCondition(notCondition),
-        SymbolicBinaryCondition binaryCondition => RewriteBinaryCondition(binaryCondition),
-        _ => condition
-    };
-    internal SymbolicAtom Rewrite(SymbolicAtom atom) => atom switch {
-        SymbolicTruthAtom truth => new SymbolicTruthAtom(Rewrite(truth.Condition)),
-        SymbolicRelationAtom relation => new SymbolicRelationAtom(relation.Operator, Rewrite(relation.Left), Rewrite(relation.Right)),
-        SymbolicStringPredicateAtom predicate => new SymbolicStringPredicateAtom(
-            predicate.Predicate,
-            Rewrite(predicate.Value),
-            Rewrite(predicate.Argument),
-            predicate.RegexOptions),
-        SymbolicBoundsAtom bounds => new SymbolicBoundsAtom(
-            Rewrite(bounds.Index),
-            Rewrite(bounds.Length),
-            bounds.IncludeLowerBound,
-            bounds.IncludeUpperBound),
-        SymbolicExactRuntimeTypeAtom exactRuntimeType => new SymbolicExactRuntimeTypeAtom(
-            Rewrite(exactRuntimeType.Value),
-            exactRuntimeType.TypeKey),
-        SymbolicTypeTestAtom typeTest => new SymbolicTypeTestAtom(Rewrite(typeTest.Value), typeTest.TypeKey),
-        SymbolicExceptionPreconditionAtom precondition => new SymbolicExceptionPreconditionAtom(
-            precondition.Kind,
-            precondition.Subject == null ? null : Rewrite(precondition.Subject),
-            Rewrite(precondition.Trigger)),
+internal static class SymbolicAlgebra {
+    internal static SymbolicFact Rewrite(SymbolicFact fact, Func<SymbolicTerm, SymbolicTerm?> replace) =>
+        fact with { Atom = Rewrite(fact.Atom, replace) };
+    internal static SymbolicCondition Rewrite(SymbolicCondition condition, Func<SymbolicTerm, SymbolicTerm?> replace) =>
+        condition switch {
+            SymbolicFactCondition fact => fact with { Fact = Rewrite(fact.Fact, replace) },
+            SymbolicNotCondition not => not with { Operand = Rewrite(not.Operand, replace) },
+            SymbolicBinaryCondition binary => binary with {
+                Left = Rewrite(binary.Left, replace),
+                Right = Rewrite(binary.Right, replace)
+            },
+            _ => condition
+        };
+    internal static SymbolicAtom Rewrite(SymbolicAtom atom, Func<SymbolicTerm, SymbolicTerm?> replace) => atom switch {
+        SymbolicTruthAtom truth => truth with { Condition = Rewrite(truth.Condition, replace) },
+        SymbolicRelationAtom relation => relation with {
+            Left = Rewrite(relation.Left, replace),
+            Right = Rewrite(relation.Right, replace)
+        },
+        SymbolicStringPredicateAtom predicate => predicate with {
+            Value = Rewrite(predicate.Value, replace),
+            Argument = Rewrite(predicate.Argument, replace)
+        },
+        SymbolicBoundsAtom bounds => bounds with {
+            Index = Rewrite(bounds.Index, replace),
+            Length = Rewrite(bounds.Length, replace)
+        },
+        SymbolicExactRuntimeTypeAtom exact => exact with { Value = Rewrite(exact.Value, replace) },
+        SymbolicTypeTestAtom typeTest => typeTest with { Value = Rewrite(typeTest.Value, replace) },
+        SymbolicExceptionPreconditionAtom precondition => precondition with {
+            Subject = precondition.Subject == null ? null : Rewrite(precondition.Subject, replace),
+            Trigger = Rewrite(precondition.Trigger, replace)
+        },
         _ => atom
     };
-    internal SymbolicTerm Rewrite(SymbolicTerm term) {
-        if (TryRewriteTerm(term, out var rewritten)) return rewritten;
+    internal static SymbolicTerm Rewrite(SymbolicTerm term, Func<SymbolicTerm, SymbolicTerm?> replace) {
+        var replacement = replace(term);
+        if (replacement != null) return replacement;
         return term switch {
-            SymbolicBooleanConstantTerm or
-                SymbolicIntegerConstantTerm or
-                SymbolicStringConstantTerm or
-                SymbolicNullTerm or
-                SymbolicVariableTerm or
-                SymbolicNullableHasValueTerm or
-                SymbolicNullableValueTerm or
-                SymbolicNumericConversionTerm => term,
-            SymbolicMemberTerm member => new SymbolicMemberTerm(Rewrite(member.Receiver), member.MemberName, member.Kind),
-            SymbolicElementTerm element => new SymbolicElementTerm(Rewrite(element.Receiver), Rewrite(element.Index), element.Kind),
-            SymbolicMultiElementTerm element => new SymbolicMultiElementTerm(
-                Rewrite(element.Receiver),
-                [.. element.Indices.Select(Rewrite)],
-                element.Kind),
-            SymbolicFromEndIndexTerm fromEnd => new SymbolicFromEndIndexTerm(Rewrite(fromEnd.Value)),
-            SymbolicStringContentTerm content => new SymbolicStringContentTerm(Rewrite(content.Reference)),
-            SymbolicStringConcatTerm concat => new SymbolicStringConcatTerm(Rewrite(concat.Left), Rewrite(concat.Right)),
-            SymbolicStringSliceTerm slice
-                => new SymbolicStringSliceTerm(Rewrite(slice.Value), Rewrite(slice.Offset), Rewrite(slice.Length)),
-            SymbolicLengthTerm length => new SymbolicLengthTerm(Rewrite(length.Value)),
-            SymbolicArrayDimensionLengthTerm length => new SymbolicArrayDimensionLengthTerm(Rewrite(length.Value), length.Dimension),
-            SymbolicCountTerm count => new SymbolicCountTerm(Rewrite(count.Value)),
-            SymbolicBinaryTerm binary => new SymbolicBinaryTerm(
-                binary.Operator,
-                Rewrite(binary.Left),
-                Rewrite(binary.Right),
-                binary.MayOverflow),
-            SymbolicConditionalTerm conditional => new SymbolicConditionalTerm(
-                Rewrite(conditional.Condition),
-                Rewrite(conditional.WhenTrue),
-                Rewrite(conditional.WhenFalse)),
+            SymbolicMemberTerm member => member with { Receiver = Rewrite(member.Receiver, replace) },
+            SymbolicElementTerm element => element with {
+                Receiver = Rewrite(element.Receiver, replace),
+                Index = Rewrite(element.Index, replace)
+            },
+            SymbolicMultiElementTerm element => element with {
+                Receiver = Rewrite(element.Receiver, replace),
+                Indices = [.. element.Indices.Select(term => Rewrite(term, replace))]
+            },
+            SymbolicFromEndIndexTerm fromEnd => fromEnd with { Value = Rewrite(fromEnd.Value, replace) },
+            SymbolicStringContentTerm content => content with { Reference = Rewrite(content.Reference, replace) },
+            SymbolicStringConcatTerm concat => concat with {
+                Left = Rewrite(concat.Left, replace),
+                Right = Rewrite(concat.Right, replace)
+            },
+            SymbolicStringSliceTerm slice => slice with {
+                Value = Rewrite(slice.Value, replace),
+                Offset = Rewrite(slice.Offset, replace),
+                Length = Rewrite(slice.Length, replace)
+            },
+            SymbolicLengthTerm length => length with { Value = Rewrite(length.Value, replace) },
+            SymbolicArrayDimensionLengthTerm length => length with { Value = Rewrite(length.Value, replace) },
+            SymbolicCountTerm count => count with { Value = Rewrite(count.Value, replace) },
+            SymbolicBinaryTerm binary => binary with {
+                Left = Rewrite(binary.Left, replace),
+                Right = Rewrite(binary.Right, replace)
+            },
+            SymbolicConditionalTerm conditional => conditional with {
+                Condition = Rewrite(conditional.Condition, replace),
+                WhenTrue = Rewrite(conditional.WhenTrue, replace),
+                WhenFalse = Rewrite(conditional.WhenFalse, replace)
+            },
             _ => term
         };
     }
-    protected virtual bool TryRewriteTerm(SymbolicTerm term, out SymbolicTerm rewritten) {
-        rewritten = null!;
-        return false;
-    }
-    private SymbolicCondition RewriteFactCondition(SymbolicFactCondition condition) {
-        var fact = Rewrite(condition.Fact);
-        return ReferenceEquals(fact, condition.Fact) ? condition : new SymbolicFactCondition(fact);
-    }
-    private SymbolicCondition RewriteNotCondition(SymbolicNotCondition condition) {
-        var operand = Rewrite(condition.Operand);
-        return ReferenceEquals(operand, condition.Operand) ? condition : new SymbolicNotCondition(operand);
-    }
-    private SymbolicCondition RewriteBinaryCondition(SymbolicBinaryCondition condition) {
-        var left = Rewrite(condition.Left);
-        var right = Rewrite(condition.Right);
-        return ReferenceEquals(left, condition.Left) && ReferenceEquals(right, condition.Right)
-            ? condition
-            : new SymbolicBinaryCondition(condition.Operator, left, right);
-    }
-}
-internal abstract class SymbolicIrVisitor {
-    internal void Visit(SymbolicFact fact) => Visit(fact.Atom);
-    internal void Visit(SymbolicCondition condition) {
-        switch (condition) {
-            case SymbolicFactCondition factCondition:
-                Visit(factCondition.Fact);
-                break;
-            case SymbolicNotCondition notCondition:
-                Visit(notCondition.Operand);
-                break;
-            case SymbolicBinaryCondition binaryCondition:
-                Visit(binaryCondition.Left);
-                Visit(binaryCondition.Right);
-                break;
-        }
-    }
-    internal void Visit(SymbolicAtom atom) => VisitChildren(SymbolicIrChildren.OfAtom(atom));
-    internal void Visit(SymbolicTerm term) {
-        OnTerm(term);
-        switch (term) {
-            case SymbolicVariableTerm variable:
-                OnVariableLikeName(variable.Name);
-                return;
-            case SymbolicNullableHasValueTerm nullableHasValue:
-                OnVariableLikeName(nullableHasValue.NullableName);
-                return;
-            case SymbolicNullableValueTerm nullableValue:
-                OnVariableLikeName(nullableValue.NullableName);
-                return;
-        }
-        VisitChildren(SymbolicIrChildren.OfTerm(term));
-    }
-    private void VisitChildren(SymbolicIrChildren children) {
-        if (children.First != null) Visit(children.First);
-        if (children.Second != null) Visit(children.Second);
-        if (!children.Rest.IsDefaultOrEmpty)
-            foreach (var index in children.Rest)
-                Visit(index);
-        if (children.Condition != null) Visit(children.Condition);
-    }
-    protected virtual void OnTerm(SymbolicTerm term) {
-    }
-    protected virtual void OnVariableLikeName(string name) {
-    }
+    internal static bool Any(SymbolicFact fact, Func<SymbolicTerm, bool> predicate) => Any(fact.Atom, predicate);
+    internal static bool Any(SymbolicAtom atom, Func<SymbolicTerm, bool> predicate) =>
+        Any(SymbolicIrChildren.Of(atom), predicate);
+    internal static bool Any(SymbolicCondition condition, Func<SymbolicTerm, bool> predicate) => condition switch {
+        SymbolicFactCondition fact => Any(fact.Fact, predicate),
+        SymbolicNotCondition not => Any(not.Operand, predicate),
+        SymbolicBinaryCondition binary => Any(binary.Left, predicate) || Any(binary.Right, predicate),
+        _ => false
+    };
+    internal static bool Any(SymbolicTerm term, Func<SymbolicTerm, bool> predicate) =>
+        predicate(term) || Any(SymbolicIrChildren.Of(term), predicate);
+    internal static void Visit(SymbolicFact fact, Action<SymbolicTerm> action) =>
+        Any(fact, term => {
+            action(term);
+            return false;
+        });
+    internal static void Visit(SymbolicCondition condition, Action<SymbolicTerm> action) =>
+        Any(condition, term => {
+            action(term);
+            return false;
+        });
+    private static bool Any(SymbolicIrChildren children, Func<SymbolicTerm, bool> predicate) =>
+        children.First != null && Any(children.First, predicate) ||
+        children.Second != null && Any(children.Second, predicate) ||
+        !children.Rest.IsDefaultOrEmpty && children.Rest.Any(term => Any(term, predicate)) ||
+        children.Condition != null && Any(children.Condition, predicate);
 }

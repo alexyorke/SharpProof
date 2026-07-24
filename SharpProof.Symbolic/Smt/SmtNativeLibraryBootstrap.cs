@@ -7,26 +7,23 @@ internal static class SmtNativeLibraryBootstrap {
     private static readonly object Sync = new();
     private static readonly HashSet<string> AttemptedLibraryPaths = new(StringComparer.OrdinalIgnoreCase);
     private static IntPtr s_libraryHandle;
-    internal static void TryLoadAdjacentLibrary() {
-        try {
+    internal static void TryLoadAdjacentLibrary() =>
+        _ = IgnoreFailures(() => {
             var assemblyDirectory = Path.GetDirectoryName(typeof(SmtAnalysisService).Assembly.Location);
             if (!string.IsNullOrWhiteSpace(assemblyDirectory)) TryLoadFromDirectories(new[] { assemblyDirectory });
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException) {
-        }
-    }
+            return true;
+        });
     internal static void TryLoadFromAnalyzerLocatorPaths(IEnumerable<string> paths) {
         if (paths == null) throw new ArgumentNullException(nameof(paths));
         var directories = new List<string>();
         foreach (var path in paths) {
-            try {
+            _ = IgnoreFailures(() => {
                 if (!string.Equals(Path.GetFileName(path), AnalyzerLocatorFileName, StringComparison.OrdinalIgnoreCase))
-                    continue;
+                    return false;
                 var directory = Path.GetDirectoryName(path);
                 if (!string.IsNullOrWhiteSpace(directory)) directories.Add(directory);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException) {
-            }
+                return true;
+            });
         }
         TryLoadFromDirectories(directories);
     }
@@ -34,26 +31,17 @@ internal static class SmtNativeLibraryBootstrap {
         var fileName = GetNativeLibraryFileName();
         if (fileName == null) return;
         foreach (var directory in directories) {
-            string libraryPath;
-            try {
-                libraryPath = Path.GetFullPath(Path.Combine(directory, fileName));
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException) {
-                continue;
-            }
+            var libraryPath = IgnoreFailures(() => Path.GetFullPath(Path.Combine(directory, fileName)));
+            if (libraryPath == null) continue;
             lock (Sync) {
                 if (s_libraryHandle != IntPtr.Zero) return;
                 if (!AttemptedLibraryPaths.Add(libraryPath) || !File.Exists(libraryPath)) continue;
-                try {
-                    s_libraryHandle = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                s_libraryHandle = IgnoreFailures(() =>
+                    RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                         ? LoadLibraryWindows(libraryPath)
                         : RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
                             ? LoadLibraryMac(libraryPath, RtldNow | RtldGlobal)
-                            : LoadLibraryLinux(libraryPath, RtldNow | RtldGlobal);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException) {
-                    s_libraryHandle = IntPtr.Zero;
-                }
+                            : LoadLibraryLinux(libraryPath, RtldNow | RtldGlobal));
                 if (s_libraryHandle != IntPtr.Zero) return;
             }
         }
@@ -73,6 +61,14 @@ internal static class SmtNativeLibraryBootstrap {
         if (platform == OSPlatform.OSX) return "libz3.dylib";
         if (platform == OSPlatform.Linux) return "libz3.so";
         return null;
+    }
+    private static T IgnoreFailures<T>(Func<T> action) {
+        try {
+            return action();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) {
+            return default!;
+        }
     }
     [DllImport("kernel32.dll", EntryPoint = "LoadLibraryW", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr LoadLibraryWindows(string libraryPath);

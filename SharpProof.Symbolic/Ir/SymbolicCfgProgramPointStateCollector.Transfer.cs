@@ -175,8 +175,8 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             ApplyUnsupportedSelfReferentialCompletion(ref state, target, expression, semanticModel, cancellationToken, provenance);
             return true;
         }
-        var transition = SymbolicOperationTransfer.ApplyAssignment(
-            state,
+        return SymbolicOperationTransfer.ApplyAssignment(
+            ref state,
             target,
             expression,
             semanticModel,
@@ -185,10 +185,6 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             bindingProvenance: provenance + ".assigned-value",
             postconditionProfile: SymbolicAssignmentPostconditionProfile.Symbolic,
             preInvalidationTargetValue: previousValue);
-        if (!transition.IsExact)
-            return false;
-        state = transition.State;
-        return true;
     }
     private static void ApplyUnsupportedSelfReferentialCompletion(
         ref SymbolicState state,
@@ -218,13 +214,9 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
             return false;
         SymbolicStateInvalidator.InvalidateMutationTarget(ref state, syntax.Left, semanticModel, cancellationToken);
         SymbolicStateInvalidator.InvalidateNestedAssignmentMutations(ref state, syntax, semanticModel, cancellationToken);
-        var transition = SymbolicOperationTransfer.ApplyLowering(
-            state,
+        return SymbolicOperationTransfer.ApplyLowering(
+            ref state,
             SymbolicOperationLowerer.LowerExplicitTargetAssignment(syntax, new SymbolicLoweringContext(semanticModel, cancellationToken)));
-        if (!transition.IsExact)
-            return false;
-        state = transition.State;
-        return true;
     }
     internal static bool RequiresStructuralAssignmentFallback(
         ISymbol target,

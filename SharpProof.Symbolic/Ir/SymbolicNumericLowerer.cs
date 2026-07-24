@@ -1,27 +1,5 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicNumericLowerer {
-    internal static bool TryLowerDefaultValueTerm(ExpressionSyntax expression, SymbolicLoweringContext context, out SymbolicTerm term) {
-        term = null!;
-        if (!expression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression) &&
-            expression is not DefaultExpressionSyntax)
-            return false;
-        var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
-        var type = typeInfo.ConvertedType ?? typeInfo.Type;
-        if (type == null) return false;
-        if (type.SpecialType == SpecialType.System_Boolean) {
-            term = new SymbolicBooleanConstantTerm(false);
-            return true;
-        }
-        if (SymbolicTypeLowerer.IsIntegerSmtType(type)) {
-            term = new SymbolicIntegerConstantTerm(0);
-            return true;
-        }
-        if (type.IsReferenceType) {
-            term = new SymbolicNullTerm();
-            return true;
-        }
-        return false;
-    }
     internal static bool TryLowerIntegralMathClampInvocation(
         InvocationExpressionSyntax invocation,
         IInvocationOperation operation,
@@ -114,23 +92,11 @@ internal static class SymbolicNumericLowerer {
         SymbolicTypeLowerer.IsIntegerSmtType(method.ReturnType) &&
         method.Parameters.All(static parameter => SymbolicTypeLowerer.IsIntegerSmtType(parameter.Type));
     internal static bool TryLowerBigIntegerStaticValueMember(ISymbol? memberSymbol, out SymbolicTerm term) {
-        if (memberSymbol is IPropertySymbol property &&
-            IsBigIntegerType(property.Type)) {
-            if (string.Equals(property.Name, "Zero", StringComparison.Ordinal)) {
-                term = new SymbolicIntegerConstantTerm(0);
-                return true;
-            }
-            if (string.Equals(property.Name, "One", StringComparison.Ordinal)) {
-                term = new SymbolicIntegerConstantTerm(1);
-                return true;
-            }
-            if (string.Equals(property.Name, "MinusOne", StringComparison.Ordinal)) {
-                term = new SymbolicIntegerConstantTerm(-1);
-                return true;
-            }
-        }
-        term = null!;
-        return false;
+        long? value = memberSymbol is IPropertySymbol property && IsBigIntegerType(property.Type)
+            ? property.Name switch { "Zero" => 0, "One" => 1, "MinusOne" => -1, _ => null }
+            : null;
+        term = value is { } integer ? new SymbolicIntegerConstantTerm(integer) : null!;
+        return term != null;
     }
     internal static bool IsBigIntegerType(ITypeSymbol type) => SymbolicTypeFacts.IsBigIntegerType(type);
 }

@@ -1,73 +1,51 @@
 namespace SharpProof.Symbolic.Ir;
 internal static class SymbolicIrVersionRewriter {
-    internal static SymbolicCondition RewriteToCurrentVersions(SymbolicCondition condition, ImmutableDictionary<string,
-        int> symbolVersions) {
+    internal static SymbolicCondition RewriteToCurrentVersions(
+        SymbolicCondition condition,
+        ImmutableDictionary<string, int> symbolVersions) {
         if (condition == null) throw new ArgumentNullException(nameof(condition));
-        return symbolVersions.IsEmpty ? condition : new CurrentVersionRewriter(symbolVersions).Rewrite(condition);
+        return symbolVersions.IsEmpty ? condition : SymbolicAlgebra.Rewrite(condition, Rewrite);
+        SymbolicTerm? Rewrite(SymbolicTerm term) => RewriteTerm(term, symbolVersions);
     }
-    internal static SymbolicFact RewriteToCurrentVersions(SymbolicFact fact, ImmutableDictionary<string, int> symbolVersions) {
+    internal static SymbolicFact RewriteToCurrentVersions(
+        SymbolicFact fact,
+        ImmutableDictionary<string, int> symbolVersions) {
         if (fact == null) throw new ArgumentNullException(nameof(fact));
-        return symbolVersions.IsEmpty ? fact : new CurrentVersionRewriter(symbolVersions).Rewrite(fact);
+        return symbolVersions.IsEmpty ? fact : SymbolicAlgebra.Rewrite(fact, Rewrite);
+        SymbolicTerm? Rewrite(SymbolicTerm term) => RewriteTerm(term, symbolVersions);
     }
-    sealed class CurrentVersionRewriter : SymbolicIrRewriter {
-        private readonly ImmutableDictionary<string, int> _symbolVersions;
-        internal CurrentVersionRewriter(ImmutableDictionary<string, int> symbolVersions) => _symbolVersions = symbolVersions;
-        protected override bool TryRewriteTerm(SymbolicTerm term, out SymbolicTerm rewritten) {
-            switch (term) {
-                case SymbolicVariableTerm variable:
-                    return TryRewriteVariableLike(
-                        variable,
-                        variable.Name,
-                        static (source, name) => new SymbolicVariableTerm(name, source.Kind),
-                        out rewritten);
-                case SymbolicNullableHasValueTerm nullableHasValue:
-                    return TryRewriteVariableLike(
-                        nullableHasValue,
-                        nullableHasValue.NullableName,
-                        static (_, name) => new SymbolicNullableHasValueTerm(name),
-                        out rewritten);
-                case SymbolicNullableValueTerm nullableValue:
-                    return TryRewriteVariableLike(
-                        nullableValue,
-                        nullableValue.NullableName,
-                        static (source, name) => new SymbolicNullableValueTerm(name, source.Kind),
-                        out rewritten);
-                default:
-                    rewritten = null!;
-                    return false;
-            }
-        }
-        private bool TryRewriteVariableLike<TTerm>(
-            TTerm term,
-            string name,
-            Func<TTerm, string, SymbolicTerm> factory,
-            out SymbolicTerm rewritten)
-            where TTerm : SymbolicTerm {
-            var rewrittenName = RewriteVariableLikeName(name);
-            if (string.Equals(rewrittenName, name, StringComparison.Ordinal)) {
-                rewritten = term;
-                return true;
-            }
-            rewritten = factory(term, rewrittenName);
-            return true;
-        }
-        private string RewriteVariableLikeName(string name) {
-            if (string.IsNullOrEmpty(name)) return name;
-            var (baseName, currentVersion) = SplitVersionedName(name);
-            if (!_symbolVersions.TryGetValue(baseName, out var targetVersion) ||
-                currentVersion == targetVersion)
-                return name;
-            return targetVersion > 0
-                ? baseName + "@v" + targetVersion.ToString(CultureInfo.InvariantCulture)
-                : baseName;
-        }
+    private static SymbolicTerm? RewriteTerm(SymbolicTerm term, ImmutableDictionary<string, int> versions) {
+        var name = term switch {
+            SymbolicVariableTerm variable => variable.Name,
+            SymbolicNullableHasValueTerm nullable => nullable.NullableName,
+            SymbolicNullableValueTerm nullable => nullable.NullableName,
+            _ => null
+        };
+        if (name == null || !TryGetCurrentName(name, versions, out var current)) return null;
+        return term switch {
+            SymbolicVariableTerm variable => variable with { Name = current },
+            SymbolicNullableHasValueTerm nullable => nullable with { NullableName = current },
+            SymbolicNullableValueTerm nullable => nullable with { NullableName = current },
+            _ => null
+        };
     }
-    private static (string BaseName, int Version) SplitVersionedName(string name) {
-        var markerIndex = name.LastIndexOf("@v", StringComparison.Ordinal);
-        if (markerIndex < 0 ||
-            markerIndex + 2 >= name.Length ||
-            !int.TryParse(name.Substring(markerIndex + 2), NumberStyles.None, CultureInfo.InvariantCulture, out var version))
-            return (name, 0);
-        return (name.Substring(0, markerIndex), version);
+    private static bool TryGetCurrentName(
+        string name,
+        ImmutableDictionary<string, int> versions,
+        out string current) {
+        var marker = name.LastIndexOf("@v", StringComparison.Ordinal);
+        var baseName = name;
+        var version = 0;
+        if (marker >= 0 && marker + 2 < name.Length &&
+            int.TryParse(name.Substring(marker + 2), NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)) {
+            baseName = name.Substring(0, marker);
+            version = parsed;
+        }
+        if (!versions.TryGetValue(baseName, out var target) || target == version) {
+            current = name;
+            return false;
+        }
+        current = target > 0 ? baseName + "@v" + target.ToString(CultureInfo.InvariantCulture) : baseName;
+        return true;
     }
 }

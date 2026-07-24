@@ -86,9 +86,9 @@ internal static class CompilerProgramPointAnalysis {
                 ControlFlowConditionKind.WhenFalse => !conditionalSuccessor,
                 _ => conditionalSuccessor
             };
-            var transition = SymbolicReachabilityLowerer.Apply(
-                state, expression, branchWhenTrue, semanticModel, cancellationToken);
-            return transition.IsExact ? transition.State : state;
+            SymbolicReachabilityLowerer.Apply(
+                ref state, expression, branchWhenTrue, semanticModel, cancellationToken);
+            return state;
         }
         public SymbolicState Merge(SymbolicState current, SymbolicState incoming) {
             if (current.NormalizedProofKey == initialKey && incoming.NormalizedProofKey != initialKey ||
@@ -115,22 +115,20 @@ internal static class CompilerProgramPointAnalysis {
                         ? false
                         : null;
                 if (!branchWhenTrue.HasValue) continue;
-                var enclosingTransition = SymbolicReachabilityLowerer.ApplyConditionOnly(
-                    state,
+                SymbolicReachabilityLowerer.ApplyConditionOnly(
+                    ref state,
                     conditional.Condition,
                     branchWhenTrue.Value,
                     semanticModel,
                     cancellationToken);
-                if (enclosingTransition.IsExact) state = enclosingTransition.State;
             }
             if (site.FirstAncestorOrSelf<StatementSyntax>() is { Parent: BlockSyntax block } target) {
                 foreach (var statement in block.Statements.TakeWhile(candidate => !ReferenceEquals(candidate, target))) {
                     if (statement is not IfStatementSyntax { Else: null } conditional ||
                         !AlwaysCompletes(conditional.Statement))
                         continue;
-                    var transition = SymbolicReachabilityLowerer.ApplyConditionOnly(
-                        state, conditional.Condition, false, semanticModel, cancellationToken);
-                    if (transition.IsExact) state = transition.State;
+                    SymbolicReachabilityLowerer.ApplyConditionOnly(
+                        ref state, conditional.Condition, false, semanticModel, cancellationToken);
                 }
             }
             captured = state;

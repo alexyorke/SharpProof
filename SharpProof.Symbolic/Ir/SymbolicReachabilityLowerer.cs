@@ -1,34 +1,31 @@
 namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicReachabilityLowerer {
-    internal static SymbolicOperationTransitionResult Apply(
-        SymbolicState state,
+    internal static bool Apply(
+        ref SymbolicState state,
         ExpressionSyntax condition,
         bool branchWhenTrue,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         condition = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition);
-        var result = state;
         var appliedOutputContract = ApplyConditionalOutputContracts(
-            ref result,
+            ref state,
             condition,
             branchWhenTrue,
             semanticModel,
             cancellationToken);
-        var branchTransition = ApplyConditionOnly(
-            result,
+        var appliedCondition = ApplyConditionOnly(
+            ref state,
             condition,
             branchWhenTrue,
             semanticModel,
             cancellationToken);
-        if (branchTransition.IsExact)
-            result = branchTransition.State;
-        return branchTransition.IsExact || appliedOutputContract
-            ? SymbolicOperationTransitionResult.Exact(result)
-            : SymbolicOperationTransitionResult.Unsupported(state);
+        if (appliedOutputContract && !appliedCondition)
+            state = state.Normalize();
+        return appliedCondition || appliedOutputContract;
     }
-    internal static SymbolicOperationTransitionResult ApplyConditionOnly(
-        SymbolicState state,
+    internal static bool ApplyConditionOnly(
+        ref SymbolicState state,
         ExpressionSyntax condition,
         bool branchWhenTrue,
         SemanticModel semanticModel,
@@ -37,9 +34,10 @@ internal static class SymbolicReachabilityLowerer {
             condition,
             branchWhenTrue,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
-        return lowering is { IsExact: true, Value: { } branch }
-            ? SymbolicOperationTransitionResult.Exact(state.AddPathCondition(branch))
-            : SymbolicOperationTransitionResult.Unsupported(state);
+        if (lowering is not { IsExact: true, Value: { } branch })
+            return false;
+        state = state.AddPathCondition(branch).Normalize();
+        return true;
     }
     private static bool ApplyConditionalOutputContracts(
         ref SymbolicState state,

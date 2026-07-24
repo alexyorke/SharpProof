@@ -150,7 +150,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
         startExpression = null!;
         countExpression = null;
         if (!IsMemoryExtensionsViewInvocation(method)) return false;
-        if (!SymbolicStringLengthLowerer.TryGetMemoryExtensionsViewSourceExpression(
+        if (!TryGetMemoryExtensionsViewSourceExpression(
                 invocationOperation, out sourceExpression, out var firstArgumentIndex) ||
             !TryGetIntSlicingArguments(
                 invocationOperation, firstArgumentIndex, out startExpression, out countExpression))
@@ -184,12 +184,39 @@ internal static class SymbolicRuntimeHazardSyntaxFacts {
                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) &&
                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(method.ContainingType) &&
                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(method.ReturnType);
-    internal static bool IsMemoryExtensionsViewInvocation(IMethodSymbol method) => method.Name is "AsSpan" or "AsMemory" &&
-               method.ContainingType?.OriginalDefinition.ToDisplayString() == "System.MemoryExtensions" &&
+    internal static bool IsMemoryExtensionsViewMethod(IMethodSymbol method) {
+        var definition = method.ReducedFrom ?? method;
+        return definition.Name is "AsSpan" or "AsMemory" &&
+               definition.IsExtensionMethod &&
+               definition.ContainingType?.ToDisplayString() == "System.MemoryExtensions";
+    }
+    internal static bool IsMemoryExtensionsViewInvocation(IMethodSymbol method) => IsMemoryExtensionsViewMethod(method) &&
                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(method.ReturnType) &&
                method.Parameters.Count(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) is
                    1 or 2 &&
                method.Parameters.Any(static parameter => IsMemoryExtensionsViewSourceType(parameter.Type));
+    internal static bool TryGetMemoryExtensionsViewSourceExpression(
+        IInvocationOperation operation,
+        out ExpressionSyntax sourceExpression,
+        out int firstArgumentIndex) {
+        if (operation.Instance?.Syntax is ExpressionSyntax instance &&
+            IsMemoryExtensionsViewSourceType(operation.Instance.Type)) {
+            sourceExpression = instance;
+            firstArgumentIndex = 0;
+            return true;
+        }
+        foreach (var argument in operation.Arguments)
+            if (argument.Parameter?.Ordinal == 0 &&
+                argument.Value.Syntax is ExpressionSyntax expression &&
+                IsMemoryExtensionsViewSourceType(argument.Value.Type)) {
+                sourceExpression = expression;
+                firstArgumentIndex = 1;
+                return true;
+            }
+        sourceExpression = null!;
+        firstArgumentIndex = 0;
+        return false;
+    }
     internal static bool IsMemoryExtensionsViewSourceType(ITypeSymbol? typeSymbol)
         => typeSymbol?.SpecialType == SpecialType.System_String ||
                typeSymbol is IArrayTypeSymbol;

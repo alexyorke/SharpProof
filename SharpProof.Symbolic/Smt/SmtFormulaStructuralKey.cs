@@ -9,27 +9,23 @@ internal static class SmtFormulaStructuralKey {
             SmtNullConstant => "null",
             SmtVariable variable => "variable:" + (int)variable.Kind + ":" + Encode(variable.Name),
             SmtUnaryFormula unary => "unary:" + (int)unary.Operator + "(" + Create(unary.Operand) + ")",
-            SmtBinaryFormula binary => "binary:" + (int)binary.Operator + "(" + Create(binary.Left) + "," +
-                                       Create(binary.Right) + ")",
+            SmtBinaryFormula binary => Binary("binary:" + (int)binary.Operator, binary.Left, binary.Right),
             SmtIntegerUnaryTerm unary =>
                 "integer-unary:" + (int)unary.Operator + "(" + Create(unary.Operand) + ")",
             SmtIntegerBinaryTerm binary =>
-                "integer-binary:" + (int)binary.Operator + "(" + Create(binary.Left) + "," +
-                Create(binary.Right) + ")",
+                Binary("integer-binary:" + (int)binary.Operator, binary.Left, binary.Right),
             SmtOpaqueIntegerBinaryTerm binary =>
-                "opaque-integer-binary:" + (int)binary.Operator + "(" + Create(binary.Left) + "," +
-                Create(binary.Right) + ")",
+                Binary("opaque-integer-binary:" + (int)binary.Operator, binary.Left, binary.Right),
             SmtStringLengthTerm length => "string-length(" + Create(length.Value) + ")",
-            SmtStringConcatTerm concat => "string-concat(" + Create(concat.Left) + "," + Create(concat.Right) +
-                                           ")",
+            SmtStringConcatTerm concat => Binary("string-concat", concat.Left, concat.Right),
             SmtStringSubstringTerm substring => "string-substring(" + Create(substring.Value) + "," +
-                                           Create(substring.Offset) + "," + Create(substring.Length) + ")",
+                                            Create(substring.Offset) + "," + Create(substring.Length) + ")",
             SmtStringContainsFormula contains =>
-                "string-contains(" + Create(contains.Value) + "," + Create(contains.Search) + ")",
+                Binary("string-contains", contains.Value, contains.Search),
             SmtStringStartsWithFormula startsWith =>
-                "string-starts-with(" + Create(startsWith.Value) + "," + Create(startsWith.Prefix) + ")",
+                Binary("string-starts-with", startsWith.Value, startsWith.Prefix),
             SmtStringEndsWithFormula endsWith =>
-                "string-ends-with(" + Create(endsWith.Value) + "," + Create(endsWith.Suffix) + ")",
+                Binary("string-ends-with", endsWith.Value, endsWith.Suffix),
             SmtRegexMatchFormula regex => "regex(" + Create(regex.Value) + "," + Encode(regex.Pattern) + "," +
                                           (int)regex.Options + ")",
             SmtRuntimeTypeTestFormula typeTest =>
@@ -40,6 +36,8 @@ internal static class SmtFormulaStructuralKey {
             _ => throw new NotSupportedException("Unsupported SMT formula type: " + formula.GetType().FullName)
         };
     }
+    private static string Binary(string kind, SmtFormula left, SmtFormula right) =>
+        kind + "(" + Create(left) + "," + Create(right) + ")";
     private static string Encode(string value) =>
         value.Length.ToString(CultureInfo.InvariantCulture) + ":" + value;
 }

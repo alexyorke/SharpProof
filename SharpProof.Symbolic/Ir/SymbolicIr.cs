@@ -127,6 +127,12 @@ internal enum SymbolicConditionOperator {
     Or
 }
 internal sealed class SymbolicState {
+    private sealed class KeyBox(ProofKey value) {
+        internal ProofKey Value { get; } = value;
+    }
+    private static readonly ConditionalWeakTable<SymbolicTerm, KeyBox> s_termKeys = new();
+    private static readonly ConditionalWeakTable<SymbolicFact, KeyBox> s_factKeys = new();
+    private static readonly ConditionalWeakTable<SymbolicCondition, KeyBox> s_conditionKeys = new();
     public SymbolicState(
         IEnumerable<SymbolicFact>? facts = null,
         IEnumerable<SymbolicCondition>? pathConditions = null,
@@ -149,6 +155,7 @@ internal sealed class SymbolicState {
         IsExact = isExact;
         UnknownReason = unknownReason;
         Provenance = provenance?.ToImmutableArray() ?? [];
+        ProofIndex = new FactIndex(Facts, PathConditions);
         NormalizedProofKey = CreateProofKey(Facts, PathConditions, SymbolVersions, IsContradictory);
     }
     public ImmutableArray<SymbolicFact> Facts { get; }
@@ -159,6 +166,7 @@ internal sealed class SymbolicState {
     public ImmutableArray<SymbolicLoweringProvenance> Provenance { get; }
     public bool IsExact { get; }
     public string NormalizedProofKey { get; }
+    internal FactIndex ProofIndex { get; }
     public SymbolicState MarkContradictory() =>
         new(Facts, PathConditions, SymbolVersions, true, IsExact, UnknownReason, Provenance);
     public SymbolicState AddFact(SymbolicFact fact) {
@@ -195,60 +203,51 @@ internal sealed class SymbolicState {
     private static ImmutableArray<SymbolicFact> AddIntrinsicDomainFacts(
         ImmutableArray<SymbolicFact> facts,
         ImmutableArray<SymbolicCondition> conditions) {
-        var collector = new IntrinsicDomainTermCollector();
+        var domainTerms = new Dictionary<string, SymbolicTerm>(StringComparer.Ordinal);
         foreach (var fact in facts)
             if (fact != null)
-                collector.Visit(fact);
+                SymbolicAlgebra.Visit(fact, Collect);
         foreach (var condition in conditions)
             if (condition != null)
-                collector.Visit(condition);
-        var domainTerms = collector.Terms;
+                SymbolicAlgebra.Visit(condition, Collect);
         if (domainTerms.Count == 0) return facts;
         var builder = facts.ToBuilder();
         foreach (var term in domainTerms.OrderBy(static pair => pair.Key, StringComparer.Ordinal).Select(static pair => pair.Value)) {
-            builder.Add(new SymbolicFact(
-                new SymbolicRelationAtom(SymbolicRelationOperator.GreaterThanOrEqual, term, new SymbolicIntegerConstantTerm(0)),
-                true,
-                SymbolicFactConfidence.Exact,
-                "ir.domain.non-negative-size",
-                default,
-                null,
-                "ir.domain.non-negative-size"));
+            builder.Add(DomainFact(term, SymbolicRelationOperator.GreaterThanOrEqual, 0, "ir.domain.non-negative-size"));
             // Encoding a large upper bound over SMT string lengths makes even
             // simple concatenation identities pathologically expensive. String
             // result operations use an overflow-aware total extension instead.
             if (term is not SymbolicLengthTerm { Value.Kind: SmtValueKind.String })
-                builder.Add(new SymbolicFact(
-                    new SymbolicRelationAtom(SymbolicRelationOperator.LessThanOrEqual, term, new SymbolicIntegerConstantTerm(int.MaxValue)),
-                    true,
-                    SymbolicFactConfidence.Exact,
-                    "ir.domain.bounded-size",
-                    default,
-                    null,
-                    "ir.domain.bounded-size"));
+                builder.Add(DomainFact(term, SymbolicRelationOperator.LessThanOrEqual, int.MaxValue, "ir.domain.bounded-size"));
         }
         return builder.ToImmutable();
-    }
-    sealed class IntrinsicDomainTermCollector : SymbolicIrVisitor {
-        internal Dictionary<string, SymbolicTerm> Terms { get; } =
-            new(StringComparer.Ordinal);
-        protected override void OnTerm(SymbolicTerm term) {
+        void Collect(SymbolicTerm term) {
             if (term is not (SymbolicLengthTerm or SymbolicArrayDimensionLengthTerm or SymbolicCountTerm))
                 return;
             var termKey = CreateTermKey(term);
-            if (!Terms.ContainsKey(termKey)) Terms.Add(termKey, term);
+            if (!domainTerms.ContainsKey(termKey)) domainTerms.Add(termKey, term);
         }
     }
+    private static SymbolicFact DomainFact(
+        SymbolicTerm term,
+        SymbolicRelationOperator op,
+        long value,
+        string provenance) => new(
+        new SymbolicRelationAtom(op, term, new SymbolicIntegerConstantTerm(value)),
+        true,
+        SymbolicFactConfidence.Exact,
+        provenance,
+        default,
+        null,
+        provenance);
     private static ImmutableArray<SymbolicFact> DeduplicateFacts(ImmutableArray<SymbolicFact> facts) {
         if (facts.IsDefaultOrEmpty) return [];
-        var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+        var seen = new Dictionary<ProofKey, int>();
         var builder = ImmutableArray.CreateBuilder<SymbolicFact>(facts.Length);
         foreach (var fact in facts) {
             if (fact == null) continue;
-            if (TryEvaluateFact(fact, out var factValue) &&
-                factValue)
-                continue;
-            var key = CreateFactKey(fact);
+            if (EvaluateFact(fact) == true) continue;
+            var key = CreateProofFactIndexKey(fact);
             if (seen.TryGetValue(key, out var existingIndex)) {
                 builder[existingIndex] = SelectCanonicalFact(builder[existingIndex], fact);
             }
@@ -270,15 +269,14 @@ internal sealed class SymbolicState {
         ImmutableArray<SymbolicCondition> conditions,
         ImmutableArray<SymbolicFact> facts) {
         if (conditions.IsDefaultOrEmpty) return [];
-        var factConditionKeys = new HashSet<string>(
-            facts.Select(static fact => "fact-condition:" + CreateFactKey(fact)),
-            StringComparer.Ordinal);
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var factConditionKeys = new HashSet<ProofKey>(
+            facts.Select(static fact => CreateFactConditionIndexKey(CreateProofFactIndexKey(fact))));
+        var seen = new HashSet<ProofKey>();
         var builder = ImmutableArray.CreateBuilder<SymbolicCondition>(conditions.Length);
         foreach (var condition in conditions) {
             if (condition == null) continue;
-            var key = CreateConditionKey(condition);
-            if (string.Equals(key, "const:true", StringComparison.Ordinal) ||
+            var key = CreateProofConditionIndexKey(condition);
+            if (key.Value == "const:true" ||
                 factConditionKeys.Contains(key))
                 continue;
             if (seen.Add(key)) builder.Add(condition);
@@ -286,11 +284,9 @@ internal sealed class SymbolicState {
         return builder.ToImmutable();
     }
     private static bool ContainsContradiction(ImmutableArray<SymbolicFact> facts, ImmutableArray<SymbolicCondition> conditions) {
-        var polarities = new Dictionary<string, bool>(StringComparer.Ordinal);
+        var polarities = new Dictionary<ProofKey, bool>();
         foreach (var fact in facts) {
-            if (TryEvaluateFact(fact, out var factValue) &&
-                !factValue)
-                return true;
+            if (EvaluateFact(fact) == false) return true;
             if (HasOppositePolarity(polarities, fact)) return true;
         }
         foreach (var condition in conditions) {
@@ -298,16 +294,14 @@ internal sealed class SymbolicState {
             if (ContainsPolarityConflict(condition, SymbolicConditionOperator.And)) return true;
             foreach (var fact in EnumerateConditionFacts(condition)) {
                 if (HasOppositePolarity(polarities, fact)) return true;
-                if (TryEvaluateFact(fact, out var factValue) &&
-                    !factValue)
-                    return true;
+                if (EvaluateFact(fact) == false) return true;
             }
         }
         return false;
     }
     private static bool ContainsPolarityConflict(SymbolicCondition condition, SymbolicConditionOperator conditionOperator) {
         if (condition is not SymbolicBinaryCondition binary || binary.Operator != conditionOperator) return false;
-        var polarities = new Dictionary<string, bool>(StringComparer.Ordinal);
+        var polarities = new Dictionary<ProofKey, bool>();
         var facts = conditionOperator == SymbolicConditionOperator.And
             ? EnumerateConditionFacts(condition)
             : EnumerateDisjunctionFacts(condition);
@@ -316,72 +310,38 @@ internal sealed class SymbolicState {
                 return true;
         return false;
     }
-    private static bool HasOppositePolarity(IDictionary<string, bool> polarities, SymbolicFact fact) {
+    private static bool HasOppositePolarity(IDictionary<ProofKey, bool> polarities, SymbolicFact fact) {
         if (fact.Confidence != SymbolicFactConfidence.Exact) return false;
         var key = CreateFactCoreKey(fact);
-        if (polarities.TryGetValue(key.AtomKey, out var existingPolarity)) return existingPolarity != key.Polarity;
-        polarities.Add(key.AtomKey, key.Polarity);
+        var atomKey = new ProofKey(key.AtomKey);
+        if (polarities.TryGetValue(atomKey, out var existingPolarity)) return existingPolarity != key.Polarity;
+        polarities.Add(atomKey, key.Polarity);
         return false;
     }
-    private static bool TryEvaluateFact(SymbolicFact fact, out bool value) {
-        if (fact.Confidence != SymbolicFactConfidence.Exact) {
-            value = false;
-            return false;
-        }
-        if (fact.Atom is SymbolicTruthAtom { Condition: var truthCondition } &&
-            TryEvaluateBooleanTerm(truthCondition, out var truthValue)) {
-            value = fact.Polarity ? truthValue : !truthValue;
-            return true;
-        }
-        if (fact.Atom is SymbolicRelationAtom relation &&
-            (TryEvaluateSelfRelation(relation, out value) ||
-             TryEvaluateConstantRelation(relation, out value))) {
-            value = fact.Polarity ? value : !value;
-            return true;
-        }
-        if (fact.Atom is SymbolicBoundsAtom bounds &&
-            TryEvaluateConstantBounds(bounds, out value)) {
-            value = fact.Polarity ? value : !value;
-            return true;
-        }
-        if (fact.Atom is SymbolicStringPredicateAtom stringPredicate &&
-            TryEvaluateConstantStringPredicate(stringPredicate, out value)) {
-            value = fact.Polarity ? value : !value;
-            return true;
-        }
-        if (fact.Atom is SymbolicTypeTestAtom typeTest &&
-            TryEvaluateNullTypeTest(typeTest, out value)) {
-            value = fact.Polarity ? value : !value;
-            return true;
-        }
-        value = false;
-        return false;
+    private static bool? EvaluateFact(SymbolicFact fact) {
+        if (fact.Confidence != SymbolicFactConfidence.Exact) return null;
+        var value = fact.Atom switch {
+            SymbolicTruthAtom truth => EvaluateTerm(truth.Condition) as bool?,
+            SymbolicRelationAtom relation => EvaluateRelation(relation),
+            SymbolicBoundsAtom bounds => EvaluateBounds(bounds),
+            SymbolicStringPredicateAtom predicate => EvaluateStringPredicate(predicate),
+            SymbolicTypeTestAtom { Value: SymbolicNullTerm } => false,
+            _ => null
+        };
+        return value.HasValue && !fact.Polarity ? !value.Value : value;
     }
-    private static bool TryEvaluateSelfRelation(SymbolicRelationAtom relation, out bool value) {
-        if (!string.Equals(CreateTermKey(relation.Left), CreateTermKey(relation.Right), StringComparison.Ordinal)) {
-            value = false;
-            return false;
-        }
-        value = EvaluateIntegerRelation(relation.Operator, 0, 0);
-        return true;
-    }
-    private static bool TryEvaluateConstantRelation(SymbolicRelationAtom relation, out bool value) {
-        if (TryEvaluateIntegerTerm(relation.Left, out var leftInteger) &&
-            TryEvaluateIntegerTerm(relation.Right, out var rightInteger)) {
-            value = EvaluateIntegerRelation(relation.Operator, leftInteger, rightInteger);
-            return true;
-        }
-        if (relation.Operator is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual &&
-            TryGetConstantEqualityKey(relation.Left, out var leftKey) &&
-            TryGetConstantEqualityKey(relation.Right, out var rightKey)) {
-            var equal = string.Equals(leftKey, rightKey, StringComparison.Ordinal);
-            value = relation.Operator == SymbolicRelationOperator.Equal
-                ? equal
-                : !equal;
-            return true;
-        }
-        value = false;
-        return false;
+    private static bool? EvaluateRelation(SymbolicRelationAtom relation) {
+        if (CreateProofTermIndexKey(relation.Left).Equals(CreateProofTermIndexKey(relation.Right)))
+            return EvaluateIntegerRelation(relation.Operator, 0, 0);
+        if (TryEvaluateTerm<long>(relation.Left, out var left) &&
+            TryEvaluateTerm<long>(relation.Right, out var right))
+            return EvaluateIntegerRelation(relation.Operator, left, right);
+        if (relation.Operator is not (SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual) ||
+            !TryGetConstantEqualityKey(relation.Left, out var leftKey) ||
+            !TryGetConstantEqualityKey(relation.Right, out var rightKey))
+            return null;
+        var equal = string.Equals(leftKey, rightKey, StringComparison.Ordinal);
+        return relation.Operator == SymbolicRelationOperator.Equal ? equal : !equal;
     }
     private static bool EvaluateIntegerRelation(SymbolicRelationOperator relation, long left, long right) => relation switch {
         SymbolicRelationOperator.Equal => left == right,
@@ -392,49 +352,36 @@ internal sealed class SymbolicState {
         SymbolicRelationOperator.GreaterThanOrEqual => left >= right,
         _ => false
     };
-    private static bool TryEvaluateConstantBounds(SymbolicBoundsAtom bounds, out bool value) {
-        if (!TryEvaluateIntegerTerm(bounds.Index, out var index) ||
-            !TryEvaluateIntegerTerm(bounds.Length, out var length) ||
-            (!bounds.IncludeLowerBound && !bounds.IncludeUpperBound)) {
-            value = false;
-            return false;
-        }
-        value = (!bounds.IncludeLowerBound || index >= 0) &&
-                (!bounds.IncludeUpperBound || index < length);
-        return true;
+    private static bool? EvaluateBounds(SymbolicBoundsAtom bounds) {
+        if (!TryEvaluateTerm<long>(bounds.Index, out var index) ||
+            !TryEvaluateTerm<long>(bounds.Length, out var length) ||
+            !bounds.IncludeLowerBound && !bounds.IncludeUpperBound)
+            return null;
+        return (!bounds.IncludeLowerBound || index >= 0) && (!bounds.IncludeUpperBound || index < length);
     }
-    private static bool TryEvaluateConstantStringPredicate(SymbolicStringPredicateAtom predicate, out bool value) {
-        if (predicate.Predicate is
-            SymbolicStringPredicateKind.Contains or
-            SymbolicStringPredicateKind.StartsWith or
-            SymbolicStringPredicateKind.EndsWith)
-            if (predicate.Argument is SymbolicStringConstantTerm { Value.Length: 0 } ||
-                string.Equals(CreateTermKey(predicate.Value), CreateTermKey(predicate.Argument), StringComparison.Ordinal)) {
-                value = true;
-                return true;
-            }
-        if (!TryEvaluateStringTerm(predicate.Value, out var valueText) ||
-            !TryEvaluateStringTerm(predicate.Argument, out var argumentText)) {
-            value = false;
-            return false;
-        }
-        value = predicate.Predicate switch {
-            SymbolicStringPredicateKind.Contains => valueText.IndexOf(argumentText, StringComparison.Ordinal) >= 0,
-            SymbolicStringPredicateKind.StartsWith => valueText.StartsWith(argumentText, StringComparison.Ordinal),
-            SymbolicStringPredicateKind.EndsWith => valueText.EndsWith(argumentText, StringComparison.Ordinal),
-            _ => false
+    private static bool? EvaluateStringPredicate(SymbolicStringPredicateAtom predicate) {
+        var supported = predicate.Predicate is SymbolicStringPredicateKind.Contains or
+            SymbolicStringPredicateKind.StartsWith or SymbolicStringPredicateKind.EndsWith;
+        if (!supported) return null;
+        if (predicate.Argument is SymbolicStringConstantTerm { Value.Length: 0 } ||
+            CreateProofTermIndexKey(predicate.Value).Equals(CreateProofTermIndexKey(predicate.Argument)))
+            return true;
+        if (!TryEvaluateTerm<string>(predicate.Value, out var value) ||
+            !TryEvaluateTerm<string>(predicate.Argument, out var argument))
+            return null;
+        return predicate.Predicate switch {
+            SymbolicStringPredicateKind.Contains => value.IndexOf(argument, StringComparison.Ordinal) >= 0,
+            SymbolicStringPredicateKind.StartsWith => value.StartsWith(argument, StringComparison.Ordinal),
+            _ => value.EndsWith(argument, StringComparison.Ordinal)
         };
-        return predicate.Predicate is
-            SymbolicStringPredicateKind.Contains or
-            SymbolicStringPredicateKind.StartsWith or
-            SymbolicStringPredicateKind.EndsWith;
     }
     private static bool TryGetConstantEqualityKey(SymbolicTerm term, out string key) {
         if (term is SymbolicNullTerm) {
             key = CreateTermKey(term);
             return true;
         }
-        if (!TryEvaluateTerm(term, out var value)) {
+        var value = EvaluateTerm(term);
+        if (value == null) {
             key = string.Empty;
             return false;
         }
@@ -447,71 +394,37 @@ internal sealed class SymbolicState {
         key = constant == null ? string.Empty : CreateTermKey(constant);
         return constant != null;
     }
-    private static bool TryEvaluateTerm(SymbolicTerm term, out object value) {
-        switch (term) {
-            case SymbolicIntegerConstantTerm integer:
-                value = integer.Value;
-                return true;
-            case SymbolicBooleanConstantTerm boolean:
-                value = boolean.Value;
-                return true;
-            case SymbolicStringConstantTerm text:
-                value = text.Value;
-                return true;
-            case SymbolicLengthTerm { Value: var lengthValue }
-                when TryEvaluateStringTerm(lengthValue, out var stringValue):
-                value = (long)stringValue.Length;
-                return true;
-            case SymbolicStringConcatTerm concat
-                when TryEvaluateStringTerm(concat.Left, out var left) &&
-                     TryEvaluateStringTerm(concat.Right, out var right):
-                value = left + right;
-                return true;
-            case SymbolicConditionalTerm conditional
-                when TrySelectConstantConditionalBranch(conditional, out var selected):
-                return TryEvaluateTerm(selected, out value);
-            default:
-                value = null!;
-                return false;
-        }
-    }
-    private static bool TryEvaluateIntegerTerm(SymbolicTerm term, out long value) =>
-        TryEvaluateTerm(term, out value);
-    private static bool TryEvaluateStringTerm(SymbolicTerm term, out string value) =>
-        TryEvaluateTerm(term, out value);
-    private static bool TryEvaluateBooleanTerm(SymbolicTerm term, out bool value) =>
-        TryEvaluateTerm(term, out value);
+    private static object? EvaluateTerm(SymbolicTerm term) => term switch {
+        SymbolicIntegerConstantTerm integer => integer.Value,
+        SymbolicBooleanConstantTerm boolean => boolean.Value,
+        SymbolicStringConstantTerm text => text.Value,
+        SymbolicLengthTerm length when EvaluateTerm(length.Value) is string text => (long)text.Length,
+        SymbolicStringConcatTerm concat => EvaluateConcat(concat),
+        SymbolicConditionalTerm conditional => SelectBranch(conditional) is { } selected
+            ? EvaluateTerm(selected)
+            : null,
+        _ => null
+    };
+    private static string? EvaluateConcat(SymbolicStringConcatTerm concat) =>
+        EvaluateTerm(concat.Left) is string left && EvaluateTerm(concat.Right) is string right
+            ? left + right
+            : null;
     private static bool TryEvaluateTerm<T>(SymbolicTerm term, out T value) {
-        if (TryEvaluateTerm(term, out object result) && result is T typed) {
+        if (EvaluateTerm(term) is T typed) {
             value = typed;
             return true;
         }
         value = default!;
         return false;
     }
-    private static bool TrySelectConstantConditionalBranch(SymbolicConditionalTerm conditional, out SymbolicTerm selected) {
-        var conditionKey = CreateConditionKey(conditional.Condition);
-        if (string.Equals(conditionKey, "const:true", StringComparison.Ordinal)) {
-            selected = conditional.WhenTrue;
-            return true;
-        }
-        if (string.Equals(conditionKey, "const:false", StringComparison.Ordinal)) {
-            selected = conditional.WhenFalse;
-            return true;
-        }
-        selected = conditional.WhenTrue;
-        return false;
-    }
-    private static bool TryEvaluateNullTypeTest(SymbolicTypeTestAtom typeTest, out bool value) {
-        if (typeTest.Value is not SymbolicNullTerm) {
-            value = false;
-            return false;
-        }
-        value = false;
-        return true;
-    }
+    private static SymbolicTerm? SelectBranch(SymbolicConditionalTerm conditional) =>
+        CreateProofConditionIndexKey(conditional.Condition).Value switch {
+            "const:true" => conditional.WhenTrue,
+            "const:false" => conditional.WhenFalse,
+            _ => null
+        };
     private static bool ContainsConstant(SymbolicCondition condition, bool expected) {
-        if (string.Equals(CreateConditionKey(condition), expected ? "const:true" : "const:false", StringComparison.Ordinal))
+        if (CreateProofConditionIndexKey(condition).Value == (expected ? "const:true" : "const:false"))
             return true;
         return condition switch {
             SymbolicConstantCondition constant => constant.Value == expected,
@@ -581,20 +494,34 @@ internal sealed class SymbolicState {
         CreateTermKey(term);
     internal static string CreateProofConditionKey(SymbolicCondition condition) =>
         CreateConditionKey(condition);
-    internal static IEnumerable<string> EnumerateProofConditionFactKeys(SymbolicCondition condition) =>
-        EnumerateConditionFacts(condition).Select(CreateFactKey);
-    internal static bool TryEvaluateProofFact(SymbolicFact fact, out bool value) =>
-        TryEvaluateFact(fact, out value);
-    private static string CreateFactKey(SymbolicFact fact) {
+    internal static ProofKey CreateProofFactIndexKey(SymbolicFact fact) =>
+        s_factKeys.GetValue(fact, static value => new KeyBox(new ProofKey(CreateFactKeyCore(value)))).Value;
+    internal static ProofKey CreateProofTermIndexKey(SymbolicTerm term) =>
+        s_termKeys.GetValue(term, static value => new KeyBox(new ProofKey(CreateTermKeyCore(value)))).Value;
+    internal static ProofKey CreateProofConditionIndexKey(SymbolicCondition condition) =>
+        s_conditionKeys.GetValue(
+            condition,
+            static value => new KeyBox(new ProofKey(CreateConditionKeyCore(value)))).Value;
+    internal static ProofKey CreateFactConditionIndexKey(ProofKey fact) => new("fact-condition:" + fact.Value);
+    internal static IEnumerable<ProofKey> EnumerateProofConditionFactIndexKeys(SymbolicCondition condition) =>
+        EnumerateConditionFacts(condition).Select(static fact => new ProofKey(CreateFactKey(fact)));
+    internal static bool TryEvaluateProofFact(SymbolicFact fact, out bool value) {
+        var evaluated = EvaluateFact(fact);
+        value = evaluated.GetValueOrDefault();
+        return evaluated.HasValue;
+    }
+    private static string CreateFactKey(SymbolicFact fact) => CreateProofFactIndexKey(fact).Value;
+    private static string CreateFactKeyCore(SymbolicFact fact) {
         var key = CreateFactCoreKey(fact);
         return string.Join("|", key.AtomKey, key.Polarity ? "true" : "false", fact.Confidence.ToString());
     }
-    private static (string AtomKey, bool Polarity) CreateFactCoreKey(SymbolicFact fact) => fact.Atom is SymbolicRelationAtom relation
-            ? CreateRelationFactCoreKey(relation, fact.Polarity)
+    private static (string AtomKey, bool Polarity) CreateFactCoreKey(SymbolicFact fact) =>
+        fact.Atom is SymbolicRelationAtom relation
+            ? CreateRelationKey(relation, fact.Polarity, true)
             : (CreateAtomKey(fact.Atom), fact.Polarity);
     private static string CreateAtomKey(SymbolicAtom atom) => atom switch {
         SymbolicTruthAtom truth => "truth:" + CreateTermKey(truth.Condition),
-        SymbolicRelationAtom relation => CreateRelationAtomKey(relation),
+        SymbolicRelationAtom relation => CreateRelationKey(relation, true, false).AtomKey,
         SymbolicStringPredicateAtom predicate => "string-predicate:" + predicate.Predicate + ":" +
                                predicate.RegexOptions + "(" +
                                CreateTermKey(predicate.Value) + "," +
@@ -612,56 +539,45 @@ internal sealed class SymbolicState {
                                CreateConditionKey(precondition.Trigger),
         _ => throw new NotSupportedException("Unsupported symbolic atom type: " + atom.GetType().FullName),
     };
-    private static (string AtomKey, bool Polarity) CreateRelationFactCoreKey(SymbolicRelationAtom relation, bool polarity) {
+    private static (string AtomKey, bool Polarity) CreateRelationKey(
+        SymbolicRelationAtom relation,
+        bool polarity,
+        bool normalizePolarity) {
         var left = CreateTermKey(relation.Left);
         var right = CreateTermKey(relation.Right);
-        var relationOperator = relation.Operator;
-        switch (relationOperator) {
-            case SymbolicRelationOperator.NotEqual:
-                relationOperator = SymbolicRelationOperator.Equal;
+        var op = relation.Operator;
+        switch (op) {
+            case SymbolicRelationOperator.NotEqual when normalizePolarity:
+                op = SymbolicRelationOperator.Equal;
                 polarity = !polarity;
                 break;
-            case SymbolicRelationOperator.LessThanOrEqual:
-                relationOperator = SymbolicRelationOperator.LessThan;
+            case SymbolicRelationOperator.LessThanOrEqual when normalizePolarity:
+                op = SymbolicRelationOperator.LessThan;
                 (left, right) = (right, left);
                 polarity = !polarity;
                 break;
             case SymbolicRelationOperator.GreaterThan:
-                relationOperator = SymbolicRelationOperator.LessThan;
+                op = SymbolicRelationOperator.LessThan;
                 (left, right) = (right, left);
                 break;
             case SymbolicRelationOperator.GreaterThanOrEqual:
-                relationOperator = SymbolicRelationOperator.LessThan;
-                polarity = !polarity;
+                if (normalizePolarity) {
+                    op = SymbolicRelationOperator.LessThan;
+                    polarity = !polarity;
+                }
+                else {
+                    op = SymbolicRelationOperator.LessThanOrEqual;
+                    (left, right) = (right, left);
+                }
                 break;
         }
-        if ((relationOperator == SymbolicRelationOperator.Equal ||
-             relationOperator == SymbolicRelationOperator.NotEqual) &&
+        if (op is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual &&
             string.CompareOrdinal(left, right) > 0)
             (left, right) = (right, left);
-        return ("relation:" + relationOperator + "(" + left + "," + right + ")", polarity);
+        return ("relation:" + op + "(" + left + "," + right + ")", polarity);
     }
-    private static string CreateRelationAtomKey(SymbolicRelationAtom relation) {
-        var left = CreateTermKey(relation.Left);
-        var right = CreateTermKey(relation.Right);
-        var relationOperator = relation.Operator;
-        switch (relationOperator) {
-            case SymbolicRelationOperator.Equal:
-            case SymbolicRelationOperator.NotEqual:
-                if (string.CompareOrdinal(left, right) > 0) (left, right) = (right, left);
-                break;
-            case SymbolicRelationOperator.GreaterThan:
-                relationOperator = SymbolicRelationOperator.LessThan;
-                (left, right) = (right, left);
-                break;
-            case SymbolicRelationOperator.GreaterThanOrEqual:
-                relationOperator = SymbolicRelationOperator.LessThanOrEqual;
-                (left, right) = (right, left);
-                break;
-        }
-        return "relation:" + relationOperator + "(" + left + "," + right + ")";
-    }
-    private static string CreateTermKey(SymbolicTerm term) {
+    private static string CreateTermKey(SymbolicTerm term) => CreateProofTermIndexKey(term).Value;
+    private static string CreateTermKeyCore(SymbolicTerm term) {
         if (term is SymbolicFromEndIndexTerm fromEnd)
             return "from-end-index:" + CreateTermKey(fromEnd.Value);
         if (term is SymbolicNumericConversionTerm conversion)
@@ -671,8 +587,10 @@ internal sealed class SymbolicState {
             return SmtFormulaStructuralKey.Create(formula);
         throw new NotSupportedException("Unsupported symbolic term type: " + term.GetType().FullName);
     }
-    private static string CreateConditionKey(SymbolicCondition condition) {
-        if (TryEvaluateCondition(condition, out var value)) return "const:" + (value ? "true" : "false");
+    private static string CreateConditionKey(SymbolicCondition condition) => CreateProofConditionIndexKey(condition).Value;
+    private static string CreateConditionKeyCore(SymbolicCondition condition) {
+        var value = EvaluateCondition(condition);
+        if (value.HasValue) return "const:" + (value.Value ? "true" : "false");
         if (condition is SymbolicFactCondition fact) return "fact-condition:" + CreateFactKey(fact.Fact);
         if (condition is SymbolicNotCondition { Operand: SymbolicFactCondition factOperand })
             return "fact-condition:" + CreateFactKey(factOperand.Fact.Negate());
@@ -680,19 +598,10 @@ internal sealed class SymbolicState {
             throw new NotSupportedException("Unsupported symbolic condition type: " + condition.GetType().FullName);
         return SmtFormulaStructuralKey.Create(formula);
     }
-    private static bool TryEvaluateCondition(SymbolicCondition condition, out bool value) {
-        switch (condition) {
-            case SymbolicConstantCondition constant:
-                value = constant.Value;
-                return true;
-            case SymbolicFactCondition fact:
-                return TryEvaluateFact(fact.Fact, out value);
-            case SymbolicNotCondition operand when TryEvaluateCondition(operand.Operand, out value):
-                value = !value;
-                return true;
-            default:
-                value = false;
-                return false;
-        }
-    }
+    private static bool? EvaluateCondition(SymbolicCondition condition) => condition switch {
+        SymbolicConstantCondition constant => constant.Value,
+        SymbolicFactCondition fact => EvaluateFact(fact.Fact),
+        SymbolicNotCondition not when EvaluateCondition(not.Operand) is { } value => !value,
+        _ => null
+    };
 }

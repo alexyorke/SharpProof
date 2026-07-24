@@ -1,30 +1,6 @@
 using static SharpProof.Symbolic.SymbolicRuntimeHazardSourceCandidateFactory;
 namespace SharpProof.Symbolic;
 internal static class SymbolicRuntimeHazardCandidateFactory {
-    private static readonly TryLowerOperationHazard[] OperationHazardLowerers =
-    [
-        SymbolicOperationLowerer.TryLowerDivideByZeroHazard,
-        SymbolicOperationLowerer.TryLowerDecimalOverflowHazard,
-        SymbolicOperationLowerer.TryLowerCheckedOverflowHazard,
-        SymbolicOperationLowerer.TryLowerNullableValueCastHazard,
-        SymbolicOperationLowerer.TryLowerUnboxNullCastHazard,
-        SymbolicOperationLowerer.TryLowerInvalidCastHazard,
-        SymbolicOperationLowerer.TryLowerIndexConstructionBoundsHazard,
-        SymbolicOperationLowerer.TryLowerMathAbsOverflowHazard,
-        SymbolicOperationLowerer.TryLowerMathClampBoundsHazard,
-        SymbolicOperationLowerer.TryLowerKnownArgumentGuardHazard,
-        SymbolicOperationLowerer.TryLowerArrayStoreMismatchHazard,
-        SymbolicOperationLowerer.TryLowerArrayGetValueBoundsHazard,
-        SymbolicOperationLowerer.TryLowerElementAccessBoundsHazard,
-        SymbolicOperationLowerer.TryLowerSlicingBoundsHazard,
-        SymbolicOperationLowerer.TryLowerInvalidCollectionCardinalityHazard,
-        SymbolicOperationLowerer.TryLowerNegativeLengthHazard,
-        SymbolicOperationLowerer.TryLowerSwitchNoMatchHazard,
-        SymbolicOperationLowerer.TryLowerNullableValueAccessHazard,
-        SymbolicOperationLowerer.TryLowerDynamicNullBindingHazard,
-        SymbolicOperationLowerer.TryLowerNullDereferenceHazard,
-        SymbolicOperationLowerer.TryLowerArgumentNullHazard
-    ];
     internal static IEnumerable<RuntimeHazardCandidate> EnumerateCandidates(
         SyntaxNode root,
         SemanticModel semanticModel,
@@ -54,9 +30,8 @@ internal static class SymbolicRuntimeHazardCandidateFactory {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var operation = semanticModel.GetOperation(node, cancellationToken);
         if (operation != null)
-            foreach (var lower in OperationHazardLowerers)
-                if (lower(operation, context, out var hazard))
-                    yield return new RuntimeHazardCandidate(node, hazard);
+            foreach (var hazard in SymbolicOperationLowerer.LowerOperationHazards(operation, context))
+                yield return new RuntimeHazardCandidate(node, hazard);
         // Invocation targets can have no member-level operation because Roslyn owns the operation at the parent call.
         if (node is MemberAccessExpressionSyntax memberAccess &&
             (operation == null || !ReferenceEquals(operation.Syntax, memberAccess)) &&
@@ -66,6 +41,4 @@ internal static class SymbolicRuntimeHazardCandidateFactory {
             foreach (var throwCandidate in CreateThrowCandidates(node, semanticModel, cancellationToken))
                 yield return throwCandidate;
     }
-    private delegate bool TryLowerOperationHazard(IOperation operation, SymbolicLoweringContext context,
-        out SymbolicHazardOperation hazard);
 }

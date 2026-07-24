@@ -154,13 +154,10 @@ internal sealed class SmtAnalysisService : IDisposable {
                             budget.RecordConsumedResources(search.ConsumedResourceCount - resourcesBefore);
                         }
                     }
-                    catch (InvalidOperationException) {
-                        RecordFailure("smt_encoding_failure", SmtAnalysisHealthState.Ready);
-                        return Unknown("smt_encoding_failure");
-                    }
-                    catch (RegexMatchTimeoutException) {
-                        RecordFailure("smt_timeout", SmtAnalysisHealthState.Ready);
-                        return Unknown("smt_timeout");
+                    catch (Exception ex) when (ex is InvalidOperationException or RegexMatchTimeoutException) {
+                        var failureCode = ex is RegexMatchTimeoutException ? "smt_timeout" : "smt_encoding_failure";
+                        RecordFailure(failureCode, SmtAnalysisHealthState.Ready);
+                        return Unknown(failureCode);
                     }
                     catch (Exception ex) when (IsTransientSolverFailure(ex)) {
                         result = Unknown("smt_transient_failure");
@@ -239,19 +236,19 @@ internal sealed class SmtAnalysisService : IDisposable {
     private SmtAnalysisHealthState GetHealthState() =>
         (SmtAnalysisHealthState)Volatile.Read(ref _healthState);
     private void SetHealthState(SmtAnalysisHealthState state) => Volatile.Write(ref _healthState, (int)state);
+    private bool CanTransitionHealth =>
+        !_disposed && GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable;
     private void RecordFailure(string failureCode, SmtAnalysisHealthState state) {
         lock (_healthLock) {
             _lastFailureCode = failureCode;
-            if (!_disposed && GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable)
-                SetHealthState(state);
+            if (CanTransitionHealth) SetHealthState(state);
         }
     }
     private void RecordTransientFailure() {
         lock (_healthLock) {
             _lastFailureCode = "smt_transient_failure";
             _consecutiveTransientFailureCount++;
-            if (!_disposed && GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable)
-                SetHealthState(SmtAnalysisHealthState.Degraded);
+            if (CanTransitionHealth) SetHealthState(SmtAnalysisHealthState.Degraded);
         }
     }
     private void RecordSolverSuccess() {
@@ -259,9 +256,7 @@ internal sealed class SmtAnalysisService : IDisposable {
             if (GetHealthState() == SmtAnalysisHealthState.Degraded)
                 _recoveredTransientFailureCount++;
             _consecutiveTransientFailureCount = 0;
-            if (!_disposed &&
-                GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable)
-                SetHealthState(SmtAnalysisHealthState.Ready);
+            if (CanTransitionHealth) SetHealthState(SmtAnalysisHealthState.Ready);
         }
     }
     private void MarkPermanentlyUnavailable(string failureCode) {
@@ -270,25 +265,17 @@ internal sealed class SmtAnalysisService : IDisposable {
             SetHealthState(SmtAnalysisHealthState.PermanentlyUnavailable);
         }
     }
-    private static string CreateQueryKey(AnalysisProofQuery query) => CreateFormulaSequenceKey(query.PathConditions) +
-               "|hazard=" + (int)query.Hazard.Kind +
-               "|visibility=" + (int)query.Hazard.Visibility +
-               "|trigger=" + SmtFormulaStructuralKey.Create(query.Hazard.TriggerCondition);
-    private static ImmutableArray<SmtFormula> NormalizePathConditions(IEnumerable<SmtFormula> pathConditions) {
-        var builder = ImmutableArray.CreateBuilder<SmtFormula>();
-        var seen = new HashSet<SmtFormula>();
-        foreach (var pathCondition in pathConditions) {
-            if (pathCondition is SmtBooleanConstant { Value: true }) continue;
-            if (seen.Add(pathCondition)) builder.Add(pathCondition);
-        }
-        return [.. builder.OrderBy(SmtFormulaStructuralKey.Create, StringComparer.Ordinal)];
-    }
-    private static string CreateFormulaSequenceKey(IEnumerable<SmtFormula> formulas) {
-        var keys = formulas.Select(SmtFormulaStructuralKey.Create).ToArray();
-        return string.Join(
-            string.Empty,
-            keys.Select(static key => key.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + key));
-    }
+    private static string CreateQueryKey(AnalysisProofQuery query) =>
+        $"{CreateFormulaSequenceKey(query.PathConditions)}|hazard={(int)query.Hazard.Kind}" +
+        $"|visibility={(int)query.Hazard.Visibility}|trigger={SmtFormulaStructuralKey.Create(query.Hazard.TriggerCondition)}";
+    private static ImmutableArray<SmtFormula> NormalizePathConditions(IEnumerable<SmtFormula> pathConditions) =>
+        [.. pathConditions
+            .Where(static condition => condition is not SmtBooleanConstant { Value: true })
+            .Distinct()
+            .OrderBy(SmtFormulaStructuralKey.Create, StringComparer.Ordinal)];
+    private static string CreateFormulaSequenceKey(IEnumerable<SmtFormula> formulas) =>
+        string.Concat(formulas.Select(SmtFormulaStructuralKey.Create).Select(static key =>
+            key.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + key));
     private static bool IsWithinFormulaNodeBudget(IEnumerable<SmtFormula> pathConditions, SmtFormula triggerCondition, int maxNodes) {
         var remaining = maxNodes;
         foreach (var formula in pathConditions)

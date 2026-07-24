@@ -20,9 +20,8 @@ internal static class SymbolicSourceCompletionLowerer {
                     semanticModel,
                     cancellationToken))
                 continue;
-            var transition = SymbolicReachabilityLowerer.Apply(
-                state, argumentSyntax.Expression, !doesNotReturnWhen, semanticModel, cancellationToken);
-            if (transition.IsExact) state = transition.State;
+            SymbolicReachabilityLowerer.Apply(
+                ref state, argumentSyntax.Expression, !doesNotReturnWhen, semanticModel, cancellationToken);
         }
         if (frameworkLowering is { IsExact: true, Value: { } afterPlan })
             state = ApplyConditions(state, afterPlan.AfterDoesNotReturnIf);
@@ -33,5 +32,5 @@ internal static class SymbolicSourceCompletionLowerer {
         IReadOnlyList<SymbolicCondition> conditions) =>
         conditions.Count == 0
             ? state
-            : SymbolicOperationTransferKernel.AssumeAll(state, conditions).State;
+            : SymbolicOperationTransferKernel.AssumeAll(state, conditions);
 }

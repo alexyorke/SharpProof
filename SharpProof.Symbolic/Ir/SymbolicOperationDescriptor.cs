@@ -9,7 +9,6 @@ internal readonly record struct SymbolicInvalidationTarget(
     SymbolicInvalidationMatchKind MatchKind = SymbolicInvalidationMatchKind.VariablePrefix,
     int? DefinitionVersion = null);
 internal readonly record struct SymbolicOperationOrigin(TextSpan SourceSpan, string Provenance);
-internal abstract record SymbolicOperationDescriptor(SymbolicOperationOrigin Origin);
 internal sealed record SymbolicAssignmentBinding(
     string TargetKey,
     SymbolicTerm Target,
@@ -19,15 +18,12 @@ internal sealed record SymbolicAssignmentBinding(
     bool PropagateSourceFacts = false,
     bool DeriveIntegerBounds = false,
     bool InvalidateTarget = true);
-internal sealed record SymbolicAssignmentOperation(
+internal sealed record SymbolicStateDelta(
     ImmutableArray<SymbolicAssignmentBinding> Bindings,
-    ImmutableArray<SymbolicCondition> Postconditions,
     SymbolicOperationOrigin Origin,
-    ImmutableArray<SymbolicInvalidationTarget> Invalidations = default) : SymbolicOperationDescriptor(Origin);
-internal sealed record SymbolicMutationOperation(
-    ImmutableArray<SymbolicAssignmentBinding> Bindings,
-    ImmutableArray<SymbolicInvalidationTarget> Invalidations,
-    SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin);
+    ImmutableArray<SymbolicCondition> Assumptions = default,
+    ImmutableArray<SymbolicInvalidationTarget> Invalidations = default,
+    SymbolicUnknownReason UnknownReason = SymbolicUnknownReason.None);
 internal sealed record SymbolicHazardOperation(
     SymbolicRuntimeHazardKind HazardKind,
     SymbolicExceptionPreconditionKind PreconditionKind,
@@ -36,7 +32,7 @@ internal sealed record SymbolicHazardOperation(
     SymbolicFactConfidence Confidence,
     string ExceptionType,
     string Category,
-    SymbolicOperationOrigin Origin) : SymbolicOperationDescriptor(Origin) {
+    SymbolicOperationOrigin Origin) {
     internal SymbolicFact ToPreconditionFact() => new(
             new SymbolicExceptionPreconditionAtom(PreconditionKind, Subject, Trigger),
             true,

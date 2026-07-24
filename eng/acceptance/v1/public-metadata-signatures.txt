@@ -1,0 +1,377 @@
+assembly SharpProof.Analyzer
+type public class SharpProof.Analyzer.SharpProofAnalyzer : Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzer [] attrs=[Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzerAttribute(System.String:"C#",System.String[]:[];)|System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor ()
+  method virtual System.Void Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) return
+  property get System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor> SupportedDiagnostics[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)]
+assembly SharpProof.Attributes
+type public sealed class SharpProof.Attributes.AllowedCapabilitiesAttribute : System.Attribute [] attrs=[System.AttributeUsageAttribute(System.AttributeTargets:224;Inherited=System.Boolean:false)]
+  ctor (SharpProof.Attributes.SharpProofCapability capabilities)
+  property get SharpProof.Attributes.SharpProofCapability Capabilities[]
+type public sealed class SharpProof.Attributes.AllowedExceptionsAttribute : System.Attribute [] attrs=[System.AttributeUsageAttribute(System.AttributeTargets:224;AllowMultiple=System.Boolean:true,Inherited=System.Boolean:false)|System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (System.Type[] exceptionTypes attrs=[System.ParamArrayAttribute(;)])
+  property get System.Type[] ExceptionTypes[]
+type public enum SharpProof.Attributes.ComplexityKind : System.Enum [System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable]
+  field  System.Int32 value__
+  field const SharpProof.Attributes.ComplexityKind Constant=0
+  field const SharpProof.Attributes.ComplexityKind Linear=1
+  field const SharpProof.Attributes.ComplexityKind Linearithmic=4
+  field const SharpProof.Attributes.ComplexityKind Logarithmic=3
+  field const SharpProof.Attributes.ComplexityKind Max=6
+  field const SharpProof.Attributes.ComplexityKind Product=5
+  field const SharpProof.Attributes.ComplexityKind Quadratic=2
+type public sealed class SharpProof.Attributes.DoesNotThrowAttribute : System.Attribute [] attrs=[System.AttributeUsageAttribute(System.AttributeTargets:224;Inherited=System.Boolean:false)]
+  ctor ()
+type public sealed class SharpProof.Attributes.EffectContractAttribute : System.Attribute [] attrs=[System.AttributeUsageAttribute(System.AttributeTargets:225;AllowMultiple=System.Boolean:true,Inherited=System.Boolean:false)|System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (SharpProof.Attributes.SharpProofEffect effects)
+  ctor (System.String targetMethodKey,SharpProof.Attributes.SharpProofEffect effects)
+  property get SharpProof.Attributes.SharpProofEffect Effects[]
+  property get System.String TargetMethodKey[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)]
+  property get,set SharpProof.Attributes.SharpProofCapability Capabilities[]
+  property get,set System.Boolean Complete[]
+  property get,set System.Boolean IsDeterministic[]
+  property get,set System.Type[] ThrownExceptions[]
+type public sealed class SharpProof.Attributes.EnforcePureAttribute : System.Attribute [] attrs=[System.AttributeUsageAttribute(System.AttributeTargets:224;Inherited=System.Boolean:false)]
+  ctor ()
+type public sealed class SharpProof.Attributes.EnsuresAttribute : System.Attribute [] attrs=[System.AttributeUsageAttribute(System.AttributeTargets:224;AllowMultiple=System.Boolean:true,Inherited=System.Boolean:false)|System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (System.String condition)
+  property get System.String Condition[]
+type public sealed class SharpProof.Attributes.ExpectedComplexityAttribute : System.Attribute [] attrs=[System.AttributeUsageAttribute(System.AttributeTargets:224;Inherited=System.Boolean:false)]
+  ctor (SharpProof.Attributes.ComplexityKind maximumComplexity)
+  property get SharpProof.Attributes.ComplexityKind MaximumComplexity[]
+type public sealed class SharpProof.Attributes.RequiresAttribute : System.Attribute [] attrs=[System.AttributeUsageAttribute(System.AttributeTargets:96;AllowMultiple=System.Boolean:true,Inherited=System.Boolean:false)|System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (System.String condition)
+  property get System.String Condition[]
+type public enum SharpProof.Attributes.SharpProofCapability : System.Enum [System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable] attrs=[System.FlagsAttribute(;)]
+  field  System.Int32 value__
+  field const SharpProof.Attributes.SharpProofCapability Clock=256
+  field const SharpProof.Attributes.SharpProofCapability Console=16
+  field const SharpProof.Attributes.SharpProofCapability Environment=64
+  field const SharpProof.Attributes.SharpProofCapability FileRead=2
+  field const SharpProof.Attributes.SharpProofCapability FileWrite=4
+  field const SharpProof.Attributes.SharpProofCapability IO=1
+  field const SharpProof.Attributes.SharpProofCapability NativeInterop=4096
+  field const SharpProof.Attributes.SharpProofCapability Network=8
+  field const SharpProof.Attributes.SharpProofCapability None=0
+  field const SharpProof.Attributes.SharpProofCapability Process=32
+  field const SharpProof.Attributes.SharpProofCapability Randomness=512
+  field const SharpProof.Attributes.SharpProofCapability Reflection=1024
+  field const SharpProof.Attributes.SharpProofCapability Registry=128
+  field const SharpProof.Attributes.SharpProofCapability Synchronization=2048
+type public enum SharpProof.Attributes.SharpProofEffect : System.Enum [System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable] attrs=[System.FlagsAttribute(;)]
+  field  System.Int64 value__
+  field const SharpProof.Attributes.SharpProofEffect Allocates=32
+  field const SharpProof.Attributes.SharpProofEffect BudgetExhaustion=2097152
+  field const SharpProof.Attributes.SharpProofEffect DirectCall=262144
+  field const SharpProof.Attributes.SharpProofEffect DispatchUncertainty=524288
+  field const SharpProof.Attributes.SharpProofEffect None=0
+  field const SharpProof.Attributes.SharpProofEffect ReadsAmbientState=1
+  field const SharpProof.Attributes.SharpProofEffect ReadsArgumentState=8192
+  field const SharpProof.Attributes.SharpProofEffect ReadsCapturedState=16384
+  field const SharpProof.Attributes.SharpProofEffect ReadsReceiverState=4096
+  field const SharpProof.Attributes.SharpProofEffect ReadsStaticState=32768
+  field const SharpProof.Attributes.SharpProofEffect Synchronizes=128
+  field const SharpProof.Attributes.SharpProofEffect Throws=64
+  field const SharpProof.Attributes.SharpProofEffect Unknown=2048
+  field const SharpProof.Attributes.SharpProofEffect UnsupportedOperation=1048576
+  field const SharpProof.Attributes.SharpProofEffect UsesNativeCode=512
+  field const SharpProof.Attributes.SharpProofEffect UsesNondeterminism=256
+  field const SharpProof.Attributes.SharpProofEffect UsesReflection=1024
+  field const SharpProof.Attributes.SharpProofEffect WritesAmbientState=65536
+  field const SharpProof.Attributes.SharpProofEffect WritesArgumentState=4
+  field const SharpProof.Attributes.SharpProofEffect WritesCapturedState=8
+  field const SharpProof.Attributes.SharpProofEffect WritesFreshOwnedState=131072
+  field const SharpProof.Attributes.SharpProofEffect WritesReceiverState=2
+  field const SharpProof.Attributes.SharpProofEffect WritesStaticState=16
+type public sealed class SharpProof.Attributes.ZeroAllocationsAttribute : System.Attribute [] attrs=[System.AttributeUsageAttribute(System.AttributeTargets:224;Inherited=System.Boolean:false)]
+  ctor ()
+assembly SharpProof.Package
+assembly SharpProof.ProofCore
+assembly SharpProof.Symbolic
+type public enum SharpProof.Symbolic.MethodEffectOrigin : System.Enum [System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable]
+  field  System.Int32 value__
+  field const SharpProof.Symbolic.MethodEffectOrigin Allocation=6
+  field const SharpProof.Symbolic.MethodEffectOrigin Ambient=0
+  field const SharpProof.Symbolic.MethodEffectOrigin Argument=2
+  field const SharpProof.Symbolic.MethodEffectOrigin Call=11
+  field const SharpProof.Symbolic.MethodEffectOrigin Captured=3
+  field const SharpProof.Symbolic.MethodEffectOrigin Exception=10
+  field const SharpProof.Symbolic.MethodEffectOrigin FreshOwned=5
+  field const SharpProof.Symbolic.MethodEffectOrigin Native=8
+  field const SharpProof.Symbolic.MethodEffectOrigin Nondeterminism=9
+  field const SharpProof.Symbolic.MethodEffectOrigin Receiver=1
+  field const SharpProof.Symbolic.MethodEffectOrigin Static=4
+  field const SharpProof.Symbolic.MethodEffectOrigin Synchronization=7
+  field const SharpProof.Symbolic.MethodEffectOrigin Unknown=12
+type public sealed class SharpProof.Symbolic.MethodEffects : System.Object [System.IEquatable<SharpProof.Symbolic.MethodEffects>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (SharpProof.Attributes.SharpProofEffect Effects,SharpProof.Attributes.SharpProofCapability Capabilities,System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.MethodExceptionFact> ExceptionFacts attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)],System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.MethodEffectSite> Sites attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)],System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason> UnknownReasons attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)])
+  method  SharpProof.Symbolic.MethodEffects <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method  System.Void Deconstruct(out SharpProof.Attributes.SharpProofEffect& Effects attrs=[System.Runtime.InteropServices.OutAttribute(;)],out SharpProof.Attributes.SharpProofCapability& Capabilities attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.MethodExceptionFact>& ExceptionFacts attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)|System.Runtime.InteropServices.OutAttribute(;)],out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.MethodEffectSite>& Sites attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)|System.Runtime.InteropServices.OutAttribute(;)],out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason>& UnknownReasons attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)|System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.MethodEffects other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.MethodEffects left,SharpProof.Symbolic.MethodEffects right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.MethodEffects left,SharpProof.Symbolic.MethodEffects right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  property get SharpProof.Symbolic.SharpProofVerdict AllocationFree[]
+  property get SharpProof.Symbolic.SharpProofVerdict DoesNotThrow[]
+  property get SharpProof.Symbolic.SharpProofVerdict Purity[]
+  property get System.Collections.Immutable.ImmutableArray<System.String> ThrownExceptions[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)]
+  property get,set SharpProof.Attributes.SharpProofCapability Capabilities[]
+  property get,set SharpProof.Attributes.SharpProofEffect Effects[]
+  property get,set System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.MethodEffectSite> Sites[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)]
+  property get,set System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.MethodExceptionFact> ExceptionFacts[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)]
+  property get,set System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason> UnknownReasons[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)]
+type public sealed class SharpProof.Symbolic.MethodEffectSite : System.Object [System.IEquatable<SharpProof.Symbolic.MethodEffectSite>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (SharpProof.Attributes.SharpProofEffect Effect,SharpProof.Attributes.SharpProofCapability Capabilities,System.String Operation,System.String Symbol,System.Int32 SpanStart,System.Int32 SpanLength,System.Boolean IsTransitive,System.String Reason,SharpProof.Symbolic.MethodEffectOrigin Origin=SharpProof.Symbolic.MethodEffectOrigin:12 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.String ExceptionType=null attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)|System.Runtime.InteropServices.OptionalAttribute(;)],System.String TransitiveSource=null attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)|System.Runtime.InteropServices.OptionalAttribute(;)],SharpProof.Symbolic.SharpProofVerdict EscapeStatus=SharpProof.Symbolic.SharpProofVerdict:2 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],SharpProof.Symbolic.SharpProofVerdict ProofStatus=SharpProof.Symbolic.SharpProofVerdict:0 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)])
+  method  SharpProof.Symbolic.MethodEffectSite <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method  System.Void Deconstruct(out SharpProof.Attributes.SharpProofEffect& Effect attrs=[System.Runtime.InteropServices.OutAttribute(;)],out SharpProof.Attributes.SharpProofCapability& Capabilities attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Operation attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Symbol attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& SpanStart attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& SpanLength attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Boolean& IsTransitive attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Reason attrs=[System.Runtime.InteropServices.OutAttribute(;)],out SharpProof.Symbolic.MethodEffectOrigin& Origin attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& ExceptionType attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)|System.Runtime.InteropServices.OutAttribute(;)],out System.String& TransitiveSource attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)|System.Runtime.InteropServices.OutAttribute(;)],out SharpProof.Symbolic.SharpProofVerdict& EscapeStatus attrs=[System.Runtime.InteropServices.OutAttribute(;)],out SharpProof.Symbolic.SharpProofVerdict& ProofStatus attrs=[System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.MethodEffectSite other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.MethodEffectSite left,SharpProof.Symbolic.MethodEffectSite right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.MethodEffectSite left,SharpProof.Symbolic.MethodEffectSite right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  property get,set SharpProof.Attributes.SharpProofCapability Capabilities[]
+  property get,set SharpProof.Attributes.SharpProofEffect Effect[]
+  property get,set SharpProof.Symbolic.MethodEffectOrigin Origin[]
+  property get,set SharpProof.Symbolic.SharpProofVerdict EscapeStatus[]
+  property get,set SharpProof.Symbolic.SharpProofVerdict ProofStatus[]
+  property get,set System.Boolean IsTransitive[]
+  property get,set System.Int32 SpanLength[]
+  property get,set System.Int32 SpanStart[]
+  property get,set System.String ExceptionType[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)]
+  property get,set System.String Operation[]
+  property get,set System.String Reason[]
+  property get,set System.String Symbol[]
+  property get,set System.String TransitiveSource[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)]
+type public sealed class SharpProof.Symbolic.MethodExceptionFact : System.Object [System.IEquatable<SharpProof.Symbolic.MethodExceptionFact>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (System.String ExceptionType,SharpProof.Symbolic.SharpProofVerdict Escape,SharpProof.Symbolic.MethodExceptionSource Source,System.String Operation,System.String Symbol,System.Int32 SpanStart,System.Int32 SpanLength,System.Boolean IsTransitive,System.String Reason,System.String Kind="" attrs=[System.Runtime.InteropServices.OptionalAttribute(;)])
+  method  SharpProof.Symbolic.MethodExceptionFact <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method  System.Void Deconstruct(out System.String& ExceptionType attrs=[System.Runtime.InteropServices.OutAttribute(;)],out SharpProof.Symbolic.SharpProofVerdict& Escape attrs=[System.Runtime.InteropServices.OutAttribute(;)],out SharpProof.Symbolic.MethodExceptionSource& Source attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Operation attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Symbol attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& SpanStart attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& SpanLength attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Boolean& IsTransitive attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Reason attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Kind attrs=[System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.MethodExceptionFact other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static SharpProof.Symbolic.MethodExceptionFact Boundary(System.String exceptionType,SharpProof.Symbolic.MethodExceptionSource source,System.String reason,SharpProof.Symbolic.SharpProofVerdict escape=SharpProof.Symbolic.SharpProofVerdict:0 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)]) return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.MethodExceptionFact left,SharpProof.Symbolic.MethodExceptionFact right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.MethodExceptionFact left,SharpProof.Symbolic.MethodExceptionFact right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  property get,set SharpProof.Symbolic.MethodExceptionSource Source[]
+  property get,set SharpProof.Symbolic.SharpProofVerdict Escape[]
+  property get,set System.Boolean IsTransitive[]
+  property get,set System.Int32 SpanLength[]
+  property get,set System.Int32 SpanStart[]
+  property get,set System.String ExceptionType[]
+  property get,set System.String Kind[]
+  property get,set System.String Operation[]
+  property get,set System.String Reason[]
+  property get,set System.String Symbol[]
+type public enum SharpProof.Symbolic.MethodExceptionSource : System.Enum [System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable]
+  field  System.Int32 value__
+  field const SharpProof.Symbolic.MethodExceptionSource Callee=2
+  field const SharpProof.Symbolic.MethodExceptionSource Contract=4
+  field const SharpProof.Symbolic.MethodExceptionSource ExplicitThrow=0
+  field const SharpProof.Symbolic.MethodExceptionSource Metadata=3
+  field const SharpProof.Symbolic.MethodExceptionSource RuntimeHazard=1
+  field const SharpProof.Symbolic.MethodExceptionSource Unknown=5
+type public sealed class SharpProof.Symbolic.SharpProofAnalysisBudget : System.Object [System.IEquatable<SharpProof.Symbolic.SharpProofAnalysisBudget>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (System.Int32 MaxMergedIfElseFacts=16 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Int32 MaxMergedSwitchFacts=32 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Int32 MaxMergedTryFacts=16 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Int32 MaxTryCompletionBranches=8 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Int32 MaxFiniteForeachElementFacts=8 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Int32 MaxScopedBlockCompletionStatements=32 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Int32 MaxStructuralNullStateDepth=4 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Int32 MaxMergedPathConditions=32 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Int32 MaxMergeableFactsPerTargetPerState=4 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Int32 MaxFactChoiceCombinationsPerTarget=64 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Int32 MaxGuardFactsPerTargetPerState=6 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)])
+  method  SharpProof.Symbolic.SharpProofAnalysisBudget <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method  System.Void Deconstruct(out System.Int32& MaxMergedIfElseFacts attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& MaxMergedSwitchFacts attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& MaxMergedTryFacts attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& MaxTryCompletionBranches attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& MaxFiniteForeachElementFacts attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& MaxScopedBlockCompletionStatements attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& MaxStructuralNullStateDepth attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& MaxMergedPathConditions attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& MaxMergeableFactsPerTargetPerState attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& MaxFactChoiceCombinationsPerTarget attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& MaxGuardFactsPerTargetPerState attrs=[System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.SharpProofAnalysisBudget other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.SharpProofAnalysisBudget left,SharpProof.Symbolic.SharpProofAnalysisBudget right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.SharpProofAnalysisBudget left,SharpProof.Symbolic.SharpProofAnalysisBudget right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  property get SharpProof.Symbolic.SharpProofAnalysisBudget Default[]
+  property get,set System.Int32 MaxFactChoiceCombinationsPerTarget[]
+  property get,set System.Int32 MaxFiniteForeachElementFacts[]
+  property get,set System.Int32 MaxGuardFactsPerTargetPerState[]
+  property get,set System.Int32 MaxMergeableFactsPerTargetPerState[]
+  property get,set System.Int32 MaxMergedIfElseFacts[]
+  property get,set System.Int32 MaxMergedPathConditions[]
+  property get,set System.Int32 MaxMergedSwitchFacts[]
+  property get,set System.Int32 MaxMergedTryFacts[]
+  property get,set System.Int32 MaxScopedBlockCompletionStatements[]
+  property get,set System.Int32 MaxStructuralNullStateDepth[]
+  property get,set System.Int32 MaxTryCompletionBranches[]
+type public enum SharpProof.Symbolic.SharpProofAnalysisFacet : System.Enum [System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable] attrs=[System.FlagsAttribute(;)]
+  field  System.Int32 value__
+  field const SharpProof.Symbolic.SharpProofAnalysisFacet All=15
+  field const SharpProof.Symbolic.SharpProofAnalysisFacet Complexity=8
+  field const SharpProof.Symbolic.SharpProofAnalysisFacet Effects=1
+  field const SharpProof.Symbolic.SharpProofAnalysisFacet None=0
+  field const SharpProof.Symbolic.SharpProofAnalysisFacet ProofFacts=2
+  field const SharpProof.Symbolic.SharpProofAnalysisFacet RuntimeHazards=4
+type public sealed class SharpProof.Symbolic.SharpProofAnalysisOptions : System.Object [System.IEquatable<SharpProof.Symbolic.SharpProofAnalysisOptions>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)]
+  ctor (SharpProof.Symbolic.SharpProofAnalysisBudget AnalysisBudget=null attrs=[System.Runtime.InteropServices.OptionalAttribute(;)])
+  method  SharpProof.Symbolic.SharpProofAnalysisOptions <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)] return
+  method  System.Void Deconstruct(out SharpProof.Symbolic.SharpProofAnalysisBudget& AnalysisBudget attrs=[System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.SharpProofAnalysisOptions other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.SharpProofAnalysisOptions left,SharpProof.Symbolic.SharpProofAnalysisOptions right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.SharpProofAnalysisOptions left,SharpProof.Symbolic.SharpProofAnalysisOptions right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)] return
+  property get,set SharpProof.Symbolic.SharpProofAnalysisBudget AnalysisBudget[]
+type public sealed class SharpProof.Symbolic.SharpProofAnalysisRequest : System.Object [System.IEquatable<SharpProof.Symbolic.SharpProofAnalysisRequest>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (SharpProof.Symbolic.SharpProofTarget Target,SharpProof.Symbolic.SharpProofAnalysisFacet Facets=SharpProof.Symbolic.SharpProofAnalysisFacet:15 attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.String Condition=null attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)|System.Runtime.InteropServices.OptionalAttribute(;)])
+  method  SharpProof.Symbolic.SharpProofAnalysisRequest <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method  System.Void Deconstruct(out SharpProof.Symbolic.SharpProofTarget& Target attrs=[System.Runtime.InteropServices.OutAttribute(;)],out SharpProof.Symbolic.SharpProofAnalysisFacet& Facets attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Condition attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)|System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.SharpProofAnalysisRequest other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.SharpProofAnalysisRequest left,SharpProof.Symbolic.SharpProofAnalysisRequest right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.SharpProofAnalysisRequest left,SharpProof.Symbolic.SharpProofAnalysisRequest right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  property get,set SharpProof.Symbolic.SharpProofAnalysisFacet Facets[]
+  property get,set SharpProof.Symbolic.SharpProofTarget Target[]
+  property get,set System.String Condition[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)]
+type public sealed class SharpProof.Symbolic.SharpProofAnalysisResult : System.Object [System.IEquatable<SharpProof.Symbolic.SharpProofAnalysisResult>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)]
+  ctor (SharpProof.Symbolic.SharpProofTarget Target attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:1;)],SharpProof.Symbolic.SharpProofQueryStatus Status,SharpProof.Symbolic.MethodEffects MethodEffects,System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofProofFact> ProofFacts attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)],System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofHazard> Hazards attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)],System.String Complexity,System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason> UnknownReasons attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)],System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofTruncationReason> Truncations attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)],SharpProof.Symbolic.SharpProofError Error)
+  method  SharpProof.Symbolic.SharpProofAnalysisResult <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)] return
+  method  System.Void Deconstruct(out SharpProof.Symbolic.SharpProofTarget& Target attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:1;)|System.Runtime.InteropServices.OutAttribute(;)],out SharpProof.Symbolic.SharpProofQueryStatus& Status attrs=[System.Runtime.InteropServices.OutAttribute(;)],out SharpProof.Symbolic.MethodEffects& MethodEffects attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofProofFact>& ProofFacts attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)|System.Runtime.InteropServices.OutAttribute(;)],out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofHazard>& Hazards attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)|System.Runtime.InteropServices.OutAttribute(;)],out System.String& Complexity attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason>& UnknownReasons attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)|System.Runtime.InteropServices.OutAttribute(;)],out System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofTruncationReason>& Truncations attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)|System.Runtime.InteropServices.OutAttribute(;)],out SharpProof.Symbolic.SharpProofError& Error attrs=[System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.SharpProofAnalysisResult other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.SharpProofAnalysisResult left,SharpProof.Symbolic.SharpProofAnalysisResult right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.SharpProofAnalysisResult left,SharpProof.Symbolic.SharpProofAnalysisResult right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)] return
+  property get,set SharpProof.Symbolic.MethodEffects MethodEffects[]
+  property get,set SharpProof.Symbolic.SharpProofError Error[]
+  property get,set SharpProof.Symbolic.SharpProofQueryStatus Status[]
+  property get,set SharpProof.Symbolic.SharpProofTarget Target[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:1;)]
+  property get,set System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofHazard> Hazards[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)]
+  property get,set System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofProofFact> ProofFacts[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)]
+  property get,set System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofTruncationReason> Truncations[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)]
+  property get,set System.Collections.Immutable.ImmutableArray<SharpProof.Symbolic.SharpProofUnknownReason> UnknownReasons[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte[]:[System.Byte:0,System.Byte:1];)]
+  property get,set System.String Complexity[]
+type public sealed class SharpProof.Symbolic.SharpProofAnalysisSession : System.Object [System.IDisposable] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  method  SharpProof.Symbolic.SharpProofAnalysisResult Analyze(SharpProof.Symbolic.SharpProofAnalysisRequest request,System.Threading.CancellationToken cancellationToken=null attrs=[System.Runtime.InteropServices.OptionalAttribute(;)]) return
+  method sealed-virtual System.Void Dispose() return
+  method static SharpProof.Symbolic.SharpProofAnalysisSession FromFile(System.String filePath,SharpProof.Symbolic.SharpProofAnalysisOptions options=null attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)|System.Runtime.InteropServices.OptionalAttribute(;)]) return
+  method static SharpProof.Symbolic.SharpProofAnalysisSession FromText(System.String sourceText,System.String filePath=null attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)|System.Runtime.InteropServices.OptionalAttribute(;)],SharpProof.Symbolic.SharpProofAnalysisOptions options=null attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)|System.Runtime.InteropServices.OptionalAttribute(;)]) return
+type public sealed class SharpProof.Symbolic.SharpProofError : System.Object [System.IEquatable<SharpProof.Symbolic.SharpProofError>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (System.String Code,SharpProof.Symbolic.SharpProofErrorCategory Category,System.String Message,System.Int32 RecommendedExitCode,System.Boolean IsRetryable,System.Collections.Immutable.ImmutableDictionary<System.String,System.String> Details)
+  method  SharpProof.Symbolic.SharpProofError <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method  System.Void Deconstruct(out System.String& Code attrs=[System.Runtime.InteropServices.OutAttribute(;)],out SharpProof.Symbolic.SharpProofErrorCategory& Category attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Message attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& RecommendedExitCode attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Boolean& IsRetryable attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Collections.Immutable.ImmutableDictionary<System.String,System.String>& Details attrs=[System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.SharpProofError other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.SharpProofError left,SharpProof.Symbolic.SharpProofError right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.SharpProofError left,SharpProof.Symbolic.SharpProofError right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  property get,set SharpProof.Symbolic.SharpProofErrorCategory Category[]
+  property get,set System.Boolean IsRetryable[]
+  property get,set System.Collections.Immutable.ImmutableDictionary<System.String,System.String> Details[]
+  property get,set System.Int32 RecommendedExitCode[]
+  property get,set System.String Code[]
+  property get,set System.String Message[]
+type public enum SharpProof.Symbolic.SharpProofErrorCategory : System.Enum [System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable]
+  field  System.Int32 value__
+  field const SharpProof.Symbolic.SharpProofErrorCategory Cancellation=7
+  field const SharpProof.Symbolic.SharpProofErrorCategory Input=1
+  field const SharpProof.Symbolic.SharpProofErrorCategory Internal=8
+  field const SharpProof.Symbolic.SharpProofErrorCategory Parse=3
+  field const SharpProof.Symbolic.SharpProofErrorCategory Project=4
+  field const SharpProof.Symbolic.SharpProofErrorCategory Solver=5
+  field const SharpProof.Symbolic.SharpProofErrorCategory Timeout=6
+  field const SharpProof.Symbolic.SharpProofErrorCategory Unsupported=2
+  field const SharpProof.Symbolic.SharpProofErrorCategory Usage=0
+type public sealed class SharpProof.Symbolic.SharpProofHazard : System.Object [System.IEquatable<SharpProof.Symbolic.SharpProofHazard>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (System.String Kind,System.String Status,System.String Reason,System.String ExceptionType,System.String Operation,System.Nullable<System.Int32> SpanStart,System.Nullable<System.Int32> SpanEnd,System.String Counterexample attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)])
+  method  SharpProof.Symbolic.SharpProofHazard <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method  System.Void Deconstruct(out System.String& Kind attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Status attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Reason attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& ExceptionType attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Operation attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Nullable<System.Int32>& SpanStart attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Nullable<System.Int32>& SpanEnd attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Counterexample attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)|System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.SharpProofHazard other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.SharpProofHazard left,SharpProof.Symbolic.SharpProofHazard right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.SharpProofHazard left,SharpProof.Symbolic.SharpProofHazard right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  property get,set System.Nullable<System.Int32> SpanEnd[]
+  property get,set System.Nullable<System.Int32> SpanStart[]
+  property get,set System.String Counterexample[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)]
+  property get,set System.String ExceptionType[]
+  property get,set System.String Kind[]
+  property get,set System.String Operation[]
+  property get,set System.String Reason[]
+  property get,set System.String Status[]
+type public sealed class SharpProof.Symbolic.SharpProofProofFact : System.Object [System.IEquatable<SharpProof.Symbolic.SharpProofProofFact>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (System.String Condition,System.String Status,System.String Reason,System.String SymbolicCondition,System.String Counterexample attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)])
+  method  SharpProof.Symbolic.SharpProofProofFact <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method  System.Void Deconstruct(out System.String& Condition attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Status attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Reason attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& SymbolicCondition attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Counterexample attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)|System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.SharpProofProofFact other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.SharpProofProofFact left,SharpProof.Symbolic.SharpProofProofFact right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.SharpProofProofFact left,SharpProof.Symbolic.SharpProofProofFact right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  property get,set System.String Condition[]
+  property get,set System.String Counterexample[] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:2;)]
+  property get,set System.String Reason[]
+  property get,set System.String Status[]
+  property get,set System.String SymbolicCondition[]
+type public enum SharpProof.Symbolic.SharpProofQueryStatus : System.Enum [System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable]
+  field  System.Int32 value__
+  field const SharpProof.Symbolic.SharpProofQueryStatus Canceled=3
+  field const SharpProof.Symbolic.SharpProofQueryStatus Failed=2
+  field const SharpProof.Symbolic.SharpProofQueryStatus Succeeded=0
+  field const SharpProof.Symbolic.SharpProofQueryStatus Unknown=1
+type public sealed class SharpProof.Symbolic.SharpProofTarget : System.Object [System.IEquatable<SharpProof.Symbolic.SharpProofTarget>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (SharpProof.Symbolic.SharpProofTargetKind Kind,System.Nullable<System.Int32> Line=null attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Nullable<System.Int32> Column=null attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Nullable<System.Int32> Position=null attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Nullable<System.Int32> SpanStart=null attrs=[System.Runtime.InteropServices.OptionalAttribute(;)],System.Nullable<System.Int32> SpanEnd=null attrs=[System.Runtime.InteropServices.OptionalAttribute(;)])
+  method  SharpProof.Symbolic.SharpProofTarget <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method  System.Void Deconstruct(out SharpProof.Symbolic.SharpProofTargetKind& Kind attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Nullable<System.Int32>& Line attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Nullable<System.Int32>& Column attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Nullable<System.Int32>& Position attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Nullable<System.Int32>& SpanStart attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Nullable<System.Int32>& SpanEnd attrs=[System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.SharpProofTarget other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.SharpProofTarget left,SharpProof.Symbolic.SharpProofTarget right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.SharpProofTarget left,SharpProof.Symbolic.SharpProofTarget right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  property get,set SharpProof.Symbolic.SharpProofTargetKind Kind[]
+  property get,set System.Nullable<System.Int32> Column[]
+  property get,set System.Nullable<System.Int32> Line[]
+  property get,set System.Nullable<System.Int32> Position[]
+  property get,set System.Nullable<System.Int32> SpanEnd[]
+  property get,set System.Nullable<System.Int32> SpanStart[]
+type public enum SharpProof.Symbolic.SharpProofTargetKind : System.Enum [System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable]
+  field  System.Int32 value__
+  field const SharpProof.Symbolic.SharpProofTargetKind AllLines=4
+  field const SharpProof.Symbolic.SharpProofTargetKind Line=2
+  field const SharpProof.Symbolic.SharpProofTargetKind Point=0
+  field const SharpProof.Symbolic.SharpProofTargetKind Position=1
+  field const SharpProof.Symbolic.SharpProofTargetKind Span=3
+type public sealed class SharpProof.Symbolic.SharpProofTruncationReason : System.Object [System.IEquatable<SharpProof.Symbolic.SharpProofTruncationReason>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (System.String Code,System.Int32 Limit,System.Int32 Observed,System.String Provenance,System.Nullable<System.Int32> SourceSpanStart)
+  method  SharpProof.Symbolic.SharpProofTruncationReason <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method  System.Void Deconstruct(out System.String& Code attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& Limit attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Int32& Observed attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Provenance attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Nullable<System.Int32>& SourceSpanStart attrs=[System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.SharpProofTruncationReason other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.SharpProofTruncationReason left,SharpProof.Symbolic.SharpProofTruncationReason right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.SharpProofTruncationReason left,SharpProof.Symbolic.SharpProofTruncationReason right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  property get,set System.Int32 Limit[]
+  property get,set System.Int32 Observed[]
+  property get,set System.Nullable<System.Int32> SourceSpanStart[]
+  property get,set System.String Code[]
+  property get,set System.String Provenance[]
+type public sealed class SharpProof.Symbolic.SharpProofUnknownReason : System.Object [System.IEquatable<SharpProof.Symbolic.SharpProofUnknownReason>] attrs=[System.Runtime.CompilerServices.NullableAttribute(System.Byte:0;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:1;)]
+  ctor (System.String Code,System.String Category,System.String Message,System.Boolean IsRetryable,System.Boolean IsConfigurationRelated)
+  method  SharpProof.Symbolic.SharpProofUnknownReason <Clone>$() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method  System.Void Deconstruct(out System.String& Code attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Category attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.String& Message attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Boolean& IsRetryable attrs=[System.Runtime.InteropServices.OutAttribute(;)],out System.Boolean& IsConfigurationRelated attrs=[System.Runtime.InteropServices.OutAttribute(;)]) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method sealed-virtual System.Boolean Equals(SharpProof.Symbolic.SharpProofUnknownReason other) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Equality(SharpProof.Symbolic.SharpProofUnknownReason left,SharpProof.Symbolic.SharpProofUnknownReason right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method static System.Boolean op_Inequality(SharpProof.Symbolic.SharpProofUnknownReason left,SharpProof.Symbolic.SharpProofUnknownReason right) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Boolean Equals(System.Object obj) attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)|System.Runtime.CompilerServices.NullableContextAttribute(System.Byte:2;)] return
+  method virtual System.Int32 GetHashCode() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  method virtual System.String ToString() attrs=[System.Runtime.CompilerServices.CompilerGeneratedAttribute(;)] return
+  property get,set System.Boolean IsConfigurationRelated[]
+  property get,set System.Boolean IsRetryable[]
+  property get,set System.String Category[]
+  property get,set System.String Code[]
+  property get,set System.String Message[]
+type public enum SharpProof.Symbolic.SharpProofVerdict : System.Enum [System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable]
+  field  System.Int32 value__
+  field const SharpProof.Symbolic.SharpProofVerdict Disproven=1
+  field const SharpProof.Symbolic.SharpProofVerdict Proven=0
+  field const SharpProof.Symbolic.SharpProofVerdict Unknown=2

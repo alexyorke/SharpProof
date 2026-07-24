@@ -1,6 +1,6 @@
 namespace SharpProof.Symbolic.Ir;
 internal static partial class SymbolicOperationLowerer {
-    internal static SymbolicLoweringResult<SymbolicOperationDescriptor> LowerSimpleAssignment(
+    internal static SymbolicLoweringResult<SymbolicStateDelta> LowerSimpleAssignment(
         ISymbol targetSymbol,
         SyntaxNode source,
         SymbolicLoweringContext targetContext,
@@ -72,14 +72,12 @@ internal static partial class SymbolicOperationLowerer {
             AddSymbolicThrowGuardedAssignmentPostconditions(postconditions, targetSymbol, throwGuardedValue, valueContext, provenance);
         if (bindings.Count == 0 && postconditions.Count == 0)
             return Unsupported(source, provenance + ".value");
-        var operation = new SymbolicAssignmentOperation(
+        var operation = new SymbolicStateDelta(
             bindings.ToImmutable(),
-            postconditions.ToImmutable(),
             new SymbolicOperationOrigin(valueExpression.Span, provenance),
+            postconditions.ToImmutable(),
             [new SymbolicInvalidationTarget(SymbolicFactFactory.GetSmtVariableName(targetSymbol.OriginalDefinition))]);
-        return SymbolicLoweringResult<SymbolicOperationDescriptor>.Exact(
-            operation,
-            new SymbolicLoweringProvenance("roslyn-to-operation", valueExpression.Span, provenance));
+        return Exact(operation, valueExpression, provenance);
     }
     private static void AddSymbolicThrowGuardedAssignmentPostconditions(
         ImmutableArray<SymbolicCondition>.Builder conditions,
@@ -163,11 +161,7 @@ internal static partial class SymbolicOperationLowerer {
         SymbolicLoweringContext context,
         out SymbolicTerm term) {
         if (!TryGetTupleElementType(tupleSymbol, elementName, out var elementType) ||
-            !SymbolicFactFactory.TryGetValueKind(
-                elementType,
-                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
-                SymbolicTypeFacts.IsSymbolicReferenceLikeType,
-                out var elementKind)) {
+            !SymbolicStateFactBuilder.TryGetValueKind(elementType, out var elementKind)) {
             term = null!;
             return false;
         }
@@ -177,7 +171,7 @@ internal static partial class SymbolicOperationLowerer {
             elementKind);
         return true;
     }
-    internal static SymbolicLoweringResult<SymbolicOperationDescriptor> LowerComputedUpdate(
+    internal static SymbolicLoweringResult<SymbolicStateDelta> LowerComputedUpdate(
         ISymbol targetSymbol,
         SymbolicTerm sourceTerm,
         SyntaxNode source,
@@ -196,15 +190,12 @@ internal static partial class SymbolicOperationLowerer {
                     sourceTerm,
                     provenance));
         var origin = new SymbolicOperationOrigin(source.Span, provenance);
-        var operation = new SymbolicMutationOperation(
+        var operation = new SymbolicStateDelta(
             bindings,
-            [],
             origin);
-        return SymbolicLoweringResult<SymbolicOperationDescriptor>.Exact(
-            operation,
-            new SymbolicLoweringProvenance("roslyn-to-operation", source.Span, provenance));
+        return Exact(operation, source, provenance);
     }
-    internal static SymbolicLoweringResult<SymbolicOperationDescriptor> LowerExplicitTargetAssignment(
+    internal static SymbolicLoweringResult<SymbolicStateDelta> LowerExplicitTargetAssignment(
         AssignmentExpressionSyntax assignment,
         SymbolicLoweringContext context) {
         if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
@@ -241,7 +232,7 @@ internal static partial class SymbolicOperationLowerer {
             isMember ? provenance + ".assigned-value" : provenance,
             includeReferencePostconditions: isMember);
     }
-    internal static SymbolicLoweringResult<SymbolicOperationDescriptor> LowerExplicitTargetAssignment(
+    internal static SymbolicLoweringResult<SymbolicStateDelta> LowerExplicitTargetAssignment(
         SymbolicTerm target,
         ExpressionSyntax valueExpression,
         SyntaxNode source,
@@ -270,14 +261,16 @@ internal static partial class SymbolicOperationLowerer {
         }
         if (bindings.Count == 0 && postconditions.Count == 0)
             return Unsupported(source, provenance + ".value");
-        return SymbolicLoweringResult<SymbolicOperationDescriptor>.Exact(
-            new SymbolicAssignmentOperation(
+        return Exact(
+            new SymbolicStateDelta(
                 bindings.ToImmutable(),
-                postconditions.ToImmutable(),
-                new SymbolicOperationOrigin(source.Span, provenance)),
-            new SymbolicLoweringProvenance("explicit-target-assignment", source.Span, provenance));
+                new SymbolicOperationOrigin(source.Span, provenance),
+                postconditions.ToImmutable()),
+            source,
+            provenance,
+            "explicit-target-assignment");
     }
-    internal static SymbolicLoweringResult<SymbolicOperationDescriptor> LowerCoalesceAssignment(
+    internal static SymbolicLoweringResult<SymbolicStateDelta> LowerCoalesceAssignment(
         ISymbol targetSymbol,
         ExpressionSyntax rightExpression,
         SymbolicLoweringContext context,
@@ -352,29 +345,30 @@ internal static partial class SymbolicOperationLowerer {
         else {
             return Unsupported(rightExpression, provenance + ".target");
         }
-        var operation = new SymbolicAssignmentOperation(
+        var operation = new SymbolicStateDelta(
             [],
-            [postcondition],
-            new SymbolicOperationOrigin(rightExpression.Span, provenance));
-        return SymbolicLoweringResult<SymbolicOperationDescriptor>.Exact(
-            operation,
-            new SymbolicLoweringProvenance("roslyn-to-operation", rightExpression.Span, provenance));
+            new SymbolicOperationOrigin(rightExpression.Span, provenance),
+            [postcondition]);
+        return Exact(operation, rightExpression, provenance);
     }
     private static bool TryCreateSymbolTerm(ISymbol symbol, SymbolicLoweringContext context, out SymbolicTerm term) {
         var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
-        if (type == null ||
-            !SymbolicFactFactory.TryGetValueKind(
-                type,
-                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
-                SymbolicTypeFacts.IsSymbolicReferenceLikeType,
-                out var kind)) {
+        if (type == null || !SymbolicStateFactBuilder.TryGetValueKind(type, out var kind)) {
             term = null!;
             return false;
         }
         term = new SymbolicVariableTerm(context.GetVariableName(symbol), kind);
         return true;
     }
-    private static SymbolicLoweringResult<SymbolicOperationDescriptor> Unsupported(SyntaxNode source, string provenance)
-        => SymbolicLoweringResult<SymbolicOperationDescriptor>.Unsupported(
+    private static SymbolicLoweringResult<SymbolicStateDelta> Exact(
+        SymbolicStateDelta delta,
+        SyntaxNode source,
+        string provenance,
+        string stage = "roslyn-to-operation") =>
+        SymbolicLoweringResult<SymbolicStateDelta>.Exact(
+            delta,
+            new SymbolicLoweringProvenance(stage, source.Span, provenance));
+    private static SymbolicLoweringResult<SymbolicStateDelta> Unsupported(SyntaxNode source, string provenance)
+        => SymbolicLoweringResult<SymbolicStateDelta>.Unsupported(
             new SymbolicLoweringProvenance("roslyn-to-operation", source.Span, provenance));
 }

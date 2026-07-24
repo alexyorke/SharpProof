@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "version": "0.1.0-preview.1",
+  "authors": "Alex Yorke",
+  "license": "MIT",
+  "projectUrl": "https://github.com/alexyorke/SharpProof",
+  "sourceProjects": [
+    "SharpProof.Package/SharpProof.Package.csproj",
+    "SharpProof.Attributes/SharpProof.Attributes.csproj",
+    "SharpProof.Symbolic/SharpProof.Symbolic.csproj"
+  ],
+  "packages": [
+    {
+      "id": "SharpProof",
+      "project": "SharpProof.Package/SharpProof.Package.csproj",
+      "targetFramework": "netstandard2.0",
+      "entries": [
+        "SharpProof.nuspec",
+        "README.md",
+        "THIRD-PARTY-NOTICES.txt",
+        "buildTransitive/SharpProof.targets",
+        "lib/netstandard2.0/SharpProof.Attributes.dll",
+        "analyzers/dotnet/cs/SharpProof.Analyzer.dll",
+        "analyzers/dotnet/cs/SharpProof.Attributes.dll",
+        "analyzers/dotnet/cs/SharpProof.Symbolic.dll",
+        "analyzers/dotnet/cs/SharpProof.ProofCore.dll",
+        "analyzers/dotnet/cs/Microsoft.CodeAnalysis.AnalyzerUtilities.dll",
+        "analyzers/dotnet/cs/Microsoft.Z3.dll",
+        "analyzers/dotnet/cs/libz3.dll",
+        "analyzers/dotnet/cs/libz3.dylib",
+        "analyzers/dotnet/cs/SharpProof.NativeSmtLocator.txt"
+      ]
+    },
+    {
+      "id": "SharpProof.Attributes",
+      "project": "SharpProof.Attributes/SharpProof.Attributes.csproj",
+      "targetFramework": "netstandard2.0",
+      "entries": [
+        "SharpProof.Attributes.nuspec",
+        "README.md",
+        "lib/netstandard2.0/SharpProof.Attributes.dll"
+      ]
+    },
+    {
+      "id": "SharpProof.Symbolic",
+      "project": "SharpProof.Symbolic/SharpProof.Symbolic.csproj",
+      "targetFramework": "netstandard2.0",
+      "entries": [
+        "SharpProof.Symbolic.nuspec",
+        "README.md",
+        "lib/netstandard2.0/SharpProof.Symbolic.dll",
+        "lib/netstandard2.0/SharpProof.Symbolic.pdb",
+        "lib/netstandard2.0/SharpProof.Symbolic.xml",
+        "lib/netstandard2.0/SharpProof.ProofCore.dll",
+        "lib/netstandard2.0/SharpProof.ProofCore.pdb",
+        "samples/SharpProof.Symbolic/README.md",
+        "samples/SharpProof.Symbolic/Program.cs",
+        "samples/SharpProof.Symbolic/SharpProof.Symbolic.Sample.csproj"
+      ]
+    }
+  ]
+}

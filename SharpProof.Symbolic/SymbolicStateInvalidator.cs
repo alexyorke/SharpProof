@@ -28,7 +28,7 @@ internal static class SymbolicStateInvalidator {
         SymbolicMutationInventory.Create(root, semanticModel, cancellationToken).ToInvalidationPlan();
     internal static SymbolicState ApplyNestedMutationInvalidations(SymbolicState state, SymbolicNestedMutationInvalidationPlan plan) {
         foreach (var step in plan.Steps)
-            state = SymbolicOperationTransferKernel.Invalidate(state, step.Targets, step.SourceSpan, step.Provenance).State;
+            state = SymbolicOperationTransferKernel.Invalidate(state, step.Targets, step.SourceSpan, step.Provenance);
         return state;
     }
     internal static void InvalidateMutationTarget(
@@ -42,14 +42,14 @@ internal static class SymbolicStateInvalidator {
                 state,
                 invalidations,
                 mutatedExpression.Span,
-                "operation-transfer.mutation-invalidation").State;
+                "operation-transfer.mutation-invalidation");
     }
     internal static void InvalidateSymbol(ref SymbolicState state, ISymbol symbol, SyntaxNode source)
         => state = SymbolicOperationTransferKernel.Invalidate(
             state,
             [new SymbolicInvalidationTarget(SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition))],
             source.Span,
-            "operation-transfer.reference-invalidation").State;
+            "operation-transfer.reference-invalidation");
     internal static bool IsCurrentInstanceMemberReference(
         ExpressionSyntax expression,
         SemanticModel semanticModel,

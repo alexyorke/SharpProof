@@ -85,22 +85,15 @@ internal static class SymbolicOperatorLowerer {
         }, out op);
     internal static bool TryGetBinaryTermOperator(
         SmtIntegerBinaryOperator smtOperator, out SymbolicBinaryTermOperator op) =>
-        TryMap(smtOperator switch {
-            SmtIntegerBinaryOperator.Add => SymbolicBinaryTermOperator.Add,
-            SmtIntegerBinaryOperator.Subtract => SymbolicBinaryTermOperator.Subtract,
-            SmtIntegerBinaryOperator.Multiply => SymbolicBinaryTermOperator.Multiply,
-            SmtIntegerBinaryOperator.Divide => SymbolicBinaryTermOperator.Divide,
-            SmtIntegerBinaryOperator.Remainder => SymbolicBinaryTermOperator.Remainder,
-            _ => (SymbolicBinaryTermOperator?)null
-        }, out op);
-    internal static SmtIntegerBinaryOperator GetSmtIntegerBinaryOperator(SymbolicBinaryTermOperator op) => op switch {
-        SymbolicBinaryTermOperator.Add => SmtIntegerBinaryOperator.Add,
-        SymbolicBinaryTermOperator.Subtract => SmtIntegerBinaryOperator.Subtract,
-        SymbolicBinaryTermOperator.Multiply => SmtIntegerBinaryOperator.Multiply,
-        SymbolicBinaryTermOperator.Divide => SmtIntegerBinaryOperator.Divide,
-        SymbolicBinaryTermOperator.Remainder => SmtIntegerBinaryOperator.Remainder,
-        _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
-    };
+        TryAlignedOperator((int)smtOperator, out op);
+    internal static SmtIntegerBinaryOperator GetSmtIntegerBinaryOperator(SymbolicBinaryTermOperator op) =>
+        op is >= SymbolicBinaryTermOperator.Add and <= SymbolicBinaryTermOperator.Remainder
+            ? (SmtIntegerBinaryOperator)(int)op
+            : throw new ArgumentOutOfRangeException(nameof(op), op, null);
+    private static bool TryAlignedOperator(int value, out SymbolicBinaryTermOperator op) {
+        op = (SymbolicBinaryTermOperator)value;
+        return op is >= SymbolicBinaryTermOperator.Add and <= SymbolicBinaryTermOperator.Remainder;
+    }
     private static bool TryMap<T>(T? candidate, out T value) where T : struct {
         value = candidate.GetValueOrDefault();
         return candidate.HasValue;
