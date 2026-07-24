@@ -126,12 +126,19 @@ internal static class SymbolicSourcePredicateLowerer {
     private static bool LambdaReadsOnlyStableParameterMembers(
         AnonymousFunctionExpressionSyntax lambda,
         IParameterSymbol parameter,
-        SymbolicLoweringContext context) =>
-        ReadsOnlyStableParameterMembers(
-            GetLambdaBody(lambda),
-            parameter,
-            context.SemanticModel,
-            context.CancellationToken);
+        SymbolicLoweringContext context) {
+        var body = GetLambdaBody(lambda);
+        return body != null &&
+               !SymbolicMutationInventory.Create(
+                   body,
+                   context.SemanticModel,
+                   context.CancellationToken).InvalidatesSymbol(parameter, true) &&
+               ReadsOnlyStableParameterMembers(
+                   body,
+                   parameter,
+                   context.SemanticModel,
+                   context.CancellationToken);
+    }
     private static bool ReadsOnlyStableParameterMembers(
         SyntaxNode? body,
         IParameterSymbol parameter,

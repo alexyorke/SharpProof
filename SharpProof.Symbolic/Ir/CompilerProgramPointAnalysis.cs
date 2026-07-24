@@ -139,7 +139,7 @@ internal static class CompilerProgramPointAnalysis {
             foreach (var loop in site.Ancestors().OfType<ForEachStatementSyntax>()) {
                 if (!loop.Statement.Span.Contains(site.SpanStart) ||
                     semanticModel.GetDeclaredSymbol(loop, cancellationToken) is not ILocalSymbol iterationVariable ||
-                    !TryGetEnumerableWherePredicates(loop.Expression, out var predicates) ||
+                    !TryGetGuaranteedSequencePredicates(loop.Expression, out var predicates) ||
                     SymbolicMutationInventory.Create(loop.Statement, semanticModel, cancellationToken)
                         .InvalidatesBetween(loop.Statement.SpanStart - 1, site.SpanStart, iterationVariable, true) ||
                     !SymbolicStateFactBuilder.TryCreateSymbolTerm(iterationVariable, out var iterationTerm))
@@ -156,13 +156,13 @@ internal static class CompilerProgramPointAnalysis {
                 }
             }
         }
-        private bool TryGetEnumerableWherePredicates(
+        private bool TryGetGuaranteedSequencePredicates(
             ExpressionSyntax collection,
             out ImmutableArray<ExpressionSyntax> predicates) {
             var builder = ImmutableArray.CreateBuilder<ExpressionSyntax>();
             var resolvedUses = new List<(ISymbol Symbol, int Position)>();
             while (true) {
-                if (TryGetEnumerableWhereStep(collection, out var source, out var predicate)) {
+                if (TryGetGuaranteedSequencePredicateStep(collection, out var source, out var predicate)) {
                     builder.Add(predicate);
                     collection = source;
                     continue;
@@ -213,7 +213,7 @@ internal static class CompilerProgramPointAnalysis {
                 return false;
             return TryGetStandardSequenceSource(invocation, out source);
         }
-        private bool TryGetEnumerableWhereStep(
+        private bool TryGetGuaranteedSequencePredicateStep(
             ExpressionSyntax collection,
             out ExpressionSyntax source,
             out ExpressionSyntax predicate) {
@@ -226,11 +226,17 @@ internal static class CompilerProgramPointAnalysis {
                     IInvocationOperation { TargetMethod: { } targetMethod })
                 return false;
             var definition = targetMethod.ReducedFrom ?? targetMethod;
-            if (definition.Name != nameof(Enumerable.Where) ||
-                definition.ContainingType.ToDisplayString() is not
-                    ("System.Linq.Enumerable" or
-                     "System.Linq.ImmutableArrayExtensions" or
-                     "System.Linq.Queryable"))
+            var containingType = definition.ContainingType.ToDisplayString();
+            var supported = containingType switch {
+                "System.Linq.Enumerable" => definition.Name is
+                    nameof(Enumerable.Where) or nameof(Enumerable.TakeWhile),
+                "System.Linq.ImmutableArrayExtensions" =>
+                    definition.Name == nameof(Enumerable.Where),
+                "System.Linq.Queryable" =>
+                    definition.Name == nameof(Queryable.Where),
+                _ => false
+            };
+            if (!supported)
                 return false;
             if (!TryGetStandardSequenceSource(invocation, out source)) return false;
             predicate = candidatePredicate;

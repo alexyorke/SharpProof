@@ -289,6 +289,118 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_TakeWhilePredicateRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items.TakeWhile(
+                        static item => item.Value is not null))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_IndexedTakeWhilePredicateRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items.TakeWhile(
+                        static (item, index) => index < 10 && item.Value is not null))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_MutatingTakeWhileInvalidatesWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed class Item {
+                public object? Value { get; set; }
+            }
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .TakeWhile(static item => {
+                            item.Value = null;
+                            return true;
+                        }))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_MutatingBlockWhereInvalidatesInnerPredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed class Item {
+                public object? Value { get; set; }
+            }
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Where(static item => {
+                            item.Value = null;
+                            return true;
+                        }))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_OuterWhereReassertsAfterMutatingTakeWhile_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed class Item {
+                public object? Value { get; set; }
+            }
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .TakeWhile(static item => {
+                            item.Value = null;
+                            return true;
+                        })
+                        .Where(static item => item.Value is not null))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_CustomTakeWhileDoesNotRefineLoopElement_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Collections.Generic;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static IEnumerable<Item> TakeWhile(
+                    IEnumerable<Item> items,
+                    Func<Item, bool> predicate) => new[] { new Item(null) };
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in TakeWhile(
+                        items,
+                        static item => item.Value is not null))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_QueryableWhereThroughLazySubsetRefinesLoopElement_DoesNotReport",
             """
             #nullable enable
