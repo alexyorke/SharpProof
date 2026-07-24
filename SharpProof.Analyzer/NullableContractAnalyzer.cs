@@ -26,7 +26,11 @@ internal static class NullableContractAnalyzer {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (completion.ResultExpression == null) continue;
             var resultText = Parenthesize(completion.ResultExpression);
-            if (requiresNonNull)
+            if (requiresNonNull &&
+                !NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
+                    completion.ResultExpression,
+                    context.SemanticModel,
+                    context.CancellationToken))
                 Verify(
                     context,
                     session,

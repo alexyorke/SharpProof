@@ -73,6 +73,17 @@ public sealed class NullableContractVerificationTests {
     [Test]
     public Task NonNullableReturn_NullLiteral_ReportsViolation() =>
         AssertDiagnosticAsync(Class("public static string GetName() => null;", Nullable), "SP0041");
+    [Test]
+    public async Task NonNullableReturn_ObjectCreation_DoesNotReportUnknownContract() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            public sealed record Result(int Value);
+            public static class Factory {
+                public static Result Create() => new Result(1);
+            }
+            """);
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Not.Contain("SP0047"));
+    }
     [ReadmeExample("sp0042-nullable-parameter-contract")]
     [Test]
     public Task NotNullWhen_TrueWithNullOutValue_ReportsViolation() => AssertDiagnosticAsync(

@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <SharpProofDogfoodAnalyzerDirectory Condition="'$(SharpProofDogfoodAnalyzerDirectory)' == ''">$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0</SharpProofDogfoodAnalyzerDirectory>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(SharpProofDogfood)' == 'true'">
+    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Analyzer.dll" />
+    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Symbolic.dll" />
+    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.ProofCore.dll" />
+    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Attributes.dll" />
+    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\Microsoft.CodeAnalysis.AnalyzerUtilities.dll" />
+    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\Microsoft.Z3.dll" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)SharpProof.Package\SharpProof.NativeSmtLocator.txt" />
+  </ItemGroup>
+
+  <Target Name="_ValidateSharpProofDogfoodAnalyzer"
+          BeforeTargets="CoreCompile"
+          Condition="'$(SharpProofDogfood)' == 'true'">
+    <Error Condition="!Exists('$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Analyzer.dll')"
+           Text="SharpProof dogfood analyzer was not built at '$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Analyzer.dll'." />
+  </Target>
+</Project>
