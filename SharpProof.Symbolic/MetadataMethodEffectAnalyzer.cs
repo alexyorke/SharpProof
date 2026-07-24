@@ -227,7 +227,8 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 reader,
                 member.Parent,
                 out var declaringPath,
-                out var declaringType)) {
+                out var declaringType,
+                out var typeArguments)) {
             result = default;
             return false;
         }
@@ -235,11 +236,16 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         using var declaringPe = new PEReader(declaringStream, PEStreamOptions.PrefetchMetadata);
         var declaringReader = declaringPe.GetMetadataReader();
         var wantedName = reader.GetString(member.Name);
-        var wantedSignature = member.DecodeMethodSignature(new StructuralTypeProvider(), null);
+        var genericContext = new StructuralGenericContext(typeArguments, []);
+        var wantedSignature = member.DecodeMethodSignature(new StructuralTypeProvider(), genericContext);
         foreach (var methodHandle in declaringReader.GetTypeDefinition(declaringType).GetMethods()) {
             var definition = declaringReader.GetMethodDefinition(methodHandle);
             if (!string.Equals(declaringReader.GetString(definition.Name), wantedName, StringComparison.Ordinal) ||
-                !SignaturesMatch(wantedSignature, definition.DecodeSignature(new StructuralTypeProvider(), null)))
+                !SignaturesMatch(
+                    wantedSignature,
+                    definition.DecodeSignature(
+                        new StructuralTypeProvider(),
+                        genericContext)))
                 continue;
             result = new MethodLocation(declaringPath, methodHandle);
             return true;
@@ -252,21 +258,38 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         MetadataReader reader,
         EntityHandle parent,
         out string declaringPath,
-        out TypeDefinitionHandle declaringType) {
+        out TypeDefinitionHandle declaringType,
+        out ImmutableArray<StructuralDecodedType> typeArguments) {
         if (parent.Kind == HandleKind.TypeDefinition) {
             declaringPath = currentPath;
             declaringType = (TypeDefinitionHandle)parent;
+            typeArguments = [];
+            return true;
+        }
+        if (parent.Kind == HandleKind.TypeSpecification) {
+            var decoded = reader.GetTypeSpecification((TypeSpecificationHandle)parent)
+                .DecodeSignature(new DeclaringTypeProvider(), null);
+            if (decoded.Definition.IsNil)
+                return FailContainingType(out declaringPath, out declaringType, out typeArguments);
+            if (!TryResolveContainingType(
+                    currentPath,
+                    reader,
+                    decoded.Definition,
+                    out declaringPath,
+                    out declaringType,
+                    out _))
+                return FailContainingType(out declaringPath, out declaringType, out typeArguments);
+            typeArguments = decoded.TypeArguments;
             return true;
         }
         if (parent.Kind != HandleKind.TypeReference) {
-            declaringPath = string.Empty;
-            declaringType = default;
-            return false;
+            return FailContainingType(out declaringPath, out declaringType, out typeArguments);
         }
         var referenceHandle = (TypeReferenceHandle)parent;
         var reference = reader.GetTypeReference(referenceHandle);
         if (!TryResolveAssemblyPath(reader, reference.ResolutionScope, currentPath, out declaringPath)) {
             declaringType = default;
+            typeArguments = [];
             return false;
         }
         var wantedType = EcmaStructuralMethodIdentity.GetTypeReferenceMetadataName(reader, referenceHandle);
@@ -280,9 +303,20 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                     StringComparison.Ordinal))
                 continue;
             declaringType = typeHandle;
+            typeArguments = [];
             return true;
         }
         declaringType = default;
+        typeArguments = [];
+        return false;
+    }
+    private static bool FailContainingType(
+        out string declaringPath,
+        out TypeDefinitionHandle declaringType,
+        out ImmutableArray<StructuralDecodedType> typeArguments) {
+        declaringPath = string.Empty;
+        declaringType = default;
+        typeArguments = [];
         return false;
     }
     private bool TryResolveAssemblyPath(
@@ -400,5 +434,71 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 version,
                 (culture ?? string.Empty).ToUpperInvariant(),
                 Convert.ToBase64String(publicKeyToken));
+    }
+    private readonly record struct DecodedDeclaringType(
+        EntityHandle Definition,
+        StructuralDecodedType StructuralType,
+        ImmutableArray<StructuralDecodedType> TypeArguments);
+    private sealed class DeclaringTypeProvider : ISignatureTypeProvider<DecodedDeclaringType, object?> {
+        private static readonly StructuralTypeProvider Structural = new();
+        public DecodedDeclaringType GetArrayType(DecodedDeclaringType elementType, ArrayShape shape) =>
+            Type(Structural.GetArrayType(elementType.StructuralType, shape));
+        public DecodedDeclaringType GetByReferenceType(DecodedDeclaringType elementType) =>
+            Type(Structural.GetByReferenceType(elementType.StructuralType));
+        public DecodedDeclaringType GetFunctionPointerType(MethodSignature<DecodedDeclaringType> signature) =>
+            Type(new StructuralDecodedType("unsupported:function-pointer"));
+        public DecodedDeclaringType GetGenericInstantiation(
+            DecodedDeclaringType genericType,
+            ImmutableArray<DecodedDeclaringType> typeArguments) {
+            ImmutableArray<StructuralDecodedType> arguments =
+                [.. typeArguments.Select(static argument => argument.StructuralType)];
+            return new(
+                genericType.Definition,
+                Structural.GetGenericInstantiation(genericType.StructuralType, arguments),
+                arguments);
+        }
+        public DecodedDeclaringType GetGenericMethodParameter(object? genericContext, int index) =>
+            Type(Structural.GetGenericMethodParameter(genericContext, index));
+        public DecodedDeclaringType GetGenericTypeParameter(object? genericContext, int index) =>
+            Type(Structural.GetGenericTypeParameter(genericContext, index));
+        public DecodedDeclaringType GetModifiedType(
+            DecodedDeclaringType modifier,
+            DecodedDeclaringType unmodifiedType,
+            bool isRequired) =>
+            Type(Structural.GetModifiedType(
+                modifier.StructuralType,
+                unmodifiedType.StructuralType,
+                isRequired));
+        public DecodedDeclaringType GetPinnedType(DecodedDeclaringType elementType) =>
+            Type(Structural.GetPinnedType(elementType.StructuralType));
+        public DecodedDeclaringType GetPointerType(DecodedDeclaringType elementType) =>
+            Type(Structural.GetPointerType(elementType.StructuralType));
+        public DecodedDeclaringType GetPrimitiveType(PrimitiveTypeCode typeCode) =>
+            Type(Structural.GetPrimitiveType(typeCode));
+        public DecodedDeclaringType GetSZArrayType(DecodedDeclaringType elementType) =>
+            Type(Structural.GetSZArrayType(elementType.StructuralType));
+        public DecodedDeclaringType GetTypeFromDefinition(
+            MetadataReader reader,
+            TypeDefinitionHandle handle,
+            byte rawTypeKind) =>
+            new(
+                handle,
+                Structural.GetTypeFromDefinition(reader, handle, rawTypeKind),
+                []);
+        public DecodedDeclaringType GetTypeFromReference(
+            MetadataReader reader,
+            TypeReferenceHandle handle,
+            byte rawTypeKind) =>
+            new(
+                handle,
+                Structural.GetTypeFromReference(reader, handle, rawTypeKind),
+                []);
+        public DecodedDeclaringType GetTypeFromSpecification(
+            MetadataReader reader,
+            object? genericContext,
+            TypeSpecificationHandle handle,
+            byte rawTypeKind) =>
+            reader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
+        private static DecodedDeclaringType Type(StructuralDecodedType type) => new(default, type, []);
     }
 }

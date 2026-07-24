@@ -92,6 +92,9 @@ internal static class EcmaStructuralMethodIdentity {
     }
 }
 internal readonly record struct StructuralDecodedType(string Key, bool IsByRef = false, bool IsReadOnlyModifier = false);
+internal readonly record struct StructuralGenericContext(
+    ImmutableArray<StructuralDecodedType> TypeArguments,
+    ImmutableArray<StructuralDecodedType> MethodArguments);
 internal sealed class StructuralTypeProvider : ISignatureTypeProvider<StructuralDecodedType, object?> {
     public StructuralDecodedType GetArrayType(StructuralDecodedType elementType, ArrayShape shape) =>
         new("array:" + shape.Rank + "[" + elementType.Key + "]");
@@ -114,9 +117,13 @@ internal sealed class StructuralTypeProvider : ISignatureTypeProvider<Structural
         ImmutableArray<StructuralDecodedType> typeArguments) => new(
             genericType.Key + "[" + string.Join(";", typeArguments.Select(static argument => argument.Key)) + "]");
     public StructuralDecodedType GetGenericMethodParameter(object? genericContext, int index) =>
-        new("mparam:" + index);
+        genericContext is StructuralGenericContext context && index < context.MethodArguments.Length
+            ? context.MethodArguments[index]
+            : new("mparam:" + index);
     public StructuralDecodedType GetGenericTypeParameter(object? genericContext, int index) =>
-        new("tparam:" + index);
+        genericContext is StructuralGenericContext context && index < context.TypeArguments.Length
+            ? context.TypeArguments[index]
+            : new("tparam:" + index);
     public StructuralDecodedType GetModifiedType(StructuralDecodedType modifier, StructuralDecodedType unmodifiedType, bool isRequired) {
         var isReadOnly = isRequired &&
                          (modifier.Key.IndexOf("System.Runtime.CompilerServices.IsReadOnlyAttribute", StringComparison.Ordinal) >= 0 ||

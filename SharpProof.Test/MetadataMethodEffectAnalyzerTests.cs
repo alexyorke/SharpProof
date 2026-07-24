@@ -80,6 +80,9 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                 public static int Increment(int value) => value + 1;
                 public static void Mutate() { State++; }
             }
+            public static class PureBox<T> {
+                public static T Identity(T value) => value;
+            }
             """);
         EmitFixture(
             _bridgeFixturePath,
@@ -88,6 +91,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             namespace MetadataBridge;
             public static class PureBridge {
                 public static int Increment(int value) => MetadataDependency.PureLeaf.Increment(value);
+                public static int GenericIdentity(int value) => MetadataDependency.PureBox<int>.Identity(value);
                 public static void Mutate() { MetadataDependency.PureLeaf.Mutate(); }
             }
             """,
@@ -188,6 +192,16 @@ public sealed class MetadataMethodEffectAnalyzerTests {
         Assert.Multiple(() => {
             Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Disproven));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesStaticState), Is.True);
+            Assert.That(effects.UnknownReasons, Has.None.Property(nameof(SharpProofUnknownReason.Message))
+                .EqualTo("metadata_external_call_unresolved"));
+        });
+    }
+    [Test]
+    public void CallsOnConstructedGenericTypesAreAnalyzedRecursively() {
+        var effects = Analyze("static int M(int value) => MetadataBridge.PureBridge.GenericIdentity(value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.UnknownReasons, Has.None.Property(nameof(SharpProofUnknownReason.Message))
                 .EqualTo("metadata_external_call_unresolved"));
         });
