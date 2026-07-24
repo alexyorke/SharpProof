@@ -252,6 +252,9 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                     else if (opcode == OpCodes.Castclass) {
                         hasUnknownExceptionBoundary = true;
                     }
+                    else if (opcode == OpCodes.Unbox || opcode == OpCodes.Unbox_Any) {
+                        hasUnknownExceptionBoundary = true;
+                    }
                     else if (MayThrowImplicitly(opcode)) {
                         MarkUnknown("metadata_implicit_exception", exceptionBoundary: true);
                     }
@@ -317,7 +320,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         opcode == OpCodes.Rem_Un ||
         opcode.Name?.IndexOf("ovf", StringComparison.Ordinal) >= 0;
     private static bool MayThrowImplicitly(OpCode opcode) =>
-               opcode == OpCodes.Unbox || opcode == OpCodes.Unbox_Any || opcode == OpCodes.Ldlen ||
+               opcode == OpCodes.Ldlen ||
                opcode == OpCodes.Ldelema || opcode.Name?.StartsWith("ldelem", StringComparison.Ordinal) == true ||
                opcode.Name?.StartsWith("ldind", StringComparison.Ordinal) == true;
     private static bool IsModeledNoEffectOpcode(OpCode opcode) {
@@ -840,6 +843,16 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
             if (opcode == OpCodes.Castclass || opcode == OpCodes.Isinst) {
                 var origin = Pop();
                 Push(origin);
+                return null;
+            }
+            if (opcode == OpCodes.Unbox) {
+                var origin = Pop();
+                Push(origin);
+                return null;
+            }
+            if (opcode == OpCodes.Unbox_Any) {
+                Pop();
+                Push(MetadataValueOrigin.Unknown);
                 return null;
             }
             if (opcode == OpCodes.Call || opcode == OpCodes.Callvirt || opcode == OpCodes.Calli) {

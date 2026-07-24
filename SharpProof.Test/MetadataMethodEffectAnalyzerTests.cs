@@ -43,6 +43,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                 public static void FieldWriteViaCast(object value) { Cast(value).Value = 1; }
                 public static MutableBox? TryCast(object value) => value as MutableBox;
                 public static void FieldWriteViaTryCast(object value) { TryCast(value)!.Value = 1; }
+                public static int UnboxInt32(object value) => (int)value;
                 public static unsafe int IndirectRead(int* value) => *value;
                 public static unsafe void IndirectWrite(int* value) { *value = 1; }
                 public static int Divide(int left, int right) => left / right;
@@ -294,6 +295,17 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(write.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
             Assert.That(write.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
             Assert.That(write.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataUnboxingFailuresDoNotMakeEffectsUnknown() {
+        var effects = Analyze(
+            "static int M(object value) => MetadataFixture.Effects.UnboxInt32(value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
         });
     }
     [Test]
