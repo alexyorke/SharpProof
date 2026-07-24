@@ -142,8 +142,12 @@ internal static class SymbolicReachabilityLowerer {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(condition);
-        return CSharpSyntaxFacts.DescendantNodesInExecution(executionRoot)
-            .Where(node => node.SpanStart >= initializer.Span.End && node.Span.End <= condition.SpanStart)
+        return CSharpSyntaxFacts.DescendantNodesInExecution(
+                executionRoot,
+                includeNestedCallables: true)
+            .Where(node =>
+                node.SpanStart >= initializer.Span.End && node.Span.End <= condition.SpanStart ||
+                IsInsideNestedCallable(node, executionRoot))
             .Any(node =>
                 SymbolMutationFacts.TryGetMutationTarget(node, out var target) &&
                 SymbolMutationFacts.ExpressionMatchesSymbol(
@@ -152,4 +156,8 @@ internal static class SymbolicReachabilityLowerer {
                     semanticModel,
                     cancellationToken));
     }
+    private static bool IsInsideNestedCallable(SyntaxNode node, SyntaxNode executionRoot) =>
+        node.Ancestors()
+            .TakeWhile(ancestor => !ReferenceEquals(ancestor, executionRoot))
+            .Any(CSharpSyntaxFacts.IsNestedLocalCallableBoundary);
 }
