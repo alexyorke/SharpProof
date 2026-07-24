@@ -23,6 +23,8 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                 public static int State;
                 public static volatile int VolatileState;
                 public static void ElementWrite(int[] values) { values[0] = 1; }
+                public static int ElementRead(int[] values) => values[0];
+                public static int ArrayLength(int[] values) => values.Length;
                 public static int[] FreshElementWrite() {
                     var values = new int[1];
                     values[0] = 1;
@@ -140,6 +142,27 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Disproven));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesFreshOwnedState), Is.True);
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataElementReadsThroughArgumentsAreArgumentEffects() {
+        var effects = Analyze("static int M(int[] values) => MetadataFixture.Effects.ElementRead(values);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.ReadsArgumentState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.ReadsReceiverState), Is.False);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataArrayLengthReadsThroughArgumentsAreArgumentEffects() {
+        var effects = Analyze("static int M(int[] values) => MetadataFixture.Effects.ArrayLength(values);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.ReadsArgumentState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
         });
     }
     [Test]

@@ -183,6 +183,20 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                                 true);
                         if (accessOrigin is not MetadataValueOrigin.Fresh) hasUnknownExceptionBoundary = true;
                     }
+                    else if (IsElementRead(opcode)) {
+                        if (accessOrigin is MetadataValueOrigin.Argument)
+                            effects |= SharpProofEffect.ReadsArgumentState;
+                        else if (accessOrigin is MetadataValueOrigin.Receiver)
+                            effects |= SharpProofEffect.ReadsReceiverState;
+                        else if (accessOrigin is MetadataValueOrigin.Static)
+                            effects |= SharpProofEffect.ReadsStaticState;
+                        else if (accessOrigin is not MetadataValueOrigin.Fresh)
+                            MarkUnknown(
+                                "metadata_element_read_origin_unknown",
+                                SharpProofEffect.ReadsArgumentState | SharpProofEffect.ReadsReceiverState,
+                                true);
+                        hasUnknownExceptionBoundary = true;
+                    }
                     else if (opcode == OpCodes.Call || opcode == OpCodes.Callvirt) {
                         effects |= SharpProofEffect.DirectCall;
                         if (opcode == OpCodes.Callvirt) {
@@ -258,6 +272,10 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                opcode == OpCodes.Initblk || opcode.Name?.StartsWith("stelem", StringComparison.Ordinal) == true;
     private static bool IsElementWrite(OpCode opcode) =>
         opcode.Name?.StartsWith("stelem", StringComparison.Ordinal) == true;
+    private static bool IsElementRead(OpCode opcode) =>
+        opcode == OpCodes.Ldlen ||
+        opcode == OpCodes.Ldelema ||
+        opcode.Name?.StartsWith("ldelem", StringComparison.Ordinal) == true;
     private static bool MayThrowImplicitly(OpCode opcode) => opcode == OpCodes.Div || opcode == OpCodes.Div_Un ||
                opcode == OpCodes.Rem || opcode == OpCodes.Rem_Un || opcode == OpCodes.Castclass ||
                opcode == OpCodes.Unbox || opcode == OpCodes.Unbox_Any || opcode == OpCodes.Ldlen ||
@@ -731,13 +749,18 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 Pop();
                 var array = Pop();
                 Push(array);
-                return null;
+                return array;
             }
             if (opcode.Name?.StartsWith("ldelem", StringComparison.Ordinal) == true) {
                 Pop();
-                Pop();
+                var array = Pop();
                 Push(MetadataValueOrigin.Unknown);
-                return null;
+                return array;
+            }
+            if (opcode == OpCodes.Ldlen) {
+                var array = Pop();
+                Push(MetadataValueOrigin.Scalar);
+                return array;
             }
             if (opcode == OpCodes.Stsfld) {
                 Pop();
