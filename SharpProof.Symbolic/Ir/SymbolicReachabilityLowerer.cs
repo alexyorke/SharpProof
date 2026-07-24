@@ -203,18 +203,20 @@ internal static class SymbolicReachabilityLowerer {
         }
         if (semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not ILocalSymbol local ||
             !visitedLocals.Add(local) ||
-            local.DeclaringSyntaxReferences.Length != 1 ||
-            local.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not
-                VariableDeclaratorSyntax { Initializer.Value: { } initializer }) {
+            !SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
+                local,
+                expression,
+                semanticModel,
+                cancellationToken,
+                out var valueExpression)) {
             return false;
         }
-        var initializerExpression =
-            CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(initializer);
-        if (!ReferenceEquals(initializerExpression.SyntaxTree, expression.SyntaxTree) ||
-            initializerExpression.Span.End > expression.SpanStart ||
-            IsMutatedBetween(local, initializerExpression, expression, semanticModel, cancellationToken) ||
+        valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression);
+        if (!ReferenceEquals(valueExpression.SyntaxTree, expression.SyntaxTree) ||
+            valueExpression.Span.End > expression.SpanStart ||
+            IsMutatedBetween(local, valueExpression, expression, semanticModel, cancellationToken) ||
             !TryResolveConditionalInvocation(
-                initializerExpression,
+                valueExpression,
                 expressionValue,
                 semanticModel,
                 cancellationToken,
