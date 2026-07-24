@@ -197,6 +197,20 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                                 true);
                         hasUnknownExceptionBoundary = true;
                     }
+                    else if (IsIndirectRead(opcode)) {
+                        if (accessOrigin is MetadataValueOrigin.Argument)
+                            effects |= SharpProofEffect.ReadsArgumentState;
+                        else if (accessOrigin is MetadataValueOrigin.Receiver)
+                            effects |= SharpProofEffect.ReadsReceiverState;
+                        else if (accessOrigin is MetadataValueOrigin.Static)
+                            effects |= SharpProofEffect.ReadsStaticState;
+                        else if (accessOrigin is not MetadataValueOrigin.Fresh)
+                            MarkUnknown(
+                                "metadata_indirect_read_origin_unknown",
+                                SharpProofEffect.ReadsArgumentState | SharpProofEffect.ReadsReceiverState,
+                                true);
+                        hasUnknownExceptionBoundary = true;
+                    }
                     else if (opcode == OpCodes.Call || opcode == OpCodes.Callvirt) {
                         effects |= SharpProofEffect.DirectCall;
                         if (opcode == OpCodes.Callvirt) {
@@ -276,6 +290,9 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         opcode == OpCodes.Ldlen ||
         opcode == OpCodes.Ldelema ||
         opcode.Name?.StartsWith("ldelem", StringComparison.Ordinal) == true;
+    private static bool IsIndirectRead(OpCode opcode) =>
+        opcode == OpCodes.Ldobj ||
+        opcode.Name?.StartsWith("ldind", StringComparison.Ordinal) == true;
     private static bool MayThrowImplicitly(OpCode opcode) => opcode == OpCodes.Div || opcode == OpCodes.Div_Un ||
                opcode == OpCodes.Rem || opcode == OpCodes.Rem_Un || opcode == OpCodes.Castclass ||
                opcode == OpCodes.Unbox || opcode == OpCodes.Unbox_Any || opcode == OpCodes.Ldlen ||
@@ -761,6 +778,11 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                 var array = Pop();
                 Push(MetadataValueOrigin.Scalar);
                 return array;
+            }
+            if (IsIndirectRead(opcode)) {
+                var address = Pop();
+                Push(MetadataValueOrigin.Unknown);
+                return address;
             }
             if (opcode == OpCodes.Stsfld) {
                 Pop();

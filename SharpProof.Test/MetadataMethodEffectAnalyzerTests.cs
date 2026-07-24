@@ -39,6 +39,7 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                 public static int FieldRead(MutableBox value) => value.Value;
                 public static MutableBox Identity(MutableBox value) => value;
                 public static void FieldWriteViaIdentity(MutableBox value) { Identity(value).Value = 1; }
+                public static unsafe int IndirectRead(int* value) => *value;
                 public static unsafe void IndirectWrite(int* value) { *value = 1; }
                 public static void CopyBlockOpcodeFixture() { VolatileState = 1; }
                 private static void Helper() { State++; }
@@ -158,6 +159,17 @@ public sealed class MetadataMethodEffectAnalyzerTests {
     [Test]
     public void MetadataArrayLengthReadsThroughArgumentsAreArgumentEffects() {
         var effects = Analyze("static int M(int[] values) => MetadataFixture.Effects.ArrayLength(values);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.ReadsArgumentState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataIndirectReadsThroughArgumentsAreArgumentEffects() {
+        var effects = Analyze(
+            "static unsafe int M(int* value) => MetadataFixture.Effects.IndirectRead(value);");
         Assert.Multiple(() => {
             Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Unknown));
