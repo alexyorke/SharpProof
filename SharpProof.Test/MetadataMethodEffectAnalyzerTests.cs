@@ -365,6 +365,18 @@ public sealed class MetadataMethodEffectAnalyzerTests {
         });
     }
     [Test]
+    public void MetadataRootValueTypeConstructionDoesNotAllocate() {
+        var effects = Analyze(
+            "static MetadataFixture.SmallValue M(int value) => new MetadataFixture.SmallValue(value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Allocates), Is.False);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
     public void MetadataByValueStructReadsUseCopiedStorage() {
         var effects = Analyze(
             "static int M(MetadataFixture.SmallValue value) => MetadataFixture.Effects.ReadSmallValue(value);");

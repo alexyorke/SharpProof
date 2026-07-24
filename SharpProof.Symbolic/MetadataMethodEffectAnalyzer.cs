@@ -319,7 +319,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         var rootLocation = new MethodLocation(path, root);
         if (TryFindRootTypeInitializer(rootLocation, out var rootInitializer))
             _ = Visit(rootInitializer, 0);
-        _ = Visit(rootLocation, 0);
+        _ = Visit(rootLocation, 0, CreateRootCallContext(rootLocation));
         var exceptionFacts = ImmutableArray.CreateBuilder<MethodExceptionFact>();
         exceptionFacts.AddRange(exceptions.Select(static type =>
             MethodExceptionFact.Boundary(type, MethodExceptionSource.Metadata, "metadata_throw")));
@@ -612,6 +612,18 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
         }
         initializer = default;
         return false;
+    }
+    private static MetadataCallContext? CreateRootCallContext(MethodLocation rootLocation) {
+        using var stream = File.OpenRead(rootLocation.Path);
+        using var pe = new PEReader(stream, PEStreamOptions.PrefetchMetadata);
+        var reader = pe.GetMetadataReader();
+        var root = reader.GetMethodDefinition(rootLocation.Handle);
+        if (!string.Equals(reader.GetString(root.Name), ".ctor", StringComparison.Ordinal))
+            return null;
+        var signature = root.DecodeSignature(new StructuralTypeProvider(), null);
+        return new MetadataCallContext(
+            MetadataValueOrigin.Fresh,
+            [.. Enumerable.Repeat(MetadataValueOrigin.Argument, signature.ParameterTypes.Length)]);
     }
     private static MetadataValueOrigin MergeOrigins(
         MetadataValueOrigin? current,
