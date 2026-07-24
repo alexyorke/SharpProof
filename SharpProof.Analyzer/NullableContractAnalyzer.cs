@@ -317,6 +317,12 @@ internal static class NullableContractAnalyzer {
             var operand = suppression.Operand;
             var condition = Parenthesize(operand) + " is not null";
             if (IsStaticallyNonNullInput(operand, context)) continue;
+            var roslynState = NullableFlowFacts.GetExpressionStateAtPosition(
+                operand,
+                suppression.SpanStart,
+                context.SemanticModel,
+                context.CancellationToken);
+            if (roslynState == NullableFlowFactState.NotNull) continue;
             var proof = context.State.ProveAtNode(
                 suppression,
                 condition,
@@ -333,11 +339,6 @@ internal static class NullableContractAnalyzer {
                 ReportUnsafeSuppression(context, suppression);
                 continue;
             }
-            var roslynState = NullableFlowFacts.GetExpressionStateAtPosition(
-                operand,
-                suppression.SpanStart,
-                context.SemanticModel,
-                context.CancellationToken);
             if (roslynState == NullableFlowFactState.MaybeNull &&
                 CanUseSuppressionCounterexample(operand, context))
                 ReportUnsafeSuppression(context, suppression);
