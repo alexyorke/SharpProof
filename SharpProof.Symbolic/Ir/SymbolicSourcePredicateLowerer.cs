@@ -4,16 +4,31 @@ internal static class SymbolicSourcePredicateLowerer {
         ExpressionSyntax selector,
         SymbolicLoweringContext context) {
         selector = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(selector);
-        if (selector is not AnonymousFunctionExpressionSyntax lambda ||
-            context.SemanticModel.GetOperation(lambda, context.CancellationToken) is not
-                IAnonymousFunctionOperation { Symbol: { } lambdaMethod })
+        if (selector is AnonymousFunctionExpressionSyntax lambda)
+            return IsIdentityLambdaSequenceSelector(lambda, context);
+        var symbolInfo = context.SemanticModel.GetSymbolInfo(selector, context.CancellationToken);
+        if (symbolInfo.Symbol is ILocalSymbol local &&
+            selector.FirstAncestorOrSelf<InvocationExpressionSyntax>() is { } invocation &&
+            TryGetLocalDelegateInitializer(
+                (ILocalSymbol)local.OriginalDefinition,
+                invocation,
+                context,
+                out var initializer))
+            return IsIdentitySequenceSelector(initializer, context);
+        var method = symbolInfo.Symbol as IMethodSymbol ??
+                     (symbolInfo.CandidateSymbols.Length == 1
+                         ? symbolInfo.CandidateSymbols[0] as IMethodSymbol
+                         : null);
+        return method != null && IsIdentitySourceSequenceSelector(method, context);
+    }
+    private static bool IsIdentityLambdaSequenceSelector(
+        AnonymousFunctionExpressionSyntax lambda,
+        SymbolicLoweringContext context) {
+        if (context.SemanticModel.GetOperation(lambda, context.CancellationToken) is not
+            IAnonymousFunctionOperation { Symbol: { } lambdaMethod })
             return false;
         var parameters = GetLambdaParameterSymbols(lambda, context).ToArray();
-        if (parameters.Length is < 1 or > 2 ||
-            parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
-            parameters.Length == 2 &&
-            parameters[1].Type.SpecialType != SpecialType.System_Int32 ||
-            !SymbolEqualityComparer.Default.Equals(lambdaMethod.ReturnType, parameters[0].Type) ||
+        if (!HasIdentitySelectorSignature(parameters, lambdaMethod.ReturnType) ||
             !TryGetSingleReturnedExpression(lambda, out var returned) ||
             !LambdaBodyReferencesOnlyParameters(lambda, context) ||
             !LambdaReadsOnlyStableParameterMembers(lambda, parameters[0], context))
@@ -23,19 +38,52 @@ internal static class SymbolicSourcePredicateLowerer {
             context.SemanticModel.GetSymbolInfo(returned, context.CancellationToken).Symbol?.OriginalDefinition,
             parameters[0]);
     }
+    private static bool IsIdentitySourceSequenceSelector(
+        IMethodSymbol method,
+        SymbolicLoweringContext callerContext) {
+        method = method.OriginalDefinition;
+        if (!method.IsStatic ||
+            !HasIdentitySelectorSignature(method.Parameters, method.ReturnType) ||
+            method.DeclaringSyntaxReferences.Length != 1)
+            return false;
+        var callable = method.DeclaringSyntaxReferences[0].GetSyntax(callerContext.CancellationToken);
+        if (!TryGetSingleReturnedExpression(callable, out var returned))
+            return false;
+        var semanticModel = callerContext.Compilation.GetSemanticModel(callable.SyntaxTree);
+        var parameter = method.Parameters[0].OriginalDefinition;
+        return !SymbolicMutationInventory.Create(
+                   callable,
+                   semanticModel,
+                   callerContext.CancellationToken).InvalidatesSymbol(parameter, true) &&
+               SymbolEqualityComparer.Default.Equals(
+                   semanticModel.GetSymbolInfo(returned, callerContext.CancellationToken).Symbol?.OriginalDefinition,
+                   parameter);
+    }
+    private static bool HasIdentitySelectorSignature(
+        IReadOnlyList<IParameterSymbol> parameters,
+        ITypeSymbol returnType) =>
+        parameters.Count is 1 or 2 &&
+        parameters.All(static parameter => parameter.RefKind == RefKind.None) &&
+        (parameters.Count == 1 ||
+         parameters[1].Type.SpecialType == SpecialType.System_Int32) &&
+        SymbolEqualityComparer.Default.Equals(returnType, parameters[0].Type);
     private static bool TryGetSingleReturnedExpression(
-        AnonymousFunctionExpressionSyntax lambda,
+        SyntaxNode callable,
         out ExpressionSyntax returned) {
-        returned = lambda switch {
+        returned = callable switch {
             SimpleLambdaExpressionSyntax { ExpressionBody: { } expression } => expression,
             ParenthesizedLambdaExpressionSyntax { ExpressionBody: { } expression } => expression,
+            MethodDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
+            LocalFunctionStatementSyntax { ExpressionBody.Expression: { } expression } => expression,
             _ => null!
         };
         if (returned != null) return true;
-        var block = lambda switch {
+        var block = callable switch {
             SimpleLambdaExpressionSyntax simple => simple.Block,
             ParenthesizedLambdaExpressionSyntax parenthesized => parenthesized.Block,
             AnonymousMethodExpressionSyntax anonymous => anonymous.Block,
+            MethodDeclarationSyntax method => method.Body,
+            LocalFunctionStatementSyntax localFunction => localFunction.Body,
             _ => null
         };
         if (block?.Statements.Count != 1 ||

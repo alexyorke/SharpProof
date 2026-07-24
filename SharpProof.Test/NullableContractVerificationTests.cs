@@ -578,6 +578,116 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_WhereThroughIdentityMethodSelectRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static Item Identity(Item item) => item;
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(Identity))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_WhereThroughGenericIdentityMethodSelectRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static T Identity<T>(T value) => value;
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(Identity))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_WhereThroughIndexedIdentityMethodSelectRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                private static Item Identity(Item item, int index) => item;
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(Identity))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_WhereThroughLocalIdentityDelegateSelectRefinesLoopElement_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    Func<Item, Item> identity = static item => item;
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(identity))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_MutatingIdentityMethodSelectDoesNotPreserveWherePredicate_Reports",
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed class Item {
+                public object? Value { get; set; }
+            }
+            public static class Consumer {
+                private static Item Reset(Item item) {
+                    item.Value = null;
+                    return item;
+                }
+                public static object FirstValue(IEnumerable<Item> items) {
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(Reset))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ReassignedIdentityDelegateSelectDoesNotPreserveWherePredicate_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue(IEnumerable<Item> items) {
+                    Func<Item, Item> identity = static item => item;
+                    identity = static item => new Item(null);
+                    foreach (var item in items
+                        .Where(static item => item.Value is not null)
+                        .Select(identity))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_QueryableWhereThroughIdentitySelectRefinesLoopElement_DoesNotReport",
             """
             #nullable enable
