@@ -436,6 +436,14 @@ internal static class CompilerProgramPointAnalysis {
                     out _,
                     out var secondProducesNoElements))
                 definitelyNoElements = secondProducesNoElements;
+            if (definition.Name == "TakeLast" &&
+                targetMethod.Parameters.Length != 0 &&
+                TryGetInvocationArgument(
+                    operation,
+                    targetMethod.Parameters[targetMethod.Parameters.Length - 1],
+                    out var count) &&
+                DefinitelyCapsSequenceAtZero(count))
+                definitelyNoElements = true;
             return true;
         }
         private bool DefinitelyProducesNoElements(ExpressionSyntax collection) {
@@ -673,13 +681,40 @@ internal static class CompilerProgramPointAnalysis {
                     operation,
                     targetMethod.Parameters[targetMethod.Parameters.Length - 1],
                     out var count) &&
-                (semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount } &&
-                 constantCount <= 0 ||
-                 SymbolicIndexingLowerer.DefinitelyProducesNoElements(
-                     count,
-                     new(semanticModel, cancellationToken))))
+                DefinitelyCapsSequenceAtZero(count))
                 definitelyNoElements = true;
             return true;
+        }
+        private bool DefinitelyCapsSequenceAtZero(ExpressionSyntax limit) {
+            var resolvedUses = new List<(ISymbol Symbol, int Position)>();
+            while (true) {
+                limit = SymbolicConversionLowerer.UnwrapIdentityConversions(
+                    limit,
+                    semanticModel,
+                    cancellationToken);
+                if (semanticModel.GetConstantValue(limit, cancellationToken) is { HasValue: true, Value: int constant } &&
+                    constant <= 0 ||
+                    SymbolicIndexingLowerer.DefinitelyProducesNoElements(
+                        limit,
+                        new(semanticModel, cancellationToken)))
+                    return true;
+                limit = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(limit);
+                var symbol = semanticModel.GetSymbolInfo(limit, cancellationToken).Symbol?.OriginalDefinition;
+                var usePosition = limit.SpanStart;
+                if (symbol is not (ILocalSymbol or IParameterSymbol) ||
+                    resolvedUses.Any(candidate =>
+                        candidate.Position == usePosition &&
+                        SymbolEqualityComparer.Default.Equals(candidate.Symbol, symbol)) ||
+                    !SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
+                        symbol,
+                        limit,
+                        semanticModel,
+                        cancellationToken,
+                        true,
+                        out limit))
+                    return false;
+                resolvedUses.Add((symbol, usePosition));
+            }
         }
         private bool TryGetSequencePredicateStep(
             ExpressionSyntax collection,
