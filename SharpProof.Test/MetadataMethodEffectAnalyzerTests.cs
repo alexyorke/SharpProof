@@ -81,6 +81,16 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                     var value = new VolatileBox();
                     return value.Value;
                 }
+                public static int SwitchValue(int value) {
+                    switch (value) {
+                        case 0: return 10;
+                        case 1: return 20;
+                        case 2: return 30;
+                        case 3: return 40;
+                        case 4: return 50;
+                        default: return -1;
+                    }
+                }
                 public static unsafe int SizeOf<T>() where T : unmanaged => sizeof(T);
                 public static void CopyBlockOpcodeFixture() { VolatileState = 1; }
                 private static void Helper() { State++; }
@@ -311,6 +321,17 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.Synchronizes), Is.True);
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+        });
+    }
+    [Test]
+    public void MetadataSwitchControlFlowIsPure() {
+        var effects = Analyze("static int M(int value) => MetadataFixture.Effects.SwitchValue(value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.AllocationFree, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProofVerdict.Proven));
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.Unknown), Is.False);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.UnsupportedOperation), Is.False);
         });
     }
     [Test]

@@ -349,6 +349,7 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                name.StartsWith("ldarg", StringComparison.Ordinal) || name.StartsWith("ldloc", StringComparison.Ordinal) ||
                name.StartsWith("starg", StringComparison.Ordinal) || name.StartsWith("stloc", StringComparison.Ordinal) ||
                name.StartsWith("ldc", StringComparison.Ordinal) ||
+               opcode == OpCodes.Switch ||
                name.StartsWith("br", StringComparison.Ordinal) || name.StartsWith("leave", StringComparison.Ordinal) ||
                name.StartsWith("conv", StringComparison.Ordinal) || name.StartsWith("readonly", StringComparison.Ordinal) ||
                name.StartsWith("constrained", StringComparison.Ordinal) || name.StartsWith("tail", StringComparison.Ordinal) ||
