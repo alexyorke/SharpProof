@@ -845,6 +845,28 @@ internal static class CompilerProgramPointAnalysis {
                     definitelyAllNonPositive);
                 return facts != default;
             }
+            if (definition.Name is "Append" or "Prepend") {
+                var elementParameter = targetMethod.Parameters.FirstOrDefault(parameter =>
+                    parameter.Name == "element");
+                if (elementParameter == null ||
+                    !TryGetStandardSequenceSource(invocation, operation, out var augmentedSource) ||
+                    !TryGetInvocationArgument(operation, elementParameter, out var element))
+                    return false;
+                var augmentedSourceFacts = GetArrayDimensionVectorFacts(augmentedSource, [.. visited]);
+                var elementIsNonPositive = DefinitelyCapsSequenceAtZero(element);
+                var definitelyContainsNonPositive =
+                    augmentedSourceFacts.DefinitelyContainsNonPositive ||
+                    elementIsNonPositive;
+                var definitelyAllNonPositive =
+                    augmentedSourceFacts.DefinitelyAllNonPositive &&
+                    elementIsNonPositive;
+                facts = new(
+                    false,
+                    definitelyContainsNonPositive,
+                    definitelyContainsNonPositive || definitelyAllNonPositive,
+                    definitelyAllNonPositive);
+                return facts != default;
+            }
             var preservesEveryElement = definition.Name is
                     nameof(Enumerable.AsEnumerable) or
                     nameof(Enumerable.OrderBy) or
