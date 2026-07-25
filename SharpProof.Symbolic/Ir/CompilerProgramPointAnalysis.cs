@@ -1043,10 +1043,11 @@ internal static class CompilerProgramPointAnalysis {
                 return constant <= 0;
             var operation = model.GetOperation(expression, cancellationToken);
             return operation != null &&
-                   OperationDefinitelyProducesNonPositiveInt32(operation, callPath);
+                   OperationDefinitelyProducesNonPositiveInt32(operation, model, callPath);
         }
         private bool OperationDefinitelyProducesNonPositiveInt32(
             IOperation operation,
+            SemanticModel model,
             HashSet<ISymbol> callPath) {
             while (operation is IConversionOperation conversion)
                 operation = conversion.Operand;
@@ -1061,14 +1062,19 @@ internal static class CompilerProgramPointAnalysis {
                     WhenFalse: { } whenFalse
                 } =>
                     OperationDefinitelyProducesNonPositiveInt32(
-                        whenTrue, callPath) &&
+                        whenTrue, model, callPath) &&
                     OperationDefinitelyProducesNonPositiveInt32(
-                        whenFalse, callPath),
+                        whenFalse, model, callPath),
                 ISwitchExpressionOperation { Arms.Length: > 0 } switchExpression =>
                     switchExpression.Arms.All(arm =>
                         OperationDefinitelyProducesNonPositiveInt32(
-                            arm.Value, callPath)),
+                            arm.Value, model, callPath)),
                 IThrowOperation => true,
+                ILocalReferenceOperation {
+                    Local.Type.SpecialType: SpecialType.System_Int32
+                } local =>
+                    LocalReferenceDefinitelyProducesNonPositiveInt32(
+                        local, model, callPath),
                 IInvocationOperation {
                     TargetMethod: {
                         ReturnType.SpecialType: SpecialType.System_Int32,
@@ -1078,6 +1084,34 @@ internal static class CompilerProgramPointAnalysis {
                     SourceMethodReturnsOnlyNonPositiveValues(targetMethod, callPath),
                 _ => false
             };
+        }
+        private bool LocalReferenceDefinitelyProducesNonPositiveInt32(
+            ILocalReferenceOperation reference,
+            SemanticModel model,
+            HashSet<ISymbol> callPath) {
+            if (reference.Syntax is not ExpressionSyntax use ||
+                reference.Local.DeclaringSyntaxReferences.FirstOrDefault() is not { } declarationReference)
+                return false;
+            var declaration = declarationReference.GetSyntax(cancellationToken);
+            if (!ReferenceEquals(
+                    CSharpSyntaxFacts.GetContainingExecutionRoot(declaration),
+                    CSharpSyntaxFacts.GetContainingExecutionRoot(use)))
+                return false;
+            var local = reference.Local.OriginalDefinition;
+            var nextCallPath = new HashSet<ISymbol>(callPath, SymbolEqualityComparer.Default);
+            if (!nextCallPath.Add(local) ||
+                !SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
+                    local,
+                    use,
+                    model,
+                    cancellationToken,
+                    true,
+                    out var value))
+                return false;
+            return ExpressionDefinitelyProducesNonPositiveInt32(
+                value,
+                model,
+                nextCallPath);
         }
         private bool DefinitelyProvidesPositiveDimensionCount(ExpressionSyntax count) {
             var visited = new HashSet<SyntaxNode>();
