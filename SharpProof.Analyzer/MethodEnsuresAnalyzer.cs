@@ -10,7 +10,15 @@ internal static class MethodEnsuresAnalyzer {
         if (contracts.Length == 0) return;
         contracts = ContractConditionHelpers.ReportAndFilterInvalid(contracts, "[Ensures]", context);
         if (contracts.Length == 0) return;
-        if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) {
+        if (!SupportsEnsuresPostconditions(context.Node, out var unsupportedReason)) {
+            foreach (var contract in contracts)
+                ContractConditionHelpers.ReportUnsupported(
+                    context, methodSymbol, contract, unsupportedReason, CreateUnsupportedDiagnostic);
+            return;
+        }
+        var proofContext = context;
+        if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context) &&
+            !TryCreateAutoPropertyProofContext(context, out proofContext)) {
             foreach (var contract in contracts)
                 ContractConditionHelpers.ReportUnsupported(
                     context, methodSymbol, contract,
@@ -18,14 +26,8 @@ internal static class MethodEnsuresAnalyzer {
                     CreateUnsupportedDiagnostic);
             return;
         }
-        if (!SupportsEnsuresPostconditions(context.Node, out var unsupportedReason)) {
-            foreach (var contract in contracts)
-                ContractConditionHelpers.ReportUnsupported(
-                    context, methodSymbol, contract, unsupportedReason, CreateUnsupportedDiagnostic);
-            return;
-        }
         var requiresAssumptions = CollectRequiresAssumptions(methodSymbol, context.CancellationToken);
-        var completionSites = MethodCompletionAnalysis.Collect(context);
+        var completionSites = MethodCompletionAnalysis.Collect(proofContext);
         if (completionSites.Length == 0) return;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var contract in contracts) {
@@ -47,7 +49,7 @@ internal static class MethodEnsuresAnalyzer {
                 continue;
             }
             if (!ContractConditionHelpers.TryCreateSpeculativeModel(
-                    context.SemanticModel,
+                    proofContext.SemanticModel,
                     completionSites[0].QueryNode.SpanStart,
                     conditionStatement,
                     out var speculativeModel)) {
@@ -63,7 +65,11 @@ internal static class MethodEnsuresAnalyzer {
                     CreateUnsupportedDiagnostic);
                 continue;
             }
-            if (ReferencesUserLocalOrUnsupportedParameter(conditionExpression, speculativeModel, methodSymbol, context.CancellationToken)) {
+            if (ReferencesUserLocalOrUnsupportedParameter(
+                    conditionExpression,
+                    speculativeModel,
+                    proofContext.MethodSymbol,
+                    context.CancellationToken)) {
                 ContractConditionHelpers.ReportUnsupported(
                     context, methodSymbol, contract,
                     "local variables are not supported in [Ensures] conditions", CreateUnsupportedDiagnostic);
@@ -85,7 +91,7 @@ internal static class MethodEnsuresAnalyzer {
                 }
                 var proofCondition =
                     RequiresContractHelpers.CombineAsImplication(requiresAssumptions, rewrittenCondition);
-                var proof = MethodCompletionAnalysis.Prove(context, smtAnalysis, completionSite, proofCondition);
+                var proof = MethodCompletionAnalysis.Prove(proofContext, smtAnalysis, completionSite, proofCondition);
                 if (proof.TruthValue == SymbolicTruthValue.ProvenTrue ||
                     proof.TruthValue == SymbolicTruthValue.Unreachable)
                     continue;
@@ -108,6 +114,57 @@ internal static class MethodEnsuresAnalyzer {
                     contract.Location == null ? null : [contract.Location]);
             }
         }
+    }
+    private static bool TryCreateAutoPropertyProofContext(
+        MethodBodyAnalysisContext context,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out MethodBodyAnalysisContext? proofContext) {
+        proofContext = null;
+        if (context.Node is not AccessorDeclarationSyntax {
+            Parent.Parent: PropertyDeclarationSyntax {
+                Initializer.Value: { } initializer
+            }
+        } accessor)
+            return false;
+        if (context.MethodSymbol.AssociatedSymbol is not IPropertySymbol property ||
+            property.SetMethod != null ||
+            !context.SemanticModel.GetConstantValue(initializer, context.CancellationToken).HasValue ||
+            property.ContainingType.GetMembers()
+                .OfType<IMethodSymbol>()
+                .Any(constructor =>
+                    constructor.MethodKind is MethodKind.Constructor or MethodKind.StaticConstructor &&
+                    constructor.IsStatic == property.IsStatic &&
+                    !constructor.IsImplicitlyDeclared))
+            return false;
+        var annotation = new SyntaxAnnotation();
+        var syntheticAccessor = accessor
+            .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(initializer.WithoutTrivia()))
+            .WithAdditionalAnnotations(annotation);
+        var sourceTree = accessor.SyntaxTree;
+        var sourceRoot = sourceTree.GetRoot(context.CancellationToken);
+        var syntheticRoot = sourceRoot.ReplaceNode(accessor, syntheticAccessor);
+        var syntheticTree = sourceTree.WithRootAndOptions(syntheticRoot, sourceTree.Options);
+        var syntheticCompilation = context.SemanticModel.Compilation.ReplaceSyntaxTree(sourceTree, syntheticTree);
+        var syntheticModel = syntheticCompilation.GetSemanticModel(syntheticTree);
+        var rewrittenAccessor = syntheticTree
+            .GetRoot(context.CancellationToken)
+            .GetAnnotatedNodes(annotation)
+            .OfType<AccessorDeclarationSyntax>()
+            .Single();
+        if (syntheticModel.GetDeclaredSymbol(
+                rewrittenAccessor,
+                context.CancellationToken) is not IMethodSymbol syntheticMethod)
+            return false;
+        var snapshot = MethodAnalysisSnapshot.Create(
+            syntheticMethod,
+            rewrittenAccessor,
+            syntheticModel,
+            [],
+            context.CancellationToken);
+        proofContext = new MethodBodyAnalysisContext(
+            new MethodBodyAnalysisState(snapshot),
+            context.CancellationToken,
+            static _ => { });
+        return true;
     }
     private static ImmutableArray<ContractAttributeCondition> CollectRequiresAssumptions(
         IMethodSymbol methodSymbol,

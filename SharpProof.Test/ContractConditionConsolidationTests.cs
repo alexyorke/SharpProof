@@ -45,8 +45,7 @@ public sealed class ContractConditionConsolidationTests {
                 [Ensures("result > 0")]
                 public static int P { get; } = 1;
             }
-            """,
-            "SP0019@3[]: Method 'get_P' is marked [Ensures], but postcondition 'result > 0' could not be verified: auto-property getter result is not source-visible for [Ensures] verification");
+            """);
         yield return Case(
             "Inherited",
             """

@@ -85,6 +85,32 @@ public sealed class UnknownContractDiagnosticTests {
         });
     }
     [Test]
+    public async Task MixedProvenAndUnknownFactsAtOneExceptionSiteReportViolationOnly() {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""
+            using SharpProof.Attributes;
+            public static class C {
+                [EffectContract(
+                    SharpProofEffect.Throws,
+                    ThrownExceptions = new[] { typeof(System.InvalidOperationException) })]
+                [EffectContract(SharpProofEffect.Throws)]
+                private static extern void Boundary();
+                [DoesNotThrow]
+                public static void Caller() => Boundary();
+            }
+            """);
+        var exceptionDiagnostics = diagnostics
+            .Where(static diagnostic => diagnostic.Id is "SP0030" or "SP0046")
+            .ToArray();
+        Assert.Multiple(() => {
+            Assert.That(
+                exceptionDiagnostics.Select(static diagnostic => diagnostic.Id),
+                Does.Contain("SP0030"));
+            Assert.That(
+                exceptionDiagnostics.Select(static diagnostic => diagnostic.Id),
+                Does.Not.Contain("SP0046"));
+        });
+    }
+    [Test]
     public async Task InterfaceDoesNotThrowContractAppliesToImplementation() {
         const string source = """
             using SharpProof.Attributes;

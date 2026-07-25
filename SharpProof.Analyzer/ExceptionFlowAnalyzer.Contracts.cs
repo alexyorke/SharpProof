@@ -69,7 +69,7 @@ internal static partial class ExceptionFlowAnalyzer {
                     contract.AttributeDisplay,
                     firstEntry.Site.ToString(),
                     FormatExceptionList(provenSites)));
-            if (unknownSites.Length != 0)
+            else if (unknownSites.Length != 0)
                 ReportUnknownExceptionContract(context, methodSymbol, contract, siteLocation, unknownSites);
         }
     }

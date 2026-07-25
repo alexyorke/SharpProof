@@ -46,8 +46,12 @@
 # identity, configuration precedence, contract deduplication, property-setter,
 # Requires binding, params, optional-argument, extension-receiver, constructed
 # generic-contract, guarded-setter, single-evaluation, and constructor-initializer
-# cases.
-8c7e62be9b4553a1bb918f0641e52d3c32d51d9b  SharpProof.Test/NullableContractVerificationTests.cs
+# cases, plus contract-placeholder shadowing, auto-property Ensures, and
+# per-completion Ensures binding coverage.
+7d6391cc6760ae569bb1e8fef197ca00448f23ff  SharpProof.Test/NullableContractVerificationTests.cs
+# ContractConditionConsolidationTests.cs updates the auto-property acceptance
+# case now that constant initializer-backed getters can be verified.
+625c240137d09587343d4c55feac13e23b7cc524  SharpProof.Test/ContractConditionConsolidationTests.cs
 # MetadataMethodEffectAnalyzerTests.cs adds a callvirt regression proving that
 # non-virtual instance methods are analyzed recursively.
 3c67608a618c3c452ab60d0933bf6b6b0197b17e  SharpProof.Test/MetadataMethodEffectAnalyzerTests.cs
@@ -58,7 +62,7 @@
 # synchronization effect required by the capability model.
 f7e4c319512795895f0772d575227425afa90b6c  SharpProof.Test/MethodEffectsTests.cs
 # UnknownContractDiagnosticTests.cs verifies that mixed exception facts retain
-# their distinct source locations.
-fa522cf5429de28f1c36297b30f969b9f6cb431e  SharpProof.Test/UnknownContractDiagnosticTests.cs
+# distinct source locations and that same-site proven facts dominate unknowns.
+96491c0e10859da4cc8aca4abd259052e80051b3  SharpProof.Test/UnknownContractDiagnosticTests.cs
 # FuzzRunnerBehaviorTests.cs adds a long-deadline cancellation regression.
 765399ac8f22c5a47084b76ee65402a42c46fa39  SharpProof.ToolingTest/FuzzRunnerBehaviorTests.cs

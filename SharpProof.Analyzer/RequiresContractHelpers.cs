@@ -184,11 +184,11 @@ internal static class RequiresContractHelpers {
                 return typeReplacement.WithTriviaFrom(node);
             if (!_replacements.TryGetValue(node.Identifier.ValueText, out var replacement))
                 return base.VisitIdentifierName(node);
-            if (IsShadowedByNestedCallableParameter(node, node.Identifier.ValueText))
+            if (IsShadowedByNestedDeclaration(node, node.Identifier.ValueText))
                 return base.VisitIdentifierName(node);
             return SyntaxFactory.ParenthesizedExpression(replacement).WithTriviaFrom(node);
         }
-        private static bool IsShadowedByNestedCallableParameter(IdentifierNameSyntax node, string name) {
+        private static bool IsShadowedByNestedDeclaration(IdentifierNameSyntax node, string name) {
             foreach (var ancestor in node.Ancestors())
                 switch (ancestor) {
                     case SimpleLambdaExpressionSyntax simpleLambda
@@ -202,9 +202,56 @@ internal static class RequiresContractHelpers {
                     case LocalFunctionStatementSyntax localFunction
                         when localFunction.ParameterList.Parameters.Any(
                             parameter => parameter.Identifier.ValueText == name):
+                    case CatchClauseSyntax catchClause
+                        when catchClause.Declaration?.Identifier.ValueText == name:
+                    case BlockSyntax block
+                        when HasEarlierBlockScopedDeclaration(block, node, name):
+                    case ExpressionSyntax expression
+                        when HasEarlierPatternDeclaration(expression, node, name):
+                    case QueryExpressionSyntax query
+                        when HasEarlierQueryDeclaration(query, node, name):
                         return true;
                 }
             return false;
         }
+        private static bool HasEarlierBlockScopedDeclaration(
+            BlockSyntax block,
+            IdentifierNameSyntax node,
+            string name) => block
+            .DescendantNodes()
+            .Where(declaration => declaration.SpanStart < node.SpanStart)
+            .Where(declaration => declaration switch {
+                VariableDeclaratorSyntax variable =>
+                    variable.Identifier.ValueText == name,
+                SingleVariableDesignationSyntax designation =>
+                    designation.Identifier.ValueText == name,
+                _ => false
+            })
+            .Any(declaration => ReferenceEquals(
+                declaration.Ancestors().OfType<BlockSyntax>().FirstOrDefault(),
+                block));
+        private static bool HasEarlierPatternDeclaration(
+            ExpressionSyntax expression,
+            IdentifierNameSyntax node,
+            string name) => expression
+            .DescendantNodes()
+            .OfType<SingleVariableDesignationSyntax>()
+            .Any(designation =>
+                designation.SpanStart < node.SpanStart &&
+                designation.Identifier.ValueText == name);
+        private static bool HasEarlierQueryDeclaration(
+            QueryExpressionSyntax query,
+            IdentifierNameSyntax node,
+            string name) => query
+            .DescendantNodesAndSelf()
+            .Where(declaration => declaration.SpanStart < node.SpanStart)
+            .Any(declaration => declaration switch {
+                FromClauseSyntax from => from.Identifier.ValueText == name,
+                JoinClauseSyntax join => join.Identifier.ValueText == name,
+                LetClauseSyntax let => let.Identifier.ValueText == name,
+                QueryContinuationSyntax continuation =>
+                    continuation.Identifier.ValueText == name,
+                _ => false
+            });
     }
 }

@@ -9777,6 +9777,107 @@ public sealed class NullableContractVerificationTests {
         Assert.That(rewritten, Does.Contain("p > q"));
         Assert.That(rewritten, Does.Not.Contain("42 > q"));
     }
+    [TestCase(
+        "System.Array.Exists(new[] { 1 }, _ => { var p = 1; return p > 0; })",
+        "return p > 0")]
+    [TestCase(
+        "((System.Func<int>)(() => { var (p, q) = (1, 2); return p + q; }))()",
+        "return p + q")]
+    [TestCase(
+        "((System.Func<int>)(() => { try { throw new System.Exception(); } catch (System.Exception p) { return p.HResult; } }))()",
+        "return p.HResult")]
+    [TestCase(
+        "System.Array.Exists(new object[] { 1 }, item => item is int p && p > 0)",
+        "p > 0")]
+    [TestCase(
+        "(from p in new[] { 1 } select p).Any()",
+        "select p")]
+    public void PotentialBugRegression_NestedDeclarationsShadowContractParameters(
+        string condition,
+        string expected) {
+        const string source = """
+            public static class C {
+                public static void M(int p) { }
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var declaration = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+            .Single();
+        var method =
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(
+                model,
+                declaration)!;
+        Assert.That(
+            SharpProof.Analyzer.RequiresContractHelpers.TryRewriteForArguments(
+                condition,
+                method,
+                method,
+                new Dictionary<
+                    string,
+                    Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax> {
+                    ["p"] =
+                        Microsoft.CodeAnalysis.CSharp.SyntaxFactory
+                            .ParseExpression("42")
+                },
+                out var rewritten),
+            Is.True);
+        Assert.That(rewritten, Does.Contain(expected));
+    }
+    [Test]
+    public async Task PotentialBugRegression_AutoPropertyInitializerCanProveEnsures() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                [Ensures("result > 0")]
+                public static int P { get; } = 1;
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0018").And.Not.Contain("SP0019"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public async Task PotentialBugRegression_ConstructorAssignedAutoPropertyIsNotPreProven() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                [Ensures("result == 1")]
+                public static int P { get; } = 1;
+                static C() => P = 0;
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0019"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public async Task PotentialBugRegression_EnsuresBindingIsValidatedAtEveryReturn() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                private static int value = 1;
+                [Ensures("result == value")]
+                public static int M(bool first) {
+                    if (first)
+                        return 1;
+                    {
+                        var value = 2;
+                        return value;
+                    }
+                }
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0019"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
     [Test]
     public void PotentialBugRegression_LinuxDlopenUsesGlobalFlag() {
         Assert.That(
