@@ -958,13 +958,62 @@ internal static class CompilerProgramPointAnalysis {
                     expression,
                 _ => null
             };
-            return projectedValue != null &&
-                   semanticModel.GetConstantValue(projectedValue, cancellationToken) is {
-                       HasValue: true,
-                       Value: int constant
-                   } &&
-                   constant <= 0;
+            if (projectedValue != null)
+                return IsConstantNonPositiveInt32(projectedValue, semanticModel);
+            return semanticModel.GetSymbolInfo(selector, cancellationToken).Symbol is
+                       IMethodSymbol {
+                           IsStatic: true,
+                           ReturnType.SpecialType: SpecialType.System_Int32,
+                           MethodKind: MethodKind.Ordinary or MethodKind.LocalFunction
+                       } method &&
+                   SourceMethodReturnsOnlyConstantNonPositiveValues(method);
         }
+        private bool SourceMethodReturnsOnlyConstantNonPositiveValues(IMethodSymbol method) {
+            var foundBody = false;
+            foreach (var syntaxReference in method.DeclaringSyntaxReferences) {
+                cancellationToken.ThrowIfCancellationRequested();
+                var declaration = syntaxReference.GetSyntax(cancellationToken);
+                var model = semanticModel.Compilation.GetSemanticModel(declaration.SyntaxTree);
+                var expressionBody = declaration switch {
+                    MethodDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
+                    LocalFunctionStatementSyntax { ExpressionBody.Expression: { } expression } => expression,
+                    _ => null
+                };
+                if (expressionBody != null) {
+                    foundBody = true;
+                    if (!IsConstantNonPositiveInt32(expressionBody, model))
+                        return false;
+                    continue;
+                }
+                var body = declaration switch {
+                    MethodDeclarationSyntax methodDeclaration => methodDeclaration.Body,
+                    LocalFunctionStatementSyntax localFunction => localFunction.Body,
+                    _ => null
+                };
+                if (body == null)
+                    continue;
+                foundBody = true;
+                var returns = body.DescendantNodes(node =>
+                        node is not AnonymousFunctionExpressionSyntax and
+                            not LocalFunctionStatementSyntax)
+                    .OfType<ReturnStatementSyntax>()
+                    .ToArray();
+                if (returns.Length == 0 ||
+                    returns.Any(statement =>
+                        statement.Expression == null ||
+                        !IsConstantNonPositiveInt32(statement.Expression, model)))
+                    return false;
+            }
+            return foundBody;
+        }
+        private bool IsConstantNonPositiveInt32(
+            ExpressionSyntax expression,
+            SemanticModel model) =>
+            model.GetConstantValue(expression, cancellationToken) is {
+                HasValue: true,
+                Value: int constant
+            } &&
+            constant <= 0;
         private bool DefinitelyProvidesPositiveDimensionCount(ExpressionSyntax count) {
             var visited = new HashSet<SyntaxNode>();
             while (true) {
