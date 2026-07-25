@@ -1109,13 +1109,21 @@ internal static class CompilerProgramPointAnalysis {
                 Conversion.IsIdentity: true
             } conversion)
                 operation = conversion.Operand;
-            if (operation.ConstantValue is {
-                HasValue: true,
-                Value: int constant
-            })
-                return Int32ConstantSatisfiesBound(constant, bound);
+            if (operation.ConstantValue is { HasValue: true } constant &&
+                IntegralConstantSatisfiesBound(constant.Value, bound))
+                return true;
+            if (bound == Int32Bound.NonNegative &&
+                IsUnsignedIntegralType(operation.Type))
+                return true;
             return operation switch {
                 IConversionOperation { Operand: IThrowOperation } => true,
+                IConversionOperation conversion
+                    when BuiltInIntegralConversionDefinitelyProducesInt32Bound(
+                        conversion,
+                        model,
+                        callPath,
+                        bound) =>
+                    true,
                 IParenthesizedOperation parenthesized =>
                     OperationDefinitelyProducesInt32Bound(
                         parenthesized.Operand,
@@ -1198,6 +1206,96 @@ internal static class CompilerProgramPointAnalysis {
                 _ => false
             };
         }
+        private bool BuiltInIntegralConversionDefinitelyProducesInt32Bound(
+            IConversionOperation operation,
+            SemanticModel model,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
+            if (operation.OperatorMethod != null ||
+                !IsBuiltInIntegralType(operation.Type) ||
+                !IsBuiltInIntegralType(operation.Operand.Type) ||
+                !operation.Conversion.IsNumeric)
+                return false;
+            return (operation.IsChecked ||
+                    IntegralConversionPreservesSign(
+                        operation.Operand.Type!.SpecialType,
+                        operation.Type!.SpecialType)) &&
+                   OperationDefinitelyProducesInt32Bound(
+                       operation.Operand,
+                       model,
+                       callPath,
+                       bound);
+        }
+        private static bool IntegralConversionPreservesSign(
+            SpecialType source,
+            SpecialType target) =>
+            source == target ||
+            source == SpecialType.System_SByte &&
+            target is SpecialType.System_Int16 or
+                SpecialType.System_Int32 or
+                SpecialType.System_Int64 ||
+            source == SpecialType.System_Byte &&
+            target is SpecialType.System_Int16 or
+                SpecialType.System_UInt16 or
+                SpecialType.System_Int32 or
+                SpecialType.System_UInt32 or
+                SpecialType.System_Int64 or
+                SpecialType.System_UInt64 ||
+            source == SpecialType.System_Int16 &&
+            target is SpecialType.System_Int32 or
+                SpecialType.System_Int64 ||
+            source is SpecialType.System_UInt16 or SpecialType.System_Char &&
+            target is SpecialType.System_Int32 or
+                SpecialType.System_UInt32 or
+                SpecialType.System_Int64 or
+                SpecialType.System_UInt64 ||
+            source == SpecialType.System_Int32 &&
+            target == SpecialType.System_Int64 ||
+            source == SpecialType.System_UInt32 &&
+            target is SpecialType.System_Int64 or
+                SpecialType.System_UInt64;
+        private static bool IsBuiltInIntegralType(ITypeSymbol? type) =>
+            type?.SpecialType is
+                SpecialType.System_SByte or
+                SpecialType.System_Byte or
+                SpecialType.System_Int16 or
+                SpecialType.System_UInt16 or
+                SpecialType.System_Int32 or
+                SpecialType.System_UInt32 or
+                SpecialType.System_Int64 or
+                SpecialType.System_UInt64 or
+                SpecialType.System_Char or
+                SpecialType.System_IntPtr or
+                SpecialType.System_UIntPtr;
+        private static bool IsUnsignedIntegralType(ITypeSymbol? type) =>
+            type?.SpecialType is
+                SpecialType.System_Byte or
+                SpecialType.System_UInt16 or
+                SpecialType.System_UInt32 or
+                SpecialType.System_UInt64 or
+                SpecialType.System_Char or
+                SpecialType.System_UIntPtr;
+        private static bool IntegralConstantSatisfiesBound(
+            object? value,
+            Int32Bound bound) =>
+            value switch {
+                sbyte signed => bound == Int32Bound.NonPositive
+                    ? signed <= 0
+                    : signed >= 0,
+                byte unsigned => bound == Int32Bound.NonNegative || unsigned == 0,
+                short signed => bound == Int32Bound.NonPositive
+                    ? signed <= 0
+                    : signed >= 0,
+                ushort unsigned => bound == Int32Bound.NonNegative || unsigned == 0,
+                int signed => Int32ConstantSatisfiesBound(signed, bound),
+                uint unsigned => bound == Int32Bound.NonNegative || unsigned == 0,
+                long signed => bound == Int32Bound.NonPositive
+                    ? signed <= 0
+                    : signed >= 0,
+                ulong unsigned => bound == Int32Bound.NonNegative || unsigned == 0,
+                char unsigned => bound == Int32Bound.NonNegative || unsigned == 0,
+                _ => false
+            };
         private bool BuiltInBinaryOperationDefinitelyProducesInt32Bound(
             IBinaryOperation operation,
             SemanticModel model,
