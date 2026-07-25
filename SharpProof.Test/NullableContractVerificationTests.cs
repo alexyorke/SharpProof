@@ -10058,6 +10058,56 @@ public sealed class NullableContractVerificationTests {
             Assert.That(signed, Is.True);
             Assert.That(signedBits, Is.EqualTo(64));
         });
+    [Test]
+    public async Task PotentialBugRegression_UnsignedParameterCannotReachNegativeBranch() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                [DoesNotThrow]
+                public static void M(uint value) {
+                    if ((long)value < 0)
+                        throw new System.Exception();
+                }
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0030"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public void PotentialBugRegression_NestedGenericContractRewritesOuterTypeParameter() {
+        const string source = """
+            public sealed class Outer<T> {
+                public sealed class Inner<U> {
+                    public static void Target(object value) { }
+                }
+            }
+            public static class C {
+                public static void M() =>
+                    Outer<string>.Inner<int>.Target("value");
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var invocation = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
+            .Single();
+        var operation = (Microsoft.CodeAnalysis.Operations.IInvocationOperation)
+            model.GetOperation(invocation)!;
+        Assert.That(
+            SharpProof.Analyzer.RequiresContractHelpers.TryRewriteForArguments(
+                "value is T",
+                operation.TargetMethod.OriginalDefinition,
+                operation.TargetMethod,
+                new Dictionary<string, Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax> {
+                    ["value"] = invocation.ArgumentList.Arguments[0].Expression
+                },
+                out var rewritten),
+            Is.True);
+        Assert.That(rewritten, Does.Contain("is string"));
+        Assert.That(rewritten, Does.Not.Match(@"\bis\s+T\b"));
+    }
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)

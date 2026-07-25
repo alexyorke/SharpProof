@@ -31,6 +31,38 @@ internal static class SymbolicStatementStateTransfer {
                 parameter);
             state = state.AddPathCondition(new SymbolicFactCondition(fact));
         }
+        if (semanticModel.GetEnclosingSymbol(site.SpanStart, cancellationToken) is not IMethodSymbol containingMethod)
+            return;
+        foreach (var parameter in containingMethod.Parameters) {
+            if (!TryCreateSymbolTerm(parameter.OriginalDefinition, out var parameterTerm) ||
+                parameterTerm.Kind != SmtValueKind.Int ||
+                !SymbolicTypeFacts.TryGetIntegralShape(
+                    parameter.Type.SpecialType,
+                    out var signed,
+                    out _) ||
+                signed ||
+                !SymbolicTypeFacts.TryGetBoundedIntegralRange(
+                    parameter.Type,
+                    out var minimum,
+                    out var maximum))
+                continue;
+            state = state.AddPathCondition(new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThanOrEqual,
+                    parameterTerm,
+                    new SymbolicIntegerConstantTerm(minimum)),
+                site,
+                "ir.path.method-entry.integral-lower-bound",
+                parameter)));
+            state = state.AddPathCondition(new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    parameterTerm,
+                    new SymbolicIntegerConstantTerm(maximum)),
+                site,
+                "ir.path.method-entry.integral-upper-bound",
+                parameter)));
+        }
     }
     private static IEnumerable<IParameterSymbol> GetDefinitelyNotNullEntryParameters(
         SyntaxNode site,

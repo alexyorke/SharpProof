@@ -76,11 +76,16 @@ internal static class RequiresContractHelpers {
         IMethodSymbol invokedMethod) {
         var replacements = new Dictionary<string, TypeSyntax>(StringComparer.Ordinal);
         AddTypeParameterReplacements(contractMethod.TypeParameters, invokedMethod.TypeArguments, replacements);
-        if (contractMethod.ContainingType != null)
+        var contractType = contractMethod.ContainingType;
+        var invokedType = invokedMethod.ContainingType;
+        while (contractType != null && invokedType != null) {
             AddTypeParameterReplacements(
-                contractMethod.ContainingType.OriginalDefinition.TypeParameters,
-                contractMethod.ContainingType.TypeArguments,
+                contractType.OriginalDefinition.TypeParameters,
+                invokedType.TypeArguments,
                 replacements);
+            contractType = contractType.ContainingType;
+            invokedType = invokedType.ContainingType;
+        }
         return replacements;
     }
     private static void AddTypeParameterReplacements(

@@ -109,7 +109,15 @@ internal sealed class MethodEffectAnalysisSession(
                 accumulator.WrittenArgumentOrdinals, accumulator.ReadArgumentOrdinals,
                 accumulator.BoundArgumentEffects, accumulator.BoundReceiverEffects);
             summary = summary with { Effects = AddCompilerAllocations(summary.Effects, declaration, semanticModel) };
-            if (smtAnalysis != null) summary = summary with { Effects = AddRuntimeHazards(summary.Effects, declaration, semanticModel) };
+            if (smtAnalysis != null) {
+                summary = summary with { Effects = AddRuntimeHazards(summary.Effects, declaration, semanticModel) };
+                summary = summary with {
+                    Effects = SuppressSymbolicallyUnreachableExplicitThrows(
+                        summary.Effects,
+                        declaration,
+                        semanticModel)
+                };
+            }
             if (captures == null) _cache[method] = summary;
             return summary;
         }
@@ -238,6 +246,71 @@ internal sealed class MethodEffectAnalysisSession(
             };
         }
         return result;
+    }
+    private MethodEffects SuppressSymbolicallyUnreachableExplicitThrows(
+        MethodEffects effects,
+        SyntaxNode declaration,
+        SemanticModel semanticModel) {
+        if (!effects.ExceptionFacts.Any(static fact =>
+                fact.Source == MethodExceptionSource.ExplicitThrow &&
+                fact.Escape == SharpProofVerdict.Proven))
+            return effects;
+        var proofService = new SymbolicProofService(smtAnalysis);
+        var facts = effects.ExceptionFacts.Select(fact => {
+            if (fact.Source != MethodExceptionSource.ExplicitThrow ||
+                fact.Escape != SharpProofVerdict.Proven)
+                return fact;
+            var site = declaration.DescendantNodesAndSelf().FirstOrDefault(node =>
+                node.SpanStart == fact.SpanStart &&
+                node.Span.Length == fact.SpanLength);
+            if (site == null)
+                return fact;
+            var state = SymbolicReachabilityService.CollectPathStateAt(
+                site,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis);
+            var unreachable = proofService.ClassifyReachability(state).Status == SymbolicProofStatus.Unreachable ||
+                              IsUnreachableFromMethodEntryConditions(
+                                  site,
+                                  semanticModel,
+                                  proofService);
+            return unreachable
+                ? fact with {
+                    Escape = SharpProofVerdict.Disproven,
+                    Reason = "symbolically_unreachable_explicit_throw"
+                }
+                : fact;
+        }).ToImmutableArray();
+        return effects with { ExceptionFacts = facts };
+    }
+    private bool IsUnreachableFromMethodEntryConditions(
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        SymbolicProofService proofService) {
+        var state = new SymbolicState();
+        SymbolicStatementStateTransfer.AddMethodEntryNullableFlowStateFacts(
+            ref state,
+            site,
+            semanticModel,
+            cancellationToken);
+        var foundCondition = false;
+        foreach (var statement in site.Ancestors().OfType<IfStatementSyntax>().Reverse()) {
+            var branchWhenTrue = statement.Statement.Span.Contains(site.SpanStart);
+            if (!branchWhenTrue &&
+                (statement.Else == null || !statement.Else.Statement.Span.Contains(site.SpanStart)))
+                continue;
+            var lowering = Ir.SymbolicSemanticPipeline.LowerBranchCondition(
+                statement.Condition,
+                branchWhenTrue,
+                new SymbolicLoweringContext(semanticModel, cancellationToken));
+            if (lowering is not { IsExact: true, Value: { } condition })
+                return false;
+            state = state.AddPathCondition(condition);
+            foundCondition = true;
+        }
+        return foundCondition &&
+               proofService.ClassifyReachability(state).Status == SymbolicProofStatus.Unreachable;
     }
     private static bool IsCaughtHazard(SyntaxNode declaration, SemanticModel model, int position, string exceptionType) {
         var node = declaration.FindToken(position).Parent;
