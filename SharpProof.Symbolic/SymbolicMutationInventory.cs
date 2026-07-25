@@ -115,8 +115,15 @@ internal sealed class SymbolicMutationInventory(
         var receiverSymbol = receiver == null ? null : semanticModel.GetSymbolInfo(
             CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(receiver),
             cancellationToken).Symbol?.OriginalDefinition;
-        if (receiverSymbol is ILocalSymbol or IParameterSymbol)
-            invalidations.Add(ForSymbol(receiverSymbol));
+        if (receiverSymbol is ILocalSymbol or IParameterSymbol) {
+            var receiverType = semanticModel.GetTypeInfo(receiver!, cancellationToken).Type;
+            invalidations.Add(
+                target is ElementAccessExpressionSyntax && receiverType is IArrayTypeSymbol
+                    ? new SymbolicInvalidationTarget(
+                        SymbolicFactFactory.GetSmtVariableName(receiverSymbol),
+                        SymbolicInvalidationMatchKind.VariableElements)
+                    : ForSymbol(receiverSymbol));
+        }
         return invalidations.ToImmutable();
     }
     private bool ExactTargetMatchesAny(ExpressionSyntax target, IReadOnlyCollection<ISymbol> symbols) {

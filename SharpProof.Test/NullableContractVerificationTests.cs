@@ -9943,6 +9943,121 @@ public sealed class NullableContractVerificationTests {
             diagnostic.Location.GetLineSpan().StartLinePosition.Line,
             Is.EqualTo(9));
     }
+    [Test]
+    public void PotentialBugRegression_ArrayElementInvalidationPreservesLengthFacts() {
+        const string source = """
+            public static class C {
+                public static void M(int[] values) {
+                    values[0] = 1;
+                }
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var parameterSyntax = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ParameterSyntax>()
+            .Single();
+        var parameter = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(
+            model,
+            parameterSyntax)!;
+        var elementAccess = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ElementAccessExpressionSyntax>()
+            .Single();
+        var array = new SharpProof.Symbolic.Ir.SymbolicVariableTerm(
+            SharpProof.Symbolic.SymbolicFactFactory.GetSmtVariableName(parameter),
+            SharpProof.ProofCore.Smt.SmtValueKind.Reference);
+        var length = new SharpProof.Symbolic.Ir.SymbolicLengthTerm(array);
+        var element = new SharpProof.Symbolic.Ir.SymbolicElementTerm(
+            array,
+            new SharpProof.Symbolic.Ir.SymbolicIntegerConstantTerm(0),
+            SharpProof.ProofCore.Smt.SmtValueKind.Int);
+        var state = new SharpProof.Symbolic.Ir.SymbolicState([
+            SharpProof.Symbolic.Ir.SymbolicFact.Exact(
+                new SharpProof.Symbolic.Ir.SymbolicRelationAtom(
+                    SharpProof.Symbolic.Ir.SymbolicRelationOperator.Equal,
+                    length,
+                    new SharpProof.Symbolic.Ir.SymbolicIntegerConstantTerm(1)),
+                elementAccess,
+                "test.array-length"),
+            SharpProof.Symbolic.Ir.SymbolicFact.Exact(
+                new SharpProof.Symbolic.Ir.SymbolicRelationAtom(
+                    SharpProof.Symbolic.Ir.SymbolicRelationOperator.Equal,
+                    element,
+                    new SharpProof.Symbolic.Ir.SymbolicIntegerConstantTerm(0)),
+                elementAccess,
+                "test.array-element")
+        ]);
+        SharpProof.Symbolic.SymbolicStateInvalidator.InvalidateMutationTarget(
+            ref state,
+            elementAccess,
+            model,
+            CancellationToken.None);
+        Assert.Multiple(() => {
+            Assert.That(
+                state.Facts,
+                Has.Some.Matches<SharpProof.Symbolic.Ir.SymbolicFact>(fact =>
+                    SharpProof.Symbolic.Ir.SymbolicAlgebra.Any(
+                        fact,
+                        static term => term is SharpProof.Symbolic.Ir.SymbolicLengthTerm)));
+            Assert.That(
+                state.Facts,
+                Has.None.Matches<SharpProof.Symbolic.Ir.SymbolicFact>(fact =>
+                    SharpProof.Symbolic.Ir.SymbolicAlgebra.Any(
+                        fact,
+                        static term => term is SharpProof.Symbolic.Ir.SymbolicElementTerm)));
+        });
+    }
+    [Test]
+    public void PotentialBugRegression_NullForgivingOperatorDoesNotSuppressDefiniteDereferenceHazard() {
+        const string source = """
+            #nullable enable
+            public static class C {
+                public static int M() {
+                    string? value = null;
+                    return value!.Length;
+                }
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "M(");
+        Assert.That(
+            effects.ExceptionFacts,
+            Has.Some.Matches<SharpProof.Symbolic.MethodExceptionFact>(fact =>
+                fact.ExceptionType == "System.NullReferenceException" &&
+                fact.Escape == SharpProof.Symbolic.SharpProofVerdict.Proven));
+    }
+    [Test]
+    public async Task PotentialBugRegression_CoalesceAssignmentChecksPropertySetterRequires() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            using SharpProof.Attributes;
+            public static class C {
+                private static string? storage;
+                public static string? Value {
+                    get => storage;
+                    [Requires("value != null")]
+                    set => storage = value;
+                }
+                public static void M() {
+                    Value ??= null;
+                }
+            }
+            """);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0027"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public void PotentialBugRegression_SignedNativeIntegerHasConservativeIntegralShape() =>
+        Assert.Multiple(() => {
+            Assert.That(
+                SharpProof.Symbolic.SymbolicTypeFacts.TryGetIntegralShape(
+                    Microsoft.CodeAnalysis.SpecialType.System_IntPtr,
+                    out var signed,
+                    out var signedBits),
+                Is.True);
+            Assert.That(signed, Is.True);
+            Assert.That(signedBits, Is.EqualTo(64));
+        });
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)

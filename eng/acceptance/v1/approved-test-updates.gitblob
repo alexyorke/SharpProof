@@ -1,5 +1,5 @@
 # Exact post-baseline test updates approved without replacing the pinned baseline blob.
-# NullableContractVerificationTests.cs has additive TDD coverage only (9645 added
+# NullableContractVerificationTests.cs has additive TDD coverage only (9760 added
 # lines, no removed lines) from f7694bdf, e15f487a, 5527f4c5, and the aliased
 # conditional output, chained/assigned-alias,
 # boolean-wrapper/algebra/identity-conversion, logical/conditional-implication,
@@ -32,7 +32,8 @@
 # mutated-output, direct-output,
 # local-function, loop, soundness-audit, aliasing, framework-boundary,
 # complexity, named-argument, regex, exception-flow, lifecycle, balanced-string,
-# nested-tuple, nested-exception, span-copy, and diagnostic-location cases.
-1cc0304826e28bda6cbe7dd8ce4245440d699931  SharpProof.Test/NullableContractVerificationTests.cs
+# nested-tuple, nested-exception, span-copy, diagnostic-location, array-element
+# invalidation, null-suppression hazard, coalesce-setter, and signed-native-integer cases.
+82aa27e74f304395960a5eca724ae9f67928ca8e  SharpProof.Test/NullableContractVerificationTests.cs
 # FuzzRunnerBehaviorTests.cs adds a long-deadline cancellation regression.
 765399ac8f22c5a47084b76ee65402a42c46fa39  SharpProof.ToolingTest/FuzzRunnerBehaviorTests.cs

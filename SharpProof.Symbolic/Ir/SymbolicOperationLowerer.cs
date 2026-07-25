@@ -336,7 +336,8 @@ internal static partial class SymbolicOperationLowerer {
             category,
             "ir.runtime-hazard.null-dereference",
             context,
-            suppressDefinitelyNotNull: true);
+            suppressDefinitelyNotNull: !receiver.DescendantNodesAndSelf().Any(static node =>
+                node.IsKind(SyntaxKind.SuppressNullableWarningExpression)));
     }
     private static SymbolicHazardOperation? TryLowerArgumentNullHazard(
         IOperation operation,

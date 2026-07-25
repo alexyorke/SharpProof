@@ -45,6 +45,8 @@ internal static class SymbolicOperationTransferKernel {
                     SymbolicIrReferenceScanner.RemoveVariableOrMemberReferences(state, target.Key),
                 SymbolicInvalidationMatchKind.VariableDescendants =>
                     SymbolicIrReferenceScanner.RemoveVariableDescendantReferences(state, target.Key),
+                SymbolicInvalidationMatchKind.VariableElements =>
+                    SymbolicIrReferenceScanner.RemoveVariableElementReferences(state, target.Key),
                 _ => state
             };
             if (target.DefinitionVersion is { } definitionVersion)

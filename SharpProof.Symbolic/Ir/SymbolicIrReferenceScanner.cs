@@ -16,6 +16,8 @@ internal static class SymbolicIrReferenceScanner {
         Remove(state, fact => ContainsVariableOrMember(fact, name), condition => ContainsVariableOrMember(condition, name));
     internal static SymbolicState RemoveVariableDescendantReferences(SymbolicState state, string name) =>
         Remove(state, fact => ContainsDescendant(fact, name), condition => ContainsDescendant(condition, name));
+    internal static SymbolicState RemoveVariableElementReferences(SymbolicState state, string name) =>
+        Remove(state, fact => ContainsElement(fact, name), condition => ContainsElement(condition, name));
     private static SymbolicState Remove(
         SymbolicState state,
         Func<SymbolicFact, bool> factMatches,
@@ -47,6 +49,15 @@ internal static class SymbolicIrReferenceScanner {
         SymbolicAlgebra.Any(fact, term => IsDescendant(term, name));
     private static bool ContainsDescendant(SymbolicCondition condition, string name) =>
         SymbolicAlgebra.Any(condition, term => IsDescendant(term, name));
+    private static bool ContainsElement(SymbolicFact fact, string name) =>
+        SymbolicAlgebra.Any(fact, term => IsElementOf(term, name));
+    private static bool ContainsElement(SymbolicCondition condition, string name) =>
+        SymbolicAlgebra.Any(condition, term => IsElementOf(term, name));
+    private static bool IsElementOf(SymbolicTerm term, string name) => term switch {
+        SymbolicElementTerm element => ContainsVariableOrMember(element.Receiver, name),
+        SymbolicMultiElementTerm element => ContainsVariableOrMember(element.Receiver, name),
+        _ => false
+    };
     private static bool IsDescendant(SymbolicTerm term, string name) =>
         term is not SymbolicVariableTerm &&
         Contains(term, candidate => SymbolicFactFactory.MatchesVariableOrMemberName(candidate, name)) ||

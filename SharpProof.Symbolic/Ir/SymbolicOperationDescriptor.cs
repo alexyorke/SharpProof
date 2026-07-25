@@ -2,7 +2,8 @@ namespace SharpProof.Symbolic.Ir;
 internal enum SymbolicInvalidationMatchKind {
     VariablePrefix,
     VariableOrMember,
-    VariableDescendants
+    VariableDescendants,
+    VariableElements
 }
 internal readonly record struct SymbolicInvalidationTarget(
     string Key,

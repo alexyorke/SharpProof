@@ -89,6 +89,21 @@ internal static class MethodRequiresAnalyzer {
                     simpleAssignment.Value.Syntax as ExpressionSyntax,
                     simpleAssignment.Syntax);
                 break;
+            case ICoalesceAssignmentOperation coalesceAssignment
+                when coalesceAssignment.Target is IPropertyReferenceOperation propertyTarget:
+                AddPropertyAccessor(
+                    builder,
+                    propertyTarget,
+                    propertyTarget.Property.GetMethod,
+                    null,
+                    coalesceAssignment.Syntax);
+                AddPropertyAccessor(
+                    builder,
+                    propertyTarget,
+                    propertyTarget.Property.SetMethod,
+                    coalesceAssignment.Value.Syntax as ExpressionSyntax,
+                    coalesceAssignment.Syntax);
+                break;
             case ICompoundAssignmentOperation compoundAssignment
                 when compoundAssignment.Target is IPropertyReferenceOperation propertyTarget:
                 AddPropertyAccessor(builder, propertyTarget, propertyTarget.Property.GetMethod, null, compoundAssignment.Syntax);
