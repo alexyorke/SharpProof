@@ -161,8 +161,8 @@ internal static class SymbolicOperationTransferKernel {
             (true, SymbolicRelationOperator.GreaterThan) => strictlyPositive ? constant >= 0 : constant >= -1,
             (true, SymbolicRelationOperator.GreaterThanOrEqual) => strictlyPositive ? constant > 0 : constant >= 0,
             (true, SymbolicRelationOperator.Equal) => strictlyPositive ? constant > 0 : constant >= 0,
-            (false, SymbolicRelationOperator.LessThan) => strictlyPositive ? constant <= 0 : constant <= -1,
-            (false, SymbolicRelationOperator.LessThanOrEqual) => strictlyPositive ? constant < 0 : constant <= 0,
+            (false, SymbolicRelationOperator.LessThan) => strictlyPositive ? constant >= 0 : constant >= -1,
+            (false, SymbolicRelationOperator.LessThanOrEqual) => strictlyPositive ? constant > 0 : constant >= 0,
             (false, SymbolicRelationOperator.Equal) => strictlyPositive ? constant > 0 : constant >= 0,
             _ => false
         };

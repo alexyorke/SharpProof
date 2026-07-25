@@ -290,7 +290,11 @@ internal static class SymbolicPatternLowerer {
                 break;
             }
         var fixedCount = pattern.Patterns.Count - (sliceIndex >= 0 ? 1 : 0);
-        if (sliceIndex < 0 || pattern.Patterns[sliceIndex] is SlicePatternSyntax { Pattern: null })
+        var nestedList = sliceIndex >= 0 &&
+                         pattern.Patterns[sliceIndex] is SlicePatternSyntax {
+                             Pattern: ListPatternSyntax
+                         };
+        if (!nestedList)
             combined = And(combined, Relation(
                 pattern,
                 sliceIndex < 0 ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.GreaterThanOrEqual,

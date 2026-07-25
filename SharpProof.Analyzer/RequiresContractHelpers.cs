@@ -111,14 +111,18 @@ internal static class RequiresContractHelpers {
         private static bool IsShadowedByNestedCallableParameter(IdentifierNameSyntax node, string name) {
             foreach (var ancestor in node.Ancestors())
                 switch (ancestor) {
-                    case SimpleLambdaExpressionSyntax simpleLambda:
-                        return simpleLambda.Parameter.Identifier.ValueText == name;
-                    case ParenthesizedLambdaExpressionSyntax parenthesizedLambda:
-                        return parenthesizedLambda.ParameterList.Parameters.Any(parameter => parameter.Identifier.ValueText == name);
-                    case AnonymousMethodExpressionSyntax anonymousMethod:
-                        return anonymousMethod.ParameterList?.Parameters.Any(parameter => parameter.Identifier.ValueText == name) == true;
-                    case LocalFunctionStatementSyntax localFunction:
-                        return localFunction.ParameterList.Parameters.Any(parameter => parameter.Identifier.ValueText == name);
+                    case SimpleLambdaExpressionSyntax simpleLambda
+                        when simpleLambda.Parameter.Identifier.ValueText == name:
+                    case ParenthesizedLambdaExpressionSyntax parenthesizedLambda
+                        when parenthesizedLambda.ParameterList.Parameters.Any(
+                            parameter => parameter.Identifier.ValueText == name):
+                    case AnonymousMethodExpressionSyntax anonymousMethod
+                        when anonymousMethod.ParameterList?.Parameters.Any(
+                            parameter => parameter.Identifier.ValueText == name) == true:
+                    case LocalFunctionStatementSyntax localFunction
+                        when localFunction.ParameterList.Parameters.Any(
+                            parameter => parameter.Identifier.ValueText == name):
+                        return true;
                 }
             return false;
         }

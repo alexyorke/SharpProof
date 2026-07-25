@@ -75,9 +75,12 @@ public static class FuzzRunner {
                         deadlineCancellation?.Token ?? cancellationToken);
                 }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested &&
-                                                         deadline is { } batchEnd &&
-                                                         DateTimeOffset.UtcNow >= batchEnd) {
-                    break;
+                                                         deadline != null) {
+                    if (!ShouldContinueAfterDeadlineCancellation(
+                            deadline.Value,
+                            DateTimeOffset.UtcNow))
+                        break;
+                    continue;
                 }
             }
             foreach (var analysis in analyses) {
@@ -129,6 +132,10 @@ public static class FuzzRunner {
         source.CancelAfter(remaining > maximumDelay ? maximumDelay : remaining);
         return source;
     }
+    internal static bool ShouldContinueAfterDeadlineCancellation(
+        DateTimeOffset deadline,
+        DateTimeOffset now) =>
+        now < deadline;
     internal static async Task<ImmutableArray<FuzzCaseAnalysis>> AnalyzeCasesCoreAsync(
         ImmutableArray<FuzzCase> fuzzCases,
         bool repeatAnalyzer,

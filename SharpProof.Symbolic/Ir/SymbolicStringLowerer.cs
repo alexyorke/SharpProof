@@ -279,8 +279,10 @@ internal static class SymbolicStringLowerer {
                     },
                     Arguments.Length: 2
                 } operation ||
-            operation.Arguments[0].Value.Syntax is not ExpressionSyntax startExpression ||
-            operation.Arguments[1].Value.Syntax is not ExpressionSyntax lengthExpression)
+            !TryGetArgument(operation.Arguments, 0, out var startArgument) ||
+            startArgument.Value.Syntax is not ExpressionSyntax startExpression ||
+            !TryGetArgument(operation.Arguments, 1, out var lengthArgument) ||
+            lengthArgument.Value.Syntax is not ExpressionSyntax lengthExpression)
             return null;
         if (!SymbolicLoweringValueFacts.TryGetIntegralConstant(
                 startExpression, context.SemanticModel, context.CancellationToken, out var startValue) ||
@@ -290,6 +292,14 @@ internal static class SymbolicStringLowerer {
             lengthValue != prefix.Length)
             return null;
         return (receiverExpression, prefix);
+    }
+    private static bool TryGetArgument(
+        ImmutableArray<IArgumentOperation> arguments,
+        int ordinal,
+        out IArgumentOperation argument) {
+        argument = arguments.FirstOrDefault(candidate =>
+            candidate.Parameter?.Ordinal == ordinal)!;
+        return argument != null;
     }
     private static SymbolicCondition? CreateStringEqualityCondition(
         ExpressionSyntax leftExpression,

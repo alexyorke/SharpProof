@@ -73,7 +73,9 @@ internal static class MethodEnsuresAnalyzer {
                 if (!TryRewriteConditionForCompletionSite(
                         implementationCondition,
                         completionSite,
-                        NullableFlowFacts.GetMethodReturnState(methodSymbol),
+                        NullableFlowFacts.GetMethodBodyReturnState(
+                            methodSymbol,
+                            methodSymbol.IsAsync),
                         out var rewrittenCondition,
                         out _)) {
                     ContractConditionHelpers.ReportUnsupported(

@@ -34,11 +34,11 @@ internal static partial class ExceptionFlowAnalyzer {
         SyntaxNode site,
         string name) {
         var operation = semanticModel.GetOperation(site);
-        var operationType = operation switch {
+        var thrownType = operation switch {
             IThrowOperation { Exception.Type: { } exceptionType } => exceptionType,
-            _ => operation?.Type
+            _ => null
         };
-        return operationType ??
+        return thrownType ??
                semanticModel.Compilation.GetTypeByMetadataName(name.Replace("global::", string.Empty));
     }
     private static Location GetExceptionSiteLocation(SyntaxNode node) => node.GetLocation();

@@ -8,6 +8,20 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class FuzzRunnerBehaviorTests {
     [Test]
+    public void ClampedDeadlineCancellationContinuesBeforeRealDeadline() {
+        var now = DateTimeOffset.UtcNow;
+        Assert.That(
+            FuzzRunner.ShouldContinueAfterDeadlineCancellation(
+                now.AddDays(25),
+                now.AddDays(24)),
+            Is.True);
+        Assert.That(
+            FuzzRunner.ShouldContinueAfterDeadlineCancellation(
+                now,
+                now),
+            Is.False);
+    }
+    [Test]
     public void RunAsyncRejectsNegativeProgrammaticIterations() {
         var outputDirectory = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,

@@ -227,7 +227,7 @@ internal static class SymbolicIrFormulaEncoder {
         _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
     };
     private static string ReferenceName(SmtFormula formula) =>
-        formula is SmtVariable variable ? variable.Name : "?";
+        SymbolicFactFactory.GetReferenceFormulaName(formula);
     private static bool Try(SmtFormula? encoded, out SmtFormula formula) {
         formula = encoded!;
         return encoded != null;

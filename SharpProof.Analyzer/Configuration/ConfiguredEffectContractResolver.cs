@@ -55,7 +55,7 @@ internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions opt
                     ? []
                     : [Reason("partial_configured_effect_contract")]);
         }
-        catch (Exception exception) when (exception is JsonException or InvalidOperationException) {
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or OverflowException) {
             return Unknown("malformed_configured_effect_contract");
         }
     }
@@ -76,7 +76,7 @@ internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions opt
         ulong knownBits = 0;
         foreach (var defined in Enum.GetValues(typeof(T)))
             knownBits |= Convert.ToUInt64(defined, CultureInfo.InvariantCulture);
-        var actualBits = Convert.ToUInt64(value, CultureInfo.InvariantCulture);
+        var actualBits = unchecked((ulong)Convert.ToInt64(value, CultureInfo.InvariantCulture));
         return (actualBits & ~knownBits) == 0;
     }
     private static string Sha256(string value) {

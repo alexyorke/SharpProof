@@ -23,6 +23,11 @@ internal sealed partial class Z3RegexCompiler {
             return Z3RegexTranslationResult.Failed();
         if (!TryNormalize(pattern, options, out var normalized))
             return Z3RegexTranslationResult.Failed();
+        if (ContainsUnsafeLookaround(
+                normalized.Body,
+                normalized.StartAnchored,
+                normalized.StrictEndAnchored))
+            return Z3RegexTranslationResult.Failed();
         var compiler = new Z3RegexCompiler(context, normalized.Body, options);
         if (!compiler.TryParseExpression(out var body))
             return Z3RegexTranslationResult.Failed();
@@ -35,6 +40,55 @@ internal sealed partial class Z3RegexCompiler {
             regex = context.MkConcat(regex, compiler.OptionalFinalNewline());
         else if (!normalized.StrictEndAnchored) regex = context.MkConcat(regex, compiler.AnyString());
         return Z3RegexTranslationResult.Succeeded(regex, compiler._isExact);
+    }
+    private static bool ContainsUnsafeLookaround(
+        string pattern,
+        bool startAnchored,
+        bool strictEndAnchored) {
+        var escaped = false;
+        var inCharacterClass = false;
+        var groupDepth = 0;
+        for (var index = 0; index < pattern.Length; index++) {
+            var current = pattern[index];
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (current == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (current == '[') {
+                inCharacterClass = true;
+                continue;
+            }
+            if (current == ']' && inCharacterClass) {
+                inCharacterClass = false;
+                continue;
+            }
+            if (inCharacterClass)
+                continue;
+            if (current == ')' && groupDepth > 0) {
+                groupDepth--;
+                continue;
+            }
+            if (current != '(')
+                continue;
+            var isLookahead =
+                index + 2 < pattern.Length &&
+                pattern[index + 1] == '?' &&
+                pattern[index + 2] is '=' or '!';
+            var isLookbehind =
+                index + 3 < pattern.Length &&
+                pattern[index + 1] == '?' &&
+                pattern[index + 2] == '<' &&
+                pattern[index + 3] is '=' or '!';
+            if (isLookahead && (groupDepth != 0 || !strictEndAnchored) ||
+                isLookbehind && (groupDepth != 0 || !startAnchored))
+                return true;
+            groupDepth++;
+        }
+        return false;
     }
     internal bool TryParseExpression([NotNullWhen(true)] out ReExpr? regex) {
         SkipIgnoredPatternTrivia();
@@ -412,7 +466,10 @@ internal sealed partial class Z3RegexCompiler {
                 ? "\\" + escaped + "{" + category + "}"
                 : null;
         if (atomPattern == null) return false;
-        var isExact = TryCreateCharacterRangesRegex(atomPattern, RegexOptions.None, out var expression);
+        var isExact = TryCreateCharacterRangesRegex(
+            atomPattern,
+            CreateCurrentCharacterClassRegexOptions(),
+            out var expression);
         regex = new RegexClassTranslation(isExact ? expression! : AnyCharacter(), isExact);
         return true;
     }

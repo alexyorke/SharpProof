@@ -11,6 +11,8 @@ internal static class CompilerProgramPointAnalysis {
         bool forInitialEntry = false,
         SmtAnalysisService? smtAnalysis = null) {
         cancellationToken.ThrowIfCancellationRequested();
+        if (initialState is { IsExact: false })
+            return Unsupported(site, "initial-state-inexact");
         var searchNode = site is LocalFunctionStatementSyntax ? site.Parent ?? site : site;
         var root = CSharpSyntaxFacts.GetContainingExecutionRoot(searchNode, ExecutionRootPolicy.Callable);
         if (root == null) return Unsupported(site, "execution-root");

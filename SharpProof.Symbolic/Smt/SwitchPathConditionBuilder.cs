@@ -72,14 +72,24 @@ internal static class SwitchPathConditionBuilder {
             return false;
         if (section.Labels.Any(static label => label is DefaultSwitchLabelSyntax)) {
             var explicitSelections = new List<SymbolicCondition>();
+            var ownSelections = new List<SymbolicCondition>();
             foreach (var candidateSection in switchStatement.Sections)
                 foreach (var label in candidateSection.Labels)
                     if (label is not DefaultSwitchLabelSyntax &&
-                        TryCreateCanonicalSwitchLabelCondition(governingValue, governingType, label, context, out var labelCondition))
+                        TryCreateCanonicalSwitchLabelCondition(governingValue, governingType, label, context, out var labelCondition)) {
                         explicitSelections.Add(labelCondition);
-            condition = explicitSelections.Count == 0
+                        if (ReferenceEquals(candidateSection, section))
+                            ownSelections.Add(labelCondition);
+                    }
+            SymbolicCondition defaultSelection = explicitSelections.Count == 0
                 ? new SymbolicConstantCondition(true)
                 : new SymbolicNotCondition(CreateCanonicalDisjunction(explicitSelections));
+            condition = ownSelections.Count == 0
+                ? defaultSelection
+                : new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    CreateCanonicalDisjunction(ownSelections),
+                    defaultSelection);
             return true;
         }
         var currentSelections = new List<SymbolicCondition>();

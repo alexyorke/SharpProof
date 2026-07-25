@@ -14,10 +14,13 @@ internal sealed class SymbolicMutationInventory(
                 case InvocationExpressionSyntax invocation:
                     if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
                         entries.Add(new(node, null, memberAccess.Expression));
+                    else if (invocation.Parent is ConditionalAccessExpressionSyntax conditionalAccess &&
+                             ReferenceEquals(conditionalAccess.WhenNotNull, invocation))
+                        entries.Add(new(node, null, conditionalAccess.Expression));
                     foreach (var argument in invocation.ArgumentList.Arguments)
                         entries.Add(new(node, null, argument.Expression));
                     break;
-                case ObjectCreationExpressionSyntax { ArgumentList: { } arguments }:
+                case BaseObjectCreationExpressionSyntax { ArgumentList: { } arguments }:
                     foreach (var argument in arguments.Arguments)
                         entries.Add(new(node, null, argument.Expression));
                     break;

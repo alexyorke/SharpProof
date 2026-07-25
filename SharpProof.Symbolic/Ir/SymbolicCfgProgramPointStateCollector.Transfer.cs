@@ -73,7 +73,30 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                 semanticModel,
                 cancellationToken,
                 out invalidatedGuardTarget);
-        if (expressionOperation is ISimpleAssignmentOperation assignment)
+        if (expressionOperation is ISimpleAssignmentOperation assignment) {
+            if (assignment.IsRef ||
+                assignment.Target is ILocalReferenceOperation {
+                    Local.IsRef: true
+                } ||
+                assignment.Target is IArrayElementReferenceOperation {
+                    ArrayReference.Type: { } receiverType
+                } &&
+                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(receiverType) ||
+                assignment.Target is IPropertyReferenceOperation {
+                    Property.IsIndexer: true,
+                    Instance.Type: { } indexerReceiverType
+                } &&
+                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(
+                    indexerReceiverType)) {
+                state = state.MarkInexact(
+                    SymbolicUnknownReason.UnsupportedIrEncoding,
+                    new SymbolicLoweringProvenance(
+                        "compiler-flow",
+                        assignment.Syntax.Span,
+                        "aliased-write"));
+                invalidatedGuardTarget = null;
+                return true;
+            }
             return TryGetDirectTarget(assignment.Target, out var target)
                 ? TryApplyAssignment(
                     ref state,
@@ -93,6 +116,7 @@ internal static partial class SymbolicCfgProgramPointStateCollector {
                     semanticModel,
                     cancellationToken,
                     out invalidatedGuardTarget);
+        }
         var computedUpdate = expressionOperation is IIncrementOrDecrementOperation or ICompoundAssignmentOperation
             ? expressionOperation
             : null;

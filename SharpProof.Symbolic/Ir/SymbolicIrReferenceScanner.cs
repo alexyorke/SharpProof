@@ -22,7 +22,11 @@ internal static class SymbolicIrReferenceScanner {
         Func<SymbolicCondition, bool> conditionMatches) => new SymbolicState(
         state.Facts.Where(fact => !factMatches(fact)),
         state.PathConditions.Where(condition => !conditionMatches(condition)),
-        state.SymbolVersions).Normalize();
+        state.SymbolVersions,
+        state.IsContradictory,
+        state.IsExact,
+        state.UnknownReason,
+        state.Provenance).Normalize();
     private static bool Contains(SymbolicFact fact, Func<string, bool> match) =>
         SymbolicAlgebra.Any(fact, term => Matches(term, match));
     private static bool Contains(SymbolicCondition condition, Func<string, bool> match) =>

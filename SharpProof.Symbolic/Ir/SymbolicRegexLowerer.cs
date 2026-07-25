@@ -123,15 +123,19 @@ internal static class SymbolicRegexLowerer {
         SymbolicLoweringContext context) {
         if (operation.TargetMethod.IsStatic) {
             if (operation.Arguments.Length is not 2 and not 3 ||
-                operation.Arguments[0].Value.Syntax is not ExpressionSyntax input ||
+                !TryGetArgument(operation.Arguments, 0, out var inputArgument) ||
+                inputArgument.Value.Syntax is not ExpressionSyntax input ||
                 ResolveRegexArguments(operation.Arguments, 1, context) is not { } source)
                 return null;
             return new RegexInvocation(input, source);
         }
         if (operation.Instance?.Syntax is not ExpressionSyntax receiver ||
             operation.Arguments.Length is not 1 and not 2 ||
-            operation.Arguments[0].Value.Syntax is not ExpressionSyntax instanceInput ||
-            operation.Arguments.Length == 2 && !IsConstantZero(operation.Arguments[1].Value.Syntax, context) ||
+            !TryGetArgument(operation.Arguments, 0, out var instanceInputArgument) ||
+            instanceInputArgument.Value.Syntax is not ExpressionSyntax instanceInput ||
+            operation.Arguments.Length == 2 &&
+            (!TryGetArgument(operation.Arguments, 1, out var startAtArgument) ||
+             !IsConstantZero(startAtArgument.Value.Syntax, context)) ||
             ResolveRegexSource(receiver, invocation, context) is not { } instanceSource)
             return null;
         return new RegexInvocation(instanceInput, instanceSource);
@@ -144,15 +148,25 @@ internal static class SymbolicRegexLowerer {
         if (arguments.Length is var count &&
             count != optionsIndex &&
             count != optionsIndex + 1 ||
-            arguments[patternIndex].Value.Syntax is not ExpressionSyntax patternExpression ||
+            !TryGetArgument(arguments, patternIndex, out var patternArgument) ||
+            patternArgument.Value.Syntax is not ExpressionSyntax patternExpression ||
             !SymbolicStringLowerer.TryGetConstantString(patternExpression, context, out var pattern))
             return null;
         var options = RegexOptions.None;
         if (arguments.Length > optionsIndex &&
-            (arguments[optionsIndex].Value.Syntax is not ExpressionSyntax optionsExpression ||
+            (!TryGetArgument(arguments, optionsIndex, out var optionsArgument) ||
+             optionsArgument.Value.Syntax is not ExpressionSyntax optionsExpression ||
              !SymbolicStringLowerer.TryGetRegexOptions(optionsExpression, context, out options)))
             return null;
         return new RegexSource(pattern, options);
+    }
+    private static bool TryGetArgument(
+        ImmutableArray<IArgumentOperation> arguments,
+        int ordinal,
+        out IArgumentOperation argument) {
+        argument = arguments.FirstOrDefault(candidate =>
+            candidate.Parameter?.Ordinal == ordinal)!;
+        return argument != null;
     }
     private static RegexSource? ResolveRegexSource(
         ExpressionSyntax expression,

@@ -3,7 +3,8 @@ namespace SharpProof.Symbolic.Smt;
 internal static class SmtNativeLibraryBootstrap {
     internal const string AnalyzerLocatorFileName = "SharpProof.NativeSmtLocator.txt";
     private const int RtldNow = 0x2;
-    private const int RtldGlobal = 0x8;
+    private const int RtldGlobalMac = 0x8;
+    private const int RtldGlobalLinux = 0x100;
     private static readonly object Sync = new();
     private static readonly HashSet<string> AttemptedLibraryPaths = new(StringComparer.OrdinalIgnoreCase);
     private static IntPtr s_libraryHandle;
@@ -40,8 +41,8 @@ internal static class SmtNativeLibraryBootstrap {
                     RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                         ? LoadLibraryWindows(libraryPath)
                         : RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
-                            ? LoadLibraryMac(libraryPath, RtldNow | RtldGlobal)
-                            : LoadLibraryLinux(libraryPath, RtldNow | RtldGlobal));
+                            ? LoadLibraryMac(libraryPath, GetDlopenFlags(OSPlatform.OSX))
+                            : LoadLibraryLinux(libraryPath, GetDlopenFlags(OSPlatform.Linux)));
                 if (s_libraryHandle != IntPtr.Zero) return;
             }
         }
@@ -62,6 +63,13 @@ internal static class SmtNativeLibraryBootstrap {
         if (platform == OSPlatform.Linux) return "libz3.so";
         return null;
     }
+    internal static int GetDlopenFlags(OSPlatform platform) =>
+        RtldNow |
+        (platform == OSPlatform.OSX
+            ? RtldGlobalMac
+            : platform == OSPlatform.Linux
+                ? RtldGlobalLinux
+                : 0);
     private static T IgnoreFailures<T>(Func<T> action) {
         try {
             return action();

@@ -9179,6 +9179,727 @@ public sealed class NullableContractVerificationTests {
             """);
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Not.Contain("SP0043"));
     }
+    [Test]
+    public void PotentialBugRegression_ConstantOnLeftDoesNotInventPositiveBound() {
+        const string source = """
+            public static class C {
+                public static int M(int y) {
+                    if (-1 < y) {
+                        var x = y;
+                        return x;
+                    }
+                    return 0;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(source, "return x", "x > 0").ProofFacts.Single().Status,
+            Is.Not.EqualTo("ProvenTrue"));
+    }
+    [Test]
+    public void PotentialBugRegression_InexactStateMetadataSurvivesRemovalAndMerge() {
+        var provenance = new SharpProof.Symbolic.Ir.SymbolicLoweringProvenance(
+            "test",
+            default,
+            "inexact");
+        var inexact = new SharpProof.Symbolic.Ir.SymbolicState(
+            facts: [
+                new SharpProof.Symbolic.Ir.SymbolicFact(
+                    new SharpProof.Symbolic.Ir.SymbolicTruthAtom(
+                        new SharpProof.Symbolic.Ir.SymbolicVariableTerm(
+                            "removed",
+                            SharpProof.ProofCore.Smt.SmtValueKind.Bool)),
+                    true,
+                    SharpProof.Symbolic.Ir.SymbolicFactConfidence.Exact,
+                    "test",
+                    default,
+                    null,
+                    null)
+            ],
+            isExact: false,
+            unknownReason: SharpProof.Symbolic.SymbolicUnknownReason.UnsupportedIrEncoding,
+            provenance: [provenance]);
+        var removed =
+            SharpProof.Symbolic.Ir.SymbolicIrReferenceScanner.RemoveVariableReferences(
+                inexact,
+                "removed");
+        var merged =
+            SharpProof.Symbolic.Ir.SymbolicStateMerger.MergePathStatesAcrossAll(
+                [new SharpProof.Symbolic.Ir.SymbolicState(), inexact],
+                static (left, right) =>
+                    SharpProof.Symbolic.Ir.SymbolicState.CreateProofFactKey(left) ==
+                    SharpProof.Symbolic.Ir.SymbolicState.CreateProofFactKey(right),
+                0);
+        Assert.Multiple(() => {
+            Assert.That(removed.IsExact, Is.False);
+            Assert.That(
+                removed.UnknownReason,
+                Is.EqualTo(
+                    SharpProof.Symbolic.SymbolicUnknownReason.UnsupportedIrEncoding));
+            Assert.That(removed.Provenance, Does.Contain(provenance));
+            Assert.That(merged.IsExact, Is.False);
+            Assert.That(
+                merged.UnknownReason,
+                Is.EqualTo(
+                    SharpProof.Symbolic.SymbolicUnknownReason.UnsupportedIrEncoding));
+            Assert.That(merged.Provenance, Does.Contain(provenance));
+        });
+    }
+    [Test]
+    public void PotentialBugRegression_StringRemoveOneArgumentUsesStartIndexAsLength() {
+        const string source = """
+            public static class C {
+                public static int M() {
+                    var text = "hello".Remove(2);
+                    return text.Length;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(
+                source,
+                "return text.Length",
+                "text.Length == 2").ProofFacts.Single().Status,
+            Is.EqualTo("ProvenTrue"));
+    }
+    [Test]
+    public void PotentialBugRegression_MixedDefaultSwitchSectionIncludesOwnCase() {
+        const string source = """
+            public static class C {
+                public static int M(int value) {
+                    switch (value) {
+                        case 1:
+                        default:
+                            return value;
+                        case 2:
+                            return 0;
+                    }
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(
+                source,
+                "return value",
+                "value == 1").ProofFacts.Single().Status,
+            Is.Not.EqualTo("ProvenFalse"));
+    }
+    [TestCase(@"b(?<=ab)c", "abc")]
+    [TestCase(@"a(?=bc)b", "abc")]
+    [TestCase(@"\A(a(?=bc)b)c\z", "abc")]
+    public void PotentialBugRegression_UnsafeLocalLookaroundReturnsUnknown(
+        string pattern,
+        string value) {
+        using var solver = new SharpProof.ProofCore.Smt.SmtSolver();
+        var text = new SharpProof.ProofCore.Smt.SmtVariable(
+            "lookaround-text",
+            SharpProof.ProofCore.Smt.SmtValueKind.String);
+        var result = solver.CheckSatisfiability(
+            [
+                new SharpProof.ProofCore.Smt.SmtRegexMatchFormula(
+                    text,
+                    pattern),
+                new SharpProof.ProofCore.Smt.SmtStringStartsWithFormula(
+                    text,
+                    new SharpProof.ProofCore.Smt.SmtStringConstant(
+                        value.Substring(0, 1))),
+                new SharpProof.ProofCore.Smt.SmtBinaryFormula(
+                    SharpProof.ProofCore.Smt.SmtBinaryOperator.Equal,
+                    new SharpProof.ProofCore.Smt.SmtStringLengthTerm(text),
+                    new SharpProof.ProofCore.Smt.SmtIntegerConstant(value.Length))
+            ],
+            TimeSpan.FromMilliseconds(500));
+        Assert.That(
+            result.Feasibility,
+            Is.EqualTo(SharpProof.ProofCore.Smt.Feasibility.Unknown));
+    }
+    [Test]
+    public void PotentialBugRegression_UnicodeCategoryHonorsIgnoreCase() {
+        using var solver = new SharpProof.ProofCore.Smt.SmtSolver();
+        var text = new SharpProof.ProofCore.Smt.SmtVariable(
+            "category-text",
+            SharpProof.ProofCore.Smt.SmtValueKind.String);
+        var result = solver.CheckSatisfiability(
+            [
+                new SharpProof.ProofCore.Smt.SmtRegexMatchFormula(
+                    text,
+                    @"\A\p{Lu}\z",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+                new SharpProof.ProofCore.Smt.SmtBinaryFormula(
+                    SharpProof.ProofCore.Smt.SmtBinaryOperator.Equal,
+                    text,
+                    new SharpProof.ProofCore.Smt.SmtStringConstant("a"))
+            ],
+            TimeSpan.FromMilliseconds(500));
+        Assert.That(
+            result.Feasibility,
+            Is.EqualTo(SharpProof.ProofCore.Smt.Feasibility.Satisfiable));
+    }
+    [Test]
+    public void PotentialBugRegression_ListSliceDesignationPreservesMinimumLength() {
+        const string source = """
+            public static class C {
+                public static int M(int[] values) {
+                    if (values is [1, 2, .. var rest])
+                        return values[1];
+                    return 0;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(
+                source,
+                "return values[1]",
+                "values.Length >= 2").ProofFacts.Single().Status,
+            Is.EqualTo("ProvenTrue"));
+    }
+    [Test]
+    public void PotentialBugRegression_UlongAboveLongMaxIsReachable() {
+        const string source = """
+            public static class C {
+                public static int M(ulong value) {
+                    if (value > 9223372036854775807UL)
+                        return 1;
+                    return 0;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(
+                source,
+                "return 1",
+                "value == 0").ProofFacts.Single().Status,
+            Is.Not.EqualTo("Unreachable"));
+    }
+    [TestCase(
+        """
+        using System;
+        public static class C {
+            public static int M(int[] values) {
+                values[0] = 1;
+                Span<int> alias = values;
+                alias[0] = 2;
+                return values[0];
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        public static class C {
+            public static int M() {
+                var value = 1;
+                ref var alias = ref value;
+                alias = 2;
+                return value;
+            }
+        }
+        """)]
+    public void PotentialBugRegression_AliasWritesDoNotLeaveStaleValueFacts(
+        string source) =>
+        Assert.That(
+            AnalyzeProofAtMarker(
+                source,
+                "return",
+                source.Contains("values", StringComparison.Ordinal)
+                    ? "values[0] == 1"
+                    : "value == 1").ProofFacts.Single().Status,
+            Is.Not.EqualTo("ProvenTrue"));
+    [TestCase(
+        """
+        using System.Collections.Generic;
+        public static class C {
+            public static int M(string key) {
+                var values = new Dictionary<string, int>();
+                return values[key];
+            }
+        }
+        """,
+        "System.Collections.Generic.KeyNotFoundException")]
+    [TestCase(
+        """
+        using System.Collections.Generic;
+        public static class C {
+            public static int M(int capacity) {
+                var values = new List<int>(capacity);
+                return values.Count;
+            }
+        }
+        """,
+        "System.ArgumentOutOfRangeException")]
+    [TestCase(
+        """
+        public static class C {
+            public static string M(int value, string format) =>
+                value.ToString(format);
+        }
+        """,
+        "System.FormatException")]
+    [TestCase(
+        """
+        public static class C {
+            public static string M(string oldValue, string newValue) =>
+                "abc".Replace(oldValue, newValue);
+        }
+        """,
+        "System.ArgumentException")]
+    public void PotentialBugRegression_ThrowingFrameworkMembersAreNotProvenSafe(
+        string source,
+        string expectedException) {
+        var effects = AnalyzeEffectsAtMarker(source, "M(");
+        Assert.Multiple(() => {
+            Assert.That(
+                effects.DoesNotThrow,
+                Is.Not.EqualTo(SharpProof.Symbolic.SharpProofVerdict.Proven));
+            Assert.That(
+                effects.ThrownExceptions,
+                Does.Contain(expectedException));
+        });
+    }
+    [Test]
+    public async Task PotentialBugRegression_AsyncEnsuresUsesBodyReturnNullability() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            using System.Threading.Tasks;
+            using SharpProof.Attributes;
+            public static class C {
+                [Ensures("result != null")]
+                public static async Task<string?> M() {
+                    await Task.Yield();
+                    return null;
+                }
+            }
+            """);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0018"));
+    }
+    [Test]
+    public void PotentialBugRegression_ArrayLengthDoesNotPoisonComplexity() {
+        const string source = """
+            public static class C {
+                public static int M(int[] values) {
+                    var total = 0;
+                    for (var index = 0; index < values.Length; index++)
+                        total++;
+                    return total;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeComplexityAtMarker(source, "M("),
+            Does.Not.Contain("Unknown"));
+    }
+    [Test]
+    public void PotentialBugRegression_ProductLoopBoundRetainsMultiplication() {
+        const string source = """
+            public static class C {
+                public static int M(int left, int right) {
+                    var total = 0;
+                    for (var index = 0; index < left * right; index++)
+                        total++;
+                    return total;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeComplexityAtMarker(source, "M("),
+            Does.Contain("*"));
+    }
+    [Test]
+    public void PotentialBugRegression_ReorderedRegexArgumentsUseParameterOrdinals() {
+        const string source = """
+            using System.Text.RegularExpressions;
+            public static class C {
+                public static int M() {
+                    if (Regex.IsMatch(pattern: "a+", input: "aaa"))
+                        return 1;
+                    return 0;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(
+                source,
+                "return 1",
+                "true").ProofFacts.Single().Status,
+            Is.Not.EqualTo("Unreachable"));
+    }
+    [Test]
+    public void PotentialBugRegression_ReorderedSubstringArgumentsUseParameterOrdinals() {
+        const string source = """
+            public static class C {
+                public static int M(string text) {
+                    if (text.Substring(length: 0, startIndex: 3) == "abc")
+                        return 1;
+                    return 0;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(
+                source,
+                "return 1",
+                "text == \"abcdef\"").ProofFacts.Single().Status,
+            Is.Not.EqualTo("ProvenTrue"));
+    }
+    [Test]
+    public void PotentialBugRegression_GuardedDiscardSwitchCanThrow() {
+        const string source = """
+            public static class C {
+                public static int M(int value, bool enabled) =>
+                    value switch {
+                        _ when enabled => 1
+                    };
+            }
+            """;
+        Assert.That(
+            AnalyzeEffectsAtMarker(source, "M(").DoesNotThrow,
+            Is.Not.EqualTo(SharpProof.Symbolic.SharpProofVerdict.Proven));
+    }
+    [TestCase("Exchange")]
+    [TestCase("Add")]
+    [TestCase("CompareExchange")]
+    public void PotentialBugRegression_InterlockedWritesArgumentState(
+        string method) {
+        var call = method == "CompareExchange"
+            ? "System.Threading.Interlocked.CompareExchange(ref value, 1, 0)"
+            : "System.Threading.Interlocked." + method + "(ref value, 1)";
+        var source = """
+            public static class C {
+                public static int M(ref int value) {
+                    CALL;
+                    return value;
+                }
+            }
+            """.Replace("CALL", call, StringComparison.Ordinal);
+        Assert.That(
+            AnalyzeEffectsAtMarker(source, "M(").Effects.HasFlag(
+                SharpProof.Attributes.SharpProofEffect.WritesArgumentState),
+            Is.True);
+    }
+    [Test]
+    public void PotentialBugRegression_VolatileWriteReportsArgumentMutation() {
+        const string source = """
+            public static class C {
+                public static void M(ref int value) {
+                    System.Threading.Volatile.Write(ref value, 1);
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeEffectsAtMarker(source, "M(").Effects.HasFlag(
+                SharpProof.Attributes.SharpProofEffect.WritesArgumentState),
+            Is.True);
+    }
+    [Test]
+    public void PotentialBugRegression_BitConverterSpanUsesArgumentException() {
+        const string source = """
+            using System;
+            public static class C {
+                public static int M(ReadOnlySpan<byte> value) =>
+                    BitConverter.ToInt32(value);
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "M(");
+        Assert.Multiple(() => {
+            Assert.That(
+                effects.ThrownExceptions,
+                Does.Contain("System.ArgumentException"));
+            Assert.That(
+                effects.ThrownExceptions,
+                Does.Not.Contain("System.ArgumentOutOfRangeException"));
+        });
+    }
+    [Test]
+    public async Task PotentialBugRegression_AllowedBaseExceptionAcceptsHazardSubtype() {
+        var diagnostics = await AnalyzeAsync("""
+            using SharpProof.Attributes;
+            public static class C {
+                [AllowedExceptions(typeof(System.ArgumentException))]
+                public static string M() => "a".Substring(2);
+            }
+            """);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0030"));
+    }
+    [Test]
+    public void PotentialBugRegression_UnrelatedCaughtThrowDoesNotHideThrowNull() {
+        const string source = """
+            public static class C {
+                public static void M() {
+                    try {
+                        throw new System.InvalidOperationException();
+                    }
+                    catch (System.InvalidOperationException) {
+                    }
+                    throw null;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeEffectsAtMarker(source, "M(").DoesNotThrow,
+            Is.EqualTo(SharpProof.Symbolic.SharpProofVerdict.Disproven));
+    }
+    [Test]
+    public void PotentialBugRegression_ReturnedLambdasMergeEffects() {
+        const string source = """
+            using System;
+            public static class C {
+                private static int state;
+                private static Func<int> Create(bool mutate) {
+                    if (mutate)
+                        return () => ++state;
+                    return () => 0;
+                }
+                public static int M(bool mutate) => Create(mutate)();
+            }
+            """;
+        Assert.That(
+            AnalyzeEffectsAtMarker(source, "M(").Effects.HasFlag(
+                SharpProof.Attributes.SharpProofEffect.WritesStaticState),
+            Is.True);
+    }
+    [TestCase(
+        """
+        using System.Collections.Generic;
+        public sealed class Box {
+            public Box(List<int> values) { }
+        }
+        public static class C {
+            public static void M(List<int> values) {
+                Box box = new(values);
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        using System.Collections.Generic;
+        public static class C {
+            public static void M(List<int> values) {
+                values?.Clear();
+            }
+        }
+        """)]
+    public void PotentialBugRegression_MutationInventoryTracksImplicitExposures(
+        string source) {
+        var (root, model) = CreateSemanticModel(source);
+        var method = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+            .Single(candidate => candidate.Identifier.ValueText == "M");
+        var parameter =
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(
+                model,
+                method.ParameterList.Parameters[0])!;
+        var inventory =
+            SharpProof.Symbolic.SymbolicMutationInventory.Create(
+                method,
+                model,
+                CancellationToken.None);
+        Assert.That(inventory.ExposesSymbol(parameter, mutableOnly: true), Is.True);
+    }
+    [Test]
+    public void PotentialBugRegression_NegativeConfiguredFlagsAreRejected() {
+        using var document = System.Text.Json.JsonDocument.Parse(
+            """{"effects":-1}""");
+        var method = typeof(SharpProof.Analyzer.Configuration.ConfiguredEffectContractResolver)
+            .GetMethod(
+                "TryReadFlags",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Static)!
+            .MakeGenericMethod(typeof(SharpProof.Attributes.SharpProofEffect));
+        var arguments = new object?[] {
+            document.RootElement,
+            "effects",
+            SharpProof.Attributes.SharpProofEffect.None,
+            null
+        };
+        Assert.That(
+            () => method.Invoke(null, arguments),
+            Throws.Nothing);
+        Assert.That(arguments[3], Is.EqualTo((SharpProof.Attributes.SharpProofEffect)(-1L)));
+        Assert.That((bool)method.Invoke(null, arguments)!, Is.False);
+    }
+    [Test]
+    public void PotentialBugRegression_NonVariableReferenceNamesAreStructural() {
+        var method = typeof(SharpProof.Symbolic.Ir.SymbolicIrFormulaEncoder)
+            .GetMethod(
+                "ReferenceName",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Static)!;
+        var first = new SharpProof.ProofCore.Smt.SmtConditionalFormula(
+            new SharpProof.ProofCore.Smt.SmtBooleanConstant(true),
+            new SharpProof.ProofCore.Smt.SmtVariable(
+                "first",
+                SharpProof.ProofCore.Smt.SmtValueKind.Reference),
+            new SharpProof.ProofCore.Smt.SmtNullConstant(),
+            SharpProof.ProofCore.Smt.SmtValueKind.Reference);
+        var second = new SharpProof.ProofCore.Smt.SmtConditionalFormula(
+            new SharpProof.ProofCore.Smt.SmtBooleanConstant(true),
+            new SharpProof.ProofCore.Smt.SmtVariable(
+                "second",
+                SharpProof.ProofCore.Smt.SmtValueKind.Reference),
+            new SharpProof.ProofCore.Smt.SmtNullConstant(),
+            SharpProof.ProofCore.Smt.SmtValueKind.Reference);
+        Assert.That(
+            method.Invoke(null, [first]),
+            Is.Not.EqualTo(method.Invoke(null, [second])));
+    }
+    [Test]
+    public void PotentialBugRegression_OuterLambdaShadowingPreventsReplacement() {
+        const string source = """
+            public static class C {
+                public static void M(int p) { }
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var declaration = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+            .Single();
+        var method =
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(
+                model,
+                declaration)!;
+        Assert.That(
+            SharpProof.Analyzer.RequiresContractHelpers.TryRewriteForArguments(
+                "xs.Any(p => ys.Any(q => p > q))",
+                method,
+                method,
+                new Dictionary<
+                    string,
+                    Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax> {
+                    ["p"] =
+                        Microsoft.CodeAnalysis.CSharp.SyntaxFactory
+                            .ParseExpression("42")
+                },
+                out var rewritten),
+            Is.True);
+        Assert.That(rewritten, Does.Contain("p > q"));
+        Assert.That(rewritten, Does.Not.Contain("42 > q"));
+    }
+    [Test]
+    public void PotentialBugRegression_LinuxDlopenUsesGlobalFlag() {
+        Assert.That(
+            SharpProof.Symbolic.Smt.SmtNativeLibraryBootstrap.GetDlopenFlags(
+                System.Runtime.InteropServices.OSPlatform.Linux),
+            Is.EqualTo(0x102));
+        Assert.That(
+            SharpProof.Symbolic.Smt.SmtNativeLibraryBootstrap.GetDlopenFlags(
+                System.Runtime.InteropServices.OSPlatform.OSX),
+            Is.EqualTo(0xA));
+    }
+    [Test]
+    public void PotentialBugRegression_ReorderedComplexityArgumentsUseParameterOrdinals() {
+        const string source = """
+            public static class C {
+                private static int Sum(int[] a, int[] b) {
+                    var total = 0;
+                    foreach (var value in a)
+                        total += value;
+                    return total;
+                }
+                public static int M(int[] large, int[] small) =>
+                    Sum(b: small, a: large);
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var invocation = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
+            .Single(candidate => candidate.ToString().StartsWith(
+                "Sum(",
+                StringComparison.Ordinal));
+        var operation =
+            (Microsoft.CodeAnalysis.Operations.IInvocationOperation)
+            model.GetOperation(invocation)!;
+        Assert.That(
+            SharpProof.Symbolic.SymbolicComplexityAnalysisSession
+                .FindArgumentByOrdinal(operation.Arguments, 0)!
+                .Value.Syntax.ToString(),
+            Is.EqualTo("large"));
+    }
+    private static (
+        Microsoft.CodeAnalysis.SyntaxNode Root,
+        Microsoft.CodeAnalysis.SemanticModel Model)
+        CreateSemanticModel(string source) {
+        var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+            source,
+            new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+                Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview));
+        var trustedPlatformAssemblies =
+            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
+            throw new InvalidOperationException(
+                "Trusted platform assemblies are unavailable.");
+        var compilation =
+            Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+                "PotentialBugRegression",
+                [tree],
+                trustedPlatformAssemblies
+                    .Split(Path.PathSeparator)
+                    .Select(static path =>
+                        Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path)),
+                new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                    Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+        return (tree.GetRoot(), compilation.GetSemanticModel(tree));
+    }
+    private static SharpProof.Symbolic.MethodEffects AnalyzeEffectsAtMarker(
+        string source,
+        string marker) {
+        using var session =
+            SharpProof.Symbolic.SharpProofAnalysisSession.FromText(source);
+        var position = source.IndexOf(marker, StringComparison.Ordinal);
+        var result = session.Analyze(
+            new SharpProof.Symbolic.SharpProofAnalysisRequest(
+                new SharpProof.Symbolic.SharpProofTarget(
+                    SharpProof.Symbolic.SharpProofTargetKind.Position,
+                    Position: position),
+                SharpProof.Symbolic.SharpProofAnalysisFacet.Effects));
+        return result.MethodEffects ??
+               throw new InvalidOperationException("Method effects were unavailable.");
+    }
+    private static string AnalyzeComplexityAtMarker(
+        string source,
+        string marker) {
+        using var session =
+            SharpProof.Symbolic.SharpProofAnalysisSession.FromText(source);
+        var position = source.IndexOf(marker, StringComparison.Ordinal);
+        var result = session.Analyze(
+            new SharpProof.Symbolic.SharpProofAnalysisRequest(
+                new SharpProof.Symbolic.SharpProofTarget(
+                    SharpProof.Symbolic.SharpProofTargetKind.Position,
+                    Position: position),
+                SharpProof.Symbolic.SharpProofAnalysisFacet.Complexity));
+        return result.Complexity ??
+               throw new InvalidOperationException("Complexity was unavailable.");
+    }
+    private static SharpProof.Symbolic.SharpProofAnalysisResult
+        AnalyzeProofAtMarker(
+            string source,
+            string marker,
+            string condition) =>
+        AnalyzeProofAtPosition(
+            source,
+            source.IndexOf(marker, StringComparison.Ordinal),
+            condition);
+    private static SharpProof.Symbolic.SharpProofAnalysisResult
+        AnalyzeProofAtPosition(
+            string source,
+            int position,
+            string condition) {
+        if (position < 0)
+            throw new InvalidOperationException("Marker was not found.");
+        var lineStart = source.LastIndexOf('\n', position);
+        var line = source.Take(position).Count(static value => value == '\n') + 1;
+        var column = position - lineStart;
+        using var session =
+            SharpProof.Symbolic.SharpProofAnalysisSession.FromText(source);
+        return session.Analyze(new SharpProof.Symbolic.SharpProofAnalysisRequest(
+            new SharpProof.Symbolic.SharpProofTarget(
+                SharpProof.Symbolic.SharpProofTargetKind.Point,
+                Line: line,
+                Column: column),
+            SharpProof.Symbolic.SharpProofAnalysisFacet.ProofFacts,
+            condition));
+    }
     private static string Class(string members, string directives, bool isStatic = true) =>
         SemanticTestSource.Class(members, directives).Replace(
             "public class TestClass",

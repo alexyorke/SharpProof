@@ -48,7 +48,9 @@ internal static class SymbolicStringLengthLowerer {
             if (method.Parameters.Length is not (1 or 2) ||
                 !TryLowerIntegerArgument(operation.Arguments, ordinal, context, out var removed))
                 return false;
-            term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, removed);
+            term = method.Parameters.Length == 1
+                ? removed
+                : new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, removed);
             return true;
         }
         if (method.Name == nameof(string.Insert) &&

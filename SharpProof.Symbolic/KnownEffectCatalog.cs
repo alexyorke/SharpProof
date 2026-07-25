@@ -368,6 +368,12 @@ internal static class KnownEffectCatalog {
         var definition = type?.OriginalDefinition.ToDisplayString();
         var numeric = SymbolicTypeFacts.IsBuiltInNumericSpecialType(type?.SpecialType ?? SpecialType.None) &&
                       type?.SpecialType != SpecialType.System_Char;
+        if (TryCreateThrowingFrameworkMember(
+                method,
+                definition,
+                numeric,
+                out model))
+            return true;
         SharpProofEffect? effects = (definition, method.MethodKind, method.Name) switch {
             ("System.Collections.Generic.List<T>" or "System.Collections.Generic.Dictionary<TKey, TValue>",
                 MethodKind.PropertyGet, _) => SharpProofEffect.ReadsReceiverState,
@@ -404,6 +410,59 @@ internal static class KnownEffectCatalog {
             : [];
         return effects.HasValue && Create(effects.Value, out model, exceptions);
     }
+    private static bool TryCreateThrowingFrameworkMember(
+        IMethodSymbol method,
+        string? definition,
+        bool numeric,
+        out KnownEffectModel model) {
+        model = null!;
+        if (numeric &&
+            method.Name == "ToString" &&
+            method.Parameters.Length != 0)
+            return Create(
+                SharpProofEffect.Allocates | SharpProofEffect.Throws,
+                out model,
+                Facts(
+                    "framework_numeric_format_model",
+                    "System.FormatException"));
+        if (method.ContainingType?.SpecialType == SpecialType.System_String &&
+            method.Name is "Split" or "Replace")
+            return Create(
+                SharpProofEffect.Allocates | SharpProofEffect.Throws,
+                out model,
+                Facts(
+                    "framework_string_argument_validation_model",
+                    "System.ArgumentException",
+                    "System.ArgumentNullException",
+                    "System.ArgumentOutOfRangeException"));
+        if (definition is not
+            ("System.Collections.Generic.List<T>" or
+             "System.Collections.Generic.Dictionary<TKey, TValue>"))
+            return false;
+        var throws = method.Name == "Add" ||
+                     method.MethodKind == MethodKind.Constructor &&
+                     method.Parameters.Length != 0 ||
+                     method.AssociatedSymbol is IPropertySymbol {
+                         IsIndexer: true
+                     } ||
+                     method.MethodKind == MethodKind.PropertySet;
+        if (!throws)
+            return false;
+        var effects = method.MethodKind == MethodKind.PropertyGet
+            ? SharpProofEffect.ReadsReceiverState
+            : SharpProofEffect.WritesReceiverState;
+        if (method.Name == "Add")
+            effects |= SharpProofEffect.Allocates;
+        return Create(
+            effects | SharpProofEffect.Throws,
+            out model,
+            Facts(
+                "framework_collection_argument_validation_model",
+                "System.ArgumentException",
+                "System.ArgumentNullException",
+                "System.ArgumentOutOfRangeException",
+                "System.Collections.Generic.KeyNotFoundException"));
+    }
 
     private static bool TryCreateThreading(IMethodSymbol method, out KnownEffectModel model) {
         model = null!;
@@ -417,11 +476,11 @@ internal static class KnownEffectCatalog {
                 return Create(SharpProofEffect.WritesArgumentState, out model, write: [0]);
             if (method.Name is "Exchange" or "Add" && method.Parameters.Length == 2 && integralRef &&
                 method.Parameters[1].Type.SpecialType == first!.Type.SpecialType)
-                return Create(SharpProofEffect.None, out model, write: [0]);
+                return Create(SharpProofEffect.WritesArgumentState, out model, write: [0]);
             if (method.Name == "CompareExchange" && method.Parameters.Length == 3 && integralRef &&
                 method.Parameters[1].Type.SpecialType == first!.Type.SpecialType &&
                 method.Parameters[2].Type.SpecialType == first.Type.SpecialType)
-                return Create(SharpProofEffect.None, out model, write: [0]);
+                return Create(SharpProofEffect.WritesArgumentState, out model, write: [0]);
             if (method.Name == "Read" && method.Parameters.Length == 1 &&
                 first is { RefKind: not RefKind.None, Type.SpecialType: SpecialType.System_Int64 })
                 return Create(SharpProofEffect.ReadsArgumentState, out model, read: [0]);
@@ -435,7 +494,7 @@ internal static class KnownEffectCatalog {
         return method.Name == "Write" &&
                method.Parameters.Length == 2 &&
                method.Parameters[0].RefKind != RefKind.None &&
-               Create(SharpProofEffect.None, out model, write: [0]);
+               Create(SharpProofEffect.WritesArgumentState, out model, write: [0]);
     }
 
     private static bool TryCreateSpan(IMethodSymbol method, out KnownEffectModel model) {
@@ -570,7 +629,7 @@ internal static class KnownEffectCatalog {
         var reason = "framework_bit_converter_to_" + resultName + (array ? "_array_model" : "_span_model");
         var exceptions = array
             ? ExceptionFacts(reason, includeNull: true, includeArgument: result != SpecialType.System_Boolean)
-            : ExceptionFacts(reason);
+            : ExceptionFacts(reason, includeArgument: true, includeOutOfRange: false);
         return Create(SharpProofEffect.ReadsArgumentState | SharpProofEffect.Throws, out model, exceptions, read: [0]);
     }
 

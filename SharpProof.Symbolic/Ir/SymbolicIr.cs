@@ -169,6 +169,17 @@ internal sealed class SymbolicState {
     internal FactIndex ProofIndex { get; }
     public SymbolicState MarkContradictory() =>
         new(Facts, PathConditions, SymbolVersions, true, IsExact, UnknownReason, Provenance);
+    public SymbolicState MarkInexact(
+        SymbolicUnknownReason reason,
+        SymbolicLoweringProvenance provenance) =>
+        new(
+            Facts,
+            PathConditions,
+            SymbolVersions,
+            IsContradictory,
+            false,
+            reason,
+            Provenance.Add(provenance));
     public SymbolicState AddFact(SymbolicFact fact) {
         if (fact == null) throw new ArgumentNullException(nameof(fact));
         return new SymbolicState(Facts.Add(fact), PathConditions, SymbolVersions, IsContradictory, IsExact, UnknownReason, Provenance);

@@ -230,9 +230,10 @@ internal sealed class MethodEffectAnalysisSession(
             if (IsCaughtHazard(declaration, semanticModel, hazard.SpanStart, hazard.ExceptionType))
                 escape = SharpProofVerdict.Disproven;
             if (escape == SharpProofVerdict.Proven && result.ExceptionFacts.Any(fact =>
-                    fact.Escape == SharpProofVerdict.Disproven && fact.Source == MethodExceptionSource.ExplicitThrow &&
-                    (fact.SpanStart <= hazard.SpanStart && hazard.SpanStart <= fact.SpanStart + fact.SpanLength ||
-                     hazard.Category.IndexOf("throw", StringComparison.OrdinalIgnoreCase) >= 0)))
+                    fact.Escape == SharpProofVerdict.Disproven &&
+                    fact.Source == MethodExceptionSource.ExplicitThrow &&
+                    fact.SpanStart <= hazard.SpanStart &&
+                    hazard.SpanStart <= fact.SpanStart + fact.SpanLength))
                 escape = SharpProofVerdict.Disproven;
             var fact = new MethodExceptionFact(
                 hazard.ExceptionType, escape, MethodExceptionSource.RuntimeHazard, hazard.Category, string.Empty,
@@ -507,7 +508,8 @@ internal sealed class MethodEffectAnalysisSession(
             foreach (var returned in syntaxNodes.OfType<ReturnStatementSyntax>())
                 if (returned.Expression is AnonymousFunctionExpressionSyntax) {
                     var value = Evaluate(semanticModel.GetOperation(returned.Expression, session.CancellationToken), ref state);
-                    if (!ReferenceEquals(value, EffectFlowValue.None)) ReturnValue = value;
+                    if (!ReferenceEquals(value, EffectFlowValue.None))
+                        AddReturn(value);
                 }
             foreach (var assignment in syntaxNodes.OfType<AssignmentExpressionSyntax>())
                 if (assignment.Left.DescendantNodesAndSelf().OfType<ConditionalExpressionSyntax>().FirstOrDefault() is { } conditional) {
@@ -545,8 +547,7 @@ internal sealed class MethodEffectAnalysisSession(
                     .FirstOrDefault(static candidate => candidate.Parameters.Length == 0);
             }
             if (target == null) return state;
-            var values = arguments.Select(argument => Evaluate(semanticModel.GetOperation(argument.Expression,
-                session.CancellationToken), ref state)).ToArray();
+            var values = EvaluateArguments(arguments, target, ref state);
             effects.Add(SharpProofEffect.DirectCall, site, target, "direct_call");
             var summary = GetSummary(target, null);
             AddSummary(summary.Effects, state.Receiver, values, semanticModel.GetOperation(site, session.CancellationToken) ??
@@ -565,8 +566,10 @@ internal sealed class MethodEffectAnalysisSession(
             state = state with { Receiver = ApplyDeclaredInitializers(state.Receiver, method.ContainingType, ref state, false) };
             if (declaration.BaseList?.Types.OfType<PrimaryConstructorBaseTypeSyntax>().FirstOrDefault() is { } baseType &&
                 semanticModel.GetSymbolInfo(baseType, session.CancellationToken).Symbol is IMethodSymbol constructor) {
-                var values = baseType.ArgumentList.Arguments.Select(argument => Evaluate(semanticModel.GetOperation(
-                    argument.Expression, session.CancellationToken), ref state)).ToArray();
+                var values = EvaluateArguments(
+                    baseType.ArgumentList.Arguments,
+                    constructor,
+                    ref state);
                 effects.Add(SharpProofEffect.DirectCall, baseType, constructor, "direct_call");
                 var summary = GetSummary(constructor, null);
                 AddSummary(summary.Effects, state.Receiver, values, semanticModel.GetOperation(baseType,
@@ -1093,9 +1096,13 @@ internal sealed class MethodEffectAnalysisSession(
             return _unreachableOperations.Contains(key) && !_reachableOperations.Contains(key);
         }
         private bool IsExhaustive(SwitchExpressionSyntax expression) =>
-            expression.Arms.Any(static arm => arm.Pattern is DiscardPatternSyntax) ||
+            expression.Arms.Any(static arm =>
+                arm.Pattern is DiscardPatternSyntax &&
+                arm.WhenClause == null) ||
             semanticModel.GetTypeInfo(expression.GoverningExpression, session.CancellationToken).Type?.SpecialType ==
-                SpecialType.System_Boolean && expression.Arms.Where(static arm => arm.Pattern is ConstantPatternSyntax)
+                SpecialType.System_Boolean && expression.Arms.Where(static arm =>
+                    arm.Pattern is ConstantPatternSyntax &&
+                    arm.WhenClause == null)
                 .Select(arm => semanticModel.GetConstantValue(((ConstantPatternSyntax)arm.Pattern).Expression,
                     session.CancellationToken).Value).OfType<bool>().Distinct().Count() == 2;
         private bool TrySelectArm(SwitchExpressionSyntax? expression, out SwitchExpressionArmSyntax? selected) {
@@ -2096,6 +2103,29 @@ internal sealed class MethodEffectAnalysisSession(
                 var value = Evaluate(argument.Value, ref state);
                 var ordinal = argument.Parameter?.Ordinal ?? 0;
                 if (ordinal >= 0 && ordinal < values.Length) values[ordinal] = value;
+            }
+            return values;
+        }
+        private IReadOnlyList<EffectFlowValue> EvaluateArguments(
+            SeparatedSyntaxList<ArgumentSyntax> arguments,
+            IMethodSymbol target,
+            ref EffectFlowState state) {
+            if (target.Parameters.Length == 0)
+                return [];
+            var values = Enumerable.Repeat(
+                    EffectFlowValue.None,
+                    target.Parameters.Length)
+                .ToArray();
+            foreach (var argument in arguments) {
+                if (semanticModel.GetOperation(
+                        argument,
+                        session.CancellationToken) is not IArgumentOperation {
+                            Parameter: { } parameter
+                        } operation ||
+                    parameter.Ordinal < 0 ||
+                    parameter.Ordinal >= values.Length)
+                    continue;
+                values[parameter.Ordinal] = Evaluate(operation.Value, ref state);
             }
             return values;
         }

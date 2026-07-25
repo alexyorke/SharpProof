@@ -411,7 +411,15 @@ internal sealed class SymbolicComplexityAnalysisSession {
         if (expression is BinaryExpressionSyntax binary &&
             TryExpressionCost(binary.Left, model, method, length, out var left) &&
             TryExpressionCost(binary.Right, model, method, length, out var right)) {
-            cost = ComplexityValue.Max(left, right);
+            cost = binary.IsKind(SyntaxKind.MultiplyExpression)
+                ? ComplexityValue.Multiply(left, right)
+                : binary.Kind() is SyntaxKind.AddExpression or
+                    SyntaxKind.SubtractExpression or
+                    SyntaxKind.DivideExpression or
+                    SyntaxKind.ModuloExpression
+                    ? ComplexityValue.Max(left, right)
+                    : ComplexityValue.Unknown(
+                        SymbolicComplexityUnknownReason.UnsupportedOperation);
             return true;
         }
         if (symbol is ILocalSymbol or IFieldSymbol or IPropertySymbol) {
@@ -428,8 +436,9 @@ internal sealed class SymbolicComplexityAnalysisSession {
         SemanticModel model,
         IMethodSymbol method) => cost.Substitute(key => {
             if (ComplexityValue.TryParseParameterKey(key, out var ordinal)) {
-                if (ordinal >= 0 && ordinal < arguments.Length &&
-                    TryExpressionCost(arguments[ordinal].Value.Syntax as ExpressionSyntax, model, method,
+                var argument = FindArgumentByOrdinal(arguments, ordinal);
+                if (argument != null &&
+                    TryExpressionCost(argument.Value.Syntax as ExpressionSyntax, model, method,
                         key.EndsWith(":length", StringComparison.Ordinal), out var replacement))
                     return replacement;
                 return ComplexityValue.Unknown(SymbolicComplexityUnknownReason.UnknownCallee);
@@ -440,6 +449,11 @@ internal sealed class SymbolicComplexityAnalysisSession {
                 return receiverCost;
             return null;
         });
+    internal static IArgumentOperation? FindArgumentByOrdinal(
+        ImmutableArray<IArgumentOperation> arguments,
+        int ordinal) =>
+        arguments.FirstOrDefault(candidate =>
+            candidate.Parameter?.Ordinal == ordinal);
 
     private bool Mutates(ISymbol symbol, SyntaxNode body, SemanticModel model, bool ignoreRecognizedStep) {
         foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(body)) {
@@ -516,8 +530,8 @@ internal sealed class SymbolicComplexityAnalysisSession {
 
     private static bool IsConstantProperty(IPropertySymbol property) =>
         property.Name is "Length" or "Count" &&
-        (property.ContainingType.SpecialType == SpecialType.System_String ||
-         property.ContainingType is IArrayTypeSymbol) ||
+        property.ContainingType.SpecialType is
+            SpecialType.System_String or SpecialType.System_Array ||
         property.IsIndexer && property.ContainingType.SpecialType == SpecialType.System_String;
 
     private static bool SetDirection(Direction value, out Direction direction) {

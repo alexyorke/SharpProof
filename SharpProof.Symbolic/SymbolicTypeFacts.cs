@@ -16,7 +16,6 @@ internal static class SymbolicTypeFacts {
             SpecialType.System_Int32 => (true, 32),
             SpecialType.System_UInt32 => (false, 32),
             SpecialType.System_Int64 => (true, 64),
-            SpecialType.System_UInt64 => (false, 64),
             _ => ((bool, int)?)null
         };
         (signed, bits) = shape.GetValueOrDefault();
