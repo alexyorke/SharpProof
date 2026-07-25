@@ -2761,6 +2761,110 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedMultiReturnLambdaNonPositiveDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Select(static value => {
+                            if (value > 0)
+                                return 0;
+                            return -1;
+                        })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedMultiReturnAnonymousNonPositiveDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Select(delegate(int value) {
+                            if (value > 0)
+                                return 0;
+                            return -1;
+                        })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedBlockHelperNonPositiveDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Zero() => 0;
+                private static int Negative() => -1;
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Select(static value => {
+                            if (value > 0)
+                                return Zero();
+                            return Negative();
+                        })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedNestedLambdaPositiveReturnDoesNotAffectOuterSummary_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Select(static value => {
+                            Func<int> nested = () => 1;
+                            GC.KeepAlive(nested);
+                            if (value > 0)
+                                return 0;
+                            return -1;
+                        })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedMultiReturnLambdaPositiveArmLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static value => {
+                            if (value > 0)
+                                return 1;
+                            return 0;
+                        })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedAnonymousConstantNonPositiveDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable

@@ -945,33 +945,29 @@ internal static class CompilerProgramPointAnalysis {
         }
         private bool IsConstantNonPositiveDimensionSelector(ExpressionSyntax selector) {
             selector = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(selector);
-            ExpressionSyntax? projectedValue = selector switch {
-                LambdaExpressionSyntax { Body: ExpressionSyntax expression } => expression,
-                LambdaExpressionSyntax {
-                    Body: BlockSyntax { Statements.Count: 1 } block
-                } when block.Statements[0] is ReturnStatementSyntax { Expression: { } expression } =>
-                    expression,
-                AnonymousMethodExpressionSyntax {
-                    Block.Statements.Count: 1
-                } anonymous when anonymous.Block.Statements[0] is
-                    ReturnStatementSyntax { Expression: { } expression } =>
-                    expression,
-                _ => null
-            };
-            if (projectedValue != null)
+            var callPath = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            if (selector is LambdaExpressionSyntax { Body: ExpressionSyntax projectedValue })
                 return ExpressionDefinitelyProducesNonPositiveInt32(
                     projectedValue,
                     semanticModel,
-                    new(SymbolEqualityComparer.Default));
+                    callPath);
+            if (selector is LambdaExpressionSyntax { Body: BlockSyntax lambdaBody })
+                return BlockReturnsOnlyNonPositiveValues(
+                    lambdaBody,
+                    semanticModel,
+                    callPath);
+            if (selector is AnonymousMethodExpressionSyntax { Block: { } anonymousBody })
+                return BlockReturnsOnlyNonPositiveValues(
+                    anonymousBody,
+                    semanticModel,
+                    callPath);
             return semanticModel.GetSymbolInfo(selector, cancellationToken).Symbol is
                        IMethodSymbol {
                            ReturnType.SpecialType: SpecialType.System_Int32,
                            MethodKind: MethodKind.Ordinary or MethodKind.LocalFunction
                        } method &&
                    IsStaticallyDispatchedDimensionSelector(method) &&
-                   SourceMethodReturnsOnlyNonPositiveValues(
-                       method,
-                       new(SymbolEqualityComparer.Default));
+                   SourceMethodReturnsOnlyNonPositiveValues(method, callPath);
         }
         private static bool IsStaticallyDispatchedDimensionSelector(IMethodSymbol method) =>
             method.MethodKind == MethodKind.LocalFunction ||
@@ -1014,21 +1010,27 @@ internal static class CompilerProgramPointAnalysis {
                 if (body == null)
                     continue;
                 foundBody = true;
-                var returns = body.DescendantNodes(node =>
-                        node is not AnonymousFunctionExpressionSyntax and
-                            not LocalFunctionStatementSyntax)
-                    .OfType<ReturnStatementSyntax>()
-                    .ToArray();
-                if (returns.Length == 0 ||
-                    returns.Any(statement =>
-                        statement.Expression == null ||
-                        !ExpressionDefinitelyProducesNonPositiveInt32(
-                            statement.Expression,
-                            model,
-                            nextCallPath)))
+                if (!BlockReturnsOnlyNonPositiveValues(body, model, nextCallPath))
                     return false;
             }
             return foundBody;
+        }
+        private bool BlockReturnsOnlyNonPositiveValues(
+            BlockSyntax body,
+            SemanticModel model,
+            HashSet<ISymbol> callPath) {
+            var returns = body.DescendantNodes(node =>
+                    node is not AnonymousFunctionExpressionSyntax and
+                        not LocalFunctionStatementSyntax)
+                .OfType<ReturnStatementSyntax>()
+                .ToArray();
+            return returns.Length != 0 &&
+                   returns.All(statement =>
+                       statement.Expression != null &&
+                       ExpressionDefinitelyProducesNonPositiveInt32(
+                           statement.Expression,
+                           model,
+                           callPath));
         }
         private bool ExpressionDefinitelyProducesNonPositiveInt32(
             ExpressionSyntax expression,
