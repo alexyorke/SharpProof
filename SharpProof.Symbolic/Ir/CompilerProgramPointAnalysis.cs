@@ -816,6 +816,35 @@ internal static class CompilerProgramPointAnalysis {
                         : new(false, false, true, true);
                 return true;
             }
+            if (definition.Name == nameof(Enumerable.Concat)) {
+                var secondParameter = targetMethod.Parameters.FirstOrDefault(parameter =>
+                    parameter.Name == "second");
+                if (secondParameter == null ||
+                    !TryGetStandardSequenceSource(invocation, operation, out var first) ||
+                    !TryGetInvocationArgument(operation, secondParameter, out var second))
+                    return false;
+                var firstFacts = GetArrayDimensionVectorFacts(first, [.. visited]);
+                var secondFacts = GetArrayDimensionVectorFacts(second, [.. visited]);
+                var definitelyEmpty = firstFacts.DefinitelyEmpty && secondFacts.DefinitelyEmpty;
+                var definitelyContainsNonPositive =
+                    firstFacts.DefinitelyContainsNonPositive ||
+                    secondFacts.DefinitelyContainsNonPositive;
+                var definitelyAllNonPositive =
+                    firstFacts.DefinitelyAllNonPositive &&
+                    secondFacts.DefinitelyAllNonPositive;
+                var preventsNonEmptyAllPositive =
+                    definitelyEmpty ||
+                    definitelyContainsNonPositive ||
+                    definitelyAllNonPositive ||
+                    firstFacts.PreventsNonEmptyAllPositive &&
+                    secondFacts.PreventsNonEmptyAllPositive;
+                facts = new(
+                    definitelyEmpty,
+                    definitelyContainsNonPositive,
+                    preventsNonEmptyAllPositive,
+                    definitelyAllNonPositive);
+                return facts != default;
+            }
             var preservesEveryElement = definition.Name is
                     nameof(Enumerable.AsEnumerable) or
                     nameof(Enumerable.OrderBy) or

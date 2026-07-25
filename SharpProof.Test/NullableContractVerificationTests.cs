@@ -2519,6 +2519,70 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceConcatenatedNonPositiveDimensionsLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue(int firstRank, int secondRank) {
+                    var lengths = Enumerable.Repeat(0, firstRank)
+                        .Concat(Enumerable.Repeat(-1, secondRank))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceConcatenatedGuaranteedNonPositiveDimensionLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var first = new[] { 0 };
+                    var second = new[] { 2 };
+                    var lengths = first.Concat(second).ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceConcatenatedPossiblyEmptyNonPositiveAndPositiveDimensionsLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue(int rank) {
+                    var lengths = Enumerable.Repeat(0, rank)
+                        .Concat(new[] { 2 })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceConcatenatedPositiveDimensionsLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { 2 }
+                        .Concat(new[] { 3 })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedPositiveDimensionVectorLoopBodyRemainsReachable_Reports",
             """
             #nullable enable
