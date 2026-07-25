@@ -959,14 +959,19 @@ internal static class CompilerProgramPointAnalysis {
                 _ => null
             };
             if (projectedValue != null)
-                return IsConstantNonPositiveInt32(projectedValue, semanticModel);
+                return ExpressionDefinitelyProducesNonPositiveInt32(
+                    projectedValue,
+                    semanticModel,
+                    new(SymbolEqualityComparer.Default));
             return semanticModel.GetSymbolInfo(selector, cancellationToken).Symbol is
                        IMethodSymbol {
                            ReturnType.SpecialType: SpecialType.System_Int32,
                            MethodKind: MethodKind.Ordinary or MethodKind.LocalFunction
                        } method &&
                    IsStaticallyDispatchedDimensionSelector(method) &&
-                   SourceMethodReturnsOnlyConstantNonPositiveValues(method);
+                   SourceMethodReturnsOnlyNonPositiveValues(
+                       method,
+                       new(SymbolEqualityComparer.Default));
         }
         private static bool IsStaticallyDispatchedDimensionSelector(IMethodSymbol method) =>
             method.MethodKind == MethodKind.LocalFunction ||
@@ -976,7 +981,12 @@ internal static class CompilerProgramPointAnalysis {
              !method.IsOverride ||
              method.IsSealed ||
              method.ContainingType.IsSealed);
-        private bool SourceMethodReturnsOnlyConstantNonPositiveValues(IMethodSymbol method) {
+        private bool SourceMethodReturnsOnlyNonPositiveValues(
+            IMethodSymbol method,
+            HashSet<ISymbol> callPath) {
+            var nextCallPath = new HashSet<ISymbol>(callPath, SymbolEqualityComparer.Default);
+            if (!nextCallPath.Add(method.OriginalDefinition))
+                return false;
             var foundBody = false;
             foreach (var syntaxReference in method.DeclaringSyntaxReferences) {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -989,7 +999,10 @@ internal static class CompilerProgramPointAnalysis {
                 };
                 if (expressionBody != null) {
                     foundBody = true;
-                    if (!IsConstantNonPositiveInt32(expressionBody, model))
+                    if (!ExpressionDefinitelyProducesNonPositiveInt32(
+                            expressionBody,
+                            model,
+                            nextCallPath))
                         return false;
                     continue;
                 }
@@ -1009,19 +1022,35 @@ internal static class CompilerProgramPointAnalysis {
                 if (returns.Length == 0 ||
                     returns.Any(statement =>
                         statement.Expression == null ||
-                        !IsConstantNonPositiveInt32(statement.Expression, model)))
+                        !ExpressionDefinitelyProducesNonPositiveInt32(
+                            statement.Expression,
+                            model,
+                            nextCallPath)))
                     return false;
             }
             return foundBody;
         }
-        private bool IsConstantNonPositiveInt32(
+        private bool ExpressionDefinitelyProducesNonPositiveInt32(
             ExpressionSyntax expression,
-            SemanticModel model) =>
-            model.GetConstantValue(expression, cancellationToken) is {
+            SemanticModel model,
+            HashSet<ISymbol> callPath) {
+            if (model.GetConstantValue(expression, cancellationToken) is {
                 HasValue: true,
                 Value: int constant
+            })
+                return constant <= 0;
+            var operation = model.GetOperation(expression, cancellationToken);
+            while (operation is IConversionOperation conversion)
+                operation = conversion.Operand;
+            return operation is IInvocationOperation {
+                TargetMethod: {
+                    ReturnType.SpecialType: SpecialType.System_Int32,
+                    MethodKind: MethodKind.Ordinary or MethodKind.LocalFunction
+                } targetMethod
             } &&
-            constant <= 0;
+                   IsStaticallyDispatchedDimensionSelector(targetMethod) &&
+                   SourceMethodReturnsOnlyNonPositiveValues(targetMethod, callPath);
+        }
         private bool DefinitelyProvidesPositiveDimensionCount(ExpressionSyntax count) {
             var visited = new HashSet<SyntaxNode>();
             while (true) {
