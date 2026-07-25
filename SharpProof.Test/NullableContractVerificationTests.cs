@@ -10202,6 +10202,204 @@ public sealed class NullableContractVerificationTests {
                 CancellationToken.None),
             Is.True);
     }
+    [Test]
+    public void PotentialBugRegression_EffectContractCompleteDefaultsTrue() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                [EffectContract(SharpProofEffect.None)]
+                private static extern void Boundary();
+                public static void M() => Boundary();
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "M()");
+        Assert.Multiple(() => {
+            Assert.That(effects.Purity, Is.EqualTo(SharpProof.Symbolic.SharpProofVerdict.Proven));
+            Assert.That(effects.UnknownReasons, Is.Empty);
+        });
+    }
+    [Test]
+    public void PotentialBugRegression_AssemblyStringEffectContractUsesCanonicalTargetKey() {
+        const string targetSource = """
+            public static class C {
+                private static extern void Boundary();
+                public static void M() => Boundary();
+            }
+            """;
+        var (root, model) = CreateSemanticModel(targetSource);
+        var boundary = (Microsoft.CodeAnalysis.IMethodSymbol)
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(
+                model,
+                root.DescendantNodes()
+                    .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+                    .Single(static method => method.Identifier.ValueText == "Boundary"))!;
+        var key = SharpProof.Symbolic.RoslynStructuralMethodIdentity.GetCanonicalKey(boundary);
+        var source = $$"""
+            using SharpProof.Attributes;
+            [assembly: EffectContract("{{key}}", SharpProofEffect.WritesAmbientState)]
+            public static class C {
+                private static extern void Boundary();
+                public static void M() => Boundary();
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "M()");
+        Assert.That(
+            effects.Effects.HasFlag(SharpProof.Attributes.SharpProofEffect.WritesAmbientState),
+            Is.True);
+    }
+    [Test]
+    public void PotentialBugRegression_PropertyEffectContractAppliesToGetter() {
+        const string source = """
+            using SharpProof.Attributes;
+            public interface I {
+                [EffectContract(SharpProofEffect.ReadsAmbientState)]
+                int Value { get; }
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "Value");
+        Assert.That(
+            effects.Effects.HasFlag(SharpProof.Attributes.SharpProofEffect.ReadsAmbientState),
+            Is.True);
+    }
+    [Test]
+    public void PotentialBugRegression_ThrowsEffectWithoutExceptionFactIsNotProvenSafe() {
+        var effects = new SharpProof.Symbolic.MethodEffects(
+            SharpProof.Attributes.SharpProofEffect.Throws,
+            SharpProof.Attributes.SharpProofCapability.None,
+            [],
+            [],
+            []);
+        Assert.That(
+            effects.DoesNotThrow,
+            Is.EqualTo(SharpProof.Symbolic.SharpProofVerdict.Unknown));
+    }
+    [Test]
+    public void PotentialBugRegression_EffectContractRejectsNonExceptionThrownType() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                [EffectContract(
+                    SharpProofEffect.Throws,
+                    ThrownExceptions = new[] { typeof(string) })]
+                private static extern void Boundary();
+                public static void M() => Boundary();
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "M()");
+        Assert.Multiple(() => {
+            Assert.That(effects.DoesNotThrow, Is.EqualTo(SharpProof.Symbolic.SharpProofVerdict.Unknown));
+            Assert.That(effects.ThrownExceptions, Does.Not.Contain("string"));
+            Assert.That(
+                effects.UnknownReasons.Select(static reason => reason.Message),
+                Does.Contain("invalid_effect_contract_exception_type"));
+        });
+    }
+    [Test]
+    public void PotentialBugRegression_CapabilityEffectsRemainOnSites() {
+        const string source = """
+            public static class C {
+                public static void M(object gate) {
+                    lock (gate) { }
+                }
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "M(");
+        Assert.That(
+            effects.Sites,
+            Has.Some.Matches<SharpProof.Symbolic.MethodEffectSite>(site =>
+                site.Capabilities.HasFlag(SharpProof.Attributes.SharpProofCapability.Synchronization)));
+    }
+    [Test]
+    public async Task PotentialBugRegression_AllowedCapabilitiesRejectsUndefinedFlags() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                [AllowedCapabilities((SharpProofCapability)(-1))]
+                public static void M() { }
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0024"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public void PotentialBugRegression_EffectSiteRetainsForeignPartialTypeSyntaxTree() {
+        const string initializerSource = """
+            public partial class C {
+                private static int state = 1;
+            }
+            """;
+        const string methodSource = """
+            public partial class C {
+                public static int M() => state;
+            }
+            """;
+        var (_, seedModel) = CreateSemanticModel(initializerSource);
+        var parseOptions = (Microsoft.CodeAnalysis.CSharp.CSharpParseOptions)
+            seedModel.SyntaxTree.Options;
+        var initializerTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+            initializerSource,
+            parseOptions,
+            "Initializer.cs");
+        var methodTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+            methodSource,
+            parseOptions,
+            "Method.cs");
+        var compilation = seedModel.Compilation
+            .RemoveAllSyntaxTrees()
+            .AddSyntaxTrees(initializerTree, methodTree);
+        var model = compilation.GetSemanticModel(methodTree);
+        var declaration = methodTree.GetRoot()
+            .DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+            .Single();
+        var method = (Microsoft.CodeAnalysis.IMethodSymbol)
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(model, declaration)!;
+        var session = new SharpProof.Symbolic.MethodEffectAnalysisSession(
+            compilation,
+            CancellationToken.None);
+        var effects = session.Analyze(method, declaration, model);
+        var initializerSite = effects.Sites.Single(static site =>
+            site.Reason == "static_initializer_write");
+        Assert.That(initializerSite.SourceTree, Is.SameAs(initializerTree));
+    }
+    [Test]
+    public void PotentialBugRegression_FrameworkConsoleCallCarriesCapability() {
+        const string source = """
+            public static class C {
+                public static void M() => System.Console.WriteLine("value");
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "M()");
+        Assert.Multiple(() => {
+            Assert.That(
+                effects.Capabilities.HasFlag(
+                    SharpProof.Attributes.SharpProofCapability.Console),
+                Is.True);
+            Assert.That(
+                effects.Sites,
+                Has.Some.Matches<SharpProof.Symbolic.MethodEffectSite>(site =>
+                    site.Capabilities.HasFlag(
+                        SharpProof.Attributes.SharpProofCapability.Console)));
+        });
+    }
+    [Test]
+    public async Task PotentialBugRegression_DisallowedCapabilityReportsSiteDiagnostic() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static void M() => System.Console.WriteLine("value");
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0015"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)

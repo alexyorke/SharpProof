@@ -20,7 +20,11 @@ internal static class MethodAllocationAnalyzer {
                 reason));
         }
         foreach (var site in effects.Sites.Where(static site => (site.Effect & SharpProofEffect.Allocates) != 0)) {
-            var location = Location.Create(context.Node.SyntaxTree, new TextSpan(site.SpanStart, site.SpanLength));
+            var tree = site.SourceTree ?? context.Node.SyntaxTree;
+            var location = site.SpanStart >= 0 && site.SpanLength >= 0 &&
+                           site.SpanStart + site.SpanLength <= tree.GetText(context.CancellationToken).Length
+                ? Location.Create(tree, new TextSpan(site.SpanStart, site.SpanLength))
+                : AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
             context.ReportDiagnostic(Diagnostic.Create(
                 AnalyzerDiagnosticCatalog.Get("AllocationInZeroAllocationMethodRule"),
                 location,

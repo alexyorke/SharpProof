@@ -13,7 +13,14 @@ internal static class EnforcePureContractAnalyzer {
             (site.Effect & MethodEffects.ImpureEffects) != 0);
         var location = firstSite == null
             ? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node)
-            : Location.Create(context.Node.SyntaxTree, new TextSpan(firstSite.SpanStart, firstSite.SpanLength));
+            : CreateSiteLocation(context, firstSite);
         context.ReportDiagnostic(Diagnostic.Create(AnalyzerDiagnosticCatalog.Get("PurityNotVerifiedRule"), location, method.Name));
+    }
+    private static Location CreateSiteLocation(MethodBodyAnalysisContext context, MethodEffectSite site) {
+        var tree = site.SourceTree ?? context.Node.SyntaxTree;
+        return site.SpanStart >= 0 && site.SpanLength >= 0 &&
+               site.SpanStart + site.SpanLength <= tree.GetText(context.CancellationToken).Length
+            ? Location.Create(tree, new TextSpan(site.SpanStart, site.SpanLength))
+            : AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
     }
 }

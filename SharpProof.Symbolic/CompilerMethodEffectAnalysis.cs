@@ -171,8 +171,10 @@ internal sealed class MethodEffectAnalysisSession(
     private static IMethodSymbol Normalize(IMethodSymbol method) =>
         ((method.ReducedFrom ?? method).PartialImplementationPart ?? method.ReducedFrom ?? method).OriginalDefinition;
     private bool TryReadEffectContract(IMethodSymbol method, out MethodEffects effects) {
-        var matches = method.GetAttributes().Where(static attribute =>
-            attribute.AttributeClass?.ToDisplayString() == "SharpProof.Attributes.EffectContractAttribute").ToArray();
+        var canonicalKey = RoslynStructuralMethodIdentity.GetCanonicalKey(method);
+        var matches = EnumerateEffectContractAttributes(method, canonicalKey)
+            .Distinct()
+            .ToArray();
         var configured = externalContractResolver?.Invoke(method);
         if (matches.Length == 0) {
             effects = configured!;
@@ -192,29 +194,88 @@ internal sealed class MethodEffectAnalysisSession(
         effects = configured == null ? result : Union(result, configured);
         return true;
     }
-    private static MethodEffects Contract(AttributeData attribute) {
-        var rawValue = attribute.ConstructorArguments.Length == 0 ? null : attribute.ConstructorArguments[0].Value;
+    private static IEnumerable<AttributeData> EnumerateEffectContractAttributes(
+        IMethodSymbol method,
+        string canonicalKey) {
+        foreach (var attribute in method.GetAttributes().Where(IsEffectContractAttribute))
+            yield return attribute;
+        if (method.AssociatedSymbol is IPropertySymbol property)
+            foreach (var attribute in property.GetAttributes().Where(IsEffectContractAttribute))
+                yield return attribute;
+        foreach (var attribute in method.ContainingAssembly.GetAttributes().Where(IsEffectContractAttribute)) {
+            if (attribute.ConstructorArguments.Length > 0 &&
+                attribute.ConstructorArguments[0].Value is string targetKey &&
+                string.Equals(targetKey, canonicalKey, StringComparison.Ordinal))
+                yield return attribute;
+        }
+    }
+    private static bool IsEffectContractAttribute(AttributeData attribute) =>
+        attribute.AttributeClass?.ToDisplayString() == "SharpProof.Attributes.EffectContractAttribute";
+    private MethodEffects Contract(AttributeData attribute) {
+        var effectArgumentIndex = attribute.ConstructorArguments.Length > 1 &&
+                                  attribute.ConstructorArguments[0].Value is string
+            ? 1
+            : 0;
+        var rawValue = attribute.ConstructorArguments.Length <= effectArgumentIndex
+            ? null
+            : attribute.ConstructorArguments[effectArgumentIndex].Value;
         var value = rawValue != null
             ? (SharpProofEffect)Convert.ToInt64(rawValue, CultureInfo.InvariantCulture)
             : SharpProofEffect.Unknown;
         var capabilities = ReadNamed(attribute, "Capabilities", SharpProofCapability.None);
-        var complete = ReadNamed(attribute, "Complete", false);
+        var complete = ReadNamed(attribute, "Complete", true);
         var deterministic = ReadNamed(attribute, "IsDeterministic", true);
         var exceptionArgument = attribute.NamedArguments.FirstOrDefault(static pair => pair.Key == "ThrownExceptions");
         var exceptions = exceptionArgument.Key == null ? [] : exceptionArgument.Value.Values;
+        var exceptionBase = compilation.GetTypeByMetadataName("System.Exception");
+        var validExceptions = ImmutableArray.CreateBuilder<ITypeSymbol>();
+        var invalidException = false;
+        foreach (var exception in exceptions) {
+            if (exception.Value is not ITypeSymbol exceptionType ||
+                exceptionBase == null ||
+                !IsSameOrDerivedFrom(exceptionType, exceptionBase)) {
+                invalidException = true;
+                continue;
+            }
+            validExceptions.Add(exceptionType);
+        }
         if (!deterministic) value |= SharpProofEffect.UsesNondeterminism;
         if (!exceptions.IsDefaultOrEmpty) value |= SharpProofEffect.Throws;
-        var invalid = !EnumFlagsDefined(value) || !EnumFlagsDefined(capabilities);
+        var invalidFlags = !EnumFlagsDefined(value) || !EnumFlagsDefined(capabilities);
+        var missingExceptionBoundary = (value & SharpProofEffect.Throws) != 0 && validExceptions.Count == 0;
         if (!complete) value |= SharpProofEffect.Unknown;
-        if (invalid) value |= SharpProofEffect.Unknown;
+        if (invalidFlags || invalidException || missingExceptionBoundary) value |= SharpProofEffect.Unknown;
+        var exceptionFacts = validExceptions.Select(static exceptionType =>
+            MethodExceptionFact.Boundary(
+                exceptionType.ToDisplayString(),
+                MethodExceptionSource.Contract,
+                "effect_contract")).ToImmutableArray();
+        if (missingExceptionBoundary)
+            exceptionFacts = exceptionFacts.Add(MethodExceptionFact.Boundary(
+                "System.Exception",
+                MethodExceptionSource.Contract,
+                "effect_contract_unknown_exception",
+                SharpProofVerdict.Unknown));
+        var unknownReasons = ImmutableArray.CreateBuilder<SharpProofUnknownReason>();
+        if (invalidFlags) unknownReasons.Add(ConfigurationReason("invalid_effect_contract_flags"));
+        if (invalidException) unknownReasons.Add(ConfigurationReason("invalid_effect_contract_exception_type"));
+        if (missingExceptionBoundary && !invalidException)
+            unknownReasons.Add(Reason("effect_contract_throws_without_exception_types"));
+        if (!complete) unknownReasons.Add(Reason("incomplete_effect_contract"));
         return new(
             value,
             capabilities,
-            [.. exceptions.Where(static item => item.Value is ITypeSymbol).Select(static item =>
-                MethodExceptionFact.Boundary(((ITypeSymbol)item.Value!).ToDisplayString(), MethodExceptionSource.Contract,
-                    "effect_contract"))],
+            exceptionFacts,
             [],
-            invalid ? [ConfigurationReason("invalid_effect_contract_flags")] : complete ? [] : [Reason("incomplete_effect_contract")]);
+            unknownReasons.ToImmutable());
+    }
+    private static bool IsSameOrDerivedFrom(ITypeSymbol candidate, ITypeSymbol expectedBase) {
+        if (candidate is ITypeParameterSymbol typeParameter)
+            return typeParameter.ConstraintTypes.Any(constraint => IsSameOrDerivedFrom(constraint, expectedBase));
+        for (var current = candidate as INamedTypeSymbol; current != null; current = current.BaseType)
+            if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, expectedBase.OriginalDefinition))
+                return true;
+        return false;
     }
     private static T ReadNamed<T>(AttributeData attribute, string name, T fallback) where T : struct {
         var value = attribute.NamedArguments.FirstOrDefault(pair => string.Equals(pair.Key, name, StringComparison.Ordinal)).Value.Value;
@@ -239,7 +300,9 @@ internal sealed class MethodEffectAnalysisSession(
                 escape = SharpProofVerdict.Disproven;
             var fact = new MethodExceptionFact(
                 hazard.ExceptionType, escape, MethodExceptionSource.RuntimeHazard, hazard.Category, string.Empty,
-                hazard.SpanStart, hazard.SpanEnd - hazard.SpanStart, false, hazard.Category, hazard.Kind.ToString());
+                hazard.SpanStart, hazard.SpanEnd - hazard.SpanStart, false, hazard.Category, hazard.Kind.ToString()) {
+                SourceTree = declaration.SyntaxTree
+            };
             result = result with {
                 Effects = escape == SharpProofVerdict.Proven ? result.Effects | SharpProofEffect.Throws : result.Effects,
                 ExceptionFacts = result.ExceptionFacts.Add(fact)
@@ -397,9 +460,16 @@ internal sealed class MethodEffectAnalysisSession(
                 "type_initializer_exception", escape))]
         };
     }
-    private static MethodEffectSite Site(SharpProofEffect effect, SyntaxNode syntax, ISymbol? symbol, string reason) => new(
-        effect, SharpProofCapability.None, syntax.ToString(), symbol?.ToDisplayString() ?? string.Empty,
-        syntax.SpanStart, syntax.Span.Length, false, reason, Origin(effect));
+    private static MethodEffectSite Site(
+        SharpProofEffect effect,
+        SyntaxNode syntax,
+        ISymbol? symbol,
+        string reason,
+        SharpProofCapability capabilities = SharpProofCapability.None) => new(
+        effect, capabilities, syntax.ToString(), symbol?.ToDisplayString() ?? string.Empty,
+        syntax.SpanStart, syntax.Span.Length, false, reason, Origin(effect)) {
+            SourceTree = syntax.SyntaxTree
+        };
     private static SharpProofUnknownReason Reason(string reason) => new("SP-EFFECT-UNKNOWN", "Effects", reason, false, false);
     private static SharpProofUnknownReason ConfigurationReason(string reason) =>
         new("SP-EFFECT-CONFIG", "Effects", reason, false, true);
@@ -1551,6 +1621,8 @@ internal sealed class MethodEffectAnalysisSession(
             var exactTarget = SymbolicDispatchFacts.ResolveExactDispatchTarget(target, null, receiver.ExactType);
             if (exactTarget != null) target = exactTarget;
             effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+            if (TryGetFrameworkCapability(target, out var capabilityEffect, out var capability))
+                effects.Add(capabilityEffect, capability, site.Syntax, target, "framework_capability");
             if (target.IsStatic && target.MethodKind != MethodKind.StaticConstructor)
                 AddTypeInitializerEffects(target.ContainingType, site);
             if (exactTarget == null && (target.IsVirtual || target.IsOverride ||
@@ -1583,6 +1655,83 @@ internal sealed class MethodEffectAnalysisSession(
             return target.ReturnsByRef && returnedValue.Roots.Any(static root => root.Kind == EffectValueRootKind.Unknown)
                 ? ResolveRefReturn(target, receiver, values)
                 : returnedValue;
+        }
+        private static bool TryGetFrameworkCapability(
+            IMethodSymbol target,
+            out SharpProofEffect effect,
+            out SharpProofCapability capability) {
+            effect = SharpProofEffect.None;
+            capability = SharpProofCapability.None;
+            var type = target.ContainingType;
+            var namespaceName = type?.ContainingNamespace?.ToDisplayString() ?? string.Empty;
+            var typeName = type?.Name ?? string.Empty;
+            if (namespaceName == "System" && typeName == "Console")
+                return SetFrameworkCapability(
+                    SharpProofEffect.WritesAmbientState, SharpProofCapability.Console, out effect, out capability);
+            if (namespaceName.StartsWith("System.IO", StringComparison.Ordinal) &&
+                typeName is not ("Path" or "PathInternal")) {
+                var writes = target.Name.StartsWith("Write", StringComparison.Ordinal) ||
+                             target.Name.StartsWith("Set", StringComparison.Ordinal) ||
+                             target.Name is "AppendAllText" or "AppendAllLines" or "Create" or "Delete" or "Move" or "Copy";
+                return SetFrameworkCapability(
+                    writes ? SharpProofEffect.WritesAmbientState : SharpProofEffect.ReadsAmbientState,
+                    SharpProofCapability.IO |
+                    (writes ? SharpProofCapability.FileWrite : SharpProofCapability.FileRead),
+                    out effect,
+                    out capability);
+            }
+            if (namespaceName.StartsWith("System.Net", StringComparison.Ordinal))
+                return SetFrameworkCapability(
+                    SharpProofEffect.WritesAmbientState, SharpProofCapability.Network, out effect, out capability);
+            if (namespaceName == "System.Diagnostics" && typeName == "Process")
+                return SetFrameworkCapability(
+                    SharpProofEffect.WritesAmbientState, SharpProofCapability.Process, out effect, out capability);
+            if (namespaceName == "System" && typeName == "Environment")
+                return SetFrameworkCapability(
+                    target.Name.StartsWith("Set", StringComparison.Ordinal) || target.Name is "Exit" or "FailFast"
+                        ? SharpProofEffect.WritesAmbientState
+                        : SharpProofEffect.ReadsAmbientState,
+                    SharpProofCapability.Environment,
+                    out effect,
+                    out capability);
+            if (namespaceName.StartsWith("Microsoft.Win32", StringComparison.Ordinal) &&
+                typeName.StartsWith("Registry", StringComparison.Ordinal))
+                return SetFrameworkCapability(
+                    SharpProofEffect.WritesAmbientState, SharpProofCapability.Registry, out effect, out capability);
+            if (namespaceName == "System" &&
+                typeName is "DateTime" or "DateTimeOffset" &&
+                target.Name is "get_Now" or "get_UtcNow" or "get_Today" ||
+                namespaceName == "System.Diagnostics" && typeName == "Stopwatch" &&
+                target.Name == "GetTimestamp")
+                return SetFrameworkCapability(
+                    SharpProofEffect.ReadsAmbientState | SharpProofEffect.UsesNondeterminism,
+                    SharpProofCapability.Clock,
+                    out effect,
+                    out capability);
+            if (namespaceName == "System" && typeName == "Random" ||
+                namespaceName == "System.Security.Cryptography" &&
+                typeName.EndsWith("RandomNumberGenerator", StringComparison.Ordinal))
+                return SetFrameworkCapability(
+                    SharpProofEffect.UsesNondeterminism, SharpProofCapability.Randomness, out effect, out capability);
+            if (namespaceName.StartsWith("System.Reflection", StringComparison.Ordinal) ||
+                namespaceName == "System" && typeName == "Type")
+                return SetFrameworkCapability(
+                    SharpProofEffect.UsesReflection, SharpProofCapability.Reflection, out effect, out capability);
+            if (namespaceName.StartsWith("System.Threading", StringComparison.Ordinal) &&
+                typeName is "Monitor" or "Interlocked" or "Volatile" or "Mutex" or "Semaphore" or "SemaphoreSlim" or
+                    "ReaderWriterLock" or "ReaderWriterLockSlim")
+                return SetFrameworkCapability(
+                    SharpProofEffect.Synchronizes, SharpProofCapability.Synchronization, out effect, out capability);
+            return false;
+        }
+        private static bool SetFrameworkCapability(
+            SharpProofEffect requiredEffect,
+            SharpProofCapability requiredCapability,
+            out SharpProofEffect effect,
+            out SharpProofCapability capability) {
+            effect = requiredEffect;
+            capability = requiredCapability;
+            return true;
         }
         private static bool CapturesCanMapArgumentEffects(ImmutableDictionary<string, EffectFlowValue> captures) =>
             captures.Values.All(static capture => capture.Roots.All(static root =>
@@ -2395,8 +2544,9 @@ internal sealed class MethodEffectAnalysisSession(
         }
         internal void Add(SharpProofEffect effect, SharpProofCapability capabilities, SyntaxNode syntax, ISymbol? symbol,
             string reason) {
+            _effects |= effect;
             _capabilities |= capabilities;
-            Add(effect, syntax, symbol, reason);
+            _sites.Add(Site(effect, syntax, symbol, reason, capabilities));
         }
         internal void Read(EffectFlowValue value, SyntaxNode syntax, ISymbol? symbol, string reason) =>
             RecordAccess(value, syntax, symbol, reason, write: false);
@@ -2448,9 +2598,11 @@ internal sealed class MethodEffectAnalysisSession(
         internal void Caught(ITypeSymbol? type, SyntaxNode syntax, string reason) =>
             AddException(type, syntax, reason, SharpProofVerdict.Disproven);
         private void AddException(ITypeSymbol? type, SyntaxNode syntax, string reason, SharpProofVerdict escape) =>
-            _exceptions.Add(new(type?.ToDisplayString() ?? "System.Exception", escape,
+            _exceptions.Add(new MethodExceptionFact(type?.ToDisplayString() ?? "System.Exception", escape,
                 MethodExceptionSource.ExplicitThrow, syntax.ToString(), string.Empty, syntax.SpanStart, syntax.Span.Length,
-                false, reason));
+                false, reason) {
+                SourceTree = syntax.SyntaxTree
+            });
         internal void AddUnknown(SyntaxNode syntax, string reason, ISymbol? symbol = null) {
             Add(SharpProofEffect.Unknown, syntax, symbol, reason);
             _unknowns.Add(Reason(reason));
@@ -2464,7 +2616,10 @@ internal sealed class MethodEffectAnalysisSession(
                 Reason = reason,
                 Source = MethodExceptionSource.Callee
             }));
-            if (summary.Effects != SharpProofEffect.None) _sites.Add(Site(summary.Effects, syntax, symbol, reason) with { IsTransitive = true });
+            if (summary.Effects != SharpProofEffect.None || summary.Capabilities != SharpProofCapability.None)
+                _sites.Add(Site(summary.Effects, syntax, symbol, reason, summary.Capabilities) with {
+                    IsTransitive = true
+                });
         }
         internal MethodEffects Build() => new(
             _effects,

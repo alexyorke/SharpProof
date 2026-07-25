@@ -17,6 +17,7 @@ public sealed record MethodExceptionFact(
     bool IsTransitive,
     string Reason,
     string Kind = "") {
+    internal SyntaxTree? SourceTree { get; init; }
     public static MethodExceptionFact Boundary(
         string exceptionType,
         MethodExceptionSource source,
@@ -37,7 +38,9 @@ public sealed record MethodEffectSite(
     string? ExceptionType = null,
     string? TransitiveSource = null,
     SharpProofVerdict EscapeStatus = SharpProofVerdict.Unknown,
-    SharpProofVerdict ProofStatus = SharpProofVerdict.Proven);
+    SharpProofVerdict ProofStatus = SharpProofVerdict.Proven) {
+    internal SyntaxTree? SourceTree { get; init; }
+}
 public sealed record MethodEffects(
     SharpProofEffect Effects,
     SharpProofCapability Capabilities,
@@ -60,6 +63,8 @@ public sealed record MethodEffects(
         get {
             if (ExceptionFacts.Any(static fact => fact.Escape == SharpProofVerdict.Proven)) return SharpProofVerdict.Disproven;
             if (ExceptionFacts.Any(static fact => fact.Escape == SharpProofVerdict.Unknown)) return SharpProofVerdict.Unknown;
+            if ((Effects & SharpProofEffect.Throws) != 0 && ExceptionFacts.IsDefaultOrEmpty)
+                return SharpProofVerdict.Unknown;
             return (Effects & SharpProofEffect.Unknown) != 0 || !UnknownReasons.IsDefaultOrEmpty
                 ? SharpProofVerdict.Unknown : SharpProofVerdict.Proven;
         }

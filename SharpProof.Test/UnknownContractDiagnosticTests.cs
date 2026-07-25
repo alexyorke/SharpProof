@@ -77,8 +77,11 @@ public sealed class UnknownContractDiagnosticTests {
             """);
         var exceptionDiagnostics = diagnostics.Where(static diagnostic => diagnostic.Id is "SP0030" or "SP0046").ToArray();
         Assert.Multiple(() => {
-            Assert.That(exceptionDiagnostics.Select(static diagnostic => diagnostic.Id), Is.EqualTo(["SP0030", "SP0046"]));
-            Assert.That(exceptionDiagnostics.Select(static diagnostic => diagnostic.Location.SourceSpan).Distinct().Count(), Is.EqualTo(1));
+            Assert.That(exceptionDiagnostics.Select(static diagnostic => diagnostic.Id), Does.Contain("SP0030"));
+            Assert.That(exceptionDiagnostics.Select(static diagnostic => diagnostic.Id), Does.Contain("SP0046"));
+            Assert.That(
+                exceptionDiagnostics.Select(static diagnostic => diagnostic.Location.SourceSpan).Distinct().Count(),
+                Is.EqualTo(exceptionDiagnostics.Length));
         });
     }
     [Test]

@@ -18,11 +18,13 @@ internal static partial class ExceptionFlowAnalyzer {
     private static ExceptionFactView ProjectEffectFact(
         MethodBodyAnalysisContext context,
         MethodExceptionFact fact) {
-        var site = FindSite(context.Node, fact.SpanStart, fact.SpanStart + fact.SpanLength);
+        var root = fact.SourceTree?.GetRoot(context.CancellationToken) ?? context.Node;
+        var site = FindSite(root, fact.SpanStart, fact.SpanStart + fact.SpanLength);
+        var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(site.SyntaxTree);
         return new ExceptionFactView(
             site,
             fact.ExceptionType,
-            ResolveExceptionType(context.SemanticModel, site, fact.ExceptionType),
+            ResolveExceptionType(semanticModel, site, fact.ExceptionType),
             fact.Escape);
     }
     private static SyntaxNode FindSite(SyntaxNode method, int start, int end) =>

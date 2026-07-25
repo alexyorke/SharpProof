@@ -933,9 +933,9 @@ public sealed class MethodEffectsTests {
                 static int M(ref int value) => System.Threading.Volatile.Read(ref value);
             }
             """, 2,
-            purity: SharpProofVerdict.Proven,
+            purity: SharpProofVerdict.Disproven,
             allocationFree: SharpProofVerdict.Proven,
-            required: SharpProofEffect.ReadsArgumentState,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Synchronizes,
             forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("ReadOnlyRefCallDoesNotWriteArgument", """
             class C {
@@ -962,9 +962,9 @@ public sealed class MethodEffectsTests {
                 static long M(ref long value) => System.Threading.Interlocked.Read(ref value);
             }
             """, 2,
-            purity: SharpProofVerdict.Proven,
+            purity: SharpProofVerdict.Disproven,
             allocationFree: SharpProofVerdict.Proven,
-            required: SharpProofEffect.ReadsArgumentState,
+            required: SharpProofEffect.ReadsArgumentState | SharpProofEffect.Synchronizes,
             forbidden: SharpProofEffect.WritesArgumentState | SharpProofEffect.Allocates | SharpProofEffect.Unknown);
         yield return Effect("StringCopyToSpanWritesDestinationWithoutAllocating", """
             class C {
