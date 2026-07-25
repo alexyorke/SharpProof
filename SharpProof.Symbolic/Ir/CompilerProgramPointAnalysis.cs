@@ -1189,6 +1189,20 @@ internal static class CompilerProgramPointAnalysis {
                 } local =>
                     LocalReferenceDefinitelyProducesInt32Bound(
                         local, model, callPath, bound),
+                IFieldReferenceOperation tupleElement
+                    when TupleLiteralElementDefinitelyProducesInt32Bound(
+                        tupleElement,
+                        model,
+                        callPath,
+                        bound) =>
+                    true,
+                IArrayElementReferenceOperation arrayElement
+                    when FreshArrayElementDefinitelyProducesInt32Bound(
+                        arrayElement,
+                        model,
+                        callPath,
+                        bound) =>
+                    true,
                 IPropertyReferenceOperation {
                     Property.Type.SpecialType: SpecialType.System_Int32
                 } property
@@ -1213,6 +1227,77 @@ internal static class CompilerProgramPointAnalysis {
                         bound),
                 _ => false
             };
+        }
+        private bool TupleLiteralElementDefinitelyProducesInt32Bound(
+            IFieldReferenceOperation reference,
+            SemanticModel model,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
+            if (reference.Instance is not { } instance ||
+                reference.Field.ContainingType is not {
+                    IsTupleType: true
+                } tupleType)
+                return false;
+            var elements = tupleType.TupleElements;
+            var elementIndex = -1;
+            for (var index = 0; index < elements.Length; index++) {
+                if (SymbolEqualityComparer.Default.Equals(
+                        elements[index],
+                        reference.Field) ||
+                    SymbolEqualityComparer.Default.Equals(
+                        elements[index].CorrespondingTupleField,
+                        reference.Field.CorrespondingTupleField)) {
+                    elementIndex = index;
+                    break;
+                }
+            }
+            if (elementIndex < 0)
+                return false;
+            while (instance is IConversionOperation {
+                Conversion.IsIdentity: true
+            } conversion)
+                instance = conversion.Operand;
+            while (instance is IParenthesizedOperation parenthesized)
+                instance = parenthesized.Operand;
+            return instance is ITupleOperation tuple &&
+                   elementIndex < tuple.Elements.Length &&
+                   OperationDefinitelyProducesInt32Bound(
+                       tuple.Elements[elementIndex],
+                       model,
+                       callPath,
+                       bound);
+        }
+        private bool FreshArrayElementDefinitelyProducesInt32Bound(
+            IArrayElementReferenceOperation reference,
+            SemanticModel model,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
+            if (reference.ArrayReference is not IArrayCreationOperation {
+                Type: IArrayTypeSymbol {
+                    Rank: 1,
+                    ElementType.SpecialType: SpecialType.System_Int32
+                },
+                Initializer: var initializer
+            } ||
+                reference.Indices.Length != 1)
+                return false;
+            if (initializer == null)
+                return true;
+            var values = initializer.ElementValues;
+            if (TryGetInt32Constant(reference.Indices[0], out var index))
+                return index < 0 ||
+                       index >= values.Length ||
+                       OperationDefinitelyProducesInt32Bound(
+                           values[index],
+                           model,
+                           callPath,
+                           bound);
+            return values.All(value =>
+                OperationDefinitelyProducesInt32Bound(
+                    value,
+                    model,
+                    callPath,
+                    bound));
         }
         private bool SourcePropertyReturnsOnlyBoundValues(
             IPropertySymbol property,
