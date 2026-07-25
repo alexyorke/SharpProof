@@ -57,7 +57,12 @@ internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull 
                 return value;
             }
             _misses++;
-            value = valueFactory(key);
+        }
+        var created = valueFactory(key);
+        lock (_gate) {
+            if (_entries.TryGetValue(key, out var value))
+                return value;
+            value = created;
             AddMissingValue(key, value);
             return value;
         }

@@ -205,8 +205,22 @@ internal sealed class MethodEffectAnalysisSession(
                 yield return attribute;
         }
     }
-    private static bool IsEffectContractAttribute(AttributeData attribute) =>
-        attribute.AttributeClass?.ToDisplayString() == "SharpProof.Attributes.EffectContractAttribute";
+    private static bool IsEffectContractAttribute(AttributeData attribute) {
+        var definition = attribute.AttributeClass?.OriginalDefinition;
+        return definition != null &&
+               string.Equals(
+                   definition.Name,
+                   "EffectContractAttribute",
+                   StringComparison.Ordinal) &&
+               string.Equals(
+                   definition.ContainingNamespace?.ToDisplayString(),
+                   "SharpProof.Attributes",
+                   StringComparison.Ordinal) &&
+               string.Equals(
+                   definition.ContainingAssembly?.Identity.Name,
+                   "SharpProof.Attributes",
+                   StringComparison.Ordinal);
+    }
     private MethodEffects Contract(AttributeData attribute) {
         var effectArgumentIndex = attribute.ConstructorArguments.Length > 1 &&
                                   attribute.ConstructorArguments[0].Value is string

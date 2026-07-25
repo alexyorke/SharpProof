@@ -11004,6 +11004,73 @@ public sealed class NullableContractVerificationTests {
                 .ProofFacts.Single().Status,
             Is.EqualTo("ProvenTrue"));
     }
+    [Test]
+    public void PotentialBugRegression_RegexDotUsesUtf16Units() {
+        const string source = """
+            public static class C {
+                public static int M(string value) {
+                    if (value != "\U0001F600")
+                        return 0;
+                    return 1;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(
+                    source,
+                    "return 1",
+                    "System.Text.RegularExpressions.Regex.IsMatch(value, \"^.$\")")
+                .ProofFacts.Single().Status,
+            Is.EqualTo("ProvenFalse"));
+    }
+    [Test]
+    public void PotentialBugRegression_CacheFactoryDoesNotHoldGlobalLock() {
+        var cache =
+            new SharpProof.ProofCore.Collections.BoundedConcurrentCache<
+                string,
+                int>(4);
+        using var factoryStarted = new ManualResetEventSlim();
+        using var releaseFactory = new ManualResetEventSlim();
+        var slow = Task.Run(() => cache.GetOrAdd("slow", _ => {
+            factoryStarted.Set();
+            releaseFactory.Wait();
+            return 1;
+        }));
+        Assert.That(factoryStarted.Wait(TimeSpan.FromSeconds(5)), Is.True);
+        try {
+            var unrelated = Task.Run(() => cache.TryAdd("unrelated", 2));
+            Assert.That(
+                unrelated.Wait(TimeSpan.FromSeconds(2)),
+                Is.True,
+                "An unrelated cache insertion was blocked by the value factory.");
+        }
+        finally {
+            releaseFactory.Set();
+            Assert.That(slow.Wait(TimeSpan.FromSeconds(5)), Is.True);
+        }
+    }
+    [Test]
+    public void PotentialBugRegression_CounterfeitEffectContractIsIgnored() {
+        const string source = """
+            namespace SharpProof.Attributes {
+                [System.AttributeUsage(System.AttributeTargets.Method)]
+                public sealed class EffectContractAttribute : System.Attribute {
+                    public EffectContractAttribute(long effects) { }
+                    public bool Complete { get; set; } = true;
+                }
+            }
+            public static class C {
+                [SharpProof.Attributes.EffectContract(0)]
+                private static extern void Boundary();
+                public static void M() => Boundary();
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "M()");
+        Assert.That(
+            effects.Effects.HasFlag(
+                SharpProof.Attributes.SharpProofEffect.Unknown),
+            Is.True);
+    }
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)
