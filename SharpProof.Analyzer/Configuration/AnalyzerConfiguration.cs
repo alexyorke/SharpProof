@@ -23,7 +23,7 @@ internal sealed record AnalyzerConfiguration(
         var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
         foreach (var option in AnalyzerConfigurationOptionRegistry.All) {
             if (!TryGetAnalyzerConfigOption(options, option.Key, out var value)) continue;
-            if (TryGetMatchingGlobalOption(globalOptions, option.Key, value)) continue;
+            if (TryGetMatchingGlobalOption(globalOptions, option, value)) continue;
             builder.Add(new InvalidAnalyzerConfigurationValue(
                 option.Key,
                 value.Trim(),
@@ -59,13 +59,71 @@ internal sealed record AnalyzerConfiguration(
         parsed >= minimum
             ? null
             : reason;
-    private static bool TryGetMatchingGlobalOption(AnalyzerConfigOptions? globalOptions, string key, string treeValue) {
+    private static bool TryGetMatchingGlobalOption(
+        AnalyzerConfigOptions? globalOptions,
+        AnalyzerConfigurationOption option,
+        string treeValue) {
         if (globalOptions == null) return false;
-        if (globalOptions.TryGetValue(key, out var value) &&
-            string.Equals(value, treeValue, StringComparison.Ordinal))
-            return true;
-        return globalOptions.TryGetValue("build_property." + key, out value) &&
-               string.Equals(value, treeValue, StringComparison.Ordinal);
+        if (AnalyzerConfigurationValueReader.TryGetNonEmpty(
+                globalOptions,
+                option.Key,
+                out var value))
+            return AreEquivalent(option, value, treeValue);
+        return AnalyzerConfigurationValueReader.TryGetNonEmpty(
+                   globalOptions,
+                   "build_property." + option.Key,
+                   out value) &&
+               AreEquivalent(option, value, treeValue);
+    }
+    private static bool AreEquivalent(
+        AnalyzerConfigurationOption option,
+        string left,
+        string right) => option.ValueKind switch {
+            AnalyzerConfigurationValueKind.Bool =>
+                TryParseBool(left, out var leftBool) &&
+                TryParseBool(right, out var rightBool) &&
+                leftBool == rightBool,
+            AnalyzerConfigurationValueKind.NonNegativeInteger or
+                AnalyzerConfigurationValueKind.PositiveInteger =>
+                int.TryParse(
+                    left.Trim(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var leftInteger) &&
+                int.TryParse(
+                    right.Trim(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var rightInteger) &&
+                leftInteger == rightInteger,
+            AnalyzerConfigurationValueKind.SmtMode =>
+                string.Equals(
+                    left.Trim(),
+                    right.Trim(),
+                    StringComparison.OrdinalIgnoreCase),
+            _ => string.Equals(
+                left.Trim(),
+                right.Trim(),
+                StringComparison.Ordinal)
+        };
+    private static bool TryParseBool(string value, out bool parsed) {
+        switch (value.Trim().ToLowerInvariant()) {
+            case "1":
+            case "true":
+            case "yes":
+            case "on":
+                parsed = true;
+                return true;
+            case "0":
+            case "false":
+            case "no":
+            case "off":
+                parsed = false;
+                return true;
+            default:
+                parsed = false;
+                return false;
+        }
     }
     private static bool TryGetAnalyzerConfigOption(AnalyzerConfigOptions options, string key, out string value)
         => AnalyzerConfigurationValueReader.TryGetNonEmpty(options, key, out value);

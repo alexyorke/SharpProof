@@ -5,15 +5,19 @@ internal static class ContractConditionHelpers {
         string attributeTypeName,
         CancellationToken cancellationToken) {
         var builder = ImmutableArray.CreateBuilder<ContractAttributeCondition>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken)) {
-            var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var attribute in SharpProofAttributeIdentityPolicy.GetAcceptedAttributes(source, attributeTypeName)) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var condition = attribute.ConstructorArguments.Length == 1
                     ? attribute.ConstructorArguments[0].Value as string
                     : null;
                 var argument = AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken);
-                var key = condition ?? "<invalid>:" + argument;
+                var key = GetDeduplicationKey(
+                    condition,
+                    argument,
+                    source,
+                    methodSymbol);
                 if (!seen.Add(key)) continue;
                 builder.Add(new ContractAttributeCondition(
                     condition ?? string.Empty,
@@ -24,6 +28,21 @@ internal static class ContractConditionHelpers {
             }
         }
         return builder.ToImmutable();
+    }
+    private static string GetDeduplicationKey(
+        string? condition,
+        string argument,
+        IMethodSymbol source,
+        IMethodSymbol target) {
+        if (condition != null &&
+            RequiresContractHelpers.TryRewriteForMethod(
+                condition,
+                source,
+                target,
+                out var rewritten))
+            return rewritten;
+        return (condition ?? "<invalid>:" + argument) + "|" +
+               RoslynStructuralMethodIdentity.GetCanonicalKey(source);
     }
     internal static ImmutableArray<ContractAttributeCondition> ReportAndFilterInvalid(
         ImmutableArray<ContractAttributeCondition> contracts,

@@ -5,7 +5,7 @@ internal static class SharpProofAttributeIdentityPolicy {
     internal static bool HasAttribute(ISymbol symbol, string attributeTypeName) =>
         GetAcceptedAttributes(symbol, attributeTypeName).Any();
     internal static IEnumerable<AttributeData> GetAcceptedAttributes(ISymbol symbol, string attributeTypeName) {
-        foreach (var attribute in SymbolAttributeTraversal.GetAttributes(symbol, IncludePropertyForGetter(attributeTypeName)))
+        foreach (var attribute in SymbolAttributeTraversal.GetAttributes(symbol, IncludePropertyForAccessor(attributeTypeName)))
             if (IsAccepted(attribute.AttributeClass, attributeTypeName))
                 yield return attribute;
     }
@@ -22,7 +22,7 @@ internal static class SharpProofAttributeIdentityPolicy {
                    OfficialNamespace,
                    StringComparison.Ordinal);
     }
-    private static bool IncludePropertyForGetter(string attributeTypeName) =>
+    private static bool IncludePropertyForAccessor(string attributeTypeName) =>
         attributeTypeName is
             "AllowedCapabilitiesAttribute" or
             "AllowedExceptionsAttribute" or

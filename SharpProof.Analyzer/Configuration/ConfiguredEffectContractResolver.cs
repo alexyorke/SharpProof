@@ -5,7 +5,7 @@ namespace SharpProof.Analyzer.Configuration;
 internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions options) {
     private const string Prefix = "sharpproof_effect_contract.";
     internal MethodEffects? Resolve(IMethodSymbol method) {
-        var canonicalKey = RoslynStructuralMethodIdentity.GetCanonicalKey(method);
+        var canonicalKey = GetContractKey(method);
         var optionKey = Prefix + Sha256(canonicalKey);
         if (!options.TryGetValue(optionKey, out var json) || string.IsNullOrWhiteSpace(json)) return null;
         try {
@@ -58,6 +58,13 @@ internal sealed class ConfiguredEffectContractResolver(AnalyzerConfigOptions opt
         catch (Exception exception) when (exception is JsonException or InvalidOperationException or OverflowException) {
             return Unknown("malformed_configured_effect_contract");
         }
+    }
+    internal static string GetContractKey(IMethodSymbol method) {
+        if (method == null) throw new ArgumentNullException(nameof(method));
+        var assemblyIdentity = method.ContainingAssembly?.Identity.GetDisplayName() ??
+                               "<unknown-assembly>";
+        return assemblyIdentity + "|" +
+               RoslynStructuralMethodIdentity.GetCanonicalKey(method);
     }
     private static bool TryReadFlags<T>(JsonElement root, string property, T fallback, out T value) where T : struct, Enum {
         if (!root.TryGetProperty(property, out var element)) {

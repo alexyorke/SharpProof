@@ -11071,6 +11071,124 @@ public sealed class NullableContractVerificationTests {
                 SharpProof.Attributes.SharpProofEffect.Unknown),
             Is.True);
     }
+    [Test]
+    public void PotentialBugRegression_ConfiguredContractKeysIncludeAssemblyIdentity() {
+        const string source = """
+            namespace N {
+                public static class C {
+                    public static void M() { }
+                }
+            }
+            """;
+        var (_, seedModel) = CreateSemanticModel(source);
+        var firstCompilation = seedModel.Compilation.WithAssemblyName("First");
+        var secondCompilation = seedModel.Compilation.WithAssemblyName("Second");
+        var firstMethod = (Microsoft.CodeAnalysis.IMethodSymbol)
+            firstCompilation.GetTypeByMetadataName("N.C")!.GetMembers("M").Single();
+        var secondMethod = (Microsoft.CodeAnalysis.IMethodSymbol)
+            secondCompilation.GetTypeByMetadataName("N.C")!.GetMembers("M").Single();
+        var keyMethod = typeof(
+                SharpProof.Analyzer.Configuration.ConfiguredEffectContractResolver)
+            .GetMethod(
+                "GetContractKey",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Static);
+        Assert.That(keyMethod, Is.Not.Null);
+        Assert.That(
+            keyMethod!.Invoke(null, [firstMethod]),
+            Is.Not.EqualTo(keyMethod.Invoke(null, [secondMethod])));
+    }
+    [Test]
+    public void PotentialBugRegression_EquivalentTreeConfigurationIsNotRejected() {
+        var tree = new TestAnalyzerConfigOptions(new Dictionary<string, string> {
+            ["sharpproof_smt_mode"] = " DEEP ",
+            ["sharpproof_smt_timeout_ms"] = "01"
+        });
+        var global = new TestAnalyzerConfigOptions(new Dictionary<string, string> {
+            ["sharpproof_smt_mode"] = "deep",
+            ["sharpproof_smt_timeout_ms"] = "1"
+        });
+        Assert.That(
+            SharpProof.Analyzer.Configuration.AnalyzerConfiguration
+                .GetInvalidTreeConfigurationValues(tree, global),
+            Is.Empty);
+    }
+    [Test]
+    public void PotentialBugRegression_DirectGlobalConfigurationPrecedesBuildProperty() {
+        var tree = new TestAnalyzerConfigOptions(new Dictionary<string, string> {
+            ["sharpproof_smt_mode"] = "bounded"
+        });
+        var global = new TestAnalyzerConfigOptions(new Dictionary<string, string> {
+            ["sharpproof_smt_mode"] = "deep",
+            ["build_property.sharpproof_smt_mode"] = "bounded"
+        });
+        Assert.That(
+            SharpProof.Analyzer.Configuration.AnalyzerConfiguration
+                .GetInvalidTreeConfigurationValues(tree, global),
+            Has.Length.EqualTo(1));
+    }
+    [Test]
+    public void PotentialBugRegression_InheritedContractConditionsAreDeduplicated() {
+        const string source = """
+            using SharpProof.Attributes;
+            public interface I {
+                [Ensures("result > 0")]
+                int M();
+            }
+            public sealed class C : I {
+                [Ensures("result > 0")]
+                public int M() => 1;
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var declaration = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+            .Single(method => method.Parent is
+                Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax);
+        var method = (Microsoft.CodeAnalysis.IMethodSymbol)
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(
+                model,
+                declaration)!;
+        Assert.That(
+            SharpProof.Analyzer.ContractConditionHelpers.Collect(
+                method,
+                "EnsuresAttribute",
+                CancellationToken.None),
+            Has.Length.EqualTo(1));
+    }
+    [Test]
+    public async Task PotentialBugRegression_PropertyPurityContractAppliesToSetter() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                private static int state;
+                [EnforcePure]
+                public static int P {
+                    get => 0;
+                    set => state = value;
+                }
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SP0002"),
+            Is.GreaterThanOrEqualTo(1),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    private sealed class TestAnalyzerConfigOptions(
+        IReadOnlyDictionary<string, string> values)
+        : Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions {
+        public override bool TryGetValue(
+            string key,
+            out string value) {
+            if (values.TryGetValue(key, out var found)) {
+                value = found;
+                return true;
+            }
+            value = string.Empty;
+            return false;
+        }
+    }
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)
