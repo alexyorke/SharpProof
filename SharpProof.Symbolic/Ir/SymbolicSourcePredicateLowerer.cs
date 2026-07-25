@@ -194,8 +194,8 @@ internal static class SymbolicSourcePredicateLowerer {
                 argument,
                 lambda.SpanStart,
                 out var substitutions) ||
-            !LambdaBodyReferencesOnlyParameters(lambda, callerContext) ||
-            !LambdaReadsOnlyStableParameterMembers(lambda, parameters[0], callerContext))
+            !LambdaReadsOnlyStableParameterMembers(lambda, parameters[0], callerContext) ||
+            !LambdaReadsOnlyStableProperties(lambda, callerContext))
             return false;
         return TryLowerReturnedBooleanSyntax(
             lambda,
@@ -271,6 +271,32 @@ internal static class SymbolicSourcePredicateLowerer {
                 CSharpSyntaxFacts.IsStableStorageProperty(property, cancellationToken))
                 continue;
             return false;
+        }
+        return true;
+    }
+    private static bool LambdaReadsOnlyStableProperties(
+        AnonymousFunctionExpressionSyntax lambda,
+        SymbolicLoweringContext context) {
+        var body = GetLambdaBody(lambda);
+        if (body == null)
+            return false;
+        foreach (var syntax in body.DescendantNodesAndSelf()) {
+            ISymbol? symbol = syntax switch {
+                IdentifierNameSyntax identifier =>
+                    context.SemanticModel.GetSymbolInfo(
+                        identifier,
+                        context.CancellationToken).Symbol,
+                ElementAccessExpressionSyntax elementAccess =>
+                    context.SemanticModel.GetSymbolInfo(
+                        elementAccess,
+                        context.CancellationToken).Symbol,
+                _ => null
+            };
+            if (symbol is IPropertySymbol property &&
+                !CSharpSyntaxFacts.IsStableStorageProperty(
+                    property,
+                    context.CancellationToken))
+                return false;
         }
         return true;
     }
@@ -596,7 +622,7 @@ internal static class SymbolicSourcePredicateLowerer {
             !TryGetLocalDelegateInitializer(delegateLocal, invocationSyntax, context, out var initializer))
             return false;
         if (initializer is AnonymousFunctionExpressionSyntax lambda)
-            return LambdaBodyReferencesOnlyParameters(lambda, context) &&
+            return LambdaReadsOnlyStableProperties(lambda, context) &&
                    TryCreateParameterSubstitutions(
                        GetLambdaParameterSymbols(lambda, context).ToArray(),
                        invocation,
@@ -661,27 +687,6 @@ internal static class SymbolicSourcePredicateLowerer {
             .Count(identifier => SymbolEqualityComparer.Default.Equals(
                 context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol,
                 local));
-    private static bool LambdaBodyReferencesOnlyParameters(AnonymousFunctionExpressionSyntax lambda, SymbolicLoweringContext context) {
-        var parameters = GetLambdaParameterSymbols(lambda, context)
-            .ToImmutableHashSet<ISymbol>(SymbolEqualityComparer.Default);
-        if (parameters.Count == 0) return false;
-        foreach (var identifier in GetLambdaBody(lambda)?.DescendantNodesAndSelf()
-                     .OfType<IdentifierNameSyntax>() ?? []) {
-            var symbol = context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol;
-            if (symbol == null ||
-                (!parameters.Contains(symbol) &&
-                 !IsAllowedLambdaParameterMember(identifier, parameters, context)))
-                return false;
-        }
-        return true;
-    }
-    private static bool IsAllowedLambdaParameterMember(
-        IdentifierNameSyntax identifier,
-        ImmutableHashSet<ISymbol> parameters,
-        SymbolicLoweringContext context) => identifier.Parent is MemberAccessExpressionSyntax member &&
-               ReferenceEquals(member.Name, identifier) &&
-               context.SemanticModel.GetSymbolInfo(member.Expression, context.CancellationToken).Symbol is { } receiver &&
-               parameters.Contains(receiver);
     private static IEnumerable<IParameterSymbol> GetLambdaParameterSymbols(
         AnonymousFunctionExpressionSyntax lambda,
         SymbolicLoweringContext context) {

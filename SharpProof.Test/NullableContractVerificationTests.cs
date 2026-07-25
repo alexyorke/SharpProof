@@ -4784,6 +4784,168 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredGuardedCapturedLambdaPredicateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue(bool include) {
+                    var lengths = new[] { -1, 1 }
+                        .Where(value => {
+                            if (value > 0)
+                                return false;
+                            return include;
+                        })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredGuardedCapturedLocalDelegatePredicateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue(bool include) {
+                    Func<int, bool> predicate = value => {
+                        if (value > 0)
+                            return false;
+                        return include;
+                    };
+                    var lengths = new[] { -1, 1 }
+                        .Where(predicate)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredCapturedPositivePredicateLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue(bool include) {
+                    var lengths = new[] { -1, 1 }
+                        .Where(value => include || value <= 0)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredReassignedCapturedGuardedPredicateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var include = false;
+                    var query = new[] { -1, 1 }
+                        .Where(value => {
+                            if (value > 0)
+                                return false;
+                            return include;
+                        });
+                    include = true;
+                    var lengths = query.ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredReassignedCapturedPositivePredicateLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var include = false;
+                    var query = new[] { -1, 1 }
+                        .Where(value => include || value <= 0);
+                    include = true;
+                    var lengths = query.ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredCapturedStableRecordPropertyPredicateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public sealed record Filter(bool Include);
+            public static class Consumer {
+                public static object FirstValue(Filter filter) {
+                    var lengths = new[] { -1, 1 }
+                        .Where(value => {
+                            if (value > 0)
+                                return false;
+                            return filter.Include;
+                        })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredCapturedUnstablePropertyPredicateLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public sealed class Toggle {
+                private int reads;
+                public bool Flag => reads++ == 0;
+            }
+            public static class Consumer {
+                public static object FirstValue(Toggle toggle) {
+                    var lengths = new[] { 1 }
+                        .Where(value =>
+                            toggle.Flag && !toggle.Flag ||
+                            value <= 0)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredCapturedUnstableIndexerPredicateLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public sealed class Toggle {
+                private int reads;
+                public bool this[int index] => reads++ == 0;
+            }
+            public static class Consumer {
+                public static object FirstValue(Toggle toggle) {
+                    var lengths = new[] { 1 }
+                        .Where(value =>
+                            toggle[0] && !toggle[0] ||
+                            value <= 0)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredPositiveReturnGuardPredicateLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable
