@@ -962,12 +962,20 @@ internal static class CompilerProgramPointAnalysis {
                 return IsConstantNonPositiveInt32(projectedValue, semanticModel);
             return semanticModel.GetSymbolInfo(selector, cancellationToken).Symbol is
                        IMethodSymbol {
-                           IsStatic: true,
                            ReturnType.SpecialType: SpecialType.System_Int32,
                            MethodKind: MethodKind.Ordinary or MethodKind.LocalFunction
                        } method &&
+                   IsStaticallyDispatchedDimensionSelector(method) &&
                    SourceMethodReturnsOnlyConstantNonPositiveValues(method);
         }
+        private static bool IsStaticallyDispatchedDimensionSelector(IMethodSymbol method) =>
+            method.MethodKind == MethodKind.LocalFunction ||
+            method.IsStatic ||
+            !method.IsAbstract &&
+            (!method.IsVirtual &&
+             !method.IsOverride ||
+             method.IsSealed ||
+             method.ContainingType.IsSealed);
         private bool SourceMethodReturnsOnlyConstantNonPositiveValues(IMethodSymbol method) {
             var foundBody = false;
             foreach (var syntaxReference in method.DeclaringSyntaxReferences) {
