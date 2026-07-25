@@ -10108,6 +10108,41 @@ public sealed class NullableContractVerificationTests {
         Assert.That(rewritten, Does.Contain("is string"));
         Assert.That(rewritten, Does.Not.Match(@"\bis\s+T\b"));
     }
+    [Test]
+    public void PotentialBugRegression_DeconstructionTracksTupleReturningInvocation() {
+        const string source = """
+            public static class C {
+                private static (int, int) Values(int first) => (first, 2);
+                public static int M() {
+                    var (x, y) = Values(1);
+                    return x;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(source, "return x", "x == 1").ProofFacts.Single().Status,
+            Is.EqualTo("ProvenTrue"));
+    }
+    [Test]
+    public void PotentialBugRegression_ShadowedCountDoesNotInheritIntegerShape() {
+        const string source = """
+            public class Base {
+                public int Count => 1;
+            }
+            public class Derived : Base {
+                public new string Count => "";
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var derivedDeclaration = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax>()
+            .Single(static declaration => declaration.Identifier.ValueText == "Derived");
+        var derived = (Microsoft.CodeAnalysis.INamedTypeSymbol)
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(model, derivedDeclaration)!;
+        Assert.That(
+            SharpProof.Symbolic.SymbolicTypeFacts.HasInstanceInt32Member(derived, "Count"),
+            Is.False);
+    }
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)

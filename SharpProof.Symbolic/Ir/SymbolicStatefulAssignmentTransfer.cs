@@ -97,6 +97,34 @@ internal static class SymbolicStatefulAssignmentTransfer {
                         out _);
             return true;
         }
+        if (semanticModel.GetOperation(right, cancellationToken) is IInvocationOperation invocation &&
+            SymbolicTupleLowerer.TryLowerTupleReturningInvocationElements(
+                invocation,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out var invocationElements) &&
+            invocationElements.Length == targetSymbols.Length) {
+            var invocationBindings = ImmutableArray.CreateBuilder<SymbolicAssignmentBinding>(targetSymbols.Length);
+            for (var index = 0; index < targetSymbols.Length; index++) {
+                var target = targetSymbols[index];
+                if (target == null ||
+                    !TryCreateSymbolTerm(target, out var targetTerm) ||
+                    !CanCompareIrTerms(targetTerm, invocationElements[index]))
+                    continue;
+                invocationBindings.Add(new SymbolicAssignmentBinding(
+                    SymbolicFactFactory.GetSmtVariableName(target),
+                    targetTerm,
+                    invocationElements[index],
+                    "ir.path.prior-statement.tuple-invocation-target.assigned-value",
+                    PropagateSourceFacts: true));
+            }
+            if (invocationBindings.Count != 0)
+                SymbolicOperationTransfer.ApplyBindings(
+                    ref state,
+                    invocationBindings.ToImmutable(),
+                    right,
+                    "ir.path.prior-statement.tuple-invocation-target");
+            return true;
+        }
         if (!SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(right, semanticModel, cancellationToken, out var sourceSymbol) ||
             !SymbolicOperationLowerer.TryGetTupleElementStorageNames(sourceSymbol, targetSymbols.Length, out var sourceElementNames))
             return true;

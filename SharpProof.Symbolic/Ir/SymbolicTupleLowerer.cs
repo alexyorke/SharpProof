@@ -107,6 +107,74 @@ internal static class SymbolicTupleLowerer {
         terms = builder.ToImmutable();
         return true;
     }
+    internal static bool TryLowerTupleReturningInvocationElements(
+        IInvocationOperation invocation,
+        SymbolicLoweringContext callerContext,
+        out ImmutableArray<SymbolicTerm> terms) {
+        terms = [];
+        var method = invocation.TargetMethod;
+        if (callerContext.InlineDepth >= SymbolicLoweringContext.MaxSourcePredicateInlineDepth ||
+            method.ReturnsByRef ||
+            method.ReturnsByRefReadonly ||
+            method.ReturnType is not INamedTypeSymbol { IsTupleType: true } ||
+            method.DeclaringSyntaxReferences.Length == 0 ||
+            method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
+            SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(method, invocation))
+            return false;
+        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default);
+        foreach (var parameter in method.Parameters) {
+            if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(
+                    invocation,
+                    parameter.Ordinal,
+                    out var argumentExpression) ||
+                !SymbolicLoweringValue.TryGet(
+                    SymbolicIrLowerer.LowerTerm(argumentExpression, callerContext),
+                    out var argument))
+                return false;
+            substitutions[parameter.OriginalDefinition] = argument;
+        }
+        var implicitThis = callerContext.ImplicitThis;
+        if (!method.IsStatic) {
+            if (invocation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
+                !SymbolicLoweringValue.TryGet(
+                    SymbolicIrLowerer.LowerTerm(receiverExpression, callerContext),
+                    out var loweredImplicitThis) ||
+                loweredImplicitThis.Kind != SmtValueKind.Reference)
+                return false;
+            implicitThis = loweredImplicitThis;
+        }
+        var callable = method.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(callerContext.CancellationToken))
+            .FirstOrDefault();
+        if (!TryGetSingleReturnedExpression(callable, out var returned))
+            return false;
+        var semanticModel = callerContext.Compilation.GetSemanticModel(returned.SyntaxTree);
+        var nestedContext = new SymbolicLoweringContext(
+            semanticModel,
+            callerContext.CancellationToken,
+            callerContext.GetSymbolVersion,
+            callerContext.SmtAnalysis,
+            callerContext.InvocationTermLowerer,
+            implicitThis,
+            callerContext.InlineDepth + 1,
+            substitutions,
+            callerContext.InvocationTermTypeResolver);
+        return TryLowerTupleElementTerms(returned, nestedContext, out terms);
+    }
+    private static bool TryGetSingleReturnedExpression(
+        SyntaxNode? callable,
+        out ExpressionSyntax returned) {
+        returned = callable switch {
+            MethodDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
+            LocalFunctionStatementSyntax { ExpressionBody.Expression: { } expression } => expression,
+            MethodDeclarationSyntax { Body.Statements.Count: 1 } method
+                when method.Body.Statements[0] is ReturnStatementSyntax { Expression: { } expression } => expression,
+            LocalFunctionStatementSyntax { Body.Statements.Count: 1 } localFunction
+                when localFunction.Body.Statements[0] is ReturnStatementSyntax { Expression: { } expression } => expression,
+            _ => null!
+        };
+        return returned != null;
+    }
     private static bool TryAppendTupleExpressionTerms(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,

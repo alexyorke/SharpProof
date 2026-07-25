@@ -149,9 +149,16 @@ internal static class SymbolicTypeFacts {
         }
         return false;
     }
-    public static bool HasInstanceInt32Member(ITypeSymbol? typeSymbol, string memberName) => typeSymbol != null &&
-        EnumerateSelfBaseTypesAndInterfaces(typeSymbol).Any(candidate =>
+    public static bool HasInstanceInt32Member(ITypeSymbol? typeSymbol, string memberName) {
+        if (typeSymbol == null) return false;
+        for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType) {
+            var declared = current.GetMembers(memberName);
+            if (declared.Length != 0)
+                return declared.Any(IsInstanceInt32Member);
+        }
+        return typeSymbol.AllInterfaces.Any(candidate =>
             HasDeclaredInstanceInt32Member(candidate, memberName));
+    }
     internal static IEnumerable<ITypeSymbol> EnumerateSelfBaseTypesAndInterfaces(ITypeSymbol typeSymbol) {
         for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
             yield return current;
@@ -209,9 +216,10 @@ internal static class SymbolicTypeFacts {
         return expected != null && SymbolEqualityComparer.Default.Equals(candidate, expected);
     }
     public static bool HasDeclaredInstanceInt32Member(ITypeSymbol typeSymbol, string memberName) =>
-        typeSymbol.GetMembers(memberName).Any(static member => !member.IsStatic && member is
-            IPropertySymbol { Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 } or
-            IFieldSymbol { Type.SpecialType: SpecialType.System_Int32 });
+        typeSymbol.GetMembers(memberName).Any(IsInstanceInt32Member);
+    private static bool IsInstanceInt32Member(ISymbol member) => !member.IsStatic && member is
+        IPropertySymbol { Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 } or
+        IFieldSymbol { Type.SpecialType: SpecialType.System_Int32 };
     public static bool HasInt32Indexer(ITypeSymbol? typeSymbol) => typeSymbol != null &&
         EnumerateSelfBaseTypesAndInterfaces(typeSymbol).Any(HasDeclaredInt32Indexer);
     public static bool HasDeclaredInt32Indexer(ITypeSymbol typeSymbol) {
