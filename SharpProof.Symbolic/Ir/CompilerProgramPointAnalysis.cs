@@ -678,45 +678,129 @@ internal static class CompilerProgramPointAnalysis {
                     }
                 } &&
                     TryGetInvocationArgument(operation, parameter, out var lengths) &&
-                    DefinitelyContainsZeroArrayDimension(lengths))
+                    DefinitelyPreventsRuntimeArrayElements(lengths))
                     return true;
             }
             return false;
         }
-        private bool DefinitelyContainsZeroArrayDimension(ExpressionSyntax dimensions) {
+        private readonly record struct ArrayDimensionVectorFacts(
+            bool DefinitelyEmpty,
+            bool DefinitelyContainsNonPositive,
+            bool PreventsNonEmptyAllPositive);
+        private bool DefinitelyPreventsRuntimeArrayElements(ExpressionSyntax dimensions) =>
+            GetArrayDimensionVectorFacts(dimensions, []).PreventsNonEmptyAllPositive;
+        private ArrayDimensionVectorFacts GetArrayDimensionVectorFacts(
+            ExpressionSyntax dimensions,
+            HashSet<SyntaxNode> visited) {
+            dimensions = SymbolicConversionLowerer.UnwrapIdentityConversions(
+                dimensions,
+                semanticModel,
+                cancellationToken);
+            if (!visited.Add(dimensions))
+                return default;
+            switch (dimensions) {
+                case ArrayCreationExpressionSyntax { Initializer: { } initializer }:
+                    return GetExplicitArrayDimensionVectorFacts(initializer.Expressions);
+                case ImplicitArrayCreationExpressionSyntax { Initializer: { } initializer }:
+                    return GetExplicitArrayDimensionVectorFacts(initializer.Expressions);
+                case ArrayCreationExpressionSyntax { Initializer: null } array:
+                    var size = array.Type.RankSpecifiers
+                        .SelectMany(rank => rank.Sizes)
+                        .FirstOrDefault();
+                    if (size != null && DefinitelyCapsSequenceAtZero(size))
+                        return new(true, false, true);
+                    return size != null && DefinitelyProvidesPositiveDimensionCount(size)
+                        ? new(false, true, true)
+                        : new(false, false, true);
+                case CollectionExpressionSyntax collection:
+                    var hasExpression = false;
+                    var allSpreadsEmpty = true;
+                    var allSpreadsPreventNonEmptyAllPositive = true;
+                    foreach (var element in collection.Elements) {
+                        if (element is ExpressionElementSyntax expression) {
+                            hasExpression = true;
+                            if (DefinitelyCapsSequenceAtZero(expression.Expression))
+                                return new(false, true, true);
+                            continue;
+                        }
+                        if (element is not SpreadElementSyntax spread)
+                            return default;
+                        var spreadFacts = GetArrayDimensionVectorFacts(spread.Expression, [.. visited]);
+                        if (spreadFacts.DefinitelyContainsNonPositive)
+                            return new(false, true, true);
+                        allSpreadsEmpty &= spreadFacts.DefinitelyEmpty;
+                        allSpreadsPreventNonEmptyAllPositive &=
+                            spreadFacts.PreventsNonEmptyAllPositive;
+                    }
+                    if (!hasExpression && allSpreadsEmpty)
+                        return new(true, false, true);
+                    return !hasExpression && allSpreadsPreventNonEmptyAllPositive
+                        ? new(false, false, true)
+                        : default;
+                case InvocationExpressionSyntax invocation
+                    when IsKnownEmptyArrayDimensionFactory(invocation):
+                    return new(true, false, true);
+            }
+            dimensions = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(dimensions);
+            var symbol = semanticModel.GetSymbolInfo(dimensions, cancellationToken).Symbol?.OriginalDefinition;
+            return symbol is ILocalSymbol or IParameterSymbol &&
+                   SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
+                       symbol,
+                       dimensions,
+                       semanticModel,
+                       cancellationToken,
+                       false,
+                       true,
+                       out var resolved)
+                ? GetArrayDimensionVectorFacts(resolved, visited)
+                : default;
+        }
+        private ArrayDimensionVectorFacts GetExplicitArrayDimensionVectorFacts(
+            SeparatedSyntaxList<ExpressionSyntax> dimensions) {
+            if (dimensions.Count == 0)
+                return new(true, false, true);
+            return dimensions.Any(DefinitelyCapsSequenceAtZero)
+                ? new(false, true, true)
+                : default;
+        }
+        private bool IsKnownEmptyArrayDimensionFactory(InvocationExpressionSyntax invocation) {
+            if (semanticModel.GetOperation(invocation, cancellationToken) is not
+                IInvocationOperation {
+                    TargetMethod: {
+                        Name: "Empty",
+                        Parameters.Length: 0
+                    } targetMethod
+                })
+                return false;
+            var type = targetMethod.OriginalDefinition.ContainingType;
+            return type.SpecialType == SpecialType.System_Array ||
+                   type.ContainingAssembly?.Name == "System.Linq" &&
+                   type.ToDisplayString() == "System.Linq.Enumerable";
+        }
+        private bool DefinitelyProvidesPositiveDimensionCount(ExpressionSyntax count) {
             var visited = new HashSet<SyntaxNode>();
             while (true) {
-                dimensions = SymbolicConversionLowerer.UnwrapIdentityConversions(
-                    dimensions,
+                count = SymbolicConversionLowerer.UnwrapIdentityConversions(
+                    count,
                     semanticModel,
                     cancellationToken);
-                if (!visited.Add(dimensions))
-                    return false;
-                switch (dimensions) {
-                    case ArrayCreationExpressionSyntax { Initializer: { } initializer }:
-                        return initializer.Expressions.Any(DefinitelyCapsSequenceAtZero);
-                    case ImplicitArrayCreationExpressionSyntax { Initializer: { } initializer }:
-                        return initializer.Expressions.Any(DefinitelyCapsSequenceAtZero);
-                    case CollectionExpressionSyntax collection:
-                        foreach (var element in collection.Elements)
-                            if (element is ExpressionElementSyntax expression &&
-                                DefinitelyCapsSequenceAtZero(expression.Expression) ||
-                                element is SpreadElementSyntax spread &&
-                                DefinitelyContainsZeroArrayDimension(spread.Expression))
-                                return true;
-                        return false;
-                }
-                dimensions = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(dimensions);
-                var symbol = semanticModel.GetSymbolInfo(dimensions, cancellationToken).Symbol?.OriginalDefinition;
+                if (semanticModel.GetConstantValue(count, cancellationToken) is {
+                    HasValue: true,
+                    Value: int constant
+                } &&
+                    constant > 0)
+                    return true;
+                count = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(count);
+                var symbol = semanticModel.GetSymbolInfo(count, cancellationToken).Symbol?.OriginalDefinition;
                 if (symbol is not (ILocalSymbol or IParameterSymbol) ||
+                    !visited.Add(count) ||
                     !SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
                         symbol,
-                        dimensions,
+                        count,
                         semanticModel,
                         cancellationToken,
-                        false,
                         true,
-                        out dimensions))
+                        out count))
                     return false;
             }
         }

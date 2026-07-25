@@ -2335,6 +2335,110 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceZeroInitializedDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var _ in Array.CreateInstance(typeof(int), new int[2]))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceZeroInitializedDimensionVectorAliasLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue(int rank) {
+                    var lengths = new int[rank];
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceEmptyDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    int[] lengths = [];
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceEmptyFactoryDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var _ in Array.CreateInstance(typeof(int), Array.Empty<int>()))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceZeroInitializedDimensionSpreadLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    int[] lengths = [2, .. new int[1]];
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceOnlyUnknownZeroInitializedSpreadLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue(int rank) {
+                    int[] lengths = [.. new int[rank]];
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceMixedUnknownZeroInitializedSpreadLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue(int rank) {
+                    int[] lengths = [2, .. new int[rank]];
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceMutatedZeroInitializedVectorLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new int[2];
+                    lengths[0] = 2;
+                    lengths[1] = 3;
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ArrayCreateInstanceZeroCollectionDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable
