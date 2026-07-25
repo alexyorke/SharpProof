@@ -10496,6 +10496,93 @@ public sealed class NullableContractVerificationTests {
             diagnostic.Id is "SP0018" or "SP0019").ToArray();
         Assert.That(ensuresDiagnostics, Is.Empty, string.Join(Environment.NewLine, diagnostics));
     }
+    [Test]
+    public void PotentialBugRegression_ChainedConstructorRunsInstanceInitializerOnce() {
+        const string source = """
+            public sealed class C {
+                private static int state;
+                private readonly int value = Tick();
+                private static int Tick() => ++state;
+                public C() : this(0) { }
+                private C(int _) { }
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "C() :");
+        Assert.That(
+            effects.Sites.Count(static site =>
+                site.Effect.HasFlag(
+                    SharpProof.Attributes.SharpProofEffect.WritesStaticState)),
+            Is.EqualTo(1));
+    }
+    [Test]
+    public void PotentialBugRegression_ObjectInitializerInvokesCustomSetter() {
+        const string source = """
+            public sealed class Target {
+                private static int state;
+                public int Value {
+                    set {
+                        state++;
+                    }
+                }
+            }
+            public static class C {
+                public static Target M() => new Target { Value = 1 };
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "M()");
+        Assert.That(
+            effects.Effects.HasFlag(
+                SharpProof.Attributes.SharpProofEffect.WritesStaticState),
+            Is.True);
+    }
+    [Test]
+    public void PotentialBugRegression_LambdaReadsCapturedVariableAtInvocation() {
+        const string source = """
+            public sealed class Box {
+                public int Value;
+            }
+            public static class C {
+                public static void M(Box input) {
+                    var current = new Box();
+                    System.Action mutate = () => current.Value++;
+                    current = input;
+                    mutate();
+                }
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "M(");
+        Assert.Multiple(() => {
+            Assert.That(
+                effects.Effects.HasFlag(
+                    SharpProof.Attributes.SharpProofEffect.WritesArgumentState),
+                Is.True);
+            Assert.That(
+                effects.Effects.HasFlag(
+                    SharpProof.Attributes.SharpProofEffect.WritesFreshOwnedState),
+                Is.False);
+        });
+    }
+    [Test]
+    public void PotentialBugRegression_SpanSliceRetainsEffectsAndExceptions() {
+        const string source = """
+            public static class C {
+                public static System.Span<int> M(System.Span<int> input) =>
+                    input.Slice(2);
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "M(");
+        Assert.Multiple(() => {
+            Assert.That(
+                effects.Effects.HasFlag(
+                    SharpProof.Attributes.SharpProofEffect.ReadsArgumentState),
+                Is.True);
+            Assert.That(
+                effects.ExceptionFacts,
+                Has.Some.Matches<SharpProof.Symbolic.MethodExceptionFact>(fact =>
+                    fact.ExceptionType == "System.ArgumentOutOfRangeException" &&
+                    fact.Escape != SharpProof.Symbolic.SharpProofVerdict.Disproven));
+        });
+    }
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)

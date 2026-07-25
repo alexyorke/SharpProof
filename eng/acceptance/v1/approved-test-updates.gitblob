@@ -1,5 +1,5 @@
 # Exact post-baseline test updates approved without replacing the pinned baseline blob.
-# NullableContractVerificationTests.cs has additive TDD coverage only (10198 added
+# NullableContractVerificationTests.cs has additive TDD coverage only (10285 added
 # lines, no removed lines) from f7694bdf, e15f487a, 5527f4c5, and the aliased
 # conditional output, chained/assigned-alias,
 # boolean-wrapper/algebra/identity-conversion, logical/conditional-implication,
@@ -37,8 +37,9 @@
 # unsigned-domain, nested-generic-contract, tuple-invocation-deconstruction, and
 # shadowed-count-member, nested-property-invalidation, loop-member-dependency,
 # effect-contract decoding, capability propagation, cross-tree effect-site,
-# CFG-bottom/truncation, and old-value snapshot cases.
-f69de2b5ce6dbcb7c6caa7575a19b1b9e012da17  SharpProof.Test/NullableContractVerificationTests.cs
+# CFG-bottom/truncation, old-value snapshot, constructor sequencing,
+# closure-cell capture, initializer setter, and span-slice cases.
+059a63cc52e1256270b986b9c9aa82f88278762c  SharpProof.Test/NullableContractVerificationTests.cs
 # MethodEffectsTests.cs updates synchronization-read expectations to include the
 # synchronization effect required by the capability model.
 f7e4c319512795895f0772d575227425afa90b6c  SharpProof.Test/MethodEffectsTests.cs

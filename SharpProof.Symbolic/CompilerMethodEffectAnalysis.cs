@@ -85,10 +85,6 @@ internal sealed class MethodEffectAnalysisSession(
             ControlFlowGraph? graph;
             try { graph = ControlFlowGraph.Create(declaration, semanticModel, cancellationToken); }
             catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { graph = null; }
-            if (method.MethodKind == MethodKind.Constructor) {
-                var initializedReceiver = domain.ApplyDeclaredInitializers(state.Receiver, method.ContainingType, ref state);
-                state = state with { Receiver = initializedReceiver };
-            }
             state = domain.AnalyzeConstructorInitializer(declaration, state);
             EffectFlowState finalState;
             if (graph == null) {
@@ -672,24 +668,38 @@ internal sealed class MethodEffectAnalysisSession(
             IMethodSymbol? target = null;
             SeparatedSyntaxList<ArgumentSyntax> arguments = default;
             SyntaxNode site = declaration;
+            var delegatesToThis = false;
             if (declaration is ConstructorDeclarationSyntax constructor) {
                 site = constructor.Initializer is null ? constructor : constructor.Initializer;
                 if (constructor.Initializer != null) {
                     target = semanticModel.GetSymbolInfo(constructor.Initializer, session.CancellationToken).Symbol as IMethodSymbol;
                     arguments = constructor.Initializer.ArgumentList.Arguments;
+                    delegatesToThis = constructor.Initializer.ThisOrBaseKeyword.IsKind(SyntaxKind.ThisKeyword);
                 }
                 else target = method.ContainingType.BaseType?.InstanceConstructors
-                    .FirstOrDefault(static candidate => candidate.Parameters.Length == 0);
+                    .FirstOrDefault(static candidate => candidate.Parameters.All(parameter => parameter.IsOptional));
             }
-            if (target == null) return state;
-            var values = EvaluateArguments(arguments, target, ref state);
-            effects.Add(SharpProofEffect.DirectCall, site, target, "direct_call");
-            var summary = GetSummary(target, null);
-            AddSummary(summary.Effects, state.Receiver, values, semanticModel.GetOperation(site, session.CancellationToken) ??
-                semanticModel.GetOperation(declaration, session.CancellationToken)!, target,
-                summary.WrittenArgumentOrdinals, summary.ReadArgumentOrdinals,
-                summary.BoundArgumentEffects, summary.BoundReceiverEffects);
-            return state with { Receiver = summary.Receiver.Instantiate(state.Receiver, values, sourceMethod: target) };
+            if (target != null) {
+                var values = EvaluateArguments(arguments, target, ref state);
+                effects.Add(SharpProofEffect.DirectCall, site, target, "direct_call");
+                var summary = GetSummary(target, null);
+                AddSummary(summary.Effects, state.Receiver, values, semanticModel.GetOperation(site, session.CancellationToken) ??
+                    semanticModel.GetOperation(declaration, session.CancellationToken)!, target,
+                    summary.WrittenArgumentOrdinals, summary.ReadArgumentOrdinals,
+                    summary.BoundArgumentEffects, summary.BoundReceiverEffects);
+                state = state with {
+                    Receiver = summary.Receiver.Instantiate(state.Receiver, values, sourceMethod: target)
+                };
+            }
+            if (!delegatesToThis)
+                state = state with {
+                    Receiver = ApplyDeclaredInitializers(
+                        state.Receiver,
+                        method.ContainingType,
+                        ref state,
+                        false)
+                };
+            return state;
         }
         internal EffectFlowState AnalyzePrimaryInitializers(TypeDeclarationSyntax declaration, EffectFlowState state) {
             foreach (var parameter in method.Parameters)
@@ -1474,20 +1484,6 @@ internal sealed class MethodEffectAnalysisSession(
                 value = summary.Receiver.Instantiate(value, arguments, sourceMethod: creation.Constructor);
                 ApplyRefArguments(summary, creation.Constructor, creation.Arguments, value, arguments, ref state);
             }
-            if (creation.Constructor?.IsImplicitlyDeclared == true && creation.Type is INamedTypeSymbol {
-                BaseType: { } baseType
-            }) {
-                var baseConstructor = baseType.InstanceConstructors.FirstOrDefault(static constructor =>
-                    constructor.Parameters.All(parameter => parameter.IsOptional));
-                if (baseConstructor != null) {
-                    var baseArguments = baseConstructor.Parameters.Select(static _ => EffectFlowValue.None).ToArray();
-                    var baseSummary = GetSummary(baseConstructor, null);
-                    AddSummary(baseSummary.Effects, value, baseArguments, creation, baseConstructor,
-                        baseSummary.WrittenArgumentOrdinals, baseSummary.ReadArgumentOrdinals,
-                        baseSummary.BoundArgumentEffects, baseSummary.BoundReceiverEffects);
-                    value = baseSummary.Receiver.Instantiate(value, baseArguments, sourceMethod: baseConstructor);
-                }
-            }
             if (creation.Constructor?.IsImplicitlyDeclared != false)
                 value = ApplyDeclaredInitializers(value, creation.Type, ref state);
             if (creation.Initializer != null)
@@ -1557,26 +1553,32 @@ internal sealed class MethodEffectAnalysisSession(
             ref EffectFlowState state) {
             if (TryGetMemoryViewSource(target, receiver, values, out var spanSource)) {
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+                effects.Read(spanSource, site.Syntax, target, "memory_view_source_read");
                 return spanSource.WithExactType(target.ReturnType).AsDefinitelyNonNull();
             }
             if (TryGetRefBackedSpanSource(target, values, out var refSpanSource)) {
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+                effects.Read(refSpanSource, site.Syntax, target, "ref_backed_span_source_read");
                 return refSpanSource;
             }
             if (TryGetReinterpretedSpanSource(target, values, out var reinterpretedSpanSource)) {
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+                effects.Read(reinterpretedSpanSource, site.Syntax, target, "reinterpreted_span_source_read");
                 return reinterpretedSpanSource;
             }
             if (TryGetMemoryMarshalMemorySource(target, values, out var memoryMarshalSource)) {
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+                effects.Read(memoryMarshalSource, site.Syntax, target, "memory_marshal_source_read");
                 return memoryMarshalSource;
             }
             if (TryGetMemoryMarshalReferenceSource(target, values, out var memoryMarshalReference)) {
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+                effects.Read(memoryMarshalReference, site.Syntax, target, "memory_marshal_reference_read");
                 return memoryMarshalReference;
             }
             if (IsMemoryViewSlice(target)) {
                 effects.Add(SharpProofEffect.DirectCall, site.Syntax, target, "direct_call");
+                effects.Read(receiver, site.Syntax, target, "memory_view_slice_read");
                 return receiver.WithExactType(target.ReturnType).AsDefinitelyNonNull();
             }
             if (target.MethodKind == MethodKind.LocalFunction) {
@@ -1598,6 +1600,7 @@ internal sealed class MethodEffectAnalysisSession(
             if (target.MethodKind == MethodKind.DelegateInvoke && receiver.IsDefinitelyNull)
                 return EffectFlowValue.None;
             if (target.MethodKind == MethodKind.DelegateInvoke && !receiver.Callables.IsDefaultOrEmpty) {
+                receiver = RefreshCallableCaptures(receiver, state);
                 var returned = EffectFlowValue.None;
                 foreach (var callable in receiver.Callables) {
                     if (callable.Method.IsStatic && callable.Method.MethodKind != MethodKind.StaticConstructor)
@@ -1656,6 +1659,25 @@ internal sealed class MethodEffectAnalysisSession(
             return target.ReturnsByRef && returnedValue.Roots.Any(static root => root.Kind == EffectValueRootKind.Unknown)
                 ? ResolveRefReturn(target, receiver, values)
                 : returnedValue;
+        }
+        private EffectFlowValue RefreshCallableCaptures(
+            EffectFlowValue value,
+            EffectFlowState state) {
+            if (value.Callables.IsDefaultOrEmpty) return value;
+            return value.WithCallables([.. value.Callables.Select(callable => {
+                var captures = callable.Captures;
+                foreach (var local in state.Locals) {
+                    var key = EffectFlowState.SymbolKey(local.Key);
+                    if (captures.ContainsKey(key))
+                        captures = captures.SetItem(key, local.Value);
+                }
+                foreach (var parameter in method.Parameters) {
+                    var key = EffectFlowState.SymbolKey(parameter);
+                    if (captures.ContainsKey(key))
+                        captures = captures.SetItem(key, state.GetParameter(parameter));
+                }
+                return callable with { Captures = captures };
+            })]);
         }
         private static bool TryGetFrameworkCapability(
             IMethodSymbol target,
