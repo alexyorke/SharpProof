@@ -51,6 +51,7 @@ internal static class CompilerProgramPointAnalysis {
         string initialKey) : IControlFlowDomain<SymbolicState> {
         private SymbolicState? captured;
         private bool targetIsCompilerUnreachable;
+        private readonly Stack<Dictionary<IParameterSymbol, Int32BoundFacts>> parameterBoundScopes = new();
         internal bool TargetIsCompilerUnreachable => targetIsCompilerUnreachable;
         internal SymbolicState? CapturedState => captured;
         public void SetControlFlowGraph(ControlFlowGraph graph, PointsToAnalysisResult? pointsToAnalysisResult) =>
@@ -981,6 +982,12 @@ internal static class CompilerProgramPointAnalysis {
             NonPositive,
             NonNegative
         }
+        [Flags]
+        private enum Int32BoundFacts {
+            None = 0,
+            NonPositive = 1,
+            NonNegative = 2
+        }
         private bool SourceMethodReturnsOnlyNonPositiveValues(
             IMethodSymbol method,
             HashSet<ISymbol> callPath) =>
@@ -989,6 +996,31 @@ internal static class CompilerProgramPointAnalysis {
                 callPath,
                 Int32Bound.NonPositive);
         private bool SourceMethodReturnsOnlyBoundValues(
+            IMethodSymbol method,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound,
+            IInvocationOperation? invocation = null,
+            SemanticModel? invocationModel = null) {
+            Dictionary<IParameterSymbol, Int32BoundFacts>? parameterFacts = null;
+            if (invocation != null && invocationModel != null) {
+                parameterFacts = CreateArgumentParameterBoundFacts(
+                    invocation.Arguments,
+                    invocationModel,
+                    callPath);
+                parameterBoundScopes.Push(parameterFacts);
+            }
+            try {
+                return SourceMethodReturnsOnlyBoundValuesCore(
+                    method,
+                    callPath,
+                    bound);
+            }
+            finally {
+                if (parameterFacts != null)
+                    parameterBoundScopes.Pop();
+            }
+        }
+        private bool SourceMethodReturnsOnlyBoundValuesCore(
             IMethodSymbol method,
             HashSet<ISymbol> callPath,
             Int32Bound bound) {
@@ -1031,6 +1063,36 @@ internal static class CompilerProgramPointAnalysis {
                     return false;
             }
             return foundBody;
+        }
+        private Dictionary<IParameterSymbol, Int32BoundFacts> CreateArgumentParameterBoundFacts(
+            ImmutableArray<IArgumentOperation> arguments,
+            SemanticModel model,
+            HashSet<ISymbol> callPath) {
+            var facts = new Dictionary<IParameterSymbol, Int32BoundFacts>(
+                SymbolEqualityComparer.Default);
+            foreach (var argument in arguments) {
+                if (argument.Parameter is not {
+                    RefKind: RefKind.None,
+                    Type.SpecialType: SpecialType.System_Int32
+                } parameter)
+                    continue;
+                var argumentFacts = Int32BoundFacts.None;
+                if (OperationDefinitelyProducesInt32Bound(
+                        argument.Value,
+                        model,
+                        callPath,
+                        Int32Bound.NonPositive))
+                    argumentFacts |= Int32BoundFacts.NonPositive;
+                if (OperationDefinitelyProducesInt32Bound(
+                        argument.Value,
+                        model,
+                        callPath,
+                        Int32Bound.NonNegative))
+                    argumentFacts |= Int32BoundFacts.NonNegative;
+                if (argumentFacts != Int32BoundFacts.None)
+                    facts[parameter.OriginalDefinition] = argumentFacts;
+            }
+            return facts;
         }
         private bool BlockReturnsOnlyNonPositiveValues(
             BlockSyntax body,
@@ -1189,6 +1251,14 @@ internal static class CompilerProgramPointAnalysis {
                 } local =>
                     LocalReferenceDefinitelyProducesInt32Bound(
                         local, model, callPath, bound),
+                IParameterReferenceOperation {
+                    Parameter.Type.SpecialType: SpecialType.System_Int32
+                } parameter =>
+                    ParameterReferenceDefinitelyProducesInt32Bound(
+                        parameter,
+                        model,
+                        callPath,
+                        bound),
                 IFieldReferenceOperation tupleElement
                     when TupleLiteralElementDefinitelyProducesInt32Bound(
                         tupleElement,
@@ -1207,7 +1277,8 @@ internal static class CompilerProgramPointAnalysis {
                     Property.Type.SpecialType: SpecialType.System_Int32
                 } property
                     when SourcePropertyReturnsOnlyBoundValues(
-                        property.Property,
+                        property,
+                        model,
                         callPath,
                         bound) =>
                     true,
@@ -1220,11 +1291,13 @@ internal static class CompilerProgramPointAnalysis {
                         ReturnType.SpecialType: SpecialType.System_Int32,
                         MethodKind: MethodKind.Ordinary or MethodKind.LocalFunction
                     } targetMethod
-                } when IsStaticallyDispatchedBoundSource(targetMethod) =>
+                } invocation when IsStaticallyDispatchedBoundSource(targetMethod) =>
                     SourceMethodReturnsOnlyBoundValues(
                         targetMethod,
                         callPath,
-                        bound),
+                        bound,
+                        invocation,
+                        model),
                 _ => false
             };
         }
@@ -1300,6 +1373,41 @@ internal static class CompilerProgramPointAnalysis {
                     bound));
         }
         private bool SourcePropertyReturnsOnlyBoundValues(
+            IPropertyReferenceOperation reference,
+            SemanticModel invocationModel,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
+            var parameterFacts = CreateArgumentParameterBoundFacts(
+                reference.Arguments,
+                invocationModel,
+                callPath);
+            foreach (var argument in reference.Arguments) {
+                if (argument.Parameter is not { } parameter ||
+                    !parameterFacts.TryGetValue(
+                        parameter.OriginalDefinition,
+                        out var facts))
+                    continue;
+                var ordinal = parameter.Ordinal;
+                if (ordinal < reference.Property.Parameters.Length)
+                    parameterFacts[
+                        reference.Property.Parameters[ordinal].OriginalDefinition] = facts;
+                if (reference.Property.GetMethod is { } getter &&
+                    ordinal < getter.Parameters.Length)
+                    parameterFacts[
+                        getter.Parameters[ordinal].OriginalDefinition] = facts;
+            }
+            parameterBoundScopes.Push(parameterFacts);
+            try {
+                return SourcePropertyReturnsOnlyBoundValuesCore(
+                    reference.Property,
+                    callPath,
+                    bound);
+            }
+            finally {
+                parameterBoundScopes.Pop();
+            }
+        }
+        private bool SourcePropertyReturnsOnlyBoundValuesCore(
             IPropertySymbol property,
             HashSet<ISymbol> callPath,
             Int32Bound bound) {
@@ -1743,6 +1851,57 @@ internal static class CompilerProgramPointAnalysis {
                        model,
                        callPath,
                        bound);
+        }
+        private bool ParameterReferenceDefinitelyProducesInt32Bound(
+            IParameterReferenceOperation reference,
+            SemanticModel model,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
+            if (reference.Syntax is not ExpressionSyntax use)
+                return false;
+            var parameter = reference.Parameter.OriginalDefinition;
+            var nextCallPath = new HashSet<ISymbol>(callPath, SymbolEqualityComparer.Default);
+            if (!nextCallPath.Add(parameter))
+                return false;
+            if (SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
+                    parameter,
+                    use,
+                    model,
+                    cancellationToken,
+                    true,
+                    out var assignedValue))
+                return ExpressionDefinitelyProducesInt32Bound(
+                    assignedValue,
+                    model,
+                    nextCallPath,
+                    bound);
+            var root = CSharpSyntaxFacts.GetContainingExecutionRoot(use);
+            if (root == null)
+                return false;
+            var mutations = SymbolicMutationInventory.Create(
+                root,
+                model,
+                cancellationToken);
+            if (mutations.MutatesBetween(
+                    root.SpanStart - 1,
+                    use.SpanStart,
+                    parameter) ||
+                root.DescendantNodes()
+                    .Where(CSharpSyntaxFacts.IsNestedLocalCallableBoundary)
+                    .Any(callable =>
+                        SymbolicMutationInventory.Create(
+                                callable,
+                                model,
+                                cancellationToken)
+                            .MutatesSymbol(parameter)))
+                return false;
+            var requiredFact = bound == Int32Bound.NonPositive
+                ? Int32BoundFacts.NonPositive
+                : Int32BoundFacts.NonNegative;
+            foreach (var scope in parameterBoundScopes)
+                if (scope.TryGetValue(parameter, out var facts))
+                    return (facts & requiredFact) != 0;
+            return false;
         }
         private bool LocalReferenceDefinitelyProducesInt32Bound(
             ILocalReferenceOperation reference,

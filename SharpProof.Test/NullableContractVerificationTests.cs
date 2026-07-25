@@ -4004,6 +4004,282 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedBoundArgumentIdentityHelperLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Identity(int value) => value;
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => Identity(0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedNestedBoundArgumentHelpersLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Identity(int value) => value;
+                private static int Forward(int value) => Identity(value);
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => Forward(0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedReorderedNamedBoundArgumentHelperLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Choose(int positive, int nonPositive) => nonPositive;
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => Choose(nonPositive: 0, positive: 1))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedPositiveArgumentIdentityHelperLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Identity(int value) => value;
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => Identity(1))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedReassignedPositiveArgumentHelperLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Reassign(int value) {
+                    value = 1;
+                    return value;
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => Reassign(0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedReassignedNonPositiveArgumentHelperLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Normalize(int value) {
+                    value = 0;
+                    return value;
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => Normalize(1))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedConditionallyMutatedBoundArgumentHelperLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int MaybeReassign(int value) {
+                    if (DateTime.UtcNow.Ticks > 0)
+                        value = 1;
+                    return value;
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => MaybeReassign(0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedRefMutatedBoundArgumentHelperLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Mutate(ref int value) {
+                    value = 1;
+                    return value;
+                }
+                private static int Dimension() {
+                    var value = 0;
+                    return Mutate(ref value);
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => Dimension())
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedBoundArgumentMutatedThroughRefLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static void MakePositive(ref int value) => value = 1;
+                private static int Dimension(int value) {
+                    MakePositive(ref value);
+                    return value;
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => Dimension(0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedCapturedMutatedBoundArgumentHelperLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Dimension(int value) {
+                    void MakePositive() => value = 1;
+                    MakePositive();
+                    return value;
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => Dimension(0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedCapturedMutatedReassignedArgumentHelperLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Dimension(int value) {
+                    value = 0;
+                    void MakePositive() => value = 1;
+                    MakePositive();
+                    return value;
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => Dimension(0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedCapturedOuterBoundArgumentHelperLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Forward(int value) {
+                    int Inner() => value;
+                    return Inner();
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => Forward(0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedBoundArgumentIndexerLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public sealed class Dimensions {
+                public int this[int value] => value;
+            }
+            public static class Consumer {
+                public static object FirstValue(Dimensions dimensions) {
+                    var lengths = new[] { 1 }
+                        .Select(_ => dimensions[0])
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedPositiveArgumentIndexerLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public sealed class Dimensions {
+                public int this[int value] => value;
+            }
+            public static class Consumer {
+                public static object FirstValue(Dimensions dimensions) {
+                    var lengths = new[] { 1 }
+                        .Select(_ => dimensions[1])
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedSourceDefinedMinLoopBodyRemainsReachable_Reports",
             """
             #nullable enable
