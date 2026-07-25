@@ -690,10 +690,11 @@ internal static class CompilerProgramPointAnalysis {
             bool PreventsNonEmptyAllPositive,
             bool DefinitelyAllNonPositive);
         private bool DefinitelyPreventsRuntimeArrayElements(ExpressionSyntax dimensions) =>
-            GetArrayDimensionVectorFacts(dimensions, []).PreventsNonEmptyAllPositive;
+            GetArrayDimensionVectorFacts(dimensions, [], null).PreventsNonEmptyAllPositive;
         private ArrayDimensionVectorFacts GetArrayDimensionVectorFacts(
             ExpressionSyntax dimensions,
-            HashSet<SyntaxNode> visited) {
+            HashSet<SyntaxNode> visited,
+            SyntaxNode? deferredUse) {
             dimensions = SymbolicConversionLowerer.UnwrapIdentityConversions(
                 dimensions,
                 semanticModel,
@@ -710,6 +711,7 @@ internal static class CompilerProgramPointAnalysis {
             if (TryGetValuePreservingArrayDimensionProducerFacts(
                     dimensions,
                     visited,
+                    deferredUse,
                     out var producerFacts))
                 return producerFacts;
             switch (dimensions) {
@@ -742,7 +744,10 @@ internal static class CompilerProgramPointAnalysis {
                         }
                         if (element is not SpreadElementSyntax spread)
                             return default;
-                        var spreadFacts = GetArrayDimensionVectorFacts(spread.Expression, [.. visited]);
+                        var spreadFacts = GetArrayDimensionVectorFacts(
+                            spread.Expression,
+                            [.. visited],
+                            deferredUse);
                         definitelyContainsNonPositive |= spreadFacts.DefinitelyContainsNonPositive;
                         definitelyAllNonPositive &= spreadFacts.DefinitelyAllNonPositive;
                         allSpreadsEmpty &= spreadFacts.DefinitelyEmpty;
@@ -766,13 +771,13 @@ internal static class CompilerProgramPointAnalysis {
             return symbol is ILocalSymbol or IParameterSymbol &&
                    SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
                        symbol,
-                       dimensions,
+                       deferredUse ?? dimensions,
                        semanticModel,
                        cancellationToken,
                        false,
                        true,
                        out var resolved)
-                ? GetArrayDimensionVectorFacts(resolved, visited)
+                ? GetArrayDimensionVectorFacts(resolved, visited, deferredUse)
                 : default;
         }
         private ArrayDimensionVectorFacts GetExplicitArrayDimensionVectorFacts(
@@ -790,6 +795,7 @@ internal static class CompilerProgramPointAnalysis {
         private bool TryGetValuePreservingArrayDimensionProducerFacts(
             ExpressionSyntax dimensions,
             HashSet<SyntaxNode> visited,
+            SyntaxNode? deferredUse,
             out ArrayDimensionVectorFacts facts) {
             facts = default;
             if (dimensions is not InvocationExpressionSyntax invocation ||
@@ -822,12 +828,22 @@ internal static class CompilerProgramPointAnalysis {
                     parameter.Name == "selector");
                 if (selectorParameter == null ||
                     !TryGetStandardSequenceSource(invocation, operation, out var projectedSource) ||
-                    !TryGetInvocationArgument(operation, selectorParameter, out var selector) ||
-                    !IsConstantNonPositiveDimensionSelector(selector))
+                    !TryGetInvocationArgument(operation, selectorParameter, out var selector))
                     return false;
-                var projectedSourceFacts = GetArrayDimensionVectorFacts(projectedSource, [.. visited]);
+                var projectedSourceFacts = GetArrayDimensionVectorFacts(
+                    projectedSource,
+                    [.. visited],
+                    deferredUse);
+                if (projectedSourceFacts.DefinitelyEmpty) {
+                    facts = new(true, false, true, true);
+                    return true;
+                }
+                if (!IsNonPositiveDimensionSelector(
+                        selector,
+                        projectedSourceFacts.DefinitelyAllNonPositive))
+                    return false;
                 facts = new(
-                    projectedSourceFacts.DefinitelyEmpty,
+                    false,
                     false,
                     true,
                     true);
@@ -840,8 +856,14 @@ internal static class CompilerProgramPointAnalysis {
                     !TryGetStandardSequenceSource(invocation, operation, out var first) ||
                     !TryGetInvocationArgument(operation, secondParameter, out var second))
                     return false;
-                var firstFacts = GetArrayDimensionVectorFacts(first, [.. visited]);
-                var secondFacts = GetArrayDimensionVectorFacts(second, [.. visited]);
+                var firstFacts = GetArrayDimensionVectorFacts(
+                    first,
+                    [.. visited],
+                    deferredUse);
+                var secondFacts = GetArrayDimensionVectorFacts(
+                    second,
+                    [.. visited],
+                    deferredUse);
                 var definitelyEmpty = firstFacts.DefinitelyEmpty && secondFacts.DefinitelyEmpty;
                 var definitelyContainsNonPositive =
                     firstFacts.DefinitelyContainsNonPositive ||
@@ -869,8 +891,14 @@ internal static class CompilerProgramPointAnalysis {
                     !TryGetStandardSequenceSource(invocation, operation, out var first) ||
                     !TryGetInvocationArgument(operation, secondParameter, out var second))
                     return false;
-                var firstFacts = GetArrayDimensionVectorFacts(first, [.. visited]);
-                var secondFacts = GetArrayDimensionVectorFacts(second, [.. visited]);
+                var firstFacts = GetArrayDimensionVectorFacts(
+                    first,
+                    [.. visited],
+                    deferredUse);
+                var secondFacts = GetArrayDimensionVectorFacts(
+                    second,
+                    [.. visited],
+                    deferredUse);
                 var definitelyEmpty = firstFacts.DefinitelyEmpty && secondFacts.DefinitelyEmpty;
                 var definitelyAllNonPositive =
                     firstFacts.DefinitelyAllNonPositive &&
@@ -889,7 +917,10 @@ internal static class CompilerProgramPointAnalysis {
                     !TryGetStandardSequenceSource(invocation, operation, out var augmentedSource) ||
                     !TryGetInvocationArgument(operation, elementParameter, out var element))
                     return false;
-                var augmentedSourceFacts = GetArrayDimensionVectorFacts(augmentedSource, [.. visited]);
+                var augmentedSourceFacts = GetArrayDimensionVectorFacts(
+                    augmentedSource,
+                    [.. visited],
+                    deferredUse);
                 var elementIsNonPositive = DefinitelyCapsSequenceAtZero(element);
                 var definitelyContainsNonPositive =
                     augmentedSourceFacts.DefinitelyContainsNonPositive ||
@@ -928,7 +959,15 @@ internal static class CompilerProgramPointAnalysis {
                 !producesSubset ||
                 !TryGetStandardSequenceSource(invocation, operation, out var source))
                 return false;
-            var sourceFacts = GetArrayDimensionVectorFacts(source, visited);
+            var sourceUse = definition.Name is
+                    nameof(Enumerable.ToArray) or
+                    nameof(Enumerable.ToList)
+                ? dimensions
+                : deferredUse;
+            var sourceFacts = GetArrayDimensionVectorFacts(
+                source,
+                visited,
+                sourceUse);
             if (sourceFacts == default)
                 return false;
             if (preservesEveryElement) {
@@ -944,31 +983,104 @@ internal static class CompilerProgramPointAnalysis {
                 true);
             return true;
         }
-        private bool IsConstantNonPositiveDimensionSelector(ExpressionSyntax selector) {
+        private bool IsNonPositiveDimensionSelector(
+            ExpressionSyntax selector,
+            bool sourceElementsAreNonPositive) =>
+            IsNonPositiveDimensionSelector(
+                selector,
+                sourceElementsAreNonPositive,
+                []);
+        private bool IsNonPositiveDimensionSelector(
+            ExpressionSyntax selector,
+            bool sourceElementsAreNonPositive,
+            HashSet<SyntaxNode> visited) {
             selector = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(selector);
+            if (!visited.Add(selector))
+                return false;
+            var selectorSymbol = semanticModel.GetSymbolInfo(
+                selector,
+                cancellationToken).Symbol?.OriginalDefinition;
+            if (selectorSymbol is ILocalSymbol or IParameterSymbol &&
+                SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
+                    selectorSymbol,
+                    selector,
+                    semanticModel,
+                    cancellationToken,
+                    out var resolvedSelector))
+                return IsNonPositiveDimensionSelector(
+                    resolvedSelector,
+                    sourceElementsAreNonPositive,
+                    visited);
             var callPath = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
-            if (selector is LambdaExpressionSyntax { Body: ExpressionSyntax projectedValue })
-                return ExpressionDefinitelyProducesNonPositiveInt32(
-                    projectedValue,
-                    semanticModel,
-                    callPath);
-            if (selector is LambdaExpressionSyntax { Body: BlockSyntax lambdaBody })
-                return BlockReturnsOnlyNonPositiveValues(
-                    lambdaBody,
-                    semanticModel,
-                    callPath);
-            if (selector is AnonymousMethodExpressionSyntax { Block: { } anonymousBody })
-                return BlockReturnsOnlyNonPositiveValues(
-                    anonymousBody,
-                    semanticModel,
-                    callPath);
-            return semanticModel.GetSymbolInfo(selector, cancellationToken).Symbol is
-                       IMethodSymbol {
-                           ReturnType.SpecialType: SpecialType.System_Int32,
-                           MethodKind: MethodKind.Ordinary or MethodKind.LocalFunction
-                       } method &&
-                   IsStaticallyDispatchedBoundSource(method) &&
-                   SourceMethodReturnsOnlyNonPositiveValues(method, callPath);
+            var parameterFacts = CreateSelectorParameterBoundFacts(
+                selector,
+                sourceElementsAreNonPositive);
+            parameterBoundScopes.Push(parameterFacts);
+            try {
+                if (selector is LambdaExpressionSyntax { Body: ExpressionSyntax projectedValue })
+                    return ExpressionDefinitelyProducesNonPositiveInt32(
+                        projectedValue,
+                        semanticModel,
+                        callPath);
+                if (selector is LambdaExpressionSyntax { Body: BlockSyntax lambdaBody })
+                    return BlockReturnsOnlyNonPositiveValues(
+                        lambdaBody,
+                        semanticModel,
+                        callPath);
+                if (selector is AnonymousMethodExpressionSyntax { Block: { } anonymousBody })
+                    return BlockReturnsOnlyNonPositiveValues(
+                        anonymousBody,
+                        semanticModel,
+                        callPath);
+                return semanticModel.GetSymbolInfo(selector, cancellationToken).Symbol is
+                           IMethodSymbol {
+                               ReturnType.SpecialType: SpecialType.System_Int32,
+                               MethodKind: MethodKind.Ordinary or MethodKind.LocalFunction
+                           } method &&
+                       IsStaticallyDispatchedBoundSource(method) &&
+                       SourceMethodReturnsOnlyNonPositiveValues(method, callPath);
+            }
+            finally {
+                parameterBoundScopes.Pop();
+            }
+        }
+        private Dictionary<IParameterSymbol, Int32BoundFacts> CreateSelectorParameterBoundFacts(
+            ExpressionSyntax selector,
+            bool sourceElementsAreNonPositive) {
+            var facts = new Dictionary<IParameterSymbol, Int32BoundFacts>(
+                SymbolEqualityComparer.Default);
+            IEnumerable<IParameterSymbol> parameters = selector switch {
+                SimpleLambdaExpressionSyntax simple =>
+                    GetDeclaredParameters([simple.Parameter]),
+                ParenthesizedLambdaExpressionSyntax parenthesized =>
+                    GetDeclaredParameters(parenthesized.ParameterList.Parameters),
+                AnonymousMethodExpressionSyntax {
+                    ParameterList: { } parameterList
+                } =>
+                    GetDeclaredParameters(parameterList.Parameters),
+                _ => semanticModel.GetSymbolInfo(selector, cancellationToken).Symbol is
+                    IMethodSymbol method
+                        ? method.Parameters
+                        : []
+            };
+            var parameterArray = parameters.ToArray();
+            if (sourceElementsAreNonPositive &&
+                parameterArray.FirstOrDefault() is {
+                    Type.SpecialType: SpecialType.System_Int32
+                } element)
+                facts[element.OriginalDefinition] = Int32BoundFacts.NonPositive;
+            if (parameterArray.ElementAtOrDefault(1) is {
+                Type.SpecialType: SpecialType.System_Int32
+            } index)
+                facts[index.OriginalDefinition] = Int32BoundFacts.NonNegative;
+            return facts;
+        }
+        private IEnumerable<IParameterSymbol> GetDeclaredParameters(
+            IEnumerable<ParameterSyntax> parameters) {
+            foreach (var parameter in parameters)
+                if (semanticModel.GetDeclaredSymbol(parameter, cancellationToken) is
+                    IParameterSymbol symbol)
+                    yield return symbol;
         }
         private static bool IsStaticallyDispatchedBoundSource(IMethodSymbol method) =>
             method.MethodKind == MethodKind.LocalFunction ||
