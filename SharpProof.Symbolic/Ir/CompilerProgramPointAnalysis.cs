@@ -686,7 +686,8 @@ internal static class CompilerProgramPointAnalysis {
         private readonly record struct ArrayDimensionVectorFacts(
             bool DefinitelyEmpty,
             bool DefinitelyContainsNonPositive,
-            bool PreventsNonEmptyAllPositive);
+            bool PreventsNonEmptyAllPositive,
+            bool DefinitelyAllNonPositive);
         private bool DefinitelyPreventsRuntimeArrayElements(ExpressionSyntax dimensions) =>
             GetArrayDimensionVectorFacts(dimensions, []).PreventsNonEmptyAllPositive;
         private ArrayDimensionVectorFacts GetArrayDimensionVectorFacts(
@@ -704,7 +705,7 @@ internal static class CompilerProgramPointAnalysis {
                     out _,
                     out var definitelyNoDimensions) &&
                 definitelyNoDimensions)
-                return new(true, false, true);
+                return new(true, false, true, true);
             if (TryGetValuePreservingArrayDimensionProducerFacts(
                     dimensions,
                     visited,
@@ -720,35 +721,44 @@ internal static class CompilerProgramPointAnalysis {
                         .SelectMany(rank => rank.Sizes)
                         .FirstOrDefault();
                     if (size != null && DefinitelyCapsSequenceAtZero(size))
-                        return new(true, false, true);
+                        return new(true, false, true, true);
                     return size != null && DefinitelyProvidesPositiveDimensionCount(size)
-                        ? new(false, true, true)
-                        : new(false, false, true);
+                        ? new(false, true, true, true)
+                        : new(false, false, true, true);
                 case CollectionExpressionSyntax collection:
                     var hasExpression = false;
+                    var definitelyContainsNonPositive = false;
+                    var definitelyAllNonPositive = true;
                     var allSpreadsEmpty = true;
                     var allSpreadsPreventNonEmptyAllPositive = true;
                     foreach (var element in collection.Elements) {
                         if (element is ExpressionElementSyntax expression) {
                             hasExpression = true;
-                            if (DefinitelyCapsSequenceAtZero(expression.Expression))
-                                return new(false, true, true);
+                            var nonPositive = DefinitelyCapsSequenceAtZero(expression.Expression);
+                            definitelyContainsNonPositive |= nonPositive;
+                            definitelyAllNonPositive &= nonPositive;
                             continue;
                         }
                         if (element is not SpreadElementSyntax spread)
                             return default;
                         var spreadFacts = GetArrayDimensionVectorFacts(spread.Expression, [.. visited]);
-                        if (spreadFacts.DefinitelyContainsNonPositive)
-                            return new(false, true, true);
+                        definitelyContainsNonPositive |= spreadFacts.DefinitelyContainsNonPositive;
+                        definitelyAllNonPositive &= spreadFacts.DefinitelyAllNonPositive;
                         allSpreadsEmpty &= spreadFacts.DefinitelyEmpty;
                         allSpreadsPreventNonEmptyAllPositive &=
                             spreadFacts.PreventsNonEmptyAllPositive;
                     }
-                    if (!hasExpression && allSpreadsEmpty)
-                        return new(true, false, true);
-                    return !hasExpression && allSpreadsPreventNonEmptyAllPositive
-                        ? new(false, false, true)
-                        : default;
+                    var definitelyEmpty = !hasExpression && allSpreadsEmpty;
+                    var preventsNonEmptyAllPositive =
+                        definitelyEmpty ||
+                        definitelyContainsNonPositive ||
+                        definitelyAllNonPositive ||
+                        !hasExpression && allSpreadsPreventNonEmptyAllPositive;
+                    return new(
+                        definitelyEmpty,
+                        definitelyContainsNonPositive,
+                        preventsNonEmptyAllPositive,
+                        definitelyAllNonPositive);
             }
             dimensions = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(dimensions);
             var symbol = semanticModel.GetSymbolInfo(dimensions, cancellationToken).Symbol?.OriginalDefinition;
@@ -767,10 +777,14 @@ internal static class CompilerProgramPointAnalysis {
         private ArrayDimensionVectorFacts GetExplicitArrayDimensionVectorFacts(
             SeparatedSyntaxList<ExpressionSyntax> dimensions) {
             if (dimensions.Count == 0)
-                return new(true, false, true);
-            return dimensions.Any(DefinitelyCapsSequenceAtZero)
-                ? new(false, true, true)
-                : default;
+                return new(true, false, true, true);
+            var definitelyContainsNonPositive = dimensions.Any(DefinitelyCapsSequenceAtZero);
+            var definitelyAllNonPositive = dimensions.All(DefinitelyCapsSequenceAtZero);
+            return new(
+                false,
+                definitelyContainsNonPositive,
+                definitelyContainsNonPositive,
+                definitelyAllNonPositive);
         }
         private bool TryGetValuePreservingArrayDimensionProducerFacts(
             ExpressionSyntax dimensions,
@@ -796,13 +810,13 @@ internal static class CompilerProgramPointAnalysis {
                     !DefinitelyCapsSequenceAtZero(element))
                     return false;
                 facts = DefinitelyCapsSequenceAtZero(count)
-                    ? new(true, false, true)
+                    ? new(true, false, true, true)
                     : DefinitelyProvidesPositiveDimensionCount(count)
-                        ? new(false, true, true)
-                        : new(false, false, true);
+                        ? new(false, true, true, true)
+                        : new(false, false, true, true);
                 return true;
             }
-            if (definition.Name is not (
+            var preservesEveryElement = definition.Name is
                     nameof(Enumerable.AsEnumerable) or
                     nameof(Enumerable.OrderBy) or
                     nameof(Enumerable.OrderByDescending) or
@@ -810,11 +824,37 @@ internal static class CompilerProgramPointAnalysis {
                     nameof(Enumerable.ThenBy) or
                     nameof(Enumerable.ThenByDescending) or
                     nameof(Enumerable.ToArray) or
-                    nameof(Enumerable.ToList)) ||
+                    nameof(Enumerable.ToList);
+            var producesSubset = definition.Name is
+                    nameof(Enumerable.Distinct) or
+                    nameof(Enumerable.Except) or
+                    nameof(Enumerable.Intersect) or
+                    nameof(Enumerable.Skip) or
+                    "SkipLast" or
+                    nameof(Enumerable.SkipWhile) or
+                    nameof(Enumerable.Take) or
+                    "TakeLast" or
+                    nameof(Enumerable.TakeWhile) or
+                    nameof(Enumerable.Where);
+            if (!preservesEveryElement &&
+                !producesSubset ||
                 !TryGetStandardSequenceSource(invocation, operation, out var source))
                 return false;
-            facts = GetArrayDimensionVectorFacts(source, visited);
-            return facts != default;
+            var sourceFacts = GetArrayDimensionVectorFacts(source, visited);
+            if (sourceFacts == default)
+                return false;
+            if (preservesEveryElement) {
+                facts = sourceFacts;
+                return true;
+            }
+            if (!sourceFacts.DefinitelyAllNonPositive)
+                return false;
+            facts = new(
+                sourceFacts.DefinitelyEmpty,
+                false,
+                true,
+                true);
+            return true;
         }
         private bool DefinitelyProvidesPositiveDimensionCount(ExpressionSyntax count) {
             var visited = new HashSet<SyntaxNode>();
