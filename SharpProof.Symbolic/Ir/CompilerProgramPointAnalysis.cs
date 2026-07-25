@@ -698,6 +698,13 @@ internal static class CompilerProgramPointAnalysis {
                 cancellationToken);
             if (!visited.Add(dimensions))
                 return default;
+            if (TryGetSequencePredicateSteps(
+                    dimensions,
+                    [],
+                    out _,
+                    out var definitelyNoDimensions) &&
+                definitelyNoDimensions)
+                return new(true, false, true);
             switch (dimensions) {
                 case ArrayCreationExpressionSyntax { Initializer: { } initializer }:
                     return GetExplicitArrayDimensionVectorFacts(initializer.Expressions);
@@ -737,9 +744,6 @@ internal static class CompilerProgramPointAnalysis {
                     return !hasExpression && allSpreadsPreventNonEmptyAllPositive
                         ? new(false, false, true)
                         : default;
-                case InvocationExpressionSyntax invocation
-                    when IsKnownEmptyArrayDimensionFactory(invocation):
-                    return new(true, false, true);
             }
             dimensions = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(dimensions);
             var symbol = semanticModel.GetSymbolInfo(dimensions, cancellationToken).Symbol?.OriginalDefinition;
@@ -762,20 +766,6 @@ internal static class CompilerProgramPointAnalysis {
             return dimensions.Any(DefinitelyCapsSequenceAtZero)
                 ? new(false, true, true)
                 : default;
-        }
-        private bool IsKnownEmptyArrayDimensionFactory(InvocationExpressionSyntax invocation) {
-            if (semanticModel.GetOperation(invocation, cancellationToken) is not
-                IInvocationOperation {
-                    TargetMethod: {
-                        Name: "Empty",
-                        Parameters.Length: 0
-                    } targetMethod
-                })
-                return false;
-            var type = targetMethod.OriginalDefinition.ContainingType;
-            return type.SpecialType == SpecialType.System_Array ||
-                   type.ContainingAssembly?.Name == "System.Linq" &&
-                   type.ToDisplayString() == "System.Linq.Enumerable";
         }
         private bool DefinitelyProvidesPositiveDimensionCount(ExpressionSyntax count) {
             var visited = new HashSet<SyntaxNode>();
