@@ -613,10 +613,25 @@ internal static class CompilerProgramPointAnalysis {
                     .Any(DefinitelyCapsSequenceAtZero))
                     return true;
             }
+            if (collection is StackAllocArrayCreationExpressionSyntax stackAllocation) {
+                if (stackAllocation.Initializer is { Expressions.Count: 0 })
+                    return true;
+                if (stackAllocation.Type is ArrayTypeSyntax arrayType &&
+                    arrayType.RankSpecifiers
+                        .SelectMany(rank => rank.Sizes)
+                        .Any(DefinitelyCapsSequenceAtZero))
+                    return true;
+            }
+            if (collection is ImplicitStackAllocArrayCreationExpressionSyntax {
+                Initializer.Expressions.Count: 0
+            })
+                return true;
             if (collection is not InvocationExpressionSyntax invocation ||
                 semanticModel.GetOperation(invocation, cancellationToken) is not
                     IInvocationOperation { TargetMethod: { } targetMethod } operation)
                 return false;
+            if (IsKnownEmptyRuntimeArrayFactory(operation, targetMethod))
+                return true;
             if (IsKnownImmutableEmptyFactory(targetMethod))
                 return true;
             var definition = targetMethod.OriginalDefinition;
@@ -633,6 +648,29 @@ internal static class CompilerProgramPointAnalysis {
             return countParameter != null &&
                    TryGetInvocationArgument(operation, countParameter, out var count) &&
                    DefinitelyCapsSequenceAtZero(count);
+        }
+        private bool IsKnownEmptyRuntimeArrayFactory(
+            IInvocationOperation operation,
+            IMethodSymbol targetMethod) {
+            var definition = targetMethod.OriginalDefinition;
+            var containingType = definition.ContainingType;
+            var knownFactory =
+                IsCoreLibraryType(containingType) &&
+                containingType.ContainingNamespace.ToDisplayString() == "System" &&
+                containingType.Name == "GC" &&
+                definition.Name is "AllocateArray" or "AllocateUninitializedArray" &&
+                targetMethod.ReturnType is IArrayTypeSymbol ||
+                containingType.SpecialType == SpecialType.System_Array &&
+                definition.Name == "CreateInstance";
+            if (!knownFactory)
+                return false;
+            foreach (var parameter in targetMethod.Parameters)
+                if (parameter.Type.SpecialType == SpecialType.System_Int32 &&
+                    parameter.Name.StartsWith("length", StringComparison.Ordinal) &&
+                    TryGetInvocationArgument(operation, parameter, out var length) &&
+                    DefinitelyCapsSequenceAtZero(length))
+                    return true;
+            return false;
         }
         private bool IsKnownDefaultEmptyCoreSequenceValue(ExpressionSyntax collection) {
             if (semanticModel.GetOperation(collection, cancellationToken) is

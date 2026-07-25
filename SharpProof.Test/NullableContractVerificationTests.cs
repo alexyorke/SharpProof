@@ -2228,6 +2228,126 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ZeroLengthStackallocAliasLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var length = 1;
+                    length = 0;
+                    Span<int> items = stackalloc int[length];
+                    foreach (var _ in items)
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_PositiveLengthStackallocLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    Span<int> items = stackalloc int[1];
+                    foreach (var _ in items)
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_GcAllocatedZeroLengthArrayLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var length = 1;
+                    length = 0;
+                    foreach (var _ in GC.AllocateUninitializedArray<int>(length))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_GcAllocatedInitializedZeroLengthArrayLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var _ in GC.AllocateArray<int>(0, pinned: true))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_GcAllocatedPositiveLengthArrayLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var _ in GC.AllocateUninitializedArray<int>(1))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceZeroLengthLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var _ in Array.CreateInstance(typeof(int), 0))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceZeroDimensionAliasLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var width = 1;
+                    width = 0;
+                    foreach (var _ in Array.CreateInstance(typeof(int), 2, width))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstancePositiveLengthLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var _ in Array.CreateInstance(typeof(int), 1))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_SourceDefinedAllocateArrayLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            namespace Contoso {
+                public static class GC {
+                    public static int[] AllocateArray(int length) => new[] { 1 };
+                }
+            }
+            public static class Consumer {
+                public static object FirstValue() {
+                    foreach (var _ in Contoso.GC.AllocateArray(0))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ZeroDimensionArrayLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable
