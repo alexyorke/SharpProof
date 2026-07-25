@@ -610,9 +610,7 @@ internal static class CompilerProgramPointAnalysis {
                     return true;
                 if (arrayCreation.Type.RankSpecifiers
                     .SelectMany(rank => rank.Sizes)
-                    .Any(size =>
-                        semanticModel.GetConstantValue(size, cancellationToken) is { HasValue: true, Value: int length } &&
-                        length == 0))
+                    .Any(DefinitelyCapsSequenceAtZero))
                     return true;
             }
             if (collection is not InvocationExpressionSyntax invocation ||
@@ -634,8 +632,7 @@ internal static class CompilerProgramPointAnalysis {
                 parameter.Name == "count");
             return countParameter != null &&
                    TryGetInvocationArgument(operation, countParameter, out var count) &&
-                   semanticModel.GetConstantValue(count, cancellationToken) is { HasValue: true, Value: int constantCount } &&
-                   constantCount <= 0;
+                   DefinitelyCapsSequenceAtZero(count);
         }
         private bool IsKnownDefaultEmptyCoreSequenceValue(ExpressionSyntax collection) {
             if (semanticModel.GetOperation(collection, cancellationToken) is

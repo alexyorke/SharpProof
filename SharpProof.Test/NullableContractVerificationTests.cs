@@ -1684,6 +1684,52 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_RepeatZeroAliasLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var count = 1;
+                    count = 0;
+                    foreach (var item in Enumerable.Repeat(new Item(null), count))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_RangeZeroAliasProjectionLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var count = 1;
+                    count = 0;
+                    foreach (var item in Enumerable.Range(0, count)
+                        .Select(static _ => new Item(null)))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_RepeatUpdatedPositiveAliasLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System.Linq;
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var count = 0;
+                    count = 1;
+                    foreach (var item in Enumerable.Repeat(new Item(null), count))
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_NegativeRepeatCountLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable
@@ -2154,6 +2200,34 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ZeroLengthArrayAliasLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var length = 1;
+                    length = 0;
+                    foreach (var item in new Item[length])
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_NegativeArrayLengthAliasLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var length = 0;
+                    length = -1;
+                    foreach (var item in new Item[length])
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
         yield return Case("NullForgivingOperator_ZeroDimensionArrayLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable
@@ -2161,6 +2235,20 @@ public sealed class NullableContractVerificationTests {
             public static class Consumer {
                 public static object FirstValue() {
                     foreach (var item in new Item[2, 0])
+                        return item.Value!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ZeroDimensionArrayAliasLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            public sealed record Item(object? Value);
+            public static class Consumer {
+                public static object FirstValue() {
+                    var width = 1;
+                    width = 0;
+                    foreach (var item in new Item[2, width])
                         return item.Value!;
                     return new object();
                 }
