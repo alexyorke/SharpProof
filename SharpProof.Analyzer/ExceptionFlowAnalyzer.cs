@@ -38,8 +38,19 @@ internal static partial class ExceptionFlowAnalyzer {
             IThrowOperation { Exception.Type: { } exceptionType } => exceptionType,
             _ => null
         };
-        return thrownType ??
-               semanticModel.Compilation.GetTypeByMetadataName(name.Replace("global::", string.Empty));
+        if (thrownType != null) return thrownType;
+        var normalizedName = name.Replace("global::", string.Empty);
+        var direct = semanticModel.Compilation.GetTypeByMetadataName(normalizedName);
+        if (direct != null) return direct;
+        var simpleNameStart = normalizedName.LastIndexOf('.') + 1;
+        var simpleName = normalizedName.Substring(simpleNameStart);
+        return semanticModel.Compilation
+            .GetSymbolsWithName(simpleName, SymbolFilter.Type)
+            .OfType<INamedTypeSymbol>()
+            .FirstOrDefault(candidate => string.Equals(
+                candidate.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+                normalizedName,
+                StringComparison.Ordinal));
     }
     private static Location GetExceptionSiteLocation(SyntaxNode node) => node.GetLocation();
     private readonly record struct ExceptionFactView(SyntaxNode Site, string ExceptionType, ITypeSymbol? Type, SharpProofVerdict Escape);

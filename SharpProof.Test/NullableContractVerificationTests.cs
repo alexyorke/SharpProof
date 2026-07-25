@@ -9817,6 +9817,132 @@ public sealed class NullableContractVerificationTests {
                 .Value.Syntax.ToString(),
             Is.EqualTo("large"));
     }
+    [Test]
+    public void PotentialBugRegression_InterpolatedStringConcatTreeIsBalanced() {
+        var contents = string.Concat(
+            Enumerable.Range(0, 2048).Select(static index => "x{" + (index % 2 == 0 ? "left" : "right") + "}"));
+        var source = "public static class C { public static string M(string left, string right) => $\"" +
+                     contents +
+                     "\"; }";
+        var (root, model) = CreateSemanticModel(source);
+        var interpolation = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InterpolatedStringExpressionSyntax>()
+            .Single();
+        var lowered = SharpProof.Symbolic.Ir.SymbolicStringLowerer.TryLowerStringTerm(
+            interpolation,
+            new SharpProof.Symbolic.Ir.SymbolicLoweringContext(model, CancellationToken.None),
+            out var term);
+        Assert.That(lowered, Is.True);
+        var pending = new Stack<(SharpProof.Symbolic.Ir.SymbolicTerm Term, int Depth)>();
+        pending.Push((term, 1));
+        var maximumDepth = 0;
+        while (pending.Count != 0) {
+            var (currentTerm, depth) = pending.Pop();
+            maximumDepth = Math.Max(maximumDepth, depth);
+            var children = SharpProof.Symbolic.Ir.SymbolicIrChildren.Of(currentTerm);
+            if (children.First != null) pending.Push((children.First, depth + 1));
+            if (children.Second != null) pending.Push((children.Second, depth + 1));
+            if (!children.Rest.IsDefaultOrEmpty)
+                foreach (var child in children.Rest)
+                    pending.Push((child, depth + 1));
+        }
+        Assert.That(maximumDepth, Is.LessThan(64));
+    }
+    [Test]
+    public void PotentialBugRegression_CaughtExplicitThrowDoesNotMaskArgumentHazard() {
+        const string source = """
+            public static class C {
+                public static void M() {
+                    var zero = 0;
+                    try {
+                        throw new System.ArgumentException((1 / zero).ToString());
+                    }
+                    catch (System.ArgumentException) {
+                    }
+                }
+            }
+            """;
+        var effects = AnalyzeEffectsAtMarker(source, "M(");
+        Assert.Multiple(() => {
+            Assert.That(
+                effects.ExceptionFacts,
+                Has.Some.Matches<SharpProof.Symbolic.MethodExceptionFact>(fact =>
+                    fact.ExceptionType == "System.DivideByZeroException" &&
+                    fact.Escape == SharpProof.Symbolic.SharpProofVerdict.Proven));
+            Assert.That(
+                effects.DoesNotThrow,
+                Is.EqualTo(SharpProof.Symbolic.SharpProofVerdict.Disproven));
+        });
+    }
+    [Test]
+    public async Task PotentialBugRegression_NestedTupleEqualityIsStructural() {
+        var diagnostics = await AnalyzeAsync("""
+            #nullable enable
+            public static class C {
+                public static object M() {
+                    if (((1, 2), 3) != ((1, 2), 3))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0044"));
+    }
+    [Test]
+    public async Task PotentialBugRegression_NestedExceptionSubtypeSatisfiesBaseContractAcrossCall() {
+        var diagnostics = await AnalyzeAsync("""
+            using SharpProof.Attributes;
+            public static class Outer {
+                public sealed class NestedException : System.Exception { }
+                private static void ThrowNested() => throw new NestedException();
+                [AllowedExceptions(typeof(System.Exception))]
+                public static void M() => ThrowNested();
+            }
+            """);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0030"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public void PotentialBugRegression_SpanCopyReadsSourceArgument() {
+        const string source = """
+            public static class C {
+                public static void M(
+                    System.ReadOnlySpan<int> source,
+                    System.Span<int> destination) =>
+                    source.CopyTo(destination);
+            }
+            """;
+        Assert.That(
+            AnalyzeEffectsAtMarker(source, "M(").Effects.HasFlag(
+                SharpProof.Attributes.SharpProofEffect.ReadsArgumentState),
+            Is.True);
+    }
+    [Test]
+    public async Task PotentialBugRegression_EnforcePurePointsAtFirstImpureEffect() {
+        var diagnostics = await AnalyzeAsync("""
+            using SharpProof.Attributes;
+            public sealed class Box {
+                public int Value;
+            }
+            public static class C {
+                private static int state;
+                [EnforcePure]
+                public static int M(Box box) {
+                    var value = box.Value;
+                    state = 1;
+                    return value;
+                }
+            }
+            """);
+        var diagnostic = diagnostics.Single(candidate => candidate.Id == "SP0002");
+        Assert.That(
+            diagnostic.Location.GetLineSpan().StartLinePosition.Line,
+            Is.EqualTo(9));
+    }
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)

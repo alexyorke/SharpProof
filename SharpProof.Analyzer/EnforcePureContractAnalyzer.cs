@@ -10,8 +10,7 @@ internal static class EnforcePureContractAnalyzer {
         var effects = context.State.GetMethodEffects(context.CancellationToken);
         if (effects.Purity == SharpProofVerdict.Proven) return;
         var firstSite = effects.Sites.FirstOrDefault(site =>
-            site.Effect != SharpProof.Attributes.SharpProofEffect.Allocates &&
-            site.Effect != SharpProof.Attributes.SharpProofEffect.Throws);
+            (site.Effect & MethodEffects.ImpureEffects) != 0);
         var location = firstSite == null
             ? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node)
             : Location.Create(context.Node.SyntaxTree, new TextSpan(firstSite.SpanStart, firstSite.SpanLength));

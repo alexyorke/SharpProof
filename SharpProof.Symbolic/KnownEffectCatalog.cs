@@ -510,7 +510,10 @@ internal static class KnownEffectCatalog {
             HasSingleCharSpanParameter(method))
             return Create(SharpProofEffect.WritesArgumentState, out model, write: [0]);
         if (method.MethodKind == MethodKind.Ordinary && IsSpanCopy(method))
-            return Create(SharpProofEffect.WritesArgumentState, out model, write: [0]);
+            return Create(
+                SharpProofEffect.ReadsReceiverState | SharpProofEffect.WritesArgumentState,
+                out model,
+                write: [0]);
         if (method.MethodKind == MethodKind.Ordinary && IsSpanFill(method))
             return Create(SharpProofEffect.WritesReceiverState, out model);
         if (definition == "System.Span<T>" && method is {

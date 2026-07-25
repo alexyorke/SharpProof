@@ -44,7 +44,7 @@ public sealed record MethodEffects(
     ImmutableArray<MethodExceptionFact> ExceptionFacts,
     ImmutableArray<MethodEffectSite> Sites,
     ImmutableArray<SharpProofUnknownReason> UnknownReasons) {
-    private const SharpProofEffect ImpureEffects =
+    internal const SharpProofEffect ImpureEffects =
         SharpProofEffect.ReadsAmbientState | SharpProofEffect.WritesAmbientState |
         SharpProofEffect.ReadsStaticState | SharpProofEffect.WritesReceiverState |
         SharpProofEffect.WritesArgumentState | SharpProofEffect.WritesCapturedState |

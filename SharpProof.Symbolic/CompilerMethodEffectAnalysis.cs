@@ -229,12 +229,6 @@ internal sealed class MethodEffectAnalysisSession(
             };
             if (IsCaughtHazard(declaration, semanticModel, hazard.SpanStart, hazard.ExceptionType))
                 escape = SharpProofVerdict.Disproven;
-            if (escape == SharpProofVerdict.Proven && result.ExceptionFacts.Any(fact =>
-                    fact.Escape == SharpProofVerdict.Disproven &&
-                    fact.Source == MethodExceptionSource.ExplicitThrow &&
-                    fact.SpanStart <= hazard.SpanStart &&
-                    hazard.SpanStart <= fact.SpanStart + fact.SpanLength))
-                escape = SharpProofVerdict.Disproven;
             var fact = new MethodExceptionFact(
                 hazard.ExceptionType, escape, MethodExceptionSource.RuntimeHazard, hazard.Category, string.Empty,
                 hazard.SpanStart, hazard.SpanEnd - hazard.SpanStart, false, hazard.Category, hazard.Kind.ToString());
@@ -247,10 +241,7 @@ internal sealed class MethodEffectAnalysisSession(
     }
     private static bool IsCaughtHazard(SyntaxNode declaration, SemanticModel model, int position, string exceptionType) {
         var node = declaration.FindToken(position).Parent;
-        var thrownType = node?.AncestorsAndSelf().OfType<ThrowStatementSyntax>().FirstOrDefault()?.Expression is { } expression
-            ? model.GetTypeInfo(expression).Type as INamedTypeSymbol
-            : null;
-        var hazardType = thrownType ?? model.Compilation.GetTypeByMetadataName(exceptionType);
+        var hazardType = model.Compilation.GetTypeByMetadataName(exceptionType);
         for (var current = node; current != null; current = current.Parent) {
             if (current is not TryStatementSyntax statement) continue;
             var inTry = statement.Block.Span.Contains(position);

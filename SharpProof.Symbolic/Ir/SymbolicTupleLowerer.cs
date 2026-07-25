@@ -83,11 +83,10 @@ internal static class SymbolicTupleLowerer {
         if (expression is TupleExpressionSyntax tupleExpression) {
             var tupleBuilder = ImmutableArray.CreateBuilder<SymbolicTerm>(tupleExpression.Arguments.Count);
             foreach (var argument in tupleExpression.Arguments) {
-                if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argument.Expression, context), out var element)) {
+                if (!TryAppendTupleExpressionTerms(argument.Expression, context, tupleBuilder)) {
                     terms = [];
                     return false;
                 }
-                tupleBuilder.Add(element);
             }
             terms = tupleBuilder.MoveToImmutable();
             return terms.Length != 0;
@@ -100,14 +99,55 @@ internal static class SymbolicTupleLowerer {
             tupleType.TupleElements.Length == 0)
             return false;
         var builder = ImmutableArray.CreateBuilder<SymbolicTerm>(tupleType.TupleElements.Length);
+        if (!TryAppendTupleStorageTerms(
+                context.GetVariableName(symbol),
+                tupleType,
+                builder))
+            return false;
+        terms = builder.ToImmutable();
+        return true;
+    }
+    private static bool TryAppendTupleExpressionTerms(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        ImmutableArray<SymbolicTerm>.Builder builder) {
+        expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
+        if (expression is TupleExpressionSyntax tupleExpression) {
+            foreach (var argument in tupleExpression.Arguments)
+                if (!TryAppendTupleExpressionTerms(argument.Expression, context, builder))
+                    return false;
+            return tupleExpression.Arguments.Count != 0;
+        }
+        if (context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type is
+                INamedTypeSymbol { IsTupleType: true } tupleType &&
+            SymbolicLoweringValueFacts.TryGetStableVariableSymbol(expression, context, out var symbol))
+            return TryAppendTupleStorageTerms(
+                context.GetVariableName(symbol),
+                tupleType,
+                builder);
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var element))
+            return false;
+        builder.Add(element);
+        return true;
+    }
+    private static bool TryAppendTupleStorageTerms(
+        string storagePrefix,
+        INamedTypeSymbol tupleType,
+        ImmutableArray<SymbolicTerm>.Builder builder) {
         foreach (var element in tupleType.TupleElements) {
             var field = element.CorrespondingTupleField ?? element;
-            if (!TryGetTupleElementStorageName(field, out var storageName) ||
-                !SymbolicTypeLowerer.TryGetValueKind(field.Type, out var kind))
+            if (!TryGetTupleElementStorageName(field, out var storageName))
                 return false;
-            builder.Add(CreateTupleStorageTerm(symbol, storageName, kind, context));
+            var elementStorage = storagePrefix + "." + storageName;
+            if (field.Type is INamedTypeSymbol { IsTupleType: true } nestedTuple) {
+                if (!TryAppendTupleStorageTerms(elementStorage, nestedTuple, builder))
+                    return false;
+                continue;
+            }
+            if (!SymbolicTypeLowerer.TryGetValueKind(field.Type, out var kind))
+                return false;
+            builder.Add(new SymbolicVariableTerm(elementStorage, kind));
         }
-        terms = builder.ToImmutable();
         return true;
     }
     internal static bool TryGetTupleElementStorageName(IFieldSymbol field, out string storageName) {

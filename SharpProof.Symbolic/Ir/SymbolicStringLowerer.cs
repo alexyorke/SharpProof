@@ -575,8 +575,16 @@ internal static class SymbolicStringLowerer {
             term = new SymbolicStringConstantTerm(string.Empty);
             return true;
         }
-        term = parts[0];
-        for (var index = 1; index < parts.Length; index++) term = new SymbolicStringConcatTerm(term, parts[index]);
+        var level = parts;
+        while (level.Length > 1) {
+            var next = ImmutableArray.CreateBuilder<SymbolicTerm>((level.Length + 1) / 2);
+            for (var index = 0; index < level.Length; index += 2)
+                next.Add(index + 1 < level.Length
+                    ? new SymbolicStringConcatTerm(level[index], level[index + 1])
+                    : level[index]);
+            level = next.MoveToImmutable();
+        }
+        term = level[0];
         return true;
     }
     internal static bool TryGetRegexOptions(ExpressionSyntax expression, SymbolicLoweringContext context, out RegexOptions options) {
