@@ -12,13 +12,36 @@ internal static class RequiresContractHelpers {
         IMethodSymbol methodSymbol,
         CancellationToken cancellationToken)
             => [.. CollectContracts(methodSymbol, cancellationToken).Where(static contract
-            => contract.InvalidReason == null)];
+            => contract.InvalidReason == null &&
+               !ContainsUnsupportedResultReference(
+                   contract.Condition,
+                   contract.SourceMethod))];
     internal static bool ContainsResultReference(ExpressionSyntax conditionExpression) => conditionExpression
             .DescendantNodesAndSelf()
             .OfType<IdentifierNameSyntax>()
             .Any(IsResultPlaceholder);
     internal static bool IsResultPlaceholder(IdentifierNameSyntax identifier) =>
         string.Equals(identifier.Identifier.Text, "result", StringComparison.Ordinal);
+    internal static bool ContainsUnsupportedResultReference(
+        string condition,
+        IMethodSymbol contractMethod) {
+        if (!ContractConditionHelpers.TryParse(
+                condition,
+                out _,
+                out var expression))
+            return false;
+        if (contractMethod.Parameters.Any(static parameter =>
+                string.Equals(
+                    parameter.Name,
+                    "result",
+                    StringComparison.Ordinal)))
+            return false;
+        return expression.DescendantNodesAndSelf()
+            .OfType<IdentifierNameSyntax>()
+            .Any(static identifier =>
+                IsResultPlaceholder(identifier) &&
+                !CSharpSyntaxFacts.IsMemberOrQualifiedNameRightSide(identifier));
+    }
     internal static string CombineAsImplication(
         ImmutableArray<ContractAttributeCondition> requiresContracts, string consequent) {
         if (requiresContracts.IsDefaultOrEmpty) return consequent;

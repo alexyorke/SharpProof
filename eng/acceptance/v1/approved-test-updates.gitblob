@@ -1,5 +1,5 @@
 # Exact post-baseline test updates approved without replacing the pinned baseline blob.
-# NullableContractVerificationTests.cs has additive TDD coverage only (10470 added
+# NullableContractVerificationTests.cs has additive TDD coverage only (10557 added
 # lines, no removed lines) from f7694bdf, e15f487a, 5527f4c5, and the aliased
 # conditional output, chained/assigned-alias,
 # boolean-wrapper/algebra/identity-conversion, logical/conditional-implication,
@@ -43,9 +43,9 @@
 # exception source-tree, unsupported-mutation, signed-domain, semantic-old,
 # out-snapshot, snapshot-deduplication, escaped-result, single-evaluation,
 # runtime-type, short-circuit, UTF-16 string, cache-concurrency, effect-contract
-# identity, configuration precedence, contract deduplication, and property-setter
-# cases.
-aff239287efe06e50eada3dfc058dca13a54d571  SharpProof.Test/NullableContractVerificationTests.cs
+# identity, configuration precedence, contract deduplication, property-setter,
+# Requires binding, params, optional-argument, and extension-receiver cases.
+34ade7f86c525acc8886094e4c2aeb4d1636ca8b  SharpProof.Test/NullableContractVerificationTests.cs
 # MetadataMethodEffectAnalyzerTests.cs adds a callvirt regression proving that
 # non-virtual instance methods are analyzed recursively.
 3c67608a618c3c452ab60d0933bf6b6b0197b17e  SharpProof.Test/MetadataMethodEffectAnalyzerTests.cs

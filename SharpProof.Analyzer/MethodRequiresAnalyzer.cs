@@ -15,12 +15,71 @@ internal static class MethodRequiresAnalyzer {
                     context, methodSymbol, contract, "condition parse failure", CreateUnsupportedDiagnostic);
                 continue;
             }
-            if (RequiresContractHelpers.ContainsResultReference(conditionExpression))
+            if (RequiresContractHelpers.ContainsUnsupportedResultReference(
+                    contract.Condition,
+                    contract.SourceMethod)) {
                 ContractConditionHelpers.ReportUnsupported(
                     context, methodSymbol, contract,
                     "result placeholder is not supported in [Requires] conditions", CreateUnsupportedDiagnostic);
+                continue;
+            }
+            if (!RequiresContractHelpers.TryRewriteForMethod(
+                    contract.Condition,
+                    contract.SourceMethod,
+                    methodSymbol,
+                    out var implementationCondition) ||
+                !ContractConditionHelpers.TryParse(
+                    implementationCondition,
+                    out var implementationStatement,
+                    out var implementationExpression) ||
+                !TryValidateConditionBinding(
+                    context,
+                    implementationStatement,
+                    implementationExpression)) {
+                ContractConditionHelpers.ReportUnsupported(
+                    context,
+                    methodSymbol,
+                    contract,
+                    "condition binding failure",
+                    CreateUnsupportedDiagnostic);
+            }
         }
         AnalyzeCallSitesForRequires(context, smtAnalysis);
+    }
+    private static bool TryValidateConditionBinding(
+        MethodBodyAnalysisContext context,
+        IfStatementSyntax conditionStatement,
+        ExpressionSyntax conditionExpression) {
+        var completion = MethodCompletionAnalysis.Collect(context).FirstOrDefault();
+        if (completion.QueryNode == null) return true;
+        var position = completion.QueryNode.SpanStart;
+        if (!ContractConditionHelpers.TryCreateSpeculativeModel(
+                context.SemanticModel,
+                position,
+                conditionStatement,
+                out var speculativeModel))
+            return false;
+        if (speculativeModel.GetTypeInfo(
+                conditionExpression,
+                context.CancellationToken).ConvertedType is not {
+                    SpecialType: SpecialType.System_Boolean
+                })
+            return false;
+        foreach (var node in conditionExpression.DescendantNodesAndSelf()) {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            if (node is IdentifierNameSyntax identifier &&
+                !CSharpSyntaxFacts.IsMemberOrQualifiedNameRightSide(identifier) &&
+                speculativeModel.GetSymbolInfo(
+                    identifier,
+                    context.CancellationToken).Symbol == null)
+                return false;
+            if (node is MemberAccessExpressionSyntax or InvocationExpressionSyntax &&
+                speculativeModel.GetSymbolInfo(
+                    node,
+                    context.CancellationToken).Symbol == null)
+                return false;
+        }
+        return true;
     }
     private static void AnalyzeCallSitesForRequires(
         MethodBodyAnalysisContext context,
@@ -204,14 +263,86 @@ internal static class MethodRequiresAnalyzer {
         IMethodSymbol method,
         ImmutableArray<IArgumentOperation> arguments) {
         var result = ImmutableDictionary.CreateBuilder<string, ExpressionSyntax>(StringComparer.Ordinal);
-        foreach (var argument in arguments) {
-            var ordinal = argument.Parameter?.Ordinal ?? -1;
-            if (ordinal < 0 || ordinal >= method.Parameters.Length ||
-                argument.Value.Syntax is not ExpressionSyntax expression)
+        foreach (var parameter in method.Parameters) {
+            var matching = arguments
+                .Where(argument => argument.Parameter?.Ordinal == parameter.Ordinal)
+                .ToImmutableArray();
+            if (parameter.IsParams &&
+                matching.Any(static argument =>
+                    argument.ArgumentKind == ArgumentKind.ParamArray)) {
+                var expressions = matching
+                    .SelectMany(static argument =>
+                        argument.Value is IArrayCreationOperation {
+                            Initializer: { } initializer
+                        }
+                            ? initializer.ElementValues
+                            : [argument.Value])
+                    .Select(static value => value.Syntax)
+                    .OfType<ExpressionSyntax>()
+                    .Select(static expression =>
+                        (ExpressionSyntax)expression.WithoutTrivia())
+                    .ToArray();
+                var initializer = SyntaxFactory.InitializerExpression(
+                    SyntaxKind.ArrayInitializerExpression,
+                    SyntaxFactory.SeparatedList(expressions));
+                ExpressionSyntax paramsArray = parameter.Type is IArrayTypeSymbol arrayType
+                    ? (ExpressionSyntax)SyntaxFactory.ArrayCreationExpression(
+                        SyntaxFactory.ArrayType(
+                            SyntaxFactory.ParseTypeName(
+                                arrayType.ElementType.ToDisplayString(
+                                    SymbolDisplayFormat.FullyQualifiedFormat)),
+                            SyntaxFactory.SingletonList(
+                                SyntaxFactory.ArrayRankSpecifier(
+                                    SyntaxFactory.SingletonSeparatedList<
+                                        ExpressionSyntax>(
+                                        SyntaxFactory.OmittedArraySizeExpression())))),
+                        initializer)
+                    : SyntaxFactory.ImplicitArrayCreationExpression(initializer);
+                result[parameter.Name] =
+                    (ExpressionSyntax)paramsArray.NormalizeWhitespace();
                 continue;
-            result[method.Parameters[ordinal].Name] = (ExpressionSyntax)expression.WithoutTrivia();
+            }
+            var argument = matching.FirstOrDefault();
+            if (argument == null) {
+                if (TryCreateDefaultValueExpression(
+                        parameter,
+                        out var missingDefault))
+                    result[parameter.Name] = missingDefault;
+                continue;
+            }
+            if (argument.ArgumentKind == ArgumentKind.DefaultValue) {
+                if (TryCreateDefaultValueExpression(
+                        parameter,
+                        out var implicitDefault))
+                    result[parameter.Name] = implicitDefault;
+                continue;
+            }
+            if (argument.Value.Syntax is ExpressionSyntax expression)
+                result[parameter.Name] =
+                    (ExpressionSyntax)expression.WithoutTrivia();
         }
         return result.ToImmutable();
+    }
+    private static bool TryCreateDefaultValueExpression(
+        IParameterSymbol parameter,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)]
+        out ExpressionSyntax? expression) {
+        expression = null;
+        if (!parameter.HasExplicitDefaultValue) return false;
+        var text = parameter.ExplicitDefaultValue == null
+            ? "null"
+            : Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatPrimitive(
+                parameter.ExplicitDefaultValue,
+                quoteStrings: true,
+                useHexadecimalNumbers: false);
+        if (parameter.Type.TypeKind == TypeKind.Enum)
+            text = "(" +
+                   parameter.Type.ToDisplayString(
+                       SymbolDisplayFormat.FullyQualifiedFormat) +
+                   ")" +
+                   text;
+        expression = SyntaxFactory.ParseExpression(text);
+        return !expression.ContainsDiagnostics;
     }
     private static ExpressionSyntax? GetExplicitReceiver(IOperation? instance) =>
         instance is { IsImplicit: false, Syntax: ExpressionSyntax expression }
