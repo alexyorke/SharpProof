@@ -29,6 +29,13 @@ internal static class SymbolicStateInvalidator {
     internal static SymbolicState ApplyNestedMutationInvalidations(SymbolicState state, SymbolicNestedMutationInvalidationPlan plan) {
         foreach (var step in plan.Steps)
             state = SymbolicOperationTransferKernel.Invalidate(state, step.Targets, step.SourceSpan, step.Provenance);
+        if (plan.HasUnsupportedMutation)
+            state = state.MarkInexact(
+                SymbolicUnknownReason.UnsupportedIrEncoding,
+                new SymbolicLoweringProvenance(
+                    "operation-transfer",
+                    default,
+                    "unsupported-mutation"));
         return state;
     }
     internal static void InvalidateMutationTarget(

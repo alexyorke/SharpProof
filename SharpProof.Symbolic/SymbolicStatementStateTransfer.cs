@@ -34,15 +34,16 @@ internal static class SymbolicStatementStateTransfer {
         if (semanticModel.GetEnclosingSymbol(site.SpanStart, cancellationToken) is not IMethodSymbol containingMethod)
             return;
         foreach (var parameter in containingMethod.Parameters) {
+            var integralType = parameter.Type is INamedTypeSymbol {
+                TypeKind: TypeKind.Enum,
+                EnumUnderlyingType: { } underlyingType
+            }
+                ? underlyingType
+                : parameter.Type;
             if (!TryCreateSymbolTerm(parameter.OriginalDefinition, out var parameterTerm) ||
                 parameterTerm.Kind != SmtValueKind.Int ||
-                !SymbolicTypeFacts.TryGetIntegralShape(
-                    parameter.Type.SpecialType,
-                    out var signed,
-                    out _) ||
-                signed ||
                 !SymbolicTypeFacts.TryGetBoundedIntegralRange(
-                    parameter.Type,
+                    integralType,
                     out var minimum,
                     out var maximum))
                 continue;

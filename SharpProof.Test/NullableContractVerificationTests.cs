@@ -10663,6 +10663,192 @@ public sealed class NullableContractVerificationTests {
             candidate.ExceptionType == "System.InvalidOperationException");
         Assert.That(fact.SourceTree, Is.SameAs(calleeTree));
     }
+    [Test]
+    public void PotentialBugRegression_UnsupportedMutationMarksStateInexact() {
+        var source = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.IdentifierName("mutation");
+        var fact = SharpProof.Symbolic.Ir.SymbolicFact.Exact(
+            new SharpProof.Symbolic.Ir.SymbolicRelationAtom(
+                SharpProof.Symbolic.Ir.SymbolicRelationOperator.Equal,
+                new SharpProof.Symbolic.Ir.SymbolicVariableTerm(
+                    "value",
+                    SmtValueKind.Int),
+                new SharpProof.Symbolic.Ir.SymbolicIntegerConstantTerm(1)),
+            source,
+            "test");
+        var state = new SharpProof.Symbolic.Ir.SymbolicState([fact]);
+        var plan = new SharpProof.Symbolic.SymbolicNestedMutationInvalidationPlan([], true);
+        var result = SharpProof.Symbolic.SymbolicStateInvalidator
+            .ApplyNestedMutationInvalidations(state, plan);
+        Assert.That(result.IsExact, Is.False);
+    }
+    [TestCase(
+        "int",
+        "value >= -2147483648 && value <= 2147483647")]
+    [TestCase(
+        "sbyte",
+        "value >= -128 && value <= 127")]
+    public void PotentialBugRegression_SignedParameterHasClrDomain(
+        string type,
+        string condition) {
+        var source = $$"""
+            public static class C {
+                public static int M({{type}} value) {
+                    return 0;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(source, "return 0", condition)
+                .ProofFacts.Single().Status,
+            Is.EqualTo("ProvenTrue"));
+    }
+    [Test]
+    public void PotentialBugRegression_SignedEnumParameterHasClrDomain() {
+        const string source = """
+            public enum Small : sbyte { Zero }
+            public static class C {
+                public static int M(Small value) {
+                    return 0;
+                }
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var statement = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ReturnStatementSyntax>()
+            .Single();
+        var state = new SharpProof.Symbolic.Ir.SymbolicState();
+        SharpProof.Symbolic.SymbolicStatementStateTransfer
+            .AddMethodEntryNullableFlowStateFacts(
+                ref state,
+                statement,
+                model,
+                CancellationToken.None);
+        Assert.Multiple(() => {
+            Assert.That(
+                state.PathConditions,
+                Has.Some.Matches<SharpProof.Symbolic.Ir.SymbolicFactCondition>(
+                    condition =>
+                        condition.Fact.Atom is
+                            SharpProof.Symbolic.Ir.SymbolicRelationAtom {
+                                Operator:
+                                    SharpProof.Symbolic.Ir.SymbolicRelationOperator
+                                        .GreaterThanOrEqual,
+                                Right:
+                                    SharpProof.Symbolic.Ir.SymbolicIntegerConstantTerm {
+                                        Value: -128
+                                    }
+                            }));
+            Assert.That(
+                state.PathConditions,
+                Has.Some.Matches<SharpProof.Symbolic.Ir.SymbolicFactCondition>(
+                    condition =>
+                        condition.Fact.Atom is
+                            SharpProof.Symbolic.Ir.SymbolicRelationAtom {
+                                Operator:
+                                    SharpProof.Symbolic.Ir.SymbolicRelationOperator
+                                        .LessThanOrEqual,
+                                Right:
+                                    SharpProof.Symbolic.Ir.SymbolicIntegerConstantTerm {
+                                        Value: 127
+                                    }
+                            }));
+        });
+    }
+    [Test]
+    public void PotentialBugRegression_UserOldMethodIsNotContractOperator() {
+        const string source = """
+            public static class C {
+                private static int old(int value) => value + 1;
+                public static int M(int value) {
+                    return value;
+                }
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var declaration = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "M");
+        var method = (Microsoft.CodeAnalysis.IMethodSymbol)
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(
+                model,
+                declaration)!;
+        Assert.That(
+            SharpProof.Analyzer.MethodEnsuresAnalyzer
+                .TryCreateEntrySnapshotProofCondition(
+                    "old(value) == value + 1",
+                    method,
+                    model,
+                    declaration.Body!.Statements[0].SpanStart,
+                    CancellationToken.None,
+                    out _,
+                    out _,
+                    out _),
+            Is.False);
+    }
+    [Test]
+    public void PotentialBugRegression_OldRejectsOutParameter() {
+        const string source = """
+            public static class C {
+                public static void M(out int output) {
+                    output = 0;
+                }
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var declaration = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+            .Single();
+        var method = (Microsoft.CodeAnalysis.IMethodSymbol)
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(
+                model,
+                declaration)!;
+        var success = SharpProof.Analyzer.MethodEnsuresAnalyzer
+            .TryCreateEntrySnapshotProofCondition(
+                "old(output) == 0",
+                method,
+                model,
+                declaration.Body!.Statements[0].SpanStart,
+                CancellationToken.None,
+                out _,
+                out _,
+                out var failureReason);
+        Assert.Multiple(() => {
+            Assert.That(success, Is.False);
+            Assert.That(failureReason, Does.Contain("out parameter"));
+        });
+    }
+    [Test]
+    public void PotentialBugRegression_OldSnapshotsDeduplicateSemanticTerm() {
+        const string source = """
+            public static class C {
+                public static int M(int value) {
+                    return value;
+                }
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var declaration = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+            .Single();
+        var method = (Microsoft.CodeAnalysis.IMethodSymbol)
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(
+                model,
+                declaration)!;
+        var success = SharpProof.Analyzer.MethodEnsuresAnalyzer
+            .TryCreateEntrySnapshotProofCondition(
+                "old(value) == old((value))",
+                method,
+                model,
+                declaration.Body!.Statements[0].SpanStart,
+                CancellationToken.None,
+                out _,
+                out var initialState,
+                out _);
+        Assert.Multiple(() => {
+            Assert.That(success, Is.True);
+            Assert.That(initialState.Facts, Has.Length.EqualTo(1));
+        });
+    }
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)

@@ -280,13 +280,15 @@ internal static class MethodEnsuresAnalyzer {
             [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out SymbolicTerm? term) {
             _ = context;
             term = null;
-            if (!IsOldValueInvocation(invocation)) return false;
+            if (!IsContractOldValueInvocation(invocation)) return false;
             if (invocation.ArgumentList.Arguments.Count != 1) {
                 FailureReason = "old(...) requires exactly one argument";
                 return false;
             }
             var argument = invocation.ArgumentList.Arguments[0].Expression;
-            if (ContainsOldValueInvocation(argument)) {
+            if (argument.DescendantNodesAndSelf()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(IsContractOldValueInvocation)) {
                 FailureReason = "nested old(...) expressions are not supported";
                 return false;
             }
@@ -298,14 +300,18 @@ internal static class MethodEnsuresAnalyzer {
                 FailureReason = "local variables are not supported inside old(...)";
                 return false;
             }
-            var key = argument.WithoutTrivia().ToString();
-            if (_snapshotTerms.TryGetValue(key, out term)) return true;
+            if (ReferencesOutParameter(argument)) {
+                FailureReason = "an out parameter is not available inside old(...)";
+                return false;
+            }
             var entryContext = new SymbolicLoweringContext(_semanticModel, _cancellationToken);
             var lowering = SymbolicSemanticPipeline.LowerTerm(argument, entryContext);
             if (lowering is not { IsExact: true, Value: { } entryTerm }) {
                 FailureReason = "old(...) expression is not supported by the current bounded proof engine";
                 return false;
             }
+            var key = SymbolicState.CreateProofTermKey(entryTerm);
+            if (_snapshotTerms.TryGetValue(key, out term)) return true;
             term = new SymbolicVariableTerm("__sp_old_" + _nextSnapshotId.ToString(CultureInfo.InvariantCulture), entryTerm.Kind);
             _nextSnapshotId++;
             _snapshotTerms.Add(key, term);
@@ -316,7 +322,8 @@ internal static class MethodEnsuresAnalyzer {
             return true;
         }
         public ITypeSymbol? ResolveInvocationTermType(InvocationExpressionSyntax invocation) {
-            if (!IsOldValueInvocation(invocation) || invocation.ArgumentList.Arguments.Count != 1)
+            if (!IsContractOldValueInvocation(invocation) ||
+                invocation.ArgumentList.Arguments.Count != 1)
                 return null;
             var argument = invocation.ArgumentList.Arguments[0].Expression;
             var typeInfo = _semanticModel.GetTypeInfo(argument, _cancellationToken);
@@ -324,5 +331,25 @@ internal static class MethodEnsuresAnalyzer {
         }
         public SymbolicState CreateInitialState() =>
             new(_snapshotFacts);
+        private bool IsContractOldValueInvocation(
+            InvocationExpressionSyntax invocation) {
+            if (!IsOldValueInvocation(invocation)) return false;
+            var symbolInfo = _semanticModel.GetSymbolInfo(
+                invocation,
+                _cancellationToken);
+            return symbolInfo.Symbol == null &&
+                   symbolInfo.CandidateSymbols.IsDefaultOrEmpty;
+        }
+        private bool ReferencesOutParameter(ExpressionSyntax expression) =>
+            expression.DescendantNodesAndSelf()
+                .OfType<IdentifierNameSyntax>()
+                .Select(identifier =>
+                    _semanticModel.GetSymbolInfo(identifier, _cancellationToken).Symbol)
+                .OfType<IParameterSymbol>()
+                .Any(parameter =>
+                    parameter.RefKind == RefKind.Out &&
+                    SymbolEq.AreEqual(
+                        parameter.ContainingSymbol?.OriginalDefinition,
+                        _methodSymbol.OriginalDefinition));
     }
 }

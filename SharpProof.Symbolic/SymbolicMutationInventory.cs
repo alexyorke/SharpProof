@@ -82,7 +82,10 @@ internal sealed class SymbolicMutationInventory(
         foreach (var entry in entries) {
             if (entry.Target is { } target) {
                 var targets = LowerTargetInvalidations(target, semanticModel, cancellationToken);
-                if (targets.IsDefaultOrEmpty) unsupported = true;
+                if (targets.IsDefaultOrEmpty) {
+                    if (!IsFreshInitializerMutation(target))
+                        unsupported = true;
+                }
                 else steps.Add(new(targets, target.Span, "operation-transfer.mutation-invalidation"));
                 continue;
             }
@@ -95,6 +98,15 @@ internal sealed class SymbolicMutationInventory(
                         "operation-transfer.reference-invalidation"));
         }
         return new(steps.ToImmutable(), unsupported);
+    }
+    private static bool IsFreshInitializerMutation(ExpressionSyntax target) {
+        foreach (var ancestor in target.Ancestors()) {
+            if (ancestor is BaseObjectCreationExpressionSyntax or WithExpressionSyntax)
+                return true;
+            if (ancestor is StatementSyntax)
+                return false;
+        }
+        return false;
     }
     internal static ImmutableArray<SymbolicInvalidationTarget> LowerTargetInvalidations(
         ExpressionSyntax target, SemanticModel semanticModel, CancellationToken cancellationToken) {
