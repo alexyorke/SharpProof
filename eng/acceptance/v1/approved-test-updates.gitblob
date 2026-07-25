@@ -1,5 +1,5 @@
 # Exact post-baseline test updates approved without replacing the pinned baseline blob.
-# NullableContractVerificationTests.cs has additive TDD coverage only (6539 added
+# NullableContractVerificationTests.cs has additive TDD coverage only (6695 added
 # lines, no removed lines) from f7694bdf, e15f487a, 5527f4c5, and the aliased
 # conditional output, chained/assigned-alias,
 # boolean-wrapper/algebra/identity-conversion, logical/conditional-implication,
@@ -20,9 +20,10 @@
 # empty-sequence-composition/uniform-generator/materialization/subset-filter
 # and multi-source/source-element/set-composition/constant-projection/
 # source-method-summary/static-dispatch/helper-call/branch-expression/
-# block-return/local-value/numeric-bound reachability,
+# block-return/local-value/numeric-bound/sign-negation/identity-conversion
+# reachability,
 # alias-snapshot, captured-alias,
 # predicate-semantics/mutation,
 # mutated-output, direct-output,
 # local-function, and loop cases.
-beac85ff934d7ef3e4845fb0d538d51fa4e47205  SharpProof.Test/NullableContractVerificationTests.cs
+193068c7b5e1bd9d7b01eb927bc5c6b95e6d0c39  SharpProof.Test/NullableContractVerificationTests.cs

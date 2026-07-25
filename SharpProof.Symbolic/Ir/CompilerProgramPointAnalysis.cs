@@ -977,9 +977,21 @@ internal static class CompilerProgramPointAnalysis {
              !method.IsOverride ||
              method.IsSealed ||
              method.ContainingType.IsSealed);
+        private enum Int32Bound {
+            NonPositive,
+            NonNegative
+        }
         private bool SourceMethodReturnsOnlyNonPositiveValues(
             IMethodSymbol method,
-            HashSet<ISymbol> callPath) {
+            HashSet<ISymbol> callPath) =>
+            SourceMethodReturnsOnlyBoundValues(
+                method,
+                callPath,
+                Int32Bound.NonPositive);
+        private bool SourceMethodReturnsOnlyBoundValues(
+            IMethodSymbol method,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
             var nextCallPath = new HashSet<ISymbol>(callPath, SymbolEqualityComparer.Default);
             if (!nextCallPath.Add(method.OriginalDefinition))
                 return false;
@@ -995,10 +1007,11 @@ internal static class CompilerProgramPointAnalysis {
                 };
                 if (expressionBody != null) {
                     foundBody = true;
-                    if (!ExpressionDefinitelyProducesNonPositiveInt32(
+                    if (!ExpressionDefinitelyProducesInt32Bound(
                             expressionBody,
                             model,
-                            nextCallPath))
+                            nextCallPath,
+                            bound))
                         return false;
                     continue;
                 }
@@ -1010,7 +1023,11 @@ internal static class CompilerProgramPointAnalysis {
                 if (body == null)
                     continue;
                 foundBody = true;
-                if (!BlockReturnsOnlyNonPositiveValues(body, model, nextCallPath))
+                if (!BlockReturnsOnlyInt32BoundValues(
+                        body,
+                        model,
+                        nextCallPath,
+                        bound))
                     return false;
             }
             return foundBody;
@@ -1018,7 +1035,17 @@ internal static class CompilerProgramPointAnalysis {
         private bool BlockReturnsOnlyNonPositiveValues(
             BlockSyntax body,
             SemanticModel model,
-            HashSet<ISymbol> callPath) {
+            HashSet<ISymbol> callPath) =>
+            BlockReturnsOnlyInt32BoundValues(
+                body,
+                model,
+                callPath,
+                Int32Bound.NonPositive);
+        private bool BlockReturnsOnlyInt32BoundValues(
+            BlockSyntax body,
+            SemanticModel model,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
             var returns = body.DescendantNodes(node =>
                     node is not AnonymousFunctionExpressionSyntax and
                         not LocalFunctionStatementSyntax)
@@ -1027,57 +1054,108 @@ internal static class CompilerProgramPointAnalysis {
             return returns.Length != 0 &&
                    returns.All(statement =>
                        statement.Expression != null &&
-                       ExpressionDefinitelyProducesNonPositiveInt32(
+                       ExpressionDefinitelyProducesInt32Bound(
                            statement.Expression,
                            model,
-                           callPath));
+                           callPath,
+                           bound));
         }
         private bool ExpressionDefinitelyProducesNonPositiveInt32(
             ExpressionSyntax expression,
             SemanticModel model,
-            HashSet<ISymbol> callPath) {
+            HashSet<ISymbol> callPath) =>
+            ExpressionDefinitelyProducesInt32Bound(
+                expression,
+                model,
+                callPath,
+                Int32Bound.NonPositive);
+        private bool ExpressionDefinitelyProducesInt32Bound(
+            ExpressionSyntax expression,
+            SemanticModel model,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
             if (model.GetConstantValue(expression, cancellationToken) is {
                 HasValue: true,
                 Value: int constant
             })
-                return constant <= 0;
+                return Int32ConstantSatisfiesBound(constant, bound);
             var operation = model.GetOperation(expression, cancellationToken);
             return operation != null &&
-                   OperationDefinitelyProducesNonPositiveInt32(operation, model, callPath);
+                   OperationDefinitelyProducesInt32Bound(
+                       operation,
+                       model,
+                       callPath,
+                       bound);
         }
         private bool OperationDefinitelyProducesNonPositiveInt32(
             IOperation operation,
             SemanticModel model,
-            HashSet<ISymbol> callPath) {
-            while (operation is IConversionOperation conversion)
+            HashSet<ISymbol> callPath) =>
+            OperationDefinitelyProducesInt32Bound(
+                operation,
+                model,
+                callPath,
+                Int32Bound.NonPositive);
+        private bool OperationDefinitelyProducesInt32Bound(
+            IOperation operation,
+            SemanticModel model,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
+            while (operation is IConversionOperation {
+                Conversion.IsIdentity: true
+            } conversion)
                 operation = conversion.Operand;
             if (operation.ConstantValue is {
                 HasValue: true,
                 Value: int constant
             })
-                return constant <= 0;
+                return Int32ConstantSatisfiesBound(constant, bound);
             return operation switch {
+                IConversionOperation { Operand: IThrowOperation } => true,
                 IConditionalOperation {
                     WhenTrue: { } whenTrue,
                     WhenFalse: { } whenFalse
                 } =>
-                    OperationDefinitelyProducesNonPositiveInt32(
-                        whenTrue, model, callPath) &&
-                    OperationDefinitelyProducesNonPositiveInt32(
-                        whenFalse, model, callPath),
+                    OperationDefinitelyProducesInt32Bound(
+                        whenTrue, model, callPath, bound) &&
+                    OperationDefinitelyProducesInt32Bound(
+                        whenFalse, model, callPath, bound),
                 ISwitchExpressionOperation { Arms.Length: > 0 } switchExpression =>
                     switchExpression.Arms.All(arm =>
-                        OperationDefinitelyProducesNonPositiveInt32(
-                            arm.Value, model, callPath)),
+                        OperationDefinitelyProducesInt32Bound(
+                            arm.Value, model, callPath, bound)),
                 IThrowOperation => true,
+                IUnaryOperation {
+                    OperatorKind: UnaryOperatorKind.Plus,
+                    OperatorMethod: null,
+                    Type.SpecialType: SpecialType.System_Int32,
+                    Operand.Type.SpecialType: SpecialType.System_Int32
+                } unary =>
+                    OperationDefinitelyProducesInt32Bound(
+                        unary.Operand, model, callPath, bound),
+                IUnaryOperation {
+                    OperatorKind: UnaryOperatorKind.Minus,
+                    OperatorMethod: null,
+                    Type.SpecialType: SpecialType.System_Int32,
+                    Operand.Type.SpecialType: SpecialType.System_Int32
+                } unary when
+                    bound == Int32Bound.NonPositive ||
+                    unary.IsChecked =>
+                    OperationDefinitelyProducesInt32Bound(
+                        unary.Operand,
+                        model,
+                        callPath,
+                        bound == Int32Bound.NonPositive
+                            ? Int32Bound.NonNegative
+                            : Int32Bound.NonPositive),
                 ILocalReferenceOperation {
                     Local.Type.SpecialType: SpecialType.System_Int32
                 } local =>
-                    LocalReferenceDefinitelyProducesNonPositiveInt32(
-                        local, model, callPath),
+                    LocalReferenceDefinitelyProducesInt32Bound(
+                        local, model, callPath, bound),
                 IInvocationOperation math
-                    when KnownMathInvocationDefinitelyProducesNonPositiveInt32(
-                        math, model, callPath) =>
+                    when KnownMathInvocationDefinitelyProducesInt32Bound(
+                        math, model, callPath, bound) =>
                     true,
                 IInvocationOperation {
                     TargetMethod: {
@@ -1085,14 +1163,24 @@ internal static class CompilerProgramPointAnalysis {
                         MethodKind: MethodKind.Ordinary or MethodKind.LocalFunction
                     } targetMethod
                 } when IsStaticallyDispatchedDimensionSelector(targetMethod) =>
-                    SourceMethodReturnsOnlyNonPositiveValues(targetMethod, callPath),
+                    SourceMethodReturnsOnlyBoundValues(
+                        targetMethod,
+                        callPath,
+                        bound),
                 _ => false
             };
         }
-        private bool KnownMathInvocationDefinitelyProducesNonPositiveInt32(
+        private static bool Int32ConstantSatisfiesBound(
+            int constant,
+            Int32Bound bound) =>
+            bound == Int32Bound.NonPositive
+                ? constant <= 0
+                : constant >= 0;
+        private bool KnownMathInvocationDefinitelyProducesInt32Bound(
             IInvocationOperation invocation,
             SemanticModel model,
-            HashSet<ISymbol> callPath) {
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
             var method = invocation.TargetMethod.OriginalDefinition;
             if (method.ReturnType.SpecialType != SpecialType.System_Int32 ||
                 method.Parameters.Any(parameter =>
@@ -1102,31 +1190,54 @@ internal static class CompilerProgramPointAnalysis {
                 containingType.ContainingNamespace.ToDisplayString() != "System" ||
                 containingType.Name != "Math")
                 return false;
+            if (method.Name == nameof(Math.Abs))
+                return bound == Int32Bound.NonNegative &&
+                       invocation.Arguments.Length == 1;
+            if (method.Name == nameof(Math.Sign))
+                return invocation.Arguments.Length == 1 &&
+                       OperationDefinitelyProducesInt32Bound(
+                           invocation.Arguments[0].Value,
+                           model,
+                           callPath,
+                           bound);
             if (method.Name is nameof(Math.Min) or nameof(Math.Max)) {
                 var values = invocation.Arguments
                     .Select(argument => argument.Value)
                     .ToArray();
-                return values.Length == 2 &&
-                       (method.Name == nameof(Math.Min)
-                           ? values.Any(value =>
-                               OperationDefinitelyProducesNonPositiveInt32(
-                                   value, model, callPath))
-                           : values.All(value =>
-                               OperationDefinitelyProducesNonPositiveInt32(
-                                   value, model, callPath)));
+                if (values.Length != 2)
+                    return false;
+                var oneBoundArgumentIsEnough =
+                    method.Name == nameof(Math.Min) &&
+                    bound == Int32Bound.NonPositive ||
+                    method.Name == nameof(Math.Max) &&
+                    bound == Int32Bound.NonNegative;
+                return oneBoundArgumentIsEnough
+                    ? values.Any(value =>
+                        OperationDefinitelyProducesInt32Bound(
+                            value, model, callPath, bound))
+                    : values.All(value =>
+                        OperationDefinitelyProducesInt32Bound(
+                            value, model, callPath, bound));
             }
             if (method.Name != "Clamp")
                 return false;
-            var maximum = invocation.Arguments.FirstOrDefault(argument =>
-                argument.Parameter?.Name == "max")?.Value;
-            return maximum != null &&
-                   OperationDefinitelyProducesNonPositiveInt32(
-                       maximum, model, callPath);
+            var boundingParameter = bound == Int32Bound.NonPositive
+                ? "max"
+                : "min";
+            var boundingArgument = invocation.Arguments.FirstOrDefault(argument =>
+                argument.Parameter?.Name == boundingParameter)?.Value;
+            return boundingArgument != null &&
+                   OperationDefinitelyProducesInt32Bound(
+                       boundingArgument,
+                       model,
+                       callPath,
+                       bound);
         }
-        private bool LocalReferenceDefinitelyProducesNonPositiveInt32(
+        private bool LocalReferenceDefinitelyProducesInt32Bound(
             ILocalReferenceOperation reference,
             SemanticModel model,
-            HashSet<ISymbol> callPath) {
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
             if (reference.Syntax is not ExpressionSyntax use ||
                 reference.Local.DeclaringSyntaxReferences.FirstOrDefault() is not { } declarationReference)
                 return false;
@@ -1146,10 +1257,11 @@ internal static class CompilerProgramPointAnalysis {
                     true,
                     out var value))
                 return false;
-            return ExpressionDefinitelyProducesNonPositiveInt32(
+            return ExpressionDefinitelyProducesInt32Bound(
                 value,
                 model,
-                nextCallPath);
+                nextCallPath,
+                bound);
         }
         private bool DefinitelyProvidesPositiveDimensionCount(ExpressionSyntax count) {
             var visited = new HashSet<SyntaxNode>();
