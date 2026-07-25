@@ -36,6 +36,7 @@ internal static class MethodRequiresAnalyzer {
                         contract.SourceMethod,
                         callSite.Method,
                         callSite.Arguments,
+                        callSite.Receiver,
                         out var rewrittenCondition)) {
                     ContractConditionHelpers.ReportUnsupported(
                         context, callSite.Method, contract, "condition rewrite failure", CreateUnsupportedDiagnostic,
@@ -69,12 +70,14 @@ internal static class MethodRequiresAnalyzer {
                 builder.Add(new RequiresCallSite(
                     invocation.TargetMethod,
                     CreateArgumentMap(invocation.TargetMethod, invocation.Arguments),
+                    GetExplicitReceiver(invocation.Instance),
                     invocation.Syntax));
                 break;
             case IObjectCreationOperation { Constructor: { } constructor } objectCreation:
                 builder.Add(new RequiresCallSite(
                     constructor,
                     CreateArgumentMap(constructor, objectCreation.Arguments),
+                    null,
                     objectCreation.Syntax));
                 break;
             case IPropertyReferenceOperation propertyReference when !IsMutationTarget(propertyReference):
@@ -179,7 +182,11 @@ internal static class MethodRequiresAnalyzer {
             if (valueParameter != null)
                 arguments = arguments.SetItem(valueParameter.Name, (ExpressionSyntax)setterValue.WithoutTrivia());
         }
-        builder.Add(new RequiresCallSite(accessor, arguments, syntax ?? propertyReference.Syntax));
+        builder.Add(new RequiresCallSite(
+            accessor,
+            arguments,
+            GetExplicitReceiver(propertyReference.Instance),
+            syntax ?? propertyReference.Syntax));
     }
     private static void AddOperator(
         ImmutableArray<RequiresCallSite>.Builder builder,
@@ -191,7 +198,7 @@ internal static class MethodRequiresAnalyzer {
         for (var index = 0; index < operands.Length && index < operatorMethod.Parameters.Length; index++)
             if (operands[index].Syntax is ExpressionSyntax expression)
                 arguments[operatorMethod.Parameters[index].Name] = (ExpressionSyntax)expression.WithoutTrivia();
-        builder.Add(new RequiresCallSite(operatorMethod, arguments.ToImmutable(), syntax));
+        builder.Add(new RequiresCallSite(operatorMethod, arguments.ToImmutable(), null, syntax));
     }
     private static ImmutableDictionary<string, ExpressionSyntax> CreateArgumentMap(
         IMethodSymbol method,
@@ -206,6 +213,10 @@ internal static class MethodRequiresAnalyzer {
         }
         return result.ToImmutable();
     }
+    private static ExpressionSyntax? GetExplicitReceiver(IOperation? instance) =>
+        instance is { IsImplicit: false, Syntax: ExpressionSyntax expression }
+            ? (ExpressionSyntax)expression.WithoutTrivia()
+            : null;
     private static Diagnostic CreateNotProvenDiagnostic(
         IMethodSymbol methodSymbol,
         string condition,
@@ -239,5 +250,6 @@ internal static class MethodRequiresAnalyzer {
     readonly record struct RequiresCallSite(
         IMethodSymbol Method,
         ImmutableDictionary<string, ExpressionSyntax> Arguments,
+        ExpressionSyntax? Receiver,
         SyntaxNode Syntax);
 }

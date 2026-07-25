@@ -202,7 +202,8 @@ public sealed class SharpProofAnalysisSession : IDisposable {
                 AnalyzeProofFacts(request, target, result, cancellationToken);
             if ((request.Facets & SharpProofAnalysisFacet.RuntimeHazards) != 0)
                 AnalyzeHazards(target, result, cancellationToken);
-            if ((request.Facets & SharpProofAnalysisFacet.Complexity) != 0)
+            if ((request.Facets & SharpProofAnalysisFacet.Complexity) != 0 &&
+                request.Target.Kind is not (SharpProofTargetKind.Span or SharpProofTargetKind.AllLines))
                 AnalyzeComplexity(target, result);
             return result.Build();
         }

@@ -51,6 +51,9 @@ public sealed class MetadataMethodEffectAnalyzerTests {
                     return values;
                 }
                 public static void FieldWrite(MutableBox value) { value.Value = 1; }
+                public static void CallNonVirtual(NonVirtualCall target, MutableBox value) {
+                    target.Mutate(value);
+                }
                 public static int FieldRead(MutableBox value) => value.Value;
                 public static MutableBox Identity(MutableBox value) => value;
                 public static void FieldWriteViaIdentity(MutableBox value) { Identity(value).Value = 1; }
@@ -139,6 +142,9 @@ public sealed class MetadataMethodEffectAnalyzerTests {
             }
             public class WithEffect {
                 public WithEffect() { Effects.State++; }
+            }
+            public class NonVirtualCall {
+                public void Mutate(MutableBox value) { Effects.FieldWrite(value); }
             }
             public class VirtualBase {
                 public virtual void Work() { }
@@ -659,6 +665,17 @@ public sealed class MetadataMethodEffectAnalyzerTests {
         Assert.Multiple(() => {
             Assert.That(effects.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.True);
             Assert.That(effects.Purity, Is.EqualTo(SharpProofVerdict.Unknown));
+        });
+    }
+    [Test]
+    public void MetadataCallvirtToNonVirtualMethodIsAnalyzedRecursively() {
+        var effects = Analyze(
+            "static void M(MetadataFixture.NonVirtualCall target, MetadataFixture.MutableBox value) => MetadataFixture.Effects.CallNonVirtual(target, value);");
+        Assert.Multiple(() => {
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.WritesArgumentState), Is.True);
+            Assert.That(effects.Effects.HasFlag(SharpProofEffect.DispatchUncertainty), Is.False);
+            Assert.That(effects.UnknownReasons, Has.None.Property(nameof(SharpProofUnknownReason.Message))
+                .EqualTo("metadata_virtual_dispatch_unresolved"));
         });
     }
     [Test]

@@ -39,7 +39,15 @@
 # effect-contract decoding, capability propagation, cross-tree effect-site,
 # CFG-bottom/truncation, old-value snapshot, constructor sequencing,
 # closure-cell capture, initializer setter, and span-slice cases.
-059a63cc52e1256270b986b9c9aa82f88278762c  SharpProof.Test/NullableContractVerificationTests.cs
+# instance-receiver Requires, annotation-independent Ensures, and transitive
+# exception source-tree cases.
+a6f13a6124966f535fc612a816acc9b688f29702  SharpProof.Test/NullableContractVerificationTests.cs
+# MetadataMethodEffectAnalyzerTests.cs adds a callvirt regression proving that
+# non-virtual instance methods are analyzed recursively.
+3c67608a618c3c452ab60d0933bf6b6b0197b17e  SharpProof.Test/MetadataMethodEffectAnalyzerTests.cs
+# SharpProofAnalysisSessionTests.cs adds default-facet coverage for span and
+# all-lines targets.
+4c6646119ed5578fbc59df91fec5913f87881b27  SharpProof.ToolingTest/SharpProofAnalysisSessionTests.cs
 # MethodEffectsTests.cs updates synchronization-read expectations to include the
 # synchronization effect required by the capability model.
 f7e4c319512795895f0772d575227425afa90b6c  SharpProof.Test/MethodEffectsTests.cs

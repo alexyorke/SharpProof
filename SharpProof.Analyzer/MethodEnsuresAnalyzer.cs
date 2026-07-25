@@ -168,13 +168,12 @@ internal static class MethodEnsuresAnalyzer {
         [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ExpressionSyntax? rewrittenExpression) {
         rewrittenCondition = conditionText;
         rewrittenExpression = null;
+        _ = resultState;
         if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
         if (completionSite.ResultExpression == null) {
             rewrittenExpression = conditionExpression;
             return true;
         }
-        if (resultState == NullableFlowFactState.NotNull)
-            conditionExpression = (ExpressionSyntax)new NullableResultContractRewriter().Visit(conditionExpression)!;
         var rewriter = new ResultPlaceholderRewriter((ExpressionSyntax)completionSite.ResultExpression.WithoutTrivia());
         var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
         rewrittenCondition = rewritten.ToFullString();
@@ -265,31 +264,6 @@ internal static class MethodEnsuresAnalyzer {
                 return base.VisitIdentifierName(node);
             return _replacement.WithTriviaFrom(node);
         }
-    }
-    sealed class NullableResultContractRewriter : CSharpSyntaxRewriter {
-        public override SyntaxNode? VisitBinaryExpression(BinaryExpressionSyntax node) {
-            if ((node.IsKind(SyntaxKind.EqualsExpression) ||
-                 node.IsKind(SyntaxKind.NotEqualsExpression)) &&
-                ((IsResult(node.Left) && IsNull(node.Right)) ||
-                 (IsNull(node.Left) && IsResult(node.Right))))
-                return SyntaxFactory.LiteralExpression(
-                        node.IsKind(SyntaxKind.NotEqualsExpression)
-                            ? SyntaxKind.TrueLiteralExpression
-                            : SyntaxKind.FalseLiteralExpression)
-                    .WithTriviaFrom(node);
-            return base.VisitBinaryExpression(node);
-        }
-        public override SyntaxNode? VisitIsPatternExpression(IsPatternExpressionSyntax node) {
-            if (!IsResult(node.Expression) ||
-                !CSharpSyntaxFacts.TryGetNullPatternPolarity(node.Pattern, out var matchesNonNull))
-                return base.VisitIsPatternExpression(node);
-            return SyntaxFactory.LiteralExpression(matchesNonNull ? SyntaxKind.TrueLiteralExpression : SyntaxKind.FalseLiteralExpression)
-                .WithTriviaFrom(node);
-        }
-        private static bool IsResult(ExpressionSyntax expression) => expression is IdentifierNameSyntax identifier &&
-                   string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal);
-        private static bool IsNull(ExpressionSyntax expression) =>
-            expression.IsKind(SyntaxKind.NullLiteralExpression);
     }
     sealed class OldValueSnapshotBuilder(SemanticModel semanticModel, IMethodSymbol methodSymbol, CancellationToken cancellationToken) {
         private readonly CancellationToken _cancellationToken = cancellationToken;

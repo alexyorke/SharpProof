@@ -28,6 +28,27 @@ public sealed class SharpProofAnalysisSessionTests {
             Assert.That(result.Error, Is.Null);
         });
     }
+    [TestCase(SharpProofTargetKind.AllLines)]
+    [TestCase(SharpProofTargetKind.Span)]
+    public void DefaultFacetsWorkForMultiPointTargets(SharpProofTargetKind kind) {
+        const string source = """
+            class C {
+                static int M(int value) {
+                    return value + 1;
+                }
+            }
+            """;
+        using var session = SharpProofAnalysisSession.FromText(source);
+        var target = kind == SharpProofTargetKind.Span
+            ? new SharpProofTarget(kind, SpanStart: 0, SpanEnd: source.Length)
+            : new SharpProofTarget(kind);
+        var result = session.Analyze(new SharpProofAnalysisRequest(target));
+        Assert.Multiple(() => {
+            Assert.That(result.Status, Is.Not.EqualTo(SharpProofQueryStatus.Failed));
+            Assert.That(result.MethodEffects, Is.Not.Null);
+            Assert.That(result.Error, Is.Null);
+        });
+    }
     [Test]
     public void RuntimeHazardsUseTheCanonicalSessionAndRemainUnknownWhenUnproven() {
         using var session = SharpProofAnalysisSession.FromText("""

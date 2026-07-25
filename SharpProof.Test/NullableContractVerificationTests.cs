@@ -10583,6 +10583,86 @@ public sealed class NullableContractVerificationTests {
                     fact.Escape != SharpProof.Symbolic.SharpProofVerdict.Disproven));
         });
     }
+    [Test]
+    public async Task PotentialBugRegression_InstanceRequiresUsesCallReceiver() {
+        const string source = """
+            using SharpProof.Attributes;
+            public sealed class C {
+                private bool ready;
+                [Requires("this.ready")]
+                private void Required() { }
+                public void M(C other) {
+                    ready = true;
+                    other.ready = false;
+                    other.Required();
+                }
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0028"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public async Task PotentialBugRegression_NonNullableAnnotationDoesNotProveEnsures() {
+        const string source = """
+            #nullable enable
+            using SharpProof.Attributes;
+            public static class C {
+                [Ensures("result != null")]
+                public static string M() => null!;
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0018"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public void PotentialBugRegression_TransitiveExceptionRetainsForeignSourceTree() {
+        const string calleeSource = """
+            public static class Callee {
+                public static void Fail() => throw new System.InvalidOperationException();
+            }
+            """;
+        const string callerSource = """
+            public static class Caller {
+                public static void M() => Callee.Fail();
+            }
+            """;
+        var (_, seedModel) = CreateSemanticModel(calleeSource);
+        var parseOptions = (Microsoft.CodeAnalysis.CSharp.CSharpParseOptions)
+            seedModel.SyntaxTree.Options;
+        var calleeTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+            calleeSource,
+            parseOptions,
+            "Callee.cs");
+        var callerTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+            callerSource,
+            parseOptions,
+            "Caller.cs");
+        var compilation = seedModel.Compilation
+            .RemoveAllSyntaxTrees()
+            .AddSyntaxTrees(calleeTree, callerTree);
+        var model = compilation.GetSemanticModel(callerTree);
+        var declaration = callerTree.GetRoot()
+            .DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+            .Single();
+        var method = (Microsoft.CodeAnalysis.IMethodSymbol)
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(
+                model,
+                declaration)!;
+        var effects = new SharpProof.Symbolic.MethodEffectAnalysisSession(
+            compilation,
+            CancellationToken.None)
+            .Analyze(method, declaration, model);
+        var fact = effects.ExceptionFacts.Single(static candidate =>
+            candidate.ExceptionType == "System.InvalidOperationException");
+        Assert.That(fact.SourceTree, Is.SameAs(calleeTree));
+    }
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)

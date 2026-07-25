@@ -34,12 +34,29 @@ internal static class RequiresContractHelpers {
         IMethodSymbol contractMethod,
         IMethodSymbol invokedMethod,
         IReadOnlyDictionary<string, ExpressionSyntax> arguments,
+        out string rewrittenCondition) =>
+        TryRewriteForArguments(
+            conditionText,
+            contractMethod,
+            invokedMethod,
+            arguments,
+            null,
+            out rewrittenCondition);
+    internal static bool TryRewriteForArguments(
+        string conditionText,
+        IMethodSymbol contractMethod,
+        IMethodSymbol invokedMethod,
+        IReadOnlyDictionary<string, ExpressionSyntax> arguments,
+        ExpressionSyntax? receiver,
         out string rewrittenCondition) {
         rewrittenCondition = conditionText;
         if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
         var typeReplacements = CreateTypeParameterReplacements(contractMethod, invokedMethod);
         var parameterReplacements = CreateParameterReplacements(contractMethod, invokedMethod, arguments);
-        var rewriter = new ParameterPlaceholderRewriter(parameterReplacements, typeReplacements);
+        var rewriter = new ParameterPlaceholderRewriter(
+            parameterReplacements,
+            typeReplacements,
+            receiver);
         var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
         rewrittenCondition = rewritten.ToFullString();
         return true;
@@ -99,9 +116,15 @@ internal static class RequiresContractHelpers {
     }
     sealed class ParameterPlaceholderRewriter(
         IReadOnlyDictionary<string, ExpressionSyntax> replacements,
-        IReadOnlyDictionary<string, TypeSyntax> typeReplacements) : CSharpSyntaxRewriter {
+        IReadOnlyDictionary<string, TypeSyntax> typeReplacements,
+        ExpressionSyntax? receiver) : CSharpSyntaxRewriter {
         private readonly IReadOnlyDictionary<string, ExpressionSyntax> _replacements = replacements;
         private readonly IReadOnlyDictionary<string, TypeSyntax> _typeReplacements = typeReplacements;
+        private readonly ExpressionSyntax? _receiver = receiver;
+        public override SyntaxNode? VisitThisExpression(ThisExpressionSyntax node) =>
+            _receiver == null
+                ? base.VisitThisExpression(node)
+                : SyntaxFactory.ParenthesizedExpression(_receiver).WithTriviaFrom(node);
         public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node) {
             if (CSharpSyntaxFacts.IsMemberOrQualifiedNameRightSide(node))
                 return base.VisitIdentifierName(node);

@@ -244,18 +244,23 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
                         case MetadataEffectAction.Call:
                             effects |= SharpProofEffect.DirectCall;
                             var virtualCall = instruction.Code == OpCodes.Callvirt;
-                            if (virtualCall)
-                                MarkUnknown(
-                                    "metadata_virtual_dispatch_unresolved",
-                                    SharpProofEffect.DispatchUncertainty,
-                                    true);
                             var called = MetadataTokens.Handle(operand);
                             var resolved = TryResolveMethod(
                                 location.Path,
                                 reader,
                                 called,
                                 out var calledLocation);
-                            if (!virtualCall && resolved) {
+                            var uncertainDispatch =
+                                virtualCall &&
+                                (!resolved || RequiresVirtualDispatch(calledLocation));
+                            if (uncertainDispatch)
+                                MarkUnknown(
+                                    "metadata_virtual_dispatch_unresolved",
+                                    SharpProofEffect.DispatchUncertainty,
+                                    true);
+                            if (resolved && !uncertainDispatch) {
+                                if (virtualCall)
+                                    hasUnknownExceptionBoundary = true;
                                 VisitDeclaringInitializer(calledLocation, requireStaticMember: true);
                                 var calledReturn = Visit(calledLocation, depth + 1, invocationContext);
                                 if (invocationReturnsValue)
@@ -320,6 +325,13 @@ internal sealed class MetadataMethodEffectAnalyzer(Compilation compilation) {
     }
     private static bool IsInternalStorage(MetadataValueOrigin? origin) =>
         origin is MetadataValueOrigin.Fresh or MetadataValueOrigin.Local;
+    private static bool RequiresVirtualDispatch(MethodLocation location) {
+        using var stream = File.OpenRead(location.Path);
+        using var pe = new PEReader(stream, PEStreamOptions.PrefetchMetadata);
+        var definition = pe.GetMetadataReader().GetMethodDefinition(location.Handle);
+        return (definition.Attributes & MethodAttributes.Virtual) != 0 &&
+               (definition.Attributes & MethodAttributes.Final) == 0;
+    }
     private static ImmutableDictionary<short, MetadataOpcodeModel> BuildOpcodeModels() =>
         OpCodesByValue.Values.ToImmutableDictionary(
             static opcode => opcode.Value,
