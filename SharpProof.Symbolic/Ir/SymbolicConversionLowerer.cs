@@ -156,6 +156,8 @@ internal static class SymbolicConversionLowerer {
         if (!TryGetUnsignedCastOperand(binaryExpression.Left, context, out var indexExpression, out var leftUnsignedType) ||
             !TryGetUnsignedCastOperand(binaryExpression.Right, context, out var lengthExpression, out var rightUnsignedType) ||
             leftUnsignedType != rightUnsignedType ||
+            !HasMatchingSignedSourceType(indexExpression, leftUnsignedType, context) ||
+            !HasMatchingSignedSourceType(lengthExpression, rightUnsignedType, context) ||
             !IsKnownNonNegativeIntegralExpression(lengthExpression, context) ||
             !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(indexExpression, context), out var index) ||
             index.Kind != SmtValueKind.Int ||
@@ -188,6 +190,19 @@ internal static class SymbolicConversionLowerer {
         operand = null!;
         unsignedType = SpecialType.None;
         return false;
+    }
+    private static bool HasMatchingSignedSourceType(
+        ExpressionSyntax expression,
+        SpecialType unsignedType,
+        SymbolicLoweringContext context) {
+        var sourceType = context.SemanticModel.GetTypeInfo(
+            expression,
+            context.CancellationToken).Type?.SpecialType;
+        return unsignedType switch {
+            SpecialType.System_UInt32 => sourceType == SpecialType.System_Int32,
+            SpecialType.System_UInt64 => sourceType == SpecialType.System_Int64,
+            _ => false
+        };
     }
     private static bool IsKnownNonNegativeIntegralExpression(ExpressionSyntax expression, SymbolicLoweringContext context) {
         expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);

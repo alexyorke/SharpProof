@@ -156,7 +156,13 @@ internal sealed class SymbolicState {
         UnknownReason = unknownReason;
         Provenance = provenance?.ToImmutableArray() ?? [];
         ProofIndex = new FactIndex(Facts, PathConditions);
-        NormalizedProofKey = CreateProofKey(Facts, PathConditions, SymbolVersions, IsContradictory);
+        NormalizedProofKey = CreateProofKey(
+            Facts,
+            PathConditions,
+            SymbolVersions,
+            IsContradictory,
+            IsExact,
+            UnknownReason);
     }
     public ImmutableArray<SymbolicFact> Facts { get; }
     public ImmutableArray<SymbolicCondition> PathConditions { get; }
@@ -486,11 +492,15 @@ internal sealed class SymbolicState {
         ImmutableArray<SymbolicFact> facts,
         ImmutableArray<SymbolicCondition> conditions,
         ImmutableDictionary<string, int> symbolVersions,
-        bool isContradictory) {
-        if (isContradictory) return "contradictory:true";
+        bool isContradictory,
+        bool isExact,
+        SymbolicUnknownReason unknownReason) {
         var parts = new List<string> {
-            "contradictory:false"
+            "contradictory:" + (isContradictory ? "true" : "false"),
+            "exact:" + (isExact ? "true" : "false"),
+            "unknown:" + unknownReason
         };
+        if (isContradictory) return string.Join("\n", parts);
         parts.AddRange(symbolVersions
             .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
             .Select(static pair => "version:" + pair.Key + "=" + pair.Value.ToString(CultureInfo.InvariantCulture)));

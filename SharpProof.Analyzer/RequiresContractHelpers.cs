@@ -19,7 +19,9 @@ internal static class RequiresContractHelpers {
     internal static bool ContainsResultReference(ExpressionSyntax conditionExpression) => conditionExpression
             .DescendantNodesAndSelf()
             .OfType<IdentifierNameSyntax>()
-            .Any(IsResultPlaceholder);
+            .Any(identifier =>
+                IsResultPlaceholder(identifier) &&
+                !CSharpSyntaxFacts.IsMemberOrQualifiedNameRightSide(identifier));
     internal static bool IsResultPlaceholder(IdentifierNameSyntax identifier) =>
         string.Equals(identifier.Identifier.Text, "result", StringComparison.Ordinal);
     internal static bool ContainsUnsupportedResultReference(

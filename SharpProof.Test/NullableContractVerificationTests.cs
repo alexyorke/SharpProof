@@ -9879,6 +9879,130 @@ public sealed class NullableContractVerificationTests {
             string.Join(Environment.NewLine, diagnostics));
     }
     [Test]
+    public async Task PotentialBugRegression_InheritedEnsuresUsesItsOwnRequiresDomain() {
+        const string source = """
+            using SharpProof.Attributes;
+            public interface IPositive {
+                [Requires("value > 0")]
+                [Ensures("result > 0")]
+                int M(int value);
+            }
+            public interface INonPositive {
+                [Requires("value <= 0")]
+                int M(int value);
+            }
+            public sealed class C : IPositive, INonPositive {
+                public int M(int value) => 0;
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0018").Or.Contain("SP0019"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public async Task PotentialBugRegression_ResultNamedParameterShadowsEnsuresPlaceholder() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                [Requires("result == 1")]
+                [Ensures("result == 1")]
+                public static int M(int result) => 0;
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0018").And.Not.Contain("SP0019"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public async Task PotentialBugRegression_ResultNamedMemberIsAllowedOnVoidEnsures() {
+        const string source = """
+            using SharpProof.Attributes;
+            public sealed class Holder {
+                public int result = 1;
+            }
+            public static class C {
+                [Ensures("holder.result > 0")]
+                public static void M(Holder holder) { }
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.GetMessage()),
+            Has.None.Contains(
+                "result is not available for [Ensures] on void-returning members or constructors"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public async Task PotentialBugRegression_UserOldMethodUsesNormalCallSemantics() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                private static int old(int value) => value + 1;
+                [Ensures("old(value) == value + 1")]
+                public static int M(int value) => 0;
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.GetMessage()),
+            Has.None.Contains(
+                "old(...) expression is not supported by the current bounded proof engine"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public void PotentialBugRegression_ExactnessParticipatesInSymbolicStateIdentity() {
+        var exact = new SharpProof.Symbolic.Ir.SymbolicState();
+        var inexact = exact.MarkInexact(
+            SharpProof.Symbolic.SymbolicUnknownReason.UnsupportedIrEncoding,
+            new SharpProof.Symbolic.Ir.SymbolicLoweringProvenance(
+                "test",
+                default,
+                "inexact"));
+        Assert.That(inexact.NormalizedProofKey, Is.Not.EqualTo(exact.NormalizedProofKey));
+    }
+    [Test]
+    public void PotentialBugRegression_CurrentValuePreservesCapturedInitializerValue() {
+        const string source = """
+            #nullable enable
+            public static class C {
+                public static bool M() {
+                    object? source = null;
+                    var captured = source;
+                    source = new object();
+                    return captured == null;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(
+                source,
+                "return captured == null",
+                "captured == null").ProofFacts.Single().Status,
+            Is.EqualTo("ProvenTrue"));
+    }
+    [Test]
+    public async Task PotentialBugRegression_UnsignedBoundsRewriteRejectsNarrowingCasts() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                [Ensures("result")]
+                public static bool M() {
+                    long index = 1L << 32;
+                    return (uint)index < (uint)1;
+                }
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0018"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
     public void PotentialBugRegression_LinuxDlopenUsesGlobalFlag() {
         Assert.That(
             SharpProof.Symbolic.Smt.SmtNativeLibraryBootstrap.GetDlopenFlags(

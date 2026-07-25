@@ -26,11 +26,14 @@ internal static class MethodEnsuresAnalyzer {
                     CreateUnsupportedDiagnostic);
             return;
         }
-        var requiresAssumptions = CollectRequiresAssumptions(methodSymbol, context.CancellationToken);
         var completionSites = MethodCompletionAnalysis.Collect(proofContext);
         if (completionSites.Length == 0) return;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var contract in contracts) {
+            var requiresAssumptions = CollectRequiresAssumptions(
+                methodSymbol,
+                contract.SourceMethod,
+                context.CancellationToken);
             if (!RequiresContractHelpers.TryRewriteForMethod(
                     contract.Condition,
                     contract.SourceMethod,
@@ -168,10 +171,15 @@ internal static class MethodEnsuresAnalyzer {
     }
     private static ImmutableArray<ContractAttributeCondition> CollectRequiresAssumptions(
         IMethodSymbol methodSymbol,
+        IMethodSymbol ensuresSource,
         CancellationToken cancellationToken) {
         var assumptions = ImmutableArray.CreateBuilder<ContractAttributeCondition>();
         foreach (var contract in RequiresContractHelpers.ValidContracts(methodSymbol, cancellationToken)) {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!SymbolEq.AreEqual(
+                    contract.SourceMethod.OriginalDefinition,
+                    ensuresSource.OriginalDefinition))
+                continue;
             if (!RequiresContractHelpers.TryRewriteForMethod(
                     contract.Condition,
                     contract.SourceMethod,
@@ -254,7 +262,11 @@ internal static class MethodEnsuresAnalyzer {
             failureReason = "condition parse failure";
             return false;
         }
-        if (!ContainsOldValueInvocation(proofExpression)) return false;
+        if (!proofExpression
+                .DescendantNodesAndSelf()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(IsOldValueInvocation))
+            return false;
         if (!ContractConditionHelpers.TryCreateSpeculativeModel(
                 semanticModel,
                 speculativePosition,
@@ -263,6 +275,11 @@ internal static class MethodEnsuresAnalyzer {
             failureReason = "condition binding failure";
             return false;
         }
+        if (!ContainsOldValueInvocation(
+                proofExpression,
+                speculativeModel,
+                cancellationToken))
+            return false;
         var snapshots = new OldValueSnapshotBuilder(speculativeModel, methodSymbol, cancellationToken);
         var loweringContext = new SymbolicLoweringContext(
             speculativeModel,
@@ -283,13 +300,28 @@ internal static class MethodEnsuresAnalyzer {
         initialState = snapshots.CreateInitialState();
         return true;
     }
-    private static bool ContainsOldValueInvocation(ExpressionSyntax expression) => expression
+    private static bool ContainsOldValueInvocation(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) => expression
             .DescendantNodesAndSelf()
             .OfType<InvocationExpressionSyntax>()
-            .Any(IsOldValueInvocation);
+            .Any(invocation => IsContractOldValueInvocation(
+                invocation,
+                semanticModel,
+                cancellationToken));
     private static bool IsOldValueInvocation(InvocationExpressionSyntax invocation)
         => invocation.Expression is IdentifierNameSyntax identifier &&
                string.Equals(identifier.Identifier.ValueText, "old", StringComparison.Ordinal);
+    private static bool IsContractOldValueInvocation(
+        InvocationExpressionSyntax invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) {
+        if (!IsOldValueInvocation(invocation)) return false;
+        var symbolInfo = semanticModel.GetSymbolInfo(invocation, cancellationToken);
+        return symbolInfo.Symbol == null &&
+               symbolInfo.CandidateSymbols.IsDefaultOrEmpty;
+    }
     private static Diagnostic CreateNotProvenDiagnostic(
         IMethodSymbol methodSymbol,
         string condition,
@@ -400,14 +432,11 @@ internal static class MethodEnsuresAnalyzer {
         public SymbolicState CreateInitialState() =>
             new(_snapshotFacts);
         private bool IsContractOldValueInvocation(
-            InvocationExpressionSyntax invocation) {
-            if (!IsOldValueInvocation(invocation)) return false;
-            var symbolInfo = _semanticModel.GetSymbolInfo(
+            InvocationExpressionSyntax invocation) =>
+            MethodEnsuresAnalyzer.IsContractOldValueInvocation(
                 invocation,
+                _semanticModel,
                 _cancellationToken);
-            return symbolInfo.Symbol == null &&
-                   symbolInfo.CandidateSymbols.IsDefaultOrEmpty;
-        }
         private bool ReferencesOutParameter(ExpressionSyntax expression) =>
             expression.DescendantNodesAndSelf()
                 .OfType<IdentifierNameSyntax>()
