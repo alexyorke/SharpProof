@@ -966,10 +966,10 @@ internal static class CompilerProgramPointAnalysis {
                            ReturnType.SpecialType: SpecialType.System_Int32,
                            MethodKind: MethodKind.Ordinary or MethodKind.LocalFunction
                        } method &&
-                   IsStaticallyDispatchedDimensionSelector(method) &&
+                   IsStaticallyDispatchedBoundSource(method) &&
                    SourceMethodReturnsOnlyNonPositiveValues(method, callPath);
         }
-        private static bool IsStaticallyDispatchedDimensionSelector(IMethodSymbol method) =>
+        private static bool IsStaticallyDispatchedBoundSource(IMethodSymbol method) =>
             method.MethodKind == MethodKind.LocalFunction ||
             method.IsStatic ||
             !method.IsAbstract &&
@@ -1189,6 +1189,14 @@ internal static class CompilerProgramPointAnalysis {
                 } local =>
                     LocalReferenceDefinitelyProducesInt32Bound(
                         local, model, callPath, bound),
+                IPropertyReferenceOperation {
+                    Property.Type.SpecialType: SpecialType.System_Int32
+                } property
+                    when SourcePropertyReturnsOnlyBoundValues(
+                        property.Property,
+                        callPath,
+                        bound) =>
+                    true,
                 IInvocationOperation math
                     when KnownMathInvocationDefinitelyProducesInt32Bound(
                         math, model, callPath, bound) =>
@@ -1198,13 +1206,78 @@ internal static class CompilerProgramPointAnalysis {
                         ReturnType.SpecialType: SpecialType.System_Int32,
                         MethodKind: MethodKind.Ordinary or MethodKind.LocalFunction
                     } targetMethod
-                } when IsStaticallyDispatchedDimensionSelector(targetMethod) =>
+                } when IsStaticallyDispatchedBoundSource(targetMethod) =>
                     SourceMethodReturnsOnlyBoundValues(
                         targetMethod,
                         callPath,
                         bound),
                 _ => false
             };
+        }
+        private bool SourcePropertyReturnsOnlyBoundValues(
+            IPropertySymbol property,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
+            if (property.GetMethod is not { } getter ||
+                !IsStaticallyDispatchedBoundSource(getter))
+                return false;
+            var nextCallPath = new HashSet<ISymbol>(callPath, SymbolEqualityComparer.Default);
+            if (!nextCallPath.Add(getter.OriginalDefinition))
+                return false;
+            var foundBody = false;
+            foreach (var syntaxReference in property.DeclaringSyntaxReferences) {
+                cancellationToken.ThrowIfCancellationRequested();
+                var declaration = syntaxReference.GetSyntax(cancellationToken);
+                var model = semanticModel.Compilation.GetSemanticModel(declaration.SyntaxTree);
+                var expressionBody = declaration switch {
+                    PropertyDeclarationSyntax {
+                        ExpressionBody.Expression: { } expression
+                    } => expression,
+                    IndexerDeclarationSyntax {
+                        ExpressionBody.Expression: { } expression
+                    } => expression,
+                    _ => null
+                };
+                if (expressionBody != null) {
+                    foundBody = true;
+                    if (!ExpressionDefinitelyProducesInt32Bound(
+                            expressionBody,
+                            model,
+                            nextCallPath,
+                            bound))
+                        return false;
+                    continue;
+                }
+                var accessorList = declaration switch {
+                    PropertyDeclarationSyntax propertyDeclaration =>
+                        propertyDeclaration.AccessorList,
+                    IndexerDeclarationSyntax indexerDeclaration =>
+                        indexerDeclaration.AccessorList,
+                    _ => null
+                };
+                var getterDeclaration = accessorList?.Accessors.FirstOrDefault(accessor =>
+                    accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
+                if (getterDeclaration?.ExpressionBody?.Expression is { } getterExpression) {
+                    foundBody = true;
+                    if (!ExpressionDefinitelyProducesInt32Bound(
+                            getterExpression,
+                            model,
+                            nextCallPath,
+                            bound))
+                        return false;
+                    continue;
+                }
+                if (getterDeclaration?.Body is not { } getterBody)
+                    continue;
+                foundBody = true;
+                if (!BlockReturnsOnlyInt32BoundValues(
+                        getterBody,
+                        model,
+                        nextCallPath,
+                        bound))
+                    return false;
+            }
+            return foundBody;
         }
         private bool BuiltInIntegralConversionDefinitelyProducesInt32Bound(
             IConversionOperation operation,
