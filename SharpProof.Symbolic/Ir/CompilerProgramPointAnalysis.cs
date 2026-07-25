@@ -655,22 +655,70 @@ internal static class CompilerProgramPointAnalysis {
             var definition = targetMethod.OriginalDefinition;
             var containingType = definition.ContainingType;
             var knownFactory =
-                IsCoreLibraryType(containingType) &&
-                containingType.ContainingNamespace.ToDisplayString() == "System" &&
-                containingType.Name == "GC" &&
-                definition.Name is "AllocateArray" or "AllocateUninitializedArray" &&
-                targetMethod.ReturnType is IArrayTypeSymbol ||
-                containingType.SpecialType == SpecialType.System_Array &&
-                definition.Name == "CreateInstance";
+                (IsCoreLibraryType(containingType) &&
+                 containingType.ContainingNamespace.ToDisplayString() == "System" &&
+                 containingType.Name == "GC" &&
+                 definition.Name is "AllocateArray" or "AllocateUninitializedArray" &&
+                 targetMethod.ReturnType is IArrayTypeSymbol) ||
+                (containingType.SpecialType == SpecialType.System_Array &&
+                 definition.Name == "CreateInstance");
             if (!knownFactory)
                 return false;
-            foreach (var parameter in targetMethod.Parameters)
+            foreach (var parameter in targetMethod.Parameters) {
                 if (parameter.Type.SpecialType == SpecialType.System_Int32 &&
                     parameter.Name.StartsWith("length", StringComparison.Ordinal) &&
                     TryGetInvocationArgument(operation, parameter, out var length) &&
                     DefinitelyCapsSequenceAtZero(length))
                     return true;
+                if (parameter is {
+                    Name: "lengths",
+                    Type: IArrayTypeSymbol {
+                        Rank: 1,
+                        ElementType.SpecialType: SpecialType.System_Int32
+                    }
+                } &&
+                    TryGetInvocationArgument(operation, parameter, out var lengths) &&
+                    DefinitelyContainsZeroArrayDimension(lengths))
+                    return true;
+            }
             return false;
+        }
+        private bool DefinitelyContainsZeroArrayDimension(ExpressionSyntax dimensions) {
+            var visited = new HashSet<SyntaxNode>();
+            while (true) {
+                dimensions = SymbolicConversionLowerer.UnwrapIdentityConversions(
+                    dimensions,
+                    semanticModel,
+                    cancellationToken);
+                if (!visited.Add(dimensions))
+                    return false;
+                switch (dimensions) {
+                    case ArrayCreationExpressionSyntax { Initializer: { } initializer }:
+                        return initializer.Expressions.Any(DefinitelyCapsSequenceAtZero);
+                    case ImplicitArrayCreationExpressionSyntax { Initializer: { } initializer }:
+                        return initializer.Expressions.Any(DefinitelyCapsSequenceAtZero);
+                    case CollectionExpressionSyntax collection:
+                        foreach (var element in collection.Elements)
+                            if (element is ExpressionElementSyntax expression &&
+                                DefinitelyCapsSequenceAtZero(expression.Expression) ||
+                                element is SpreadElementSyntax spread &&
+                                DefinitelyContainsZeroArrayDimension(spread.Expression))
+                                return true;
+                        return false;
+                }
+                dimensions = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(dimensions);
+                var symbol = semanticModel.GetSymbolInfo(dimensions, cancellationToken).Symbol?.OriginalDefinition;
+                if (symbol is not (ILocalSymbol or IParameterSymbol) ||
+                    !SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
+                        symbol,
+                        dimensions,
+                        semanticModel,
+                        cancellationToken,
+                        false,
+                        true,
+                        out dimensions))
+                    return false;
+            }
         }
         private bool IsKnownDefaultEmptyCoreSequenceValue(ExpressionSyntax collection) {
             if (semanticModel.GetOperation(collection, cancellationToken) is

@@ -2320,6 +2320,77 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceZeroDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var height = 1;
+                    height = 0;
+                    var lengths = new[] { 2, height };
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceZeroCollectionDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var width = 1;
+                    width = 0;
+                    int[] lengths = [2, width];
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths, [0, 0]))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceZeroSpreadDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var width = 0;
+                    int[] lengths = [2, .. new[] { 3, width }];
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstancePositiveDimensionVectorLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { 2, 3 };
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceMutatedDimensionVectorLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { 2, 0 };
+                    lengths[1] = 3;
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ArrayCreateInstancePositiveLengthLoopBodyRemainsReachable_Reports",
             """
             #nullable enable
