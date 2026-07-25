@@ -3278,6 +3278,146 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedCheckedNonPositiveSumLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { -2, 2 }
+                        .Select(static value => checked(
+                            Math.Min(value, 0) + Math.Min(value, 0)))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedUncheckedOverflowingNonPositiveSumLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Minimum() => int.MinValue;
+                private static int MinusOne() => -1;
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => unchecked(Minimum() + MinusOne()))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedUncheckedNonPositiveAdditiveIdentityLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { -2, 2 }
+                        .Select(static value => unchecked(Math.Min(value, 0) + 0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedCheckedNonPositiveDifferenceLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int NonPositive() => -6;
+                private static int NonNegative() => 2;
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => checked(NonPositive() - NonNegative()))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedCheckedOppositeSignProductLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int NonPositive() => -6;
+                private static int NonNegative() => 2;
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => checked(NonPositive() * NonNegative()))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedUncheckedOverflowingOppositeSignProductLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int NonPositive() => -1073741824;
+                private static int NonNegative() => 3;
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => unchecked(NonPositive() * NonNegative()))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedNonPositiveQuotientLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int NonPositive() => -6;
+                private static int NonNegative() => 2;
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => NonPositive() / NonNegative())
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedNonPositiveRemainderLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int NonPositive() => -5;
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static value => NonPositive() % value)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
         yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedSourceDefinedMinLoopBodyRemainsReachable_Reports",
             """
             #nullable enable

@@ -1074,6 +1074,10 @@ internal static class CompilerProgramPointAnalysis {
             SemanticModel model,
             HashSet<ISymbol> callPath,
             Int32Bound bound) {
+            expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+            while (expression is CheckedExpressionSyntax checkedExpression)
+                expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(
+                    checkedExpression.Expression);
             if (model.GetConstantValue(expression, cancellationToken) is {
                 HasValue: true,
                 Value: int constant
@@ -1112,6 +1116,12 @@ internal static class CompilerProgramPointAnalysis {
                 return Int32ConstantSatisfiesBound(constant, bound);
             return operation switch {
                 IConversionOperation { Operand: IThrowOperation } => true,
+                IParenthesizedOperation parenthesized =>
+                    OperationDefinitelyProducesInt32Bound(
+                        parenthesized.Operand,
+                        model,
+                        callPath,
+                        bound),
                 IConditionalOperation {
                     WhenTrue: { } whenTrue,
                     WhenFalse: { } whenFalse
@@ -1125,6 +1135,13 @@ internal static class CompilerProgramPointAnalysis {
                         OperationDefinitelyProducesInt32Bound(
                             arm.Value, model, callPath, bound)),
                 IThrowOperation => true,
+                IBinaryOperation binary
+                    when BuiltInBinaryOperationDefinitelyProducesInt32Bound(
+                        binary,
+                        model,
+                        callPath,
+                        bound) =>
+                    true,
                 IUnaryOperation {
                     OperatorKind: UnaryOperatorKind.Plus,
                     OperatorMethod: null,
@@ -1138,16 +1155,14 @@ internal static class CompilerProgramPointAnalysis {
                     OperatorMethod: null,
                     Type.SpecialType: SpecialType.System_Int32,
                     Operand.Type.SpecialType: SpecialType.System_Int32
-                } unary when
-                    bound == Int32Bound.NonPositive ||
-                    unary.IsChecked =>
-                    OperationDefinitelyProducesInt32Bound(
+                } unary
+                    when NegatedOperationDefinitelyProducesInt32Bound(
                         unary.Operand,
+                        unary.IsChecked,
                         model,
                         callPath,
-                        bound == Int32Bound.NonPositive
-                            ? Int32Bound.NonNegative
-                            : Int32Bound.NonPositive),
+                        bound) =>
+                    true,
                 ILocalReferenceOperation {
                     Local.Type.SpecialType: SpecialType.System_Int32
                 } local =>
@@ -1170,6 +1185,154 @@ internal static class CompilerProgramPointAnalysis {
                 _ => false
             };
         }
+        private bool BuiltInBinaryOperationDefinitelyProducesInt32Bound(
+            IBinaryOperation operation,
+            SemanticModel model,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) {
+            if (operation.OperatorMethod != null ||
+                operation.Type?.SpecialType != SpecialType.System_Int32 ||
+                operation.LeftOperand.Type?.SpecialType != SpecialType.System_Int32 ||
+                operation.RightOperand.Type?.SpecialType != SpecialType.System_Int32)
+                return false;
+            var left = operation.LeftOperand;
+            var right = operation.RightOperand;
+            var leftIsZero = OperationHasInt32Constant(left, 0);
+            var rightIsZero = OperationHasInt32Constant(right, 0);
+            var leftIsOne = OperationHasInt32Constant(left, 1);
+            var rightIsOne = OperationHasInt32Constant(right, 1);
+            var leftIsNegativeOne = OperationHasInt32Constant(left, -1);
+            var rightIsNegativeOne = OperationHasInt32Constant(right, -1);
+            switch (operation.OperatorKind) {
+                case BinaryOperatorKind.Add:
+                    if (leftIsZero)
+                        return OperationDefinitelyProducesInt32Bound(
+                            right, model, callPath, bound);
+                    if (rightIsZero)
+                        return OperationDefinitelyProducesInt32Bound(
+                            left, model, callPath, bound);
+                    return operation.IsChecked &&
+                           OperationDefinitelyProducesInt32Bound(
+                               left, model, callPath, bound) &&
+                           OperationDefinitelyProducesInt32Bound(
+                               right, model, callPath, bound);
+                case BinaryOperatorKind.Subtract:
+                    if (rightIsZero)
+                        return OperationDefinitelyProducesInt32Bound(
+                            left, model, callPath, bound);
+                    if (leftIsZero)
+                        return NegatedOperationDefinitelyProducesInt32Bound(
+                            right,
+                            operation.IsChecked,
+                            model,
+                            callPath,
+                            bound);
+                    return operation.IsChecked &&
+                           OperationDefinitelyProducesInt32Bound(
+                               left, model, callPath, bound) &&
+                           OperationDefinitelyProducesInt32Bound(
+                               right,
+                               model,
+                               callPath,
+                               OppositeInt32Bound(bound));
+                case BinaryOperatorKind.Multiply:
+                    if (leftIsZero || rightIsZero)
+                        return true;
+                    if (leftIsOne)
+                        return OperationDefinitelyProducesInt32Bound(
+                            right, model, callPath, bound);
+                    if (rightIsOne)
+                        return OperationDefinitelyProducesInt32Bound(
+                            left, model, callPath, bound);
+                    if (leftIsNegativeOne)
+                        return NegatedOperationDefinitelyProducesInt32Bound(
+                            right,
+                            operation.IsChecked,
+                            model,
+                            callPath,
+                            bound);
+                    if (rightIsNegativeOne)
+                        return NegatedOperationDefinitelyProducesInt32Bound(
+                            left,
+                            operation.IsChecked,
+                            model,
+                            callPath,
+                            bound);
+                    if (!operation.IsChecked)
+                        return false;
+                    return BinarySignCombinationDefinitelyProducesInt32Bound(
+                        left,
+                        right,
+                        model,
+                        callPath,
+                        bound);
+                case BinaryOperatorKind.Divide:
+                    if (leftIsZero)
+                        return true;
+                    if (rightIsOne)
+                        return OperationDefinitelyProducesInt32Bound(
+                            left, model, callPath, bound);
+                    if (rightIsNegativeOne)
+                        return OperationDefinitelyProducesInt32Bound(
+                            left,
+                            model,
+                            callPath,
+                            OppositeInt32Bound(bound));
+                    return BinarySignCombinationDefinitelyProducesInt32Bound(
+                        left,
+                        right,
+                        model,
+                        callPath,
+                        bound);
+                case BinaryOperatorKind.Remainder:
+                    if (leftIsZero ||
+                        rightIsOne ||
+                        rightIsNegativeOne)
+                        return true;
+                    return OperationDefinitelyProducesInt32Bound(
+                        left, model, callPath, bound);
+                default:
+                    return false;
+            }
+        }
+        private bool BinarySignCombinationDefinitelyProducesInt32Bound(
+            IOperation left,
+            IOperation right,
+            SemanticModel model,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) =>
+            OperationDefinitelyProducesInt32Bound(
+                left, model, callPath, bound) &&
+            OperationDefinitelyProducesInt32Bound(
+                right, model, callPath, Int32Bound.NonNegative) ||
+            OperationDefinitelyProducesInt32Bound(
+                left, model, callPath, OppositeInt32Bound(bound)) &&
+            OperationDefinitelyProducesInt32Bound(
+                right, model, callPath, Int32Bound.NonPositive);
+        private bool NegatedOperationDefinitelyProducesInt32Bound(
+            IOperation operand,
+            bool overflowThrows,
+            SemanticModel model,
+            HashSet<ISymbol> callPath,
+            Int32Bound bound) =>
+            (bound == Int32Bound.NonPositive || overflowThrows) &&
+            OperationDefinitelyProducesInt32Bound(
+                operand,
+                model,
+                callPath,
+                OppositeInt32Bound(bound));
+        private static Int32Bound OppositeInt32Bound(Int32Bound bound) =>
+            bound == Int32Bound.NonPositive
+                ? Int32Bound.NonNegative
+                : Int32Bound.NonPositive;
+        private static bool OperationHasInt32Constant(
+            IOperation operation,
+            int expected) =>
+            operation.ConstantValue is {
+                HasValue: true,
+                Value: int value
+            } &&
+            value == expected;
         private static bool Int32ConstantSatisfiesBound(
             int constant,
             Int32Bound bound) =>
