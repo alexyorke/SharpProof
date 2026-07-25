@@ -4763,6 +4763,178 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredGuardedSourceMethodPredicateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static bool IsNonPositive(int value) {
+                    if (value > 0)
+                        return false;
+                    return true;
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Where(IsNonPositive)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredPositiveReturnGuardPredicateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static bool IsNonPositive(int value) {
+                    if (value <= 0)
+                        return true;
+                    return false;
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Where(IsNonPositive)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredLocalBooleanGuardPredicateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static bool IsNonPositive(int value) {
+                    var positive = value > 0;
+                    if (positive)
+                        return false;
+                    return true;
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Where(IsNonPositive)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredHelperGuardPredicateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static bool IsPositive(int value) => value > 0;
+                private static bool IsNonPositive(int value) {
+                    if (IsPositive(value))
+                        return false;
+                    return true;
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Where(IsNonPositive)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredSwitchPredicateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static bool IsNonPositive(int value) =>
+                    value switch {
+                        > 0 => false,
+                        _ => true
+                    };
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Where(IsNonPositive)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredSwitchPositivePredicateLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static bool IsPositive(int value) =>
+                    value switch {
+                        > 0 => true,
+                        _ => false
+                    };
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Where(IsPositive)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredGuardedPositivePredicateLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static bool IsPositive(int value) {
+                    if (value > 0)
+                        return true;
+                    return false;
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Where(IsPositive)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredReassignedGuardPredicateLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static bool AcceptAll(int value) {
+                    var positive = value > 0;
+                    positive = false;
+                    if (positive)
+                        return false;
+                    return true;
+                }
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Where(AcceptAll)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredMutatingPredicateLoopBodyRemainsReachable_Reports",
             """
             #nullable enable

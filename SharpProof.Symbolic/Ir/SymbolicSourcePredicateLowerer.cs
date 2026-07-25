@@ -488,6 +488,35 @@ internal static class SymbolicSourcePredicateLowerer {
         condition = CreateBooleanConditional(testCondition, whenTrue, whenFalse);
         return true;
     }
+    internal static bool TryLowerBooleanSwitchExpression(
+        SwitchExpressionSyntax switchExpression,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition) {
+        condition = new SymbolicConstantCondition(false);
+        if (switchExpression.Arms.Count == 0)
+            return false;
+        foreach (var arm in switchExpression.Arms) {
+            if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmSymbolicCondition(
+                    switchExpression.GoverningExpression,
+                    arm,
+                    context,
+                    out var selected) ||
+                !SymbolicLoweringValue.TryGet(
+                    SymbolicIrLowerer.LowerCondition(arm.Expression, context),
+                    out var result)) {
+                condition = null!;
+                return false;
+            }
+            condition = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                condition,
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    selected,
+                    result));
+        }
+        return true;
+    }
     private static SymbolicCondition CreateBooleanConditional(
         SymbolicCondition test,
         SymbolicCondition whenTrue,

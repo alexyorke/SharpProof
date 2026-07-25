@@ -50,6 +50,13 @@ internal static partial class SymbolicIrLowerer {
                         conditional.Condition, conditional.WhenTrue, conditional.WhenFalse, context, out condition))
                     return true;
                 break;
+            case SyntaxKind.SwitchExpression:
+                if (SymbolicSourcePredicateLowerer.TryLowerBooleanSwitchExpression(
+                        (SwitchExpressionSyntax)expression,
+                        context,
+                        out condition))
+                    return true;
+                break;
             case SyntaxKind.IsPatternExpression:
                 var isPattern = (IsPatternExpressionSyntax)expression;
                 if (SymbolicPatternLowerer.TryLowerNullablePatternCondition(isPattern, context, out condition) ||

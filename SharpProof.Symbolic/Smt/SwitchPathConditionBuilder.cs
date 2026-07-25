@@ -38,6 +38,18 @@ internal static class SwitchPathConditionBuilder {
             cancellationToken,
             out condition,
             getSymbolVersion);
+    internal static bool TryCreateSwitchExpressionArmSymbolicCondition(
+        ExpressionSyntax governingExpression,
+        SwitchExpressionArmSyntax arm,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition) => TryCreateCanonicalSwitchExpressionArmCondition(
+            governingExpression,
+            arm,
+            context.SemanticModel,
+            context.CancellationToken,
+            out condition,
+            context.GetSymbolVersion,
+            context);
     private static bool TryCreateCanonicalSwitchStatementSectionCondition(
         ExpressionSyntax governingExpression,
         SwitchSectionSyntax section,
@@ -100,7 +112,8 @@ internal static class SwitchPathConditionBuilder {
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out SymbolicCondition condition,
-        Func<ISymbol, int>? getSymbolVersion) {
+        Func<ISymbol, int>? getSymbolVersion,
+        SymbolicLoweringContext? existingContext = null) {
         condition = null!;
         if (arm.Parent is not SwitchExpressionSyntax switchExpression ||
             !TryLowerCanonicalSwitchGoverningValue(
@@ -110,7 +123,8 @@ internal static class SwitchPathConditionBuilder {
                 getSymbolVersion,
                 out var governingValue,
                 out var governingType,
-                out var context) ||
+                out var context,
+                existingContext) ||
             !TryCreateCanonicalPatternAndGuardCondition(
                 governingValue,
                 governingType,

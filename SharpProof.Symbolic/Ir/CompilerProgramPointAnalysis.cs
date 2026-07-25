@@ -999,7 +999,36 @@ internal static class CompilerProgramPointAnalysis {
             PredicateTruthGuaranteesNonPositiveElement(
                 predicate,
                 [],
-                new HashSet<ISymbol>(SymbolEqualityComparer.Default));
+                new HashSet<ISymbol>(SymbolEqualityComparer.Default)) ||
+            SymbolicPredicateTruthGuaranteesNonPositiveElement(predicate);
+        private bool SymbolicPredicateTruthGuaranteesNonPositiveElement(
+            ExpressionSyntax predicate) {
+            var argument = new SymbolicVariableTerm(
+                "array_dimension_predicate_value_" +
+                predicate.SpanStart.ToString(CultureInfo.InvariantCulture),
+                SmtValueKind.Int);
+            var context = new SymbolicLoweringContext(
+                semanticModel,
+                cancellationToken);
+            if (!SymbolicSourcePredicateLowerer.TryLowerSequencePredicate(
+                    predicate,
+                    argument,
+                    context,
+                    out var condition))
+                return false;
+            var nonPositive = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    argument,
+                    new SymbolicIntegerConstantTerm(0)),
+                predicate,
+                "array-dimension-predicate.nonpositive");
+            return new SymbolicProofService(context.SmtAnalysis)
+                       .ClassifyImplication(
+                           new SymbolicState(pathConditions: [condition]),
+                           nonPositive)
+                       .Status == SymbolicProofStatus.ProvenTrue;
+        }
         private bool PredicateTruthGuaranteesNonPositiveElement(
             ExpressionSyntax predicate,
             HashSet<SyntaxNode> visited,
