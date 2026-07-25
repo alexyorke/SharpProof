@@ -2583,6 +2583,70 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceUnionedNonPositiveDimensionsLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue(int firstRank, int secondRank) {
+                    var lengths = Enumerable.Repeat(0, firstRank)
+                        .Union(Enumerable.Repeat(-1, secondRank))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceUnionByNonPositiveDimensionsLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { 0, -1 }
+                        .UnionBy(new[] { -2 }, static _ => 0)
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceUnionedPossiblyEmptyNonPositiveAndPositiveDimensionsLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue(int rank) {
+                    var lengths = Enumerable.Repeat(0, rank)
+                        .Union(new[] { 2 })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceUnionedPositiveDimensionsLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { 2 }
+                        .Union(new[] { 3 })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ArrayCreateInstanceAppendedNonPositiveDimensionLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable

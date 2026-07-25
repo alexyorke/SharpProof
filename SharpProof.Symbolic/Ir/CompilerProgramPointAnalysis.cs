@@ -845,6 +845,26 @@ internal static class CompilerProgramPointAnalysis {
                     definitelyAllNonPositive);
                 return facts != default;
             }
+            if (definition.Name is nameof(Enumerable.Union) or "UnionBy") {
+                var secondParameter = targetMethod.Parameters.FirstOrDefault(parameter =>
+                    parameter.Name == "second");
+                if (secondParameter == null ||
+                    !TryGetStandardSequenceSource(invocation, operation, out var first) ||
+                    !TryGetInvocationArgument(operation, secondParameter, out var second))
+                    return false;
+                var firstFacts = GetArrayDimensionVectorFacts(first, [.. visited]);
+                var secondFacts = GetArrayDimensionVectorFacts(second, [.. visited]);
+                var definitelyEmpty = firstFacts.DefinitelyEmpty && secondFacts.DefinitelyEmpty;
+                var definitelyAllNonPositive =
+                    firstFacts.DefinitelyAllNonPositive &&
+                    secondFacts.DefinitelyAllNonPositive;
+                facts = new(
+                    definitelyEmpty,
+                    false,
+                    definitelyEmpty || definitelyAllNonPositive,
+                    definitelyAllNonPositive);
+                return facts != default;
+            }
             if (definition.Name is "Append" or "Prepend") {
                 var elementParameter = targetMethod.Parameters.FirstOrDefault(parameter =>
                     parameter.Name == "element");
