@@ -16,7 +16,9 @@ internal static class RequiresContractHelpers {
     internal static bool ContainsResultReference(ExpressionSyntax conditionExpression) => conditionExpression
             .DescendantNodesAndSelf()
             .OfType<IdentifierNameSyntax>()
-            .Any(static identifier => string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal));
+            .Any(IsResultPlaceholder);
+    internal static bool IsResultPlaceholder(IdentifierNameSyntax identifier) =>
+        string.Equals(identifier.Identifier.Text, "result", StringComparison.Ordinal);
     internal static string CombineAsImplication(
         ImmutableArray<ContractAttributeCondition> requiresContracts, string consequent) {
         if (requiresContracts.IsDefaultOrEmpty) return consequent;

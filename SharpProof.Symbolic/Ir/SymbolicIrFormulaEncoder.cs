@@ -28,6 +28,14 @@ internal static class SymbolicIrFormulaEncoder {
         SymbolicRelationAtom relation => EncodeRelation(relation),
         SymbolicStringPredicateAtom predicate => EncodeStringPredicate(predicate),
         SymbolicBoundsAtom bounds => EncodeBounds(bounds),
+        SymbolicExactRuntimeTypeAtom exactType =>
+            new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtVariable(
+                    "$runtime-type:" +
+                    SymbolicState.CreateProofTermKey(exactType.Value),
+                    SmtValueKind.String),
+                new SmtStringConstant(exactType.TypeKey)),
         SymbolicTypeTestAtom typeTest => Kind(Encode(typeTest.Value), SmtValueKind.Reference) is { } value
             ? new SmtRuntimeTypeTestFormula(value, typeTest.TypeKey)
             : null,

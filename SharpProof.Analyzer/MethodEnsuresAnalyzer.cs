@@ -149,7 +149,7 @@ internal static class MethodEnsuresAnalyzer {
         CancellationToken cancellationToken) {
         foreach (var identifier in conditionExpression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()) {
             cancellationToken.ThrowIfCancellationRequested();
-            if (string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal)) continue;
+            if (RequiresContractHelpers.IsResultPlaceholder(identifier)) continue;
             var symbol = speculativeModel.GetSymbolInfo(identifier, cancellationToken).Symbol;
             if (symbol is ILocalSymbol) return true;
             if (symbol is IParameterSymbol parameter &&
@@ -174,7 +174,8 @@ internal static class MethodEnsuresAnalyzer {
             rewrittenExpression = conditionExpression;
             return true;
         }
-        var rewriter = new ResultPlaceholderRewriter((ExpressionSyntax)completionSite.ResultExpression.WithoutTrivia());
+        var rewriter = new ResultPlaceholderRewriter(
+            (ExpressionSyntax)completionSite.ResultExpression.WithoutTrivia());
         var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
         rewrittenCondition = rewritten.ToFullString();
         rewrittenExpression = rewritten;
@@ -256,13 +257,23 @@ internal static class MethodEnsuresAnalyzer {
             methodSymbol.Name,
             reason);
     sealed class ResultPlaceholderRewriter(ExpressionSyntax replacement) : CSharpSyntaxRewriter {
-        private readonly ExpressionSyntax _replacement = SyntaxFactory.ParenthesizedExpression(replacement);
+        private readonly ExpressionSyntax _replacement =
+            SyntaxFactory.ParenthesizedExpression(GetResultValueExpression(replacement));
         public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node) {
-            if (!string.Equals(node.Identifier.ValueText, "result", StringComparison.Ordinal))
+            if (!RequiresContractHelpers.IsResultPlaceholder(node))
                 return base.VisitIdentifierName(node);
             if (CSharpSyntaxFacts.IsMemberOrQualifiedNameRightSide(node))
                 return base.VisitIdentifierName(node);
             return _replacement.WithTriviaFrom(node);
+        }
+        private static ExpressionSyntax GetResultValueExpression(
+            ExpressionSyntax expression) {
+            expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(
+                expression);
+            return expression is AssignmentExpressionSyntax assignment &&
+                   assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                ? assignment.Right
+                : expression;
         }
     }
     sealed class OldValueSnapshotBuilder(SemanticModel semanticModel, IMethodSymbol methodSymbol, CancellationToken cancellationToken) {

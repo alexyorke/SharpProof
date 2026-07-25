@@ -20,7 +20,7 @@ internal static class MethodCompletionAnalysis {
                 expression,
                 expression?.GetLocation() ?? operation.Syntax.GetLocation(),
                 operation.Syntax,
-                false,
+                true,
                 expression?.ToString() ?? "return"));
         }
         if (CSharpSyntaxFacts.TryGetExpressionBody(context.Node, out var expressionBody)) {
@@ -29,7 +29,7 @@ internal static class MethodCompletionAnalysis {
                 hasResultValue ? expressionBody : null,
                 expressionBody.GetLocation(),
                 expressionBody,
-                !hasResultValue,
+                true,
                 hasResultValue ? expressionBody.ToString() : "normal completion"));
         }
         else if (CSharpSyntaxFacts.GetBlockBody(context.Node) is { } body &&

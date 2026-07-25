@@ -41,8 +41,9 @@
 # closure-cell capture, initializer setter, and span-slice cases.
 # instance-receiver Requires, annotation-independent Ensures, and transitive
 # exception source-tree, unsupported-mutation, signed-domain, semantic-old,
-# out-snapshot, and snapshot-deduplication cases.
-a42aa04e4d1bcba814081ee9aabdfe2e4265be81  SharpProof.Test/NullableContractVerificationTests.cs
+# out-snapshot, snapshot-deduplication, escaped-result, single-evaluation,
+# runtime-type, short-circuit, and UTF-16 string cases.
+0198a8db690335572a7c86d59de7ef91a26e271f  SharpProof.Test/NullableContractVerificationTests.cs
 # MetadataMethodEffectAnalyzerTests.cs adds a callvirt regression proving that
 # non-virtual instance methods are analyzed recursively.
 3c67608a618c3c452ab60d0933bf6b6b0197b17e  SharpProof.Test/MetadataMethodEffectAnalyzerTests.cs

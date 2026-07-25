@@ -425,14 +425,38 @@ internal static class SymbolicPatternLowerer {
         Try(BindType(new PatternSubject(value, null, sourceNode, context), typeSyntax, negate), out condition);
     private static SymbolicCondition? BindType(PatternSubject subject, TypeSyntax syntax, bool negate) {
         var type = subject.Context.SemanticModel.GetTypeInfo(syntax, subject.Context.CancellationToken).Type;
-        if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(type, out var typeKey) ||
+        if (type == null ||
+            !SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(type, out _) ||
             subject.Value.Kind != SmtValueKind.Reference)
             return null;
         var nonNull = Relation(subject.Source, SymbolicRelationOperator.NotEqual,
             subject.Value, new SymbolicNullTerm(), "ir.pattern.type.non-null");
-        var typeTest = SymbolicIrLowerer.CreateFactCondition(
-            new SymbolicTypeTestAtom(subject.Value, typeKey), subject.Source, "ir.pattern.type.test");
-        var positive = And(nonNull, typeTest);
+        SymbolicCondition positive = nonNull;
+        var seenTypeKeys = new HashSet<string>(StringComparer.Ordinal);
+        var isTargetType = true;
+        foreach (var compatibleType in
+                 SymbolicTypeFacts.EnumerateSelfBaseTypesAndInterfaces(type)) {
+            if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(
+                    compatibleType,
+                    out var compatibleTypeKey) ||
+                !seenTypeKeys.Add(compatibleTypeKey) ||
+                compatibleType.SpecialType == SpecialType.System_Object)
+                continue;
+            var typeAtom = isTargetType && type.IsSealed
+                ? new SymbolicExactRuntimeTypeAtom(
+                    subject.Value,
+                    compatibleTypeKey)
+                : new SymbolicTypeTestAtom(
+                    subject.Value,
+                    compatibleTypeKey);
+            positive = And(
+                positive,
+                SymbolicIrLowerer.CreateFactCondition(
+                    typeAtom,
+                    subject.Source,
+                    "ir.pattern.type.test"));
+            isTargetType = false;
+        }
         return negate ? new SymbolicNotCondition(positive) : positive;
     }
     private static TypeSyntax? GetTypeSyntax(PatternSyntax pattern) => pattern switch {

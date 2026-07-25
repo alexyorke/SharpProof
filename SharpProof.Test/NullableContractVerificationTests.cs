@@ -10849,6 +10849,161 @@ public sealed class NullableContractVerificationTests {
             Assert.That(initialState.Facts, Has.Length.EqualTo(1));
         });
     }
+    [Test]
+    public async Task PotentialBugRegression_EscapedResultParameterIsNotPlaceholder() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                [Ensures("@result > 0")]
+                public static int M(int result) => 1;
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0019"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public async Task PotentialBugRegression_RequiresAllowsEscapedResultParameter() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                [Requires("@result > 0")]
+                private static void Required(int result) { }
+                public static void M() => Required(1);
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Where(static diagnostic =>
+                diagnostic.Id is "SP0027" or "SP0028"),
+            Is.Empty,
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public async Task PotentialBugRegression_ResultExpressionEvaluatedOnce() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                private static int state;
+                [Ensures("result == 1 && result == 1")]
+                public static int M() => state = 1;
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Where(static diagnostic =>
+                diagnostic.Id is "SP0018" or "SP0019"),
+            Is.Empty,
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public void PotentialBugRegression_RuntimeTypeTestImpliesBaseType() {
+        const string source = """
+            public class Base { }
+            public sealed class Derived : Base { }
+            public static class C {
+                public static int M(object value) {
+                    if (value is Derived)
+                        return 1;
+                    return 0;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(source, "return 1", "value is Base")
+                .ProofFacts.Single().Status,
+            Is.EqualTo("ProvenTrue"));
+    }
+    [Test]
+    public void PotentialBugRegression_SealedRuntimeTypesAreExclusive() {
+        const string source = """
+            public sealed class Other { }
+            public static class C {
+                public static int M(object value) {
+                    if (value is string)
+                        return 1;
+                    return 0;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(source, "return 1", "value is Other")
+                .ProofFacts.Single().Status,
+            Is.EqualTo("ProvenFalse"));
+    }
+    [Test]
+    public void PotentialBugRegression_GuardedDivisionUsesOrShortCircuit() {
+        const string source = """
+            public static class C {
+                public static int M(int value) {
+                    if (!(value == 0 || 10 / value > 1))
+                        return 0;
+                    return 1;
+                }
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var expression = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.BinaryExpressionSyntax>()
+            .Single(static binary =>
+                binary.RawKind ==
+                (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind
+                    .LogicalOrExpression);
+        var lowering = SharpProof.Symbolic.Ir.SymbolicSemanticPipeline
+            .LowerCondition(
+                expression,
+                new SharpProof.Symbolic.Ir.SymbolicLoweringContext(
+                    model,
+                    CancellationToken.None));
+        Assert.Multiple(() => {
+            Assert.That(lowering.IsExact, Is.True);
+            Assert.That(
+                SharpProof.Symbolic.SymbolicProofEncoder
+                    .TryEncodeConditionWithPathState(
+                        lowering.Value!,
+                        new SharpProof.Symbolic.Ir.SymbolicState(),
+                        expression,
+                        out _),
+                Is.True);
+        });
+    }
+    [Test]
+    public void PotentialBugRegression_NonBmpStringUsesUtf16Length() {
+        const string source = """
+            public static class C {
+                public static int M(string value) {
+                    if (value != "\U0001F600")
+                        return 0;
+                    return value.Length;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(source, "return value.Length", "value.Length == 2")
+                .ProofFacts.Single().Status,
+            Is.EqualTo("ProvenTrue"));
+    }
+    [Test]
+    public void PotentialBugRegression_NonBmpSubstringUsesUtf16Units() {
+        const string source = """
+            public static class C {
+                public static int M(string value) {
+                    if (value != "\U0001F600")
+                        return 0;
+                    return 1;
+                }
+            }
+            """;
+        Assert.That(
+            AnalyzeProofAtMarker(
+                    source,
+                    "return 1",
+                    "value.Substring(0, 1) == \"\\uD83D\"")
+                .ProofFacts.Single().Status,
+            Is.EqualTo("ProvenTrue"));
+    }
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)
