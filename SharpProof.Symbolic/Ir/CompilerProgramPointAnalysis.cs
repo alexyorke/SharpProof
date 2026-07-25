@@ -968,13 +968,24 @@ internal static class CompilerProgramPointAnalysis {
                 source,
                 visited,
                 sourceUse);
-            if (sourceFacts == default)
-                return false;
             if (preservesEveryElement) {
+                if (sourceFacts == default)
+                    return false;
                 facts = sourceFacts;
                 return true;
             }
-            if (!sourceFacts.DefinitelyAllNonPositive)
+            var predicateEstablishesNonPositive =
+                (definition.Name is nameof(Enumerable.Where) or
+                    nameof(Enumerable.TakeWhile)) &&
+                targetMethod.Parameters.FirstOrDefault(parameter =>
+                    parameter.Name == "predicate") is { } predicateParameter &&
+                TryGetInvocationArgument(
+                    operation,
+                    predicateParameter,
+                    out var predicate) &&
+                PredicateTruthGuaranteesNonPositiveElement(predicate);
+            if (!sourceFacts.DefinitelyAllNonPositive &&
+                !predicateEstablishesNonPositive)
                 return false;
             facts = new(
                 sourceFacts.DefinitelyEmpty,
@@ -983,6 +994,320 @@ internal static class CompilerProgramPointAnalysis {
                 true);
             return true;
         }
+        private bool PredicateTruthGuaranteesNonPositiveElement(
+            ExpressionSyntax predicate) =>
+            PredicateTruthGuaranteesNonPositiveElement(
+                predicate,
+                [],
+                new HashSet<ISymbol>(SymbolEqualityComparer.Default));
+        private bool PredicateTruthGuaranteesNonPositiveElement(
+            ExpressionSyntax predicate,
+            HashSet<SyntaxNode> visited,
+            HashSet<ISymbol> callPath) {
+            predicate = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(predicate);
+            if (!visited.Add(predicate))
+                return false;
+            var predicateSymbol = semanticModel.GetSymbolInfo(
+                predicate,
+                cancellationToken).Symbol?.OriginalDefinition;
+            if (predicateSymbol is ILocalSymbol or IParameterSymbol &&
+                SymbolCurrentValueResolver.TryResolveCurrentSimpleValueExpression(
+                    predicateSymbol,
+                    predicate,
+                    semanticModel,
+                    cancellationToken,
+                    out var resolvedPredicate))
+                return PredicateTruthGuaranteesNonPositiveElement(
+                    resolvedPredicate,
+                    visited,
+                    callPath);
+            var parameter = predicate switch {
+                SimpleLambdaExpressionSyntax simple =>
+                    semanticModel.GetDeclaredSymbol(simple.Parameter, cancellationToken),
+                ParenthesizedLambdaExpressionSyntax parenthesized =>
+                    parenthesized.ParameterList.Parameters.FirstOrDefault() is { } syntax
+                        ? semanticModel.GetDeclaredSymbol(syntax, cancellationToken)
+                        : null,
+                AnonymousMethodExpressionSyntax anonymous =>
+                    anonymous.ParameterList?.Parameters.FirstOrDefault() is { } syntax
+                        ? semanticModel.GetDeclaredSymbol(syntax, cancellationToken)
+                        : null,
+                _ => null
+            };
+            if (parameter is {
+                Type.SpecialType: SpecialType.System_Int32
+            }) {
+                var body = predicate switch {
+                    LambdaExpressionSyntax lambda => lambda.Body,
+                    AnonymousMethodExpressionSyntax anonymous => anonymous.Block,
+                    _ => null
+                };
+                return body != null &&
+                       PredicateBodyTruthGuaranteesNonPositiveElement(
+                           body,
+                           parameter,
+                           semanticModel,
+                           callPath);
+            }
+            return semanticModel.GetSymbolInfo(predicate, cancellationToken).Symbol is
+                       IMethodSymbol method &&
+                   method.ReturnType.SpecialType == SpecialType.System_Boolean &&
+                   method.Parameters.FirstOrDefault() is {
+                       Type.SpecialType: SpecialType.System_Int32
+                   } &&
+                   method.MethodKind is MethodKind.Ordinary or MethodKind.LocalFunction &&
+                   IsStaticallyDispatchedBoundSource(method) &&
+                   SourcePredicateTruthGuaranteesNonPositiveElement(method, callPath);
+        }
+        private bool SourcePredicateTruthGuaranteesNonPositiveElement(
+            IMethodSymbol method,
+            HashSet<ISymbol> callPath) {
+            var nextCallPath = new HashSet<ISymbol>(
+                callPath,
+                SymbolEqualityComparer.Default);
+            if (!nextCallPath.Add(method.OriginalDefinition))
+                return false;
+            var foundBody = false;
+            foreach (var syntaxReference in method.DeclaringSyntaxReferences) {
+                cancellationToken.ThrowIfCancellationRequested();
+                var declaration = syntaxReference.GetSyntax(cancellationToken);
+                var model = semanticModel.Compilation.GetSemanticModel(declaration.SyntaxTree);
+                var parameter = declaration switch {
+                    MethodDeclarationSyntax methodDeclaration =>
+                        methodDeclaration.ParameterList.Parameters.FirstOrDefault() is { } syntax
+                            ? model.GetDeclaredSymbol(syntax, cancellationToken)
+                            : null,
+                    LocalFunctionStatementSyntax localFunction =>
+                        localFunction.ParameterList.Parameters.FirstOrDefault() is { } syntax
+                            ? model.GetDeclaredSymbol(syntax, cancellationToken)
+                            : null,
+                    _ => null
+                };
+                if (parameter is not {
+                    Type.SpecialType: SpecialType.System_Int32
+                })
+                    return false;
+                SyntaxNode? body = declaration switch {
+                    MethodDeclarationSyntax {
+                        ExpressionBody.Expression: { } expression
+                    } => expression,
+                    LocalFunctionStatementSyntax {
+                        ExpressionBody.Expression: { } expression
+                    } => expression,
+                    MethodDeclarationSyntax { Body: { } block } => block,
+                    LocalFunctionStatementSyntax { Body: { } block } => block,
+                    _ => null
+                };
+                if (body == null)
+                    continue;
+                foundBody = true;
+                if (!PredicateBodyTruthGuaranteesNonPositiveElement(
+                        body,
+                        parameter,
+                        model,
+                        nextCallPath))
+                    return false;
+            }
+            return foundBody;
+        }
+        private bool PredicateBodyTruthGuaranteesNonPositiveElement(
+            SyntaxNode body,
+            IParameterSymbol parameter,
+            SemanticModel model,
+            HashSet<ISymbol> callPath) {
+            if (SymbolicMutationInventory.Create(
+                    body,
+                    model,
+                    cancellationToken).MutatesSymbol(parameter))
+                return false;
+            if (body is ExpressionSyntax expression)
+                return model.GetOperation(expression, cancellationToken) is { } operation &&
+                       BooleanResultGuaranteesParameterNonPositive(
+                           operation,
+                           true,
+                           parameter,
+                           model,
+                           callPath);
+            if (body is not BlockSyntax block)
+                return false;
+            var returns = block.DescendantNodes(node =>
+                    node is not AnonymousFunctionExpressionSyntax and
+                        not LocalFunctionStatementSyntax)
+                .OfType<ReturnStatementSyntax>()
+                .ToArray();
+            return returns.Length != 0 &&
+                   returns.All(statement =>
+                       statement.Expression != null &&
+                       model.GetOperation(
+                           statement.Expression,
+                           cancellationToken) is { } operation &&
+                       BooleanResultGuaranteesParameterNonPositive(
+                           operation,
+                           true,
+                           parameter,
+                           model,
+                           callPath));
+        }
+        private bool BooleanResultGuaranteesParameterNonPositive(
+            IOperation operation,
+            bool result,
+            IParameterSymbol parameter,
+            SemanticModel model,
+            HashSet<ISymbol> callPath) {
+            while (operation is IConversionOperation {
+                Conversion.IsIdentity: true
+            } conversion)
+                operation = conversion.Operand;
+            if (operation is IParenthesizedOperation parenthesized)
+                return BooleanResultGuaranteesParameterNonPositive(
+                    parenthesized.Operand,
+                    result,
+                    parameter,
+                    model,
+                    callPath);
+            if (operation.ConstantValue is {
+                HasValue: true,
+                Value: bool constant
+            })
+                return constant != result;
+            if (operation is IThrowOperation or
+                IConversionOperation { Operand: IThrowOperation })
+                return true;
+            if (operation is IUnaryOperation {
+                OperatorKind: UnaryOperatorKind.Not,
+                OperatorMethod: null
+            } unary)
+                return BooleanResultGuaranteesParameterNonPositive(
+                    unary.Operand,
+                    !result,
+                    parameter,
+                    model,
+                    callPath);
+            if (operation is IConditionalOperation {
+                WhenTrue: { } whenTrue,
+                WhenFalse: { } whenFalse
+            })
+                return BooleanResultGuaranteesParameterNonPositive(
+                           whenTrue,
+                           result,
+                           parameter,
+                           model,
+                           callPath) &&
+                       BooleanResultGuaranteesParameterNonPositive(
+                           whenFalse,
+                           result,
+                           parameter,
+                           model,
+                           callPath);
+            if (operation is not IBinaryOperation {
+                OperatorMethod: null
+            } binary)
+                return false;
+            if (binary.OperatorKind is BinaryOperatorKind.ConditionalAnd or
+                    BinaryOperatorKind.And)
+                return result
+                    ? BooleanResultGuaranteesParameterNonPositive(
+                          binary.LeftOperand, true, parameter, model, callPath) ||
+                      BooleanResultGuaranteesParameterNonPositive(
+                          binary.RightOperand, true, parameter, model, callPath)
+                    : BooleanResultGuaranteesParameterNonPositive(
+                          binary.LeftOperand, false, parameter, model, callPath) &&
+                      BooleanResultGuaranteesParameterNonPositive(
+                          binary.RightOperand, false, parameter, model, callPath);
+            if (binary.OperatorKind is BinaryOperatorKind.ConditionalOr or
+                    BinaryOperatorKind.Or)
+                return result
+                    ? BooleanResultGuaranteesParameterNonPositive(
+                          binary.LeftOperand, true, parameter, model, callPath) &&
+                      BooleanResultGuaranteesParameterNonPositive(
+                          binary.RightOperand, true, parameter, model, callPath)
+                    : BooleanResultGuaranteesParameterNonPositive(
+                          binary.LeftOperand, false, parameter, model, callPath) ||
+                      BooleanResultGuaranteesParameterNonPositive(
+                          binary.RightOperand, false, parameter, model, callPath);
+            var comparison = result
+                ? binary.OperatorKind
+                : binary.OperatorKind switch {
+                    BinaryOperatorKind.LessThan =>
+                        BinaryOperatorKind.GreaterThanOrEqual,
+                    BinaryOperatorKind.LessThanOrEqual =>
+                        BinaryOperatorKind.GreaterThan,
+                    BinaryOperatorKind.GreaterThan =>
+                        BinaryOperatorKind.LessThanOrEqual,
+                    BinaryOperatorKind.GreaterThanOrEqual =>
+                        BinaryOperatorKind.LessThan,
+                    BinaryOperatorKind.Equals =>
+                        BinaryOperatorKind.NotEquals,
+                    BinaryOperatorKind.NotEquals =>
+                        BinaryOperatorKind.Equals,
+                    _ => binary.OperatorKind
+                };
+            var leftIsParameter = IsDirectParameterReference(
+                binary.LeftOperand,
+                parameter);
+            var rightIsParameter = IsDirectParameterReference(
+                binary.RightOperand,
+                parameter);
+            return comparison switch {
+                BinaryOperatorKind.LessThan when leftIsParameter =>
+                    OperationDefinitelyProducesAtMostOne(
+                        binary.RightOperand,
+                        model,
+                        callPath),
+                BinaryOperatorKind.LessThanOrEqual when leftIsParameter =>
+                    OperationDefinitelyProducesNonPositiveInt32(
+                        binary.RightOperand,
+                        model,
+                        callPath),
+                BinaryOperatorKind.GreaterThan when rightIsParameter =>
+                    OperationDefinitelyProducesAtMostOne(
+                        binary.LeftOperand,
+                        model,
+                        callPath),
+                BinaryOperatorKind.GreaterThanOrEqual when rightIsParameter =>
+                    OperationDefinitelyProducesNonPositiveInt32(
+                        binary.LeftOperand,
+                        model,
+                        callPath),
+                BinaryOperatorKind.Equals when leftIsParameter =>
+                    OperationDefinitelyProducesNonPositiveInt32(
+                        binary.RightOperand,
+                        model,
+                        callPath),
+                BinaryOperatorKind.Equals when rightIsParameter =>
+                    OperationDefinitelyProducesNonPositiveInt32(
+                        binary.LeftOperand,
+                        model,
+                        callPath),
+                _ => false
+            };
+        }
+        private static bool IsDirectParameterReference(
+            IOperation operation,
+            IParameterSymbol parameter) {
+            while (operation is IConversionOperation {
+                Conversion.IsIdentity: true
+            } conversion)
+                operation = conversion.Operand;
+            while (operation is IParenthesizedOperation parenthesized)
+                operation = parenthesized.Operand;
+            return operation is IParameterReferenceOperation reference &&
+                   SymbolEqualityComparer.Default.Equals(
+                       reference.Parameter.OriginalDefinition,
+                       parameter.OriginalDefinition);
+        }
+        private bool OperationDefinitelyProducesAtMostOne(
+            IOperation operation,
+            SemanticModel model,
+            HashSet<ISymbol> callPath) =>
+            operation.ConstantValue is {
+                HasValue: true,
+                Value: int constant
+            } && constant <= 1 ||
+            OperationDefinitelyProducesNonPositiveInt32(
+                operation,
+                model,
+                callPath);
         private bool IsNonPositiveDimensionSelector(
             ExpressionSyntax selector,
             bool sourceElementsAreNonPositive) =>
