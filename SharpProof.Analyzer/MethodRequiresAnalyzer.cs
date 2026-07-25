@@ -84,7 +84,24 @@ internal static class MethodRequiresAnalyzer {
     private static void AnalyzeCallSitesForRequires(
         MethodBodyAnalysisContext context,
         SmtAnalysisService smtAnalysis) {
-        foreach (var callSite in context.Snapshot.VisibleOperations.SelectMany(static operation => CreateCallSites(operation))) {
+        var callSites = context.Snapshot.VisibleOperations.SelectMany(operation =>
+            CreateCallSites(
+                operation,
+                context.SemanticModel,
+                context.CancellationToken));
+        if (context.Node is ConstructorDeclarationSyntax {
+            Initializer: { } initializer
+        } &&
+            context.SemanticModel.GetOperation(
+                initializer,
+                context.CancellationToken) is { } initializerOperation)
+            callSites = callSites.Concat(
+                initializerOperation.DescendantsAndSelf().SelectMany(operation =>
+                    CreateCallSites(
+                        operation,
+                        context.SemanticModel,
+                        context.CancellationToken)));
+        foreach (var callSite in callSites) {
             var contracts = RequiresContractHelpers.ValidContracts(callSite.Method, context.CancellationToken);
             if (contracts.Length == 0) continue;
             var location = callSite.Syntax.GetLocation();
@@ -103,9 +120,19 @@ internal static class MethodRequiresAnalyzer {
                     continue;
                 }
                 if (!seenConditions.Add(rewrittenCondition)) continue;
+                var activationCondition = callSite.ActivationCondition?
+                    .NormalizeWhitespace()
+                    .ToFullString();
+                var proofCondition = callSite.ActivationCondition == null
+                    ? rewrittenCondition
+                    : "!(" +
+                      activationCondition +
+                      ") || (" +
+                      rewrittenCondition +
+                      ")";
                 var proof = context.State.ProveAtNode(
                     callSite.Syntax,
-                    rewrittenCondition,
+                    proofCondition,
                     smtAnalysis,
                     includeCurrentStatementCompletionFacts: false,
                     context.CancellationToken);
@@ -116,13 +143,33 @@ internal static class MethodRequiresAnalyzer {
                     context.ReportDiagnostic(CreateNotProvenDiagnostic(callSite.Method, contract.Condition, location, contract.Location));
                     continue;
                 }
+                if (callSite.ActivationCondition != null) {
+                    var unguardedProof = context.State.ProveAtNode(
+                        callSite.Syntax,
+                        rewrittenCondition,
+                        smtAnalysis,
+                        includeCurrentStatementCompletionFacts: false,
+                        context.CancellationToken);
+                    if (unguardedProof.TruthValue ==
+                        SymbolicTruthValue.ProvenFalse) {
+                        context.ReportDiagnostic(CreateNotProvenDiagnostic(
+                            callSite.Method,
+                            contract.Condition,
+                            location,
+                            contract.Location));
+                        continue;
+                    }
+                }
                 ContractConditionHelpers.ReportUnsupported(
                     context, callSite.Method, contract, ContractDiagnosticSupport.FormatUnknownReason(proof, "Requires"),
                     CreateUnsupportedDiagnostic, location, AdditionalLocations(contract.Location));
             }
         }
     }
-    private static ImmutableArray<RequiresCallSite> CreateCallSites(IOperation operation) {
+    private static ImmutableArray<RequiresCallSite> CreateCallSites(
+        IOperation operation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) {
         var builder = ImmutableArray.CreateBuilder<RequiresCallSite>();
         switch (operation) {
             case IInvocationOperation invocation:
@@ -164,7 +211,11 @@ internal static class MethodRequiresAnalyzer {
                     propertyTarget,
                     propertyTarget.Property.SetMethod,
                     coalesceAssignment.Value.Syntax as ExpressionSyntax,
-                    coalesceAssignment.Syntax);
+                    coalesceAssignment.Syntax,
+                    CreateCoalesceSetterActivation(
+                        propertyTarget,
+                        semanticModel,
+                        cancellationToken));
                 break;
             case ICompoundAssignmentOperation compoundAssignment
                 when compoundAssignment.Target is IPropertyReferenceOperation propertyTarget:
@@ -175,7 +226,11 @@ internal static class MethodRequiresAnalyzer {
                     builder,
                     propertyTarget,
                     propertyTarget.Property.SetMethod,
-                    CreateCompoundSetterValue(compoundAssignment),
+                    CreateCompoundSetterValue(
+                        compoundAssignment,
+                        propertyTarget,
+                        semanticModel,
+                        cancellationToken),
                     compoundAssignment.Syntax);
                 break;
             case IIncrementOrDecrementOperation incrementOrDecrement
@@ -186,7 +241,11 @@ internal static class MethodRequiresAnalyzer {
                     builder,
                     propertyTarget,
                     propertyTarget.Property.SetMethod,
-                    CreateIncrementSetterValue(incrementOrDecrement),
+                    CreateIncrementSetterValue(
+                        incrementOrDecrement,
+                        propertyTarget,
+                        semanticModel,
+                        cancellationToken),
                     incrementOrDecrement.Syntax);
                 break;
             case IBinaryOperation { OperatorMethod: { } operatorMethod } binary:
@@ -201,10 +260,34 @@ internal static class MethodRequiresAnalyzer {
         }
         return builder.ToImmutable();
     }
-    private static ExpressionSyntax? CreateCompoundSetterValue(ICompoundAssignmentOperation operation) {
+    private static ExpressionSyntax? CreateCoalesceSetterActivation(
+        IPropertyReferenceOperation target,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) =>
+        TryGetSingleEvaluationPropertyValue(
+            target,
+            semanticModel,
+            cancellationToken,
+            out var value)
+            ? SyntaxFactory.IsPatternExpression(
+                SyntaxFactory.ParenthesizedExpression(
+                    (ExpressionSyntax)value.WithoutTrivia()),
+                SyntaxFactory.ConstantPattern(
+                    SyntaxFactory.LiteralExpression(
+                        SyntaxKind.NullLiteralExpression)))
+            : null;
+    private static ExpressionSyntax? CreateCompoundSetterValue(
+        ICompoundAssignmentOperation operation,
+        IPropertyReferenceOperation propertyTarget,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) {
         if (operation.Syntax is not AssignmentExpressionSyntax assignment ||
-            operation.Target.Syntax is not ExpressionSyntax target ||
             operation.Value.Syntax is not ExpressionSyntax value ||
+            !TryGetSingleEvaluationPropertyValue(
+                propertyTarget,
+                semanticModel,
+                cancellationToken,
+                out var target) ||
             !CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind(assignment.Kind(), out var binaryKind))
             return null;
         return SyntaxFactory.BinaryExpression(
@@ -212,15 +295,73 @@ internal static class MethodRequiresAnalyzer {
             SyntaxFactory.ParenthesizedExpression((ExpressionSyntax)target.WithoutTrivia()),
             SyntaxFactory.ParenthesizedExpression((ExpressionSyntax)value.WithoutTrivia()));
     }
-    private static ExpressionSyntax? CreateIncrementSetterValue(IIncrementOrDecrementOperation operation) {
-        if (operation.Target.Syntax is not ExpressionSyntax target ||
-            operation.Syntax is not ExpressionSyntax updateExpression ||
+    private static ExpressionSyntax? CreateIncrementSetterValue(
+        IIncrementOrDecrementOperation operation,
+        IPropertyReferenceOperation propertyTarget,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) {
+        if (operation.Syntax is not ExpressionSyntax updateExpression ||
+            !TryGetSingleEvaluationPropertyValue(
+                propertyTarget,
+                semanticModel,
+                cancellationToken,
+                out var target) ||
             !CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(updateExpression, out _, out var delta))
             return null;
         return SyntaxFactory.BinaryExpression(
             delta < 0 ? SyntaxKind.SubtractExpression : SyntaxKind.AddExpression,
             SyntaxFactory.ParenthesizedExpression((ExpressionSyntax)target.WithoutTrivia()),
             SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(1)));
+    }
+    private static bool TryGetSingleEvaluationPropertyValue(
+        IPropertyReferenceOperation propertyTarget,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)]
+        out ExpressionSyntax? value) {
+        value = null;
+        if (CSharpSyntaxFacts.IsStableStorageProperty(
+                propertyTarget.Property,
+                cancellationToken) &&
+            propertyTarget.Syntax is ExpressionSyntax storageRead) {
+            value = (ExpressionSyntax)storageRead.WithoutTrivia();
+            return true;
+        }
+        foreach (var reference in propertyTarget.Property.DeclaringSyntaxReferences) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (reference.GetSyntax(cancellationToken) is not
+                PropertyDeclarationSyntax { AccessorList: { } accessors })
+                continue;
+            var getter = accessors.Accessors.FirstOrDefault(static accessor =>
+                accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
+            var returned = getter?.ExpressionBody?.Expression;
+            if (returned == null && getter?.Body != null) {
+                var returns = getter.Body.Statements
+                    .OfType<ReturnStatementSyntax>()
+                    .Select(static statement => statement.Expression)
+                    .Where(static expression => expression != null)
+                    .Take(2)
+                    .ToArray();
+                returned = returns.Length == 1 ? returns[0] : null;
+            }
+            if (returned == null) continue;
+            var getterModel = semanticModel.Compilation.GetSemanticModel(
+                returned.SyntaxTree);
+            if (returned.DescendantNodesAndSelf().Any(node =>
+                    node is ThisExpressionSyntax or BaseExpressionSyntax or
+                        InvocationExpressionSyntax ||
+                    node is IdentifierNameSyntax identifier &&
+                    getterModel.GetSymbolInfo(
+                        identifier,
+                        cancellationToken).Symbol is
+                        IParameterSymbol or ILocalSymbol or
+                        IFieldSymbol { IsStatic: false } or
+                        IPropertySymbol { IsStatic: false }))
+                continue;
+            value = (ExpressionSyntax)returned.WithoutTrivia();
+            return true;
+        }
+        return false;
     }
     private static bool IsMutationTarget(IPropertyReferenceOperation propertyReference) => propertyReference.Parent switch {
         IAssignmentOperation assignment => ReferenceEquals(assignment.Target, propertyReference),
@@ -233,7 +374,8 @@ internal static class MethodRequiresAnalyzer {
         IPropertyReferenceOperation propertyReference,
         IMethodSymbol? accessor,
         ExpressionSyntax? setterValue,
-        SyntaxNode? syntax = null) {
+        SyntaxNode? syntax = null,
+        ExpressionSyntax? activationCondition = null) {
         if (accessor == null) return;
         var arguments = CreateArgumentMap(accessor, propertyReference.Arguments);
         if (setterValue != null && accessor.MethodKind is MethodKind.PropertySet or MethodKind.EventAdd or MethodKind.EventRemove) {
@@ -245,7 +387,8 @@ internal static class MethodRequiresAnalyzer {
             accessor,
             arguments,
             GetExplicitReceiver(propertyReference.Instance),
-            syntax ?? propertyReference.Syntax));
+            syntax ?? propertyReference.Syntax,
+            activationCondition));
     }
     private static void AddOperator(
         ImmutableArray<RequiresCallSite>.Builder builder,
@@ -382,5 +525,6 @@ internal static class MethodRequiresAnalyzer {
         IMethodSymbol Method,
         ImmutableDictionary<string, ExpressionSyntax> Arguments,
         ExpressionSyntax? Receiver,
-        SyntaxNode Syntax);
+        SyntaxNode Syntax,
+        ExpressionSyntax? ActivationCondition = null);
 }

@@ -119,16 +119,43 @@ internal static class RequiresContractHelpers {
         var replacements = new Dictionary<string, TypeSyntax>(StringComparer.Ordinal);
         AddTypeParameterReplacements(contractMethod.TypeParameters, invokedMethod.TypeArguments, replacements);
         var contractType = contractMethod.ContainingType;
-        var invokedType = invokedMethod.ContainingType;
-        while (contractType != null && invokedType != null) {
+        while (contractType != null) {
+            var arguments = SymbolEqualityComparer.Default.Equals(
+                    contractType,
+                    contractType.OriginalDefinition)
+                ? FindConstructedType(
+                    invokedMethod.ContainingType,
+                    contractType.OriginalDefinition)?.TypeArguments ??
+                  contractType.TypeArguments
+                : contractType.TypeArguments;
             AddTypeParameterReplacements(
                 contractType.OriginalDefinition.TypeParameters,
-                invokedType.TypeArguments,
+                arguments,
                 replacements);
             contractType = contractType.ContainingType;
-            invokedType = invokedType.ContainingType;
         }
         return replacements;
+    }
+    private static INamedTypeSymbol? FindConstructedType(
+        INamedTypeSymbol? invokedType,
+        INamedTypeSymbol definition) {
+        for (var containing = invokedType;
+             containing != null;
+             containing = containing.ContainingType) {
+            for (var current = containing;
+                 current != null;
+                 current = current.BaseType)
+                if (SymbolEqualityComparer.Default.Equals(
+                        current.OriginalDefinition,
+                        definition))
+                    return current;
+            foreach (var interfaceType in containing.AllInterfaces)
+                if (SymbolEqualityComparer.Default.Equals(
+                        interfaceType.OriginalDefinition,
+                        definition))
+                    return interfaceType;
+        }
+        return null;
     }
     private static void AddTypeParameterReplacements(
         ImmutableArray<ITypeParameterSymbol> parameters,

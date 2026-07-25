@@ -11262,6 +11262,130 @@ public sealed class NullableContractVerificationTests {
             Does.Contain("SP0027"),
             string.Join(Environment.NewLine, diagnostics));
     }
+    [Test]
+    public async Task PotentialBugRegression_ConstructedInterfaceTypeArgumentsRewriteRequires() {
+        const string source = """
+            using SharpProof.Attributes;
+            public interface I<T, U> {
+                [Requires("value != default(T)")]
+                void Accept(T value);
+            }
+            public sealed class C : I<string, int> {
+                public void Accept(string value) { }
+                public void M() => Accept(null!);
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var implementation = (Microsoft.CodeAnalysis.IMethodSymbol)
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(
+                model,
+                root.DescendantNodes()
+                    .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+                    .Single(method => method.Identifier.ValueText == "Accept" &&
+                                      method.Parent is Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax))!;
+        var contract = SharpProof.Analyzer.RequiresContractHelpers
+            .CollectContracts(implementation, CancellationToken.None)
+            .Single();
+        Assert.That(
+            SharpProof.Analyzer.RequiresContractHelpers.TryRewriteForMethod(
+                contract.Condition,
+                contract.SourceMethod,
+                implementation,
+                out var rewritten),
+            Is.True);
+        Assert.That(rewritten, Does.Contain("default(string)"));
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.Multiple(() => {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Does.Contain("SP0027"),
+                string.Join(Environment.NewLine, diagnostics));
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Does.Not.Contain("SP0028"));
+        });
+    }
+    [Test]
+    public async Task PotentialBugRegression_CoalesceSetterRequiresIsGuarded() {
+        const string source = """
+            using SharpProof.Attributes;
+            public sealed class C {
+                private string? P {
+                    get => "ready";
+                    [Requires("value != null")]
+                    set { }
+                }
+                public void M() => P ??= null;
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0027").And.Not.Contain("SP0028"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public async Task PotentialBugRegression_CompoundSetterUsesSingleReceiverEvaluation() {
+        const string source = """
+            using SharpProof.Attributes;
+            public sealed class Box {
+                public int P {
+                    get => 1;
+                    [Requires("value == 2")]
+                    set { }
+                }
+            }
+            public static class C {
+                private static Box Get() => new();
+                public static void M() => Get().P += 1;
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0027").And.Not.Contain("SP0028"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public async Task PotentialBugRegression_IncrementSetterUsesSingleReceiverEvaluation() {
+        const string source = """
+            using SharpProof.Attributes;
+            public sealed class Box {
+                public int P {
+                    get => 1;
+                    [Requires("value == 2")]
+                    set { }
+                }
+            }
+            public static class C {
+                private static Box Get() => new();
+                public static void M() => Get().P++;
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0027").And.Not.Contain("SP0028"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
+    [Test]
+    public async Task PotentialBugRegression_BaseConstructorInitializerRequiresIsChecked() {
+        const string source = """
+            using SharpProof.Attributes;
+            public class Base {
+                [Requires("value > 0")]
+                protected Base(int value) { }
+            }
+            public sealed class Derived : Base {
+                public Derived() : base(0) { }
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0027"),
+            string.Join(Environment.NewLine, diagnostics));
+    }
     private sealed class TestAnalyzerConfigOptions(
         IReadOnlyDictionary<string, string> values)
         : Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions {
