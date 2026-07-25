@@ -37,7 +37,11 @@ internal static class SymbolicStateMerger {
         var versions = MergePhiVersions(states, phiScope);
         var normalized = states.Select(state => RewriteToVersions(state, versions)).ToArray();
         var facts = IntersectFactsAcrossAll(normalized, equivalent);
-        return new SymbolicState(facts, MergePathConditionsAcrossAll(normalized), versions);
+        return new SymbolicState(
+            facts,
+            MergePathConditionsAcrossAll(normalized),
+            versions,
+            normalized.All(static state => state.IsContradictory));
     }
     private static ImmutableDictionary<string, int> MergePhiVersions(IReadOnlyList<SymbolicState> states, int phiScope) {
         var keys = states.SelectMany(static state => state.SymbolVersions.Keys)

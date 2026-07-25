@@ -1,14 +1,20 @@
 namespace SharpProof.Symbolic;
 internal static class SymbolicFactFactory {
+    private sealed class SyntaxTreeKey(string value) {
+        internal string Value { get; } = value;
+    }
+    private static readonly ConditionalWeakTable<SyntaxTree, SyntaxTreeKey>
+        s_syntaxTreeKeys = new();
     internal static bool MatchesVariableOrMemberName(string candidate, string variableName)
         => string.Equals(candidate, variableName, StringComparison.Ordinal) ||
                candidate.StartsWith(variableName + ".", StringComparison.Ordinal) ||
                candidate.StartsWith(variableName + "[", StringComparison.Ordinal);
     internal static string GetSmtVariableName(ISymbol symbol) {
         var sourceLocation = symbol.Locations.FirstOrDefault(static location => location.IsInSource);
-        if (sourceLocation != null)
+        if (sourceLocation?.SourceTree is { } sourceTree)
             return symbol.Name + "#" +
-                   sourceLocation.SourceSpan.Start.ToString(CultureInfo.InvariantCulture);
+                   sourceLocation.SourceSpan.Start.ToString(CultureInfo.InvariantCulture) + ":" +
+                   GetSyntaxTreeKey(sourceTree);
         var containingIdentity = symbol.ContainingSymbol == null
             ? string.Empty
             : DocumentationCommentId.CreateDeclarationId(symbol.ContainingSymbol.OriginalDefinition) ??
@@ -19,6 +25,23 @@ internal static class SymbolicFactFactory {
             _ => string.Empty
         };
         return symbol.Name + "#metadata:" + containingIdentity + ":" + symbol.Kind + ":" + ordinal;
+    }
+    private static string GetSyntaxTreeKey(SyntaxTree syntaxTree) =>
+        s_syntaxTreeKeys.GetValue(
+            syntaxTree,
+            static tree => new SyntaxTreeKey(CreateSyntaxTreeKey(tree))).Value;
+    private static string CreateSyntaxTreeKey(SyntaxTree syntaxTree) {
+        var text = syntaxTree.GetText();
+        var checksum = text.GetChecksum();
+        var identity = syntaxTree.FilePath + "\0" +
+                       (checksum.IsDefaultOrEmpty
+                           ? text.ToString()
+                           : Convert.ToBase64String([.. checksum]));
+        using var hash = System.Security.Cryptography.SHA256.Create();
+        return string.Concat(
+            hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(identity))
+                .Select(static value =>
+                    value.ToString("x2", CultureInfo.InvariantCulture)));
     }
     internal static bool TryCreateReferenceBuiltInLengthFormula(SmtFormula receiverFormula, out SmtFormula formula) {
         if (receiverFormula.Kind != SmtValueKind.Reference) {

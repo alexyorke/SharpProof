@@ -394,7 +394,16 @@ internal static class SymbolicSourcePredicateLowerer {
         };
         if (body == null) return false;
         if (callable is AnonymousFunctionExpressionSyntax)
-            return TryCompose(body.Statements, SkipBindings(body.Statements), context, out condition);
+            return TryApplyLeadingBindings(
+                       body.Statements,
+                       context,
+                       substitutions,
+                       out var statementIndex) &&
+                   TryCompose(
+                       body.Statements,
+                       statementIndex,
+                       context,
+                       out condition);
         ControlFlowGraph? graph;
         try { graph = ControlFlowGraph.Create(callable, context.SemanticModel, context.CancellationToken); }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { return false; }
@@ -408,6 +417,54 @@ internal static class SymbolicSourcePredicateLowerer {
             graph, InlinePredicateState.Bottom, domain, context.Compilation, owner, context.CancellationToken);
         return !result.Truncated && result.ExitState == InlinePredicateState.Valid &&
                TryCompose(body.Statements, SkipBindings(body.Statements), context, out condition);
+    }
+    private static bool TryApplyLeadingBindings(
+        SyntaxList<StatementSyntax> statements,
+        SymbolicLoweringContext context,
+        IDictionary<ISymbol, SymbolicTerm> substitutions,
+        out int statementIndex) {
+        statementIndex = 0;
+        while (statementIndex < statements.Count) {
+            if (statements[statementIndex] is
+                LocalDeclarationStatementSyntax declaration) {
+                foreach (var variable in declaration.Declaration.Variables) {
+                    if (variable.Initializer?.Value is not { } initializer ||
+                        context.SemanticModel.GetDeclaredSymbol(
+                            variable,
+                            context.CancellationToken) is not ILocalSymbol local ||
+                        !TryLowerBooleanValueTerm(
+                            initializer,
+                            context,
+                            out var value))
+                        return false;
+                    substitutions[local.OriginalDefinition] = value;
+                }
+                statementIndex++;
+                continue;
+            }
+            if (statements[statementIndex] is
+                    ExpressionStatementSyntax {
+                        Expression: AssignmentExpressionSyntax assignment
+                    } &&
+                assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)) {
+                if (context.SemanticModel.GetOperation(
+                        assignment,
+                        context.CancellationToken) is not
+                    ISimpleAssignmentOperation {
+                        Target: ILocalReferenceOperation target
+                    } ||
+                    !TryLowerBooleanValueTerm(
+                        assignment.Right,
+                        context,
+                        out var value))
+                    return false;
+                substitutions[target.Local.OriginalDefinition] = value;
+                statementIndex++;
+                continue;
+            }
+            break;
+        }
+        return true;
     }
     private static int SkipBindings(SyntaxList<StatementSyntax> statements) {
         var index = 0;

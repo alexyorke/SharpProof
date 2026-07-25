@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
+using SharpProof.ProofCore.Smt;
 namespace SharpProof.Test;
 [TestFixture]
 public sealed class NullableContractVerificationTests {
@@ -38,6 +40,38 @@ public sealed class NullableContractVerificationTests {
                 "SP0044", true);
         yield return Case("NullForgivingOperator_InUnreachableCodeIsIgnored",
             Class("public static string Get(string? value)\n{\n    if (false)\n    {\n        return value!;\n    }\n    return \"fallback\";\n}", Nullable), "SP0044", false);
+        yield return Case("NullForgivingOperator_TwoArmedAssignmentJoinRetainsNullablePath_Reports",
+            """
+            #nullable enable
+            public static class Consumer {
+                public static int Length(bool flag) {
+                    string? value;
+                    if (flag)
+                        value = "present";
+                    else
+                        value = null;
+                    return value!.Length;
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_SwitchAssignmentJoinRetainsNullablePath_Reports",
+            """
+            #nullable enable
+            public static class Consumer {
+                public static int Length(int selection) {
+                    string? value;
+                    switch (selection) {
+                        case 0:
+                            value = "present";
+                            break;
+                        default:
+                            value = null;
+                            break;
+                    }
+                    return value!.Length;
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_StaleMemberProofAfterExternalCall_DoesNotReport",
             Class("private string? _value;\n\npublic int Length()\n{\n    if (_value is null) return 0;\n    System.GC.KeepAlive(this);\n    return _value!.Length;\n}",
                 Nullable, false), "SP0044", false);
@@ -4804,6 +4838,47 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredLambdaLocalBindingPredicateLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Where(value => {
+                            var positive = value > 0;
+                            if (positive)
+                                return false;
+                            return true;
+                        })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredLambdaReassignedLocalPredicateLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Where(value => {
+                            var candidate = value;
+                            candidate = 0;
+                            return candidate <= 0;
+                        })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ArrayCreateInstanceFilteredGuardedCapturedLocalDelegatePredicateLoopBodyIsUnreachable_DoesNotReport",
             """
             #nullable enable
@@ -8582,6 +8657,173 @@ public sealed class NullableContractVerificationTests {
     public async Task NullableContractMatrix(NullableCase testCase) {
         var ids = (await AnalyzeAsync(testCase.Source)).Select(static diagnostic => diagnostic.Id);
         Assert.That(ids, testCase.Expected ? Does.Contain(testCase.DiagnosticId) : Does.Not.Contain(testCase.DiagnosticId));
+    }
+    [TestCase("^a|b")]
+    [TestCase("a|b$")]
+    [TestCase("^a|b$")]
+    [TestCase(@"\Aa|b")]
+    [TestCase(@"a|b\z")]
+    public void RegexNormalizer_TopLevelAlternationWithEdgeAnchor_FailsSafely(
+        string pattern) =>
+        Assert.That(
+            Z3RegexCompiler.TryNormalize(
+                pattern,
+                RegexOptions.None,
+                out _),
+            Is.False);
+    [TestCase("^(a|b)")]
+    [TestCase(@"^a\|b")]
+    [TestCase("^[a|b]")]
+    public void RegexNormalizer_NestedOrLiteralAlternationWithAnchor_Normalizes(
+        string pattern) =>
+        Assert.That(
+            Z3RegexCompiler.TryNormalize(
+                pattern,
+                RegexOptions.None,
+                out _),
+            Is.True);
+    [TestCase("[a-z-[aeiou]]", 13)]
+    [TestCase(@"[a\-[b]]", 7)]
+    [TestCase(@"[\]]", 4)]
+    [TestCase("[]]", 3)]
+    [TestCase("[^]]", 4)]
+    public void RegexNormalizer_CharacterClassEndHonorsEscapedHyphen(
+        string pattern,
+        int expectedEnd) {
+        Assert.That(
+            Z3RegexCompiler.TryFindCharacterClassEnd(
+                pattern,
+                0,
+                out var end),
+            Is.True);
+        Assert.That(end, Is.EqualTo(expectedEnd));
+    }
+    [Test]
+    public void PredicateImplication_UsesAmbientSmtService() {
+        var source = """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue(bool include) {
+                    var lengths = new[] { -1, 1 }
+                        .Where(value => {
+                            if (value > 0)
+                                return false;
+                            return include;
+                        })
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """;
+        var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+            source,
+            new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+                Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview));
+        var trustedPlatformAssemblies =
+            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
+            throw new InvalidOperationException(
+                "Trusted platform assemblies are unavailable.");
+        var compilation =
+            Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+                "PredicateImplicationAmbientSmt",
+                [tree],
+                trustedPlatformAssemblies
+                    .Split(Path.PathSeparator)
+                    .Select(static path =>
+                        Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path)),
+                new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                    Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var suppression = tree.GetRoot()
+            .DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.PostfixUnaryExpressionSyntax>()
+            .Single();
+        using var smt = new SharpProof.Symbolic.Smt.SmtAnalysisService(
+            SharpProof.Symbolic.Smt.SmtAnalysisOptions.Default);
+        _ = new SharpProof.Symbolic.SymbolicInvariantService().AnalyzeAt(
+            suppression,
+            model,
+            smt);
+        Assert.That(smt.ExecutedQueryCount, Is.GreaterThan(0));
+    }
+    [TestCase(true)]
+    [TestCase(false)]
+    public void SmtVariableNames_DistinguishSymbolsAtSameOffsetInDifferentTrees(
+        bool includeFilePaths) {
+        var firstTree =
+            Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                "class A { static int Threshold; }",
+                path: includeFilePaths ? "A.cs" : string.Empty);
+        var secondTree =
+            Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                "class B { static int Threshold; }",
+                path: includeFilePaths ? "B.cs" : string.Empty);
+        var compilation =
+            Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+                "DistinctSourceTrees",
+                [firstTree, secondTree]);
+        var first = compilation.GetTypeByMetadataName("A")!
+            .GetMembers("Threshold")
+            .Single();
+        var second = compilation.GetTypeByMetadataName("B")!
+            .GetMembers("Threshold")
+            .Single();
+        Assert.That(
+            SharpProof.Symbolic.SymbolicFactFactory.GetSmtVariableName(first),
+            Is.Not.EqualTo(
+                SharpProof.Symbolic.SymbolicFactFactory.GetSmtVariableName(second)));
+    }
+    [TestCase(true, true, true)]
+    [TestCase(true, false, false)]
+    public void SymbolicStateMerge_PreservesOnlyUniversalContradiction(
+        bool firstContradictory,
+        bool secondContradictory,
+        bool expectedContradictory) {
+        var merged =
+            SharpProof.Symbolic.Ir.SymbolicStateMerger.MergePathStatesAcrossAll(
+                [
+                    new SharpProof.Symbolic.Ir.SymbolicState(
+                        isContradictory: firstContradictory),
+                    new SharpProof.Symbolic.Ir.SymbolicState(
+                        isContradictory: secondContradictory)
+                ],
+                static (left, right) =>
+                    SharpProof.Symbolic.Ir.SymbolicState.CreateProofFactKey(left) ==
+                    SharpProof.Symbolic.Ir.SymbolicState.CreateProofFactKey(right),
+                0);
+        Assert.That(
+            merged.IsContradictory,
+            Is.EqualTo(expectedContradictory));
+    }
+    [Test]
+    public void SmtAnalysisService_DisposedSessionRaceReturnsUnknown() {
+        using var smt = new SharpProof.Symbolic.Smt.SmtAnalysisService(
+            SharpProof.Symbolic.Smt.SmtAnalysisOptions.Default,
+            static () => throw new ObjectDisposedException("test-session"));
+        SharpProof.ProofCore.Analysis.AnalysisProofResult? result = null;
+        Assert.That(
+            () => result = smt.ClassifyPathFeasibility(
+                [new SharpProof.ProofCore.Smt.SmtBooleanConstant(true)]),
+            Throws.Nothing);
+        Assert.That(result!.Reason, Is.EqualTo("smt_disposed"));
+    }
+    [Test]
+    public void AnalysisSession_InvalidBudgetIsRejectedBeforeReadingFile() {
+        var options = new SharpProof.Symbolic.SharpProofAnalysisOptions(
+            new SharpProof.Symbolic.SharpProofAnalysisBudget(
+                MaxMergedIfElseFacts: 0));
+        Assert.That(
+            () => SharpProof.Symbolic.SharpProofAnalysisSession.FromFile(
+                Path.Combine(
+                    Path.GetTempPath(),
+                    Guid.NewGuid().ToString("N"),
+                    "missing.cs"),
+                options),
+            Throws.TypeOf<ArgumentOutOfRangeException>());
     }
     [TestCase(true)]
     [TestCase(false)]

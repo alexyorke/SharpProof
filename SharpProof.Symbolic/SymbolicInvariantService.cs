@@ -22,7 +22,13 @@ internal sealed class SymbolicInvariantService {
         CancellationToken cancellationToken = default,
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicState? initialState = null) {
-        var point = CollectProgramPoint(site, semanticModel, cancellationToken, includeCurrentStatementCompletionFacts, initialState);
+        var point = CollectProgramPoint(
+            site,
+            semanticModel,
+            smtAnalysis,
+            cancellationToken,
+            includeCurrentStatementCompletionFacts,
+            initialState);
         return CreateAnalysis(point.Formulas, point.PathState, smtAnalysis, point.Truncation);
     }
     public SymbolicProgramPointAnalysis AnalyzeForInitialEntry(
@@ -31,7 +37,11 @@ internal sealed class SymbolicInvariantService {
         SmtAnalysisService? smtAnalysis = null,
         CancellationToken cancellationToken = default) {
         using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
-        var pathState = SymbolicReachabilityService.CollectForInitialEntryState(forStatement, semanticModel, cancellationToken);
+        var pathState = SymbolicReachabilityService.CollectForInitialEntryState(
+            forStatement,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis);
         var formulas = EncodePathState(pathState);
         return CreateAnalysis(formulas, pathState, smtAnalysis, limitScope.Snapshot());
     }
@@ -44,6 +54,7 @@ internal sealed class SymbolicInvariantService {
     private static CollectedProgramPoint CollectProgramPoint(
         SyntaxNode site,
         SemanticModel semanticModel,
+        SmtAnalysisService? smtAnalysis,
         CancellationToken cancellationToken,
         bool includeCurrentStatementCompletionFacts,
         SymbolicState? initialState) {
@@ -52,6 +63,7 @@ internal sealed class SymbolicInvariantService {
             site,
             semanticModel,
             cancellationToken,
+            smtAnalysis,
             initialState,
             includeCurrentStatementCompletionFacts);
         return new CollectedProgramPoint(pathState, EncodePathState(pathState), limitScope.Snapshot());

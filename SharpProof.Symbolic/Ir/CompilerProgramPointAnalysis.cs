@@ -8,7 +8,8 @@ internal static class CompilerProgramPointAnalysis {
         CancellationToken cancellationToken,
         SymbolicState? initialState = null,
         bool includeCurrentStatementCompletionFacts = false,
-        bool forInitialEntry = false) {
+        bool forInitialEntry = false,
+        SmtAnalysisService? smtAnalysis = null) {
         cancellationToken.ThrowIfCancellationRequested();
         var searchNode = site is LocalFunctionStatementSyntax ? site.Parent ?? site : site;
         var root = CSharpSyntaxFacts.GetContainingExecutionRoot(searchNode, ExecutionRootPolicy.Callable);
@@ -26,7 +27,7 @@ internal static class CompilerProgramPointAnalysis {
             ref state, site, semanticModel, cancellationToken);
         var domain = new ProgramPointDomain(
             site, semanticModel, cancellationToken, includeCurrentStatementCompletionFacts, forInitialEntry,
-            state.NormalizedProofKey);
+            state.NormalizedProofKey, smtAnalysis);
         var result = AnalyzerUtilitiesControlFlowAnalysis.Run(
             graph, state, domain, semanticModel.Compilation, owner, cancellationToken);
         var captured = domain.CapturedState;
@@ -48,7 +49,8 @@ internal static class CompilerProgramPointAnalysis {
         CancellationToken cancellationToken,
         bool includeCompletion,
         bool forInitialEntry,
-        string initialKey) : IControlFlowDomain<SymbolicState> {
+        string initialKey,
+        SmtAnalysisService? smtAnalysis) : IControlFlowDomain<SymbolicState> {
         private SymbolicState? captured;
         private bool targetIsCompilerUnreachable;
         private readonly Stack<Dictionary<IParameterSymbol, Int32BoundFacts>> parameterBoundScopes = new();
@@ -92,10 +94,20 @@ internal static class CompilerProgramPointAnalysis {
             return state;
         }
         public SymbolicState Merge(SymbolicState current, SymbolicState incoming) {
-            if (current.NormalizedProofKey == initialKey && incoming.NormalizedProofKey != initialKey ||
-                IsSubset(current, incoming))
+            if (current.NormalizedProofKey == initialKey && incoming.NormalizedProofKey != initialKey)
                 return incoming;
-            if (IsSubset(incoming, current)) return current;
+            if (incoming.NormalizedProofKey == initialKey && current.NormalizedProofKey != initialKey)
+                return current;
+            if (RequiresExpressionBranchPrecision()) {
+                if (IsSubset(current, incoming))
+                    return incoming;
+                if (IsSubset(incoming, current))
+                    return current;
+            }
+            if (IsSubset(current, incoming))
+                return current;
+            if (IsSubset(incoming, current))
+                return incoming;
             return SymbolicStateMerger.MergePathStatesAcrossAll(
                 [current, incoming], static (left, right) => SymbolicState.CreateProofFactKey(left) ==
                                                          SymbolicState.CreateProofFactKey(right), site.SpanStart);
@@ -1003,13 +1015,16 @@ internal static class CompilerProgramPointAnalysis {
             SymbolicPredicateTruthGuaranteesNonPositiveElement(predicate);
         private bool SymbolicPredicateTruthGuaranteesNonPositiveElement(
             ExpressionSyntax predicate) {
+            if (smtAnalysis == null)
+                return false;
             var argument = new SymbolicVariableTerm(
                 "array_dimension_predicate_value_" +
                 predicate.SpanStart.ToString(CultureInfo.InvariantCulture),
                 SmtValueKind.Int);
             var context = new SymbolicLoweringContext(
                 semanticModel,
-                cancellationToken);
+                cancellationToken,
+                smtAnalysis: smtAnalysis);
             if (!SymbolicSourcePredicateLowerer.TryLowerSequencePredicate(
                     predicate,
                     argument,
@@ -1023,7 +1038,7 @@ internal static class CompilerProgramPointAnalysis {
                     new SymbolicIntegerConstantTerm(0)),
                 predicate,
                 "array-dimension-predicate.nonpositive");
-            return new SymbolicProofService(context.SmtAnalysis)
+            return new SymbolicProofService(smtAnalysis)
                        .ClassifyImplication(
                            new SymbolicState(pathConditions: [condition]),
                            nonPositive)
@@ -2890,6 +2905,14 @@ internal static class CompilerProgramPointAnalysis {
             BlockSyntax block => block.Statements.LastOrDefault() is { } last && AlwaysCompletes(last),
             _ => false
         };
+        private bool RequiresExpressionBranchPrecision() =>
+            site.Ancestors().TakeWhile(static ancestor => ancestor is not StatementSyntax)
+                .OfType<ExpressionSyntax>()
+                .Any(static expression =>
+                    expression is ConditionalExpressionSyntax or SwitchExpressionSyntax or ConditionalAccessExpressionSyntax ||
+                    expression.IsKind(SyntaxKind.LogicalAndExpression) ||
+                    expression.IsKind(SyntaxKind.LogicalOrExpression) ||
+                    expression.IsKind(SyntaxKind.CoalesceExpression));
         private static bool IsSubset(SymbolicState subset, SymbolicState superset) {
             if (subset.IsContradictory && !superset.IsContradictory) return false;
             var factKeys = new HashSet<string>(superset.Facts.Select(SymbolicState.CreateProofFactKey), StringComparer.Ordinal);

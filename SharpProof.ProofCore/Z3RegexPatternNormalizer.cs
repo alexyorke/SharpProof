@@ -12,6 +12,14 @@ internal sealed partial class Z3RegexCompiler {
                                 !multiline &&
                                 effectivePattern.EndsWith("$", StringComparison.Ordinal) &&
                                 !IsEscaped(effectivePattern, effectivePattern.Length - 1);
+        if ((startAnchored ||
+             strictEndAnchored ||
+             finalNewlineEndAnchored ||
+             dollarEndAnchored) &&
+            ContainsTopLevelAlternation(effectivePattern, options)) {
+            normalized = default;
+            return false;
+        }
         var bodyEndTrim = strictEndAnchored || finalNewlineEndAnchored ? 2 : dollarEndAnchored ? 1 : 0;
         var bodyEnd = effectivePatternLength - bodyEndTrim;
         if (bodyEnd < 0 || (startAnchored && startAnchorStart + startAnchorLength > bodyEnd)) {
@@ -70,6 +78,63 @@ internal sealed partial class Z3RegexCompiler {
         }
         return lastSignificantEnd;
     }
+    private static bool ContainsTopLevelAlternation(
+        string pattern,
+        RegexOptions options) {
+        var currentScope = CreateInitialOptionScope(options);
+        var scopes = new Stack<RegexOptionScope>();
+        var position = 0;
+        while (position < pattern.Length) {
+            if (currentScope.IgnorePatternWhitespace) {
+                if (char.IsWhiteSpace(pattern[position])) {
+                    position++;
+                    continue;
+                }
+                if (pattern[position] == '#') {
+                    position++;
+                    while (position < pattern.Length &&
+                           pattern[position] is not ('\r' or '\n'))
+                        position++;
+                    continue;
+                }
+            }
+            if (pattern[position] == '\\') {
+                position = Math.Min(position + 2, pattern.Length);
+                continue;
+            }
+            if (pattern[position] == '[') {
+                SkipCharacterClass(pattern, ref position);
+                continue;
+            }
+            if (TrySkipInlineComment(pattern, ref position))
+                continue;
+            if (pattern[position] == '(') {
+                if (TryReadOptionGroup(
+                        pattern,
+                        position,
+                        currentScope,
+                        true,
+                        out var nextScope,
+                        out var nextPosition,
+                        out var scoped)) {
+                    if (scoped)
+                        scopes.Push(currentScope);
+                    currentScope = nextScope;
+                    position = nextPosition;
+                    continue;
+                }
+                scopes.Push(currentScope);
+            }
+            else if (pattern[position] == ')' && scopes.Count > 0) {
+                currentScope = scopes.Pop();
+            }
+            else if (pattern[position] == '|' && scopes.Count == 0) {
+                return true;
+            }
+            position++;
+        }
+        return false;
+    }
     private static void SkipCharacterClass(string pattern, ref int position) =>
         position = TryFindCharacterClassEnd(pattern, position, out var end) ? end : pattern.Length;
     internal static bool TryFindCharacterClassEnd(string pattern, int start, out int end) {
@@ -78,25 +143,33 @@ internal sealed partial class Z3RegexCompiler {
         var depth = 1;
         var firstCharacter = true;
         var escaped = false;
+        var previousWasUnescapedHyphen = false;
         for (var index = start + 1; index < pattern.Length; index++) {
             var current = pattern[index];
             if (escaped) {
                 escaped = false;
                 firstCharacter = false;
+                previousWasUnescapedHyphen = false;
                 continue;
             }
             if (current == '\\') {
                 escaped = true;
+                previousWasUnescapedHyphen = false;
                 continue;
             }
-            if (firstCharacter && current == '^') continue;
+            if (firstCharacter && current == '^') {
+                previousWasUnescapedHyphen = false;
+                continue;
+            }
             if (firstCharacter && current == ']') {
                 firstCharacter = false;
+                previousWasUnescapedHyphen = false;
                 continue;
             }
-            if (current == '[' && pattern[index - 1] == '-') {
+            if (current == '[' && previousWasUnescapedHyphen) {
                 depth++;
                 firstCharacter = true;
+                previousWasUnescapedHyphen = false;
                 continue;
             }
             if (current == ']' && --depth == 0) {
@@ -104,6 +177,7 @@ internal sealed partial class Z3RegexCompiler {
                 return true;
             }
             firstCharacter = false;
+            previousWasUnescapedHyphen = current == '-';
         }
         return false;
     }

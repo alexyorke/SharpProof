@@ -143,16 +143,30 @@ public sealed class SharpProofAnalysisSession : IDisposable {
     public static SharpProofAnalysisSession FromText(string sourceText, string? filePath = null,
         SharpProofAnalysisOptions? options = null) {
         options ??= new SharpProofAnalysisOptions();
+        var analysisLimits = ResolveAnalysisLimits(options);
         var source = CompileSource(sourceText, filePath ?? "SharpProof.Symbolic.Query.cs");
         var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        return new SharpProofAnalysisSession(source, ResolveAnalysisLimits(options), smt);
+        try {
+            return new SharpProofAnalysisSession(source, analysisLimits, smt);
+        }
+        catch {
+            smt.Dispose();
+            throw;
+        }
     }
     public static SharpProofAnalysisSession FromFile(string filePath, SharpProofAnalysisOptions? options = null) {
         options ??= new SharpProofAnalysisOptions();
+        var analysisLimits = ResolveAnalysisLimits(options);
         var fullPath = Path.GetFullPath(filePath);
         var source = CompileSource(File.ReadAllText(fullPath), fullPath);
         var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        return new SharpProofAnalysisSession(source, ResolveAnalysisLimits(options), smt);
+        try {
+            return new SharpProofAnalysisSession(source, analysisLimits, smt);
+        }
+        catch {
+            smt.Dispose();
+            throw;
+        }
     }
     public SharpProofAnalysisResult Analyze(SharpProofAnalysisRequest request, CancellationToken cancellationToken = default) {
         if (request == null) throw new ArgumentNullException(nameof(request));

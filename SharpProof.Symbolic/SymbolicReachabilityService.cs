@@ -1,13 +1,19 @@
 namespace SharpProof.Symbolic;
 internal static class SymbolicReachabilityService {
     private const int StructuralPathStateCacheEntryLimit = 512;
-    private static readonly ConditionalWeakTable<SemanticModel,
-        ConditionalWeakTable<SyntaxNode, BoundedConcurrentCache<PathStateCacheKey, SymbolicState>>>
-        s_structuralPathStateCache = new();
+    private sealed class StructuralPathStateCaches {
+        internal ConditionalWeakTable<SemanticModel,
+            ConditionalWeakTable<SyntaxNode,
+                BoundedConcurrentCache<PathStateCacheKey, SymbolicState>>> Models { get; } = new();
+    }
+    private static readonly StructuralPathStateCaches s_defaultStructuralPathStateCaches = new();
+    private static readonly ConditionalWeakTable<SmtAnalysisService, StructuralPathStateCaches>
+        s_serviceStructuralPathStateCaches = new();
     internal static SymbolicState CollectPathStateAt(
         SyntaxNode site,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
+        SmtAnalysisService? smtAnalysis = null,
         SymbolicState? initialState = null,
         bool includeCurrentStatementCompletionFacts = false) {
         cancellationToken.ThrowIfCancellationRequested();
@@ -16,15 +22,25 @@ internal static class SymbolicReachabilityService {
                 site,
                 semanticModel,
                 cancellationToken,
+                smtAnalysis,
                 initialState,
                 includeCurrentStatementCompletionFacts);
         var key = new PathStateCacheKey(site.SpanStart, site.Span.Length, site.RawKind, includeCurrentStatementCompletionFacts);
-        var methodCaches = s_structuralPathStateCache.GetOrCreateValue(semanticModel);
+        var structuralCaches = smtAnalysis == null
+            ? s_defaultStructuralPathStateCaches
+            : s_serviceStructuralPathStateCaches.GetOrCreateValue(smtAnalysis);
+        var methodCaches = structuralCaches.Models.GetOrCreateValue(semanticModel);
         var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(site);
         var cache = methodCaches.GetValue(executionRoot, static _ =>
             new BoundedConcurrentCache<PathStateCacheKey, SymbolicState>(StructuralPathStateCacheEntryLimit));
         if (!cache.TryGetValue(key, out var state)) {
-            state = BuildStructuralPathStateSnapshot(site, semanticModel, cancellationToken, null, includeCurrentStatementCompletionFacts);
+            state = BuildStructuralPathStateSnapshot(
+                site,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                null,
+                includeCurrentStatementCompletionFacts);
             cache.TryAdd(key, state);
         }
         return state;
@@ -32,9 +48,14 @@ internal static class SymbolicReachabilityService {
     internal static SymbolicState CollectForInitialEntryState(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        SmtAnalysisService? smtAnalysis = null) {
         var cfgState = CompilerProgramPointAnalysis.Collect(
-            forStatement, semanticModel, cancellationToken, forInitialEntry: true);
+            forStatement,
+            semanticModel,
+            cancellationToken,
+            forInitialEntry: true,
+            smtAnalysis: smtAnalysis);
         return cfgState is { IsExact: true, Value: { } exactState }
             ? exactState
             : UnsupportedState(cfgState);
@@ -43,12 +64,18 @@ internal static class SymbolicReachabilityService {
         SyntaxNode site,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
+        SmtAnalysisService? smtAnalysis,
         SymbolicState? initialState,
         bool includeCurrentStatementCompletionFacts) {
         if (!includeCurrentStatementCompletionFacts)
             site = GetNextExecutableSite(site);
         var cfgState = CompilerProgramPointAnalysis.Collect(
-            site, semanticModel, cancellationToken, initialState, includeCurrentStatementCompletionFacts);
+            site,
+            semanticModel,
+            cancellationToken,
+            initialState,
+            includeCurrentStatementCompletionFacts,
+            smtAnalysis: smtAnalysis);
         if (cfgState is { IsExact: true, Value: { } exactState })
             return exactState;
         return UnsupportedState(cfgState);

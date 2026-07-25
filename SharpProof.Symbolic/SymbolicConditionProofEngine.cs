@@ -19,7 +19,12 @@ internal sealed class SymbolicConditionProofEngine(SymbolicInvariantService _inv
                               position <= localFunction.Identifier.Span.End
             ? Math.Max(0, localFunction.SpanStart - 1)
             : position;
-        var query = _invariantService.Analyze(semanticModel, bindingPosition, node, null, cancellationToken);
+        var query = _invariantService.Analyze(
+            semanticModel,
+            bindingPosition,
+            node,
+            smtAnalysis,
+            cancellationToken);
         return ProveAtQuery(query, conditionText, smtAnalysis, cancellationToken);
     }
     internal SymbolicConditionProofResult ProveAtSyntaxNode(
@@ -34,7 +39,7 @@ internal sealed class SymbolicConditionProofEngine(SymbolicInvariantService _inv
             semanticModel,
             node.SpanStart,
             node,
-            null,
+            smtAnalysis,
             cancellationToken,
             includeCurrentStatementCompletionFacts);
         return ProveAtQuery(query, conditionText, smtAnalysis, cancellationToken);
@@ -55,7 +60,7 @@ internal sealed class SymbolicConditionProofEngine(SymbolicInvariantService _inv
             semanticModel,
             node.SpanStart,
             node,
-            null,
+            smtAnalysis,
             cancellationToken,
             includeCurrentStatementCompletionFacts,
             initialState);

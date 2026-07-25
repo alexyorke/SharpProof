@@ -8,7 +8,7 @@ internal sealed class SmtAnalysisService : IDisposable {
     private readonly SmtProofSearchSessionPool _proofSearchSessions;
     private readonly object _solverLock = new();
     private readonly object _healthLock = new();
-    private bool _disposed;
+    private volatile bool _disposed;
     private int _consecutiveTransientFailureCount;
     private int _contextRecycleCount;
     private int _executedQueryCount;
@@ -153,6 +153,9 @@ internal sealed class SmtAnalysisService : IDisposable {
                         finally {
                             budget.RecordConsumedResources(search.ConsumedResourceCount - resourcesBefore);
                         }
+                    }
+                    catch (ObjectDisposedException) {
+                        return Unknown("smt_disposed");
                     }
                     catch (Exception ex) when (ex is InvalidOperationException or RegexMatchTimeoutException) {
                         var failureCode = ex is RegexMatchTimeoutException ? "smt_timeout" : "smt_encoding_failure";

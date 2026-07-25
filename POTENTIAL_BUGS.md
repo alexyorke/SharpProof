@@ -1,3 +1,3 @@
 # Potential Bugs
 
-No unresolved potential bugs remain.
+No unresolved entries remain from the 2026-07-24 audit.
