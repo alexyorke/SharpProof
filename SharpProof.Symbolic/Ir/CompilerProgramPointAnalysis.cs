@@ -705,6 +705,11 @@ internal static class CompilerProgramPointAnalysis {
                     out var definitelyNoDimensions) &&
                 definitelyNoDimensions)
                 return new(true, false, true);
+            if (TryGetValuePreservingArrayDimensionProducerFacts(
+                    dimensions,
+                    visited,
+                    out var producerFacts))
+                return producerFacts;
             switch (dimensions) {
                 case ArrayCreationExpressionSyntax { Initializer: { } initializer }:
                     return GetExplicitArrayDimensionVectorFacts(initializer.Expressions);
@@ -766,6 +771,50 @@ internal static class CompilerProgramPointAnalysis {
             return dimensions.Any(DefinitelyCapsSequenceAtZero)
                 ? new(false, true, true)
                 : default;
+        }
+        private bool TryGetValuePreservingArrayDimensionProducerFacts(
+            ExpressionSyntax dimensions,
+            HashSet<SyntaxNode> visited,
+            out ArrayDimensionVectorFacts facts) {
+            facts = default;
+            if (dimensions is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not
+                    IInvocationOperation { TargetMethod: { } targetMethod } operation)
+                return false;
+            var definition = targetMethod.ReducedFrom ?? targetMethod;
+            if (definition.ContainingType.ToDisplayString() != "System.Linq.Enumerable")
+                return false;
+            if (definition.Name == nameof(Enumerable.Repeat)) {
+                var elementParameter = targetMethod.Parameters.FirstOrDefault(parameter =>
+                    parameter.Name == "element");
+                var countParameter = targetMethod.Parameters.FirstOrDefault(parameter =>
+                    parameter.Name == "count");
+                if (elementParameter == null ||
+                    countParameter == null ||
+                    !TryGetInvocationArgument(operation, elementParameter, out var element) ||
+                    !TryGetInvocationArgument(operation, countParameter, out var count) ||
+                    !DefinitelyCapsSequenceAtZero(element))
+                    return false;
+                facts = DefinitelyCapsSequenceAtZero(count)
+                    ? new(true, false, true)
+                    : DefinitelyProvidesPositiveDimensionCount(count)
+                        ? new(false, true, true)
+                        : new(false, false, true);
+                return true;
+            }
+            if (definition.Name is not (
+                    nameof(Enumerable.AsEnumerable) or
+                    nameof(Enumerable.OrderBy) or
+                    nameof(Enumerable.OrderByDescending) or
+                    nameof(Enumerable.Reverse) or
+                    nameof(Enumerable.ThenBy) or
+                    nameof(Enumerable.ThenByDescending) or
+                    nameof(Enumerable.ToArray) or
+                    nameof(Enumerable.ToList)) ||
+                !TryGetStandardSequenceSource(invocation, operation, out var source))
+                return false;
+            facts = GetArrayDimensionVectorFacts(source, visited);
+            return facts != default;
         }
         private bool DefinitelyProvidesPositiveDimensionCount(ExpressionSyntax count) {
             var visited = new HashSet<SyntaxNode>();
