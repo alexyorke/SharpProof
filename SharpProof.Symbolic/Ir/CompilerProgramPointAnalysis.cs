@@ -29,14 +29,16 @@ internal static class CompilerProgramPointAnalysis {
             ref state, site, semanticModel, cancellationToken);
         var domain = new ProgramPointDomain(
             site, semanticModel, cancellationToken, includeCurrentStatementCompletionFacts, forInitialEntry,
-            state.NormalizedProofKey, smtAnalysis);
+            state, smtAnalysis);
         var result = AnalyzerUtilitiesControlFlowAnalysis.Run(
             graph, state, domain, semanticModel.Compilation, owner, cancellationToken);
+        if (result.Truncated)
+            return Unsupported(site, "iteration-limit");
         var captured = domain.CapturedState;
         if (captured == null && domain.TargetIsCompilerUnreachable)
             captured = result.ExitState.MarkContradictory();
         return captured == null
-            ? Unsupported(site, result.Truncated ? "iteration-limit" : "target-block")
+            ? Unsupported(site, "target-block")
             : SymbolicLoweringResult<SymbolicState>.Exact(
                 captured.Normalize(), new("compiler-cfg-program-point", site.Span, "exact"));
     }
@@ -51,13 +53,14 @@ internal static class CompilerProgramPointAnalysis {
         CancellationToken cancellationToken,
         bool includeCompletion,
         bool forInitialEntry,
-        string initialKey,
+        SymbolicState initialState,
         SmtAnalysisService? smtAnalysis) : IControlFlowDomain<SymbolicState> {
         private SymbolicState? captured;
         private bool targetIsCompilerUnreachable;
         private readonly Stack<Dictionary<IParameterSymbol, Int32BoundFacts>> parameterBoundScopes = new();
         internal bool TargetIsCompilerUnreachable => targetIsCompilerUnreachable;
         internal SymbolicState? CapturedState => captured;
+        public SymbolicState Bottom { get; } = initialState.MarkContradictory();
         public void SetControlFlowGraph(ControlFlowGraph graph, PointsToAnalysisResult? pointsToAnalysisResult) =>
             targetIsCompilerUnreachable = graph.Blocks.Any(block => !block.IsReachable &&
                 block.Operations.Append(block.BranchValue).Where(static operation => operation != null)
@@ -96,10 +99,6 @@ internal static class CompilerProgramPointAnalysis {
             return state;
         }
         public SymbolicState Merge(SymbolicState current, SymbolicState incoming) {
-            if (current.NormalizedProofKey == initialKey && incoming.NormalizedProofKey != initialKey)
-                return incoming;
-            if (incoming.NormalizedProofKey == initialKey && current.NormalizedProofKey != initialKey)
-                return current;
             if (RequiresExpressionBranchPrecision()) {
                 if (IsSubset(current, incoming))
                     return incoming;

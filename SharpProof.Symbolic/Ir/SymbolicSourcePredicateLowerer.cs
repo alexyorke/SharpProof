@@ -481,6 +481,7 @@ internal static class SymbolicSourcePredicateLowerer {
         IDictionary<ISymbol, SymbolicTerm> substitutions) : IControlFlowDomain<InlinePredicateState> {
         private readonly HashSet<IOperation> branchValues = [];
         private readonly HashSet<IOperation> assignments = [];
+        public InlinePredicateState Bottom => InlinePredicateState.Bottom;
         public void SetControlFlowGraph(ControlFlowGraph graph, PointsToAnalysisResult? _) {
             foreach (var branch in graph.Blocks.Select(static block => block.BranchValue).Where(static value => value != null))
                 branchValues.Add(branch!);

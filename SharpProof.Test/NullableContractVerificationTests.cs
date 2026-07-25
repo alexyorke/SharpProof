@@ -10400,6 +10400,102 @@ public sealed class NullableContractVerificationTests {
             Does.Contain("SP0015"),
             string.Join(Environment.NewLine, diagnostics));
     }
+    [Test]
+    public void PotentialBugRegression_CfgJoinRetainsPathEqualToInitialState() {
+        const string source = """
+            public static class C {
+                private static extern bool Choose();
+                public static bool M(int value) {
+                    if (Choose())
+                        value = 1;
+                    return value == 1;
+                }
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var returnStatement = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ReturnStatementSyntax>()
+            .Single();
+        var initial = new SharpProof.Symbolic.Ir.SymbolicState();
+        var changed = initial.AddFact(SharpProof.Symbolic.Ir.SymbolicFact.Exact(
+            new SharpProof.Symbolic.Ir.SymbolicRelationAtom(
+                SharpProof.Symbolic.Ir.SymbolicRelationOperator.Equal,
+                new SharpProof.Symbolic.Ir.SymbolicVariableTerm(
+                    "value",
+                    SharpProof.ProofCore.Smt.SmtValueKind.Int),
+                new SharpProof.Symbolic.Ir.SymbolicIntegerConstantTerm(1)),
+            returnStatement,
+            "test.changed-path"));
+        var domainType = typeof(SharpProof.Symbolic.Ir.CompilerProgramPointAnalysis)
+            .GetNestedType(
+                "ProgramPointDomain",
+                System.Reflection.BindingFlags.NonPublic)!;
+        var domain = domainType
+            .GetConstructors(
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic)
+            .Single()
+            .Invoke([
+                returnStatement,
+                model,
+                CancellationToken.None,
+                false,
+                false,
+                initial,
+                null
+            ]);
+        var merged = (SharpProof.Symbolic.Ir.SymbolicState)domainType
+            .GetMethod("Merge")!
+            .Invoke(domain, [initial, changed])!;
+        Assert.That(merged.Facts, Is.Empty);
+    }
+    [Test]
+    public void PotentialBugRegression_TruncatedCfgCaptureIsNotExact() {
+        var statements = string.Join(
+            Environment.NewLine,
+            Enumerable.Range(0, 4200).Select(static index => $"value = {index};"));
+        var source = $$"""
+            public static class C {
+                public static int M() {
+                    int value = 0;
+                    value = -1;
+                    {{statements}}
+                    return value;
+                }
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var capturedAssignment = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AssignmentExpressionSyntax>()
+            .First();
+        var result = SharpProof.Symbolic.Ir.CompilerProgramPointAnalysis.Collect(
+            capturedAssignment,
+            model,
+            CancellationToken.None);
+        Assert.Multiple(() => {
+            Assert.That(result.IsExact, Is.False);
+            Assert.That(result.Provenance.Single().Detail, Is.EqualTo("iteration-limit"));
+        });
+    }
+    [Test]
+    public async Task PotentialBugRegression_OldValueSnapshotSurvivesAssignment() {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class C {
+                [Ensures("result == old(value)")]
+                public static int M(int value) {
+                    int result = value;
+                    value++;
+                    return result;
+                }
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source);
+        var ensuresDiagnostics = diagnostics.Where(static diagnostic =>
+            diagnostic.Id is "SP0018" or "SP0019").ToArray();
+        Assert.That(ensuresDiagnostics, Is.Empty, string.Join(Environment.NewLine, diagnostics));
+    }
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)

@@ -206,7 +206,9 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
             // FlowBranch is called once per edge, but SharpProof evaluates a block branch value once.
             var cacheKey = (source.Ordinal, context.Domain.GetKey(input.State));
             if (!completedBlocks.TryGetValue(cacheKey, out var state)) {
-                state = input.State;
+                state = source.Kind == BasicBlockKind.Entry
+                    ? context.InitialState
+                    : input.State;
                 if (branch.BranchValue != null) state = context.Transfer(state, branch.BranchValue);
                 state = context.Domain.CompleteBlock(state, source);
                 completedBlocks.Add(cacheKey, state);
@@ -246,7 +248,7 @@ internal static class AnalyzerUtilitiesControlFlowAnalysis {
         protected override EffectAnalysisData<TState> MergeAnalysisData(EffectAnalysisData<TState> value1, EffectAnalysisData<TState> value2) =>
             new(context.Domain.Merge(value1.State, value2.State));
         protected override EffectAnalysisData<TState> GetClonedAnalysisData(EffectAnalysisData<TState> value) => new(value.State);
-        public override EffectAnalysisData<TState> GetEmptyAnalysisData() => new(context.InitialState);
+        public override EffectAnalysisData<TState> GetEmptyAnalysisData() => new(context.Domain.Bottom);
         protected override EffectAnalysisData<TState> GetExitBlockOutputData(
             DataFlowAnalysisResult<EffectBlockAnalysisResult<TState>, EffectAbstractValue> result) =>
             new(result.ExitBlockOutput.State);

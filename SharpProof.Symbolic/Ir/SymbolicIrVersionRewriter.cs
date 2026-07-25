@@ -14,6 +14,12 @@ internal static class SymbolicIrVersionRewriter {
         return symbolVersions.IsEmpty ? fact : SymbolicAlgebra.Rewrite(fact, Rewrite);
         SymbolicTerm? Rewrite(SymbolicTerm term) => RewriteTerm(term, symbolVersions);
     }
+    internal static SymbolicTerm RewriteToCurrentVersions(
+        SymbolicTerm term,
+        ImmutableDictionary<string, int> symbolVersions) =>
+        symbolVersions.IsEmpty
+            ? term
+            : SymbolicAlgebra.Rewrite(term, candidate => RewriteTerm(candidate, symbolVersions));
     private static SymbolicTerm? RewriteTerm(SymbolicTerm term, ImmutableDictionary<string, int> versions) {
         var name = term switch {
             SymbolicVariableTerm variable => variable.Name,

@@ -4,15 +4,25 @@ internal static class SymbolicOperationTransferKernel {
         if (state == null) throw new ArgumentNullException(nameof(state));
         if (delta == null) throw new ArgumentNullException(nameof(delta));
         var candidate = state;
-        ApplyInvalidations(ref candidate, delta.Invalidations);
-        if (!TryApplyBindings(ref candidate, delta.Bindings, delta.Origin))
+        var sourceVersions = state.SymbolVersions;
+        var preserveHistoricalVersions = HasOldValueSnapshot(state);
+        if (preserveHistoricalVersions && !delta.Invalidations.IsDefaultOrEmpty)
+            foreach (var target in delta.Invalidations)
+                if (target.MatchKind == SymbolicInvalidationMatchKind.VariablePrefix &&
+                    !sourceVersions.ContainsKey(target.Key))
+                    sourceVersions = sourceVersions.SetItem(target.Key, 1);
+        ApplyInvalidations(ref candidate, delta.Invalidations, preserveHistoricalVersions);
+        if (!TryApplyBindings(ref candidate, delta.Bindings, delta.Origin, sourceVersions))
             return false;
         if (!delta.Assumptions.IsDefaultOrEmpty)
             foreach (var assumption in delta.Assumptions)
-                candidate = candidate.AddPathCondition(assumption);
+                candidate = candidate.AddPathCondition(
+                    SymbolicIrVersionRewriter.RewriteToCurrentVersions(
+                        assumption,
+                        candidate.SymbolVersions));
         foreach (var binding in delta.Bindings)
             if (binding.DeriveIntegerBounds)
-                AddDerivedIntegerBounds(ref candidate, binding, delta.Origin);
+                AddDerivedIntegerBounds(ref candidate, binding, delta.Origin, sourceVersions);
         state = candidate.Normalize();
         return true;
     }
@@ -35,9 +45,27 @@ internal static class SymbolicOperationTransferKernel {
             state = state.AddPathCondition(condition);
         return state.Normalize();
     }
-    private static void ApplyInvalidations(ref SymbolicState state, ImmutableArray<SymbolicInvalidationTarget> targets) {
+    private static bool HasOldValueSnapshot(SymbolicState state) =>
+        state.Facts.Any(static fact => SymbolicAlgebra.Any(
+            fact,
+            static term => term is SymbolicVariableTerm { Name: var name } &&
+                           name.StartsWith("__sp_old_", StringComparison.Ordinal)));
+    private static void ApplyInvalidations(
+        ref SymbolicState state,
+        ImmutableArray<SymbolicInvalidationTarget> targets,
+        bool preserveHistoricalVersions) {
         if (targets.IsDefaultOrEmpty) return;
         foreach (var target in targets) {
+            if (preserveHistoricalVersions &&
+                target.MatchKind == SymbolicInvalidationMatchKind.VariablePrefix) {
+                var hasCurrentVersion = state.SymbolVersions.TryGetValue(target.Key, out var currentVersion);
+                if (!hasCurrentVersion) currentVersion = 1;
+                state = FreezeCurrentVariableVersion(state, target.Key, currentVersion, !hasCurrentVersion)
+                    .WithSymbolVersion(
+                        target.Key,
+                        target.DefinitionVersion ?? checked(currentVersion + 1));
+                continue;
+            }
             state = target.MatchKind switch {
                 SymbolicInvalidationMatchKind.VariablePrefix =>
                     SymbolicIrReferenceScanner.RemoveVariableReferences(state, target.Key),
@@ -52,6 +80,42 @@ internal static class SymbolicOperationTransferKernel {
             if (target.DefinitionVersion is { } definitionVersion)
                 state = state.WithSymbolVersion(target.Key, definitionVersion);
         }
+    }
+    private static SymbolicState FreezeCurrentVariableVersion(
+        SymbolicState state,
+        string key,
+        int version,
+        bool isUnversioned) {
+        if (!isUnversioned) return state;
+        var versionedKey = key + "@v" + version.ToString(CultureInfo.InvariantCulture);
+        SymbolicTerm? Rewrite(SymbolicTerm term) {
+            var name = term switch {
+                SymbolicVariableTerm variable => variable.Name,
+                SymbolicNullableHasValueTerm nullable => nullable.NullableName,
+                SymbolicNullableValueTerm nullable => nullable.NullableName,
+                _ => null
+            };
+            if (name == null ||
+                name != key &&
+                !name.StartsWith(key + ".", StringComparison.Ordinal) &&
+                !name.StartsWith(key + "[", StringComparison.Ordinal))
+                return null;
+            var frozenName = versionedKey + name.Substring(key.Length);
+            return term switch {
+                SymbolicVariableTerm variable => variable with { Name = frozenName },
+                SymbolicNullableHasValueTerm nullable => nullable with { NullableName = frozenName },
+                SymbolicNullableValueTerm nullable => nullable with { NullableName = frozenName },
+                _ => null
+            };
+        }
+        return new SymbolicState(
+            state.Facts.Select(fact => SymbolicAlgebra.Rewrite(fact, Rewrite)),
+            state.PathConditions.Select(condition => SymbolicAlgebra.Rewrite(condition, Rewrite)),
+            state.SymbolVersions,
+            state.IsContradictory,
+            state.IsExact,
+            state.UnknownReason,
+            state.Provenance);
     }
     internal static SymbolicState PropagateSourceFacts(SymbolicState state, SymbolicTerm source, SymbolicTerm target) {
         if (!SymbolicStateFactBuilder.CanCompareIrTerms(source, target) ||
@@ -80,15 +144,25 @@ internal static class SymbolicOperationTransferKernel {
     private static bool TryApplyBindings(
         ref SymbolicState state,
         ImmutableArray<SymbolicAssignmentBinding> bindings,
-        SymbolicOperationOrigin origin) {
+        SymbolicOperationOrigin origin,
+        ImmutableDictionary<string, int> sourceVersions) {
         foreach (var binding in bindings) {
-            if (binding.Source == null ||
-                !SymbolicStateFactBuilder.CanCompareIrTerms(binding.Target, binding.Source))
+            var target = SymbolicIrVersionRewriter.RewriteToCurrentVersions(
+                binding.Target,
+                state.SymbolVersions);
+            var source = binding.Source == null
+                ? null
+                : SymbolicIrVersionRewriter.RewriteToCurrentVersions(
+                    binding.Source,
+                    sourceVersions);
+            if (source == null ||
+                !SymbolicStateFactBuilder.CanCompareIrTerms(target, source))
                 return false;
-            if (binding.InvalidateTarget)
+            if (binding.InvalidateTarget &&
+                !state.SymbolVersions.ContainsKey(binding.TargetKey))
                 state = SymbolicStateValueFacts.RemoveReferences(state, binding.TargetKey);
             state = state.AddPathCondition(new SymbolicFactCondition(new SymbolicFact(
-                new SymbolicRelationAtom(SymbolicRelationOperator.Equal, binding.Target, binding.Source),
+                new SymbolicRelationAtom(SymbolicRelationOperator.Equal, target, source),
                 true,
                 SymbolicFactConfidence.Exact,
                 binding.Provenance ?? origin.Provenance + ".value",
@@ -96,18 +170,29 @@ internal static class SymbolicOperationTransferKernel {
                 null,
                 binding.EvidenceKey)));
             if (binding.PropagateSourceFacts)
-                state = PropagateSourceFacts(state, binding.Source, binding.Target);
+                state = PropagateSourceFacts(state, source, target);
         }
         return true;
     }
-    private static void AddDerivedIntegerBounds(ref SymbolicState state, SymbolicAssignmentBinding binding,
-        SymbolicOperationOrigin origin) {
-        if (binding.Target.Kind != SmtValueKind.Int || binding.Source is not { Kind: SmtValueKind.Int } source)
+    private static void AddDerivedIntegerBounds(
+        ref SymbolicState state,
+        SymbolicAssignmentBinding binding,
+        SymbolicOperationOrigin origin,
+        ImmutableDictionary<string, int> sourceVersions) {
+        var target = SymbolicIrVersionRewriter.RewriteToCurrentVersions(
+            binding.Target,
+            state.SymbolVersions);
+        var source = binding.Source == null
+            ? null
+            : SymbolicIrVersionRewriter.RewriteToCurrentVersions(
+                binding.Source,
+                sourceVersions);
+        if (target.Kind != SmtValueKind.Int || source is not { Kind: SmtValueKind.Int })
             return;
         if (StateProvesIntegerBound(state, source, strictlyPositive: true))
             AddIntegerBound(
                 ref state,
-                binding.Target,
+                target,
                 SymbolicRelationOperator.GreaterThan,
                 new SymbolicIntegerConstantTerm(0),
                 origin,
@@ -115,7 +200,7 @@ internal static class SymbolicOperationTransferKernel {
         else if (StateProvesIntegerBound(state, source, strictlyPositive: false))
             AddIntegerBound(
                 ref state,
-                binding.Target,
+                target,
                 SymbolicRelationOperator.GreaterThanOrEqual,
                 new SymbolicIntegerConstantTerm(0),
                 origin,

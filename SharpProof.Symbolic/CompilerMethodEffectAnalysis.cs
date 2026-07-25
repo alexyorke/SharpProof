@@ -496,6 +496,7 @@ internal sealed class MethodEffectAnalysisSession(
         private AnalyzerUtilitiesFlowFacts? _flowFacts;
         internal EffectFlowValue ReturnValue { get; private set; } = EffectFlowValue.None;
         private EffectFlowValue LastValue { get; set; } = EffectFlowValue.None;
+        public EffectFlowState Bottom { get; } = EffectFlowState.Create(method) with { IsUnreachable = true };
         public EffectFlowState Transfer(EffectFlowState state, IOperation operation) {
             session.CancellationToken.ThrowIfCancellationRequested();
             if (state.IsUnreachable) return state;
