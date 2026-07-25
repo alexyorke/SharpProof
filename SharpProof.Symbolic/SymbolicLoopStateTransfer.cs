@@ -23,5 +23,5 @@ internal static class SymbolicLoopStateTransfer {
         SyntaxNode root,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) =>
-        SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(root, semanticModel, cancellationToken);
+        SymbolMutationFacts.GetReferencedStorageSymbols(root, semanticModel, cancellationToken);
 }

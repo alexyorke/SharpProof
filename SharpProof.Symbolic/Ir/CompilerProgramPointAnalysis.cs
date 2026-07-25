@@ -140,9 +140,20 @@ internal static class CompilerProgramPointAnalysis {
                     cancellationToken);
             }
             if (site.FirstAncestorOrSelf<StatementSyntax>() is { Parent: BlockSyntax block } target) {
-                foreach (var statement in block.Statements.TakeWhile(candidate => !ReferenceEquals(candidate, target))) {
+                var targetIndex = block.Statements.IndexOf(target);
+                for (var statementIndex = 0; statementIndex < targetIndex; statementIndex++) {
+                    var statement = block.Statements[statementIndex];
                     if (statement is not IfStatementSyntax { Else: null } conditional ||
-                        !AlwaysCompletes(conditional.Statement))
+                        !AlwaysCompletes(conditional.Statement) ||
+                        block.Statements
+                            .Skip(statementIndex + 1)
+                            .Take(targetIndex - statementIndex - 1)
+                            .Any(intervening =>
+                                SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(
+                                    conditional.Condition,
+                                    intervening,
+                                    semanticModel,
+                                    cancellationToken)))
                         continue;
                     SymbolicReachabilityLowerer.ApplyConditionOnly(
                         ref state, conditional.Condition, false, semanticModel, cancellationToken);

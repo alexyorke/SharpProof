@@ -10143,6 +10143,65 @@ public sealed class NullableContractVerificationTests {
             SharpProof.Symbolic.SymbolicTypeFacts.HasInstanceInt32Member(derived, "Count"),
             Is.False);
     }
+    [Test]
+    public void PotentialBugRegression_NestedPropertyMutationInvalidatesPriorFact() {
+        const string source = """
+            public sealed class Leaf {
+                public int Value { get; set; }
+            }
+            public sealed class Middle {
+                public Leaf Leaf { get; } = new();
+            }
+            public sealed class C {
+                public Middle Middle { get; } = new();
+                public bool M() {
+                    if (Middle.Leaf.Value != 0)
+                        return false;
+                    Middle.Leaf.Value = 1;
+                    return Middle.Leaf.Value == 0;
+                }
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var assignment = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AssignmentExpressionSyntax>()
+            .Single();
+        var invalidations = SharpProof.Symbolic.SymbolicStateInvalidator.LowerNestedMutations(
+            assignment.Parent!,
+            model,
+            CancellationToken.None);
+        Assert.That(invalidations.HasUnsupportedMutation, Is.False);
+        Assert.That(invalidations.Steps.SelectMany(static step => step.Targets), Is.Not.Empty);
+        Assert.That(
+            AnalyzeProofAtMarker(source, "return Middle.Leaf.Value == 0", "Middle.Leaf.Value == 0")
+                .ProofFacts.Single().Status,
+            Is.Not.EqualTo("ProvenTrue"));
+    }
+    [Test]
+    public void PotentialBugRegression_LoopMemberMutationInvalidatesConditionDependency() {
+        const string source = """
+            #nullable enable
+            public sealed class C {
+                public object? Value { get; set; }
+                public void M() {
+                    while (Value != null) {
+                        Value = null;
+                    }
+                }
+            }
+            """;
+        var (root, model) = CreateSemanticModel(source);
+        var loop = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.WhileStatementSyntax>()
+            .Single();
+        Assert.That(
+            SharpProof.Symbolic.SymbolicLoopStateTransfer.AnyConditionSymbolInvalidatedInStatement(
+                loop.Condition,
+                loop.Statement,
+                model,
+                CancellationToken.None),
+            Is.True);
+    }
     private static (
         Microsoft.CodeAnalysis.SyntaxNode Root,
         Microsoft.CodeAnalysis.SemanticModel Model)

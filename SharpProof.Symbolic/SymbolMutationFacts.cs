@@ -27,6 +27,22 @@ internal static class SymbolMutationFacts {
                 symbols.Add(symbol);
         return symbols;
     }
+    internal static IReadOnlyList<ISymbol> GetReferencedStorageSymbols(
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) {
+        var symbols = new List<ISymbol>();
+        foreach (var expression in CSharpSyntaxFacts.DescendantNodesInExecution(root).OfType<ExpressionSyntax>()) {
+            var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
+            if (symbol is IMethodSymbol { AssociatedSymbol: IPropertySymbol property })
+                symbol = property;
+            if (symbol is not (ILocalSymbol or IParameterSymbol or IFieldSymbol or IPropertySymbol) ||
+                symbols.Any(existing => SymbolEqualityComparer.Default.Equals(existing, symbol)))
+                continue;
+            symbols.Add(symbol);
+        }
+        return symbols;
+    }
     internal static bool ExpressionReferencesSymbol(
         SyntaxNode root,
         ISymbol symbol,

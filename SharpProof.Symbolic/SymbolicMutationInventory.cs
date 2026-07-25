@@ -124,6 +124,24 @@ internal sealed class SymbolicMutationInventory(
                         SymbolicInvalidationMatchKind.VariableElements)
                     : ForSymbol(receiverSymbol));
         }
+        if (invalidations.Count == 0) {
+            foreach (var rootSymbol in SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
+                         target,
+                         semanticModel,
+                         cancellationToken))
+                invalidations.Add(new(
+                    SymbolicFactFactory.GetSmtVariableName(rootSymbol.OriginalDefinition),
+                    SymbolicInvalidationMatchKind.VariableDescendants));
+            if (invalidations.Count == 0 &&
+                target.DescendantNodesAndSelf().OfType<ExpressionSyntax>().Any(expression =>
+                    SymbolicStateInvalidator.IsCurrentInstanceMemberReference(
+                        expression,
+                        semanticModel,
+                        cancellationToken)))
+                invalidations.Add(new(
+                    SymbolicStateValueFacts.ImplicitThisVariableName,
+                    SymbolicInvalidationMatchKind.VariableDescendants));
+        }
         return invalidations.ToImmutable();
     }
     private bool ExactTargetMatchesAny(ExpressionSyntax target, IReadOnlyCollection<ISymbol> symbols) {
