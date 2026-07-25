@@ -3041,6 +3041,108 @@ public sealed class NullableContractVerificationTests {
                 }
             }
             """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedMathMinNonPositiveDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { -1, 1 }
+                        .Select(static value => Math.Min(value, 0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedMathMaxNonPositiveDimensionVectorLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static _ => Math.Max(-1, 0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedMathMaxPossiblyPositiveDimensionVectorLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static value => Math.Max(value, 0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedMathClampNonPositiveMaximumLoopBodyIsUnreachable_DoesNotReport",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                private static int Maximum() => 0;
+                public static object FirstValue() {
+                    var lengths = new[] { -20, 20 }
+                        .Select(static value => Math.Clamp(value, min: -10, max: Maximum()))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", false);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedMathClampPositiveMaximumLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { 20 }
+                        .Select(static value => Math.Clamp(value, min: -10, max: 10))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
+        yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedSourceDefinedMinLoopBodyRemainsReachable_Reports",
+            """
+            #nullable enable
+            using System;
+            using System.Linq;
+            namespace Contoso {
+                public static class Numbers {
+                    public static int Min(int first, int second) => 1;
+                }
+            }
+            public static class Consumer {
+                public static object FirstValue() {
+                    var lengths = new[] { 1 }
+                        .Select(static value => Contoso.Numbers.Min(value, 0))
+                        .ToArray();
+                    foreach (var _ in Array.CreateInstance(typeof(int), lengths))
+                        return ((object?)null)!;
+                    return new object();
+                }
+            }
+            """, "SP0044", true);
         yield return Case("NullForgivingOperator_ArrayCreateInstanceProjectedPositiveSourceHelperLoopBodyRemainsReachable_Reports",
             """
             #nullable enable

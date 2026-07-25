@@ -1075,6 +1075,10 @@ internal static class CompilerProgramPointAnalysis {
                 } local =>
                     LocalReferenceDefinitelyProducesNonPositiveInt32(
                         local, model, callPath),
+                IInvocationOperation math
+                    when KnownMathInvocationDefinitelyProducesNonPositiveInt32(
+                        math, model, callPath) =>
+                    true,
                 IInvocationOperation {
                     TargetMethod: {
                         ReturnType.SpecialType: SpecialType.System_Int32,
@@ -1084,6 +1088,40 @@ internal static class CompilerProgramPointAnalysis {
                     SourceMethodReturnsOnlyNonPositiveValues(targetMethod, callPath),
                 _ => false
             };
+        }
+        private bool KnownMathInvocationDefinitelyProducesNonPositiveInt32(
+            IInvocationOperation invocation,
+            SemanticModel model,
+            HashSet<ISymbol> callPath) {
+            var method = invocation.TargetMethod.OriginalDefinition;
+            if (method.ReturnType.SpecialType != SpecialType.System_Int32 ||
+                method.Parameters.Any(parameter =>
+                    parameter.Type.SpecialType != SpecialType.System_Int32) ||
+                method.ContainingType is not { } containingType ||
+                !IsCoreLibraryType(containingType) ||
+                containingType.ContainingNamespace.ToDisplayString() != "System" ||
+                containingType.Name != "Math")
+                return false;
+            if (method.Name is nameof(Math.Min) or nameof(Math.Max)) {
+                var values = invocation.Arguments
+                    .Select(argument => argument.Value)
+                    .ToArray();
+                return values.Length == 2 &&
+                       (method.Name == nameof(Math.Min)
+                           ? values.Any(value =>
+                               OperationDefinitelyProducesNonPositiveInt32(
+                                   value, model, callPath))
+                           : values.All(value =>
+                               OperationDefinitelyProducesNonPositiveInt32(
+                                   value, model, callPath)));
+            }
+            if (method.Name != "Clamp")
+                return false;
+            var maximum = invocation.Arguments.FirstOrDefault(argument =>
+                argument.Parameter?.Name == "max")?.Value;
+            return maximum != null &&
+                   OperationDefinitelyProducesNonPositiveInt32(
+                       maximum, model, callPath);
         }
         private bool LocalReferenceDefinitelyProducesNonPositiveInt32(
             ILocalReferenceOperation reference,
