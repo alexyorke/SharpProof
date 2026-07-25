@@ -816,6 +816,22 @@ internal static class CompilerProgramPointAnalysis {
                         : new(false, false, true, true);
                 return true;
             }
+            if (definition.Name == nameof(Enumerable.Select)) {
+                var selectorParameter = targetMethod.Parameters.FirstOrDefault(parameter =>
+                    parameter.Name == "selector");
+                if (selectorParameter == null ||
+                    !TryGetStandardSequenceSource(invocation, operation, out var projectedSource) ||
+                    !TryGetInvocationArgument(operation, selectorParameter, out var selector) ||
+                    !IsConstantNonPositiveDimensionSelector(selector))
+                    return false;
+                var projectedSourceFacts = GetArrayDimensionVectorFacts(projectedSource, [.. visited]);
+                facts = new(
+                    projectedSourceFacts.DefinitelyEmpty,
+                    false,
+                    true,
+                    true);
+                return true;
+            }
             if (definition.Name == nameof(Enumerable.Concat)) {
                 var secondParameter = targetMethod.Parameters.FirstOrDefault(parameter =>
                     parameter.Name == "second");
@@ -926,6 +942,28 @@ internal static class CompilerProgramPointAnalysis {
                 true,
                 true);
             return true;
+        }
+        private bool IsConstantNonPositiveDimensionSelector(ExpressionSyntax selector) {
+            selector = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(selector);
+            ExpressionSyntax? projectedValue = selector switch {
+                LambdaExpressionSyntax { Body: ExpressionSyntax expression } => expression,
+                LambdaExpressionSyntax {
+                    Body: BlockSyntax { Statements.Count: 1 } block
+                } when block.Statements[0] is ReturnStatementSyntax { Expression: { } expression } =>
+                    expression,
+                AnonymousMethodExpressionSyntax {
+                    Block.Statements.Count: 1
+                } anonymous when anonymous.Block.Statements[0] is
+                    ReturnStatementSyntax { Expression: { } expression } =>
+                    expression,
+                _ => null
+            };
+            return projectedValue != null &&
+                   semanticModel.GetConstantValue(projectedValue, cancellationToken) is {
+                       HasValue: true,
+                       Value: int constant
+                   } &&
+                   constant <= 0;
         }
         private bool DefinitelyProvidesPositiveDimensionCount(ExpressionSyntax count) {
             var visited = new HashSet<SyntaxNode>();
